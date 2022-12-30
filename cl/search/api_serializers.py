@@ -230,7 +230,7 @@ class OpinionClusterSerializer(
 
     class Meta:
         model = OpinionCluster
-        exclude = ("filepath_json_harvard",)
+        fields = "__all__"
 
 
 class TagSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):

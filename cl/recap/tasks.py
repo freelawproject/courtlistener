@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import datetime
 from io import BytesIO
 from typing import List, Optional, Tuple
 from zipfile import ZipFile
@@ -65,6 +65,7 @@ from cl.recap.mergers import (
     add_parties_and_attorneys,
     add_tags_to_objs,
     find_docket_object,
+    get_data_from_appellate_att_report,
     get_data_from_att_report,
     merge_attachment_page_data,
     merge_pacer_docket_into_cl_docket,
@@ -125,6 +126,12 @@ def process_recap_upload(pq: ProcessingQueue) -> None:
             process_case_query_page.s(pq.pk),
             add_or_update_recap_docket.s(),
         ).apply_async()
+    elif pq.upload_type == UPLOAD_TYPE.APPELLATE_CASE_QUERY_PAGE:
+        process_recap_appellate_case_query_page.delay(pq.pk)
+    elif pq.upload_type == UPLOAD_TYPE.CASE_QUERY_RESULT_PAGE:
+        process_recap_case_query_result_page.delay(pq.pk)
+    elif pq.upload_type == UPLOAD_TYPE.APPELLATE_CASE_QUERY_RESULT_PAGE:
+        process_recap_appellate_case_query_result_page.delay(pq.pk)
 
 
 def do_pacer_fetch(fq: PacerFetchQueue):
@@ -1026,14 +1033,114 @@ def process_recap_appellate_docket(self, pk):
 
 
 @app.task(bind=True)
-def process_recap_appellate_attachment(self, pk):
-    """Process the appellate attachment pages.
+def process_recap_appellate_attachment(
+    self: Task, pk: int
+) -> Optional[Tuple[int, str, list[RECAPDocument]]]:
+    """Process an uploaded appellate attachment page.
+
+    :param self: The Celery task
+    :param pk: The primary key of the processing queue item you want to work on
+    :return: Tuple indicating the status of the processing, a related
+    message and the recap documents affected.
+    """
+
+    pq = ProcessingQueue.objects.get(pk=pk)
+    mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
+    logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq}")
+
+    try:
+        text = pq.filepath_local.read().decode()
+    except IOError as exc:
+        msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
+        if (self.request.retries == self.max_retries) or pq.debug:
+            pq_status, msg = mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+            return pq_status, msg, []
+        else:
+            mark_pq_status(pq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
+            raise self.retry(exc=exc)
+
+    att_data = get_data_from_appellate_att_report(text, pq.court_id)
+    logger.info(f"Parsing completed for item {pq}")
+
+    if att_data == {}:
+        # Bad attachment page.
+        msg = "Not a valid appellate attachment page upload."
+        self.request.chain = None
+        pq_status, msg = mark_pq_status(
+            pq, msg, PROCESSING_STATUS.INVALID_CONTENT
+        )
+        return pq_status, msg, []
+
+    if pq.pacer_case_id in ["undefined", "null"]:
+        # Bad data from the client. Fix it with parsed data.
+        pq.pacer_case_id = att_data.get("pacer_case_id")
+        pq.save()
+
+    try:
+        rds_affected, de = merge_attachment_page_data(
+            pq.court,
+            pq.pacer_case_id,
+            att_data["pacer_doc_id"],
+            None,  # Appellate attachments don't contain a document_number
+            text,
+            att_data["attachments"],
+            pq.debug,
+        )
+    except RECAPDocument.MultipleObjectsReturned:
+        msg = (
+            "Too many documents found when attempting to associate "
+            "attachment data"
+        )
+        pq_status, msg = mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+        return pq_status, msg, []
+    except RECAPDocument.DoesNotExist as exc:
+        msg = "Could not find docket to associate with attachment metadata"
+        if (self.request.retries == self.max_retries) or pq.debug:
+            pq_status, msg = mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+            return pq_status, msg, []
+        else:
+            mark_pq_status(pq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
+            raise self.retry(exc=exc)
+
+    pq_status, msg = mark_pq_successful(pq, d_id=de.docket_id, de_id=de.pk)
+    return pq_status, msg, rds_affected
+
+
+@app.task(bind=True)
+def process_recap_appellate_case_query_page(self, pk):
+    """Process the appellate case query pages.
 
     For now, this is a stub until we can get the parser working properly in
     Juriscraper.
     """
     pq = ProcessingQueue.objects.get(pk=pk)
-    msg = "Appellate attachment pages not yet supported. Coming soon."
+    msg = "Appellate case query pages not yet supported. Coming soon."
+    mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+    return None
+
+
+@app.task(bind=True)
+def process_recap_case_query_result_page(self, pk):
+    """Process case query result pages.
+
+    For now, this is a stub until we can get the parser working properly in
+    Juriscraper.
+    """
+    pq = ProcessingQueue.objects.get(pk=pk)
+    msg = "Case query result pages not yet supported. Coming soon."
+    mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+    return None
+
+
+@app.task(bind=True)
+def process_recap_appellate_case_query_result_page(self, pk):
+    """Process case query result pages.
+
+    For now, this is a stub until we can get the parser working properly in
+    Juriscraper.
+    """
+    pq = ProcessingQueue.objects.get(pk=pk)
+    msg = "Appellate case query result pages not yet supported. Coming soon."
     mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
     return None
 
@@ -1776,7 +1883,9 @@ def download_pacer_pdf_and_save_to_pq(
                 pq.save()
                 return pq
 
-            # PACER document not available via magic link.
+        if not magic_number:
+            r_msg = "No magic number available to download the document."
+        if created:
             mark_pq_status(
                 pq, r_msg, PROCESSING_STATUS.FAILED, "error_message"
             )
@@ -1845,11 +1954,13 @@ class DocketUpdatedData:
 
 
 def open_and_validate_email_notification(
+    self: Task,
     epq: EmailProcessingQueue,
 ) -> tuple[dict[str, str | bool | list[DocketType]] | None, str]:
     """Open and read a recap.email notification from S3, then validate if it's
     a valid NEF or NDA.
 
+    :param self: The Celery task
     :param epq: The EmailProcessingQueue object.
     :return: A two tuple of a dict containing the notification data if valid
     or None otherwise, the raw notification body to store in next steps.
@@ -1865,6 +1976,17 @@ def open_and_validate_email_notification(
     except UnicodeDecodeError:
         with bucket.open(message_id, "rb") as f:
             body = f.read().decode("iso-8859-1")
+    except FileNotFoundError as exc:
+        if self.request.retries == self.max_retries:
+            msg = "File not found."
+            mark_pq_status(
+                epq, msg, PROCESSING_STATUS.FAILED, "status_message"
+            )
+            return None, ""
+        else:
+            # Do a retry. Hopefully the file will be in place soon.
+            raise self.retry(exc=exc)
+
     report = S3NotificationEmail(map_cl_to_pacer_id(epq.court_id))
     report._parse_text(body)
     data = report.data
@@ -1970,14 +2092,14 @@ def process_recap_email(
 
     epq = EmailProcessingQueue.objects.get(pk=epq_pk)
     mark_pq_status(epq, "", PROCESSING_STATUS.IN_PROGRESS, "status_message")
-    data, body = open_and_validate_email_notification(epq)
+    data, body = open_and_validate_email_notification(self, epq)
     if data is None:
         self.request.chain = None
         return None
 
     dockets = data["dockets"]
     # Look for the main docket that has the valid magic number
-    magic_number = None
+    magic_number = pacer_doc_id = pacer_case_id = document_url = None
     for docket_data in dockets:
         docket_entry = docket_data["docket_entries"][0]
         if docket_entry["pacer_magic_num"] is not None:
@@ -1986,6 +2108,13 @@ def process_recap_email(
             pacer_case_id = docket_entry["pacer_case_id"]
             document_url = docket_entry["document_url"]
             break
+
+    # Some notifications don't contain a magic number at all, assign the
+    # pacer_doc_id, pacer_case_id and document_url from the first docket entry.
+    if magic_number is None:
+        pacer_doc_id = dockets[0]["docket_entries"][0]["pacer_doc_id"]
+        pacer_case_id = dockets[0]["docket_entries"][0]["pacer_case_id"]
+        document_url = dockets[0]["docket_entries"][0]["document_url"]
 
     start_time = now()
     # Ensures we have PACER cookies ready to go.

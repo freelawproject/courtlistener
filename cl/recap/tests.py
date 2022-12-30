@@ -34,7 +34,8 @@ from cl.api.factories import (
 )
 from cl.api.management.commands.cl_retry_webhooks import (
     DAYS_TO_DELETE,
-    delete_old_webhook_events,
+    HOURS_WEBHOOKS_CUT_OFF,
+    execute_additional_tasks,
     retry_webhook_events,
 )
 from cl.api.models import Webhook, WebhookEvent, WebhookEventType
@@ -54,8 +55,15 @@ from cl.people_db.models import (
 )
 from cl.recap.api_serializers import PacerFetchQueueSerializer
 from cl.recap.factories import (
+    AppellateAttachmentFactory,
+    AppellateAttachmentPageFactory,
+    DocketEntriesDataFactory,
+    DocketEntryDataFactory,
     FjcIntegratedDatabaseFactory,
     ProcessingQueueFactory,
+    RECAPEmailDocketDataFactory,
+    RECAPEmailDocketEntryDataFactory,
+    RECAPEmailNotificationDataFactory,
 )
 from cl.recap.management.commands.import_idb import Command
 from cl.recap.management.commands.reprocess_recap_dockets import (
@@ -84,6 +92,7 @@ from cl.recap.tasks import (
     do_pacer_fetch,
     fetch_pacer_doc_by_rd,
     get_and_copy_recap_attachment_docs,
+    process_recap_appellate_attachment,
     process_recap_appellate_docket,
     process_recap_attachment,
     process_recap_claims_register,
@@ -116,6 +125,26 @@ class RecapUploadsTest(TestCase):
     def setUpTestData(cls):
         CourtFactory(id="canb", jurisdiction="FB")
         cls.court = CourtFactory.create(jurisdiction="FD", in_use=True)
+        cls.court_appellate = CourtFactory(
+            id="ca9", jurisdiction="F", in_use=True
+        )
+
+        cls.att_data = AppellateAttachmentPageFactory(
+            attachments=[
+                AppellateAttachmentFactory(pacer_doc_id="04505578698"),
+                AppellateAttachmentFactory(),
+            ],
+            pacer_doc_id="04505578698",
+            pacer_case_id="104490",
+        )
+        cls.de_data = DocketEntriesDataFactory(
+            docket_entries=[
+                DocketEntryDataFactory(
+                    pacer_doc_id="04505578698",
+                    document_number=1,
+                )
+            ],
+        )
 
     def setUp(self) -> None:
         self.client = APIClient()
@@ -123,13 +152,13 @@ class RecapUploadsTest(TestCase):
         token = f"Token {self.user.auth_token.key}"
         self.client.credentials(HTTP_AUTHORIZATION=token)
         self.path = reverse("processingqueue-list", kwargs={"version": "v3"})
-        f = SimpleUploadedFile("file.txt", b"file content more content")
+        self.f = SimpleUploadedFile("file.txt", b"file content more content")
         self.data = {
             "court": self.court.id,
             "pacer_case_id": "asdf",
             "pacer_doc_id": 24,
             "document_number": 1,
-            "filepath_local": f,
+            "filepath_local": self.f,
             "upload_type": UPLOAD_TYPE.PDF,
         }
 
@@ -301,6 +330,237 @@ class RecapUploadsTest(TestCase):
             {"upload_type": UPLOAD_TYPE.CASE_QUERY_PAGE, "document_number": ""}
         )
         del self.data["pacer_doc_id"]
+        r = self.client.post(self.path, self.data)
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+
+        j = json.loads(r.content)
+        path = reverse(
+            "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
+        )
+        r = self.client.get(path)
+        self.assertEqual(r.status_code, HTTP_200_OK)
+
+    def test_uploading_an_appellate_case_query_page(self, mock):
+        """Can we upload an appellate case query and have it be saved correctly?
+
+        Note that this works fine even though we're not actually uploading a
+        case query page due to the mock.
+        """
+        self.data.update(
+            {
+                "upload_type": UPLOAD_TYPE.APPELLATE_CASE_QUERY_PAGE,
+                "court": self.court_appellate.id,
+            }
+        )
+        del self.data["pacer_doc_id"]
+        del self.data["document_number"]
+        r = self.client.post(self.path, self.data)
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+
+        j = json.loads(r.content)
+        path = reverse(
+            "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
+        )
+        r = self.client.get(path)
+        self.assertEqual(r.status_code, HTTP_200_OK)
+
+    def test_uploading_an_appellate_attachment_page(self, mock):
+        """Can we upload an appellate attachment page and have it be saved
+        correctly?
+
+        Note that this works fine even though we're not actually uploading a
+        docket due to the mock.
+        """
+
+        self.data.update(
+            {
+                "upload_type": UPLOAD_TYPE.APPELLATE_ATTACHMENT_PAGE,
+                "court": self.court_appellate.id,
+            }
+        )
+        del self.data["pacer_doc_id"]
+        del self.data["document_number"]
+        r = self.client.post(self.path, self.data)
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+
+        j = json.loads(r.content)
+        path = reverse(
+            "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
+        )
+        r = self.client.get(path)
+        self.assertEqual(r.status_code, HTTP_200_OK)
+
+    def test_processing_an_appellate_attachment_page(self, mock_upload):
+        """Can we process an appellate attachment and transform the main recap
+        document to an attachment correctly?
+
+        Note that this works fine even though we're not actually uploading a
+        docket due to the mock.
+        """
+
+        d = DocketFactory(
+            source=Docket.RECAP,
+            court=self.court_appellate,
+            pacer_case_id="104490",
+        )
+        add_docket_entries(d, self.de_data["docket_entries"])
+        pq = ProcessingQueue.objects.create(
+            court=self.court_appellate,
+            uploader=self.user,
+            pacer_case_id="104490",
+            upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
+            filepath_local=self.f,
+        )
+        recap_documents = RECAPDocument.objects.all().order_by("date_created")
+
+        # After adding 1 docket entry, it should only exist its main RD.
+        self.assertEqual(recap_documents.count(), 1)
+        main_rd = recap_documents[0]
+
+        with mock.patch(
+            "cl.recap.tasks.get_data_from_appellate_att_report",
+            side_effect=lambda x, y: self.att_data,
+        ):
+            # Process the appellate attachment page containing 2 attachments.
+            process_recap_appellate_attachment(pq.pk)
+
+        # After adding attachments, it should only exist 2 RD attachments.
+        self.assertEqual(recap_documents.count(), 2)
+
+        # Confirm that the main RD is transformed into an attachment.
+        main_attachment = RECAPDocument.objects.filter(pk=main_rd.pk)
+        self.assertEqual(
+            main_attachment[0].document_type, RECAPDocument.ATTACHMENT
+        )
+        self.assertEqual(
+            main_attachment[0].description,
+            self.att_data["attachments"][0]["description"],
+        )
+
+        pq_1 = ProcessingQueue.objects.create(
+            court=self.court_appellate,
+            uploader=self.user,
+            pacer_case_id="104490",
+            upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
+            filepath_local=self.f,
+        )
+        with mock.patch(
+            "cl.recap.tasks.get_data_from_appellate_att_report",
+            side_effect=lambda x, y: self.att_data,
+        ):
+
+            process_recap_appellate_attachment(pq_1.pk)
+
+        # Process the attachment page again, no new attachments should be added
+        self.assertEqual(recap_documents.count(), 2)
+        self.assertEqual(
+            main_attachment[0].document_type, RECAPDocument.ATTACHMENT
+        )
+        self.assertEqual(
+            main_attachment[0].description,
+            self.att_data["attachments"][0]["description"],
+        )
+
+    def test_reprocess_appellate_docket_after_adding_attachments(
+        self, mock_upload
+    ):
+        """Can we reprocess an appellate docket page after adding attachments
+        and avoid creating the main recap document again?
+        """
+
+        d = DocketFactory(
+            source=Docket.RECAP,
+            court=self.court_appellate,
+            pacer_case_id="104490",
+        )
+        # Merge docket entries
+        add_docket_entries(d, self.de_data["docket_entries"])
+
+        pq = ProcessingQueue.objects.create(
+            court=self.court_appellate,
+            uploader=self.user,
+            pacer_case_id="104490",
+            upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
+            filepath_local=self.f,
+        )
+
+        recap_documents = RECAPDocument.objects.all().order_by("date_created")
+        self.assertEqual(recap_documents.count(), 1)
+
+        main_rd = recap_documents[0]
+
+        with mock.patch(
+            "cl.recap.tasks.get_data_from_appellate_att_report",
+            side_effect=lambda x, y: self.att_data,
+        ):
+            process_recap_appellate_attachment(pq.pk)
+
+        # Confirm attachments were added correctly.
+        self.assertEqual(recap_documents.count(), 2)
+        main_attachment = RECAPDocument.objects.filter(pk=main_rd.pk)
+        self.assertEqual(
+            main_attachment[0].document_type, RECAPDocument.ATTACHMENT
+        )
+        self.assertEqual(
+            main_attachment[0].description,
+            self.att_data["attachments"][0]["description"],
+        )
+
+        # Merge docket entries data again
+        add_docket_entries(d, self.de_data["docket_entries"])
+
+        # No new main recap document should be created
+        self.assertEqual(recap_documents.count(), 2)
+        self.assertEqual(
+            main_attachment[0].document_type, RECAPDocument.ATTACHMENT
+        )
+        self.assertEqual(
+            main_attachment[0].description,
+            self.att_data["attachments"][0]["description"],
+        )
+
+    def test_uploading_a_case_query_result_page(self, mock):
+        """Can we upload a case query result page and have it be saved
+        correctly?
+
+        Note that this works fine even though we're not actually uploading a
+        base case query advanced page due to the mock.
+        """
+
+        self.data.update(
+            {
+                "upload_type": UPLOAD_TYPE.CASE_QUERY_RESULT_PAGE,
+            }
+        )
+        del self.data["pacer_doc_id"]
+        del self.data["pacer_case_id"]
+        del self.data["document_number"]
+        r = self.client.post(self.path, self.data)
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+
+        j = json.loads(r.content)
+        path = reverse(
+            "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
+        )
+        r = self.client.get(path)
+        self.assertEqual(r.status_code, HTTP_200_OK)
+
+    def test_uploading_an_appellate_case_query_result_page(self, mock):
+        """Can we upload an appellate case query result page and have it be
+        saved correctly?
+
+        Note that this works fine even though we're not actually uploading a
+        case query page due to the mock.
+        """
+        self.data.update(
+            {
+                "upload_type": UPLOAD_TYPE.APPELLATE_CASE_QUERY_RESULT_PAGE,
+                "court": self.court_appellate.id,
+            }
+        )
+        del self.data["pacer_case_id"]
+        del self.data["pacer_doc_id"]
+        del self.data["document_number"]
         r = self.client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_201_CREATED)
 
@@ -2088,6 +2348,16 @@ class RecapEmailDocketAlerts(TestCase):
             "mail": recap_mail_receipt_multi_nef_jpml["mail"],
             "receipt": recap_mail_receipt_multi_nef_jpml["receipt"],
         }
+        cls.no_magic_number_data = RECAPEmailNotificationDataFactory(
+            contains_attachments=False,
+            dockets=[
+                RECAPEmailDocketDataFactory(
+                    docket_entries=[
+                        RECAPEmailDocketEntryDataFactory(pacer_magic_num=None)
+                    ],
+                )
+            ],
+        )
 
     def setUp(self) -> None:
         self.client = APIClient()
@@ -3355,6 +3625,67 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(len(mail.outbox), 3)
         self.assertEqual(webhook_triggered.count(), 3)
 
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (None, ""),
+    )
+    @mock.patch(
+        "cl.api.utils.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    @mock.patch(
+        "cl.recap.tasks.get_document_number_for_appellate",
+        side_effect=lambda z, x, y: "011112443447",
+    )
+    def test_recap_email_no_magic_number(
+        self,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+        mock_download_pacer_pdf_by_rd,
+        mock_webhook_post,
+        mock_get_document_number_appellate,
+    ):
+        """Can we add docket entries from a recap email notification that don't
+        contain a valid magic number?
+        """
+
+        with mock.patch(
+            "cl.recap.tasks.open_and_validate_email_notification",
+            side_effect=lambda x, y: (self.no_magic_number_data, "HTML"),
+        ):
+            # Trigger a new recap.email notification from testing_1@recap.email
+            # auto-subscription option enabled
+            self.client.post(self.path, self.data, format="json")
+
+        # Can we get the recap.email recipient properly?
+        email_processing = EmailProcessingQueue.objects.all()
+        self.assertEqual(
+            email_processing[0].destination_emails, ["testing_1@recap.email"]
+        )
+
+        recap_document = RECAPDocument.objects.all()
+        self.assertEqual(len(recap_document), 1)
+        # A DocketAlert should be created when receiving the first notification
+        # for this case with Subscription type, since user has
+        # auto-subscribe True.
+        docket = recap_document[0].docket_entry.docket
+        docket_alert = DocketAlert.objects.filter(
+            user=self.recipient_user.user,
+            docket=docket,
+            alert_type=DocketAlert.SUBSCRIPTION,
+        )
+        self.assertEqual(docket_alert.count(), 1)
+        # A DocketAlert email for the recap.email user should go out
+        self.assertEqual(len(mail.outbox), 1)
+
+        pq = ProcessingQueue.objects.all()
+        self.assertEqual(len(pq), 1)
+        self.assertEqual(
+            pq[0].error_message,
+            "No magic number available to download the document.",
+        )
+
 
 class GetAndCopyRecapAttachments(TestCase):
     """Test the get_and_copy_recap_attachment_docs method"""
@@ -4055,6 +4386,8 @@ class WebhooksRetries(TestCase):
         recipient_user.save()
         self.recipient_user = recipient_user
 
+        self.r = make_redis_interface("CACHE")
+
     def test_get_next_webhook_retry_date(
         self,
         mock_bucket_open,
@@ -4549,7 +4882,16 @@ class WebhooksRetries(TestCase):
                         webhook_triggered[0].event_status,
                         status,
                     )
-                    self.assertEqual(webhook_triggered[0].retry_counter, 7)
+
+                    if status == WEBHOOK_EVENT_STATUS.FAILED:
+                        self.assertEqual(len(mail.outbox), 3)
+                        message = mail.outbox[2]
+                        subject_to_compare = "webhook is now disabled"
+                        self.assertIn(subject_to_compare, message.subject)
+                        self.assertEqual(webhook_triggered[0].retry_counter, 8)
+                    else:
+                        self.assertEqual(webhook_triggered[0].retry_counter, 7)
+
                     seven_retry_time = fake_now_4 + timedelta(
                         hours=36, minutes=27
                     )
@@ -4672,15 +5014,16 @@ class WebhooksRetries(TestCase):
         mock_get_document_number_from_confirmation_page,
     ):
         """Can we avoid retrying failing webhook events if they are older than
-        2 days? They should be marked as failed.
+        HOURS_WEBHOOKS_CUT_OFF? They should be marked as failed.
 
-        Retry counter for failing webhook events created within the last 2 days
-        should be restarted to 0 once the parent webhook endpoint is re-enabled
+        Retry counter for failing webhook events created within the last
+        HOURS_WEBHOOKS_CUT_OFF should be restarted to 0 once the parent webhook
+        endpoint is re-enabled
         """
 
         fake_now = now()
-        # Today - 2 days
-        fake_now_minus_2 = fake_now - timedelta(days=2)
+        # Today - HOURS_WEBHOOKS_CUT_OFF hours
+        fake_now_minus_2 = fake_now - timedelta(hours=HOURS_WEBHOOKS_CUT_OFF)
         with time_machine.travel(fake_now_minus_2, tick=False):
             webhook_e1 = WebhookEventFactory(
                 webhook=self.webhook,
@@ -4710,8 +5053,8 @@ class WebhooksRetries(TestCase):
                 next_retry_date=fake_now_1 + timedelta(minutes=3),
             )
 
-        # Today + 2 days
-        fake_now_2 = fake_now + timedelta(days=2)
+        # Today + HOURS_WEBHOOKS_CUT_OFF hours
+        fake_now_2 = fake_now + timedelta(hours=HOURS_WEBHOOKS_CUT_OFF)
         with time_machine.travel(fake_now_2, tick=False):
             webhook_e4 = WebhookEventFactory(
                 webhook=self.webhook,
@@ -4733,7 +5076,7 @@ class WebhooksRetries(TestCase):
                 500, mock_raw=True
             ),
         ):
-            # Today - 2 days
+            # Today - HOURS_WEBHOOKS_CUT_OFF hours
             next_retry_date = fake_now_minus_2 + timedelta(minutes=3)
             with time_machine.travel(next_retry_date, tick=False):
                 # Retry webhook_e1, marked as Failed, and disable its parent
@@ -4749,7 +5092,7 @@ class WebhooksRetries(TestCase):
                     False,
                 )
 
-            # Today + 2 days
+            # Today + HOURS_WEBHOOKS_CUT_OFF hours
             next_retry_date = fake_now_2 + timedelta(minutes=3)
             with time_machine.travel(next_retry_date, tick=False):
                 # No webhook events should be retried since
@@ -4763,7 +5106,9 @@ class WebhooksRetries(TestCase):
                 200, mock_raw=True
             ),
         ):
-            fake_now_3 = fake_now + timedelta(days=3)
+            fake_now_3 = fake_now + timedelta(
+                hours=HOURS_WEBHOOKS_CUT_OFF + 12
+            )
             with time_machine.travel(fake_now_3, tick=False):
                 # Today + 3 days, Re-enable Webhook:
                 self.webhook.enabled = True
@@ -4785,7 +5130,8 @@ class WebhooksRetries(TestCase):
                 self.assertEqual(webhook_e3_compare[0].retry_counter, 0)
                 self.assertEqual(webhook_e4_compare[0].retry_counter, 0)
 
-                # webhook_e2 marked as failed since it's older than 2 days.
+                # webhook_e2 marked as failed since it's older than
+                # HOURS_WEBHOOKS_CUT_OFF.
                 self.assertEqual(
                     webhook_e2_compare[0].event_status,
                     WEBHOOK_EVENT_STATUS.FAILED,
@@ -4959,24 +5305,109 @@ class WebhooksRetries(TestCase):
             webhook=self.webhook,
         )
 
-        # It's not time to execute the delete method, one minute ahead.
-        no_time_to_delete = now().replace(hour=12, minute=1, second=0)
-        with time_machine.travel(no_time_to_delete, tick=False):
-            deleted_count = delete_old_webhook_events()
-            self.assertEqual(deleted_count, None)
-
         # It's not time to execute the delete method, one minute behind.
         no_time_to_delete_1 = now().replace(hour=11, minute=59, second=0)
         with time_machine.travel(no_time_to_delete_1, tick=False):
-            deleted_count = delete_old_webhook_events()
+            deleted_count, notifications_send = execute_additional_tasks()
+            self.r.flushdb()
             self.assertEqual(deleted_count, None)
 
         # The delete method should be executed at 12:00 UTC.
         time_to_delete = now().replace(hour=12, minute=0, second=0)
         with time_machine.travel(time_to_delete, tick=False):
-            deleted_count = delete_old_webhook_events()
+            deleted_count, notifications_send = execute_additional_tasks()
             self.assertEqual(deleted_count, 2)
+
+        # It's not time to execute, already executed today.
+        no_time_to_delete = now().replace(hour=12, minute=5, second=0)
+        with time_machine.travel(no_time_to_delete, tick=False):
+            deleted_count, notifications_send = execute_additional_tasks()
+            self.r.flushdb()
+            self.assertEqual(deleted_count, None)
 
         webhook_events = WebhookEvent.objects.all()
         # webhook_e3 should still exist.
         self.assertEqual(webhook_events[0].pk, webhook_e3.pk)
+
+    def test_send_notifications_if_webhook_still_disabled(
+        self,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+        mock_get_document_number_from_confirmation_page,
+    ):
+        """Can we send a notification to users if one of their webhooks is
+        still disabled, one, two and three days after?
+        """
+        # Enable disabled_webhook to avoid interfering with this test
+        Webhook.objects.filter(pk=self.webhook_disabled.id).update(
+            enabled=True
+        )
+
+        now_time = datetime.now(timezone.utc)
+        fake_now = now_time.replace(hour=11, minute=00)
+
+        fake_minus_2_days = fake_now - timedelta(days=2)
+        with time_machine.travel(fake_minus_2_days, tick=False):
+            webhook_e1 = WebhookEventFactory(
+                webhook=self.webhook,
+                content="{'message': 'ok_1'}",
+                event_status=WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
+                retry_counter=7,
+                next_retry_date=fake_now + timedelta(minutes=3),
+            )
+
+        webhook_e1_compare = WebhookEvent.objects.filter(pk=webhook_e1.id)
+        with mock.patch(
+            "cl.api.utils.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                500, mock_raw=True
+            ),
+        ):
+            # Time to retry
+            next_retry_date = fake_now + timedelta(minutes=3)
+            with time_machine.travel(next_retry_date, tick=False):
+                webhooks_to_retry = retry_webhook_events()
+                self.assertEqual(webhooks_to_retry, 1)
+                self.assertEqual(
+                    webhook_e1_compare[0].event_status,
+                    WEBHOOK_EVENT_STATUS.FAILED,
+                )
+                self.assertEqual(
+                    webhook_e1_compare[0].webhook.enabled,
+                    False,
+                )
+                self.assertEqual(len(mail.outbox), 1)
+                subject_to_compare = "webhook is now disabled"
+                message = mail.outbox[0]
+                self.assertIn(subject_to_compare, message.subject)
+
+        iterations = [
+            (12, 1, 0),  # 12 hours after disabled, no new email out
+            (24, 2, 1),  # 1 day after, 1° webhook still disabled notification
+            (48, 3, 2),  # 2 days after, 2° webhook still disabled notification
+            (72, 4, 3),  # 3 days after, 3° webhook still disabled notification
+            (96, 4, 3),  # 4 days after, No new email out
+        ]
+        time_to_check = now_time.replace(hour=12, minute=00)
+        minute_delay = 0
+        for hours, email_out, days in iterations:
+            minute_delay += 1
+            hours_after = time_to_check + timedelta(
+                hours=hours, minutes=minute_delay
+            )
+            with time_machine.travel(hours_after, tick=False):
+                execute_additional_tasks()
+                self.r.flushdb()
+                self.assertEqual(len(mail.outbox), email_out)
+
+                subject_to_compare = "webhook is now disabled"
+                if email_out > 1:
+                    day_str = "day"
+                    if days > 1:
+                        day_str = "days"
+                    subject_to_compare = (
+                        f"has been disabled for {days} {day_str}"
+                    )
+                message = mail.outbox[email_out - 1]
+                self.assertIn(subject_to_compare, message.subject)

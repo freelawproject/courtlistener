@@ -629,6 +629,7 @@ def check_webhook_failure_count_and_notify(
         if current_try_counter >= WEBHOOK_MAX_RETRY_COUNTER:
             webhook.enabled = False
             update_fields.append("enabled")
+            update_fields.append("date_modified")
             # If the parent webhook is disabled mark all current ENQUEUED_RETRY
             # events as ENDPOINT_DISABLED
             WebhookEvent.objects.filter(
@@ -703,6 +704,9 @@ def update_webhook_event_after_request(
         )
         webhook_event.retry_counter = F("retry_counter") + 1
         webhook_event.event_status = WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY
+        if webhook_event.debug:
+            # Test events are not enqueued for retry.
+            webhook_event.event_status = WEBHOOK_EVENT_STATUS.FAILED
     else:
         webhook_event.event_status = WEBHOOK_EVENT_STATUS.SUCCESSFUL
     webhook_event.save()

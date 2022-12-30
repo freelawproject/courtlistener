@@ -2916,6 +2916,16 @@ class WebhooksHTMXTests(APITestCase):
         message_sent = mail.outbox[0]
         self.assertIn("A webhook was created", message_sent.subject)
 
+    def test_make_an_http_webhook_fails(self) -> None:
+        """Can we avoid creating an HTTP webhook endpoint?"""
+
+        # Make a webhook
+        webhooks = Webhook.objects.all()
+        response = self.make_a_webhook(self.client, url="http://example.com")
+        # No webhook should be created since we don't allow HTTP endpoints.
+        self.assertEqual(webhooks.count(), 0)
+        self.assertEqual(response.status_code, HTTP_200_OK)
+
     def test_list_users_webhooks(self) -> None:
         """Can we list user's own webhooks?"""
 

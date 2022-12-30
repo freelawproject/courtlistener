@@ -92,6 +92,8 @@ def enable_alert(request, secret_key):
 @login_required
 def toggle_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
     """Use Ajax to create or delete an alert for a user."""
+
+    # This could be removed and replaced using the docket-alert API.
     if request.user.is_anonymous:
         return HttpResponse("Please log in to continue.")
 

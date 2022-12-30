@@ -13,20 +13,16 @@ from cl.corpus_importer.bulk_utils import (
 from cl.corpus_importer.tasks import (
     get_docket_by_pacer_case_id,
     get_pacer_case_id_and_title,
-    get_pacer_doc_by_rd,
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.scrapers.tasks import extract_recap_pdf
-from cl.search.models import DocketEntry, RECAPDocument
-from cl.search.tasks import add_items_to_solr, add_or_update_recap_docket
+from cl.search.tasks import add_or_update_recap_docket
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get("PACER_PASSWORD", settings.PACER_PASSWORD)
 
-TAG = "ILNB-KESSLER"
-TAG_PETITIONS = "ILNB-KESSLER-PETITIONS"
-TAG_FINALS = "ILNB-KESSLER-FINAL"
+TAG = "nywb-bankr-ch7"
+TAG_PETITIONS = 'nywb-bankr-ch7-petitions"'
 
 
 def get_dockets(options):
@@ -57,78 +53,36 @@ def get_dockets(options):
             get_pacer_case_id_and_title.s(
                 pass_through=None,
                 docket_number=make_bankr_docket_number(
-                    row["docket"], row["office"]
+                    row["DOCKET"], row["OFFICE"]
                 ),
-                court_id="ilnb",
+                court_id="nywb",
                 cookies=pacer_session.cookies,
-                office_number=row["office"],
+                office_number=row["OFFICE"],
                 docket_number_letters="bk",
             ).set(queue=q),
             get_docket_by_pacer_case_id.s(
-                court_id="ilnb",
+                court_id="nywb",
                 cookies=pacer_session.cookies,
                 tag_names=[TAG],
                 **{
-                    "show_parties_and_counsel": True,
-                    "show_terminated_parties": True,
-                    "show_list_of_member_cases": True,
+                    "doc_num_start": 1,
+                    "doc_num_end": 1,
+                    "show_parties_and_counsel": False,
+                    "show_terminated_parties": False,
+                    "show_list_of_member_cases": False,
                 },
             ).set(queue=q),
             add_or_update_recap_docket.s().set(queue=q),
         ).apply_async()
 
 
-def get_final_docs(options):
-    """Get any documents that contain "final" in their description."""
-    des = (
-        DocketEntry.objects.filter(
-            tags__name=TAG, description__icontains="final"
-        )
-        .order_by("pk")
-        .iterator()
-    )
-    q = options["queue"]
-    throttle = CeleryThrottle(queue_name=q)
-    pacer_session = PacerSession(
-        username=PACER_USERNAME, password=PACER_PASSWORD
-    )
-    pacer_session.login()
-    for i, de in enumerate(des):
-        if i < options["offset"]:
-            i += 1
-            continue
-        if i >= options["limit"] > 0:
-            break
-        if i % 1000 == 0:
-            pacer_session = PacerSession(
-                username=PACER_USERNAME, password=PACER_PASSWORD
-            )
-            pacer_session.login()
-            logger.info(f"Sent {i} tasks to celery so far.")
-        logger.info("Doing row %s", i)
-        rd_pks = (
-            de.recap_documents.filter(
-                document_type=RECAPDocument.PACER_DOCUMENT,
-            )
-            .exclude(pacer_doc_id="")
-            .order_by("pk")
-            .values_list("pk", flat=True)
-        )
-        for rd_pk in rd_pks:
-            throttle.maybe_wait()
-            chain(
-                get_pacer_doc_by_rd.s(
-                    rd_pk, pacer_session.cookies, tag=TAG_FINALS
-                ).set(queue=q),
-                extract_recap_pdf.si(rd_pk).set(queue=q),
-                add_items_to_solr.si([rd_pk], "search.RECAPDocument").set(
-                    queue=q
-                ),
-            ).apply_async()
-
-
 class Command(VerboseCommand):
-    help = "Look up dockets from a spreadsheet for a client and download them."
+    help = "Purchase dockets and bankrupcy filings from PACER"
+
+    allowed_tasks = [
+        "get_dockets",
+        "get_petitions",
+    ]
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -164,13 +118,10 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
         logger.info(f"Using PACER username: {PACER_USERNAME}")
-        if options["task"] == "all_dockets":
+        if options["task"] == "get_dockets":
             get_dockets(options)
-        elif options["task"] == "all_petitions":
+        elif options["task"] == "get_petitions":
             get_petitions(
                 options, PACER_USERNAME, PACER_PASSWORD, TAG, TAG_PETITIONS
             )
-        elif options["task"] == "final_docs":
-            get_final_docs(options)
