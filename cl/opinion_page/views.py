@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.models import AnonymousUser, User
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import F, IntegerField, Prefetch
 from django.db.models.functions import Cast
@@ -99,9 +99,11 @@ def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
     return TemplateResponse(request, "court.html", render_dict)
 
 
-@group_required("tenn_work_uploaders")
+@group_required(
+    "tenn_work_uploaders", "tennworkcompcl", "tennworkcompapp", "me"
+)
 def court_publish_page(request: HttpRequest, pk: int) -> HttpResponse:
-    """Display upload form and intake Opinions for Tenn. Workers Comp Cl/App
+    """Display upload form and intake Opinions for partner courts
 
     :param request: A GET or POST request for the page
     :param pk: The CL Court ID for each court
@@ -110,6 +112,13 @@ def court_publish_page(request: HttpRequest, pk: int) -> HttpResponse:
         raise Http404(
             "Court pages only implemented for Tennessee Worker Comp Courts and Maine SJC."
         )
+    # Validate the user has permission
+    if not request.user.is_staff and not request.user.is_superuser:
+        if not [g.name for g in request.user.groups.all() if pk == g.name]:
+            raise PermissionDenied(
+                "You do not have permission to access this page."
+            )
+
     form = CourtUploadForm(pk=pk)
     if request.method == "POST":
         form = CourtUploadForm(request.POST, request.FILES, pk=pk)
