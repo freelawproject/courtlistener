@@ -21,7 +21,7 @@ from rest_framework.status import (
 
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import SimpleUserDataMixin, SitemapTest
-from cl.opinion_page.forms import TennWorkersForm
+from cl.opinion_page.forms import CourtUploadForm
 from cl.opinion_page.views import make_docket_title
 from cl.people_db.factories import PersonFactory, PositionFactory
 from cl.people_db.models import Person
@@ -528,7 +528,7 @@ class UploadPublication(TestCase):
 
     def test_pdf_upload(self, mock) -> None:
         """Can we upload a PDF and form?"""
-        form = TennWorkersForm(
+        form = CourtUploadForm(
             self.work_comp_data,
             pk="tennworkcompcl",
             files={"pdf_upload": self.pdf},
@@ -567,7 +567,7 @@ class UploadPublication(TestCase):
 
     def test_pdf_validation_failure(self, mock) -> None:
         """Can we fail upload documents that are not PDFs?"""
-        form = TennWorkersForm(
+        form = CourtUploadForm(
             self.work_comp_data,
             pk="tennworkcompcl",
             files={"pdf_upload": self.png},
@@ -586,7 +586,7 @@ class UploadPublication(TestCase):
 
     def test_tn_wc_app_upload(self, mock) -> None:
         """Can we test appellate uploading?"""
-        form = TennWorkersForm(
+        form = CourtUploadForm(
             self.work_comp_app_data,
             pk="tennworkcompapp",
             files={"pdf_upload": self.pdf},
@@ -628,7 +628,7 @@ class UploadPublication(TestCase):
         """Can we validate required testing field case title?"""
         self.work_comp_app_data.pop("case_title")
 
-        form = TennWorkersForm(
+        form = CourtUploadForm(
             self.work_comp_app_data,
             pk="tennworkcompapp",
             files={"pdf_upload": self.pdf},
@@ -647,7 +647,7 @@ class UploadPublication(TestCase):
 
         pre_count = Opinion.objects.all().count()
 
-        form = TennWorkersForm(
+        form = CourtUploadForm(
             self.work_comp_app_data,
             pk="tennworkcompapp",
             files={"pdf_upload": self.pdf},
@@ -669,7 +669,7 @@ class UploadPublication(TestCase):
         # Remove a judge from the data
         self.work_comp_app_data["third_judge"] = None
 
-        form = TennWorkersForm(
+        form = CourtUploadForm(
             self.work_comp_app_data,
             pk="tennworkcompapp",
             files={"pdf_upload": self.pdf},
@@ -704,7 +704,7 @@ class UploadPublication(TestCase):
             sha1="ffe0ec472b16e4e573aa1bbaf2ae358460b5d72c",
         )
 
-        form2 = TennWorkersForm(
+        form2 = CourtUploadForm(
             self.work_comp_data,
             pk="tennworkcompcl",
             files={"pdf_upload": self.pdf},

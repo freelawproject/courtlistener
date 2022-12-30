@@ -51,8 +51,8 @@ from cl.lib.utils import alphanumeric_sort
 from cl.lib.view_utils import increment_view_count
 from cl.opinion_page.forms import (
     CitationRedirectorForm,
+    CourtUploadForm,
     DocketEntryFilterForm,
-    TennWorkersForm,
 )
 from cl.people_db.models import AttorneyOrganization, CriminalCount, Role
 from cl.recap.constants import COURT_TIMEZONES
@@ -69,7 +69,9 @@ from cl.search.views import do_search
 
 def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
     if pk not in ["tennworkcompcl", "tennworkcompapp"]:
-        raise Http404("Court pages only implemented for Tennessee so far.")
+        raise Http404(
+            "Court pages only implemented for Tennessee Worker Comp Courts."
+        )
 
     render_dict = {
         # Load the render_dict with good results that can be shown in the
@@ -104,12 +106,13 @@ def court_publish_page(request: HttpRequest, pk: int) -> HttpResponse:
     :param request: A GET or POST request for the page
     :param pk: The CL Court ID for each court
     """
-
-    if pk not in ["tennworkcompcl", "tennworkcompapp"]:
-        raise Http404("Court pages only implemented for Tennessee so far.")
-    form = TennWorkersForm(pk=pk)
+    if pk not in ["tennworkcompcl", "tennworkcompapp", "me"]:
+        raise Http404(
+            "Court pages only implemented for Tennessee Worker Comp Courts and Maine SJC."
+        )
+    form = CourtUploadForm(pk=pk)
     if request.method == "POST":
-        form = TennWorkersForm(request.POST, request.FILES, pk=pk)
+        form = CourtUploadForm(request.POST, request.FILES, pk=pk)
         if form.is_valid():
             cluster = form.save()
             goto = reverse("view_case", args=[cluster.pk, cluster.slug])
