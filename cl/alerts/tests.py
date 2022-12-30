@@ -209,8 +209,9 @@ class DisableDocketAlertTest(TestCase):
         )
 
     def backdate_alert(self) -> None:
-        self.alert.date_created = now() - timedelta(days=365)
-        self.alert.save()
+        DocketAlert.objects.filter(pk=self.alert.pk).update(
+            date_modified=now() - timedelta(days=365)
+        )
 
     def test_alert_created_recently_termination_year_ago(self) -> None:
         self.alert.docket.date_terminated = now() - timedelta(days=365)
@@ -792,7 +793,7 @@ class DocketAlertAPITests(APITestCase):
         ten_days_ahead = now() + timedelta(days=10)
         with time_machine.travel(ten_days_ahead, tick=False):
             response = self.make_a_docket_alert(self.client)
-        self.assertEqual(docket_alert[0].date_created, ten_days_ahead)
+        self.assertEqual(docket_alert[0].date_modified, ten_days_ahead)
         self.assertEqual(docket_alert.count(), 1)
         self.assertEqual(response.status_code, HTTP_201_CREATED)
 
@@ -897,8 +898,8 @@ class DocketAlertAPITests(APITestCase):
                 docket_alert_1_path_detail, data_updated
             )
 
-        # Confirm date_created is updated on put method
-        self.assertEqual(docket_alert[0].date_created, ten_days_ahead)
+        # Confirm date_modified is updated on put method
+        self.assertEqual(docket_alert[0].date_modified, ten_days_ahead)
 
         # Check that the alert was updated
         self.assertEqual(response.status_code, HTTP_200_OK)
@@ -931,8 +932,8 @@ class DocketAlertAPITests(APITestCase):
                 docket_alert_1_path_detail, data_updated
             )
 
-        # Confirm date_created is updated on patch method
-        self.assertEqual(docket_alert[0].date_created, ten_days_ahead)
+        # Confirm date_modified is updated on patch method
+        self.assertEqual(docket_alert[0].date_modified, ten_days_ahead)
 
         # Check that the alert was updated
         self.assertEqual(response.status_code, HTTP_200_OK)
@@ -942,20 +943,19 @@ class DocketAlertAPITests(APITestCase):
         self.assertEqual(response.json()["id"], docket_alert_1.json()["id"])
 
         # Patch docket alert
-        data_updated = {"docket": 1}
+        data_updated = {"docket": self.docket_1.pk}
         eleven_days_ahead = now() + timedelta(days=11)
         with time_machine.travel(eleven_days_ahead, tick=False):
             response = self.client.patch(
                 docket_alert_1_path_detail, data_updated
             )
 
-        # Confirm date_created is not updated on patch method when alert_type
-        # is not updated
-        self.assertNotEqual(docket_alert[0].date_created, eleven_days_ahead)
+        # date_modified is updated on patch method when updating any other field
+        self.assertEqual(docket_alert[0].date_modified, eleven_days_ahead)
 
 
 class OldDocketAlertsReportToggleTest(TestCase):
-    """Do old docket alerts date_created is properly updated when toggling the
+    """Do old docket alerts date_modified is properly updated when toggling the
     alert and correctly reported by OldAlertReport?"""
 
     @classmethod
@@ -1021,7 +1021,7 @@ class OldDocketAlertsReportToggleTest(TestCase):
 
     def test_old_docket_alert_report_timeline(self):
         """Can we properly warn and disable docket alerts based on their age
-        considering their date_create is updated when the alert_type change?
+        considering their date_modified is updated when the alert_type change?
         """
 
         # Create today a subscription docket alert from a case terminated long
@@ -1055,9 +1055,9 @@ class OldDocketAlertsReportToggleTest(TestCase):
             da.save()
 
         da.refresh_from_db()
-        # The alert_type and date_created is updated.
+        # The alert_type and date_modified is updated.
         self.assertEqual(da.alert_type, DocketAlert.UNSUBSCRIPTION)
-        self.assertEqual(da.date_created, plus_sixty_days)
+        self.assertEqual(da.date_modified, plus_sixty_days)
 
         # Simulate user re-enabling docket alert 85 days in the future.
         plus_eighty_five_days = now() + timedelta(days=85)
@@ -1067,9 +1067,9 @@ class OldDocketAlertsReportToggleTest(TestCase):
             da.save()
 
         da.refresh_from_db()
-        # The alert_type and date_created is updated.
+        # The alert_type and date_modified is updated.
         self.assertEqual(da.alert_type, DocketAlert.SUBSCRIPTION)
-        self.assertEqual(da.date_created, plus_eighty_five_days)
+        self.assertEqual(da.date_modified, plus_eighty_five_days)
 
         # Report is run 95 days in the future, 10 days since docket alert was
         # re-enabled
@@ -1114,7 +1114,7 @@ class OldDocketAlertsReportToggleTest(TestCase):
 
     def test_toggle_docket_alert_date_update(self):
         """Does the docket alert toggle view properly update docket alerts
-        date_create when toggling the alert_type?
+        date_modified when toggling the alert_type?
         """
 
         # A docket alert is created today for a case terminated on 2020-01-01
@@ -1136,7 +1136,7 @@ class OldDocketAlertsReportToggleTest(TestCase):
         header = {"HTTP_X_REQUESTED_WITH": "XMLHttpRequest"}
 
         # Send an AJAX request to toggle_docket_alert view and confirm the
-        # is disabled and the date_created updated.
+        # is disabled and the date_modified updated.
         sixty_days_ahead = now() + timedelta(days=60)
         with time_machine.travel(sixty_days_ahead, tick=False):
             self.client.post(
@@ -1147,10 +1147,10 @@ class OldDocketAlertsReportToggleTest(TestCase):
             )
         da.refresh_from_db()
         self.assertEqual(da.alert_type, DocketAlert.UNSUBSCRIPTION)
-        self.assertEqual(da.date_created, sixty_days_ahead)
+        self.assertEqual(da.date_modified, sixty_days_ahead)
 
         # Send an AJAX request to toggle_docket_alert view and confirm the
-        # is enabled and the date_created updated.
+        # is enabled and the date_modified updated.
         eighty_five_days_ahead = now() + timedelta(days=85)
         with time_machine.travel(eighty_five_days_ahead, tick=False):
             self.client.post(
@@ -1161,7 +1161,7 @@ class OldDocketAlertsReportToggleTest(TestCase):
             )
         da.refresh_from_db()
         self.assertEqual(da.alert_type, DocketAlert.SUBSCRIPTION)
-        self.assertEqual(da.date_created, eighty_five_days_ahead)
+        self.assertEqual(da.date_modified, eighty_five_days_ahead)
 
 
 class OldDocketAlertsWebhooksTest(TestCase):
@@ -1212,8 +1212,8 @@ class OldDocketAlertsWebhooksTest(TestCase):
         active_docket_alerts = DocketAlert.objects.filter(
             alert_type=DocketAlert.SUBSCRIPTION
         )
-        # Update docket alerts date_created to simulate an old alert.
-        docket_alerts.update(date_created=now() - timedelta(days=365))
+        # Update docket alerts date_modified to simulate an old alert.
+        docket_alerts.update(date_modified=now() - timedelta(days=365))
         self.assertEqual(docket_alerts.count(), 4)
         self.assertEqual(active_docket_alerts.count(), 4)
 
@@ -1269,11 +1269,11 @@ class OldDocketAlertsWebhooksTest(TestCase):
             self.disabled_docket_alert.docket.pk,
         )
 
-        # Old alerts
+        # Old alerts for webhook (Very old alerts in report)
         self.assertEqual(len(content["payload"]["old_alerts"]), 1)
         self.assertEqual(
             content["payload"]["old_alerts"][0]["id"],
-            self.old_docket_alert.pk,
+            self.very_old_docket_alert.pk,
         )
         self.assertEqual(
             content["payload"]["old_alerts"][0]["alert_type"],
@@ -1281,21 +1281,6 @@ class OldDocketAlertsWebhooksTest(TestCase):
         )
         self.assertEqual(
             content["payload"]["old_alerts"][0]["docket"],
-            self.old_docket_alert.docket.pk,
-        )
-
-        # Very old alerts
-        self.assertEqual(len(content["payload"]["very_old_alerts"]), 1)
-        self.assertEqual(
-            content["payload"]["very_old_alerts"][0]["id"],
-            self.very_old_docket_alert.pk,
-        )
-        self.assertEqual(
-            content["payload"]["very_old_alerts"][0]["alert_type"],
-            DocketAlert.SUBSCRIPTION,
-        )
-        self.assertEqual(
-            content["payload"]["very_old_alerts"][0]["docket"],
             self.very_old_docket_alert.docket.pk,
         )
 
@@ -1324,8 +1309,8 @@ class OldDocketAlertsWebhooksTest(TestCase):
         active_docket_alerts = DocketAlert.objects.filter(
             alert_type=DocketAlert.SUBSCRIPTION
         )
-        # Update docket alerts date_created to simulate an old alert.
-        docket_alerts.update(date_created=now() - timedelta(days=365))
+        # Update docket alerts date_modified to simulate an old alert.
+        docket_alerts.update(date_modified=now() - timedelta(days=365))
         self.assertEqual(docket_alerts.count(), 4)
         self.assertEqual(active_docket_alerts.count(), 4)
 
@@ -1365,31 +1350,25 @@ class OldDocketAlertsWebhooksTest(TestCase):
         # No disabled alerts since delete_old_alerts=False
         self.assertEqual(len(content["payload"]["disabled_alerts"]), 0)
 
-        # One old alert
-        self.assertEqual(len(content["payload"]["old_alerts"]), 1)
-        self.assertEqual(
-            content["payload"]["old_alerts"][0]["id"],
-            self.old_docket_alert.pk,
-        )
+        # Old alerts for webhook (Very old alerts in report)
+        # Two old alerts, the alert that should have been disabled now is
+        # within old alerts
+        self.assertEqual(len(content["payload"]["old_alerts"]), 2)
 
-        # Two very old alerts, the alert that should have been disabled now is
-        # within very old alerts
-        self.assertEqual(len(content["payload"]["very_old_alerts"]), 2)
-
-        very_old_index = 1
+        old_index = 1
         disabled_index = 0
         if (
-            content["payload"]["very_old_alerts"][0]["id"]
+            content["payload"]["old_alerts"][0]["id"]
             == self.very_old_docket_alert.pk
         ):
-            very_old_index = 0
+            old_index = 0
             disabled_index = 1
 
         self.assertEqual(
-            content["payload"]["very_old_alerts"][very_old_index]["docket"],
+            content["payload"]["old_alerts"][old_index]["docket"],
             self.very_old_docket_alert.docket.pk,
         )
         self.assertEqual(
-            content["payload"]["very_old_alerts"][disabled_index]["docket"],
+            content["payload"]["old_alerts"][disabled_index]["docket"],
             self.disabled_docket_alert.docket.pk,
         )

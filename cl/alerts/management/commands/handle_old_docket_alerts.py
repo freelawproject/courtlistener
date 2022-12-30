@@ -50,10 +50,12 @@ class OldAlertReport:
 
 
 def build_user_report(user, delete=False):
-    """Figure out which alerts are old or too old; delete very old ones
+    """Figure out which alerts are old or too old; disable very old ones based
+    on date_modified since this field is updated when the alert_type field is
+    toggled
 
     :param user: A user that has alerts
-    :param delete: Whether to nuke really old alerts
+    :param delete: Whether to disable really old alerts
     :return A dict indicating the counts of old alerts.
     """
 
@@ -69,7 +71,7 @@ def build_user_report(user, delete=False):
         # docket or the alert.
 
         threshold_date = max(
-            alert.docket.date_terminated, dt_as_local_date(alert.date_created)
+            alert.docket.date_terminated, dt_as_local_date(alert.date_modified)
         )
 
         if alert.date_last_hit is not None:
@@ -121,14 +123,8 @@ def send_old_alerts_webhook_event(
     :return None
     """
 
-    serialized_old_alerts = []
     serialized_very_old_alerts = []
     serialized_disabled_alerts = []
-
-    for old_alert in report.old_alerts:
-        serialized_old_alerts.append(
-            DocketAlertSerializer(old_alert.da_alert).data
-        )
 
     for very_old_alert in report.very_old_alerts:
         serialized_very_old_alerts.append(
@@ -148,8 +144,7 @@ def send_old_alerts_webhook_event(
             "deprecation_date": None,
         },
         "payload": {
-            "old_alerts": serialized_old_alerts,
-            "very_old_alerts": serialized_very_old_alerts,
+            "old_alerts": serialized_very_old_alerts,
             "disabled_alerts": serialized_disabled_alerts,
         },
     }
@@ -165,19 +160,22 @@ def send_old_alerts_webhook_event(
     send_webhook_event(webhook_event, json_bytes)
 
 
-def send_old_alert_warning_email_and_webhook(user, report):
+def send_old_alert_warning_email_and_webhook(user, report) -> int:
     """Send alerts emails and webhooks for old alerts
 
     :param user: The user with terminated dockets
     :param report: A dict containing information about old alerts
-    :return None
+    :return The number of webhook events sent
     """
 
     user_webhooks = user.webhooks.filter(
         event_type=WebhookEventType.OLD_DOCKET_ALERTS_REPORT, enabled=True
     )
-    for user_webhook in user_webhooks:
-        send_old_alerts_webhook_event(user_webhook, report)
+    webhook_count = 0
+    if report.very_old_alerts or report.disabled_alerts:
+        for user_webhook in user_webhooks:
+            send_old_alerts_webhook_event(user_webhook, report)
+            webhook_count += 1
 
     count = report.total_count()
     subject_template = loader.get_template("emails/old_email_subject.txt")
@@ -193,6 +191,7 @@ def send_old_alert_warning_email_and_webhook(user, report):
     )
     msg.attach_alternative(html, "text/html")
     msg.send(fail_silently=False)
+    return webhook_count
 
 
 class Command(VerboseCommand):
@@ -248,6 +247,7 @@ The schedule is thus:
         )
         emails_sent = 0
         alerts_deleted = 0
+        webhooks_sent = 0
         for user in users_with_alerts:
             report = build_user_report(
                 user, delete=options["delete_old_alerts"]
@@ -256,10 +256,15 @@ The schedule is thus:
             count = report.total_count()
             if options["send_alerts"] and count > 0:
                 emails_sent += 1
-                send_old_alert_warning_email_and_webhook(user, report)
+                webhooks_count = send_old_alert_warning_email_and_webhook(
+                    user, report
+                )
+                webhooks_sent += webhooks_count
 
         logger.info(
-            "%s alerts deleted (or skipped if arg not provided).",
-            alerts_deleted,
+            f"{alerts_deleted} alerts deleted (or skipped if arg not provided)."
         )
-        logger.info("%s notification emails sent.", emails_sent)
+        logger.info(f"{emails_sent} notification emails sent.")
+        logger.info(
+            f"{webhooks_sent} webhooks sent.",
+        )

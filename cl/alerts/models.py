@@ -1,7 +1,6 @@
 from django.contrib.auth.models import User
 from django.db import models
 from django.utils.crypto import get_random_string
-from django.utils.timezone import now
 
 from cl.lib.models import AbstractDateTimeModel
 from cl.search.models import SEARCH_TYPES, Docket
@@ -64,18 +63,12 @@ class DocketAlertManager(models.Manager):
         return self.filter(alert_type=DocketAlert.SUBSCRIPTION)
 
 
-class DocketAlert(models.Model):
+class DocketAlert(AbstractDateTimeModel):
     UNSUBSCRIPTION = 0
     SUBSCRIPTION = 1
     TYPES = (
         (UNSUBSCRIPTION, "Unsubscription"),
         (SUBSCRIPTION, "Subscription"),
-    )
-
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
     )
     date_last_hit = models.DateTimeField(
         verbose_name="time of last trigger", blank=True, null=True
@@ -106,28 +99,17 @@ class DocketAlert(models.Model):
     )
     objects = DocketAlertManager()
 
-    __original_alert_type = None
-
     class Meta:
         unique_together = ("docket", "user")
 
     def __str__(self) -> str:
         return f"{self.pk}: {self.docket_id}"
 
-    def __init__(self, *args, **kwargs):
-        super(DocketAlert, self).__init__(*args, **kwargs)
-        self.__original_alert_type = self.alert_type
-
     def save(self, *args, **kwargs):
         """Ensure we get a token when we save the first time."""
         if self.pk is None:
             self.secret_key = get_random_string(length=40)
-
-        if self.alert_type != self.__original_alert_type:
-            self.date_created = now()
-
         super(DocketAlert, self).save(*args, **kwargs)
-        self.__original_alert_type = self.alert_type
 
 
 class RealTimeQueue(models.Model):
