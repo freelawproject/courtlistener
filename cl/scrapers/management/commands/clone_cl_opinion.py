@@ -21,7 +21,7 @@ import requests
 from django.db import transaction
 
 from cl.lib.command_utils import VerboseCommand
-from cl.search.models import Opinion, OpinionCluster, Docket, Citation, Court
+from cl.search.models import Citation, Court, Docket, Opinion, OpinionCluster
 from cl.search.tasks import add_items_to_solr
 
 cluster_url = "https://www.courtlistener.com/api/rest/v3/search/?format=json"
@@ -48,8 +48,11 @@ def get_courtlistener_data(cluster_id: int) -> None:
 
         s = requests.session()
         s.headers = {
-            "Authorization": "Token %s" % os.environ.get("CL_API_TOKEN", "")}
-        cluster_endpoint = f"https://www.courtlistener.com/api/rest/v3/clusters/{cluster_id}/"
+            "Authorization": f"Token {os.environ.get('CL_API_TOKEN', '')}"
+        }
+        cluster_endpoint = (
+            f"https://www.courtlistener.com/api/rest/v3/clusters/{cluster_id}/"
+        )
         results = s.get(cluster_endpoint).json()
 
         cluster_datum = results
@@ -115,7 +118,8 @@ def get_courtlistener_data(cluster_id: int) -> None:
                 add_items_to_solr.delay([op.id], "search.Opinion")
 
             print(
-                f"http://localhost:8000/opinion/{cluster_datum['id']}/{docket_datum['slug']}/")
+                f"http://localhost:8000/opinion/{cluster_datum['id']}/{docket_datum['slug']}/"
+            )
 
 
 class Command(VerboseCommand):
@@ -125,7 +129,7 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--cluster_id",
             help="Cluster id, "
-                 "opinion cluster id from courtlistener.com eg. 6905720 from https://www.courtlistener.com/opinion/6905720/schaaf-v-schaaf/",
+            "opinion cluster id from courtlistener.com eg. 6905720 from https://www.courtlistener.com/opinion/6905720/schaaf-v-schaaf/",
         )
 
     def handle(self, *args, **options):
