@@ -1,6 +1,7 @@
 from datetime import timedelta
 from unittest import mock
 
+import time_machine
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.core import mail
@@ -682,7 +683,10 @@ class SearchAlertsWebhooksTest(EmptySolrTestCase):
                     200, mock_raw=True
                 ),
             ):
-                call_command("cl_send_alerts", rate=rate)
+                day_15 = now().replace(day=15)
+                # Monthly alerts cannot be run on the 29th, 30th or 31st.
+                with time_machine.travel(day_15, tick=False):
+                    call_command("cl_send_alerts", rate=rate)
 
             webhook_events = WebhookEvent.objects.all()
             self.assertEqual(len(webhook_events), events)
