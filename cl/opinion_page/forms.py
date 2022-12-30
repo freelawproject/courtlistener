@@ -135,7 +135,7 @@ class CourtUploadForm(forms.Form):
     )
     date_argued = forms.DateField(
         label="Argued Date",
-        required=True,
+        required=False,
         widget=forms.TextInput(
             attrs={
                 "class": "form-control datepicker",
