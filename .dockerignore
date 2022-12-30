@@ -10,6 +10,7 @@
 
 # But no matter what, ignore these things.
 cl/assets/static
+cl/assets/media
 cl/node_modules
 *.secrets
 *.env.dev
