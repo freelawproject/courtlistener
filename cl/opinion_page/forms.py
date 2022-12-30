@@ -229,15 +229,24 @@ class CourtUploadForm(forms.Form):
             # The court requested the order of the panel match the seniority
             # of the judges, in order or date joined after sorting by pos type
             # Chief, Associate, Retired Active
+            # Additionally, we only want active justices so remove them if
+            # terminated or retired, without a new role being created as an
+            # retired active justice
             q_judges = (
                 Person.objects.filter(
+                    (
+                        (
+                            Q(positions__position_type="c-jus")
+                            | Q(positions__position_type="ass-jus")
+                            | Q(positions__position_type="ret-act-jus")
+                        )
+                        & (
+                            Q(positions__date_termination__isnull=True)
+                            & Q(positions__date_retirement__isnull=True)
+                        )
+                    ),
                     positions__court_id="me",
                     is_alias_of=None,
-                )
-                .filter(
-                    Q(positions__position_type="c-jus")
-                    | Q(positions__position_type="ass-jus")
-                    | Q(positions__position_type="ret-act-jus")
                 )
                 .annotate(
                     custom_order=Case(
