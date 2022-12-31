@@ -117,7 +117,9 @@ def court_publish_page(request: HttpRequest, pk: int) -> HttpResponse:
         )
     # Validate the user has permission
     if not request.user.is_staff and not request.user.is_superuser:
-        if not [g.name for g in request.user.groups.all() if g.name == f"uploaders_{pk}"]:  # type: ignore
+        if not request.user.groups.filter(
+            name__in=[f"uploaders_{pk}"]
+        ).exists():
             raise PermissionDenied(
                 "You do not have permission to access this page."
             )

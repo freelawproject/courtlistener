@@ -39,9 +39,9 @@
       <div class="col-xs-2">
         {% if form.initial.court.id == "me" %}
           <img src="https://seals.free.law/v2/128/me.png" class="img-responsive" height=128 width="128" />
-        {% else if  form.initial.court.id == "tennworkcompcl" %}
+        {% elif form.initial.court.id == "tennworkcompcl" %}
           <img src="{% static "img/tn-court.jpg" %}" class="img-responsive" width="359" height="359" >
-        {% else if  form.initial.court.id == "tennworkcompapp" %}
+        {% elif  form.initial.court.id == "tennworkcompapp" %}
           <img src="{% static "img/tn-court.jpg" %}" class="img-responsive" width="359" height="359" >
         {% endif %}
 

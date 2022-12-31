@@ -101,12 +101,12 @@ class CourtUploadForm(forms.Form):
 
     court_str = forms.CharField(required=True, widget=forms.HiddenInput())
     case_title = forms.CharField(
-        label="Case Title",
+        label="Caption",
         required=True,
         widget=forms.TextInput(
             attrs={
                 "class": "form-control",
-                "placeholder": "Case Title",
+                "placeholder": "Caption",
                 "autocomplete": "off",
             }
         ),
@@ -298,12 +298,14 @@ class CourtUploadForm(forms.Form):
                 attrs={"class": "form-control"},
             )
             self.drop_fields(["lead_author", "second_judge", "third_judge"])
-        else:
+        elif self.pk == "tennworkcompapp":
             self.fields["cite_reporter"].widget = forms.Select(
                 choices=[("TN WC App.", "TN WC App.")],
                 attrs={"class": "form-control"},
             )
             self.drop_fields(["date_argued", "date_reargued", "panel"])
+        else:
+            raise ("Unknown error")
 
         self.fields["cite_reporter"].widget.attrs["readonly"] = True
 
