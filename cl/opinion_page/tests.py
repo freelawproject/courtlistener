@@ -455,7 +455,7 @@ class UploadPublication(TestCase):
             username="learned",
             email="learnedhand@scotus.gov",
         )
-        tenn_group = Group.objects.get(name="tenn_work_uploaders")
+        tenn_group = Group.objects.get(name="uploaders_tennworkcompcl")
         cls.tenn_user.groups.add(tenn_group)
 
         cls.reg_user = UserFactory.create(

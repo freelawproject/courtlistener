@@ -100,7 +100,10 @@ def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
 
 
 @group_required(
-    "tenn_work_uploaders", "tennworkcompcl", "tennworkcompapp", "me"
+    "tenn_work_uploaders",
+    "uploaders_tennworkcompcl",
+    "uploaders_tennworkcompapp",
+    "uploaders_me",
 )
 def court_publish_page(request: HttpRequest, pk: int) -> HttpResponse:
     """Display upload form and intake Opinions for partner courts
@@ -114,7 +117,7 @@ def court_publish_page(request: HttpRequest, pk: int) -> HttpResponse:
         )
     # Validate the user has permission
     if not request.user.is_staff and not request.user.is_superuser:
-        if not [g.name for g in request.user.groups.all() if pk == g.name]:  # type: ignore
+        if not [g.name for g in request.user.groups.all() if g.name == f"uploaders_{pk}"]:  # type: ignore
             raise PermissionDenied(
                 "You do not have permission to access this page."
             )
