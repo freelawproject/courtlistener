@@ -305,7 +305,7 @@ class CourtUploadForm(forms.Form):
             )
             self.drop_fields(["date_argued", "date_reargued", "panel"])
         else:
-            raise ("Unknown error")
+            raise BaseException
 
         self.fields["cite_reporter"].widget.attrs["readonly"] = True
 
