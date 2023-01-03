@@ -543,24 +543,25 @@ class SearchAlertsWebhooksTest(EmptySolrTestCase):
             name="Test Alert O Disabled",
             query="type=o&stat_Precedential=on",
         )
+        cls.mock_date = now().replace(day=15, hour=0)
+        with time_machine.travel(cls.mock_date, tick=False):
+            cls.dly_opinion = OpinionWithParentsFactory.create(
+                cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                cluster__date_filed=now() - timedelta(hours=5),
+            )
+            cls.dly_oral_argument = AudioWithParentsFactory.create(
+                case_name="Dly Test OA",
+                docket__date_argued=now() - timedelta(hours=5),
+            )
 
-        cls.dly_opinion = OpinionWithParentsFactory.create(
-            cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
-            cluster__date_filed=now() - timedelta(hours=5),
-        )
-        cls.dly_oral_argument = AudioWithParentsFactory.create(
-            case_name="Dly Test OA",
-            docket__date_argued=now() - timedelta(hours=5),
-        )
-
-        cls.wly_opinion = OpinionWithParentsFactory.create(
-            cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
-            cluster__date_filed=now() - timedelta(days=2),
-        )
-        cls.mly_opinion = OpinionWithParentsFactory.create(
-            cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
-            cluster__date_filed=now() - timedelta(days=25),
-        )
+            cls.wly_opinion = OpinionWithParentsFactory.create(
+                cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                cluster__date_filed=now() - timedelta(days=2),
+            )
+            cls.mly_opinion = OpinionWithParentsFactory.create(
+                cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                cluster__date_filed=now() - timedelta(days=25),
+            )
 
     def setUp(self) -> None:
         super(SearchAlertsWebhooksTest, self).setUp()
@@ -588,7 +589,8 @@ class SearchAlertsWebhooksTest(EmptySolrTestCase):
                 200, mock_raw=True
             ),
         ):
-            call_command("cl_send_alerts", rate="dly")
+            with time_machine.travel(self.mock_date, tick=False):
+                call_command("cl_send_alerts", rate="dly")
 
         # Two search alert should one to user_profile and one to user_profile_2
         self.assertEqual(len(mail.outbox), 2)
@@ -644,22 +646,22 @@ class SearchAlertsWebhooksTest(EmptySolrTestCase):
 
     def test_send_search_alert_webhooks_rates(self):
         """Can we send search alert webhooks for different alert rates?"""
-
-        # Get ready the RT opinion for the test.
-        rt_opinion = OpinionWithParentsFactory.create(
-            cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
-            cluster__date_filed=now(),
-        )
-        RealTimeQueue.objects.create(
-            item_type=SEARCH_TYPES.OPINION, item_pk=rt_opinion.pk
-        )
-        add_items_to_solr(
-            [
-                rt_opinion.pk,
-            ],
-            "search.Opinion",
-            force_commit=True,
-        )
+        with time_machine.travel(self.mock_date, tick=False):
+            # Get ready the RT opinion for the test.
+            rt_opinion = OpinionWithParentsFactory.create(
+                cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                cluster__date_filed=now(),
+            )
+            RealTimeQueue.objects.create(
+                item_type=SEARCH_TYPES.OPINION, item_pk=rt_opinion.pk
+            )
+            add_items_to_solr(
+                [
+                    rt_opinion.pk,
+                ],
+                "search.Opinion",
+                force_commit=True,
+            )
 
         webhooks_enabled = Webhook.objects.filter(enabled=True)
         self.assertEqual(len(webhooks_enabled), 1)
@@ -683,9 +685,8 @@ class SearchAlertsWebhooksTest(EmptySolrTestCase):
                     200, mock_raw=True
                 ),
             ):
-                day_15 = now().replace(day=15)
                 # Monthly alerts cannot be run on the 29th, 30th or 31st.
-                with time_machine.travel(day_15, tick=False):
+                with time_machine.travel(self.mock_date, tick=False):
                     call_command("cl_send_alerts", rate=rate)
 
             webhook_events = WebhookEvent.objects.all()
