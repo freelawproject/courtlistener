@@ -63,18 +63,12 @@ class DocketAlertManager(models.Manager):
         return self.filter(alert_type=DocketAlert.SUBSCRIPTION)
 
 
-class DocketAlert(models.Model):
+class DocketAlert(AbstractDateTimeModel):
     UNSUBSCRIPTION = 0
     SUBSCRIPTION = 1
     TYPES = (
         (UNSUBSCRIPTION, "Unsubscription"),
         (SUBSCRIPTION, "Subscription"),
-    )
-
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
     )
     date_last_hit = models.DateTimeField(
         verbose_name="time of last trigger", blank=True, null=True

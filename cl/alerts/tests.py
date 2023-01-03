@@ -209,8 +209,9 @@ class DisableDocketAlertTest(TestCase):
         )
 
     def backdate_alert(self) -> None:
-        self.alert.date_created = now() - timedelta(days=365)
-        self.alert.save()
+        DocketAlert.objects.filter(pk=self.alert.pk).update(
+            date_modified=now() - timedelta(days=365)
+        )
 
     def test_alert_created_recently_termination_year_ago(self) -> None:
         self.alert.docket.date_terminated = now() - timedelta(days=365)
@@ -234,7 +235,7 @@ class DisableDocketAlertTest(TestCase):
             self.alert.docket.date_terminated = new_date_terminated
             self.alert.docket.save()
             report = build_user_report(self.alert.user, delete=True)
-            self.assertEqual(report.ninety_ago, [self.alert.docket])
+            self.assertEqual(report.old_dockets, [self.alert.docket])
 
 
 class UnlimitedAlertsTest(TestCase):
@@ -789,7 +790,10 @@ class DocketAlertAPITests(APITestCase):
 
         # Make a simple docket alert
         docket_alert = DocketAlert.objects.all()
-        response = self.make_a_docket_alert(self.client)
+        ten_days_ahead = now() + timedelta(days=10)
+        with time_machine.travel(ten_days_ahead, tick=False):
+            response = self.make_a_docket_alert(self.client)
+        self.assertEqual(docket_alert[0].date_modified, ten_days_ahead)
         self.assertEqual(docket_alert.count(), 1)
         self.assertEqual(response.status_code, HTTP_201_CREATED)
 
@@ -887,10 +891,484 @@ class DocketAlertAPITests(APITestCase):
             "docket": self.docket.pk,
             "alert_type": DocketAlert.UNSUBSCRIPTION,
         }
-        response = self.client.put(docket_alert_1_path_detail, data_updated)
+
+        ten_days_ahead = now() + timedelta(days=10)
+        with time_machine.travel(ten_days_ahead, tick=False):
+            response = self.client.put(
+                docket_alert_1_path_detail, data_updated
+            )
+
+        # Confirm date_modified is updated on put method
+        self.assertEqual(docket_alert[0].date_modified, ten_days_ahead)
+
         # Check that the alert was updated
         self.assertEqual(response.status_code, HTTP_200_OK)
         self.assertEqual(
             response.json()["alert_type"], DocketAlert.UNSUBSCRIPTION
         )
         self.assertEqual(response.json()["id"], docket_alert_1.json()["id"])
+
+    def test_docket_alert_patch(self) -> None:
+        """Can we update a docket alert?"""
+
+        # Make one alerts for user_1
+        docket_alert_1 = self.make_a_docket_alert(self.client)
+        docket_alert = DocketAlert.objects.all()
+        self.assertEqual(docket_alert.count(), 1)
+        self.assertEqual(docket_alert[0].alert_type, DocketAlert.SUBSCRIPTION)
+        docket_alert_1_path_detail = reverse(
+            "docket-alert-detail",
+            kwargs={"pk": docket_alert_1.json()["id"], "version": "v3"},
+        )
+
+        # Update the docket alert
+        data_updated = {
+            "alert_type": DocketAlert.UNSUBSCRIPTION,
+        }
+
+        ten_days_ahead = now() + timedelta(days=10)
+        with time_machine.travel(ten_days_ahead, tick=False):
+            response = self.client.patch(
+                docket_alert_1_path_detail, data_updated
+            )
+
+        # Confirm date_modified is updated on patch method
+        self.assertEqual(docket_alert[0].date_modified, ten_days_ahead)
+
+        # Check that the alert was updated
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(
+            response.json()["alert_type"], DocketAlert.UNSUBSCRIPTION
+        )
+        self.assertEqual(response.json()["id"], docket_alert_1.json()["id"])
+
+        # Patch docket alert
+        data_updated = {"docket": self.docket_1.pk}
+        eleven_days_ahead = now() + timedelta(days=11)
+        with time_machine.travel(eleven_days_ahead, tick=False):
+            response = self.client.patch(
+                docket_alert_1_path_detail, data_updated
+            )
+
+        # date_modified is updated on patch method when updating any other field
+        self.assertEqual(docket_alert[0].date_modified, eleven_days_ahead)
+
+
+class OldDocketAlertsReportToggleTest(TestCase):
+    """Do old docket alerts date_modified is properly updated when toggling the
+    alert and correctly reported by OldAlertReport?"""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user_profile = UserProfileWithParentsFactory()
+        test_user = cls.user_profile.user
+        test_user.password = make_password("password")
+        test_user.save()
+
+    def test_disable_docket_alerts_without_deleting_them(self):
+        """Can we disable docket alerts that should be disabled only by
+        changing their alert_type to "Unsubscription"?
+        """
+
+        # Create an old unsubscription docket alert from a case terminated long
+        # time ago.
+        one_year_ago = now() - timedelta(days=365)
+        with time_machine.travel(one_year_ago, tick=False):
+            DocketAlertWithParentsFactory(
+                docket__source=Docket.RECAP,
+                docket__date_terminated="2020-01-01",
+                user=self.user_profile.user,
+                alert_type=DocketAlert.UNSUBSCRIPTION,
+            )
+
+        docket_alerts = DocketAlert.objects.all()
+        active_docket_alerts = DocketAlert.objects.filter(
+            alert_type=DocketAlert.SUBSCRIPTION
+        )
+
+        self.assertEqual(docket_alerts.count(), 1)
+        self.assertEqual(active_docket_alerts.count(), 0)
+
+        # Run the report, since the docket alert is "Unsubscription" no action
+        # should be taken.
+        report = build_user_report(self.user_profile.user, delete=True)
+        self.assertEqual(report.total_count(), 0)
+
+        # Create an old subscription docket alert from a case terminated long
+        # time ago.
+        with time_machine.travel(one_year_ago, tick=False):
+            DocketAlertWithParentsFactory(
+                docket__source=Docket.RECAP,
+                docket__date_terminated="2020-01-02",
+                user=self.user_profile.user,
+                alert_type=DocketAlert.SUBSCRIPTION,
+            )
+
+        self.assertEqual(docket_alerts.count(), 2)
+        self.assertEqual(active_docket_alerts.count(), 1)
+
+        # Run the report, now the old subscription docket alert should be
+        # disabled changing its alert_type to "Unsubscription", not deleting it
+        report = build_user_report(self.user_profile.user, delete=True)
+        self.assertEqual(len(report.disabled_dockets), 1)
+        self.assertEqual(report.total_count(), 1)
+        self.assertEqual(active_docket_alerts.count(), 0)
+        self.assertEqual(docket_alerts.count(), 2)
+
+        # Run the report again, no new alerts to warn or disable.
+        report = build_user_report(self.user_profile.user, delete=True)
+        self.assertEqual(report.total_count(), 0)
+
+    def test_old_docket_alert_report_timeline(self):
+        """Can we properly warn and disable docket alerts based on their age
+        considering their date_modified is updated when the alert_type change?
+        """
+
+        # Create today a subscription docket alert from a case terminated long
+        # time ago.
+        da = DocketAlertWithParentsFactory(
+            docket__source=Docket.RECAP,
+            docket__date_terminated="2020-01-01",
+            docket__date_last_filing=None,
+            user=self.user_profile.user,
+            alert_type=DocketAlert.SUBSCRIPTION,
+            date_last_hit=None,
+        )
+        docket_alerts = DocketAlert.objects.all()
+        active_docket_alerts = DocketAlert.objects.filter(
+            alert_type=DocketAlert.SUBSCRIPTION
+        )
+
+        # Run the report
+        report = build_user_report(self.user_profile.user, delete=True)
+        # After calling the report no warning should go out since it was just
+        # created.
+        self.assertEqual(report.total_count(), 0)
+        self.assertEqual(docket_alerts.count(), 1)
+        self.assertEqual(active_docket_alerts.count(), 1)
+
+        # Simulate user disabling docket alert 60 days in the future.
+        plus_sixty_days = now() + timedelta(days=60)
+        with time_machine.travel(plus_sixty_days, tick=False):
+            # User disabled Docket alert manually.
+            da.alert_type = DocketAlert.UNSUBSCRIPTION
+            da.save()
+
+        da.refresh_from_db()
+        # The alert_type and date_modified is updated.
+        self.assertEqual(da.alert_type, DocketAlert.UNSUBSCRIPTION)
+        self.assertEqual(da.date_modified, plus_sixty_days)
+
+        # Simulate user re-enabling docket alert 85 days in the future.
+        plus_eighty_five_days = now() + timedelta(days=85)
+        with time_machine.travel(plus_eighty_five_days, tick=False):
+            # User re-enable Docket alert manually.
+            da.alert_type = DocketAlert.SUBSCRIPTION
+            da.save()
+
+        da.refresh_from_db()
+        # The alert_type and date_modified is updated.
+        self.assertEqual(da.alert_type, DocketAlert.SUBSCRIPTION)
+        self.assertEqual(da.date_modified, plus_eighty_five_days)
+
+        # Report is run 95 days in the future, 10 days since docket alert was
+        # re-enabled
+        plus_ninety_five_days = now() + timedelta(days=95)
+        with time_machine.travel(plus_ninety_five_days, tick=False):
+            report = build_user_report(self.user_profile.user, delete=True)
+
+        # After run the report 95 days in the future no warning should go out
+        # since the docket alert was re-enabled 10 days ago.
+        self.assertEqual(report.total_count(), 0)
+        self.assertEqual(active_docket_alerts.count(), 1)
+
+        # Report is run 268 days in the future, 183 days since docket alert was
+        # re-enabled
+        plus_two_hundred_sixty_eight_days = now() + timedelta(days=268)
+        with time_machine.travel(
+            plus_two_hundred_sixty_eight_days, tick=False
+        ):
+            report = build_user_report(self.user_profile.user, delete=True)
+
+        # After run the report 268 days in the future a warning should go out
+        # but no alert should be disabled since the docket alert was re-enabled
+        # 183 days ago.
+        self.assertEqual(report.total_count(), 1)
+        self.assertEqual(len(report.very_old_alerts), 1)
+        self.assertEqual(active_docket_alerts.count(), 1)
+
+        # Report is run 272 days in the future, 187 days since docket alert was
+        # re-enabled
+        plus_two_hundred_sixty_eight_days = now() + timedelta(days=272)
+        with time_machine.travel(
+            plus_two_hundred_sixty_eight_days, tick=False
+        ):
+            report = build_user_report(self.user_profile.user, delete=True)
+
+        # After run the report 272 days in the future a warning should go out
+        # but no alert should be disabled since the docket alert was re-enabled
+        # 187 days ago.
+        self.assertEqual(report.total_count(), 1)
+        self.assertEqual(len(report.disabled_alerts), 1)
+        self.assertEqual(active_docket_alerts.count(), 0)
+
+    def test_toggle_docket_alert_date_update(self):
+        """Does the docket alert toggle view properly update docket alerts
+        date_modified when toggling the alert_type?
+        """
+
+        # A docket alert is created today for a case terminated on 2020-01-01
+        da = DocketAlertWithParentsFactory(
+            docket__source=Docket.RECAP,
+            docket__date_terminated="2020-01-01",
+            docket__date_last_filing=None,
+            user=self.user_profile.user,
+            alert_type=DocketAlert.SUBSCRIPTION,
+            date_last_hit=None,
+        )
+
+        self.assertTrue(
+            self.client.login(
+                username=self.user_profile.user.username, password="password"
+            )
+        )
+        post_data = {"id": da.docket.pk}
+        header = {"HTTP_X_REQUESTED_WITH": "XMLHttpRequest"}
+
+        # Send an AJAX request to toggle_docket_alert view and confirm the
+        # is disabled and the date_modified updated.
+        sixty_days_ahead = now() + timedelta(days=60)
+        with time_machine.travel(sixty_days_ahead, tick=False):
+            self.client.post(
+                reverse("toggle_docket_alert"),
+                data=post_data,
+                follow=True,
+                **header,
+            )
+        da.refresh_from_db()
+        self.assertEqual(da.alert_type, DocketAlert.UNSUBSCRIPTION)
+        self.assertEqual(da.date_modified, sixty_days_ahead)
+
+        # Send an AJAX request to toggle_docket_alert view and confirm the
+        # is enabled and the date_modified updated.
+        eighty_five_days_ahead = now() + timedelta(days=85)
+        with time_machine.travel(eighty_five_days_ahead, tick=False):
+            self.client.post(
+                reverse("toggle_docket_alert"),
+                data=post_data,
+                follow=True,
+                **header,
+            )
+        da.refresh_from_db()
+        self.assertEqual(da.alert_type, DocketAlert.SUBSCRIPTION)
+        self.assertEqual(da.date_modified, eighty_five_days_ahead)
+
+
+class OldDocketAlertsWebhooksTest(TestCase):
+    """Test Old Docket Alerts Webhooks"""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user_profile = UserProfileWithParentsFactory()
+        cls.webhook_enabled = WebhookFactory(
+            user=cls.user_profile.user,
+            event_type=WebhookEventType.OLD_DOCKET_ALERTS_REPORT,
+            url="https://example.com/",
+            enabled=True,
+        )
+        cls.disabled_docket_alert = DocketAlertWithParentsFactory(
+            docket__source=Docket.RECAP,
+            docket__date_terminated="2020-01-01",
+            user=cls.user_profile.user,
+        )
+        cls.old_docket_alert = DocketAlertWithParentsFactory(
+            docket__source=Docket.RECAP,
+            docket__date_terminated=now() - timedelta(days=92),
+            user=cls.user_profile.user,
+        )
+        cls.very_old_docket_alert = DocketAlertWithParentsFactory(
+            docket__source=Docket.RECAP,
+            docket__date_terminated=now() - timedelta(days=182),
+            user=cls.user_profile.user,
+        )
+
+        cls.user_profile_2 = UserProfileWithParentsFactory()
+        cls.webhook_disabled = WebhookFactory(
+            user=cls.user_profile_2.user,
+            event_type=WebhookEventType.OLD_DOCKET_ALERTS_REPORT,
+            url="https://example.com/",
+            enabled=False,
+        )
+        cls.disabled_docket_alert_2 = DocketAlertWithParentsFactory(
+            docket__source=Docket.RECAP,
+            docket__date_terminated="2020-01-01",
+            user=cls.user_profile_2.user,
+        )
+
+    def test_send_old_docket_alerts_webhook(self):
+        """Can we send webhook events for old and disabled docket alerts?"""
+
+        docket_alerts = DocketAlert.objects.all()
+        active_docket_alerts = DocketAlert.objects.filter(
+            alert_type=DocketAlert.SUBSCRIPTION
+        )
+        # Update docket alerts date_modified to simulate an old alert.
+        docket_alerts.update(date_modified=now() - timedelta(days=365))
+        self.assertEqual(docket_alerts.count(), 4)
+        self.assertEqual(active_docket_alerts.count(), 4)
+
+        # Run handle_old_docket_alerts command, mocking webhook request.
+        with mock.patch(
+            "cl.api.utils.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            call_command(
+                "handle_old_docket_alerts",
+                delete_old_alerts=True,
+                send_alerts=True,
+            )
+
+        # Two emails should go out, one for user_profile and one for
+        # user_profile_2
+        self.assertEqual(len(mail.outbox), 2)
+        self.assertEqual(active_docket_alerts.count(), 2)
+
+        webhook_events = WebhookEvent.objects.all()
+        # Only one webhook event should be triggered for user_profile since
+        # user_profile_2 webhook endpoint is disabled.
+        self.assertEqual(len(webhook_events), 1)
+        self.assertEqual(
+            webhook_events[0].event_status,
+            WEBHOOK_EVENT_STATUS.SUCCESSFUL,
+        )
+        self.assertEqual(
+            webhook_events[0].webhook.user,
+            self.user_profile.user,
+        )
+        content = webhook_events[0].content
+
+        # Compare the webhook event payload.
+        self.assertEqual(
+            content["webhook"]["event_type"],
+            WebhookEventType.OLD_DOCKET_ALERTS_REPORT,
+        )
+        # Disabled alerts
+        self.assertEqual(len(content["payload"]["disabled_alerts"]), 1)
+        self.assertEqual(
+            content["payload"]["disabled_alerts"][0]["id"],
+            self.disabled_docket_alert.pk,
+        )
+        self.assertEqual(
+            content["payload"]["disabled_alerts"][0]["alert_type"],
+            DocketAlert.UNSUBSCRIPTION,
+        )
+        self.assertEqual(
+            content["payload"]["disabled_alerts"][0]["docket"],
+            self.disabled_docket_alert.docket.pk,
+        )
+
+        # Old alerts for webhook (Very old alerts in report)
+        self.assertEqual(len(content["payload"]["old_alerts"]), 1)
+        self.assertEqual(
+            content["payload"]["old_alerts"][0]["id"],
+            self.very_old_docket_alert.pk,
+        )
+        self.assertEqual(
+            content["payload"]["old_alerts"][0]["alert_type"],
+            DocketAlert.SUBSCRIPTION,
+        )
+        self.assertEqual(
+            content["payload"]["old_alerts"][0]["docket"],
+            self.very_old_docket_alert.docket.pk,
+        )
+
+        # Run command again
+        with mock.patch(
+            "cl.api.utils.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            call_command(
+                "handle_old_docket_alerts",
+                delete_old_alerts=True,
+                send_alerts=True,
+            )
+
+        # One more email should go out for old and very old alerts.
+        # No disabled alert.
+        self.assertEqual(len(mail.outbox), 3)
+        self.assertEqual(active_docket_alerts.count(), 2)
+
+    def test_send_old_docket_alerts_webhook_only_warn(self):
+        """Can we send webhook events that only warn about old docket alerts?"""
+
+        docket_alerts = DocketAlert.objects.all()
+        active_docket_alerts = DocketAlert.objects.filter(
+            alert_type=DocketAlert.SUBSCRIPTION
+        )
+        # Update docket alerts date_modified to simulate an old alert.
+        docket_alerts.update(date_modified=now() - timedelta(days=365))
+        self.assertEqual(docket_alerts.count(), 4)
+        self.assertEqual(active_docket_alerts.count(), 4)
+
+        # Run handle_old_docket_alerts command with delete_old_alerts=False,
+        # mocking webhook request.
+        with mock.patch(
+            "cl.api.utils.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            call_command(
+                "handle_old_docket_alerts",
+                delete_old_alerts=False,
+                send_alerts=True,
+            )
+
+        # Two emails should go out, one for user_profile and one for
+        # user_profile_2
+        self.assertEqual(len(mail.outbox), 2)
+
+        # Only one webhook event should be triggered for user_profile since
+        # user_profile_2 webhook endpoint is disabled.
+        webhook_events = WebhookEvent.objects.all()
+        self.assertEqual(len(webhook_events), 1)
+
+        self.assertEqual(
+            webhook_events[0].webhook.user,
+            self.user_profile.user,
+        )
+        content = webhook_events[0].content
+        # Compare the webhook event payload
+        self.assertEqual(
+            content["webhook"]["event_type"],
+            WebhookEventType.OLD_DOCKET_ALERTS_REPORT,
+        )
+        # No disabled alerts since delete_old_alerts=False
+        self.assertEqual(len(content["payload"]["disabled_alerts"]), 0)
+
+        # Old alerts for webhook (Very old alerts in report)
+        # Two old alerts, the alert that should have been disabled now is
+        # within old alerts
+        self.assertEqual(len(content["payload"]["old_alerts"]), 2)
+
+        old_index = 1
+        disabled_index = 0
+        if (
+            content["payload"]["old_alerts"][0]["id"]
+            == self.very_old_docket_alert.pk
+        ):
+            old_index = 0
+            disabled_index = 1
+
+        self.assertEqual(
+            content["payload"]["old_alerts"][old_index]["docket"],
+            self.very_old_docket_alert.docket.pk,
+        )
+        self.assertEqual(
+            content["payload"]["old_alerts"][disabled_index]["docket"],
+            self.disabled_docket_alert.docket.pk,
+        )

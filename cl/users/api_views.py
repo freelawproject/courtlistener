@@ -141,6 +141,17 @@ class WebhooksViewSet(ModelViewSet):
                 event_dummy_curl = event_curl_template.render(
                     {"endpoint_url": webhook.url}
                 ).strip()
+            case WebhookEventType.OLD_DOCKET_ALERTS_REPORT:
+                event_template = loader.get_template(
+                    "includes/old_alerts_report_webhook_dummy.txt"
+                )
+                event_dummy_content = event_template.render().strip()
+                event_curl_template = loader.get_template(
+                    "includes/old_alerts_report_webhook_dummy_curl.txt"
+                )
+                event_dummy_curl = event_curl_template.render(
+                    {"endpoint_url": webhook.url}
+                ).strip()
             case _:
                 # Webhook types with no support yet.
                 event_dummy_content = (
@@ -161,6 +172,7 @@ class WebhooksViewSet(ModelViewSet):
                     "event_types": [
                         WebhookEventType.DOCKET_ALERT,
                         WebhookEventType.SEARCH_ALERT,
+                        WebhookEventType.OLD_DOCKET_ALERTS_REPORT,
                     ],
                 },
                 template_name="includes/webhooks_htmx/webhooks-test-webhook.html",
