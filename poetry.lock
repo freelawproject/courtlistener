@@ -1227,14 +1227,14 @@ source = ["Cython (>=0.29.7)"]
 
 [[package]]
 name = "lxml-stubs"
-version = "0.1.1"
+version = "0.4.0"
 description = "Type annotations for the lxml package"
 category = "dev"
 optional = false
 python-versions = "*"
 
 [package.extras]
-test = ["coverage[toml] (==5.2)", "pytest (>=6.0.0)", "pytest-mypy-plugins (==1.4.0)"]
+test = ["coverage[toml] (==5.2)", "pytest (>=6.0.0)", "pytest-mypy-plugins (==1.9.3)"]
 
 [[package]]
 name = "markdown2"
@@ -2303,7 +2303,7 @@ h11 = ">=0.9.0,<1"
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10, <3.11"
-content-hash = "7a63218e9bfe2efa5dbae9bcd7037feb7477b6de9d3ec1c4c1c2a69076fc49ab"
+content-hash = "d74305d472d3f430d3177381bfa69b8a18c389fc7b83b0153dde28d370c1fdf9"
 
 [metadata.files]
 amqp = [
@@ -3019,8 +3019,8 @@ lxml = [
     {file = "lxml-4.9.1.tar.gz", hash = "sha256:fe749b052bb7233fe5d072fcb549221a8cb1a16725c47c37e42b0b9cb3ff2c3f"},
 ]
 lxml-stubs = [
-    {file = "lxml-stubs-0.1.1.tar.gz", hash = "sha256:9b6a01ba4bccd6e532c01e19d2a3bc6d1d018fa0b9870236f61f315cb7b06648"},
-    {file = "lxml_stubs-0.1.1-py3-none-any.whl", hash = "sha256:d34a28be0e2525b0236aff7fe67af1f61911f556cadbc61f09810b69f762b747"},
+    {file = "lxml-stubs-0.4.0.tar.gz", hash = "sha256:184877b42127256abc2b932ba8bd0ab5ea80bd0b0fee618d16daa40e0b71abee"},
+    {file = "lxml_stubs-0.4.0-py3-none-any.whl", hash = "sha256:3b381e9e82397c64ea3cc4d6f79d1255d015f7b114806d4826218805c10ec003"},
 ]
 markdown2 = [
     {file = "markdown2-2.4.0-py2.py3-none-any.whl", hash = "sha256:8d4ef4a2d090c99532069c4611a9a2b9bea6ae1fa29b6c3727c95d1e31a8f6c5"},
