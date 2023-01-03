@@ -149,7 +149,7 @@ def get_docket_notes_and_tags_by_user(
     """
 
     notes = None
-    tags = []
+    user_tags = []
     favorite = (
         Favorite.objects.filter(docket_id=d_pk, user_id=user_pk)
         .only("notes")
@@ -158,12 +158,10 @@ def get_docket_notes_and_tags_by_user(
     if favorite and favorite.notes:
         notes = favorite.notes
 
-    docket_tags = DocketTag.objects.filter(
-        docket_id=d_pk, tag__user_id=user_pk
-    ).select_related("tag")
-    for docket_tag in docket_tags:
-        tags.append(docket_tag.tag)
-    return notes, tags
+    tags = UserTag.objects.filter(user_id=user_pk, dockets__id=d_pk)
+    for tag in tags:
+        user_tags.append(tag)
+    return notes, user_tags
 
 
 def make_alert_messages(

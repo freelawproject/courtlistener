@@ -12,6 +12,10 @@
   <div class="hidden-xs col-sm-1 col-md-2"></div>
   <div class="col-xs-12 col-sm-10 col-md-8">
     <h1>Help with Tags and Favorites on CourtListener</h1>
+    <p>The tagging and favorites features on CourtListener help you to tag, organize, and share cases that you are working with.
+    </p>
+    <p>We hope that if you find these tools useful, you will donate to <a href="https://free.law">Free Law Project</a>, the non-profit supporting CourtListener and RECAP, to support the ongoing development and maintenance of these and other features.
+    </p>
 
     <p>Read on to learn more or skip ahead to the section that interests you:</p>
       <ul>
@@ -39,11 +43,6 @@
       <hr>
 
     <h2 id="tags">Tags</h2>
-    <p>The tagging feature on CourtListener helps you to tag and organize cases that you are working with.
-    </p>
-    <p>Currently you are only able to tag dockets, but we plan to add documents and other types of records in the future.</p>
-    <p>We hope that if you find our tags useful, you will donate to <a href="https://free.law">Free Law Project</a>, the non-profit supporting CourtListener and RECAP, to support the ongoing development and maintenance of this and other features.
-    </p>
     <h3 id="tags-overview">Tags Overview</h3>
     <p>Every tag you create has a page on CourtListener listing items that are labelled with that tag. This allows you to organize and describe our content for your own purposes or to share with others. When you are on one of your tag pages, you can add a description of the tag, and you can make the tag public so that other people can see it too.
     </p>
@@ -90,10 +89,9 @@
     <p>Please stay tuned!</p>
 
     <h2 id="favorites">Favorites</h2>
-    <p>You can use the Favorites feature to save Dockets, RECAP Documents, Opinions, and Oral arguments within your Favorites list. You can add notes to each favorite item as well.</p>
+    <p>You can use the Favorites feature to save Dockets, RECAP Documents, Opinions, and Oral arguments to the <a href="{% url 'profile_favorites' %}">Favorites tab</a> in your account. You can add notes to each favorite item as well. Notes on dockets will be shown in <a href="{% url 'alert_help' %}#recap-alerts">docket alerts</a> that we send you, if you subscribe to a case.</p>
     <h3 id="making-favorites">Favorite an item</h3>
-    <p>To favorite an item on CourtListener, you must be logged in and go to the Docket, RECAP Document, Opinion, or Oral Argument that you want to add to your favorites list.</p>
-    <p>Then click on the star icon located to the left of the item title.</p>
+     <p>To favorite an item on CourtListener, log in and click the star icon to the left of the title of a Docket, RECAP Document, Opinion, or Oral Argument.</p>
     <p><img src="{% static "png/favorite-title.png" %}"
          alt="screenshot of the star icon to favorite an item"
          class="img-responsive img-rounded shadow center-block"
@@ -104,32 +102,32 @@
     <p><img src="{% static "png/make-a-favorite.png" %}"
          alt="screenshot of the creating a favorite modal"
          class="img-responsive img-rounded shadow center-block"
-         height="502"
-         width="913">
+         height="418"
+         width="749">
     </p>
     <p>Complete the box with following information:</p>
     <ol>
       <li>Name: Required field, by the default the item title, you can change it.</li>
-      <li>Notes: Optional, a note to the favorite, until 500 characters.</li>
+       <li>Notes: Optional, a private note explaining why the item is important or relevant (500 character limit).</li>
     </ol>
     <p>Click on the save button.</p>
     <h3 id="editing-favorites">Viewing, Editing or Deleting a Favorite</h3>
-    <p>You can view your favorite items in the Favorites tab within your user profile panel.</p>
+    <p>You can view your favorite items in the <a href="{% url 'profile_favorites' %}">Favorites tab</a> within your user profile panel.</p>
     <p><img src="{% static "png/view-favorites.png" %}"
          alt="screenshot of the favorites tab"
          class="img-responsive img-rounded shadow center-block"
-         height="503"
-         width="1164">
+         height="347"
+         width="749">
     </p>
     <p>Here, you can edit or delete a favorite item by clicking on the "Edit/Delete" button.</p>
     <p>A modal pops up:</p>
     <p><img src="{% static "png/edit-delete-favorites.png" %}"
          alt="screenshot of the edit/delete favorites modal"
          class="img-responsive img-rounded shadow center-block"
-         height="519"
-         width="1164">
+         height="347"
+         width="749">
     </p>
-    <p>You can change the content of the favorite and Save or delete it by clicking the “Delete” button in the bottom left corner.</p>
+   <p>You can change the content of the favorite and save or you can delete it by clicking the "Delete" button in the bottom left corner.</p>
 
   </div>
 {% endblock %}
