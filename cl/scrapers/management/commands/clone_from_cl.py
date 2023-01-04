@@ -8,7 +8,7 @@ from django.utils.dateparse import parse_date
 
 from cl.lib.command_utils import VerboseCommand
 from cl.people_db.models import Person
-from cl.search.models import OpinionCluster, Court, Docket, Citation, Opinion
+from cl.search.models import Citation, Court, Docket, Opinion, OpinionCluster
 from cl.search.tasks import add_items_to_solr
 
 env = environ.FileAwareEnv()
@@ -39,14 +39,13 @@ class Command(VerboseCommand):
             "--type",
             type=str,
             choices=VALID_TYPES,
-            help="Object type to clone. Current choices are %s" % ", ".join(
-                VALID_TYPES),
+            help="Object type to clone. Current choices are %s"
+            % ", ".join(VALID_TYPES),
         )
 
         parser.add_argument(
             "--id",
-            help="Object id, "
-                 "object id to clone",
+            help="Object id, " "object id to clone",
         )
 
     def handle(self, *args, **options):
@@ -80,8 +79,7 @@ class Command(VerboseCommand):
 
         try:
             cluster_obj = OpinionCluster.objects.get(pk=self.id)
-            print(
-                f"OpinionCluster with id: {self.id} already in local env.")
+            print(f"OpinionCluster with id: {self.id} already in local env.")
             return
         except OpinionCluster.DoesNotExist:
 
@@ -89,9 +87,7 @@ class Command(VerboseCommand):
             s.headers = {
                 "Authorization": f"Token {os.environ.get('CL_API_TOKEN', '')}"
             }
-            cluster_endpoint = (
-                f"https://www.courtlistener.com/api/rest/v3/clusters/{self.id}/"
-            )
+            cluster_endpoint = f"https://www.courtlistener.com/api/rest/v3/clusters/{self.id}/"
             results = s.get(cluster_endpoint).json()
 
             cluster_datum = results
@@ -192,11 +188,14 @@ class Command(VerboseCommand):
 
             with transaction.atomic():
                 docket_data["court"] = self.get_court_from_url(
-                    docket_data["court"])
+                    docket_data["court"]
+                )
                 docket_data["appeal_from"] = self.get_court_from_url(
-                    docket_data["appeal_from"])
+                    docket_data["appeal_from"]
+                )
                 docket_data["assigned_to"] = self.get_person_from_url(
-                    docket_data["assigned_to"])
+                    docket_data["assigned_to"]
+                )
                 Docket.objects.create(**docket_data)
                 print(
                     f"http://localhost:8000/docket/{docket_data['id']}/{docket_data['slug']}/"
@@ -204,8 +203,7 @@ class Command(VerboseCommand):
 
     @staticmethod
     def get_court_from_url(court_url: str) -> Court | None:
-        """Get court data from courtlistener api url
-        """
+        """Get court data from courtlistener api url"""
         if not court_url:
             return None
         s = requests.session()
@@ -225,8 +223,7 @@ class Command(VerboseCommand):
 
     @staticmethod
     def get_person_from_url(person_url: str) -> Person | None:
-        """Get person data from courtlistener api url
-        """
+        """Get person data from courtlistener api url"""
         if not person_url:
             return None
         s = requests.session()
