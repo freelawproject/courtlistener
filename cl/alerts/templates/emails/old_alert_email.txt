@@ -2,7 +2,7 @@
 Report of Old or Expiring Docket Alerts
 ***************************************
 
-This email lists docket alerts on long-stagnant cases that you may want to
+This email lists docket alerts on long-dormant cases that you may want to
 disable or that have been automatically disabled by our systems.
 
 Disabling these alerts will prevent them from counting towards your quota and
