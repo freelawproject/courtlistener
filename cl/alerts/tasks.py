@@ -149,7 +149,6 @@ def get_docket_notes_and_tags_by_user(
     """
 
     notes = None
-    user_tags = []
     favorite = (
         Favorite.objects.filter(docket_id=d_pk, user_id=user_pk)
         .only("notes")
@@ -158,9 +157,7 @@ def get_docket_notes_and_tags_by_user(
     if favorite and favorite.notes:
         notes = favorite.notes
 
-    tags = UserTag.objects.filter(user_id=user_pk, dockets__id=d_pk)
-    for tag in tags:
-        user_tags.append(tag)
+    user_tags = list(UserTag.objects.filter(user_id=user_pk, dockets__id=d_pk))
     return notes, user_tags
 
 
