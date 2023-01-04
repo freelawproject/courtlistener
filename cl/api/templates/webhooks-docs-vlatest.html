@@ -30,6 +30,7 @@
       <ul>
         <li><a href="#docket-alerts">Docket Alerts</a></li>
         <li><a href="#search-alerts">Search Alerts</a></li>
+        <li><a href="#old-da-alerts-report">Old Docket Alerts</a></li>
       </ul>
       <li><a href="#maintenance">Maintenance Schedule</a></li>
       <li><a href="#change-log">Change Log</a></li>
@@ -43,7 +44,7 @@
   </p>
   <p>To set this up, you create a URL on your server where CourtListener can send data. Then, whenever something important happens in CourtListener, we will POST an “event” to that URL as JSON data. When you receive the event, you can process it and perform whatever actions your system needs in response.
   </p>
-  <p>Currently, CourtListener can send webhook events whenever dockets are updated or search alerts are triggered. We are also contemplating or working on sending events when <a href="https://github.com/freelawproject/courtlistener/issues/2382" rel="nofollow" target="_blank">docket alerts expire</a>, when <a href="https://github.com/freelawproject/courtlistener/issues/703" rel="nofollow" target="_blank">RECAP Fetch tasks complete</a>, and more. If you have other events of interest, please get in touch.
+  <p>Currently, CourtListener can send webhook events whenever dockets are updated, search alerts are triggered, or docket alerts expire. We are also contemplating or working on sending events when <a href="https://github.com/freelawproject/courtlistener/issues/703" rel="nofollow" target="_blank">RECAP Fetch tasks complete</a>, and more. If you have other events of interest, please get in touch.
   </p>
 
   <h2 id="getting-started">Getting Started With Webhooks</h2>
@@ -292,6 +293,72 @@ xargs curl -X POST \
   <pre>curl -X OPTIONS \
   --url '{% get_full_host %}{% url "alert-list" version="v3" %}' \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' </pre>
+
+  <h3 id="old-da-alerts-report">Old Docket Alert Events</h3>
+  <p>If a case stops receiving updates due to being terminated or otherwise dormant, we automatically disable any <a href="{% url 'alert_help' %}#recap-alerts">docket alerts</a> that may be configured for it. This helps ease the load on our servers, and helps users in our free tier identify cases that they may wish to stop following.
+  </p>
+  <p>To help our users manage this, we send a weekly email telling our users about any docket alerts they have that will soon be automatically disabled. This allows them to take one of three actions on the alert:
+  </p>
+  <ol>
+    <li>
+      <p><strong>Do nothing</strong> &mdash; If the user does this, the alert will soon be deleted during the next week's automatic process.
+      </p>
+    </li>
+    <li>
+      <p><strong>Delete the alert</strong> &mdash; The user will immediately stop getting alerts for the case.</p>
+    </li>
+    <li>
+      <p><strong>Re-up the alert</strong> &mdash; This tells us that the user wishes to continue getting alerts for the case and pushes out the automatic disablement by about six months.</p>
+    </li>
+  </ol>
+  <p>By subscribing to this webhook your server will get a notification similar to the weekly email we send to users. At that time, your server can decide whether to continue monitoring stagnant cases (by re-upping them; see below) or let the automatic disablement occur.
+  </p>
+  <p>As with our other events, this webhook event is a JSON hash with two keys, <code>webhook</code> and <code>payload</code>. <code>payload</code> has two keys:</p>
+  <ul>
+    <li>
+      <p><code>disabled_alerts</code> (Automatically Disabled Alerts):</p>
+      <p>Contains a list of docket alerts that have been automatically disabled by our system on terminated cases that haven’t had updates for over 180 days. You can re-enable these alerts if they were disabled by mistake.
+      </p>
+    </li>
+    <li>
+      <p><code>old_alerts</code> (Old Terminated Cases):</p>
+      <p>Contains a list of docket alerts on terminated cases that were last updated about 180 days ago. These alerts will be disabled during the next week's process if you do not re-up them for another six months.
+      </p>
+    </li>
+  </ul>
+  <p>The shape of the data is thus:</p>
+  <pre>{
+   "payload":{
+      "old_alerts":[
+         {
+            "id":1,
+            "date_created":"2022-09-23T19:53:36.903277-07:00",
+            "date_last_hit":null,
+            "secret_key":"ehT7V9rmnBNIOV6rTMmMH0x6EvxeA0nYXfpN3Ks3",
+            "alert_type":1,
+            "docket":1
+         }
+      ],
+      "disabled_alerts":[...]
+   },
+   "webhook":{...}
+}</pre>
+  <p><code>old_alerts</code> and <code>disabled_alerts</code> contain a list of docket alert objects based on the <a href="{% url 'rest_docs' %}#docket-alerts-endpoint">Docket Alerts API</a> and have all the same fields. </p>
+  <h4>Re-upping a docket alert</h4>
+  <p>If a case has been dormant for a long time and you wish to continue monitoring it, you must re-up the alert. To do this, simply send an HTTP PATCH request to the <a href="{% url 'rest_docs' %}#docket-alerts-endpoint">Docket Alerts</a> API endpoint:</p>
+  <pre>curl -X PATCH \
+  --data 'alert_type=1' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docket-alert-list" version="v3" %}{id}/"
+</pre>
+  <p>Doing the above will tell our system that the alert was recently modified and thus should not be disabled for another six months.
+  </p>
+  <p>A similar request can be used to disable any docket alert:</p>
+  <pre>curl -X PATCH \
+  --data 'alert_type=0' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docket-alert-list" version="v3" %}{id}/"
+</pre>
 
   <h2 id="maintenance">Maintenance Schedule</h2>
   <p>Major server maintenance is scheduled on Thursday nights from 21:00PT to 23:59PT. If you are scheduling cron jobs or otherwise crawling the API, you may experience downtime during this window.
