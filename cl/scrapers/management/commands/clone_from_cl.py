@@ -1,3 +1,23 @@
+"""
+This tool allows you to partially clone a data from courtlistener.com to your
+local environment, you only need to pass the type and object id and run it.
+
+e.g.
+
+docker-compose -f docker/courtlistener/docker-compose.yml exec cl-django python manage.py clone_from_cl --type Opinion --id 9355884
+docker-compose -f docker/courtlistener/docker-compose.yml exec cl-django python manage.py clone_from_cl --type Docket --id 5377675
+docker-compose -f docker/courtlistener/docker-compose.yml exec cl-django python manage.py clone_from_cl --type Person --id 16207
+docker-compose -f docker/courtlistener/docker-compose.yml exec cl-django python manage.py clone_from_cl --type Court --id usnmcmilrev
+
+
+This tool is only for development purposes, to enable it you need to set
+environment variable DEVELOPMENT to True. Also need to set CL_API_TOKEN env
+variable.
+
+This is still work in progress, some data is not cloned yet.
+
+"""
+
 import os
 import sys
 
@@ -17,15 +37,19 @@ DEVELOPMENT = env.bool("DEVELOPMENT", default=False)
 VALID_TYPES = (
     "Opinion",
     "Docket",
+    "Person",
+    "Court"
 )
 
 cluster_endpoint = "https://www.courtlistener.com/api/rest/v3/clusters/"
+people_endpoint = "https://www.courtlistener.com/api/rest/v3/people/"
+courts_endpoint = "https://www.courtlistener.com/api/rest/v3/courts/"
 
 
 class Command(VerboseCommand):
     help = (
-        "Adds, updates, deletes items in an index, committing changes and "
-        "optimizing it, if requested."
+        "A helper function clone a data from courtlistener.com into local "
+        "environment "
     )
 
     def __init__(self, *args, **kwargs):
@@ -40,7 +64,7 @@ class Command(VerboseCommand):
             type=str,
             choices=VALID_TYPES,
             help="Object type to clone. Current choices are %s"
-            % ", ".join(VALID_TYPES),
+                 % ", ".join(VALID_TYPES),
         )
 
         parser.add_argument(
@@ -54,9 +78,6 @@ class Command(VerboseCommand):
         self.type = options.get("type")
         self.id = options.get("id")
 
-        print("self.type", self.type)
-        print("self.id", self.id)
-
         if not self.id:
             self.stdout.write("Object id required!")
             sys.exit(1)
@@ -66,19 +87,23 @@ class Command(VerboseCommand):
                 self.clone_opinion()
             elif self.type == "Docket":
                 self.clone_docket()
+            elif self.type == "Person":
+                self.clone_person()
+            elif self.type == "Court":
+                self.clone_court()
             else:
-                self.stdout.write("Invalid type")
+                self.stdout.write("Invalid type!")
 
         else:
             self.stdout.write("Command not enabled for production environment")
 
     def clone_opinion(self) -> None:
-        """Download opinion cluster data from courtlistener.com and add to
+        """Download opinion cluster data from courtlistener.com and add it to
         local environment
         """
 
         try:
-            cluster_obj = OpinionCluster.objects.get(pk=self.id)
+            obj = OpinionCluster.objects.get(pk=self.id)
             print(f"OpinionCluster with id: {self.id} already in local env.")
             return
         except OpinionCluster.DoesNotExist:
@@ -157,11 +182,11 @@ class Command(VerboseCommand):
                 )
 
     def clone_docket(self) -> None:
-        """Download docket data from courtlistener.com and add to
-        local environment
+        """Download docket data from courtlistener.com and add it to local
+        environment
         """
         try:
-            docket_obj = Docket.objects.get(pk=self.id)
+            obj = Docket.objects.get(pk=self.id)
             print(f"Docket with id: {self.id} already in local env.")
             return
         except Docket.DoesNotExist:
@@ -200,6 +225,32 @@ class Command(VerboseCommand):
                 print(
                     f"http://localhost:8000/docket/{docket_data['id']}/{docket_data['slug']}/"
                 )
+
+    def clone_person(self):
+        """Download person data from courtlistener.com and add it to local
+        environment
+        """
+        person_url = f"{people_endpoint}{self.id}/"
+        try:
+            obj = Person.objects.get(pk=self.id)
+            print(f"Person with id: {self.id} already in local env.")
+            return
+        except Person.DoesNotExist:
+            person = self.get_person_from_url(person_url)
+            print(f"http://localhost:8000/api/rest/v3/people/{self.id}/")
+
+    def clone_court(self):
+        """Download court data from courtlistener.com and add it to local
+        environment
+        """
+        court_url = f"{courts_endpoint}{self.id}/"
+        try:
+            obj = Court.objects.get(pk=self.id)
+            print(f"Court with id: {self.id} already in local env.")
+            return
+        except Court.DoesNotExist:
+            person = self.get_court_from_url(court_url)
+            print(f"http://localhost:8000/api/rest/v3/courts/{self.id}/")
 
     @staticmethod
     def get_court_from_url(court_url: str) -> Court | None:
