@@ -34,13 +34,17 @@ from redis import ConnectionError as RedisConnectionError
 from requests import HTTPError
 from requests.cookies import RequestsCookieJar
 from requests.packages.urllib3.exceptions import ReadTimeoutError
+from rest_framework.status import (
+    HTTP_500_INTERNAL_SERVER_ERROR,
+    HTTP_504_GATEWAY_TIMEOUT,
+)
 
 from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
 from cl.celery_init import app
 from cl.corpus_importer.tasks import (
     download_pacer_pdf_by_rd,
     download_pdf_by_magic_number,
-    get_attachment_page_by_rd,
+    get_att_report_by_rd,
     get_document_number_for_appellate,
     make_attachment_pq_object,
     update_rd_metadata,
@@ -1476,11 +1480,30 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> None:
         return
 
     try:
-        r = get_attachment_page_by_rd(rd.pk, cookies)
-    except (requests.RequestException, HTTPError):
+        r = get_att_report_by_rd(rd, cookies)
+    except HTTPError as exc:
         msg = "Failed to get attachment page from network."
-        mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
-        return
+        if exc.response.status_code in [
+            HTTP_500_INTERNAL_SERVER_ERROR,
+            HTTP_504_GATEWAY_TIMEOUT,
+        ]:
+            if self.request.retries == self.max_retries:
+                mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+                return
+            logger.info(
+                f"Ran into HTTPError: {exc.response.status_code}. Retrying."
+            )
+            raise self.retry(exc=exc)
+        else:
+            mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+            return
+    except requests.RequestException as exc:
+        if self.request.retries == self.max_retries:
+            msg = "Failed to get attachment page from network."
+            mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+            return
+        logger.info("Ran into a RequestException. Retrying.")
+        raise self.retry(exc=exc)
 
     text = r.response.text
     att_data = get_data_from_att_report(text, rd.docket_entry.docket.court_id)
@@ -2035,7 +2058,7 @@ def get_and_merge_rd_attachments(
             .recap_documents.earliest("date_created")
         )
         # Get the attachment page being logged into PACER
-        att_report = get_attachment_page_by_rd(main_rd.pk, cookies)
+        att_report = get_att_report_by_rd(main_rd, cookies)
 
     for docket_entry in dockets_updated:
         # Merge the attachments for each docket/recap document
