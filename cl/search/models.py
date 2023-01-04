@@ -2907,7 +2907,7 @@ class OpinionsCited(models.Model):
         unique_together = ("citing_opinion", "cited_opinion")
 
 
-class OpinionsCitedByDocument(models.Model):
+class OpinionsCitedByRECAPDocument(models.Model):
     citing_document = models.ForeignKey(
         RECAPDocument, related_name="cited_opinions", on_delete=models.CASCADE
     )
@@ -2925,7 +2925,7 @@ class OpinionsCitedByDocument(models.Model):
         return f"{self.citing_document.id} ⤜--cites⟶  {self.cited_opinion.id}"
 
     class Meta:
-        verbose_name_plural = "Opinions cited by non-opinion document"
+        verbose_name_plural = "Opinions cited by RECAP document"
         unique_together = ("citing_document", "cited_opinion")
 
 
