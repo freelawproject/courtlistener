@@ -34,12 +34,7 @@ from cl.search.tasks import add_items_to_solr
 env = environ.FileAwareEnv()
 DEVELOPMENT = env.bool("DEVELOPMENT", default=False)
 
-VALID_TYPES = (
-    "Opinion",
-    "Docket",
-    "Person",
-    "Court"
-)
+VALID_TYPES = ("Opinion", "Docket", "Person", "Court")
 
 cluster_endpoint = "https://www.courtlistener.com/api/rest/v3/clusters/"
 people_endpoint = "https://www.courtlistener.com/api/rest/v3/people/"
@@ -64,7 +59,7 @@ class Command(VerboseCommand):
             type=str,
             choices=VALID_TYPES,
             help="Object type to clone. Current choices are %s"
-                 % ", ".join(VALID_TYPES),
+            % ", ".join(VALID_TYPES),
         )
 
         parser.add_argument(
