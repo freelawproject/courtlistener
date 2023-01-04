@@ -21,7 +21,7 @@ from cl.simple_pages.views import (
     podcasts,
     recap_email_help,
     robots,
-    tag_help,
+    tag_favorites_help,
     validate_for_wot,
 )
 
@@ -41,7 +41,9 @@ urlpatterns = [
     path("help/alerts/", alert_help, name="alert_help"),
     path("help/donations/", donation_help, name="donation_help"),
     path("help/delete-account/", delete_help, name="delete_help"),
-    path("help/tags/", tag_help, name="tag_help"),
+    path(
+        "help/tags-favorites/", tag_favorites_help, name="tag_favorites_help"
+    ),
     path("help/search-operators/", advanced_search, name="advanced_search"),
     path("help/recap/email/", recap_email_help, name="recap_email_help"),
     path("help/broken-email/", broken_email_help, name="broken_email_help"),

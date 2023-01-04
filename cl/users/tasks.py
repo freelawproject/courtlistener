@@ -169,7 +169,7 @@ def send_webhook_still_disabled_email(webhook_pk: int) -> None:
     webhook = Webhook.objects.get(pk=webhook_pk)
     first_name = webhook.user.first_name
     days_disabled = get_days_disabled(webhook)
-    subject = f"[Action Needed]: Your {webhook.get_event_type_display()} has been disabled for {days_disabled}."
+    subject = f"[Action Needed]: Your {webhook.get_event_type_display()} webhook has been disabled for {days_disabled}."
     txt_template = "emails/webhook_still_disabled.txt"
     html_template = "emails/webhook_still_disabled.html"
     context = {
