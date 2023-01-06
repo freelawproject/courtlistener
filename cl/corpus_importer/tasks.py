@@ -17,7 +17,6 @@ from django.core.files.base import ContentFile
 from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Prefetch
 from django.db.models.query import prefetch_related_objects
-from django.utils.encoding import force_bytes
 from django.utils.timezone import now
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
@@ -1375,6 +1374,28 @@ def get_appellate_docket_by_docket_number(
     }
 
 
+def get_att_report_by_rd(
+    rd: RECAPDocument,
+    cookies: RequestsCookieJar,
+) -> Optional[AttachmentPage]:
+    """Method to get the attachment report for the item in PACER.
+
+    :param rd: The RECAPDocument object to use as a source.
+    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
+    logged-on PACER user.
+    :return: The attachment report populated with the results
+    """
+
+    if not rd.pacer_doc_id:
+        return None
+
+    s = PacerSession(cookies=cookies)
+    pacer_court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
+    att_report = AttachmentPage(pacer_court_id, s)
+    att_report.query(rd.pacer_doc_id)
+    return att_report
+
+
 @app.task(
     bind=True,
     autoretry_for=(PacerLoginException,),
@@ -1401,12 +1422,8 @@ def get_attachment_page_by_rd(
         # Some docket entries are just text/don't have a pacer_doc_id.
         self.request.chain = None
         return None
-
-    s = PacerSession(cookies=cookies)
-    pacer_court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
-    att_report = AttachmentPage(pacer_court_id, s)
     try:
-        att_report.query(rd.pacer_doc_id)
+        att_report = get_att_report_by_rd(rd, cookies)
     except HTTPError as exc:
         if exc.response.status_code in [
             HTTP_500_INTERNAL_SERVER_ERROR,
