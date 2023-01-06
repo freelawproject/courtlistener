@@ -716,6 +716,16 @@ def moosend_webhook(request: HttpRequest) -> HttpResponse:
                     profiles.update(wants_newsletter=wants_newsletter)
         except JSONDecodeError:
             # This case shouldn't happen but I'd rather be careful
+            '''
+            ***************** Warning *****************
+            Possible Log injection!
+            Path:
+            	File: views.py, Line: 719
+            		logger.error(
+            		                f"Moosend webhook got unexpected response: {request.body}"
+            		            )
+            		Tainted information is used in a sink.
+            '''
             logger.error(
                 f"Moosend webhook got unexpected response: {request.body}"
             )
