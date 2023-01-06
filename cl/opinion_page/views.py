@@ -68,35 +68,38 @@ from cl.search.views import do_search
 
 
 def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
-    if pk not in ["tennworkcompcl", "tennworkcompapp"]:
-        raise Http404(
-            "Court pages only implemented for Tennessee Worker Comp Courts."
-        )
+    """Individual Court Home Pages"""
+    if pk not in ["tennworkcompcl", "tennworkcompapp", "me"]:
+        raise Http404("Court pages only implemented for select courts.")
 
     render_dict = {
-        # Load the render_dict with good results that can be shown in the
-        # "Latest Cases" sections
-        "results_compcl": do_search(
-            request.GET.copy(),
-            rows=5,
-            override_params={
-                "order_by": "dateFiled desc",
-                "court": "tennworkcompcl",
-            },
-            facet=False,
-        )["results"],
-        "results_compapp": do_search(
-            request.GET.copy(),
-            rows=5,
-            override_params={
-                "order_by": "dateFiled desc",
-                "court": "tennworkcompapp",
-            },
-            facet=False,
-        )["results"],
         "private": False,
+        "pk": pk,
+        "court": Court.objects.get(pk=pk).full_name,
     }
-    return TemplateResponse(request, "court.html", render_dict)
+
+    if "tennworkcomp" in pk:
+        courts = ["tennworkcompcl", "tennworkcompapp"]
+        template = "tn-court.html"
+    else:
+        courts = [pk]
+        template = "court.html"
+
+    for court in courts:
+        if "tennwork" in court:
+            results = f"results_{court}"
+        else:
+            results = "results"
+        render_dict[results] = do_search(
+            request.GET.copy(),
+            rows=5,
+            override_params={
+                "order_by": "dateFiled desc",
+                "court": court,
+            },
+            facet=False,
+        )["results"]
+    return TemplateResponse(request, template, render_dict)
 
 
 @group_required(
