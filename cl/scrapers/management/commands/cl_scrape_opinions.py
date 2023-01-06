@@ -255,9 +255,13 @@ class Command(VerboseCommand):
             if (
                 court_str == "nev"
                 and item["precedential_statuses"] == "Unpublished"
-            ):
+            ) or court_str in ["neb"]:
                 # Nevada's non-precedential cases have different SHA1 sums
                 # every time.
+
+                # Nebraska updates the pdf causing the SHA1 to not match
+                # the opinions in CL causing duplicates. See CL issue #1452
+
                 lookup_params = {
                     "lookup_value": item["download_urls"],
                     "lookup_by": "download_url",

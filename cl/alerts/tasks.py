@@ -15,6 +15,7 @@ from cl.api.utils import send_webhook_event
 from cl.celery_init import app
 from cl.corpus_importer.api_serializers import DocketEntrySerializer
 from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.favorites.models import DocketTag, Favorite, UserTag
 from cl.lib.redis_utils import create_redis_semaphore, delete_redis_semaphore
 from cl.lib.string_utils import trunc
 from cl.search.models import Docket, DocketEntry
@@ -39,6 +40,7 @@ class DocketAlertRecipient:
     auto_subscribe: bool
     first_email: bool
     user_pk: int
+    username: str
 
 
 def get_docket_alert_recipients(
@@ -78,6 +80,7 @@ def get_docket_alert_recipients(
                 auto_subscribe=False,
                 first_email=False,
                 user_pk=da.user.pk,
+                username=da.user.username,
             )
             da_recipients_list.append(dar)
             webhook_recipients_list.append(da.user.pk)
@@ -119,6 +122,7 @@ def get_docket_alert_recipients(
                 auto_subscribe=user_profile.auto_subscribe,
                 first_email=True,
                 user_pk=user_profile.user.pk,
+                username=user_profile.user.username,
             )
             da_recipients_list.append(dar)
             # For first-time user-case notifications we only send webhook
@@ -131,6 +135,30 @@ def get_docket_alert_recipients(
         webhook_recipients_list,
         recap_email_user_does_not_exist_list,
     )
+
+
+def get_docket_notes_and_tags_by_user(
+    d_pk: int, user_pk: int
+) -> tuple[str | None, list[UserTag]]:
+    """Get user notes and tags for a docket.
+
+    :param d_pk: Docket primary key
+    :param user_pk: The User primary key
+    :return: A two tuple of docket notes or None if not available, a list of
+    tags assigned to the docket.
+    """
+
+    notes = None
+    favorite = (
+        Favorite.objects.filter(docket_id=d_pk, user_id=user_pk)
+        .only("notes")
+        .first()
+    )
+    if favorite and favorite.notes:
+        notes = favorite.notes
+
+    user_tags = list(UserTag.objects.filter(user_id=user_pk, dockets__id=d_pk))
+    return notes, user_tags
 
 
 def make_alert_messages(
@@ -164,6 +192,13 @@ def make_alert_messages(
     }
     messages = []
     for recipient in da_recipients:
+
+        notes, tags = get_docket_notes_and_tags_by_user(
+            d.pk, recipient.user_pk
+        )
+        email_context["notes"] = notes
+        email_context["tags"] = tags
+        email_context["username"] = recipient.username
         email_context["docket_alert_secret_key"] = recipient.secret_key
         email_context["first_email"] = recipient.first_email
         subject_context["first_email"] = recipient.first_email

@@ -102,3 +102,10 @@ class LegalProvider(BaseProvider):
         volume = random.randint(1, 999)
         page = random.randint(1, 999)
         return f"{volume} {reporter} {page}"
+
+    def random_id_string(self) -> str:
+        """Generate a random integer and convert to string.
+
+        :return: Random integer as string.
+        """
+        return str(random.randint(100_000, 400_000))

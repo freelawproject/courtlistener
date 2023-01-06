@@ -935,7 +935,7 @@ a.gray:hover, a.gray:focus, a.grey:hover, a.grey:focus {
 }
 
 span.star-pagination {
-  color: #999999;
+  color: #555555;
 }
 
 span.star-pagination::after {
@@ -1402,7 +1402,8 @@ textarea {
   margin-top: 5px;
   margin-bottom: 5px;
 }
-#toc > ul > ul  {
+#toc > ul > ul,
+#toc > ul > li > ul {
   padding-inline-start: 20px;
 }
 /* END Webhooks styles */
