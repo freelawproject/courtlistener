@@ -40,6 +40,7 @@ from rest_framework.status import (
 )
 
 from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
+from cl.api.models import WebhookEventType
 from cl.celery_init import app
 from cl.corpus_importer.tasks import (
     download_pacer_pdf_by_rd,
@@ -87,6 +88,7 @@ from cl.recap.models import (
     PacerHtmlFiles,
     ProcessingQueue,
 )
+from cl.recap.utils import send_recap_fetch_webhook_event
 from cl.scrapers.tasks import extract_recap_pdf, extract_recap_pdf_base
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
 from cl.search.tasks import add_items_to_solr, add_or_update_recap_docket
@@ -1565,12 +1567,14 @@ def fetch_pacer_case_id_and_title(s, fq, court_id):
     :param court_id: The CL ID of the court
     :return: A dict of the new information or an empty dict if it fails
     """
+
     if (fq.docket_id and not fq.docket.pacer_case_id) or fq.docket_number:
         # We lack the pacer_case_id either on the docket or from the
         # submission. Look it up.
         docket_number = fq.docket_number or getattr(
             fq.docket, "docket_number", None
         )
+
         report = PossibleCaseNumberApi(map_cl_to_pacer_id(court_id), s)
         report.query(docket_number)
         return report.data()
@@ -1643,6 +1647,8 @@ def fetch_docket(self, fq_pk):
     if cookies is None:
         msg = f"Cookie cache expired before task could run for user: {fq.user_id}"
         mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+        self.request.chain = None
+        return None
 
     s = PacerSession(cookies=cookies)
     try:
@@ -1679,14 +1685,17 @@ def fetch_docket(self, fq_pk):
     #   None       --> Sealed or missing case
     #   Empty dict --> Didn't run the pacer_case_id lookup (wasn't needed)
     #   Full dict  --> Ran the query, got back results
+
     if result is None:
         msg = "Cannot find case by docket number (perhaps it's sealed?)"
         mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
         self.request.chain = None
         return None
 
-    pacer_case_id = getattr(fq.docket, "pacer_case_id", None) or result.get(
-        "pacer_case_id"
+    pacer_case_id = (
+        getattr(fq, "pacer_case_id", None)
+        or getattr(fq.docket, "pacer_case_id", None)
+        or result.get("pacer_case_id")
     )
 
     if not pacer_case_id:
@@ -1720,8 +1729,6 @@ def fetch_docket(self, fq_pk):
         newly_enqueued = enqueue_docket_alert(d_pk)
         if newly_enqueued:
             send_alert_and_webhook(d_pk, start_time)
-    msg = "Successfully got and merged docket. Adding to Solr as final step."
-    mark_fq_status(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
     return result
 
 
@@ -1746,6 +1753,20 @@ def mark_fq_status(fq, msg, status):
     if status == PROCESSING_STATUS.SUCCESSFUL:
         fq.date_completed = now()
     fq.save()
+
+    # Send webhook event when the fetch task is completed, only send it for
+    # successful or failed like statuses.
+    if fq.status in [
+        PROCESSING_STATUS.SUCCESSFUL,
+        PROCESSING_STATUS.FAILED,
+        PROCESSING_STATUS.INVALID_CONTENT,
+        PROCESSING_STATUS.NEEDS_INFO,
+    ]:
+        user_webhooks = fq.user.webhooks.filter(
+            event_type=WebhookEventType.RECAP_FETCH, enabled=True
+        )
+        for user_webhook in user_webhooks:
+            send_recap_fetch_webhook_event(user_webhook, fq)
 
 
 def get_recap_email_recipients(
