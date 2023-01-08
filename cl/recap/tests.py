@@ -60,6 +60,7 @@ from cl.recap.factories import (
     DocketEntriesDataFactory,
     DocketEntryDataFactory,
     FjcIntegratedDatabaseFactory,
+    PacerFetchQueueFactory,
     ProcessingQueueFactory,
     RECAPEmailDocketDataFactory,
     RECAPEmailDocketEntryDataFactory,
@@ -100,7 +101,12 @@ from cl.recap.tasks import (
     process_recap_pdf,
     process_recap_zip,
 )
-from cl.search.factories import CourtFactory, DocketFactory
+from cl.search.factories import (
+    CourtFactory,
+    DocketEntryWithParentsFactory,
+    DocketFactory,
+    RECAPDocumentFactory,
+)
 from cl.search.models import (
     Court,
     Docket,
@@ -577,14 +583,20 @@ class RecapUploadsTest(TestCase):
     "cl.recap.tasks.PossibleCaseNumberApi",
     new=fakes.FakePossibleCaseNumberApi,
 )
+@mock.patch(
+    "cl.recap.tasks.is_pacer_court_accessible",
+    side_effect=lambda a: True,
+)
+@mock.patch(
+    "cl.recap.tasks.get_pacer_cookie_from_cache",
+    side_effect=lambda x: True,
+)
 class RecapDocketFetchApiTest(TestCase):
     """Tests for the RECAP docket Fetch API
 
     The general approach here is to use mocks to separate out the serialization
     and API tests from the processing logic tests.
     """
-
-    fixtures = ["judge_judy.json", "test_objects_search.json"]
 
     COURT = "scotus"
 
@@ -605,7 +617,9 @@ class RecapDocketFetchApiTest(TestCase):
     def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
 
-    def test_fetch_docket_by_docket_number(self) -> None:
+    def test_fetch_docket_by_docket_number(
+        self, mock_court_accessible, mock_cookies
+    ) -> None:
         """Can we do a simple fetch of a docket from PACER?"""
         fq = PacerFetchQueue.objects.create(
             user=self.user,
@@ -619,8 +633,12 @@ class RecapDocketFetchApiTest(TestCase):
 
         fq.refresh_from_db()
         self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
+        rds = RECAPDocument.objects.all()
+        self.assertEqual(rds.count(), 1)
 
-    def test_fetch_docket_by_pacer_case_id(self) -> None:
+    def test_fetch_docket_by_pacer_case_id(
+        self, mock_court_accessible, mock_cookies
+    ) -> None:
         fq = PacerFetchQueue.objects.create(
             user=self.user,
             request_type=REQUEST_TYPE.DOCKET,
@@ -631,21 +649,27 @@ class RecapDocketFetchApiTest(TestCase):
         result.get()
         fq.refresh_from_db()
         self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
+        rds = RECAPDocument.objects.all()
+        self.assertEqual(rds.count(), 1)
 
-    def test_fetch_docket_by_docket_id(self) -> None:
+    def test_fetch_docket_by_docket_id(
+        self, mock_court_accessible, mock_cookies
+    ) -> None:
         fq = PacerFetchQueue.objects.create(
-            user=self.user, request_type=REQUEST_TYPE.DOCKET, docket_id=1
+            user=self.user,
+            request_type=REQUEST_TYPE.DOCKET,
+            docket_id=self.docket.pk,
         )
         result = do_pacer_fetch(fq)
         result.get()
         fq.refresh_from_db()
         self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
+        rds = RECAPDocument.objects.all()
+        self.assertEqual(rds.count(), 1)
 
-    @mock.patch(
-        "cl.recap.tasks.is_pacer_court_accessible",
-        side_effect=lambda a: True,
-    )
-    def test_fetch_docket_send_alert(self, mock_court_accessible) -> None:
+    def test_fetch_docket_send_alert(
+        self, mock_court_accessible, mock_cookies
+    ) -> None:
         """
         Does a docket alert is triggered when fetching a docket from PACER?
         """
@@ -5411,3 +5435,222 @@ class WebhooksRetries(TestCase):
                     )
                 message = mail.outbox[email_out - 1]
                 self.assertIn(subject_to_compare, message.subject)
+
+
+@mock.patch("cl.recap.tasks.DocketReport", new=fakes.FakeDocketReport)
+@mock.patch(
+    "cl.recap.tasks.PossibleCaseNumberApi",
+    new=fakes.FakePossibleCaseNumberApi,
+)
+@mock.patch(
+    "cl.recap.tasks.is_pacer_court_accessible",
+    side_effect=lambda a: True,
+)
+@mock.patch(
+    "cl.recap.tasks.get_pacer_cookie_from_cache",
+    side_effect=lambda x: True,
+)
+class RecapFetchWebhooksTest(TestCase):
+    """Test RECAP Fetch Webhooks"""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.user_profile = UserProfileWithParentsFactory()
+        cls.webhook_enabled = WebhookFactory(
+            user=cls.user_profile.user,
+            event_type=WebhookEventType.RECAP_FETCH,
+            url="https://example.com/",
+            enabled=True,
+        )
+
+        cls.user_profile_2 = UserProfileWithParentsFactory()
+        cls.webhook_disabled = WebhookFactory(
+            user=cls.user_profile_2.user,
+            event_type=WebhookEventType.RECAP_FETCH,
+            url="https://example.com/",
+            enabled=False,
+        )
+
+        att_page = fakes.FakeAttachmentPage()
+        pacer_doc_id = att_page.data["pacer_doc_id"]
+        document_number = att_page.data["document_number"]
+        cls.de = DocketEntryWithParentsFactory(
+            docket__court=cls.court, entry_number=document_number
+        )
+        cls.rd = RECAPDocumentFactory(
+            docket_entry=cls.de,
+            pacer_doc_id=pacer_doc_id,
+            document_number=document_number,
+        )
+
+    def test_recap_fetch_docket_webhook(
+        self, mock_court_accessible, mock_cookies
+    ):
+        """Can we send a webhook event when a docket RECAP fetch completed?"""
+
+        fq = PacerFetchQueueFactory(
+            user=self.user_profile.user,
+            request_type=REQUEST_TYPE.DOCKET,
+            court_id=self.court.pk,
+            docket_number=fakes.DOCKET_NUMBER,
+        )
+
+        dockets = Docket.objects.all()
+        self.assertEqual(dockets.count(), 1)
+
+        with mock.patch(
+            "cl.api.utils.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            result = do_pacer_fetch(fq)
+
+        # Wait for the chain to complete
+        result.get()
+
+        fq.refresh_from_db()
+        self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
+
+        self.assertEqual(dockets.count(), 2)
+
+        # Only one webhook event should be triggered for user_profile since
+        # user_profile_2 webhook endpoint is disabled.
+        webhook_events = WebhookEvent.objects.all()
+        self.assertEqual(len(webhook_events), 1)
+        self.assertEqual(
+            webhook_events[0].webhook.user,
+            self.user_profile.user,
+        )
+        content = webhook_events[0].content
+        # Compare the webhook event payload
+        self.assertEqual(
+            content["webhook"]["event_type"],
+            WebhookEventType.RECAP_FETCH,
+        )
+        self.assertEqual(content["payload"]["id"], fq.id)
+        self.assertEqual(
+            content["payload"]["status"], PROCESSING_STATUS.SUCCESSFUL
+        )
+        self.assertNotEqual(content["payload"]["date_completed"], None)
+
+    @mock.patch(
+        "cl.recap.mergers.AttachmentPage",
+        new=fakes.FakeAttachmentPage,
+    )
+    @mock.patch(
+        "cl.corpus_importer.tasks.AttachmentPage",
+        new=fakes.FakeAttachmentPage,
+    )
+    def test_recap_attachment_page_webhook(
+        self, mock_court_accessible, mock_cookies
+    ):
+        """Can we send a webhook event when an attachment page RECAP fetch
+        completed?
+        """
+
+        fq = PacerFetchQueueFactory(
+            user=self.user_profile.user,
+            request_type=REQUEST_TYPE.ATTACHMENT_PAGE,
+            recap_document=self.rd,
+        )
+
+        with mock.patch(
+            "cl.api.utils.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            result = do_pacer_fetch(fq)
+
+        # Wait for the chain to complete
+        result.get()
+
+        dockets = Docket.objects.all()
+        self.assertEqual(len(dockets), 1)
+
+        fq.refresh_from_db()
+        self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
+
+        # Only one webhook event should be triggered for user_profile since
+        # user_profile_2 webhook endpoint is disabled.
+        webhook_events = WebhookEvent.objects.all()
+        self.assertEqual(len(webhook_events), 1)
+
+        self.assertEqual(
+            webhook_events[0].webhook.user,
+            self.user_profile.user,
+        )
+        content = webhook_events[0].content
+        # Compare the webhook event payload
+        self.assertEqual(
+            content["webhook"]["event_type"],
+            WebhookEventType.RECAP_FETCH,
+        )
+        self.assertEqual(content["payload"]["id"], fq.id)
+        self.assertEqual(
+            content["payload"]["status"], PROCESSING_STATUS.SUCCESSFUL
+        )
+        self.assertNotEqual(content["payload"]["date_completed"], None)
+
+    @mock.patch(
+        "cl.recap.tasks.download_pacer_pdf_by_rd",
+        side_effect=lambda z, x, c, v, b: (
+            MockResponse(
+                200,
+                mock_bucket_open(
+                    "gov.uscourts.ca8.17-2543.00803263743.0.pdf", "rb", True
+                ),
+            ),
+            "OK",
+        ),
+    )
+    def test_recap_pacer_doc_webhook(
+        self, mock_court_accessible, mock_cookies, mock_download_pdf
+    ):
+        """Can we send a webhook event when a PDF RECAP fetch completed?"""
+
+        fq = PacerFetchQueueFactory(
+            user=self.user_profile.user,
+            request_type=REQUEST_TYPE.PDF,
+            recap_document=self.rd,
+        )
+
+        with mock.patch(
+            "cl.api.utils.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            result = do_pacer_fetch(fq)
+
+        # Wait for the chain to complete
+        result.get()
+
+        dockets = Docket.objects.all()
+        self.assertEqual(len(dockets), 1)
+
+        fq.refresh_from_db()
+        self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
+
+        # Only one webhook event should be triggered for user_profile since
+        # user_profile_2 webhook endpoint is disabled.
+        webhook_events = WebhookEvent.objects.all()
+        self.assertEqual(len(webhook_events), 1)
+
+        self.assertEqual(
+            webhook_events[0].webhook.user,
+            self.user_profile.user,
+        )
+        content = webhook_events[0].content
+        # Compare the webhook event payload
+        self.assertEqual(
+            content["webhook"]["event_type"],
+            WebhookEventType.RECAP_FETCH,
+        )
+        self.assertEqual(content["payload"]["id"], fq.id)
+        self.assertEqual(
+            content["payload"]["status"], PROCESSING_STATUS.SUCCESSFUL
+        )
+        self.assertNotEqual(content["payload"]["date_completed"], None)
