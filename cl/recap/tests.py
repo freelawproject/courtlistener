@@ -2413,7 +2413,7 @@ class RecapEmailDocketAlerts(TestCase):
         side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
     @mock.patch(
-        "cl.api.utils.requests.post",
+        "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
     def test_new_recap_email_case_auto_subscription(
@@ -2476,7 +2476,7 @@ class RecapEmailDocketAlerts(TestCase):
         side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
     @mock.patch(
-        "cl.api.utils.requests.post",
+        "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
     def test_new_recap_email_case_auto_subscription_prev_user(
@@ -2560,7 +2560,7 @@ class RecapEmailDocketAlerts(TestCase):
         side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
     @mock.patch(
-        "cl.api.utils.requests.post",
+        "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
     def test_new_recap_email_case_no_auto_subscription(
@@ -2616,7 +2616,7 @@ class RecapEmailDocketAlerts(TestCase):
         side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
     @mock.patch(
-        "cl.api.utils.requests.post",
+        "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
     def test_new_recap_email_case_no_auto_subscription_prev_user(
@@ -2741,7 +2741,7 @@ class RecapEmailDocketAlerts(TestCase):
         side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
     @mock.patch(
-        "cl.api.utils.requests.post",
+        "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
     def test_receive_same_recap_email_notification_different_users(
@@ -2839,7 +2839,7 @@ class RecapEmailDocketAlerts(TestCase):
         side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
     @mock.patch(
-        "cl.api.utils.requests.post",
+        "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
     def test_new_recap_email_subscribe_by_email_link(
@@ -2903,7 +2903,7 @@ class RecapEmailDocketAlerts(TestCase):
         side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
     @mock.patch(
-        "cl.api.utils.requests.post",
+        "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
     def test_new_recap_email_unsubscribe_by_email_link(
@@ -2986,7 +2986,7 @@ class RecapEmailDocketAlerts(TestCase):
         side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
     @mock.patch(
-        "cl.api.utils.requests.post",
+        "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
     def test_new_recap_email_alerts_integration(
@@ -3100,7 +3100,7 @@ class RecapEmailDocketAlerts(TestCase):
         side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
     @mock.patch(
-        "cl.api.utils.requests.post",
+        "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
     def test_docket_alert_toggle_confirmation_fails(
@@ -3174,7 +3174,7 @@ class RecapEmailDocketAlerts(TestCase):
         side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
     @mock.patch(
-        "cl.api.utils.requests.post",
+        "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
     @mock.patch(
@@ -3294,7 +3294,7 @@ class RecapEmailDocketAlerts(TestCase):
         ),
     )
     @mock.patch(
-        "cl.api.utils.requests.post",
+        "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
     def test_extract_pdf_for_recap_email(
@@ -3336,7 +3336,7 @@ class RecapEmailDocketAlerts(TestCase):
         side_effect=lambda z, x: "009033568259",
     )
     @mock.patch(
-        "cl.api.utils.requests.post",
+        "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
     def test_new_nda_recap_email(
@@ -3371,7 +3371,7 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(docket.docket_number, "21-16499")
 
     @mock.patch(
-        "cl.api.utils.requests.post",
+        "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
     @mock.patch(
@@ -3451,7 +3451,7 @@ class RecapEmailDocketAlerts(TestCase):
         side_effect=lambda z, x: "009033568259",
     )
     @mock.patch(
-        "cl.api.utils.requests.post",
+        "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
     def test_new_nda_recap_email_case_no_auto_subscription(
@@ -3519,7 +3519,7 @@ class RecapEmailDocketAlerts(TestCase):
         ),
     )
     @mock.patch(
-        "cl.api.utils.requests.post",
+        "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
     def test_multiple_docket_nef(
@@ -3654,7 +3654,7 @@ class RecapEmailDocketAlerts(TestCase):
         side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
     @mock.patch(
-        "cl.api.utils.requests.post",
+        "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
     @mock.patch(
@@ -4465,7 +4465,7 @@ class WebhooksRetries(TestCase):
             next_retry_date=fake_now + timedelta(minutes=3),
         )
         with mock.patch(
-            "cl.api.utils.requests.post",
+            "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
@@ -4473,7 +4473,7 @@ class WebhooksRetries(TestCase):
             # Try to retry on the exact time, 3 minutes later.
             next_retry_date = fake_now + timedelta(minutes=3)
             with time_machine.travel(next_retry_date, tick=False):
-                with mock.patch("cl.api.utils.send_webhook_event"):
+                with mock.patch("cl.api.webhooks.send_webhook_event"):
                     # webhook_e1 shouldn't be retried since its parent webhook
                     # is disabled.
                     retried_webhooks = retry_webhook_events()
@@ -4523,7 +4523,7 @@ class WebhooksRetries(TestCase):
         )
 
         with mock.patch(
-            "cl.api.utils.requests.post",
+            "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, raw=self.file_stream
             ),
@@ -4606,7 +4606,7 @@ class WebhooksRetries(TestCase):
         webhook_e1_compare = WebhookEvent.objects.filter(pk=webhook_e1.id)
         for status_code, expected_event_status in status_codes_tests:
             with mock.patch(
-                "cl.api.utils.requests.post",
+                "cl.api.webhooks.requests.post",
                 side_effect=lambda *args, **kwargs: MockResponse(
                     status_code, raw=self.file_stream
                 ),
@@ -4641,7 +4641,7 @@ class WebhooksRetries(TestCase):
         after receiving an HttpResponse with a failure status code.
         """
         with mock.patch(
-            "cl.api.utils.requests.post",
+            "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 500,
                 raw=self.file_stream_error,
@@ -4704,7 +4704,7 @@ class WebhooksRetries(TestCase):
         """
 
         with mock.patch(
-            "cl.api.utils.requests.post",
+            "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: exec(
                 "raise ConnectionError('Connection Error')"
             ),
@@ -4767,7 +4767,7 @@ class WebhooksRetries(TestCase):
         """
 
         with mock.patch(
-            "cl.api.utils.requests.post",
+            "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, raw=self.file_stream
             ),
@@ -4824,7 +4824,7 @@ class WebhooksRetries(TestCase):
         """
 
         with mock.patch(
-            "cl.api.utils.requests.post",
+            "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 500, raw=self.file_stream
             ),
@@ -4967,7 +4967,7 @@ class WebhooksRetries(TestCase):
         webhook_e2_compare = WebhookEvent.objects.filter(pk=webhook_e2.id)
         for try_count, notification_out, webhook_enabled in iterations:
             with mock.patch(
-                "cl.api.utils.requests.post",
+                "cl.api.webhooks.requests.post",
                 side_effect=lambda *args, **kwargs: MockResponse(
                     500, mock_raw=True
                 ),
@@ -5095,7 +5095,7 @@ class WebhooksRetries(TestCase):
         webhook_compare = Webhook.objects.filter(pk=self.webhook.pk)
 
         with mock.patch(
-            "cl.api.utils.requests.post",
+            "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 500, mock_raw=True
             ),
@@ -5125,7 +5125,7 @@ class WebhooksRetries(TestCase):
                 self.assertEqual(webhooks_to_retry, 0)
 
         with mock.patch(
-            "cl.api.utils.requests.post",
+            "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
@@ -5202,7 +5202,7 @@ class WebhooksRetries(TestCase):
         for try_count, notification_out in iterations:
             # Try to deliver webhook_e1 and webhook_e2 4 times.
             with mock.patch(
-                "cl.api.utils.requests.post",
+                "cl.api.webhooks.requests.post",
                 side_effect=lambda *args, **kwargs: MockResponse(
                     500, mock_raw=True
                 ),
@@ -5227,7 +5227,7 @@ class WebhooksRetries(TestCase):
                         )
 
         with mock.patch(
-            "cl.api.utils.requests.post",
+            "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
@@ -5254,7 +5254,7 @@ class WebhooksRetries(TestCase):
         # 6th try, and disable the webhook endpoint on the 8th try.
         for try_count, notification_out, webhook_enabled in iterations:
             with mock.patch(
-                "cl.api.utils.requests.post",
+                "cl.api.webhooks.requests.post",
                 side_effect=lambda *args, **kwargs: MockResponse(
                     500, mock_raw=True
                 ),
@@ -5383,7 +5383,7 @@ class WebhooksRetries(TestCase):
 
         webhook_e1_compare = WebhookEvent.objects.filter(pk=webhook_e1.id)
         with mock.patch(
-            "cl.api.utils.requests.post",
+            "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 500, mock_raw=True
             ),
@@ -5500,7 +5500,7 @@ class RecapFetchWebhooksTest(TestCase):
         self.assertEqual(dockets.count(), 1)
 
         with mock.patch(
-            "cl.api.utils.requests.post",
+            "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
@@ -5557,7 +5557,7 @@ class RecapFetchWebhooksTest(TestCase):
         )
 
         with mock.patch(
-            "cl.api.utils.requests.post",
+            "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
@@ -5618,7 +5618,7 @@ class RecapFetchWebhooksTest(TestCase):
         )
 
         with mock.patch(
-            "cl.api.utils.requests.post",
+            "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),

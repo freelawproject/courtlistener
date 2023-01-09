@@ -6,7 +6,7 @@ from django.db import transaction
 from django.utils.timezone import now
 
 from cl.api.models import WEBHOOK_EVENT_STATUS, Webhook, WebhookEvent
-from cl.api.utils import send_webhook_event
+from cl.api.webhooks import send_webhook_event
 from cl.lib.command_utils import VerboseCommand
 from cl.lib.redis_utils import make_redis_interface
 from cl.users.tasks import send_webhook_still_disabled_email

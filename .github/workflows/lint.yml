@@ -91,7 +91,7 @@ jobs:
           cl/users/forms.py \
           cl/users/email_handlers.py \
           cl/users/tasks.py \
-          cl/recap/utils.py
+          cl/api/webhooks.py
 
       - name: Flynt f-string Formatter
         run: >
