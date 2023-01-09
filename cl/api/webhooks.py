@@ -11,7 +11,10 @@ from cl.alerts.api_serializers import (
 from cl.alerts.models import Alert
 from cl.alerts.utils import OldAlertReport
 from cl.api.models import Webhook, WebhookEvent, WebhookEventType
-from cl.api.utils import update_webhook_event_after_request
+from cl.api.utils import (
+    generate_webhook_key_content,
+    update_webhook_event_after_request,
+)
 from cl.celery_init import app
 from cl.corpus_importer.api_serializers import DocketEntrySerializer
 from cl.lib.string_utils import trunc
@@ -83,12 +86,7 @@ def send_docket_alert_webhooks(
 
     for webhook in webhooks:
         post_content = {
-            "webhook": {
-                "event_type": webhook.event_type,
-                "version": webhook.version,
-                "date_created": webhook.date_created.isoformat(),
-                "deprecation_date": None,
-            },
+            "webhook": generate_webhook_key_content(webhook),
             "payload": {
                 "results": serialized_docket_entries,
             },
@@ -130,12 +128,7 @@ def send_old_alerts_webhook_event(
         )
 
     post_content = {
-        "webhook": {
-            "event_type": webhook.event_type,
-            "version": webhook.version,
-            "date_created": webhook.date_created.isoformat(),
-            "deprecation_date": None,
-        },
+        "webhook": generate_webhook_key_content(webhook),
         "payload": {
             "old_alerts": serialized_very_old_alerts,
             "disabled_alerts": serialized_disabled_alerts,
@@ -165,12 +158,7 @@ def send_recap_fetch_webhook_event(
 
     payload = PacerFetchQueueSerializer(fq).data
     post_content = {
-        "webhook": {
-            "event_type": webhook.event_type,
-            "version": webhook.version,
-            "date_created": webhook.date_created.isoformat(),
-            "deprecation_date": None,
-        },
+        "webhook": generate_webhook_key_content(webhook),
         "payload": payload,
     }
     renderer = JSONRenderer()
@@ -218,12 +206,7 @@ def send_search_alert_webhook(
     ).data
 
     post_content = {
-        "webhook": {
-            "event_type": webhook.event_type,
-            "version": webhook.version,
-            "date_created": webhook.date_created.isoformat(),
-            "deprecation_date": None,
-        },
+        "webhook": generate_webhook_key_content(webhook),
         "payload": {
             "results": serialized_results,
             "alert": serialized_alert,
