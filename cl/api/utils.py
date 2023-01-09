@@ -3,7 +3,6 @@ from collections import OrderedDict, defaultdict
 from datetime import date, datetime, timedelta
 from typing import Dict, List, Set, Union
 
-import requests
 from dateutil import parser
 from dateutil.rrule import DAILY, rrule
 from django.conf import settings
@@ -21,7 +20,6 @@ from requests import Response
 from rest_framework import serializers
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.permissions import DjangoModelPermissions
-from rest_framework.renderers import JSONRenderer
 from rest_framework.request import clone_request
 from rest_framework.throttling import UserRateThrottle
 from rest_framework_filters import FilterSet, RelatedFilter
@@ -29,7 +27,6 @@ from rest_framework_filters.backends import RestFrameworkFilterBackend
 
 from cl.api.models import WEBHOOK_EVENT_STATUS, WebhookEvent
 from cl.lib.redis_utils import make_redis_interface
-from cl.lib.string_utils import trunc
 from cl.stats.models import Event
 from cl.stats.utils import MILESTONES_FLAT, get_milestone_range
 from cl.users.tasks import notify_failing_webhook
@@ -710,40 +707,3 @@ def update_webhook_event_after_request(
     else:
         webhook_event.event_status = WEBHOOK_EVENT_STATUS.SUCCESSFUL
     webhook_event.save()
-
-
-def send_webhook_event(
-    webhook_event: WebhookEvent, content_bytes: bytes | None = None
-) -> None:
-    """Send the webhook POST request.
-
-    :param webhook_event: An WebhookEvent to send.
-    :param content_bytes: Optional, the bytes JSON content to send the first time
-    the webhook is sent.
-    """
-    headers = {
-        "Content-type": "application/json",
-        "Idempotency-Key": str(webhook_event.event_id),
-    }
-    if content_bytes:
-        json_bytes = content_bytes
-    else:
-        renderer = JSONRenderer()
-        json_bytes = renderer.render(
-            webhook_event.content,
-            accepted_media_type="application/json;",
-        )
-    try:
-        response = requests.post(
-            webhook_event.webhook.url,
-            data=json_bytes,
-            timeout=(1, 1),
-            stream=True,
-            headers=headers,
-            allow_redirects=False,
-        )
-        update_webhook_event_after_request(webhook_event, response)
-    except (requests.ConnectionError, requests.Timeout) as exc:
-        error_str = f"{type(exc).__name__}: {exc}"
-        trunc(error_str, 500)
-        update_webhook_event_after_request(webhook_event, error=error_str)

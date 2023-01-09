@@ -178,7 +178,7 @@ class DocketAlertTest(TestCase):
         self.assertEqual(len(mail.outbox), 0)
 
     @mock.patch(
-        "cl.api.utils.requests.post",
+        "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
     def test_triggering_docket_webhook(self, mock_post) -> None:
@@ -589,7 +589,7 @@ class SearchAlertsWebhooksTest(EmptySolrTestCase):
         self.assertEqual(len(search_alerts), 6)
 
         with mock.patch(
-            "cl.api.utils.requests.post",
+            "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
@@ -685,7 +685,7 @@ class SearchAlertsWebhooksTest(EmptySolrTestCase):
         ]
         for rate, events, results in rates:
             with mock.patch(
-                "cl.api.utils.requests.post",
+                "cl.api.webhooks.requests.post",
                 side_effect=lambda *args, **kwargs: MockResponse(
                     200, mock_raw=True
                 ),
@@ -1223,7 +1223,7 @@ class OldDocketAlertsWebhooksTest(TestCase):
 
         # Run handle_old_docket_alerts command, mocking webhook request.
         with mock.patch(
-            "cl.api.utils.requests.post",
+            "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
@@ -1290,7 +1290,7 @@ class OldDocketAlertsWebhooksTest(TestCase):
 
         # Run command again
         with mock.patch(
-            "cl.api.utils.requests.post",
+            "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
@@ -1321,7 +1321,7 @@ class OldDocketAlertsWebhooksTest(TestCase):
         # Run handle_old_docket_alerts command with delete_old_alerts=False,
         # mocking webhook request.
         with mock.patch(
-            "cl.api.utils.requests.post",
+            "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
