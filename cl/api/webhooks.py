@@ -1,5 +1,3 @@
-import json
-
 import requests
 from rest_framework.renderers import JSONRenderer
 from scorched.response import SolrResponse
@@ -10,20 +8,17 @@ from cl.alerts.api_serializers import (
 )
 from cl.alerts.models import Alert
 from cl.alerts.utils import OldAlertReport
-from cl.api.models import Webhook, WebhookEvent, WebhookEventType
+from cl.api.models import Webhook, WebhookEvent
 from cl.api.utils import (
     generate_webhook_key_content,
     update_webhook_event_after_request,
 )
-from cl.celery_init import app
-from cl.corpus_importer.api_serializers import DocketEntrySerializer
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.string_utils import trunc
 from cl.recap.api_serializers import PacerFetchQueueSerializer
 from cl.recap.models import PacerFetchQueue
 from cl.search.api_serializers import SearchResultSerializer
 from cl.search.api_utils import SolrObject
-from cl.search.models import DocketEntry
 
 
 def send_webhook_event(
@@ -61,48 +56,6 @@ def send_webhook_event(
         error_str = f"{type(exc).__name__}: {exc}"
         trunc(error_str, 500)
         update_webhook_event_after_request(webhook_event, error=error_str)
-
-
-@app.task()
-def send_docket_alert_webhooks(
-    des_pks: list[int],
-    webhook_recipients_pks: list[int],
-) -> None:
-    """POSTS the DocketAlert to the recipients webhook(s)
-
-    :param des_pks: The list of docket entries primary keys.
-    :param webhook_recipients_pks: A list of User pks to send the webhook to.
-    :return: None
-    """
-
-    webhooks = Webhook.objects.filter(
-        event_type=WebhookEventType.DOCKET_ALERT,
-        user_id__in=webhook_recipients_pks,
-        enabled=True,
-    )
-    docket_entries = DocketEntry.objects.filter(pk__in=des_pks)
-    serialized_docket_entries = []
-    for de in docket_entries:
-        serialized_docket_entries.append(DocketEntrySerializer(de).data)
-
-    for webhook in webhooks:
-        post_content = {
-            "webhook": generate_webhook_key_content(webhook),
-            "payload": {
-                "results": serialized_docket_entries,
-            },
-        }
-        renderer = JSONRenderer()
-        json_bytes = renderer.render(
-            post_content,
-            accepted_media_type="application/json;",
-        )
-
-        webhook_event = WebhookEvent.objects.create(
-            webhook=webhook,
-            content=post_content,
-        )
-        send_webhook_event(webhook_event, json_bytes)
 
 
 def send_old_alerts_webhook_event(
@@ -221,23 +174,3 @@ def send_search_alert_webhook(
         content=post_content,
     )
     send_webhook_event(webhook_event, json_bytes)
-
-
-@app.task()
-def send_test_webhook_event(
-    webhook_pk: int,
-    content_str: str,
-) -> None:
-    """POSTS the test webhook event.
-
-    :param webhook_pk: The webhook primary key.
-    :param content_str: The str content to POST.
-    :return: None
-    """
-
-    webhook = Webhook.objects.get(pk=webhook_pk)
-    json_obj = json.loads(content_str)
-    webhook_event = WebhookEvent.objects.create(
-        webhook=webhook, content=json_obj, debug=True
-    )
-    send_webhook_event(webhook_event, content_str.encode("utf-8"))

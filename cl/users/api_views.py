@@ -14,7 +14,7 @@ from rest_framework.viewsets import ModelViewSet
 
 from cl.api.api_permissions import IsOwner
 from cl.api.models import Webhook, WebhookEvent, WebhookEventType
-from cl.api.webhooks import send_test_webhook_event
+from cl.api.tasks import send_test_webhook_event
 from cl.users.filters import WebhookEventViewFilter
 from cl.users.forms import WebhookForm
 
