@@ -8,7 +8,7 @@ from cl.alerts.api_serializers import (
 )
 from cl.alerts.models import Alert
 from cl.alerts.utils import OldAlertReport
-from cl.api.models import Webhook, WebhookEvent
+from cl.api.models import Webhook, WebhookEvent, WebhookEventType
 from cl.api.utils import (
     generate_webhook_key_content,
     update_webhook_event_after_request,
@@ -16,7 +16,7 @@ from cl.api.utils import (
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.string_utils import trunc
 from cl.recap.api_serializers import PacerFetchQueueSerializer
-from cl.recap.models import PacerFetchQueue
+from cl.recap.models import PROCESSING_STATUS, PacerFetchQueue
 from cl.search.api_serializers import SearchResultSerializer
 from cl.search.api_utils import SolrObject
 
@@ -100,31 +100,40 @@ def send_old_alerts_webhook_event(
     send_webhook_event(webhook_event, json_bytes)
 
 
-def send_recap_fetch_webhook_event(
-    webhook: Webhook, fq: PacerFetchQueue
-) -> None:
+def send_recap_fetch_webhooks(fq: PacerFetchQueue) -> None:
     """Send webhook event for processed PacerFetchQueue objects.
 
-    :param webhook: The Webhook object to send the event to.
     :param fq: The PacerFetchQueue object related to the event.
     :return None
     """
 
-    payload = PacerFetchQueueSerializer(fq).data
-    post_content = {
-        "webhook": generate_webhook_key_content(webhook),
-        "payload": payload,
-    }
-    renderer = JSONRenderer()
-    json_bytes = renderer.render(
-        post_content,
-        accepted_media_type="application/json;",
-    )
-    webhook_event = WebhookEvent.objects.create(
-        webhook=webhook,
-        content=post_content,
-    )
-    send_webhook_event(webhook_event, json_bytes)
+    # Send webhook event when the fetch task is completed, only send it for
+    # successful or failed like statuses.
+    if fq.status in [
+        PROCESSING_STATUS.SUCCESSFUL,
+        PROCESSING_STATUS.FAILED,
+        PROCESSING_STATUS.INVALID_CONTENT,
+        PROCESSING_STATUS.NEEDS_INFO,
+    ]:
+        user_webhooks = fq.user.webhooks.filter(
+            event_type=WebhookEventType.RECAP_FETCH, enabled=True
+        )
+        for webhook in user_webhooks:
+            payload = PacerFetchQueueSerializer(fq).data
+            post_content = {
+                "webhook": generate_webhook_key_content(webhook),
+                "payload": payload,
+            }
+            renderer = JSONRenderer()
+            json_bytes = renderer.render(
+                post_content,
+                accepted_media_type="application/json;",
+            )
+            webhook_event = WebhookEvent.objects.create(
+                webhook=webhook,
+                content=post_content,
+            )
+            send_webhook_event(webhook_event, json_bytes)
 
 
 def send_search_alert_webhook(

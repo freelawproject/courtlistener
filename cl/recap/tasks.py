@@ -40,8 +40,7 @@ from rest_framework.status import (
 )
 
 from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
-from cl.api.models import WebhookEventType
-from cl.api.webhooks import send_recap_fetch_webhook_event
+from cl.api.webhooks import send_recap_fetch_webhooks
 from cl.celery_init import app
 from cl.corpus_importer.tasks import (
     download_pacer_pdf_by_rd,
@@ -1732,29 +1731,6 @@ def fetch_docket(self, fq_pk):
     return result
 
 
-def recap_fetch_webhook_check(fq: PacerFetchQueue) -> None:
-    """Checks whether webhook events should be sent based on fq status and
-    whether the user has a recap fetch webhook endpoint enabled.
-
-    :param fq: The PacerFetchQueue item to check.
-    :return: None
-    """
-
-    # Send webhook event when the fetch task is completed, only send it for
-    # successful or failed like statuses.
-    if fq.status in [
-        PROCESSING_STATUS.SUCCESSFUL,
-        PROCESSING_STATUS.FAILED,
-        PROCESSING_STATUS.INVALID_CONTENT,
-        PROCESSING_STATUS.NEEDS_INFO,
-    ]:
-        user_webhooks = fq.user.webhooks.filter(
-            event_type=WebhookEventType.RECAP_FETCH, enabled=True
-        )
-        for user_webhook in user_webhooks:
-            send_recap_fetch_webhook_event(user_webhook, fq)
-
-
 @app.task
 def mark_fq_successful(fq_pk):
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
@@ -1776,7 +1752,7 @@ def mark_fq_status(fq, msg, status):
     if status == PROCESSING_STATUS.SUCCESSFUL:
         fq.date_completed = now()
     fq.save()
-    recap_fetch_webhook_check(fq)
+    send_recap_fetch_webhooks(fq)
 
 
 def get_recap_email_recipients(
