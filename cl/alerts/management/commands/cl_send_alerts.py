@@ -235,7 +235,7 @@ class Command(VerboseCommand):
                     )
                     for user_webhook in user_webhooks:
                         send_search_alert_webhook(
-                            self, results, user_webhook, search_type, alert
+                            self.sis[search_type], results, user_webhook, alert
                         )
 
             if len(hits) > 0:

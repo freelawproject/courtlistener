@@ -17,6 +17,7 @@ from cl.api.utils import (
 )
 from cl.celery_init import app
 from cl.corpus_importer.api_serializers import DocketEntrySerializer
+from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.string_utils import trunc
 from cl.recap.api_serializers import PacerFetchQueueSerializer
 from cl.recap.models import PacerFetchQueue
@@ -174,19 +175,17 @@ def send_recap_fetch_webhook_event(
 
 
 def send_search_alert_webhook(
-    self,
+    solr_interface: ExtraSolrInterface,
     results: SolrResponse,
     webhook: Webhook,
-    search_type: str,
     alert: Alert,
 ) -> None:
     """Send a search alert webhook event containing search results from a
     search alert object.
 
-    :param self: The cl_send_alerts Command
+    :param solr_interface: The ExtraSolrInterface object.
     :param results: The search results returned by SOLR for this alert.
     :param webhook: The webhook endpoint object to send the event to.
-    :param search_type: The search type of the alert.
     :param alert: The search alert object.
     """
 
@@ -202,7 +201,7 @@ def send_search_alert_webhook(
     serialized_results = SearchResultSerializer(
         solr_results,
         many=True,
-        context={"schema": self.sis[search_type].schema},
+        context={"schema": solr_interface.schema},
     ).data
 
     post_content = {
