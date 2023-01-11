@@ -92,8 +92,10 @@ def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
             results = "results"
         render_dict[results] = do_search(
             request.GET.copy(),
-            rows=5,
             override_params={
+                "filed_after": (
+                    datetime.datetime.today() - datetime.timedelta(days=28)
+                ),
                 "order_by": "dateFiled desc",
                 "court": court,
             },
@@ -964,9 +966,12 @@ def citation_redirector(
     the text of opinions.
     """
     reporter_slug = slugify(reporter)
+
     if reporter != reporter_slug:
         # Reporter provided in non-slugified form. Redirect to slugified
         # version.
+        print("973")
+
         return HttpResponseRedirect(
             reverse(
                 "citation_redirector",
@@ -977,11 +982,14 @@ def citation_redirector(
                 ),
             ),
         )
+    print("983")
 
     # Look up the slugified reporter to get its proper version (so-2d -> So. 2d)
     slugified_editions = {str(slugify(item)): item for item in EDITIONS.keys()}
     proper_reporter = slugified_editions.get(reporter, None)
     if not proper_reporter:
+        print("989")
+
         return attempt_reporter_variation(request, reporter, volume, page)
 
     # We have a reporter (show volumes in it), a volume (show cases in
@@ -991,6 +999,8 @@ def citation_redirector(
     elif proper_reporter and volume and page is None:
         return reporter_or_volume_handler(request, proper_reporter, volume)
     elif proper_reporter and volume is None and page is None:
+        print("1002")
+
         return reporter_or_volume_handler(request, proper_reporter)
     return HttpResponse(status=500)
 
