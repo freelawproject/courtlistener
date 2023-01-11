@@ -22,29 +22,6 @@
 {% block footer-scripts %}
   <script src="{% static "js/jquery.bootstrap-growl.js" %}"></script>
 
-  <script type="text/javascript">
-    $(document).ready(function () {
-      $('#tenn-search-form').on("submit", function (e) {
-        let checkboxes = $('input:checkbox');
-        let unCheckedCheckboxes = $('input:checkbox:not(:checked)');
-        if (checkboxes.length === unCheckedCheckboxes.length){
-          // All checkboxes are unchecked
-          e.preventDefault();
-          $.bootstrapGrowl(
-            "Please select at least one court",
-              {
-                type: "danger",
-                align: "center",
-                width: "auto",
-                delay: 2000,
-                allow_dismiss: false,
-                offset: {from: 'top', amount: 80}
-              }
-          );
-        }
-      });
-    });
-  </script>
 {% endblock %}
 
 {% block content %}
@@ -63,7 +40,7 @@
     </div>
 
     <div class="row" id="main-query-box">
-      <form action="/" method="get" id="tenn-search-form" class="form-inline" role="form">
+      <form action="/?" method="get" id="court-search-form" class="form-inline" role="form">
         <div id="search-container" class="text-center">
           <div class="input-group">
             <input class="form-control input-lg"
@@ -72,6 +49,12 @@
                    id="id_q"
                    autocomplete="off"
                    type="text">
+            <div class="hidden">
+              <label for="id_{{ pk }}">
+                <input id="id_{{ pk }}" name="court_{{ pk }}" checked="checked" type="checkbox">
+              </label>
+            </div>
+
             <span class="input-group-btn">
               <button type="submit"
                       class="btn btn-primary btn-lg"
