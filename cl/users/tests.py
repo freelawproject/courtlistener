@@ -3046,7 +3046,7 @@ class WebhooksHTMXTests(APITestCase):
             kwargs={"pk": webhooks[0].pk, "format": "json"},
         )
         with mock.patch(
-            "cl.api.utils.requests.post",
+            "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockPostResponse(
                 200, mock_raw=True
             ),
@@ -3062,7 +3062,7 @@ class WebhooksHTMXTests(APITestCase):
         )
 
         with mock.patch(
-            "cl.api.utils.requests.post",
+            "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockPostResponse(
                 500, mock_raw=True
             ),

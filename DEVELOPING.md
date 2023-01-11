@@ -366,6 +366,8 @@ There are some helper methods provided via `BaseSeleniumTest` as well:
 * `assert_text_not_in_body(text)` - similar to previous, but tests that text is NOT in the body, failing if it's found.
 * `extract_result_count_from_serp()` - if on the search result page, will attempt to find and parse the total results found count into a number and return it.
 
+*Windows/WSL Tip:* If you are running tests on a Windows machine with WSL you probably hit a wall because we don't have a /dev/shm directory and this won't let you run the selenium tests. To fix this: you need to get the full path to /dev/shm or /run/shm from your WSL virtual machine, in my case is: *\\wsl.localhost\Ubuntu-20.04\run\shm* (you can get this path from Windows explorer), the next thing to do is to set the environment variable *CL_SHM_DIR* to that path and then restart your *cl-selenium* container.
+
 ##### Viewing the Remote Selenium Browser
 
 You can watch the remote selenium browser using VNC. To do so, start a VNC client, and then connect to:
