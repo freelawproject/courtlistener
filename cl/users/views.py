@@ -692,33 +692,27 @@ def moosend_webhook(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         # The body is returned as a byte string
         body = request.body.decode("utf-8")
-        try:
-            json_body = json.loads(body)
-            webhook_event = json_body.get("Event")
-            if webhook_event:
-                webhook_event_name = webhook_event.get("EventName")
-                webhook_contact_context = webhook_event.get("ContactContext")
-                wants_newsletter = None
-                email = None
-                if webhook_contact_context:
-                    email = webhook_contact_context.get("EmailAddress")
-                if webhook_event_name == "SUBSCRIBED":
-                    wants_newsletter = True
-                elif webhook_event_name == "UNSUBSCRIBED":
-                    wants_newsletter = False
-                if wants_newsletter is not None and email is not None:
-                    profiles = UserProfile.objects.filter(user__email=email)
-                    logger.info(
-                        "Updating %s profiles for email %s",
-                        profiles.count(),
-                        email,
-                    )
-                    profiles.update(wants_newsletter=wants_newsletter)
-        except JSONDecodeError:
-            # This case shouldn't happen but I'd rather be careful
-            logger.error(
-                f"Moosend webhook got unexpected response: {request.body}"
-            )
+        json_body = json.loads(body)
+        webhook_event = json_body.get("Event")
+        if webhook_event:
+            webhook_event_name = webhook_event.get("EventName")
+            webhook_contact_context = webhook_event.get("ContactContext")
+            wants_newsletter = None
+            email = None
+            if webhook_contact_context:
+                email = webhook_contact_context.get("EmailAddress")
+            if webhook_event_name == "SUBSCRIBED":
+                wants_newsletter = True
+            elif webhook_event_name == "UNSUBSCRIBED":
+                wants_newsletter = False
+            if wants_newsletter is not None and email is not None:
+                profiles = UserProfile.objects.filter(user__email=email)
+                logger.info(
+                    "Updating %s profiles for email %s",
+                    profiles.count(),
+                    email,
+                )
+                profiles.update(wants_newsletter=wants_newsletter)
 
     # Moosend does a GET when you create/edit the automation workflow,
     # so we need to return a 200 even for GETs.

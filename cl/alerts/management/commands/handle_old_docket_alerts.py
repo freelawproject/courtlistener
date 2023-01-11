@@ -1,52 +1,17 @@
 from argparse import RawTextHelpFormatter
-from dataclasses import dataclass
 
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives
 from django.template import loader
 from django.utils.timezone import now
-from rest_framework.renderers import JSONRenderer
 
-from cl.alerts.api_serializers import DocketAlertSerializer
 from cl.alerts.models import DocketAlert
-from cl.api.models import Webhook, WebhookEvent, WebhookEventType
-from cl.api.utils import send_webhook_event
+from cl.alerts.utils import DocketAlertReportObject, OldAlertReport
+from cl.api.models import WebhookEventType
+from cl.api.webhooks import send_old_alerts_webhook_event
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.date_time import dt_as_local_date
-from cl.search.models import Docket
-
-
-@dataclass
-class DocketAlertReportObject:
-    da_alert: DocketAlert
-    docket: Docket
-
-
-class OldAlertReport:
-    def __init__(self):
-        self.old_alerts = []
-        self.very_old_alerts = []
-        self.disabled_alerts = []
-
-    @property
-    def old_dockets(self):
-        return [obj.docket for obj in self.old_alerts]
-
-    @property
-    def very_old_dockets(self):
-        return [obj.docket for obj in self.very_old_alerts]
-
-    @property
-    def disabled_dockets(self):
-        return [obj.docket for obj in self.disabled_alerts]
-
-    def total_count(self):
-        return (
-            len(self.old_alerts)
-            + len(self.very_old_alerts)
-            + len(self.disabled_alerts)
-        )
 
 
 def build_user_report(user, delete=False):
@@ -111,53 +76,6 @@ def build_user_report(user, delete=False):
                 )
 
     return report
-
-
-def send_old_alerts_webhook_event(
-    webhook: Webhook, report: OldAlertReport
-) -> None:
-    """Send webhook event for old alerts
-
-    :param webhook:The Webhook object to send the event to.
-    :param report: A dict containing information about old alerts
-    :return None
-    """
-
-    serialized_very_old_alerts = []
-    serialized_disabled_alerts = []
-
-    for very_old_alert in report.very_old_alerts:
-        serialized_very_old_alerts.append(
-            DocketAlertSerializer(very_old_alert.da_alert).data
-        )
-
-    for disabled_alert in report.disabled_alerts:
-        serialized_disabled_alerts.append(
-            DocketAlertSerializer(disabled_alert.da_alert).data
-        )
-
-    post_content = {
-        "webhook": {
-            "event_type": webhook.event_type,
-            "version": webhook.version,
-            "date_created": webhook.date_created.isoformat(),
-            "deprecation_date": None,
-        },
-        "payload": {
-            "old_alerts": serialized_very_old_alerts,
-            "disabled_alerts": serialized_disabled_alerts,
-        },
-    }
-    renderer = JSONRenderer()
-    json_bytes = renderer.render(
-        post_content,
-        accepted_media_type="application/json;",
-    )
-    webhook_event = WebhookEvent.objects.create(
-        webhook=webhook,
-        content=post_content,
-    )
-    send_webhook_event(webhook_event, json_bytes)
 
 
 def send_old_alert_warning_email_and_webhook(user, report) -> int:
