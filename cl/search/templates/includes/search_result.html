@@ -27,11 +27,9 @@
       <a href="{{ result.absolute_url }}?{{ request.META.QUERY_STRING }}"
          class="visitable">
       {{ result.solr_highlights.caseName.0|safe }}
-        {% if request.path != "/court/me/" %}
-           ({% if result.court_id != 'scotus' %}{{ result.solr_highlights.court_citation_string.0|nbsp|safe }}&nbsp;{% endif %}
-            {% if type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION %}
-                {{ result.dateFiled|date:"Y" }}{% else %}{{ result.dateArgued|date:"Y" }}{% endif %})
-        {% endif %}
+      {% if request.path != "/court/me/" %}
+      ({% if result.court_id != 'scotus' %}{{ result.solr_highlights.court_citation_string.0|nbsp|safe }}&nbsp;{% endif %}{% if type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION %}{{ result.dateFiled|date:"Y" }}{% else %}{{ result.dateArgued|date:"Y" }}{% endif %})
+      {% endif %}
       </a>
     {% endif %}
   </h3>
@@ -289,12 +287,10 @@
     {% endif %}
 
     {% if type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION %}
-      {% if request.path != "/court/me/" %}
-          <div class="inline-block">
-            <span class="meta-data-header">Status:</span>
-            <span class="meta-data-value">{{ result.status }}</span>
-          </div>
-      {% endif %}
+      <div class="inline-block">
+        <span class="meta-data-header">Status:</span>
+        <span class="meta-data-value">{{ result.status }}</span>
+      </div>
       {% if result.solr_highlights.citation.0 %}
         <div class="inline-block">
           <span class="meta-data-header">Citations: </span>
