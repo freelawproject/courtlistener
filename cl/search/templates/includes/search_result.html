@@ -289,7 +289,7 @@
     {% endif %}
 
     {% if type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION %}
-      {% if maine != True %}
+      {% if request.path != "/court/me/" %}
           <div class="inline-block">
             <span class="meta-data-header">Status:</span>
             <span class="meta-data-value">{{ result.status }}</span>
