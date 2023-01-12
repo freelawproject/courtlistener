@@ -71,7 +71,7 @@
       <div class="col-xs-8">
         <h3>Recent Decisions of the&nbsp;{{ court }} <i class="gray fa fa-file-text-o"></i></h3>
         {% if request.user|in_group:"uploaders_{{ pk }}" %}
-          <p><a href="{% url "court_publish_page" pk="me" %}"
+          <p><a href="{% url "court_publish_page" pk=pk %}"
                 class="btn btn-default">Upload New {{ court }} Opinion</a></p>
         {% endif %}
         {% if results.paginator.count > 0 %}
