@@ -54,7 +54,7 @@ class Command(VerboseCommand):
             type=str,
             choices=VALID_TYPES,
             help="Object type to clone. Current choices are %s"
-                 % ", ".join(VALID_TYPES),
+            % ", ".join(VALID_TYPES),
         )
 
         parser.add_argument(
@@ -94,7 +94,8 @@ class Command(VerboseCommand):
         try:
             obj = OpinionCluster.objects.get(pk=cluster_id)
             print(
-                f"OpinionCluster with id: {cluster_id} already in local env.")
+                f"OpinionCluster with id: {cluster_id} already in local env."
+            )
             return
         except OpinionCluster.DoesNotExist:
 
@@ -121,7 +122,8 @@ class Command(VerboseCommand):
 
                 # Create opinion cluster
                 opinion_cluster = OpinionCluster.objects.create(
-                    **cluster_datum)
+                    **cluster_datum
+                )
 
                 for cite_data in citation_data:
                     # Create citations
@@ -147,9 +149,12 @@ class Command(VerboseCommand):
                     # Add opinion to search engine
                     add_items_to_solr.delay([op.id], "search.Opinion")
 
-                print(">> View cloned case here:",
-                      reverse("view_case", args=[opinion_cluster.pk,
-                                                 docket.slug]))
+                print(
+                    ">> View cloned case here:",
+                    reverse(
+                        "view_case", args=[opinion_cluster.pk, docket.slug]
+                    ),
+                )
 
     def clone_docket(self, docket_id) -> [Docket, None]:
         """Download docket data from courtlistener.com and add it to local
@@ -162,9 +167,7 @@ class Command(VerboseCommand):
         except Docket.DoesNotExist:
             # Create new Docket
 
-            docket_endpoint = (
-                f"https://www.courtlistener.com/api/rest/v3/dockets/{docket_id}/"
-            )
+            docket_endpoint = f"https://www.courtlistener.com/api/rest/v3/dockets/{docket_id}/"
             docket_data = self.s.get(docket_endpoint).json()
 
             # Remove unneeded fields
@@ -181,22 +184,32 @@ class Command(VerboseCommand):
             with transaction.atomic():
 
                 # Get or create required objects
-                docket_data["court"] = self.clone_court(
-                    docket_data["court"].split("/")[7]
-                ) if docket_data["court"] else None
+                docket_data["court"] = (
+                    self.clone_court(docket_data["court"].split("/")[7])
+                    if docket_data["court"]
+                    else None
+                )
 
-                docket_data["appeal_from"] = self.clone_court(
-                    docket_data["appeal_from"].split("/")[7]
-                ) if docket_data["appeal_from"] else None
+                docket_data["appeal_from"] = (
+                    self.clone_court(docket_data["appeal_from"].split("/")[7])
+                    if docket_data["appeal_from"]
+                    else None
+                )
 
-                docket_data["assigned_to"] = self.clone_person(
-                    docket_data["assigned_to"].split("/")[7]
-                ) if docket_data["assigned_to"] else None
+                docket_data["assigned_to"] = (
+                    self.clone_person(docket_data["assigned_to"].split("/")[7])
+                    if docket_data["assigned_to"]
+                    else None
+                )
 
                 docket = Docket.objects.create(**docket_data)
-                print(">> View cloned docket here:",
-                      reverse("view_docket", args=[
-                          docket_data['id'], docket_data['slug']]))
+                print(
+                    ">> View cloned docket here:",
+                    reverse(
+                        "view_docket",
+                        args=[docket_data["id"], docket_data["slug"]],
+                    ),
+                )
                 return docket
 
     def clone_person(self, person_id):
@@ -229,8 +242,10 @@ class Command(VerboseCommand):
             except:
                 person = Person.objects.filter(pk=person_data["id"])[0]
 
-        print(">> View cloned person here:",
-              reverse("person-detail", args=['v3', person_id]))
+        print(
+            ">> View cloned person here:",
+            reverse("person-detail", args=["v3", person_id]),
+        )
         return person
 
     def clone_court(self, court_id):
@@ -252,6 +267,8 @@ class Command(VerboseCommand):
             except:
                 ct = Court.objects.filter(pk=court_data["id"])[0]
 
-        print(">> View cloned court here:",
-              reverse("court-detail", args=['v3', court_id]))
+        print(
+            ">> View cloned court here:",
+            reverse("court-detail", args=["v3", court_id]),
+        )
         return ct
