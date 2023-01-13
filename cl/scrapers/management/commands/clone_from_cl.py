@@ -7,7 +7,7 @@ manage.py clone_from_cl --type Docket --id 5377675
 manage.py clone_from_cl --type Person --id 16207
 manage.py clone_from_cl --type Court --id usnmcmilrev
 
-This tool is only for development purposes, so it only works when 
+This tool is only for development purposes, so it only works when
 the DEVELOPMENT env is set to True. It also relies on the CL_API_TOKEN
 env variable.
 
