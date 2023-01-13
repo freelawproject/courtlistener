@@ -1,21 +1,17 @@
 """
-This tool allows you to partially clone a data from courtlistener.com to your
+This tool allows you to partially clone data from courtlistener.com to your
 local environment, you only need to pass the type and object id and run it.
 
-e.g.
+manage.py clone_from_cl --type Opinion --id 9355884
+manage.py clone_from_cl --type Docket --id 5377675
+manage.py clone_from_cl --type Person --id 16207
+manage.py clone_from_cl --type Court --id usnmcmilrev
 
-docker-compose -f docker/courtlistener/docker-compose.yml exec cl-django python manage.py clone_from_cl --type Opinion --id 9355884
-docker-compose -f docker/courtlistener/docker-compose.yml exec cl-django python manage.py clone_from_cl --type Docket --id 5377675
-docker-compose -f docker/courtlistener/docker-compose.yml exec cl-django python manage.py clone_from_cl --type Person --id 16207
-docker-compose -f docker/courtlistener/docker-compose.yml exec cl-django python manage.py clone_from_cl --type Court --id usnmcmilrev
-
-
-This tool is only for development purposes, to enable it you need to set
-environment variable DEVELOPMENT to True. Also need to set CL_API_TOKEN env
-variable.
+This tool is only for development purposes, so it only works when 
+the DEVELOPMENT env is set to True. It also relies on the CL_API_TOKEN
+env variable.
 
 This is still work in progress, some data is not cloned yet.
-
 """
 
 import os
