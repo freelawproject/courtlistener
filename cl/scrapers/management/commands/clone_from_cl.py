@@ -38,10 +38,7 @@ courts_endpoint = "https://www.courtlistener.com/api/rest/v3/courts/"
 
 
 class Command(VerboseCommand):
-    help = (
-        "A helper function clone a data from courtlistener.com into local "
-        "environment "
-    )
+    help = "Clone data from CourtListener.com into dev environment"
 
     def __init__(self, *args, **kwargs):
         super(Command, self).__init__(*args, **kwargs)
