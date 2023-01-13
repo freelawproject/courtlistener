@@ -67,11 +67,6 @@
 
 {% block content %}
     <article class="col-sm-9">
-      <i id="favorites-star"
-         class="{% if favorite_form.instance.recap_doc_id %}gold fa-star{% else %}gray fa-star-o bold{% endif %} pointer fa inline"
-         data-toggle="modal"
-         data-target="#modal-save-favorite, #modal-logged-out"
-         title="{% if favorite_form.instance.recap_doc_id %}Edit this favorite{% else %}Save this as a favorite in your profile{% endif %}"></i>
       <h2 class="inline"><a
               href="{{ rd.docket_entry.docket.get_absolute_url }}"
               class="no-underline black-link">{{ rd.docket_entry.docket|best_case_name|safe|v_wrapper }}</a></h2>

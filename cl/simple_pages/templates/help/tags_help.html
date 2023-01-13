@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Help with Tags and Favorites – CourtListener.com{% endblock %}
+{% block title %}Help with Tags and Notes – CourtListener.com{% endblock %}
 {% block footer-scripts %}
   {% include "includes/anchors.html" %}
 {% endblock %}
@@ -21,10 +21,10 @@
           </ul>
         </li>
         <li>
-          <a href="#favorites">Favorites</a>
+          <a href="#favorites">Notes</a>
           <ul>
-            <li><a href="#making-favorites">Making Favorites</a></li>
-            <li><a href="#editing-favorites">Working with Favorites</a></li>
+            <li><a href="#making-favorites">Making Notes</a></li>
+            <li><a href="#editing-favorites">Working with Notes</a></li>
           </ul>
         </li>
       </ul>
@@ -32,7 +32,7 @@
   </div>
 
   <div class="col-xs-12 col-sm-8 col-md-6">
-    <h1>Help with Tags and Favorites on CourtListener</h1>
+    <h1>Help with Tags and Notes on CourtListener</h1>
     <p>Our tagging and favorites features help you to tag, organize, and share cases that you are working with. To learn more about these features, continue reading below.
     </p>
     <p>We hope that if you find these tools useful, you will donate to <a href="https://free.law">Free Law Project</a>, the non-profit supporting CourtListener and RECAP, to support the ongoing development and maintenance of these and other features.
@@ -91,14 +91,14 @@
     <p>Please stay tuned!</p>
 
 
-    <h2 id="favorites">Favorites</h2>
-    <p>You can use the Favorites feature to save Dockets, RECAP Documents, Opinions, and Oral arguments to the <a href="{% url 'profile_favorites' %}">Favorites tab</a> in your account. You can add notes to each favorite item as well.
+    <h2 id="favorites">Notes</h2>
+    <p>You can use the Notes feature to save Dockets, RECAP Documents, Opinions, and Oral arguments to the <a href="{% url 'profile_favorites' %}">Notes tab</a> in your account. You can add notes to each favorite item as well.
     </p>
     <p>Notes on dockets will be shown in <a href="{% url 'alert_help' %}#recap-alerts">docket alerts</a> that we send you, if you subscribe to a case, but are otherwise always private.
     </p>
 
-    <h3 id="making-favorites">Favorite an item</h3>
-     <p>To favorite an item on CourtListener, log in and click the star icon to the left of the title of a Docket, RECAP Document, Opinion, or Oral Argument.</p>
+    <h3 id="making-favorites">Save a Note</h3>
+     <p>To save a note on an item on CourtListener, log in and click the star icon to the left of the title of a Docket, RECAP Document, Opinion, or Oral Argument.</p>
     <p><img src="{% static "png/favorite-title.png" %}"
          alt="screenshot of the star icon to favorite an item"
          class="img-responsive img-rounded shadow center-block"
@@ -119,8 +119,8 @@
     </ol>
     <p>Click the save button.</p>
 
-    <h3 id="editing-favorites">Viewing, Editing or Deleting a Favorite</h3>
-    <p>You can view your favorite items in the <a href="{% url 'profile_favorites' %}">Favorites tab</a> within your user profile panel.</p>
+    <h3 id="editing-favorites">Viewing, Editing or Deleting a Note</h3>
+    <p>You can view your favorite items in the <a href="{% url 'profile_favorites' %}">Notes tab</a> within your user profile panel.</p>
     <p><img src="{% static "png/view-favorites.png" %}"
          alt="screenshot of the favorites tab"
          class="img-responsive img-rounded shadow center-block"

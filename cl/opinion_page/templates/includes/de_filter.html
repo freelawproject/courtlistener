@@ -1,65 +1,92 @@
 <div class="well well-sm">
-  <form action="">
-    <div class="row">
-      <div class="form-inline">
-        {% if form.errors %}
-          <div class="col-xs-12">
-            <p class="text-danger"><strong>There were errors applying your filters.</strong>
-            </p>
-          </div>
-        {% endif %}
-        <div class="col-xs-12 col-sm-6 col-md-5">
-          <div class="form-group{% if form.filed_after.errors %} has-error{% endif %}">
-            <label for="id_filed_after"
-                   class="control-label">Filed</label>
-            {{ form.filed_after }}
-          </div>
-          <div class="form-group{% if form.filed_before.errors %} has-error{% endif %}">
-            <label for="id_filed_before"
-                   class="control-label">to</label>
-            {{ form.filed_before }}
-          </div>
-        </div>
-        <div class="col-xs-8 col-sm-4">
-          <div class="form-group{% if form.entry_gte.errors %} has-error{% endif %}">
-            <label for="id_entry_gte"
-                   class="control-label">Documents</label>
-            {{ form.entry_gte }}
-          </div>
-          <div class="form-group{% if form.entry_lte.errors %} has-error{% endif %}">
-            <label for="id_entry_lte"
-                   class="control-label">to</label>
-            {{ form.entry_lte }}
+  <div class="row filter-box">
+    <div class="col-xs-12 col-md-2">
+      {% if docket_entries %}
+        <div class="row" id="main-query-box">
+          <div id="search-container" class="col-xs-12 text-center">
+            <label class="sr-only" for="id_q">Search</label>
+            <div class="input-group">
+              <input class="form-control"
+                     id="de-filter-search"
+                     autocomplete="off"
+                     type="text"
+                     placeholder="Search this docket">
+              <span class="input-group-btn">
+                <a type="submit"
+                        href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}"
+                        class="btn btn-primary"
+                        id="search-button-de-filter"><i class="fa fa-search"></i>
+                </a>
+              </span>
+            </div>
           </div>
         </div>
-        <div class="col-xs-4 col-sm-2 col-md-3">
-          <div id="sort-buttons"
-               class="btn-group pull-right"
-               data-toggle="buttons"
-               role="group"
-               aria-label="sorting buttons">
-            {% with v=form.order_by.value %}
-              <label for="id_order_by_0"
-                     class="btn btn-default {% if v == "asc" or not v %}active{% endif %}">
-                <input type="radio"
-                       id="id_order_by_0"
-                       value="asc"
-                       name="order_by"
-                       {% if v == "asc" or not v %}checked="checked"{% endif %}/><i class="fa fa-sort-numeric-asc"></i>&nbsp;<span
-                      class="hidden-xs hidden-sm">Ascending</span></label>
-              <label for="id_order_by_1"
-                     class="btn btn-default {% if v == "desc" %}active{% endif %}">
-                <input type="radio"
-                       id="id_order_by_1"
-                       {% if v == "desc" %}checked=checked{% endif %}
-                       value="desc"
-                       name="order_by"/><i
-                      class="fa fa-sort-numeric-desc"></i>&nbsp;<span class="hidden-xs hidden-sm">Descending</span></label>
-            {% endwith %}
-          </div>
-        </div>
-        <button type="submit" class="sr-only">Filter</button>
-      </div>
+      {% endif %}
     </div>
-  </form>
+    <div class="col-xs-12 col-md-10">
+      <form action="">
+        <div class="row">
+          <div class="form-inline">
+            {% if form.errors %}
+              <div class="col-xs-12">
+                <p class="text-danger"><strong>There were errors applying your filters.</strong>
+                </p>
+              </div>
+            {% endif %}
+            <div class="col-xs-12 col-sm-6 col-md-5">
+              <div class="form-group{% if form.filed_after.errors %} has-error{% endif %}">
+                <label for="id_filed_after"
+                       class="control-label">Filed</label>
+                {{ form.filed_after }}
+              </div>
+              <div class="form-group{% if form.filed_before.errors %} has-error{% endif %}">
+                <label for="id_filed_before"
+                       class="control-label">to</label>
+                {{ form.filed_before }}
+              </div>
+            </div>
+            <div class="col-xs-8 col-sm-4">
+              <div class="form-group{% if form.entry_gte.errors %} has-error{% endif %}">
+                <label for="id_entry_gte"
+                       class="control-label">Documents</label>
+                {{ form.entry_gte }}
+              </div>
+              <div class="form-group{% if form.entry_lte.errors %} has-error{% endif %}">
+                <label for="id_entry_lte"
+                       class="control-label">to</label>
+                {{ form.entry_lte }}
+              </div>
+            </div>
+            <div class="col-xs-4 col-sm-2 col-md-3">
+              <div id="sort-buttons"
+                   class="btn-group pull-right"
+                   data-toggle="buttons"
+                   role="group"
+                   aria-label="sorting buttons">
+                {% with v=form.order_by.value %}
+                  <label for="id_order_by_0"
+                         class="btn btn-default {% if v == "asc" or not v %}active{% endif %}">
+                    <input type="radio"
+                           id="id_order_by_0"
+                           value="asc"
+                           name="order_by"
+                           {% if v == "asc" or not v %}checked="checked"{% endif %}/><i class="fa fa-sort-numeric-asc"></i>&nbsp;<span
+                          class="hidden-xs hidden-sm">Ascending</span></label>
+                  <label for="id_order_by_1"
+                         class="btn btn-default {% if v == "desc" %}active{% endif %}">
+                    <input type="radio"
+                           id="id_order_by_1"
+                           {% if v == "desc" %}checked=checked{% endif %}
+                           value="desc"
+                           name="order_by"/><i
+                          class="fa fa-sort-numeric-desc"></i>&nbsp;<span class="hidden-xs hidden-sm">Descending</span></label>
+                {% endwith %}
+              </div>
+            </div>
+            <button type="submit" class="sr-only">Filter</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>

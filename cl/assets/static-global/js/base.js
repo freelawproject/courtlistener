@@ -282,6 +282,23 @@ $(document).ready(function () {
       document.cookie = "recap_install_plea" + "=" + 'true' + expires + "; path=/";
     }
   });
+
+  // Append the base docket query to the user input and submit the search.
+  function submit_search_query(selector_id) {
+    window.location = $(selector_id).attr('href') + ' ' + $('#de-filter-search').val();
+    return false;
+  }
+  // Make the docket entries search box work on click.
+  $('#search-button-de-filter').on('click', function () {
+    submit_search_query(this);
+  });
+  // Make the docket entries search box work on "Enter".
+  $('#de-filter-search').on('keypress', function (e) {
+    if (e.keyCode == 13) {
+      submit_search_query('#search-button-de-filter');
+    }
+  });
+
 });
 
 

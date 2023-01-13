@@ -120,7 +120,7 @@ class UserFavoritesTest(BaseSeleniumTest):
         star = self.browser.find_element(By.ID, "favorites-star")
         self.assertEqual(
             star.get_attribute("title").strip(),
-            "Save this record as a favorite in your profile",
+            "Save this record as a note in your profile",
         )
         star.click()
 
@@ -150,7 +150,7 @@ class UserFavoritesTest(BaseSeleniumTest):
 
         self.browser.find_element(By.ID, "modal-save-favorite")
         modal_title = self.browser.find_element(By.ID, "save-favorite-title")
-        self.assertIn("Save Favorite", modal_title.text)
+        self.assertIn("Save Note", modal_title.text)
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_logged_in_user_can_save_favorite(self) -> None:
@@ -177,10 +177,10 @@ class UserFavoritesTest(BaseSeleniumTest):
         star = self.browser.find_element(By.ID, "favorites-star")
         self.assertEqual(
             star.get_attribute("title").strip(),
-            "Save this record as a favorite in your profile",
+            "Save this record as a note in your profile",
         )
-        self.assertIn("gray", star.get_attribute("class"))
-        self.assertNotIn("gold", star.get_attribute("class"))
+        self.assertIn("btn-success", star.get_attribute("class"))
+        self.assertNotIn("btn-danger", star.get_attribute("class"))
         star.click()
 
         # She is prompted to "Save Favorite". She notices the title is already
@@ -188,7 +188,7 @@ class UserFavoritesTest(BaseSeleniumTest):
         # empty notes field for her to add whatever she wants. She adds a note
         # to help her remember what was interesting about this result.
         title = self.browser.find_element(By.ID, "save-favorite-title")
-        self.assertIn("Save Favorite", title.text.strip())
+        self.assertIn("Save Note", title.text.strip())
 
         name_field = self.browser.find_element(
             By.ID, "save-favorite-name-field"
@@ -204,15 +204,15 @@ class UserFavoritesTest(BaseSeleniumTest):
         # She now sees the star is full on yellow implying it's a fave!
         time.sleep(1)  # Selenium is sometimes faster than JS.
         star = self.browser.find_element(By.ID, "favorites-star")
-        self.assertIn("gold", star.get_attribute("class"))
-        self.assertNotIn("gray", star.get_attribute("class"))
+        self.assertIn("btn-danger", star.get_attribute("class"))
+        self.assertNotIn("btn-success", star.get_attribute("class"))
 
         # She closes her browser and goes to the gym for a bit since it's
         # always leg day amiright
         self.reset_browser()
 
         # When she returns, she signs back into CL and wants to pull up
-        # that favorite again, so she goes to Favorites under the Profile menu
+        # that favorite again, so she goes to Notes under the Profile menu
         self.get_url_and_wait(self.live_server_url)
         self.attempt_sign_in("pandora", "password")
 
@@ -230,12 +230,12 @@ class UserFavoritesTest(BaseSeleniumTest):
 
         profile_dropdown.click()
         time.sleep(1)
-        self.click_link_for_new_page("Favorites")
+        self.click_link_for_new_page("Notes")
 
         # The case is right there with the same name and notes she gave it!
         # There are columns that show the names and notes of her favorites
         # Along with options to Edit or Delete each favorite!
-        self.assertIn("Favorites", self.browser.title)
+        self.assertIn("Notes", self.browser.title)
         table = self.browser.find_element(By.CSS_SELECTOR, ".settings-table")
         table_header = table.find_element(By.TAG_NAME, "thead")
         # Select the opinions pill
@@ -283,11 +283,11 @@ class UserFavoritesTest(BaseSeleniumTest):
 
         profile_dropdown.click()
 
-        favorites = self.browser.find_element(By.LINK_TEXT, "Favorites")
+        favorites = self.browser.find_element(By.LINK_TEXT, "Notes")
         favorites.click()
 
         # She sees an edit link next to one of them and clicks it
-        self.assertIn("Favorites", self.browser.title)
+        self.assertIn("Notes", self.browser.title)
         # Select the opinions pill
         opinions_pill = self.browser.find_element(By.LINK_TEXT, "Opinions 1")
         opinions_pill.click()
@@ -295,11 +295,9 @@ class UserFavoritesTest(BaseSeleniumTest):
         edit_link = self.browser.find_element(By.LINK_TEXT, "Edit / Delete")
         edit_link.click()
 
-        # Greeted with an "Edit This Favorite" dialog, she fixes a typo in
+        # Greeted with an "Edit This Note" dialog, she fixes a typo in
         # the name and notes fields
-        self.assert_text_in_node_by_id(
-            "Edit This Favorite", "modal-save-favorite"
-        )
+        self.assert_text_in_node_by_id("Edit This Note", "modal-save-favorite")
         modal = self.find_element_by_id(self.browser, "modal-save-favorite")
         name = self.find_element_by_id(modal, "save-favorite-name-field")
         notes = self.find_element_by_id(modal, "save-favorite-notes-field")
@@ -308,7 +306,7 @@ class UserFavoritesTest(BaseSeleniumTest):
         self.assertEqual(notes.get_property("value"), self.f.notes)
 
         name.clear()
-        name.send_keys("Renamed Favorite")
+        name.send_keys("Renamed Note")
         notes.clear()
         notes.send_keys("Modified Notes")
 
@@ -319,8 +317,8 @@ class UserFavoritesTest(BaseSeleniumTest):
 
         # And notices the change on the page immediately
         time.sleep(0.5)  # Selenium is too fast.
-        self.assertIn("Favorites", self.browser.title)
-        self.assert_text_in_node("Renamed Favorite", "body")
+        self.assertIn("Notes", self.browser.title)
+        self.assert_text_in_node("Renamed Note", "body")
         self.assert_text_in_node("Modified Notes", "body")
         self.assert_text_not_in_node("case name cluster 3", "body")
         self.assert_text_not_in_node("Totes my Notes 2", "body")
@@ -330,7 +328,7 @@ class UserFavoritesTest(BaseSeleniumTest):
         # Select the opinions pill
         opinions_pill = self.browser.find_element(By.LINK_TEXT, "Opinions 1")
         opinions_pill.click()
-        self.assert_text_in_node("Renamed Favorite", "body")
+        self.assert_text_in_node("Renamed Note", "body")
         self.assert_text_in_node("Modified Notes", "body")
 
 

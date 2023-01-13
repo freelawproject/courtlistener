@@ -1,7 +1,7 @@
 {% extends "profile/nav.html" %}
 {% load static %}
 
-{% block title %}Favorites – CourtListener.com{% endblock %}
+{% block title %}Notes – CourtListener.com{% endblock %}
 
 {% block nav-favorites %}active{% endblock %}
 {% block footer-scripts %}
@@ -81,7 +81,7 @@
                       {% elif type == "Opinions" %}
                         <a class="btn btn-default" href="{{ opinion_search_url }}" role="button">
                       {% endif %}
-                      <i class="fa fa-search"></i> Search Favorites</a>
+                      <i class="fa fa-search"></i> Search Notes</a>
                     </th>
                   </tr>
                   </thead>
@@ -93,7 +93,7 @@
                 </table>
               </div>
             {% else %}
-              <h4 class="gray caps v-offset-below-3">You haven't favorited any <code>{{ type }}</code> yet.</h4>
+              <h4 class="gray caps v-offset-below-3">You haven't notes for any <code>{{ type }}</code> yet.</h4>
             {% endif %}
           </div>
         {% endfor %}
@@ -105,9 +105,9 @@
       <div class="row">
         <div class="hidden-xs col-sm-1 col-md-3"></div>
         <div class="col-xs-12 col-sm-10 col-md-6 text-center">
-          <h1><i class="fa fa-star gold"></i>&nbsp;CourtListener Favorites</h1>
-          <h3 class="gray caps">You Have Not Saved Any&nbsp;Favorites</h3>
-          <p>Favorites can help you keep track of cases and opinions</p>
+          <h1><i class="fa fa-bookmark gold"></i>&nbsp;CourtListener Notes</h1>
+          <h3 class="gray caps">You Have Not Saved Any&nbsp;Notes</h3>
+          <p>Notes can help you keep track of cases and opinions</p>
           <p>To save a favorite, click the gold star next to the title of an opinion, docket, RECAP document, or oral argument. From there you can give it a title and make a note.
           </p>
         </div>

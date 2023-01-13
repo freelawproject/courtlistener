@@ -8,9 +8,9 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 {% if favorite_form.instance.id or edit %}
-                    <h2 id="save-favorite-title">Edit This Favorite</h2>
+                    <h2 id="save-favorite-title">Edit This Note</h2>
                 {% else %}
-                    <h2 id="save-favorite-title">Save Favorite</h2>
+                    <h2 id="save-favorite-title">Save Note</h2>
                 {% endif %}
                 <form action="" method="POST">{% csrf_token %}
                     {{ favorite_form.cluster_id }}
