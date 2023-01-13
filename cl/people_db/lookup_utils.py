@@ -350,12 +350,12 @@ def lookup_judge_by_full_name(
             [
                 Q(
                     positions__date_start__lt=event_date
-                                              + relativedelta(years=1)
+                    + relativedelta(years=1)
                 )
                 | Q(positions__date_start=None),
                 Q(
                     positions__date_termination__gt=event_date
-                                                    - relativedelta(years=1)
+                    - relativedelta(years=1)
                 )
                 | Q(positions__date_termination=None),
             ]
@@ -450,8 +450,9 @@ def lookup_judge_by_last_name(
     """Look up the judge using their last name, a date and court"""
     hn = HumanName()
     hn.last = last_name
-    return lookup_judge_by_full_name(hn, court_id, event_date,
-                                     require_living_judge)
+    return lookup_judge_by_full_name(
+        hn, court_id, event_date, require_living_judge
+    )
 
 
 def lookup_judges_by_last_name_list(
@@ -465,8 +466,9 @@ def lookup_judges_by_last_name_list(
     for last_name in last_names:
         hn = HumanName()
         hn.last = last_name
-        person = lookup_judge_by_full_name(hn, court_id, event_date,
-                                           require_living_judge)
+        person = lookup_judge_by_full_name(
+            hn, court_id, event_date, require_living_judge
+        )
         if person is not None:
             found_people.append(person)
     return found_people
