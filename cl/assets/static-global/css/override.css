@@ -236,7 +236,7 @@ a.button:active {
   }
 }
 
-@media (max-width: 1999px) {
+@media (max-width: 1200px) {
   #sort-buttons .hidden-sm{
     display: none;
   }
