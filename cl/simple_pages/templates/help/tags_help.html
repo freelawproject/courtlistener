@@ -21,10 +21,10 @@
           </ul>
         </li>
         <li>
-          <a href="#favorites">Notes</a>
+          <a href="#notes">Notes</a>
           <ul>
-            <li><a href="#making-favorites">Making Notes</a></li>
-            <li><a href="#editing-favorites">Working with Notes</a></li>
+            <li><a href="#making-notes">Making Notes</a></li>
+            <li><a href="#editing-notes">Working with Notes</a></li>
           </ul>
         </li>
       </ul>
@@ -33,7 +33,7 @@
 
   <div class="col-xs-12 col-sm-8 col-md-6">
     <h1>Help with Tags and Notes on CourtListener</h1>
-    <p>Our tagging and favorites features help you to tag, organize, and share cases that you are working with. To learn more about these features, continue reading below.
+    <p>Our tagging and notes features help you to tag, organize, and share cases that you are working with. To learn more about these features, continue reading below.
     </p>
     <p>We hope that if you find these tools useful, you will donate to <a href="https://free.law">Free Law Project</a>, the non-profit supporting CourtListener and RECAP, to support the ongoing development and maintenance of these and other features.
     </p>
@@ -91,26 +91,26 @@
     <p>Please stay tuned!</p>
 
 
-    <h2 id="favorites">Notes</h2>
+    <h2 id="notes">Notes</h2>
     <p>You can use the Notes feature to save Dockets, RECAP Documents, Opinions, and Oral arguments to the <a href="{% url 'profile_favorites' %}">Notes tab</a> in your account. You can add notes to each favorite item as well.
     </p>
     <p>Notes on dockets will be shown in <a href="{% url 'alert_help' %}#recap-alerts">docket alerts</a> that we send you, if you subscribe to a case, but are otherwise always private.
     </p>
 
-    <h3 id="making-favorites">Save a Note</h3>
+    <h3 id="making-notes">Save a Note</h3>
      <p>To save a note on an item on CourtListener, log in and click the star icon to the left of the title of a Docket, RECAP Document, Opinion, or Oral Argument.</p>
-    <p><img src="{% static "png/favorite-title.png" %}"
-         alt="screenshot of the star icon to favorite an item"
+    <p><img src="{% static "png/add-note-button.png" %}"
+         alt="screenshot of the star icon to add a note to an item"
          class="img-responsive img-rounded shadow center-block"
-         height="225"
-         width="557">
+         height="251"
+         width="554">
     </p>
     <p>A modal pops up:</p>
-    <p><img src="{% static "png/make-a-favorite.png" %}"
-         alt="screenshot of the creating a favorite modal"
+    <p><img src="{% static "png/make-a-note.png" %}"
+         alt="screenshot of the creating a note modal"
          class="img-responsive img-rounded shadow center-block"
-         height="418"
-         width="749">
+         height="296"
+         width="554">
     </p>
     <p>Complete the box with following information:</p>
     <ol>
@@ -119,21 +119,21 @@
     </ol>
     <p>Click the save button.</p>
 
-    <h3 id="editing-favorites">Viewing, Editing or Deleting a Note</h3>
+    <h3 id="editing-notes">Viewing, Editing or Deleting a Note</h3>
     <p>You can view your favorite items in the <a href="{% url 'profile_favorites' %}">Notes tab</a> within your user profile panel.</p>
-    <p><img src="{% static "png/view-favorites.png" %}"
-         alt="screenshot of the favorites tab"
+    <p><img src="{% static "png/view-notes.png" %}"
+         alt="screenshot of the notes tab"
          class="img-responsive img-rounded shadow center-block"
-         height="347"
-         width="749">
+         height="242"
+         width="554">
     </p>
     <p>Here, you can edit or delete a favorite item by clicking on the "Edit/Delete" button.</p>
     <p>A modal pops up:</p>
-    <p><img src="{% static "png/edit-delete-favorites.png" %}"
-         alt="screenshot of the edit/delete favorites modal"
+    <p><img src="{% static "png/edit-delete-notes.png" %}"
+         alt="screenshot of the edit/delete notes modal"
          class="img-responsive img-rounded shadow center-block"
-         height="347"
-         width="749">
+         height="242"
+         width="554">
     </p>
    <p>You can change the content of the favorite and save or you can delete it by clicking the "Delete" button in the bottom left corner.</p>
 
