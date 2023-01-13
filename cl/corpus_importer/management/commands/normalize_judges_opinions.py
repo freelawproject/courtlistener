@@ -9,6 +9,14 @@ class Command(VerboseCommand):
            "populate panel in opinion clusters using judges field. "
 
     def handle(self, *args, **options):
+
+        self.normalize_authors_in_opinions()
+
+        self.normalize_panel_in_opinioncluster()
+
+    def normalize_authors_in_opinions(self):
+        """Normalize author_str in opinions"""
+
         # Get opinions that have no author object and have author_str
         opinions_with_author_str = Opinion.objects.exclude(
             author__isnull=False).exclude(author_str__exact='')
@@ -31,10 +39,13 @@ class Command(VerboseCommand):
                 logger.info(
                     f"Author updated in opinion id: {opinion.pk}")
 
+    def normalize_panel_in_opinioncluster(self):
+        """Normalize panel in opinion cluster object"""
+
         # Get opinion cluster that have no panel objects and have judges_str
         opinion_clusters_with_judges_str = OpinionCluster.objects.exclude(
             panel__isnull=False).exclude(
-            judges_str__exact='')
+            judges__exact='')
 
         for opinion_cluster in opinion_clusters_with_judges_str:
             date_filed = opinion_cluster.date_filed

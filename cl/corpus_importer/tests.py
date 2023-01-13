@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import eyecite
 import pytest
+from factory import RelatedFactory
 
 from cl.corpus_importer.court_regexes import match_court_string
 from cl.corpus_importer.factories import (
@@ -22,13 +23,18 @@ from cl.corpus_importer.management.commands.harvard_opinions import (
     validate_dt,
     winnow_case_name,
 )
+from cl.corpus_importer.management.commands.normalize_judges_opinions import \
+    Command
 from cl.corpus_importer.tasks import generate_ia_json
 from cl.corpus_importer.utils import get_start_of_quarter
 from cl.lib.pacer import process_docket_data
+from cl.people_db.factories import PersonWithChildrenFactory, PositionFactory
 from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
 from cl.recap.models import UPLOAD_TYPE
-from cl.search.factories import CourtFactory, DocketFactory
+from cl.search.factories import CourtFactory, DocketFactory, \
+    OpinionClusterFactoryWithChildrenAndParents, OpinionWithChildrenFactory, \
+    OpinionClusterWithParentsFactory
 from cl.search.models import (
     Citation,
     Court,
@@ -277,7 +283,7 @@ class CourtMatchingTest(SimpleTestCase):
                 got,
                 d["answer"],
                 msg="\nDid not get court we expected: '%s'.\n"
-                "               Instead we got: '%s'" % (d["answer"], got),
+                    "               Instead we got: '%s'" % (d["answer"], got),
             )
 
     def test_get_fed_court_object_from_string(self) -> None:
@@ -458,12 +464,12 @@ class IAUploaderTest(TestCase):
             expected_num_attorneys,
             actual_num_attorneys,
             msg="Got wrong number of attorneys when making IA JSON. "
-            "Got %s, expected %s: \n%s"
-            % (
-                actual_num_attorneys,
-                expected_num_attorneys,
-                first_party_attorneys,
-            ),
+                "Got %s, expected %s: \n%s"
+                % (
+                    actual_num_attorneys,
+                    expected_num_attorneys,
+                    first_party_attorneys,
+                ),
         )
 
         first_attorney = first_party_attorneys[0]
@@ -474,7 +480,7 @@ class IAUploaderTest(TestCase):
             actual_num_roles,
             expected_num_roles,
             msg="Got wrong number of roles on attorneys when making IA JSON. "
-            "Got %s, expected %s" % (actual_num_roles, expected_num_roles),
+                "Got %s, expected %s" % (actual_num_roles, expected_num_roles),
         )
 
     def test_num_queries_ok(self) -> None:
@@ -649,7 +655,7 @@ Appeals, No. 19667-4-III, October 31, 2002. Denied September 30, 2003."
         self.read_json_func.return_value = CaseLawFactory(
             court=CaseLawCourtFactory.create(
                 name="United States Bankruptcy Court for the Northern "
-                "District of Alabama "
+                     "District of Alabama "
             )
         )
         self.assertSuccessfulParse(0)
@@ -703,7 +709,7 @@ delivered the opinion of the Court.</p></opinion> </casebody>'
         case_law = CaseLawFactory.create(
             casebody=CaseBodyFactory.create(
                 data='<casebody><opinion type="majority"><author '
-                'id="b56-3">PER CURIAM:</author></casebody> '
+                     'id="b56-3">PER CURIAM:</author></casebody> '
             ),
         )
         self.read_json_func.return_value = case_law
@@ -838,8 +844,8 @@ label="194">*194</page-number>
         # Check against itself, there must be an overlap
         case_1_data = {
             "case_name_full": "In the matter of S.J.S., a minor child. "
-            "D.L.M. and D.E.M., Petitioners/Respondents v."
-            " T.J.S.",
+                              "D.L.M. and D.E.M., Petitioners/Respondents v."
+                              " T.J.S.",
             "case_name_abbreviation": "D.L.M. v. T.J.S.",
             "case_name_cl": "D.L.M. v. T.J.S.",
             "overlaps": 2,
@@ -855,9 +861,9 @@ label="194">*194</page-number>
         # Check against different case name, there shouldn't be an overlap
         case_3_data = {
             "case_name_full": "Henry B. Wesselman et al., as Executors of "
-            "Blanche Wesselman, Deceased, Respondents, "
-            "v. The Engel Company, Inc., et al., "
-            "Appellants, et al., Defendants",
+                              "Blanche Wesselman, Deceased, Respondents, "
+                              "v. The Engel Company, Inc., et al., "
+                              "Appellants, et al., Defendants",
             "case_name_abbreviation": "Wesselman v. Engel Co.",
             "case_name_cl": " McQuillan v. Schechter",
             "overlaps": 0,
@@ -872,3 +878,90 @@ label="194">*194</page-number>
             ) & winnow_case_name(harvard_case)
 
             self.assertEqual(len(overlap), case.get("overlaps"))
+
+
+class CorpusImporterManagementCommmandsTests(TestCase):
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="nyappdiv")
+
+        # Create object person
+        cls.judge = PersonWithChildrenFactory.create(
+            name_first="Paul",
+            name_middle="J.",
+            name_last="Yesawich",
+            name_suffix="jr",
+            date_dob="1923-11-27",
+            date_granularity_dob="%Y-%m-%d"
+        )
+        position = PositionFactory.create(court=cls.court, person=cls.judge)
+        cls.judge.positions.add(position)
+
+        cls.judge_2 = PersonWithChildrenFactory.create(
+            name_first="Harold",
+            name_middle="Fleming",
+            name_last="Snead",
+            name_suffix="jr",
+            date_dob="1903-06-16",
+            date_granularity_dob="%Y-%m-%d",
+            date_dod="1987-12-23",
+            date_granularity_dod="%Y-%m-%d",
+        )
+        position_2 = PositionFactory.create(court=cls.court,
+                                            person=cls.judge_2)
+        cls.judge_2.positions.add(position_2)
+
+    def test_normalize_author_str(self):
+        """Normalize author_str field in opinions in Person object"""
+
+        # Create opinion cluster with opinion and docket
+        cluster = OpinionClusterFactoryWithChildrenAndParents(
+            docket=DocketFactory(court=self.court, case_name="Foo v. Bar",
+                                 case_name_full="Foo v. Bar"),
+            case_name="Foo v. Bar",
+            date_filed=date.today(),
+            sub_opinions=RelatedFactory(
+                OpinionWithChildrenFactory,
+                factory_related_name="cluster",
+                plain_text="Sample text",
+                author_str="Yesawich",
+                author=None
+            ),
+        ),
+
+        # Check that the opinion doesn't have an author
+        self.assertEqual(cluster[0].sub_opinions.all().first().author, None)
+
+        # Run command to normalize authors in opinions
+        Command().normalize_authors_in_opinions()
+
+        # Reload field values from the database.
+        cluster[0].refresh_from_db()
+
+        #  Check that the opinion now have an author
+        self.assertEqual(cluster[0].sub_opinions.all().first().author,
+                         self.judge)
+
+    def test_normalize_panel_str(self):
+        """Normalize judges string field into panel field(m2m) """
+
+        cluster = OpinionClusterWithParentsFactory(
+            docket=DocketFactory(court=self.court, case_name="Lorem v. Ipsum",
+                                 case_name_full="Lorem v. Ipsum"),
+            case_name="Lorem v. Ipsum",
+            date_filed=date.today(),
+            judges="Snead, Yesawich"
+        )
+
+        # Check panel is empty
+        self.assertEqual(len(cluster.panel.all()), 0)
+
+        # Run command to normalize panel in opinion clusters
+        Command().normalize_panel_in_opinioncluster()
+
+        # Reload field values from the database
+        cluster.refresh_from_db()
+
+        # Check that the opinion cluster now have judges in panel
+        self.assertEqual(len(cluster.panel.all()), 2)
