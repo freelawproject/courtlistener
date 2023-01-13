@@ -1,11 +1,17 @@
 import string
 
-from factory import DictFactory, Faker, LazyAttribute, List, SubFactory
+from factory import DictFactory, Faker, List, SubFactory
 from factory.django import DjangoModelFactory, FileField
 from factory.fuzzy import FuzzyChoice, FuzzyInteger, FuzzyText
 
 from cl.recap.constants import DATASET_SOURCES
-from cl.recap.models import UPLOAD_TYPE, FjcIntegratedDatabase, ProcessingQueue
+from cl.recap.models import (
+    REQUEST_TYPE,
+    UPLOAD_TYPE,
+    FjcIntegratedDatabase,
+    PacerFetchQueue,
+    ProcessingQueue,
+)
 from cl.search.factories import CourtFactory
 from cl.tests.providers import LegalProvider
 
@@ -28,6 +34,14 @@ class ProcessingQueueFactory(DjangoModelFactory):
     pacer_case_id = Faker("pyint", min_value=100_000, max_value=400_000)
     upload_type = FuzzyChoice(UPLOAD_TYPE.NAMES, getter=lambda c: c[0])
     filepath_local = FileField(filename=None)
+
+
+class PacerFetchQueueFactory(DjangoModelFactory):
+    class Meta:
+        model = PacerFetchQueue
+
+    pacer_case_id = Faker("pyint", min_value=100_000, max_value=400_000)
+    request_type = FuzzyChoice(REQUEST_TYPE.NAMES, getter=lambda c: c[0])
 
 
 class AppellateAttachmentFactory(DictFactory):

@@ -7,15 +7,12 @@ from django.core.mail import EmailMultiAlternatives, get_connection, send_mail
 from django.db import transaction
 from django.template import loader
 from django.utils.timezone import now
-from rest_framework.renderers import JSONRenderer
 
 from cl.alerts.models import DocketAlert
-from cl.api.models import Webhook, WebhookEvent, WebhookEventType
-from cl.api.utils import send_webhook_event
+from cl.api.tasks import send_docket_alert_webhook_events
 from cl.celery_init import app
-from cl.corpus_importer.api_serializers import DocketEntrySerializer
 from cl.custom_filters.templatetags.text_filters import best_case_name
-from cl.favorites.models import DocketTag, Favorite, UserTag
+from cl.favorites.models import Favorite, UserTag
 from cl.lib.redis_utils import create_redis_semaphore, delete_redis_semaphore
 from cl.lib.string_utils import trunc
 from cl.search.models import Docket, DocketEntry
@@ -320,7 +317,7 @@ def send_alert_and_webhook(
     DocketAlert.objects.filter(docket=d).update(date_last_hit=now())
 
     # Send docket entries to webhook
-    send_docket_alert_webhooks.delay(des_pks, webhook_recipients)
+    send_docket_alert_webhook_events.delay(des_pks, webhook_recipients)
     if not recap_email_user_only:
         delete_redis_semaphore("ALERTS", make_alert_key(d_pk))
 
@@ -388,53 +385,6 @@ def send_unsubscription_confirmation(
     html = html_template.render(email_context)
     msg.attach_alternative(html, "text/html")
     msg.send()
-
-
-@app.task()
-def send_docket_alert_webhooks(
-    des_pks: list[int],
-    webhook_recipients_pks: list[int],
-) -> None:
-    """POSTS the DocketAlert to the recipients webhook(s)
-
-    :param des_pks: The list of docket entries primary keys.
-    :param webhook_recipients_pks: A list of User pks to send the webhook to.
-    :return: None
-    """
-
-    webhooks = Webhook.objects.filter(
-        event_type=WebhookEventType.DOCKET_ALERT,
-        user_id__in=webhook_recipients_pks,
-        enabled=True,
-    )
-    docket_entries = DocketEntry.objects.filter(pk__in=des_pks)
-    serialized_docket_entries = []
-    for de in docket_entries:
-        serialized_docket_entries.append(DocketEntrySerializer(de).data)
-
-    for webhook in webhooks:
-        post_content = {
-            "webhook": {
-                "event_type": webhook.event_type,
-                "version": webhook.version,
-                "date_created": webhook.date_created.isoformat(),
-                "deprecation_date": None,
-            },
-            "payload": {
-                "results": serialized_docket_entries,
-            },
-        }
-        renderer = JSONRenderer()
-        json_bytes = renderer.render(
-            post_content,
-            accepted_media_type="application/json;",
-        )
-
-        webhook_event = WebhookEvent.objects.create(
-            webhook=webhook,
-            content=post_content,
-        )
-        send_webhook_event(webhook_event, json_bytes)
 
 
 def send_recap_email_user_not_found(recap_email_recipients: list[str]) -> None:
