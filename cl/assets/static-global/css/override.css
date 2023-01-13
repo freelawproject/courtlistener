@@ -183,14 +183,6 @@ a.button:active {
     vertical-align: middle;
 }
 
-.filter-box #de-filter-search{
-  font-size: 12px;
-}
-
-#de-filter-search::placeholder{
-  font-size: 12px;
-}
-
 @media (max-width: 767px) {
   #homepage #main-query-box {
     margin-bottom: 2em;
@@ -286,7 +278,15 @@ a.button:active {
 
   #main-query-box #de-filter-search {
     width: 600px;
-}
+  }
+
+  .filter-box #de-filter-search{
+  font-size: 12px;
+  }
+
+  #de-filter-search::placeholder{
+    font-size: 12px;
+  }
 
 }
 

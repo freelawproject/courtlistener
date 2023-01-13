@@ -289,8 +289,9 @@ $(document).ready(function () {
     return false;
   }
   // Make the docket entries search box work on click.
-  $('#search-button-de-filter').on('click', function () {
-    submit_search_query(this);
+  $('#search-button-de-filter').on('click', function (e) {
+    e.preventDefault();
+    submit_search_query('#search-button-de-filter');
   });
   // Make the docket entries search box work on "Enter".
   $('#de-filter-search').on('keypress', function (e) {
