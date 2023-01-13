@@ -386,6 +386,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
         if previously_imported_case:
             # Simply add citations to our matched case for now. Later, we'll
             # upgrade this to do a full merge.
+
             with transaction.atomic():
                 add_citations(
                     data["citations"], cluster_id=previously_imported_case.id
@@ -393,6 +394,9 @@ def parse_harvard_opinions(options: OptionsType) -> None:
                 logger.info(
                     f"Adding citations for case at https://www.courtlistener.com/opinion/{previously_imported_case.id}/{previously_imported_case.slug}"
                 )
+                # Add the filepath to the harvard file for the associated opinion
+                previously_imported_case.filepath_json_harvard = file_path
+                previously_imported_case.save()
             continue
 
         logger.info(f"Adding case {case_name_full}")
