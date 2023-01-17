@@ -38,7 +38,7 @@ from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
 from cl.donate.factories import DonationFactory
 from cl.donate.models import Donation
-from cl.favorites.factories import FavoriteFactory, UserTagFactory
+from cl.favorites.factories import NoteFactory, UserTagFactory
 from cl.lib.test_helpers import EmptySolrTestCase, SimpleUserDataMixin
 from cl.search.factories import DocketFactory, OpinionWithParentsFactory
 from cl.search.models import (
@@ -1395,20 +1395,20 @@ class DocketAlertGetNotesTagsTests(TestCase):
         cls.docket_3 = DocketFactory(
             court=cls.court,
         )
-        cls.fav_docket_1_user_1 = FavoriteFactory(
+        cls.fav_docket_1_user_1 = NoteFactory(
             user=cls.user_1,
             docket_id=cls.docket_1,
-            notes="Favorite 1 Test",
+            notes="Note 1 Test",
         )
-        cls.fav_docket_2_user_1 = FavoriteFactory(
+        cls.fav_docket_2_user_1 = NoteFactory(
             user=cls.user_1,
             docket_id=cls.docket_2,
             notes="",
         )
-        cls.fav_docket_1_user_2 = FavoriteFactory(
+        cls.fav_docket_1_user_2 = NoteFactory(
             user=cls.user_2,
             docket_id=cls.docket_1,
-            notes="Favorite 2 Test",
+            notes="Note 2 Test",
         )
 
         cls.orphan_tag_user_1 = UserTagFactory(user=cls.user_1, name="orphan")
@@ -1427,7 +1427,7 @@ class DocketAlertGetNotesTagsTests(TestCase):
             notes_docket_1_user_1,
             tags_docket_1_user_1,
         ) = get_docket_notes_and_tags_by_user(self.docket_1.pk, self.user_1.pk)
-        self.assertEqual(notes_docket_1_user_1, "Favorite 1 Test")
+        self.assertEqual(notes_docket_1_user_1, "Note 1 Test")
         self.assertEqual(
             tags_docket_1_user_1, [self.tag_1_user_1, self.tag_2_user_1]
         )
@@ -1436,7 +1436,7 @@ class DocketAlertGetNotesTagsTests(TestCase):
             notes_docket_1_user_2,
             tags_docket_1_user_2,
         ) = get_docket_notes_and_tags_by_user(self.docket_1.pk, self.user_2.pk)
-        self.assertEqual(notes_docket_1_user_2, "Favorite 2 Test")
+        self.assertEqual(notes_docket_1_user_2, "Note 2 Test")
         self.assertEqual(tags_docket_1_user_2, [self.tag_1_user_2])
 
         (

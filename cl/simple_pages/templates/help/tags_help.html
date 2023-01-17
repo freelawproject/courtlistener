@@ -92,7 +92,7 @@
 
 
     <h2 id="notes">Notes</h2>
-    <p>You can use the Notes feature to save Dockets, RECAP Documents, Opinions, and Oral arguments to the <a href="{% url 'profile_favorites' %}">Notes tab</a> in your account. You can add notes to each favorite item as well.
+    <p>You can use the Notes feature to save Dockets, RECAP Documents, Opinions, and Oral arguments to the <a href="{% url 'profile_notes' %}">Notes tab</a> in your account. You can add notes to each note item as well.
     </p>
     <p>Notes on dockets will be shown in <a href="{% url 'alert_help' %}#recap-alerts">docket alerts</a> that we send you, if you subscribe to a case, but are otherwise always private.
     </p>
@@ -120,14 +120,14 @@
     <p>Click the save button.</p>
 
     <h3 id="editing-notes">Viewing, Editing or Deleting a Note</h3>
-    <p>You can view your favorite items in the <a href="{% url 'profile_favorites' %}">Notes tab</a> within your user profile panel.</p>
+    <p>You can view your notes items in the <a href="{% url 'profile_notes' %}">Notes tab</a> within your user profile panel.</p>
     <p><img src="{% static "png/view-notes.png" %}"
          alt="screenshot of the notes tab"
          class="img-responsive img-rounded shadow center-block"
          height="242"
          width="554">
     </p>
-    <p>Here, you can edit or delete a favorite item by clicking on the "Edit/Delete" button.</p>
+    <p>Here, you can edit or delete a note item by clicking on the "Edit/Delete" button.</p>
     <p>A modal pops up:</p>
     <p><img src="{% static "png/edit-delete-notes.png" %}"
          alt="screenshot of the edit/delete notes modal"
@@ -135,7 +135,7 @@
          height="242"
          width="554">
     </p>
-   <p>You can change the content of the favorite and save or you can delete it by clicking the "Delete" button in the bottom left corner.</p>
+   <p>You can change the content of the note and save or you can delete it by clicking the "Delete" button in the bottom left corner.</p>
 
   </div>
 {% endblock %}

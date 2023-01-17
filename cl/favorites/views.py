@@ -13,70 +13,70 @@ from django.http import (
 from django.shortcuts import get_object_or_404, render
 from django.utils.datastructures import MultiValueDictKeyError
 
-from cl.favorites.forms import FavoriteForm
-from cl.favorites.models import DocketTag, Favorite, UserTag
+from cl.favorites.forms import NoteForm
+from cl.favorites.models import DocketTag, Note, UserTag
 from cl.lib.http import is_ajax
 from cl.lib.view_utils import increment_view_count
 
 
-def get_favorite(request: HttpRequest) -> HttpResponse:
+def get_note(request: HttpRequest) -> HttpResponse:
     audio_pk = request.POST.get("audio_id")
     cluster_pk = request.POST.get("cluster_id")
     docket_pk = request.POST.get("docket_id")
     recap_doc_pk = request.POST.get("recap_doc_id")
     if audio_pk and audio_pk != "undefined":
         try:
-            fave = Favorite.objects.get(audio_id=audio_pk, user=request.user)
+            note = Note.objects.get(audio_id=audio_pk, user=request.user)
         except ObjectDoesNotExist:
-            fave = Favorite()
+            note = Note()
     elif cluster_pk and cluster_pk != "undefined":
         try:
-            fave = Favorite.objects.get(
+            note = Note.objects.get(
                 cluster_id=cluster_pk, user=request.user
             )
         except ObjectDoesNotExist:
-            fave = Favorite()
+            note = Note()
     elif docket_pk and docket_pk != "undefined":
         try:
-            fave = Favorite.objects.get(docket_id=docket_pk, user=request.user)
+            note = Note.objects.get(docket_id=docket_pk, user=request.user)
         except ObjectDoesNotExist:
-            fave = Favorite()
+            note = Note()
     elif recap_doc_pk and recap_doc_pk != "undefined":
         try:
-            fave = Favorite.objects.get(
+            note = Note.objects.get(
                 recap_doc_id=recap_doc_pk, user=request.user
             )
         except ObjectDoesNotExist:
-            fave = Favorite()
+            note = Note()
     else:
-        fave = None
-    return fave
+        note = None
+    return note
 
 
 @login_required
-def save_or_update_favorite(request: HttpRequest) -> HttpResponse:
-    """Uses ajax to save or update a favorite.
+def save_or_update_note(request: HttpRequest) -> HttpResponse:
+    """Uses ajax to save or update a note.
 
     Receives a request as an argument, and then uses that plus POST data to
-    create or update a favorite in the database for a specific user. If the
-    user already has the document favorited, it updates the favorite with the
-    new information. If not, it creates a new favorite.
+    create or update a note in the database for a specific user. If the
+    user already has a note for the document, it updates the note with the
+    new information. If not, it creates a new note.
     """
     if is_ajax(request):
-        fave = get_favorite(request)
-        if fave is None:
+        note = get_note(request)
+        if note is None:
             return HttpResponseServerError(
                 "Unknown document, audio, docket or recap document id."
             )
 
-        f = FavoriteForm(request.POST, instance=fave)
+        f = NoteForm(request.POST, instance=note)
         if f.is_valid():
-            new_fave = f.save(commit=False)
-            new_fave.user = request.user
+            new_note = f.save(commit=False)
+            new_note.user = request.user
             try:
-                new_fave.save()
+                new_note.save()
             except IntegrityError:
-                # User already has this favorite.
+                # User already has this note.
                 return HttpResponse("It worked")
         else:
             # Validation errors fail silently. Probably could be better.
@@ -90,18 +90,18 @@ def save_or_update_favorite(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
-def delete_favorite(request: HttpRequest) -> HttpResponse:
-    """Delete a user's favorite
+def delete_note(request: HttpRequest) -> HttpResponse:
+    """Delete a user's note
 
-    Deletes a favorite for a user using an ajax call and post data.
+    Deletes a note for a user using an ajax call and post data.
     """
     if is_ajax(request):
-        fave = get_favorite(request)
-        if fave is None:
+        note = get_note(request)
+        if note is None:
             return HttpResponseServerError(
                 "Unknown document, audio, docket, or recap document id."
             )
-        fave.delete()
+        note.delete()
 
         try:
             if request.POST["message"] == "True":
@@ -109,7 +109,7 @@ def delete_favorite(request: HttpRequest) -> HttpResponse:
                 messages.add_message(
                     request,
                     messages.SUCCESS,
-                    "Your favorite was deleted successfully.",
+                    "Your note was deleted successfully.",
                 )
         except MultiValueDictKeyError:
             # This happens if message isn't set.

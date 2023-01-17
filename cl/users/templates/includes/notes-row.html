@@ -1,0 +1,56 @@
+{% load text_filters %}
+
+
+<tr id="note-row-{{ note_form.instance.id }}">
+  <td id="name-{{ note_form.instance.id }}">
+    {% if note_form.instance.cluster_id %}
+      <i class="fa-book fa gray" title="{{ type }}"></i>
+      <a href="{{ note_form.instance.cluster_id.get_absolute_url }}">
+        {{note_form.instance.name }}
+      </a>
+    {% elif note_form.instance.audio_id %}
+      <i class="fa-volume-up fa grey" title="{{ type }}"></i>
+      <a href="{{ note_form.instance.audio_id.get_absolute_url }}">
+        {{ note_form.instance.name }}
+      </a>
+    {% elif note_form.instance.docket_id %}
+      <i class="fa-list fa grey"
+         title="{{ type }}"></i>
+      <a href="{{ note_form.instance.docket_id.get_absolute_url }}?order_by=desc">
+        {{ note_form.instance.name }}
+      </a>
+    {% elif note_form.instance.recap_doc_id %}
+      <i class="fa-file-text-o fa grey"
+         title="{{ type }}"></i>
+      <a href="{{ note_form.instance.recap_doc_id.get_absolute_url }}">
+        {{ note_form.instance.name }}
+      </a>
+    {% endif %}
+  </td>
+  {% if type == "Dockets" %}
+    <td id="date_last_filing-{{ note_form.instance.id }}" data-text="{{  note_form.instance.docket_id.date_last_filing|date:"Ymd" }}">
+      {{ note_form.instance.docket_id.date_last_filing|date:"M j, Y"|default:"(none)"|nbsp }}
+    </td>
+  {% endif %}
+  <td id="notes-{{ note_form.instance.id }}">
+    {{ note_form.instance.notes|default:"(none)" }}
+  </td>
+  <td class="align-top">
+    <div data-toggle="modal"
+         data-target="#modal-save-note">
+      <a class="inline edit-note-trigger nowrap btn btn-primary btn-sm"
+         data-id="{{ note_form.instance.id }}"><i class="fa fa-pencil"></i> Edit / Delete
+      </a>
+
+      <div id="data-store-{{ note_form.instance.id }}"
+           class="hidden"
+           data-cluster_id="{{ note_form.instance.cluster_id.pk|default_if_none:"" }}"
+           data-audio_id="{{ note_form.instance.audio_id.pk|default_if_none:"" }}"
+           data-docket_id="{{ note_form.instance.docket_id.pk|default_if_none:"" }}"
+           data-recap_doc_id="{{ note_form.instance.recap_doc_id.pk|default_if_none:"" }}"
+           data-name="{{ note_form.instance.name|default_if_none:"" }}"
+           data-notes="{{ note_form.instance.notes|default_if_none:"" }}">
+      </div>
+    </div>
+  </td>
+</tr>

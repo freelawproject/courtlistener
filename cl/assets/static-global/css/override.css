@@ -1019,7 +1019,7 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
   cursor: default;
 }
 
-/* Save favorites and modal box configs */
+/* Save notes and modal box configs */
 .modal {
   box-shadow: 2px 2px 5px #000000;
   border: 1px solid #dddddd;
@@ -1070,31 +1070,31 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
   text-transform: uppercase;
 }
 
-#modal-save-favorite .modal-dialog {
+#modal-save-note .modal-dialog {
   width: 430px;
 }
 
-#modal-save-favorite textarea, #modal-save-favorite input {
+#modal-save-note textarea, #modal-save-note input {
   width: 404px !important;
 }
 
-#save-favorite-text-area {
+#save-note-text-area {
   height: auto;
 }
 
-#modal-save-favorite .save-favorite-button {
+#modal-save-note .save-note-button {
   margin-right: 0;
 }
 
-#favorites-bottom-section {
+#notes-bottom-section {
   margin-top: 5.5em;
 }
 
-#save-favorite-delete {
+#save-note-delete {
   margin-bottom: 0.3em;
 }
 
-#favorites-buttons {
+#notes-buttons {
   position: absolute;
   right: 1em;
   bottom: 0.3em;

@@ -3,10 +3,10 @@
 
 {% block title %}Notes – CourtListener.com{% endblock %}
 
-{% block nav-favorites %}active{% endblock %}
+{% block nav-notes %}active{% endblock %}
 {% block footer-scripts %}
     <script defer type="text/javascript"
-            src="{% static "js/save-favorites.js" %}"></script>
+            src="{% static "js/save-notes.js" %}"></script>
     <script defer type="text/javascript"
             src="{% static "js/jquery.NobleCount.min.js" %}"></script>
     <link rel="stylesheet" href="{% static "css/custom_table_sorter.css" %}" />
@@ -17,7 +17,7 @@
 
     <script type="text/javascript">
       $(document).ready(function(){
-        $(".edit-favorite-trigger").on("click", function (event) {
+        $(".edit-note-trigger").on("click", function (event) {
           event.preventDefault();
           var pk = $(this).data("id");
           var ds = $("#data-store-" + pk);
@@ -25,9 +25,9 @@
           $("#id_audio_id").val(ds.data("audio_id"));
           $("#id_docket_id").val(ds.data("docket_id"));
           $("#id_recap_doc_id").val(ds.data("recap_doc_id"));
-          $("#save-favorite-notes-field").val(ds.data("notes"));
-          $("#save-favorite-name-field").val(ds.data("name"));
-          $("#modal-save-favorite").data("id", pk);
+          $("#save-note-notes-field").val(ds.data("notes"));
+          $("#save-note-name-field").val(ds.data("name"));
+          $("#modal-save-note").data("id", pk);
         });
       });
 
@@ -46,12 +46,12 @@
 
 {% block content %}
   <div class="col-xs-12 v-offset-above-2">
-    {% if user.favorites.exists %}
+    {% if user.notes.exists %}
       {# Set up the pills #}
       <ul class="nav nav-pills">
-      {% for type, typed_favorite_forms in favorite_forms.items %}
+      {% for type, typed_note_forms in note_forms.items %}
         <li class="{% if forloop.first %}active{% endif %} medium">
-          <a href="#{{ type|slugify }}" data-toggle="tab">{{ type }} <span class="badge">{{ typed_favorite_forms|length }}</span></a>
+          <a href="#{{ type|slugify }}" data-toggle="tab">{{ type }} <span class="badge">{{ typed_note_forms|length }}</span></a>
         </li>
       {% endfor %}
       </ul>
@@ -59,9 +59,9 @@
 
       {# Set up the tab contents #}
       <div class="tab-content">
-        {% for type, typed_favorite_forms in favorite_forms.items %}
+        {% for type, typed_note_forms in note_forms.items %}
           <div class="tab-pane {% if forloop.first %}active{% endif %}" id="{{ type|slugify }}">
-            {% if typed_favorite_forms %}
+            {% if typed_note_forms %}
               <div class="table-responsive">
                 <table class="table settings-table tablesorter-bootstrap">
                   <thead>
@@ -86,8 +86,8 @@
                   </tr>
                   </thead>
                   <tbody>
-                  {% for favorite_form in typed_favorite_forms %}
-                    {% include "includes/favorites-row.html" %}
+                  {% for note_form in typed_note_forms %}
+                    {% include "includes/notes-row.html" %}
                   {% endfor %}
                   </tbody>
                 </table>
@@ -98,17 +98,17 @@
           </div>
         {% endfor %}
         {# modal & data storage #}
-        {% include "includes/favorites_modal.html" with favorite_form=blank_favorite_form edit=True%}
+        {% include "includes/notes_modal.html" with note_form=blank_note_form edit=True%}
       </div>
     {% else %}
-      {# No favorites yet #}
+      {# No notes yet #}
       <div class="row">
         <div class="hidden-xs col-sm-1 col-md-3"></div>
         <div class="col-xs-12 col-sm-10 col-md-6 text-center">
           <h1><i class="fa fa-bookmark gold"></i>&nbsp;CourtListener Notes</h1>
           <h3 class="gray caps">You Have Not Saved Any&nbsp;Notes</h3>
           <p>Notes can help you keep track of cases and opinions</p>
-          <p>To save a favorite, click the gold star next to the title of an opinion, docket, RECAP document, or oral argument. From there you can give it a title and make a note.
+          <p>To save a note, click the "Add Note" button below the title of an opinion, docket, RECAP document, or oral argument. From there you can give it a title and make a note.
           </p>
         </div>
       </div>

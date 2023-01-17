@@ -10,7 +10,7 @@ from requests import RequestException
 from simplejson import JSONDecodeError
 
 from cl.alerts.models import DocketAlert
-from cl.favorites.models import DocketTag, Favorite
+from cl.favorites.models import DocketTag, Note
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.scrapers.tasks import update_docket_info_iquery
@@ -102,10 +102,10 @@ def get_docket_ids() -> Set[int]:
                 if match := re.search(r"^/docket/([0-9]+)/", url):
                     docket_ids.add(match.group(1))
 
-    # Add in docket IDs that have docket alerts, tags, or are favorited
+    # Add in docket IDs that have docket alerts, tags, or are in notes
     docket_ids.update(DocketAlert.objects.values_list("docket", flat=True))
     docket_ids.update(
-        Favorite.objects.exclude(docket_id=None)
+        Note.objects.exclude(docket_id=None)
         .distinct("docket_id")
         .values_list("docket_id", flat=True)
     )

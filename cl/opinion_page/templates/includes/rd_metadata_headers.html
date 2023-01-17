@@ -32,12 +32,12 @@
 
 <div class="v-offset-below-3 v-offset-above-1">
   <div class="btn-group">
-    <button id="favorites-star"
-     class="btn {% if favorite_form.instance.recap_doc_id %}btn-danger{% else %}btn-success{% endif %} pointer hidden-print"
+    <button id="add-note-button"
+     class="btn {% if note_form.instance.recap_doc_id %}btn-warning{% else %}btn-success{% endif %} pointer hidden-print"
      data-toggle="modal"
-     data-target="#modal-save-favorite, #modal-logged-out"
-     title="{% if favorite_form.instance.recap_doc_id %}Edit this note{% else %}Save this record as a note in your profile{% endif %}">
-      <i class="fa fa-bookmark "></i> <span>{% if favorite_form.instance.recap_doc_id %}Edit Note{% else %}Add Note{% endif %}</span></button>
+     data-target="#modal-save-note, #modal-logged-out"
+     title="{% if note_form.instance.recap_doc_id %}Edit this note{% else %}Save this record as a note in your profile{% endif %}">
+      <i class="fa fa-bookmark "></i> <span>{% if note_form.instance.recap_doc_id %}Edit Note{% else %}Add Note{% endif %}</span></button>
   </div>
   {% include "includes/rd_download_button.html" %}
   {% include "includes/rd_doc_search_button.html" %}

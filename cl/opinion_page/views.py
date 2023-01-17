@@ -31,8 +31,8 @@ from rest_framework.status import HTTP_300_MULTIPLE_CHOICES, HTTP_404_NOT_FOUND
 from cl.alerts.models import DocketAlert
 from cl.citations.parenthetical_utils import get_or_create_parenthetical_groups
 from cl.custom_filters.templatetags.text_filters import best_case_name
-from cl.favorites.forms import FavoriteForm
-from cl.favorites.models import Favorite
+from cl.favorites.forms import NoteForm
+from cl.favorites.models import Note
 from cl.lib.auth import group_required
 from cl.lib.bot_detector import is_og_bot
 from cl.lib.http import is_ajax
@@ -223,23 +223,23 @@ def user_has_alert(user: Union[AnonymousUser, User], docket: Docket) -> bool:
 def core_docket_data(
     request: HttpRequest,
     pk: int,
-) -> Tuple[Docket, Dict[str, Union[bool, str, Docket, FavoriteForm]]]:
+) -> Tuple[Docket, Dict[str, Union[bool, str, Docket, NoteForm]]]:
     """Gather the core data for a docket, party, or IDB page."""
     docket = get_object_or_404(Docket, pk=pk)
     title = make_docket_title(docket)
 
     try:
-        fave = Favorite.objects.get(docket_id=docket.pk, user=request.user)
+        note = Note.objects.get(docket_id=docket.pk, user=request.user)
     except (ObjectDoesNotExist, TypeError):
-        # Not favorited or anonymous user
-        favorite_form = FavoriteForm(
+        # Not saved in notes or anonymous user
+        note_form = NoteForm(
             initial={
                 "docket_id": docket.pk,
                 "name": trunc(best_case_name(docket), 100, ellipsis="..."),
             }
         )
     else:
-        favorite_form = FavoriteForm(instance=fave)
+        note_form = NoteForm(instance=note)
 
     has_alert = user_has_alert(request.user, docket)
 
@@ -248,7 +248,7 @@ def core_docket_data(
         {
             "docket": docket,
             "title": title,
-            "favorite_form": favorite_form,
+            "note_form": note_form,
             "has_alert": has_alert,
             "timezone": COURT_TIMEZONES.get(docket.court_id, "US/Eastern"),
             "private": docket.blocked,
@@ -464,17 +464,17 @@ def view_recap_document(
     title = make_rd_title(rd)
     rd = make_thumb_if_needed(request, rd)
     try:
-        fave = Favorite.objects.get(recap_doc_id=rd.pk, user=request.user)
+        note = Note.objects.get(recap_doc_id=rd.pk, user=request.user)
     except (ObjectDoesNotExist, TypeError):
-        # Not favorited or anonymous user
-        favorite_form = FavoriteForm(
+        # Not saved in notes or anonymous user
+        note_form = NoteForm(
             initial={
                 "recap_doc_id": rd.pk,
                 "name": trunc(title, 100, ellipsis="..."),
             }
         )
     else:
-        favorite_form = FavoriteForm(instance=fave)
+        note_form = NoteForm(instance=note)
 
     return TemplateResponse(
         request,
@@ -482,7 +482,7 @@ def view_recap_document(
         {
             "rd": rd,
             "title": title,
-            "favorite_form": favorite_form,
+            "note_form": note_form,
             "private": True,  # Always True for RECAP docs.
         },
     )
@@ -493,12 +493,12 @@ def view_recap_document(
 def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     """Using the cluster ID, return the cluster of opinions.
 
-    We also test if the cluster ID is a favorite for the user, and send data
-    if needed. If it's a favorite, we send the bound form for the favorite so
-    it can populate the form on the page. If it is not a favorite, we send the
+    We also test if the cluster ID has a user note, and send data
+    if needed. If it's a note, we send the bound form for the note so
+    it can populate the form on the page. If it has note a note, we send the
     unbound form.
     """
-    # Look up the court, cluster, title and favorite information
+    # Look up the court, cluster, title and note information
     cluster = get_object_or_404(OpinionCluster, pk=pk)
     title = ", ".join(
         [
@@ -518,17 +518,17 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     get_string = make_get_string(request)
 
     try:
-        fave = Favorite.objects.get(cluster_id=cluster.pk, user=request.user)
+        note = Note.objects.get(cluster_id=cluster.pk, user=request.user)
     except (ObjectDoesNotExist, TypeError):
-        # Not favorited or anonymous user
-        favorite_form = FavoriteForm(
+        # Not note or anonymous user
+        note_form = NoteForm(
             initial={
                 "cluster_id": cluster.pk,
                 "name": trunc(best_case_name(cluster), 100, ellipsis="..."),
             }
         )
     else:
-        favorite_form = FavoriteForm(instance=fave)
+        note_form = NoteForm(instance=note)
 
     citing_clusters, citing_cluster_count = get_citing_clusters_with_cache(
         cluster
@@ -559,7 +559,7 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
             "title": title,
             "cluster": cluster,
             "has_downloads": has_downloads,
-            "favorite_form": favorite_form,
+            "note_form": note_form,
             "get_string": get_string,
             "private": cluster.blocked,
             "citing_clusters": citing_clusters,

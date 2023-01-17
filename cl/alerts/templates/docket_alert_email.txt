@@ -21,11 +21,11 @@ View Docket: https://www.courtlistener.com{{ docket.get_absolute_url }}?order_by
 Buy Docket on PACER: {{ docket.pacer_url }}{% endif %}
 
 {% if notes or tags %}
-Your Note: {% if notes %}{{ notes }}{% else %} You have not added notes to this case. Learn More: https://www.courtlistener.com{% url 'tag_favorites_help' %}{% endif %}
+Your Note: {% if notes %}{{ notes }}{% else %} You have not added notes to this case. Learn More: https://www.courtlistener.com{% url 'tag_notes_help' %}{% endif %}
 
-Your Tags: {% if tags %}{% for tag in tags %}{{ tag.name }}{% if not forloop.last %}, {% endif %}{% endfor %}{% else %} No tags yet. Learn More: https://www.courtlistener.com{% url 'tag_favorites_help' %}{% endif %}
+Your Tags: {% if tags %}{% for tag in tags %}{{ tag.name }}{% if not forloop.last %}, {% endif %}{% endfor %}{% else %} No tags yet. Learn More: https://www.courtlistener.com{% url 'tag_notes_help' %}{% endif %}
 {% else %}
-Use notes and tags to organize and share the cases you follow. Learn More: https://www.courtlistener.com{% url 'tag_favorites_help' %}
+Use notes and tags to organize and share the cases you follow. Learn More: https://www.courtlistener.com{% url 'tag_notes_help' %}
 {% endif %}
 
 {% for de in new_des %}{% for rd in de.recap_documents.all %}Document Number: {{ de.entry_number }}{% if rd.attachment_number  %}-{{ rd.attachment_number }}{% endif %}

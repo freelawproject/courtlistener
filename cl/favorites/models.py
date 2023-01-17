@@ -7,7 +7,7 @@ from cl.lib.models import AbstractDateTimeModel
 from cl.search.models import Docket, OpinionCluster, RECAPDocument
 
 
-class Favorite(models.Model):
+class Note(models.Model):
     date_created = models.DateTimeField(
         help_text="The original creation date for the item",
         auto_now_add=True,
@@ -18,41 +18,41 @@ class Favorite(models.Model):
     )
     user = models.ForeignKey(
         User,
-        help_text="The user that owns the favorite",
-        related_name="favorites",
+        help_text="The user that owns the note",
+        related_name="notes",
         on_delete=models.CASCADE,
     )
     cluster_id = models.ForeignKey(
         OpinionCluster,
-        verbose_name="the opinion cluster that is favorited",
+        verbose_name="the opinion cluster that is saved",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
     )
     audio_id = models.ForeignKey(
         Audio,
-        verbose_name="the audio file that is favorited",
+        verbose_name="the audio file that is saved",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
     )
     docket_id = models.ForeignKey(
         Docket,
-        verbose_name="the docket that is favorited",
+        verbose_name="the docket that is saved",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
     )
     recap_doc_id = models.ForeignKey(
         RECAPDocument,
-        verbose_name="the RECAP document that is favorited",
+        verbose_name="the RECAP document that is saved",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
     )
     name = models.CharField("a name for the alert", max_length=100)
     notes = models.TextField(
-        "notes about the favorite",
+        "notes about the item saved",
         validators=[MaxLengthValidator(500)],
         max_length=500,
         blank=True,

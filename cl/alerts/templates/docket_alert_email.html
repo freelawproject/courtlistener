@@ -62,7 +62,7 @@
 
     {% if notes or tags %}
       <p style="font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 1em 0 1em; padding: 0;">
-        <strong>Your Note: </strong><span>{% if notes %}{{ notes }}{% else %}You have not added notes to this case. <a href="https://www.courtlistener.com{% url 'tag_favorites_help' %}">Learn more</a>{% endif %}</span>
+        <strong>Your Note: </strong><span>{% if notes %}{{ notes }}{% else %}You have not added notes to this case. <a href="https://www.courtlistener.com{% url 'tag_notes_help' %}">Learn more</a>{% endif %}</span>
       </p>
       <p style="font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 1em 0 1em; padding: 0;">
         <strong>Your Tags: </strong>
@@ -72,12 +72,12 @@
               <a href="https://www.courtlistener.com{% url 'view_tag' username tag.name %}">{{ tag.name }}</a>{% if not forloop.last %}, {% endif %}
             {% endfor %}
           {% else %}
-            No tags yet. <a href="https://www.courtlistener.com{% url 'tag_favorites_help' %}">Learn more</a>
+            No tags yet. <a href="https://www.courtlistener.com{% url 'tag_notes_help' %}">Learn more</a>
           {% endif %}
         </span>
       </p>
     {% else %}
-      <p style="font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 1em 0 1em; padding: 0;">Use notes and tags to organize and share the cases you follow. <a href="https://www.courtlistener.com{% url 'tag_favorites_help' %}">Learn more</a></p>
+      <p style="font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 1em 0 1em; padding: 0;">Use notes and tags to organize and share the cases you follow. <a href="https://www.courtlistener.com{% url 'tag_notes_help' %}">Learn more</a></p>
     {% endif %}
     <hr style="background: #ddd; color: #ddd; clear: both; float: none; width: 60%; height: .1em; margin: 0 0 1.45em; border: none;">
     <table cellpadding="8">

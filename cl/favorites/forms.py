@@ -1,12 +1,12 @@
 from django import forms
 from django.forms import ModelForm
 
-from cl.favorites.models import Favorite
+from cl.favorites.models import Note
 
 
-class FavoriteForm(ModelForm):
+class NoteForm(ModelForm):
     class Meta:
-        model = Favorite
+        model = Note
         exclude = ("user",)
         fields = (
             "id",
@@ -25,7 +25,7 @@ class FavoriteForm(ModelForm):
             "recap_doc_id": forms.HiddenInput(),
             "name": forms.TextInput(
                 attrs={
-                    "id": "save-favorite-name-field",
+                    "id": "save-note-name-field",
                     "class": "form-control",
                     "maxlength": "100",
                 }
@@ -33,7 +33,7 @@ class FavoriteForm(ModelForm):
             "notes": forms.Textarea(
                 attrs={
                     "class": "bottom form-control",
-                    "id": "save-favorite-notes-field",
+                    "id": "save-note-notes-field",
                     "maxlength": "600",
                 }
             ),

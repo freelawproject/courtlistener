@@ -25,7 +25,7 @@
     <script defer type="text/javascript"
             src="{% static "js/jquery.NobleCount.min.js" %}"></script>
     <script defer type="text/javascript"
-            src="{% static "js/save-favorites.js" %}"></script>
+            src="{% static "js/save-notes.js" %}"></script>
     <script defer type="text/javascript"
             src="{% static "js/buy_pacer_modal.js" %}"></script>
 {% endblock %}
@@ -41,20 +41,20 @@
 
         {% include "includes/rd_admin_tools.html" with d=rd.docket_entry.docket de=rd.docket_entry %}
 
-        {# show this div if it is a favorite, otherwise, put it in place, in anticipation of it becoming one. #}
-        <div class="{% if not favorite_form.instance.recap_doc_id %}hidden{% endif %} sidebar-section"
+        {# show this div if it is a note, otherwise, put it in place, in anticipation of it becoming one. #}
+        <div class="{% if not note_form.instance.recap_doc_id %}hidden{% endif %} sidebar-section"
              id="sidebar-notes">
             <div>
                 <h3 class="inline"><span>Your Notes</span></h3>
 
                 <p class="inline" data-toggle="modal"
-                   data-target="#modal-save-favorite">
-                    (<a href="#favorite-editor">edit</a>)
+                   data-target="#modal-save-note">
+                    (<a href="#note-editor">edit</a>)
                     <i class="fa fa-pencil gray pointer"></i>
                 </p>
 
                 <p id="sidebar-notes-text">
-                    {{ favorite_form.instance.notes|default:"(none)" }}
+                    {{ note_form.instance.notes|default:"(none)" }}
                 </p>
             </div>
         </div>
@@ -70,7 +70,7 @@
       <h2 class="inline"><a
               href="{{ rd.docket_entry.docket.get_absolute_url }}"
               class="no-underline black-link">{{ rd.docket_entry.docket|best_case_name|safe|v_wrapper }}</a></h2>
-      {% include "includes/favorites_modal.html" %}
+      {% include "includes/notes_modal.html" %}
       {% include "includes/buy_pacer_modal.html" %}
       {% include "includes/rd_metadata_headers.html" %}
       <br>

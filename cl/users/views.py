@@ -35,7 +35,7 @@ from rest_framework.renderers import JSONRenderer
 from cl.alerts.models import DocketAlert
 from cl.api.models import WEBHOOK_EVENT_STATUS, WebhookEvent, WebhookEventType
 from cl.custom_filters.decorators import check_honeypot
-from cl.favorites.forms import FavoriteForm
+from cl.favorites.forms import NoteForm
 from cl.lib.crypto import sha1_activation_key
 from cl.lib.ratelimiter import ratelimiter_unsafe_10_per_m
 from cl.lib.types import AuthenticatedHttpRequest, EmailType
@@ -104,27 +104,27 @@ def view_docket_alerts(request: HttpRequest) -> HttpResponse:
 
 @login_required
 @never_cache
-def view_favorites(request: AuthenticatedHttpRequest) -> HttpResponse:
-    favorites = request.user.favorites.all().order_by("pk")
-    favorite_forms = OrderedDict()
-    favorite_forms["Dockets"] = []
-    favorite_forms["RECAP Documents"] = []
-    favorite_forms["Opinions"] = []
-    favorite_forms["Oral Arguments"] = []
-    for favorite in favorites:
-        if favorite.cluster_id:
+def view_notes(request: AuthenticatedHttpRequest) -> HttpResponse:
+    notes = request.user.notes.all().order_by("pk")
+    note_forms = OrderedDict()
+    note_forms["Dockets"] = []
+    note_forms["RECAP Documents"] = []
+    note_forms["Opinions"] = []
+    note_forms["Oral Arguments"] = []
+    for note in notes:
+        if note.cluster_id:
             key = "Opinions"
-        elif favorite.audio_id:
+        elif note.audio_id:
             key = "Oral Arguments"
-        elif favorite.recap_doc_id:
+        elif note.recap_doc_id:
             key = "RECAP Documents"
-        elif favorite.docket_id:
+        elif note.docket_id:
             key = "Dockets"
-        favorite_forms[key].append(FavoriteForm(instance=favorite))
+        note_forms[key].append(NoteForm(instance=note))
     docket_search_url = (
         "/?type=r&q=xxx AND docket_id:("
         + " OR ".join(
-            [str(a.instance.docket_id.pk) for a in favorite_forms["Dockets"]]
+            [str(a.instance.docket_id.pk) for a in note_forms["Dockets"]]
         )
         + ")"
     )
@@ -133,7 +133,7 @@ def view_favorites(request: AuthenticatedHttpRequest) -> HttpResponse:
         + " OR ".join(
             [
                 str(a.instance.audio_id.pk)
-                for a in favorite_forms["Oral Arguments"]
+                for a in note_forms["Oral Arguments"]
             ]
         )
         + ")"
@@ -143,7 +143,7 @@ def view_favorites(request: AuthenticatedHttpRequest) -> HttpResponse:
         + " OR ".join(
             [
                 str(a.instance.recap_doc_id.pk)
-                for a in favorite_forms["RECAP Documents"]
+                for a in note_forms["RECAP Documents"]
             ]
         )
         + ")"
@@ -151,17 +151,17 @@ def view_favorites(request: AuthenticatedHttpRequest) -> HttpResponse:
     opinion_search_url = (
         "/?q=xxx AND cluster_id:("
         + " OR ".join(
-            [str(a.instance.cluster_id.pk) for a in favorite_forms["Opinions"]]
+            [str(a.instance.cluster_id.pk) for a in note_forms["Opinions"]]
         )
         + ")&stat_Precedential=on&stat_Non-Precedential=on&stat_Errata=on&stat_Separate%20Opinion=on&stat_In-chambers=on&stat_Relating-to%20orders=on&stat_Unknown%20Status=on"
     )
     return TemplateResponse(
         request,
-        "profile/favorites.html",
+        "profile/notes.html",
         {
             "private": True,
-            "favorite_forms": favorite_forms,
-            "blank_favorite_form": FavoriteForm(),
+            "note_forms": note_forms,
+            "blank_note_form": NoteForm(),
             "docket_search_url": docket_search_url,
             "oral_search_url": oral_search_url,
             "recap_search_url": recap_search_url,
