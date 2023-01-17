@@ -190,9 +190,7 @@ class UserNotesTest(BaseSeleniumTest):
         title = self.browser.find_element(By.ID, "save-note-title")
         self.assertIn("Save Note", title.text.strip())
 
-        name_field = self.browser.find_element(
-            By.ID, "save-note-name-field"
-        )
+        name_field = self.browser.find_element(By.ID, "save-note-name-field")
         short_title = name_field.get_attribute("value")
         self.assertIn(short_title, search_title)
         notes = self.browser.find_element(By.ID, "save-note-notes-field")

@@ -131,10 +131,7 @@ def view_notes(request: AuthenticatedHttpRequest) -> HttpResponse:
     oral_search_url = (
         "/?type=oa&q=xxx AND id:("
         + " OR ".join(
-            [
-                str(a.instance.audio_id.pk)
-                for a in note_forms["Oral Arguments"]
-            ]
+            [str(a.instance.audio_id.pk) for a in note_forms["Oral Arguments"]]
         )
         + ")"
     )

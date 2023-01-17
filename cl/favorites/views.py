@@ -31,9 +31,7 @@ def get_note(request: HttpRequest) -> HttpResponse:
             note = Note()
     elif cluster_pk and cluster_pk != "undefined":
         try:
-            note = Note.objects.get(
-                cluster_id=cluster_pk, user=request.user
-            )
+            note = Note.objects.get(cluster_id=cluster_pk, user=request.user)
         except ObjectDoesNotExist:
             note = Note()
     elif docket_pk and docket_pk != "undefined":
