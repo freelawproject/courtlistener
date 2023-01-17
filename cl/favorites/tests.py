@@ -180,7 +180,7 @@ class UserNotesTest(BaseSeleniumTest):
             "Save this record as a note in your profile",
         )
         self.assertIn("btn-success", star.get_attribute("class"))
-        self.assertNotIn("btn-danger", star.get_attribute("class"))
+        self.assertNotIn("btn-warning", star.get_attribute("class"))
         star.click()
 
         # She is prompted to "Save Note". She notices the title is already
@@ -202,7 +202,7 @@ class UserNotesTest(BaseSeleniumTest):
         # She now sees the star is full on yellow implying it's a note!
         time.sleep(1)  # Selenium is sometimes faster than JS.
         star = self.browser.find_element(By.ID, "add-note-button")
-        self.assertIn("btn-danger", star.get_attribute("class"))
+        self.assertIn("btn-warning", star.get_attribute("class"))
         self.assertNotIn("btn-success", star.get_attribute("class"))
 
         # She closes her browser and goes to the gym for a bit since it's

@@ -179,8 +179,8 @@ a.button:active {
   padding-bottom: 1rem;
 }
 .filter-box #main-query-box .input-group {
-    display: inline-table;
     vertical-align: middle;
+    display: flex;
 }
 
 @media (max-width: 767px) {
@@ -231,9 +231,6 @@ a.button:active {
   .broken-email-banner .navbar-text {
     float: left;
   }
-  #main-query-box #de-filter-search {
-    width: 250px;
-  }
 }
 
 @media (max-width: 1200px) {
@@ -276,10 +273,6 @@ a.button:active {
     margin-left: 120px;
   }
 
-  #main-query-box #de-filter-search {
-    width: 600px;
-  }
-
   .filter-box #de-filter-search{
   font-size: 12px;
   }
@@ -299,10 +292,6 @@ a.button:active {
   padding-bottom: 0;
   }
 
-  #main-query-box #de-filter-search {
-    width: 100px;
-  }
-
   .lg-v-offset-below-3 {
     padding-bottom: 40px;
   }
@@ -315,10 +304,6 @@ a.button:active {
 @media (min-width: 1200px) {
   #main-query-box #id_q {
     width: 800px;
-  }
-
-  #main-query-box #de-filter-search {
-    width: 150px;
   }
 }
 
