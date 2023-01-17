@@ -1147,7 +1147,7 @@ requests = ">=2.0,<3.0"
 
 [[package]]
 name = "juriscraper"
-version = "2.5.27"
+version = "2.5.33"
 description = "An API to scrape American court websites for metadata."
 category = "main"
 optional = false
@@ -1227,9 +1227,9 @@ source = ["Cython (>=0.29.7)"]
 
 [[package]]
 name = "lxml-stubs"
-version = "0.1.1"
+version = "0.2.0"
 description = "Type annotations for the lxml package"
-category = "dev"
+category = "main"
 optional = false
 python-versions = "*"
 
@@ -1770,7 +1770,7 @@ python-versions = "*"
 
 [[package]]
 name = "reporters-db"
-version = "3.2.32"
+version = "3.2.36"
 description = "Database of Court Reporters"
 category = "main"
 optional = false
@@ -1911,7 +1911,7 @@ tornado = ["tornado (>=5)"]
 
 [[package]]
 name = "setuptools"
-version = "65.4.1"
+version = "65.5.1"
 description = "Easily download, build, install, upgrade, and uninstall Python packages"
 category = "main"
 optional = false
@@ -1919,7 +1919,7 @@ python-versions = ">=3.7"
 
 [package.extras]
 docs = ["furo", "jaraco.packaging (>=9)", "jaraco.tidelift (>=1.4)", "pygments-github-lexers (==0.0.5)", "rst.linker (>=1.9)", "sphinx (>=3.5)", "sphinx-favicon", "sphinx-hoverxref (<2)", "sphinx-inline-tabs", "sphinx-notfound-page (==0.8.3)", "sphinx-reredirects", "sphinxcontrib-towncrier"]
-testing = ["build[virtualenv]", "filelock (>=3.4.0)", "flake8 (<5)", "flake8-2020", "ini2toml[lite] (>=0.9)", "jaraco.envs (>=2.2)", "jaraco.path (>=3.2.0)", "mock", "pip (>=19.1)", "pip-run (>=8.8)", "pytest (>=6)", "pytest-black (>=0.3.7)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-enabler (>=1.3)", "pytest-flake8", "pytest-mypy (>=0.9.1)", "pytest-perf", "pytest-xdist", "tomli-w (>=1.0.0)", "virtualenv (>=13.0.0)", "wheel"]
+testing = ["build[virtualenv]", "filelock (>=3.4.0)", "flake8 (<5)", "flake8-2020", "ini2toml[lite] (>=0.9)", "jaraco.envs (>=2.2)", "jaraco.path (>=3.2.0)", "pip (>=19.1)", "pip-run (>=8.8)", "pytest (>=6)", "pytest-black (>=0.3.7)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-enabler (>=1.3)", "pytest-flake8", "pytest-mypy (>=0.9.1)", "pytest-perf", "pytest-timeout", "pytest-xdist", "tomli-w (>=1.0.0)", "virtualenv (>=13.0.0)", "wheel"]
 testing-integration = ["build[virtualenv]", "filelock (>=3.4.0)", "jaraco.envs (>=2.2)", "jaraco.path (>=3.2.0)", "pytest", "pytest-enabler", "pytest-xdist", "tomli", "virtualenv (>=13.0.0)", "wheel"]
 
 [[package]]
@@ -2303,7 +2303,7 @@ h11 = ">=0.9.0,<1"
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10, <3.11"
-content-hash = "a4913a6d0196b3477654bebfea56b29c9153c7e6a72c8d7440d3a0a4538e34ee"
+content-hash = "4f2381ed8936ae0f324542c2b71f4f4df3e620b4786018809d7a782ae29f9e55"
 
 [metadata.files]
 amqp = [
@@ -2911,8 +2911,8 @@ judge-pics = [
     {file = "judge_pics-2.0.2-py2.py3-none-any.whl", hash = "sha256:73d3add163bcd3574e485d7e1c744425eb7a3faf52958e0bd4059ef1b05097ab"},
 ]
 juriscraper = [
-    {file = "juriscraper-2.5.27-py27-none-any.whl", hash = "sha256:f5759e527ba545f19226a907bdd319fb3e0fa4cec16cd61c7a4c1331f3ccc887"},
-    {file = "juriscraper-2.5.27.tar.gz", hash = "sha256:48aaefcf49244e40e483719bc07049aea6aba1a061804fc3a39513ad2e7a1dd1"},
+    {file = "juriscraper-2.5.33-py27-none-any.whl", hash = "sha256:daf8bce9a23f8aed28c8e0cd6e24ae2d3099bcee390b12219eb24231a30711ad"},
+    {file = "juriscraper-2.5.33.tar.gz", hash = "sha256:0f1e9905121feaa2f35d3e308ba1428306f169a4d4eacc50580f6be0e240bb0b"},
 ]
 kdtree = [
     {file = "kdtree-0.16-py2.py3-none-any.whl", hash = "sha256:083945db69bc3cf0d349d8d0efe66c056de28d1c2f1e81f762dc5ce46f0dcf0a"},
@@ -3019,8 +3019,8 @@ lxml = [
     {file = "lxml-4.9.1.tar.gz", hash = "sha256:fe749b052bb7233fe5d072fcb549221a8cb1a16725c47c37e42b0b9cb3ff2c3f"},
 ]
 lxml-stubs = [
-    {file = "lxml-stubs-0.1.1.tar.gz", hash = "sha256:9b6a01ba4bccd6e532c01e19d2a3bc6d1d018fa0b9870236f61f315cb7b06648"},
-    {file = "lxml_stubs-0.1.1-py3-none-any.whl", hash = "sha256:d34a28be0e2525b0236aff7fe67af1f61911f556cadbc61f09810b69f762b747"},
+    {file = "lxml-stubs-0.2.0.tar.gz", hash = "sha256:78f1bfb31b1f2af9a5c9e9a602ab1b589a64a5a3cc444931a39cdfd02d6864b0"},
+    {file = "lxml_stubs-0.2.0-py3-none-any.whl", hash = "sha256:f0b3621ec2a23bea4145f484490c8b27383ecb407b3f8b079199ad4a0af4180b"},
 ]
 markdown2 = [
     {file = "markdown2-2.4.0-py2.py3-none-any.whl", hash = "sha256:8d4ef4a2d090c99532069c4611a9a2b9bea6ae1fa29b6c3727c95d1e31a8f6c5"},
@@ -3543,8 +3543,8 @@ regex = [
     {file = "regex-2022.1.18.tar.gz", hash = "sha256:97f32dc03a8054a4c4a5ab5d761ed4861e828b2c200febd4e46857069a483916"},
 ]
 reporters-db = [
-    {file = "reporters-db-3.2.32.tar.gz", hash = "sha256:284c03f445702c4f2ecac85d19cec8e129d5fa2427cd7a447332c9d4a735437b"},
-    {file = "reporters_db-3.2.32-py2.py3-none-any.whl", hash = "sha256:811b0970b300112acb0e1ea67bb9437d39ca884a4f94ca93c269778ec216a5e6"},
+    {file = "reporters-db-3.2.36.tar.gz", hash = "sha256:a28b4ddf167e179c6176db1d27b6b0cb6e0a8acfbddd0dbce8afdae26b69c421"},
+    {file = "reporters_db-3.2.36-py2.py3-none-any.whl", hash = "sha256:7d0986e1c5ddc260cae65a1fd10dc7c2e550c9de0dc413c5a51c691e539b7315"},
 ]
 requests = [
     {file = "requests-2.28.1-py3-none-any.whl", hash = "sha256:8fefa2a1a1365bf5520aac41836fbee479da67864514bdb821f31ce07ce65349"},
@@ -3596,8 +3596,8 @@ sentry-sdk = [
     {file = "sentry_sdk-1.9.0-py2.py3-none-any.whl", hash = "sha256:60b13757d6344a94bf0ccb3c0a006c4de77daab09871b30fbbd05d5ec24e54fb"},
 ]
 setuptools = [
-    {file = "setuptools-65.4.1-py3-none-any.whl", hash = "sha256:1b6bdc6161661409c5f21508763dc63ab20a9ac2f8ba20029aaaa7fdb9118012"},
-    {file = "setuptools-65.4.1.tar.gz", hash = "sha256:3050e338e5871e70c72983072fe34f6032ae1cdeeeb67338199c2f74e083a80e"},
+    {file = "setuptools-65.5.1-py3-none-any.whl", hash = "sha256:d0b9a8433464d5800cbe05094acf5c6d52a91bfac9b52bcfc4d41382be5d5d31"},
+    {file = "setuptools-65.5.1.tar.gz", hash = "sha256:e197a19aa8ec9722928f2206f8de752def0e4c9fc6953527360d1c36d94ddb2f"},
 ]
 sgmllib3k = [
     {file = "sgmllib3k-1.0.0.tar.gz", hash = "sha256:7868fb1c8bfa764c1ac563d3cf369c381d1325d36124933a726f29fcdaa812e9"},

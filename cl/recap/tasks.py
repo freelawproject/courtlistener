@@ -34,13 +34,18 @@ from redis import ConnectionError as RedisConnectionError
 from requests import HTTPError
 from requests.cookies import RequestsCookieJar
 from requests.packages.urllib3.exceptions import ReadTimeoutError
+from rest_framework.status import (
+    HTTP_500_INTERNAL_SERVER_ERROR,
+    HTTP_504_GATEWAY_TIMEOUT,
+)
 
 from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
+from cl.api.webhooks import send_recap_fetch_webhooks
 from cl.celery_init import app
 from cl.corpus_importer.tasks import (
     download_pacer_pdf_by_rd,
     download_pdf_by_magic_number,
-    get_attachment_page_by_rd,
+    get_att_report_by_rd,
     get_document_number_for_appellate,
     make_attachment_pq_object,
     update_rd_metadata,
@@ -1476,11 +1481,30 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> None:
         return
 
     try:
-        r = get_attachment_page_by_rd(rd.pk, cookies)
-    except (requests.RequestException, HTTPError):
+        r = get_att_report_by_rd(rd, cookies)
+    except HTTPError as exc:
         msg = "Failed to get attachment page from network."
-        mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
-        return
+        if exc.response.status_code in [
+            HTTP_500_INTERNAL_SERVER_ERROR,
+            HTTP_504_GATEWAY_TIMEOUT,
+        ]:
+            if self.request.retries == self.max_retries:
+                mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+                return
+            logger.info(
+                f"Ran into HTTPError: {exc.response.status_code}. Retrying."
+            )
+            raise self.retry(exc=exc)
+        else:
+            mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+            return
+    except requests.RequestException as exc:
+        if self.request.retries == self.max_retries:
+            msg = "Failed to get attachment page from network."
+            mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+            return
+        logger.info("Ran into a RequestException. Retrying.")
+        raise self.retry(exc=exc)
 
     text = r.response.text
     att_data = get_data_from_att_report(text, rd.docket_entry.docket.court_id)
@@ -1542,12 +1566,14 @@ def fetch_pacer_case_id_and_title(s, fq, court_id):
     :param court_id: The CL ID of the court
     :return: A dict of the new information or an empty dict if it fails
     """
+
     if (fq.docket_id and not fq.docket.pacer_case_id) or fq.docket_number:
         # We lack the pacer_case_id either on the docket or from the
         # submission. Look it up.
         docket_number = fq.docket_number or getattr(
             fq.docket, "docket_number", None
         )
+
         report = PossibleCaseNumberApi(map_cl_to_pacer_id(court_id), s)
         report.query(docket_number)
         return report.data()
@@ -1620,6 +1646,8 @@ def fetch_docket(self, fq_pk):
     if cookies is None:
         msg = f"Cookie cache expired before task could run for user: {fq.user_id}"
         mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+        self.request.chain = None
+        return None
 
     s = PacerSession(cookies=cookies)
     try:
@@ -1656,14 +1684,17 @@ def fetch_docket(self, fq_pk):
     #   None       --> Sealed or missing case
     #   Empty dict --> Didn't run the pacer_case_id lookup (wasn't needed)
     #   Full dict  --> Ran the query, got back results
+
     if result is None:
         msg = "Cannot find case by docket number (perhaps it's sealed?)"
         mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
         self.request.chain = None
         return None
 
-    pacer_case_id = getattr(fq.docket, "pacer_case_id", None) or result.get(
-        "pacer_case_id"
+    pacer_case_id = (
+        getattr(fq, "pacer_case_id", None)
+        or getattr(fq.docket, "pacer_case_id", None)
+        or result.get("pacer_case_id")
     )
 
     if not pacer_case_id:
@@ -1697,8 +1728,6 @@ def fetch_docket(self, fq_pk):
         newly_enqueued = enqueue_docket_alert(d_pk)
         if newly_enqueued:
             send_alert_and_webhook(d_pk, start_time)
-    msg = "Successfully got and merged docket. Adding to Solr as final step."
-    mark_fq_status(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
     return result
 
 
@@ -1723,6 +1752,7 @@ def mark_fq_status(fq, msg, status):
     if status == PROCESSING_STATUS.SUCCESSFUL:
         fq.date_completed = now()
     fq.save()
+    send_recap_fetch_webhooks(fq)
 
 
 def get_recap_email_recipients(
@@ -1883,7 +1913,9 @@ def download_pacer_pdf_and_save_to_pq(
                 pq.save()
                 return pq
 
-            # PACER document not available via magic link.
+        if not magic_number:
+            r_msg = "No magic number available to download the document."
+        if created:
             mark_pq_status(
                 pq, r_msg, PROCESSING_STATUS.FAILED, "error_message"
             )
@@ -1952,11 +1984,13 @@ class DocketUpdatedData:
 
 
 def open_and_validate_email_notification(
+    self: Task,
     epq: EmailProcessingQueue,
 ) -> tuple[dict[str, str | bool | list[DocketType]] | None, str]:
     """Open and read a recap.email notification from S3, then validate if it's
     a valid NEF or NDA.
 
+    :param self: The Celery task
     :param epq: The EmailProcessingQueue object.
     :return: A two tuple of a dict containing the notification data if valid
     or None otherwise, the raw notification body to store in next steps.
@@ -1972,6 +2006,17 @@ def open_and_validate_email_notification(
     except UnicodeDecodeError:
         with bucket.open(message_id, "rb") as f:
             body = f.read().decode("iso-8859-1")
+    except FileNotFoundError as exc:
+        if self.request.retries == self.max_retries:
+            msg = "File not found."
+            mark_pq_status(
+                epq, msg, PROCESSING_STATUS.FAILED, "status_message"
+            )
+            return None, ""
+        else:
+            # Do a retry. Hopefully the file will be in place soon.
+            raise self.retry(exc=exc)
+
     report = S3NotificationEmail(map_cl_to_pacer_id(epq.court_id))
     report._parse_text(body)
     data = report.data
@@ -2020,7 +2065,7 @@ def get_and_merge_rd_attachments(
             .recap_documents.earliest("date_created")
         )
         # Get the attachment page being logged into PACER
-        att_report = get_attachment_page_by_rd(main_rd.pk, cookies)
+        att_report = get_att_report_by_rd(main_rd, cookies)
 
     for docket_entry in dockets_updated:
         # Merge the attachments for each docket/recap document
@@ -2077,14 +2122,14 @@ def process_recap_email(
 
     epq = EmailProcessingQueue.objects.get(pk=epq_pk)
     mark_pq_status(epq, "", PROCESSING_STATUS.IN_PROGRESS, "status_message")
-    data, body = open_and_validate_email_notification(epq)
+    data, body = open_and_validate_email_notification(self, epq)
     if data is None:
         self.request.chain = None
         return None
 
     dockets = data["dockets"]
     # Look for the main docket that has the valid magic number
-    magic_number = None
+    magic_number = pacer_doc_id = pacer_case_id = document_url = None
     for docket_data in dockets:
         docket_entry = docket_data["docket_entries"][0]
         if docket_entry["pacer_magic_num"] is not None:
@@ -2093,6 +2138,13 @@ def process_recap_email(
             pacer_case_id = docket_entry["pacer_case_id"]
             document_url = docket_entry["document_url"]
             break
+
+    # Some notifications don't contain a magic number at all, assign the
+    # pacer_doc_id, pacer_case_id and document_url from the first docket entry.
+    if magic_number is None:
+        pacer_doc_id = dockets[0]["docket_entries"][0]["pacer_doc_id"]
+        pacer_case_id = dockets[0]["docket_entries"][0]["pacer_case_id"]
+        document_url = dockets[0]["docket_entries"][0]["document_url"]
 
     start_time = now()
     # Ensures we have PACER cookies ready to go.

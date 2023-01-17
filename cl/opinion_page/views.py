@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.models import AnonymousUser, User
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import F, IntegerField, Prefetch
 from django.db.models.functions import Cast
@@ -51,8 +51,8 @@ from cl.lib.utils import alphanumeric_sort
 from cl.lib.view_utils import increment_view_count
 from cl.opinion_page.forms import (
     CitationRedirectorForm,
+    CourtUploadForm,
     DocketEntryFilterForm,
-    TennWorkersForm,
 )
 from cl.people_db.models import AttorneyOrganization, CriminalCount, Role
 from cl.recap.constants import COURT_TIMEZONES
@@ -68,48 +68,70 @@ from cl.search.views import do_search
 
 
 def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
-    if pk not in ["tennworkcompcl", "tennworkcompapp"]:
-        raise Http404("Court pages only implemented for Tennessee so far.")
+    """Individual Court Home Pages"""
+    if pk not in ["tennworkcompcl", "tennworkcompapp", "me"]:
+        raise Http404("Court pages only implemented for select courts.")
 
     render_dict = {
-        # Load the render_dict with good results that can be shown in the
-        # "Latest Cases" sections
-        "results_compcl": do_search(
-            request.GET.copy(),
-            rows=5,
-            override_params={
-                "order_by": "dateFiled desc",
-                "court": "tennworkcompcl",
-            },
-            facet=False,
-        )["results"],
-        "results_compapp": do_search(
-            request.GET.copy(),
-            rows=5,
-            override_params={
-                "order_by": "dateFiled desc",
-                "court": "tennworkcompapp",
-            },
-            facet=False,
-        )["results"],
         "private": False,
+        "pk": pk,
+        "court": Court.objects.get(pk=pk).full_name,
     }
-    return TemplateResponse(request, "court.html", render_dict)
+
+    if "tennworkcomp" in pk:
+        courts = ["tennworkcompcl", "tennworkcompapp"]
+        template = "tn-court.html"
+    else:
+        courts = [pk]
+        template = "court.html"
+
+    for court in courts:
+        if "tennwork" in court:
+            results = f"results_{court}"
+        else:
+            results = "results"
+        render_dict[results] = do_search(
+            request.GET.copy(),
+            override_params={
+                "filed_after": (
+                    datetime.datetime.today() - datetime.timedelta(days=28)
+                ),
+                "order_by": "dateFiled desc",
+                "court": court,
+            },
+            facet=False,
+        )["results"]
+    return TemplateResponse(request, template, render_dict)
 
 
-@group_required("tenn_work_uploaders")
+@group_required(
+    "tenn_work_uploaders",
+    "uploaders_tennworkcompcl",
+    "uploaders_tennworkcompapp",
+    "uploaders_me",
+)
 def court_publish_page(request: HttpRequest, pk: int) -> HttpResponse:
-    """Display upload form and intake Opinions for Tenn. Workers Comp Cl/App
+    """Display upload form and intake Opinions for partner courts
 
     :param request: A GET or POST request for the page
     :param pk: The CL Court ID for each court
     """
+    if pk not in ["tennworkcompcl", "tennworkcompapp", "me"]:
+        raise Http404(
+            "Court pages only implemented for Tennessee Worker Comp Courts and Maine SJC."
+        )
+    # Validate the user has permission
+    if not request.user.is_staff and not request.user.is_superuser:
+        if not request.user.groups.filter(  # type: ignore
+            name__in=[f"uploaders_{pk}"]
+        ).exists():
+            raise PermissionDenied(
+                "You do not have permission to access this page."
+            )
 
-    if pk not in ["tennworkcompcl", "tennworkcompapp"]:
-        raise Http404("Court pages only implemented for Tennessee so far.")
-    form = TennWorkersForm(pk=pk)
+    form = CourtUploadForm(pk=pk)
     if request.method == "POST":
-        form = TennWorkersForm(request.POST, request.FILES, pk=pk)
+        form = CourtUploadForm(request.POST, request.FILES, pk=pk)
         if form.is_valid():
             cluster = form.save()
             goto = reverse("view_case", args=[cluster.pk, cluster.slug])
@@ -944,9 +966,11 @@ def citation_redirector(
     the text of opinions.
     """
     reporter_slug = slugify(reporter)
+
     if reporter != reporter_slug:
         # Reporter provided in non-slugified form. Redirect to slugified
         # version.
+
         return HttpResponseRedirect(
             reverse(
                 "citation_redirector",

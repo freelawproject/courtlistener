@@ -17,7 +17,6 @@ from django.core.files.base import ContentFile
 from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Prefetch
 from django.db.models.query import prefetch_related_objects
-from django.utils.encoding import force_bytes
 from django.utils.timezone import now
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
@@ -1375,6 +1374,28 @@ def get_appellate_docket_by_docket_number(
     }
 
 
+def get_att_report_by_rd(
+    rd: RECAPDocument,
+    cookies: RequestsCookieJar,
+) -> Optional[AttachmentPage]:
+    """Method to get the attachment report for the item in PACER.
+
+    :param rd: The RECAPDocument object to use as a source.
+    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
+    logged-on PACER user.
+    :return: The attachment report populated with the results
+    """
+
+    if not rd.pacer_doc_id:
+        return None
+
+    s = PacerSession(cookies=cookies)
+    pacer_court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
+    att_report = AttachmentPage(pacer_court_id, s)
+    att_report.query(rd.pacer_doc_id)
+    return att_report
+
+
 @app.task(
     bind=True,
     autoretry_for=(PacerLoginException,),
@@ -1401,12 +1422,8 @@ def get_attachment_page_by_rd(
         # Some docket entries are just text/don't have a pacer_doc_id.
         self.request.chain = None
         return None
-
-    s = PacerSession(cookies=cookies)
-    pacer_court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
-    att_report = AttachmentPage(pacer_court_id, s)
     try:
-        att_report.query(rd.pacer_doc_id)
+        att_report = get_att_report_by_rd(rd, cookies)
     except HTTPError as exc:
         if exc.response.status_code in [
             HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1644,36 +1661,28 @@ def get_document_number_for_appellate(
     empty string if not.
     """
 
-    # Get the document number for appellate documents.
     pdf_bytes = None
     document_number = ""
-    if court_id in ("ca8", "ca11", "cadc"):
-        # For ca8, ca11 and cadc the PACER document number is not available
-        # in the PDF, try to get it directly from the Download confirmation
-        # page.
+    # Try to get the document number for appellate documents from the PDF first
+    if pq.filepath_local:
+        with pq.filepath_local.open(mode="rb") as local_path:
+            pdf_bytes = local_path.read()
+    if pdf_bytes:
+        # For other jurisdictions try first to get it from the PDF document.
+        dn_response = microservice(
+            service="document-number",
+            file_type="pdf",
+            file=pdf_bytes,
+        )
+        if dn_response.ok and dn_response.text:
+            document_number = dn_response.text
+
+    if not document_number:
+        # If we still don't have the document number fall back on the
+        # download confirmation page
         document_number = get_document_number_from_confirmation_page(
             court_id, pacer_doc_id
         )
-    else:
-        if pq.filepath_local:
-            with pq.filepath_local.open(mode="rb") as local_path:
-                pdf_bytes = local_path.read()
-        if pdf_bytes:
-            # For other jurisdictions try first to get it from the PDF document.
-            dn_response = microservice(
-                service="document-number",
-                file_type="pdf",
-                file=pdf_bytes,
-            )
-            if dn_response.ok and dn_response.text:
-                document_number = dn_response.text
-
-        if not document_number:
-            # If we still don't have the document number fall back on the
-            # download confirmation page
-            document_number = get_document_number_from_confirmation_page(
-                court_id, pacer_doc_id
-            )
 
     # Document numbers from documents with attachments have the format
     # 1-1, 1-2, 1-3 in those cases the document number is the left number.

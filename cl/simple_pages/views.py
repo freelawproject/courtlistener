@@ -131,7 +131,7 @@ def markdown_help(request: HttpRequest) -> HttpResponse:
     )
 
 
-def tag_help(request: HttpRequest) -> HttpResponse:
+def tag_favorites_help(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "help/tags_help.html", {"private": False})
 
 
