@@ -102,7 +102,7 @@ def get_docket_ids() -> Set[int]:
                 if match := re.search(r"^/docket/([0-9]+)/", url):
                     docket_ids.add(match.group(1))
 
-    # Add in docket IDs that have docket alerts, tags, or are in notes
+    # Add in docket IDs that have docket alerts, tags, or notes
     docket_ids.update(DocketAlert.objects.values_list("docket", flat=True))
     docket_ids.update(
         Note.objects.exclude(docket_id=None)

@@ -1395,17 +1395,17 @@ class DocketAlertGetNotesTagsTests(TestCase):
         cls.docket_3 = DocketFactory(
             court=cls.court,
         )
-        cls.fav_docket_1_user_1 = NoteFactory(
+        cls.note_docket_1_user_1 = NoteFactory(
             user=cls.user_1,
             docket_id=cls.docket_1,
             notes="Note 1 Test",
         )
-        cls.fav_docket_2_user_1 = NoteFactory(
+        cls.note_docket_2_user_1 = NoteFactory(
             user=cls.user_1,
             docket_id=cls.docket_2,
             notes="",
         )
-        cls.fav_docket_1_user_2 = NoteFactory(
+        cls.note_docket_1_user_2 = NoteFactory(
             user=cls.user_2,
             docket_id=cls.docket_1,
             notes="Note 2 Test",

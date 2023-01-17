@@ -14,7 +14,7 @@ from cl.lib.string_utils import trunc
 def view_audio_file(request, pk, _):
     """Using the ID, return the oral argument page.
 
-    We also test if the item is a note and send data as such.
+    We also test if the item has a note and send data as such.
     """
     af = get_object_or_404(Audio, pk=pk)
     title = trunc(af.case_name, 100)
