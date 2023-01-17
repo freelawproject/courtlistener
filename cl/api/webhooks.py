@@ -1,4 +1,5 @@
 import requests
+from django.conf import settings
 from rest_framework.renderers import JSONRenderer
 from scorched.response import SolrResponse
 
@@ -30,9 +31,13 @@ def send_webhook_event(
     :param content_bytes: Optional, the bytes JSON content to send the first time
     the webhook is sent.
     """
+    proxy_server = {
+        "http": settings.EGRESS_PROXY_HOST,
+    }
     headers = {
         "Content-type": "application/json",
         "Idempotency-Key": str(webhook_event.event_id),
+        "X-WhSentry-TLS": "true",
     }
     if content_bytes:
         json_bytes = content_bytes
@@ -43,10 +48,15 @@ def send_webhook_event(
             accepted_media_type="application/json;",
         )
     try:
+        # To send a POST to an HTTPS target and using webhook-sentry as proxy,
+        # you needed to change the protocol to HTTP and set the X-WhSentry-TLS
+        # header to true. See https://github.com/juggernaut/webhook-sentry#https-target
+        url = webhook_event.webhook.url.replace("https://", "http://")
         response = requests.post(
-            webhook_event.webhook.url,
+            url,
+            proxies=proxy_server,
             data=json_bytes,
-            timeout=(1, 1),
+            timeout=(3, 3),
             stream=True,
             headers=headers,
             allow_redirects=False,

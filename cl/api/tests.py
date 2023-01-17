@@ -9,17 +9,17 @@ from django.db import connection
 from django.http import HttpRequest, JsonResponse
 from django.test import Client, RequestFactory
 from django.test.utils import CaptureQueriesContext
-from django.urls import ResolverMatch, reverse
+from django.urls import reverse
 from rest_framework.exceptions import NotFound
 from rest_framework.request import Request
 from rest_framework.status import HTTP_200_OK, HTTP_403_FORBIDDEN
 from rest_framework.test import APIRequestFactory
 
 from cl.api.factories import WebhookEventFactory, WebhookFactory
-from cl.api.models import WEBHOOK_EVENT_STATUS, WebhookEvent, WebhookEventType
+from cl.api.models import WEBHOOK_EVENT_STATUS, WebhookEventType
 from cl.api.pagination import ShallowOnlyPageNumberPagination
-from cl.api.utils import send_webhook_event
 from cl.api.views import coverage_data
+from cl.api.webhooks import send_webhook_event
 from cl.audio.api_views import AudioViewSet
 from cl.lib.redis_utils import make_redis_interface
 from cl.lib.test_helpers import IndexedSolrTestCase, SimpleUserDataMixin
