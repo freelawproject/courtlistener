@@ -2,8 +2,9 @@ from juriscraper.lib.string_utils import titlecase
 
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.people_db.lookup_utils import (
+    extract_judge_last_name,
     lookup_judge_by_last_name,
-    lookup_judges_by_last_name_list, extract_judge_last_name,
+    lookup_judges_by_last_name_list,
 )
 from cl.search.models import Opinion, OpinionCluster
 
@@ -52,8 +53,9 @@ def normalize_panel_in_opinioncluster():
         # Sometimes the full names are stored in the judges field, we only
         # need the last names
         prepared_last_name_list = [
-            titlecase("".join(extract_judge_last_name(y))) for y in
-            last_name_list]
+            titlecase("".join(extract_judge_last_name(y)))
+            for y in last_name_list
+        ]
 
         # Search for judges as Person objects
         people = lookup_judges_by_last_name_list(
