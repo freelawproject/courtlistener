@@ -6,6 +6,7 @@ from unittest import mock
 from unittest.mock import ANY
 
 import time_machine
+from dateutil.tz import tzutc
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
@@ -75,6 +76,7 @@ from cl.recap.mergers import (
     add_docket_entries,
     add_parties_and_attorneys,
     find_docket_object,
+    get_order_of_docket,
     normalize_long_description,
     update_case_names,
     update_docket_metadata,
@@ -5656,3 +5658,110 @@ class RecapFetchWebhooksTest(TestCase):
             content["payload"]["status"], PROCESSING_STATUS.SUCCESSFUL
         )
         self.assertNotEqual(content["payload"]["date_completed"], None)
+
+
+class CalculateRecapsSequenceNumbersTest(TestCase):
+    """Test calculate_recap_sequence_numbers considering docket entries court
+    timezone.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.cand = CourtFactory(id="cand", jurisdiction="FB")
+        cls.nyed = CourtFactory(id="nyed", jurisdiction="FB")
+
+        cls.d_cand = DocketFactory(
+            source=Docket.RECAP,
+            court=cls.cand,
+            pacer_case_id="104490",
+        )
+        cls.d_nyed = DocketFactory(
+            source=Docket.RECAP,
+            court=cls.nyed,
+            pacer_case_id="104491",
+        )
+
+        cls.de_date_asc = DocketEntriesDataFactory(
+            docket_entries=[
+                DocketEntryDataFactory(
+                    date_filed=date(2021, 10, 15),
+                    document_number=1,
+                ),
+                DocketEntryDataFactory(
+                    date_filed=date(2021, 10, 15),
+                    document_number=2,
+                ),
+                DocketEntryDataFactory(
+                    date_filed=date(2021, 10, 15),
+                    document_number=3,
+                ),
+            ],
+        )
+
+        cls.de_datetime_desc = DocketEntriesDataFactory(
+            docket_entries=[
+                DocketEntryDataFactory(
+                    date_filed=datetime(
+                        2021, 10, 16, 2, 46, 51, tzinfo=tzutc()
+                    ),
+                    document_number=3,
+                ),
+                DocketEntryDataFactory(
+                    date_filed=datetime(
+                        2021, 10, 16, 2, 46, 51, tzinfo=tzutc()
+                    ),
+                    document_number=2,
+                ),
+                DocketEntryDataFactory(
+                    date_filed=datetime(
+                        2021, 10, 16, 2, 46, 51, tzinfo=tzutc()
+                    ),
+                    document_number=1,
+                ),
+            ],
+        )
+
+    def test_get_order_of_docket(self):
+        """Test get_order_of_docket method"""
+
+        order_asc = get_order_of_docket(self.de_date_asc["docket_entries"])
+        self.assertEqual(order_asc, "asc")
+
+        order_desc = get_order_of_docket(
+            self.de_datetime_desc["docket_entries"]
+        )
+        self.assertEqual(order_desc, "desc")
+
+    def test_calculate_recap_sequence_numbers(self):
+        """Does calculate_recap_sequence_numbers method works properly using
+        court timezone when time is available?
+        """
+
+        add_docket_entries(
+            self.d_nyed, self.de_datetime_desc["docket_entries"]
+        )
+        add_docket_entries(self.d_cand, self.de_date_asc["docket_entries"])
+
+        docket_entries_nyed = DocketEntry.objects.filter(
+            docket__court=self.nyed
+        ).order_by("recap_sequence_number")
+
+        entry_number = 1
+        for de in docket_entries_nyed:
+            self.assertEqual(de.entry_number, entry_number)
+            self.assertEqual(
+                de.recap_sequence_number, f"2021-10-15.00{entry_number}"
+            )
+            entry_number += 1
+
+        docket_entries_cand = DocketEntry.objects.filter(
+            docket__court=self.cand
+        ).order_by("recap_sequence_number")
+
+        entry_number = 1
+        for de in docket_entries_cand:
+            self.assertEqual(de.entry_number, entry_number)
+            self.assertEqual(
+                de.recap_sequence_number, f"2021-10-15.00{entry_number}"
+            )
+            entry_number += 1

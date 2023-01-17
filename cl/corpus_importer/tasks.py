@@ -469,7 +469,8 @@ def process_free_opinion_result(
             # by a docket or other source, it tends to be better. Prefer an
             # existing rsn if we have it.
             recap_sequence_number = make_recap_sequence_number(
-                {"date_filed": result.date_filed, "recap_sequence_index": 1}
+                {"date_filed": result.date_filed, "recap_sequence_index": 1},
+                d.court_id,
             )
             de.recap_sequence_number = (
                 de.recap_sequence_number or recap_sequence_number

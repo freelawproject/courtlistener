@@ -5,10 +5,12 @@ from copy import deepcopy
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import pytz
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, OperationalError, transaction
 from django.db.models import Prefetch, Q, QuerySet
+from django.templatetags.tz import do_timezone
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer import AppellateAttachmentPage, AttachmentPage
@@ -37,6 +39,7 @@ from cl.people_db.models import (
     PartyType,
     Role,
 )
+from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.models import (
     PROCESSING_STATUS,
     UPLOAD_TYPE,
@@ -392,7 +395,7 @@ def get_order_of_docket(docket_entries):
     for _, de, nxt in previous_and_next(docket_entries):
         try:
             current_num = int(de["document_number"])
-            nxt_num = int(de["document_number"])
+            nxt_num = int(nxt["document_number"])
         except (TypeError, ValueError):
             # One or the other can't be cast to an int. Continue until we have
             # two consecutive ints we can compare.
@@ -409,26 +412,44 @@ def get_order_of_docket(docket_entries):
     return order
 
 
-def make_recap_sequence_number(de):
+def convert_to_court_timezone(datetime_filed: datetime, court_id: str) -> date:
+    """Convert a docket entry datetime filed to the court timezone it belongs
+    to.
+
+    :param datetime_filed: The docket entry datetime filed
+    :param court_id: The court id to which docket entries belong, used for
+    timezone conversion.
+    :return: A date object in the court timezone.
+    """
+    court_timezone = COURT_TIMEZONES.get(court_id, "US/Eastern")
+    datetime_filed_court = do_timezone(datetime_filed, court_timezone)
+    return datetime_filed_court.date()
+
+
+def make_recap_sequence_number(de: dict, court_id: str) -> str:
     """Make a sequence number using a date and index.
 
-    :param de: A docket entry provided as either a Juriscraper dict or
-    DocketEntry object. Regardless of which is provided, there must be a
+    :param de: A docket entry provided as either a Juriscraper dict.
+    Regardless of which is provided, there must be a
     key/attribute named recap_sequence_index, which will be used to populate
     the returned sequence number.
+    :param court_id: The court id to which docket entries belong, used for
+    timezone conversion.
     :return a str to use as the recap_sequence_number
     """
     template = "%s.%03d"
     if type(de) == dict:
+        date_filed = de["date_filed"]
+        if isinstance(de["date_filed"], datetime):
+            date_filed = convert_to_court_timezone(de["date_filed"], court_id)
+
         return template % (
-            de["date_filed"].isoformat(),
+            date_filed.isoformat(),
             de["recap_sequence_index"],
         )
-    elif isinstance(de, DocketEntry):
-        return template % (de.date_filed.isoformat(), de.recap_sequence_index)
 
 
-def calculate_recap_sequence_numbers(docket_entries):
+def calculate_recap_sequence_numbers(docket_entries: list, court_id: str):
     """Figure out the RECAP sequence number values for docket entries
     returned by a parser.
 
@@ -450,6 +471,8 @@ def calculate_recap_sequence_numbers(docket_entries):
 
     :param docket_entries: A list of docket entry dicts from juriscraper or
     another parser containing information about docket entries for a docket
+    :param court_id: The court id to which docket entries belong, used for
+    timezone conversion.
     :return None, but sets the recap_sequence_number for all items.
     """
     # Determine the sort order of the docket entries and normalize it
@@ -459,17 +482,35 @@ def calculate_recap_sequence_numbers(docket_entries):
 
     # Assign sequence numbers
     for prev, de, _ in previous_and_next(docket_entries):
-        if prev is not None and de["date_filed"] == prev["date_filed"]:
+        current_date_filed = de["date_filed"]
+        if isinstance(de["date_filed"], datetime):
+            current_date_filed = convert_to_court_timezone(
+                de["date_filed"], court_id
+            )
+
+        prev_date_filed = None
+        if prev is not None:
+            prev_date_filed = prev["date_filed"]
+        if prev is not None and isinstance(prev["date_filed"], datetime):
+            prev_date_filed = convert_to_court_timezone(
+                prev["date_filed"], court_id
+            )
+
+        if prev is not None and current_date_filed == prev_date_filed:
             # Previous item has same date. Increment the sequence number.
             de["recap_sequence_index"] = prev["recap_sequence_index"] + 1
-            de["recap_sequence_number"] = make_recap_sequence_number(de)
+            de["recap_sequence_number"] = make_recap_sequence_number(
+                de, court_id
+            )
             continue
         else:
             # prev is None --> First item on the list; OR
             # current is different than previous --> Changed date.
             # Take same action: Reset the index & assign it.
             de["recap_sequence_index"] = 1
-            de["recap_sequence_number"] = make_recap_sequence_number(de)
+            de["recap_sequence_number"] = make_recap_sequence_number(
+                de, court_id
+            )
             continue
 
     # Cleanup
@@ -611,7 +652,7 @@ def add_docket_entries(d, docket_entries, tags=None):
     rds_created = []
     des_returned = []
     content_updated = False
-    calculate_recap_sequence_numbers(docket_entries)
+    calculate_recap_sequence_numbers(docket_entries, d.court_id)
     known_filing_dates = [d.date_last_filing]
     for docket_entry in docket_entries:
         response = get_or_make_docket_entry(d, docket_entry)
@@ -623,11 +664,11 @@ def add_docket_entries(d, docket_entries, tags=None):
         de.description = docket_entry["description"] or de.description
         date_filed = docket_entry["date_filed"]
         if isinstance(date_filed, datetime):
-            # For now we do dumb date conversion. This simply returns a date
-            # object with the same year, month, and day, ignoring time and
-            # timezones. Once the DB is upgraded to support timezones, we can
-            # do better.
-            date_filed = date_filed.date()
+            # If datetime is available, transform it to UTC and store it
+            # separately in date_filed and time_filed fields.
+            date_filed_utc = date_filed.astimezone(pytz.utc)
+            de.time_filed = date_filed_utc.time()
+            date_filed = date_filed_utc.date()
 
         de.date_filed = date_filed or de.date_filed
         de.pacer_sequence_number = (

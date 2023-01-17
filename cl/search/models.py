@@ -1,4 +1,5 @@
 import re
+from datetime import datetime
 from typing import Any, Dict, List, Tuple, TypeVar
 
 from celery.canvas import chain
@@ -10,6 +11,7 @@ from django.template import loader
 from django.urls import NoReverseMatch, reverse
 from django.utils.encoding import force_str
 from django.utils.text import slugify
+from django.utils.timezone import make_aware, utc
 from eyecite import get_citations
 
 from cl.citations.utils import get_citation_depth_between_clusters
@@ -1007,6 +1009,11 @@ class DocketEntry(AbstractDateTimeModel):
         ),
         blank=True,
     )
+    time_filed = models.TimeField(
+        help_text="The Docket Entry date filed time.",
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         verbose_name_plural = "Docket Entries"
@@ -1016,6 +1023,14 @@ class DocketEntry(AbstractDateTimeModel):
 
     def __str__(self) -> str:
         return f"{self.pk} ---> {trunc(self.description, 50, ellipsis='...')}"
+
+    @property
+    def datetime_filed(self) -> datetime | None:
+        if self.time_filed:
+            return make_aware(
+                datetime.combine(self.date_filed, self.time_filed), utc
+            )
+        return None
 
 
 class AbstractPacerDocument(models.Model):
