@@ -29,8 +29,11 @@ from cl.search.models import Citation, Docket, Opinion
 from cl.search.tasks import add_items_to_solr
 
 VALID_TYPES = (
-    "search.OpinionCluster", "search.Docket", "people_db.Person",
-    "search.Court")
+    "search.OpinionCluster",
+    "search.Docket",
+    "people_db.Person",
+    "search.Court",
+)
 
 cluster_endpoint = "https://www.courtlistener.com/api/rest/v3/clusters/"
 people_endpoint = "https://www.courtlistener.com/api/rest/v3/people/"
@@ -56,7 +59,7 @@ class Command(VerboseCommand):
             type=str,
             choices=VALID_TYPES,
             help="Object type to clone. Current choices are %s"
-                 % ", ".join(VALID_TYPES),
+            % ", ".join(VALID_TYPES),
         )
 
         parser.add_argument(
@@ -141,9 +144,7 @@ class Command(VerboseCommand):
 
             with transaction.atomic():
                 # Create opinion cluster
-                opinion_cluster = model.objects.create(
-                    **cluster_datum
-                )
+                opinion_cluster = model.objects.create(**cluster_datum)
 
                 for cite_data in citation_data:
                     # Create citations
