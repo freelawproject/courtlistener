@@ -31,6 +31,7 @@
         <li><a href="#docket-alerts">Docket Alerts</a></li>
         <li><a href="#search-alerts">Search Alerts</a></li>
         <li><a href="#old-da-alerts-report">Old Docket Alerts</a></li>
+        <li><a href="#recap-fetch">RECAP Fetch</a></li>
       </ul>
       <li><a href="#maintenance">Maintenance Schedule</a></li>
       <li><a href="#change-log">Change Log</a></li>
@@ -44,7 +45,7 @@
   </p>
   <p>To set this up, you create a URL on your server where CourtListener can send data. Then, whenever something important happens in CourtListener, we will POST an “event” to that URL as JSON data. When you receive the event, you can process it and perform whatever actions your system needs in response.
   </p>
-  <p>Currently, CourtListener can send webhook events whenever dockets are updated, search alerts are triggered, or docket alerts expire. We are also contemplating or working on sending events when <a href="https://github.com/freelawproject/courtlistener/issues/703" rel="nofollow" target="_blank">RECAP Fetch tasks complete</a>, and more. If you have other events of interest, please get in touch.
+  <p>Currently, CourtListener can send webhook events whenever dockets are updated, search alerts are triggered, docket alerts expire, or when RECAP Fetch tasks complete. If you have other events of interest, please get in touch.
   </p>
 
   <h2 id="getting-started">Getting Started With Webhooks</h2>
@@ -359,6 +360,26 @@ xargs curl -X POST \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   "{% get_full_host %}{% url "docket-alert-list" version="v3" %}{id}/"
 </pre>
+
+  <h3 id="recap-fetch">RECAP Fetch Events</h3>
+  <p>The <a href="{% url 'rest_docs' %}#pacer-fetch">RECAP Fetch API</a> lets you use our servers and infrastructure to purchase items on PACER. Your server simply places a <code>POST</code> request to the API. In response, the API provides an ID for your request and your download is enqueued for processing.
+  </p>
+  <p>By listening to this webhook endpoint, your server can monitor your requests and take action when they are complete. This avoids the need to poll the API to check when your request has completed.
+  </p>
+  <p>As with our other events, this webhook event is a JSON hash with two keys, <code>webhook</code> and <code>payload</code>.</p>
+  <p>The shape of the data is thus:</p>
+  <pre>{
+   "payload":{...},
+   "webhook":{...}
+}</pre>
+  <p>The <code>payload</code> key is based on the <a href="{% url 'rest_docs' %}#pacer-fetch">RECAP Fetch API</a> endpoint and has all the same fields.
+  </p>
+  <p>To get a description of the <code>payload</code> object, do an HTTP <code>OPTIONS</code> request to the API endpoint:</p>
+  <pre>curl -X OPTIONS \
+  --url '{% get_full_host %}{% url "pacerfetchqueue-list" version="v3" %}' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' </pre>
+  <p>After you set up this endpoint, you will be notified whenever one of your fetch requests terminates in success or failure.
+  </p>
 
   <h2 id="maintenance">Maintenance Schedule</h2>
   <p>Major server maintenance is scheduled on Thursday nights from 21:00PT to 23:59PT. If you are scheduling cron jobs or otherwise crawling the API, you may experience downtime during this window.

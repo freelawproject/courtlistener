@@ -25,6 +25,9 @@ def make_docket_number_core(docket_number: Optional[str]) -> str:
 
         1201032
 
+    Changes here should be reflected in the RECAP extension's
+    makeDocketNumberCore function.
+
     :param docket_number: A docket number to condense
     :return empty string if no change possible, or the condensed version if it
     worked. Note that all values returned are strings. We cannot return an int
