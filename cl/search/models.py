@@ -2907,6 +2907,28 @@ class OpinionsCited(models.Model):
         unique_together = ("citing_opinion", "cited_opinion")
 
 
+class OpinionsCitedByRECAPDocument(models.Model):
+    citing_document = models.ForeignKey(
+        RECAPDocument, related_name="cited_opinions", on_delete=models.CASCADE
+    )
+    cited_opinion = models.ForeignKey(
+        Opinion, related_name="citing_documents", on_delete=models.CASCADE
+    )
+    depth = models.IntegerField(
+        help_text="The number of times the cited opinion was cited "
+        "in the citing document",
+        default=1,
+    )
+
+    def __str__(self) -> str:
+        return f"{self.citing_document.id} ⤜--cites⟶  {self.cited_opinion.id}"
+
+    class Meta:
+        verbose_name_plural = "Opinions cited by RECAP document"
+        unique_together = ("citing_document", "cited_opinion")
+        indexes = [models.Index(fields=["depth"])]
+
+
 class Parenthetical(models.Model):
     describing_opinion = models.ForeignKey(
         Opinion,
