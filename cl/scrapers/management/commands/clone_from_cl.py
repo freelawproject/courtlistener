@@ -32,7 +32,7 @@ from django.apps import apps
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.management import BaseCommand
-from django.db import transaction, IntegrityError
+from django.db import IntegrityError, transaction
 from django.urls import reverse
 from django.utils.dateparse import parse_date
 from requests import Session
@@ -53,8 +53,9 @@ people_endpoint = "https://www.courtlistener.com/api/rest/v3/people/"
 courts_endpoint = "https://www.courtlistener.com/api/rest/v3/courts/"
 
 
-def clone_opinion_cluster(session: Session, cluster_ids: list,
-                          object_type="search.OpinionCluster"):
+def clone_opinion_cluster(
+    session: Session, cluster_ids: list, object_type="search.OpinionCluster"
+):
     """
     Download opinion cluster data from courtlistener.com and add it to
     local environment
@@ -76,7 +77,7 @@ def clone_opinion_cluster(session: Session, cluster_ids: list,
                 ">> Opinion cluster already exists here:",
                 reverse(
                     "view_case",
-                    args=[opinion_cluster.pk, opinion_cluster.docket.slug]
+                    args=[opinion_cluster.pk, opinion_cluster.docket.slug],
                 ),
             )
             opinion_clusters.append(opinion_cluster)
@@ -91,9 +92,15 @@ def clone_opinion_cluster(session: Session, cluster_ids: list,
         citation_data = cluster_datum["citations"]
         sub_opinions_data = cluster_datum["sub_opinions"]
         # delete unneeded fields
-        for f in ["resource_uri", "docket", "citations", "sub_opinions",
-                  "absolute_url",
-                  "panel", "non_participating_judges"]:
+        for f in [
+            "resource_uri",
+            "docket",
+            "citations",
+            "sub_opinions",
+            "absolute_url",
+            "panel",
+            "non_participating_judges",
+        ]:
             del cluster_datum[f]
 
         # Assign docket pk in cluster data
@@ -106,8 +113,14 @@ def clone_opinion_cluster(session: Session, cluster_ids: list,
             # Get opinion from api
             op_data = session.get(op, timeout=60).json()
             # Delete fields with fk or m2m relations or unneeded fields
-            for f in ["opinions_cited", "cluster", "absolute_url",
-                      "resource_uri", "author", "joined_by"]:
+            for f in [
+                "opinions_cited",
+                "cluster",
+                "absolute_url",
+                "resource_uri",
+                "author",
+                "joined_by",
+            ]:
                 del op_data[f]
             # Append new data
             prepared_opinion_data.append(op_data)
@@ -134,9 +147,7 @@ def clone_opinion_cluster(session: Session, cluster_ids: list,
             opinion_clusters.append(opinion_cluster)
             print(
                 ">> View cloned case here:",
-                reverse(
-                    "view_case", args=[opinion_cluster.pk, docket.slug]
-                ),
+                reverse("view_case", args=[opinion_cluster.pk, docket.slug]),
             )
 
         # Add opinions to search engine
@@ -145,8 +156,9 @@ def clone_opinion_cluster(session: Session, cluster_ids: list,
     return opinion_clusters
 
 
-def clone_docket(session: Session, docket_ids: list,
-                 object_type="search.Docket"):
+def clone_docket(
+    session: Session, docket_ids: list, object_type="search.Docket"
+):
     """
     Download docket data from courtlistener.com and add it to local
     environment
@@ -179,9 +191,15 @@ def clone_docket(session: Session, docket_ids: list,
         docket_data = session.get(docket_endpoint, timeout=60).json()
 
         # Remove unneeded fields
-        for f in ["resource_uri", "original_court_info",
-                  "absolute_url",
-                  "clusters", "audio_files", "tags", "panel"]:
+        for f in [
+            "resource_uri",
+            "original_court_info",
+            "absolute_url",
+            "clusters",
+            "audio_files",
+            "tags",
+            "panel",
+        ]:
             del docket_data[f]
 
         with transaction.atomic():
@@ -194,15 +212,17 @@ def clone_docket(session: Session, docket_ids: list,
             )
 
             docket_data["appeal_from"] = (
-                clone_court(session,
-                            [docket_data["appeal_from"].split("/")[7]])[0]
+                clone_court(
+                    session, [docket_data["appeal_from"].split("/")[7]]
+                )[0]
                 if docket_data["appeal_from"]
                 else None
             )
 
             docket_data["assigned_to"] = (
-                clone_person(session,
-                             [docket_data["assigned_to"].split("/")[7]])[0]
+                clone_person(
+                    session, [docket_data["assigned_to"].split("/")[7]]
+                )[0]
                 if docket_data["assigned_to"]
                 else None
             )
@@ -221,8 +241,9 @@ def clone_docket(session: Session, docket_ids: list,
     return dockets
 
 
-def clone_person(session: Session, people_ids: list,
-                 object_type="people_db.Person"):
+def clone_person(
+    session: Session, people_ids: list, object_type="people_db.Person"
+):
     """
     Download person data from courtlistener.com and add it to local
     environment
@@ -254,16 +275,21 @@ def clone_person(session: Session, people_ids: list,
         person_url = f"{people_endpoint}{person_id}/"
         person_data = session.get(person_url, timeout=60).json()
         # delete unneeded fields
-        for f in ["resource_uri", "aba_ratings", "race", "sources",
-                  "educations", "positions", "political_affiliations"]:
+        for f in [
+            "resource_uri",
+            "aba_ratings",
+            "race",
+            "sources",
+            "educations",
+            "positions",
+            "political_affiliations",
+        ]:
             del person_data[f]
         # Prepare some values
         if person_data["date_dob"]:
-            person_data["date_dob"] = parse_date(
-                person_data["date_dob"])
+            person_data["date_dob"] = parse_date(person_data["date_dob"])
         try:
-            person, created = model.objects.get_or_create(
-                **person_data)
+            person, created = model.objects.get_or_create(**person_data)
         except (IntegrityError, ValidationError):
             person = model.objects.filter(pk=person_data["id"])[0]
 
@@ -344,7 +370,7 @@ class Command(BaseCommand):
             type=str,
             choices=VALID_TYPES,
             help="Object type to clone. Current choices are %s"
-                 % ", ".join(VALID_TYPES),
+            % ", ".join(VALID_TYPES),
             required=True,
         )
 
@@ -353,10 +379,10 @@ class Command(BaseCommand):
             dest="ids",
             nargs="+",
             help="Object id to clone, you can get it from courtlistener.com "
-                 "urls (e.g. in "
-                 "https://www.courtlistener.com/opinion/771797/rupinder-kaur"
-                 "-loveleen-kaur-v-immigration-and-naturalization-service/ "
-                 "the id is 771797).",
+            "urls (e.g. in "
+            "https://www.courtlistener.com/opinion/771797/rupinder-kaur"
+            "-loveleen-kaur-v-immigration-and-naturalization-service/ "
+            "the id is 771797).",
             required=True,
         )
 
