@@ -2918,7 +2918,6 @@ class OpinionsCitedByRECAPDocument(models.Model):
         help_text="The number of times the cited opinion was cited "
         "in the citing document",
         default=1,
-        # db_index=True,
     )
 
     def __str__(self) -> str:
