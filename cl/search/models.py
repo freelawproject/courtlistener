@@ -2918,7 +2918,6 @@ class OpinionsCitedByRECAPDocument(models.Model):
         help_text="The number of times the cited opinion was cited "
         "in the citing document",
         default=1,
-        db_index=True,
     )
 
     def __str__(self) -> str:
@@ -2927,6 +2926,7 @@ class OpinionsCitedByRECAPDocument(models.Model):
     class Meta:
         verbose_name_plural = "Opinions cited by RECAP document"
         unique_together = ("citing_document", "cited_opinion")
+        indexes = [models.Index(fields=["depth"])]
 
 
 class Parenthetical(models.Model):

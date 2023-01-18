@@ -23,7 +23,10 @@ from cl.alerts.management.commands.handle_old_docket_alerts import (
     build_user_report,
 )
 from cl.alerts.models import SEARCH_TYPES, Alert, DocketAlert, RealTimeQueue
-from cl.alerts.tasks import send_alert_and_webhook
+from cl.alerts.tasks import (
+    get_docket_notes_and_tags_by_user,
+    send_alert_and_webhook,
+)
 from cl.api.factories import WebhookFactory
 from cl.api.models import (
     WEBHOOK_EVENT_STATUS,
@@ -35,6 +38,7 @@ from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
 from cl.donate.factories import DonationFactory
 from cl.donate.models import Donation
+from cl.favorites.factories import FavoriteFactory, UserTagFactory
 from cl.lib.test_helpers import EmptySolrTestCase, SimpleUserDataMixin
 from cl.search.factories import DocketFactory, OpinionWithParentsFactory
 from cl.search.models import (
@@ -174,7 +178,7 @@ class DocketAlertTest(TestCase):
         self.assertEqual(len(mail.outbox), 0)
 
     @mock.patch(
-        "cl.api.utils.requests.post",
+        "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
     def test_triggering_docket_webhook(self, mock_post) -> None:
@@ -585,7 +589,7 @@ class SearchAlertsWebhooksTest(EmptySolrTestCase):
         self.assertEqual(len(search_alerts), 6)
 
         with mock.patch(
-            "cl.api.utils.requests.post",
+            "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
@@ -681,7 +685,7 @@ class SearchAlertsWebhooksTest(EmptySolrTestCase):
         ]
         for rate, events, results in rates:
             with mock.patch(
-                "cl.api.utils.requests.post",
+                "cl.api.webhooks.requests.post",
                 side_effect=lambda *args, **kwargs: MockResponse(
                     200, mock_raw=True
                 ),
@@ -1219,7 +1223,7 @@ class OldDocketAlertsWebhooksTest(TestCase):
 
         # Run handle_old_docket_alerts command, mocking webhook request.
         with mock.patch(
-            "cl.api.utils.requests.post",
+            "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
@@ -1286,7 +1290,7 @@ class OldDocketAlertsWebhooksTest(TestCase):
 
         # Run command again
         with mock.patch(
-            "cl.api.utils.requests.post",
+            "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
@@ -1317,7 +1321,7 @@ class OldDocketAlertsWebhooksTest(TestCase):
         # Run handle_old_docket_alerts command with delete_old_alerts=False,
         # mocking webhook request.
         with mock.patch(
-            "cl.api.utils.requests.post",
+            "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
@@ -1372,3 +1376,86 @@ class OldDocketAlertsWebhooksTest(TestCase):
             content["payload"]["old_alerts"][disabled_index]["docket"],
             self.disabled_docket_alert.docket.pk,
         )
+
+
+class DocketAlertGetNotesTagsTests(TestCase):
+    """Can we return notes and tags for a docket alert properly?"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user_1 = UserFactory()
+        cls.user_2 = UserFactory()
+        cls.court = Court.objects.get(id="scotus")
+        cls.docket_1 = DocketFactory(
+            court=cls.court,
+        )
+        cls.docket_2 = DocketFactory(
+            court=cls.court,
+        )
+        cls.docket_3 = DocketFactory(
+            court=cls.court,
+        )
+        cls.fav_docket_1_user_1 = FavoriteFactory(
+            user=cls.user_1,
+            docket_id=cls.docket_1,
+            notes="Favorite 1 Test",
+        )
+        cls.fav_docket_2_user_1 = FavoriteFactory(
+            user=cls.user_1,
+            docket_id=cls.docket_2,
+            notes="",
+        )
+        cls.fav_docket_1_user_2 = FavoriteFactory(
+            user=cls.user_2,
+            docket_id=cls.docket_1,
+            notes="Favorite 2 Test",
+        )
+
+        cls.orphan_tag_user_1 = UserTagFactory(user=cls.user_1, name="orphan")
+        cls.tag_1_user_1 = UserTagFactory(user=cls.user_1, name="tag_1_user_1")
+        cls.tag_2_user_1 = UserTagFactory(user=cls.user_1, name="tag_2_user_1")
+        cls.tag_1_user_1.dockets.add(cls.docket_1.pk)
+        cls.tag_2_user_1.dockets.add(cls.docket_1.pk, cls.docket_2)
+
+        cls.tag_1_user_2 = UserTagFactory(user=cls.user_2, name="tag_1_user_2")
+        cls.tag_1_user_2.dockets.add(cls.docket_1.pk, cls.docket_2)
+
+    def test_get_docket_notes_and_tags_by_user(self) -> None:
+        """Can we properly get the user notes and tags for a docket?"""
+
+        (
+            notes_docket_1_user_1,
+            tags_docket_1_user_1,
+        ) = get_docket_notes_and_tags_by_user(self.docket_1.pk, self.user_1.pk)
+        self.assertEqual(notes_docket_1_user_1, "Favorite 1 Test")
+        self.assertEqual(
+            tags_docket_1_user_1, [self.tag_1_user_1, self.tag_2_user_1]
+        )
+
+        (
+            notes_docket_1_user_2,
+            tags_docket_1_user_2,
+        ) = get_docket_notes_and_tags_by_user(self.docket_1.pk, self.user_2.pk)
+        self.assertEqual(notes_docket_1_user_2, "Favorite 2 Test")
+        self.assertEqual(tags_docket_1_user_2, [self.tag_1_user_2])
+
+        (
+            notes_docket_2_user_1,
+            tags_docket_2_user_1,
+        ) = get_docket_notes_and_tags_by_user(self.docket_2.pk, self.user_1.pk)
+        self.assertEqual(notes_docket_2_user_1, None)
+        self.assertEqual(tags_docket_2_user_1, [self.tag_2_user_1])
+
+        (
+            notes_docket_2_user_2,
+            tags_docket_2_user_2,
+        ) = get_docket_notes_and_tags_by_user(self.docket_2.pk, self.user_2.pk)
+        self.assertEqual(notes_docket_2_user_2, None)
+        self.assertEqual(tags_docket_2_user_2, [self.tag_1_user_2])
+
+        (
+            notes_docket_3_user_1,
+            tags_docket_3_user_1,
+        ) = get_docket_notes_and_tags_by_user(self.docket_3.pk, self.user_1.pk)
+        self.assertEqual(notes_docket_3_user_1, None)
+        self.assertEqual(tags_docket_3_user_1, [])
