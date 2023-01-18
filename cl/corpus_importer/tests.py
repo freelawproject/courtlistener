@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import eyecite
 import pytest
+from factory import RelatedFactory
 
 from cl.corpus_importer.court_regexes import match_court_string
 from cl.corpus_importer.factories import (
@@ -22,13 +23,25 @@ from cl.corpus_importer.management.commands.harvard_opinions import (
     validate_dt,
     winnow_case_name,
 )
+from cl.corpus_importer.management.commands.normalize_judges_opinions import (
+    Command,
+    normalize_authors_in_opinions,
+    normalize_panel_in_opinioncluster,
+)
 from cl.corpus_importer.tasks import generate_ia_json
 from cl.corpus_importer.utils import get_start_of_quarter
 from cl.lib.pacer import process_docket_data
+from cl.people_db.factories import PersonWithChildrenFactory, PositionFactory
 from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
 from cl.recap.models import UPLOAD_TYPE
-from cl.search.factories import CourtFactory, DocketFactory
+from cl.search.factories import (
+    CourtFactory,
+    DocketFactory,
+    OpinionClusterFactoryWithChildrenAndParents,
+    OpinionClusterWithParentsFactory,
+    OpinionWithChildrenFactory,
+)
 from cl.search.models import (
     Citation,
     Court,
@@ -872,3 +885,99 @@ label="194">*194</page-number>
             ) & winnow_case_name(harvard_case)
 
             self.assertEqual(len(overlap), case.get("overlaps"))
+
+
+class CorpusImporterManagementCommmandsTests(TestCase):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="nyappdiv")
+
+        # Create object person
+        cls.judge = PersonWithChildrenFactory.create(
+            name_first="Paul",
+            name_middle="J.",
+            name_last="Yesawich",
+            name_suffix="jr",
+            date_dob="1923-11-27",
+            date_granularity_dob="%Y-%m-%d",
+        )
+        position = PositionFactory.create(court=cls.court, person=cls.judge)
+        cls.judge.positions.add(position)
+
+        cls.judge_2 = PersonWithChildrenFactory.create(
+            name_first="Harold",
+            name_middle="Fleming",
+            name_last="Snead",
+            name_suffix="jr",
+            date_dob="1903-06-16",
+            date_granularity_dob="%Y-%m-%d",
+            date_dod="1987-12-23",
+            date_granularity_dod="%Y-%m-%d",
+        )
+        position_2 = PositionFactory.create(
+            court=cls.court, person=cls.judge_2
+        )
+        cls.judge_2.positions.add(position_2)
+
+    def test_normalize_author_str(self):
+        """Normalize author_str field in opinions in Person object"""
+
+        # Create opinion cluster with opinion and docket
+        cluster = (
+            OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(
+                    court=self.court,
+                    case_name="Foo v. Bar",
+                    case_name_full="Foo v. Bar",
+                ),
+                case_name="Foo v. Bar",
+                date_filed=date.today(),
+                sub_opinions=RelatedFactory(
+                    OpinionWithChildrenFactory,
+                    factory_related_name="cluster",
+                    plain_text="Sample text",
+                    author_str="Yesawich",
+                    author=None,
+                ),
+            ),
+        )
+
+        # Check that the opinion doesn't have an author
+        self.assertEqual(cluster[0].sub_opinions.all().first().author, None)
+
+        # Run function to normalize authors in opinions
+        normalize_authors_in_opinions()
+
+        # Reload field values from the database.
+        cluster[0].refresh_from_db()
+
+        #  Check that the opinion now have an author
+        self.assertEqual(
+            cluster[0].sub_opinions.all().first().author, self.judge
+        )
+
+    def test_normalize_panel_str(self):
+        """Normalize judges string field into panel field(m2m)"""
+
+        cluster = OpinionClusterWithParentsFactory(
+            docket=DocketFactory(
+                court=self.court,
+                case_name="Lorem v. Ipsum",
+                case_name_full="Lorem v. Ipsum",
+            ),
+            case_name="Lorem v. Ipsum",
+            date_filed=date.today(),
+            judges="Snead, Yesawich",
+        )
+
+        # Check panel is empty
+        self.assertEqual(len(cluster.panel.all()), 0)
+
+        # Run function to normalize panel in opinion clusters
+        normalize_panel_in_opinioncluster()
+
+        # Reload field values from the database
+        cluster.refresh_from_db()
+
+        # Check that the opinion cluster now have judges in panel
+        self.assertEqual(len(cluster.panel.all()), 2)
