@@ -47,14 +47,18 @@ VALID_TYPES = (
     "search.Court",
 )
 
-cluster_endpoint = "https://www.courtlistener.com/api/rest/v3/clusters/"
-dockets_endpoint = "https://www.courtlistener.com/api/rest/v3/dockets/"
-people_endpoint = "https://www.courtlistener.com/api/rest/v3/people/"
-courts_endpoint = "https://www.courtlistener.com/api/rest/v3/courts/"
+domain = "https://www.courtlistener.com"
+
+
+def get_id_from_url(api_url: str) -> str:
+    """Get the PK from an API url"""
+    return api_url.split("/")[-2]
 
 
 def clone_opinion_cluster(
-    session: Session, cluster_ids: list, object_type="search.OpinionCluster"
+    session: Session,
+    cluster_ids: list,
+    object_type="search.OpinionCluster"
 ):
     """
     Download opinion cluster data from courtlistener.com and add it to
@@ -68,13 +72,13 @@ def clone_opinion_cluster(
     opinion_clusters = []
 
     for cluster_id in cluster_ids:
-        print(f">> Cloning opinion cluster id: {cluster_id}")
+        print(f"Cloning opinion cluster id: {cluster_id}")
         model = apps.get_model(object_type)
 
         try:
             opinion_cluster = model.objects.get(pk=int(cluster_id))
             print(
-                ">> Opinion cluster already exists here:",
+                "Opinion cluster already exists here:",
                 reverse(
                     "view_case",
                     args=[opinion_cluster.pk, opinion_cluster.docket.slug],
@@ -85,9 +89,13 @@ def clone_opinion_cluster(
         except model.DoesNotExist:
             pass
 
-        cluster_url = f"{cluster_endpoint}{cluster_id}/"
+        cluster_path = reverse(
+            "opinioncluster-detail",
+            kwargs={"version": "v3", "pk": cluster_id},
+        )
+        cluster_url = f"{domain}{cluster_path}"
         cluster_datum = session.get(cluster_url, timeout=60).json()
-        docket_id = cluster_datum["docket"].split("/")[7]
+        docket_id = get_id_from_url(cluster_datum["docket"])
         docket = clone_docket(session, [docket_id])[0]
         citation_data = cluster_datum["citations"]
         sub_opinions_data = cluster_datum["sub_opinions"]
@@ -146,18 +154,24 @@ def clone_opinion_cluster(
 
             opinion_clusters.append(opinion_cluster)
             print(
-                ">> View cloned case here:",
+                "View cloned case here:",
                 reverse("view_case", args=[opinion_cluster.pk, docket.slug]),
             )
 
         # Add opinions to search engine
         add_items_to_solr.delay(added_opinions_ids, "search.Opinion")
 
+    # Add opinion clusters to search engine
+    add_items_to_solr.delay([oc.pk for oc in opinion_clusters],
+                            "search.OpinionCluster")
+
     return opinion_clusters
 
 
 def clone_docket(
-    session: Session, docket_ids: list, object_type="search.Docket"
+    session: Session,
+    docket_ids: list,
+    object_type="search.Docket"
 ):
     """
     Download docket data from courtlistener.com and add it to local
@@ -171,14 +185,14 @@ def clone_docket(
     dockets = []
 
     for docket_id in docket_ids:
-        print(f">> Cloning docket id: {docket_id}")
+        print(f"Cloning docket id: {docket_id}")
 
         model = apps.get_model(object_type)
 
         try:
             docket = model.objects.get(pk=docket_id)
             print(
-                ">> Docket already exists here:",
+                "Docket already exists here:",
                 reverse("view_docket", args=[docket.pk, docket.slug]),
             )
             dockets.append(docket)
@@ -187,8 +201,12 @@ def clone_docket(
             pass
 
         # Create new Docket
-        docket_endpoint = f"{dockets_endpoint}{docket_id}/"
-        docket_data = session.get(docket_endpoint, timeout=60).json()
+        docket_path = reverse(
+            "docket-detail",
+            kwargs={"version": "v3", "pk": docket_id},
+        )
+        docket_url = f"{domain}{docket_path}"
+        docket_data = session.get(docket_url, timeout=60).json()
 
         # Remove unneeded fields
         for f in [
@@ -206,14 +224,15 @@ def clone_docket(
 
             # Get or create required objects
             docket_data["court"] = (
-                clone_court(session, [docket_data["court"].split("/")[7]])[0]
+                clone_court(session, [get_id_from_url(docket_data["court"])])[
+                    0]
                 if docket_data["court"]
                 else None
             )
 
             docket_data["appeal_from"] = (
                 clone_court(
-                    session, [docket_data["appeal_from"].split("/")[7]]
+                    session, [get_id_from_url(docket_data["appeal_from"])]
                 )[0]
                 if docket_data["appeal_from"]
                 else None
@@ -221,7 +240,7 @@ def clone_docket(
 
             docket_data["assigned_to"] = (
                 clone_person(
-                    session, [docket_data["assigned_to"].split("/")[7]]
+                    session, [get_id_from_url(docket_data["assigned_to"])]
                 )[0]
                 if docket_data["assigned_to"]
                 else None
@@ -231,18 +250,23 @@ def clone_docket(
 
             dockets.append(docket)
             print(
-                ">> View cloned docket here:",
+                "View cloned docket here:",
                 reverse(
                     "view_docket",
                     args=[docket_data["id"], docket_data["slug"]],
                 ),
             )
 
+    # Add dockets to search engine
+    add_items_to_solr.delay([doc.pk for doc in dockets], "search.Docket")
+
     return dockets
 
 
 def clone_person(
-    session: Session, people_ids: list, object_type="people_db.Person"
+    session: Session,
+    people_ids: list,
+    object_type="people_db.Person"
 ):
     """
     Download person data from courtlistener.com and add it to local
@@ -256,14 +280,14 @@ def clone_person(
     people = []
 
     for person_id in people_ids:
-        print(f">> Cloning person id: {person_id}")
+        print(f"Cloning person id: {person_id}")
 
         model = apps.get_model(object_type)
 
         try:
             person = model.objects.get(pk=person_id)
             print(
-                ">> Person already exists here:",
+                "Person already exists here:",
                 reverse("person-detail", args=["v3", person.pk]),
             )
             people.append(person)
@@ -272,7 +296,11 @@ def clone_person(
             pass
 
         # Create person
-        person_url = f"{people_endpoint}{person_id}/"
+        people_path = reverse(
+            "person-detail",
+            kwargs={"version": "v3", "pk": person_id},
+        )
+        person_url = f"{domain}{people_path}"
         person_data = session.get(person_url, timeout=60).json()
         # delete unneeded fields
         for f in [
@@ -296,14 +324,21 @@ def clone_person(
         people.append(person)
 
         print(
-            ">> View cloned person here:",
+            "View cloned person here:",
             reverse("person-detail", args=["v3", person_id]),
         )
+
+    # Add people to search engine
+    add_items_to_solr.delay([person.pk for person in people],
+                            "people_db.Person")
 
     return people
 
 
-def clone_court(session: Session, court_ids: list, object_type="search.Court"):
+def clone_court(
+    session: Session,
+    court_ids: list,
+    object_type="search.Court"):
     """
     Download court data from courtlistener.com and add it to local
     environment
@@ -316,7 +351,7 @@ def clone_court(session: Session, court_ids: list, object_type="search.Court"):
     courts = []
 
     for court_id in court_ids:
-        print(f">> Cloning court id: {court_id}")
+        print(f"Cloning court id: {court_id}")
 
         model = apps.get_model(object_type)
 
@@ -324,7 +359,7 @@ def clone_court(session: Session, court_ids: list, object_type="search.Court"):
             ct = model.objects.get(pk=court_id)
             courts.append(ct)
             print(
-                ">> Court already exists here:",
+                "Court already exists here:",
                 reverse("court-detail", args=["v3", ct.pk]),
             )
             continue
@@ -332,7 +367,11 @@ def clone_court(session: Session, court_ids: list, object_type="search.Court"):
             pass
 
         # Create court
-        court_url = f"{courts_endpoint}{court_id}/"
+        court_path = reverse(
+            "court-detail",
+            kwargs={"version": "v3", "pk": court_id},
+        )
+        court_url = f"{domain}{court_path}"
         court_data = session.get(court_url, timeout=60).json()
         # delete resource_uri value generated by DRF
         del court_data["resource_uri"]
@@ -345,7 +384,7 @@ def clone_court(session: Session, court_ids: list, object_type="search.Court"):
         courts.append(ct)
 
         print(
-            ">> View cloned court here:",
+            "View cloned court here:",
             reverse("court-detail", args=["v3", court_id]),
         )
     return courts
@@ -370,7 +409,7 @@ class Command(BaseCommand):
             type=str,
             choices=VALID_TYPES,
             help="Object type to clone. Current choices are %s"
-            % ", ".join(VALID_TYPES),
+                 % ", ".join(VALID_TYPES),
             required=True,
         )
 
@@ -379,10 +418,10 @@ class Command(BaseCommand):
             dest="ids",
             nargs="+",
             help="Object id to clone, you can get it from courtlistener.com "
-            "urls (e.g. in "
-            "https://www.courtlistener.com/opinion/771797/rupinder-kaur"
-            "-loveleen-kaur-v-immigration-and-naturalization-service/ "
-            "the id is 771797).",
+                 "urls (e.g. in "
+                 "https://www.courtlistener.com/opinion/771797/rupinder-kaur"
+                 "-loveleen-kaur-v-immigration-and-naturalization-service/ "
+                 "the id is 771797).",
             required=True,
         )
 
