@@ -962,7 +962,10 @@ class DocketEntry(AbstractDateTimeModel):
         blank=True,
     )
     date_filed = models.DateField(
-        help_text="The created date of the Docket Entry.",
+        help_text=(
+            "The created date of the Docket Entry according to the "
+            "court timezone."
+        ),
         null=True,
         blank=True,
     )
@@ -1011,7 +1014,10 @@ class DocketEntry(AbstractDateTimeModel):
         blank=True,
     )
     time_filed = models.TimeField(
-        help_text="The Docket Entry date filed time.",
+        help_text=(
+            "The created time of the Docket Entry according to the court "
+            "timezone, null if no time data is available."
+        ),
         null=True,
         blank=True,
     )
