@@ -2,6 +2,7 @@ import re
 from datetime import datetime
 from typing import Any, Dict, List, Tuple, TypeVar
 
+import pytz
 from celery.canvas import chain
 from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
@@ -11,7 +12,7 @@ from django.template import loader
 from django.urls import NoReverseMatch, reverse
 from django.utils.encoding import force_str
 from django.utils.text import slugify
-from django.utils.timezone import make_aware, utc
+from django.utils.timezone import make_aware
 from eyecite import get_citations
 
 from cl.citations.utils import get_citation_depth_between_clusters
@@ -1027,8 +1028,14 @@ class DocketEntry(AbstractDateTimeModel):
     @property
     def datetime_filed(self) -> datetime | None:
         if self.time_filed:
+            from cl.recap.constants import COURT_TIMEZONES
+
+            local_timezone = pytz.timezone(
+                COURT_TIMEZONES.get(self.docket.court.id, "US/Eastern")
+            )
             return make_aware(
-                datetime.combine(self.date_filed, self.time_filed), utc
+                datetime.combine(self.date_filed, self.time_filed),
+                local_timezone,
             )
         return None
 

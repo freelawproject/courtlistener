@@ -18,7 +18,7 @@ from django.http import HttpRequest
 from django.templatetags.tz import do_timezone
 from django.test import RequestFactory, override_settings
 from django.urls import reverse
-from django.utils.timezone import make_aware, utc
+from django.utils.timezone import make_aware
 from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
 from selenium.webdriver.common.by import By
@@ -1708,8 +1708,8 @@ class CaptionTest(TestCase):
 
 
 class DocketEntriesTimezone(TestCase):
-    """Test docket entries with time, store as UTC and convert to local
-    court timezone.
+    """Test docket entries with time, store date and time in the local court
+    timezone and make datetime_filed aware to the local court timezone.
     """
 
     @classmethod
@@ -1773,8 +1773,8 @@ class DocketEntriesTimezone(TestCase):
         )
 
     def test_add_docket_entries_with_no_time(self):
-        """Do the time_filed field and datetime_filed property are None when ingesting
-        docket entries with no time info?
+        """Do the time_filed field and datetime_filed property are None when
+        ingesting docket entries with no time info?
         """
 
         add_docket_entries(self.d_cand, self.de_date_data["docket_entries"])
@@ -1787,11 +1787,11 @@ class DocketEntriesTimezone(TestCase):
         self.assertEqual(de_cand_date.datetime_filed, None)
 
     def test_add_docket_entries_with_time(self):
-        """Can we store the datetime in UTC separately in the date_filed and
-        time_filed if we ingest docket entries with datetime?
+        """Can we store the datetime in the local court timezone separately in
+        the date_filed and time_filed if we ingest docket entries with datetime?
         """
 
-        # Add docket entries with UTC datetime
+        # Add docket entries with UTC datetime for CAND
         add_docket_entries(self.d_cand, self.de_utc_data["docket_entries"])
 
         # Add docket entries with a different time offset than UTC datetime
@@ -1804,22 +1804,32 @@ class DocketEntriesTimezone(TestCase):
             docket__court=self.cand, entry_number=2
         )
 
-        # Compare both dates are stored in UTC
-        self.assertEqual(de_cand_utc.date_filed, datetime.date(2021, 10, 16))
-        self.assertEqual(de_cand_utc.time_filed, datetime.time(2, 46, 51))
+        # Compare both dates are stored in local court timezone PDT for CAND
+        self.assertEqual(de_cand_utc.date_filed, datetime.date(2021, 10, 15))
+        self.assertEqual(de_cand_utc.time_filed, datetime.time(19, 46, 51))
 
         self.assertEqual(de_cand_pdt.date_filed, datetime.date(2021, 10, 16))
-        self.assertEqual(de_cand_pdt.time_filed, datetime.time(9, 46, 51))
+        self.assertEqual(de_cand_pdt.time_filed, datetime.time(2, 46, 51))
 
-        # Does the datetime_filed property returns a proper UTC datetime?
-        self.assertEqual(
-            de_cand_utc.datetime_filed,
-            make_aware(datetime.datetime(2021, 10, 16, 2, 46, 51), utc),
+        # Add docket entries with UTC datetime for NYED
+        add_docket_entries(self.d_nyed, self.de_utc_data["docket_entries"])
+
+        # Add docket entries with a different time offset than UTC datetime
+        add_docket_entries(self.d_nyed, self.de_pdt_data["docket_entries"])
+
+        de_nyed_utc = DocketEntry.objects.get(
+            docket__court=self.nyed, entry_number=1
         )
-        self.assertEqual(
-            de_cand_pdt.datetime_filed,
-            make_aware(datetime.datetime(2021, 10, 16, 9, 46, 51), utc),
+        de_nyed_pdt = DocketEntry.objects.get(
+            docket__court=self.nyed, entry_number=2
         )
+
+        # Compare both dates are stored in local court timezone PDT for NYED
+        self.assertEqual(de_nyed_utc.date_filed, datetime.date(2021, 10, 15))
+        self.assertEqual(de_nyed_utc.time_filed, datetime.time(22, 46, 51))
+
+        self.assertEqual(de_nyed_pdt.date_filed, datetime.date(2021, 10, 16))
+        self.assertEqual(de_nyed_pdt.time_filed, datetime.time(5, 46, 51))
 
     def test_show_docket_entry_date_filed_according_court_timezone_dst(self):
         """Does the datetime_filed is shown to properly to users using the
@@ -1836,15 +1846,6 @@ class DocketEntriesTimezone(TestCase):
         )
         de_cand_pdt = DocketEntry.objects.get(
             docket__court=self.cand, entry_number=2
-        )
-        # Compare date and time stored as UTC:
-        self.assertEqual(
-            de_cand_utc.datetime_filed,
-            make_aware(datetime.datetime(2021, 10, 16, 2, 46, 51), utc),
-        )
-        self.assertEqual(
-            de_cand_pdt.datetime_filed,
-            make_aware(datetime.datetime(2021, 10, 16, 9, 46, 51), utc),
         )
 
         court_timezone = COURT_TIMEZONES.get(
@@ -1879,16 +1880,6 @@ class DocketEntriesTimezone(TestCase):
         )
         de_nyed_pdt = DocketEntry.objects.get(
             docket__court=self.nyed, entry_number=2
-        )
-
-        # Compare date stored as UTC:
-        self.assertEqual(
-            de_nyed_utc.datetime_filed,
-            make_aware(datetime.datetime(2021, 10, 16, 2, 46, 51), utc),
-        )
-        self.assertEqual(
-            de_nyed_pdt.datetime_filed,
-            make_aware(datetime.datetime(2021, 10, 16, 9, 46, 51), utc),
         )
 
         court_timezone = COURT_TIMEZONES.get(
@@ -1928,11 +1919,6 @@ class DocketEntriesTimezone(TestCase):
             docket__court=self.cand, entry_number=1
         )
 
-        # Compare date stored as UTC:
-        self.assertEqual(
-            de_cand_utc.datetime_filed,
-            make_aware(datetime.datetime(2023, 1, 16, 2, 46, 51), utc),
-        )
         court_timezone = COURT_TIMEZONES.get(
             self.d_cand.court_id, "US/Eastern"
         )
@@ -1953,11 +1939,7 @@ class DocketEntriesTimezone(TestCase):
         de_nyed_utc = DocketEntry.objects.get(
             docket__court=self.nyed, entry_number=1
         )
-        # Compare date stored as UTC:
-        self.assertEqual(
-            de_nyed_utc.datetime_filed,
-            make_aware(datetime.datetime(2023, 1, 16, 2, 46, 51), utc),
-        )
+
         court_timezone = COURT_TIMEZONES.get(
             self.d_nyed.court_id, "US/Eastern"
         )

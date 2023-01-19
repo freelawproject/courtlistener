@@ -412,7 +412,9 @@ def get_order_of_docket(docket_entries):
     return order
 
 
-def convert_to_court_timezone(datetime_filed: datetime, court_id: str) -> date:
+def convert_to_court_timezone(
+    datetime_filed: datetime, court_id: str
+) -> datetime:
     """Convert a docket entry datetime filed to the court timezone it belongs
     to.
 
@@ -422,8 +424,7 @@ def convert_to_court_timezone(datetime_filed: datetime, court_id: str) -> date:
     :return: A date object in the court timezone.
     """
     court_timezone = COURT_TIMEZONES.get(court_id, "US/Eastern")
-    datetime_filed_court = do_timezone(datetime_filed, court_timezone)
-    return datetime_filed_court.date()
+    return do_timezone(datetime_filed, court_timezone)
 
 
 def make_recap_sequence_number(de: dict, court_id: str) -> str:
@@ -441,7 +442,9 @@ def make_recap_sequence_number(de: dict, court_id: str) -> str:
     if type(de) == dict:
         date_filed = de["date_filed"]
         if isinstance(de["date_filed"], datetime):
-            date_filed = convert_to_court_timezone(de["date_filed"], court_id)
+            date_filed = convert_to_court_timezone(
+                de["date_filed"], court_id
+            ).date()
 
         return template % (
             date_filed.isoformat(),
@@ -486,7 +489,7 @@ def calculate_recap_sequence_numbers(docket_entries: list, court_id: str):
         if isinstance(de["date_filed"], datetime):
             current_date_filed = convert_to_court_timezone(
                 de["date_filed"], court_id
-            )
+            ).date()
 
         prev_date_filed = None
         if prev is not None:
@@ -494,7 +497,7 @@ def calculate_recap_sequence_numbers(docket_entries: list, court_id: str):
         if prev is not None and isinstance(prev["date_filed"], datetime):
             prev_date_filed = convert_to_court_timezone(
                 prev["date_filed"], court_id
-            )
+            ).date()
 
         if prev is not None and current_date_filed == prev_date_filed:
             # Previous item has same date. Increment the sequence number.
@@ -664,11 +667,13 @@ def add_docket_entries(d, docket_entries, tags=None):
         de.description = docket_entry["description"] or de.description
         date_filed = docket_entry["date_filed"]
         if isinstance(date_filed, datetime):
-            # If datetime is available, transform it to UTC and store it
-            # separately in date_filed and time_filed fields.
-            date_filed_utc = date_filed.astimezone(pytz.utc)
-            de.time_filed = date_filed_utc.time()
-            date_filed = date_filed_utc.date()
+            # If datetime is available, transform it to the local court
+            # timezone and store it separately in date_filed and time_filed.
+            datetime_filed_local = convert_to_court_timezone(
+                date_filed, d.court_id
+            )
+            de.time_filed = datetime_filed_local.time()
+            date_filed = datetime_filed_local.date()
 
         de.date_filed = date_filed or de.date_filed
         de.pacer_sequence_number = (
