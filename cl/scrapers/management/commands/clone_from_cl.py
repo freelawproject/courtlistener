@@ -56,9 +56,7 @@ def get_id_from_url(api_url: str) -> str:
 
 
 def clone_opinion_cluster(
-    session: Session,
-    cluster_ids: list,
-    object_type="search.OpinionCluster"
+    session: Session, cluster_ids: list, object_type="search.OpinionCluster"
 ):
     """
     Download opinion cluster data from courtlistener.com and add it to
@@ -162,16 +160,15 @@ def clone_opinion_cluster(
         add_items_to_solr.delay(added_opinions_ids, "search.Opinion")
 
     # Add opinion clusters to search engine
-    add_items_to_solr.delay([oc.pk for oc in opinion_clusters],
-                            "search.OpinionCluster")
+    add_items_to_solr.delay(
+        [oc.pk for oc in opinion_clusters], "search.OpinionCluster"
+    )
 
     return opinion_clusters
 
 
 def clone_docket(
-    session: Session,
-    docket_ids: list,
-    object_type="search.Docket"
+    session: Session, docket_ids: list, object_type="search.Docket"
 ):
     """
     Download docket data from courtlistener.com and add it to local
@@ -225,7 +222,8 @@ def clone_docket(
             # Get or create required objects
             docket_data["court"] = (
                 clone_court(session, [get_id_from_url(docket_data["court"])])[
-                    0]
+                    0
+                ]
                 if docket_data["court"]
                 else None
             )
@@ -264,9 +262,7 @@ def clone_docket(
 
 
 def clone_person(
-    session: Session,
-    people_ids: list,
-    object_type="people_db.Person"
+    session: Session, people_ids: list, object_type="people_db.Person"
 ):
     """
     Download person data from courtlistener.com and add it to local
@@ -329,16 +325,14 @@ def clone_person(
         )
 
     # Add people to search engine
-    add_items_to_solr.delay([person.pk for person in people],
-                            "people_db.Person")
+    add_items_to_solr.delay(
+        [person.pk for person in people], "people_db.Person"
+    )
 
     return people
 
 
-def clone_court(
-    session: Session,
-    court_ids: list,
-    object_type="search.Court"):
+def clone_court(session: Session, court_ids: list, object_type="search.Court"):
     """
     Download court data from courtlistener.com and add it to local
     environment
@@ -409,7 +403,7 @@ class Command(BaseCommand):
             type=str,
             choices=VALID_TYPES,
             help="Object type to clone. Current choices are %s"
-                 % ", ".join(VALID_TYPES),
+            % ", ".join(VALID_TYPES),
             required=True,
         )
 
@@ -418,10 +412,10 @@ class Command(BaseCommand):
             dest="ids",
             nargs="+",
             help="Object id to clone, you can get it from courtlistener.com "
-                 "urls (e.g. in "
-                 "https://www.courtlistener.com/opinion/771797/rupinder-kaur"
-                 "-loveleen-kaur-v-immigration-and-naturalization-service/ "
-                 "the id is 771797).",
+            "urls (e.g. in "
+            "https://www.courtlistener.com/opinion/771797/rupinder-kaur"
+            "-loveleen-kaur-v-immigration-and-naturalization-service/ "
+            "the id is 771797).",
             required=True,
         )
 
