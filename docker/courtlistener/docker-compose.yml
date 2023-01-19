@@ -105,3 +105,9 @@ services:
     container_name: "cl-disclosures"
     networks:
       - cl_net_overlay
+
+  cl-webhook-sentry:
+    image: juggernaut/webhook-sentry:latest
+    container_name: "cl-webhook-sentry"
+    networks:
+      - cl_net_overlay

@@ -1,25 +1,9 @@
-Eventually, this readme is meant to be fleshed out with lots of details about
-how to do migrations without any particular issues, but for the moment it's
-just a pointer to bugs that highlight the most grievous types of problems:
+# Steps to Making New Migrations
 
-https://github.com/freelawproject/courtlistener/issues/1106
-
-https://github.com/freelawproject/courtlistener/issues/1109
-
-Please, before you do an automated migration, check the SQL that it will run by
-using `sqlmigrate`, and be sure that the SQL doesn't run afoul of the major
-problems listed in those bug report or below.
-
-It's also worth reviewing these references, which point to problems that can
-occur on high-volume PostgreSQL instances like ours:
-
-https://www.braintreepayments.com/blog/safe-operations-for-high-volume-postgresql/
-
-https://github.com/ankane/strong_migrations
-
-https://leopard.in.ua/2016/09/20/safe-and-unsafe-operations-postgresql
-
-
+1. Create a Django migration file without running it using `docker exec -it cl-django python manage.py makemigrations <app_name>`
+2. Generate raw SQL for the migration you just made on the command line using `docker exec -it cl-django python sqlmigrate search <id_of_migration>`
+3. Copy and paste that into a `.sql` file right next to to the migration file that was generated (give the SQL file the same name as the migration file).
+4. Tweak the raw SQL as needed to avoid the issues outlined below, if any.
 
 # Known Problems
 
@@ -39,6 +23,12 @@ can be fine in regular environments, but cause a crisis in huge tables like the
 ones we have. Django does this kind of migration by default when you create a
 new text column with `blank=True`. That's very bad and until we upgrade to
 Postgresql 11 we will have to contend with this issue.
+
+Here is some background reading on why this is a problem:
+
+https://github.com/freelawproject/courtlistener/issues/1106
+
+https://github.com/freelawproject/courtlistener/issues/1109
 
 
 ## Adding and removing indexes to a column don't use CONCURRENTLY by default
@@ -113,3 +103,14 @@ populated. The general rule is to drop a column at the publisher first, then
 at the subscriber, once things have flushed. See:
 
 https://github.com/freelawproject/courtlistener/issues/1164
+
+# Misc Additional Reading
+
+It's also worth reviewing these references, which point to problems that can
+occur on high-volume PostgreSQL instances like ours:
+
+https://www.braintreepayments.com/blog/safe-operations-for-high-volume-postgresql/
+
+https://github.com/ankane/strong_migrations
+
+https://leopard.in.ua/2016/09/20/safe-and-unsafe-operations-postgresql
