@@ -674,6 +674,9 @@ def add_docket_entries(d, docket_entries, tags=None):
             )
             de.time_filed = datetime_filed_local.time()
             date_filed = datetime_filed_local.date()
+        else:
+            # If instance don't contain time data, make sure time_filed is null
+            de.time_filed = None
 
         de.date_filed = date_filed or de.date_filed
         de.pacer_sequence_number = (

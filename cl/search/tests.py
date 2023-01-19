@@ -1732,7 +1732,7 @@ class DocketEntriesTimezone(TestCase):
             docket_entries=[
                 DocketEntryDataFactory(
                     date_filed=datetime.date(2021, 10, 15),
-                    document_number=0,
+                    document_number=1,
                 )
             ],
         )
@@ -1779,7 +1779,7 @@ class DocketEntriesTimezone(TestCase):
 
         add_docket_entries(self.d_cand, self.de_date_data["docket_entries"])
         de_cand_date = DocketEntry.objects.get(
-            docket__court=self.cand, entry_number=0
+            docket__court=self.cand, entry_number=1
         )
 
         self.assertEqual(de_cand_date.date_filed, datetime.date(2021, 10, 15))
@@ -1830,6 +1830,31 @@ class DocketEntriesTimezone(TestCase):
 
         self.assertEqual(de_nyed_pdt.date_filed, datetime.date(2021, 10, 16))
         self.assertEqual(de_nyed_pdt.time_filed, datetime.time(5, 46, 51))
+
+    def test_update_docket_entries_with_no_time_data(self):
+        """Does the time_filed is null after updating a docket entry with no
+        datetime available?
+        """
+
+        # Add docket entries with UTC datetime for CAND
+        add_docket_entries(self.d_cand, self.de_utc_data["docket_entries"])
+
+        de_cand = DocketEntry.objects.get(
+            docket__court=self.cand, entry_number=1
+        )
+
+        # Compare both dates are stored in local court timezone PDT for CAND
+        self.assertEqual(de_cand.date_filed, datetime.date(2021, 10, 15))
+        self.assertEqual(de_cand.time_filed, datetime.time(19, 46, 51))
+
+        # Add docket entries with UTC datetime for CAND
+        add_docket_entries(self.d_cand, self.de_date_data["docket_entries"])
+
+        de_cand.refresh_from_db()
+        # After the docket entry is updated without time info, time_filed
+        # should be null.
+        self.assertEqual(de_cand.date_filed, datetime.date(2021, 10, 15))
+        self.assertEqual(de_cand.time_filed, None)
 
     def test_show_docket_entry_date_filed_according_court_timezone_dst(self):
         """Does the datetime_filed is shown to properly to users using the
