@@ -97,7 +97,7 @@
             <td style="text-align: center">{{ de.entry_number }}{% if rd.attachment_number  %}-{{ rd.attachment_number }}{% endif %}</td>
             <td>
               {% if de.datetime_filed %}
-                {{ de.datetime_filed|timezone:timezone|date:"M j, Y" }}
+                <span title="{{ de.datetime_filed|timezone:timezone}}">{{ de.datetime_filed|timezone:timezone|date:"M j, Y" }}</span>
               {% else %}
                 {{ de.date_filed|date:"M j, Y"|default:'<em class="gray">Unknown</em>' }}
               {% endif %}
