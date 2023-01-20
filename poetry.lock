@@ -926,6 +926,37 @@ files = [
 ]
 
 [[package]]
+name = "django-pghistory"
+version = "2.5.1"
+description = "History tracking for Django and Postgres"
+category = "main"
+optional = false
+python-versions = ">=3.7.0,<4"
+files = [
+    {file = "django-pghistory-2.5.1.tar.gz", hash = "sha256:8b020391755ce9067a9edcb59fb5237c0ffad1521d335c4fc1c637cf1c852b0d"},
+    {file = "django_pghistory-2.5.1-py3-none-any.whl", hash = "sha256:a602057524dc29b52a1cd961a03b3328dc9ab4eee30e2bb7381943844dd0b6f2"},
+]
+
+[package.dependencies]
+django = ">=2"
+django-pgtrigger = ">=4.5.0"
+
+[[package]]
+name = "django-pgtrigger"
+version = "4.6.0"
+description = "Postgres trigger support integrated with Django models."
+category = "main"
+optional = false
+python-versions = ">=3.7.0,<4"
+files = [
+    {file = "django-pgtrigger-4.6.0.tar.gz", hash = "sha256:ef54844837bb20c4ec68f10c05a89926b307bad5b3d08411ca1c84ca46fdc4c8"},
+    {file = "django_pgtrigger-4.6.0-py3-none-any.whl", hash = "sha256:1c6e25d5733b192bc62ff956521daf2b61fa5e9834a4952229fe65945bd1aac6"},
+]
+
+[package.dependencies]
+django = ">=2"
+
+[[package]]
 name = "django-ratelimit"
 version = "3.0.1"
 description = "Cache-based rate-limiting for Django."
@@ -3838,4 +3869,4 @@ h11 = ">=0.9.0,<1"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10, <3.11"
-content-hash = "4f2381ed8936ae0f324542c2b71f4f4df3e620b4786018809d7a782ae29f9e55"
+content-hash = "2e0779249cc2d1cfb65b6001a054c74f38d9889430e38a46560d6debee6431a9"
