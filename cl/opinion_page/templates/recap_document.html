@@ -41,7 +41,7 @@
 
         {% include "includes/rd_admin_tools.html" with d=rd.docket_entry.docket de=rd.docket_entry %}
 
-        show this div if there is a note, otherwise, put it in place, in anticipation of it becoming one. #}
+        {# show this div if there is a note, otherwise, put it in place, in anticipation of it becoming one. #}
         <div class="{% if not note_form.instance.recap_doc_id %}hidden{% endif %} sidebar-section"
              id="sidebar-notes">
             <div>
