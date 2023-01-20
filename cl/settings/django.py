@@ -122,6 +122,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "cl.lib.middleware.RobotsHeaderMiddleware",
     "cl.lib.middleware.MaintenanceModeMiddleware",
+    "pghistory.middleware.HistoryMiddleware",
 ]
 
 ROOT_URLCONF = "cl.urls"
@@ -147,6 +148,8 @@ INSTALLED_APPS = [
     "storages",
     "waffle",
     "admin_cursor_paginator",
+    "pghistory",
+    "pgtrigger",
     # CourtListener Apps
     "cl.alerts",
     "cl.audio",
