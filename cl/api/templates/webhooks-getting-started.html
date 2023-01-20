@@ -52,6 +52,8 @@
   <ul>
     <li>Our webhook system <a href="{% url 'webhooks_docs' %}#security">does not support authentication</a>, so the URL you create should be long and random.
     </li>
+    <li>Our POST requests will come from one of two static IP addresses, <code>34.210.230.218</code> and <code>54.189.59.91</code>. We recommend only allowing traffic from these addresses.
+    </li>
     <li>Your URL must receive POST requests and should not accept any other HTTP verbs.</li>
     <li>If you are using a web framework like Django or Ruby on Rails, the webhook URL will need to be exempted from the cross site request forgery (CSRF) protection system. If this is not done, most web frameworks will block POST requests from outside domains like ours.
     </li>
