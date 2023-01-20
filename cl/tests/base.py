@@ -92,6 +92,8 @@ class BaseSeleniumTest(SerializeSolrTestMixin, StaticLiveServerTestCase):
     def setUp(self) -> None:
         self.reset_browser()
         self._update_index()
+        # Add cookie to avoid the introducing-notes modal on tests.
+        self.browser.add_cookie({"name": "introducing_notes", "value": "true"})
 
     def reset_browser(self) -> None:
         self.browser.delete_all_cookies()
