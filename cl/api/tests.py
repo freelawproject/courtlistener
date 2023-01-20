@@ -9,14 +9,17 @@ from django.db import connection
 from django.http import HttpRequest, JsonResponse
 from django.test import Client, RequestFactory
 from django.test.utils import CaptureQueriesContext
-from django.urls import ResolverMatch, reverse
+from django.urls import reverse
 from rest_framework.exceptions import NotFound
 from rest_framework.request import Request
 from rest_framework.status import HTTP_200_OK, HTTP_403_FORBIDDEN
 from rest_framework.test import APIRequestFactory
 
+from cl.api.factories import WebhookEventFactory, WebhookFactory
+from cl.api.models import WEBHOOK_EVENT_STATUS, WebhookEventType
 from cl.api.pagination import ShallowOnlyPageNumberPagination
 from cl.api.views import coverage_data
+from cl.api.webhooks import send_webhook_event
 from cl.audio.api_views import AudioViewSet
 from cl.lib.redis_utils import make_redis_interface
 from cl.lib.test_helpers import IndexedSolrTestCase, SimpleUserDataMixin
@@ -968,3 +971,72 @@ class DRFRecapPermissionTest(TestCase):
             r = self.client.get(path)
             self.assertEqual(r.status_code, HTTP_403_FORBIDDEN)
             print("✓")
+
+
+class WebhooksProxySecurityTest(TestCase):
+    """Test Webhook proxy security"""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user_profile = UserProfileWithParentsFactory()
+        cls.webhook_https = WebhookFactory(
+            user=cls.user_profile.user,
+            event_type=WebhookEventType.DOCKET_ALERT,
+            url="https://127.0.0.1:3000",
+            enabled=True,
+        )
+
+        cls.webhook_http = WebhookFactory(
+            user=cls.user_profile.user,
+            event_type=WebhookEventType.DOCKET_ALERT,
+            url="http://127.0.0.1:3000",
+            enabled=True,
+        )
+        cls.webhook_0_0_0_0 = WebhookFactory(
+            user=cls.user_profile.user,
+            event_type=WebhookEventType.DOCKET_ALERT,
+            url="http://0.0.0.0:5050",
+            enabled=True,
+        )
+
+    def test_avoid_sending_webhooks_to_internal_ips(self):
+        """Can we avoid sending webhooks to internal IPs?"""
+
+        webhook_event = WebhookEventFactory(
+            webhook=self.webhook_https,
+            content="{'message': 'ok_1'}",
+            event_status=WEBHOOK_EVENT_STATUS.IN_PROGRESS,
+        )
+        send_webhook_event(webhook_event)
+        webhook_event.refresh_from_db()
+        self.assertIn("IP 127.0.0.1 is blocked", webhook_event.response)
+        self.assertEqual(
+            webhook_event.status_code,
+            HTTP_403_FORBIDDEN,
+        )
+
+        webhook_event_2 = WebhookEventFactory(
+            webhook=self.webhook_http,
+            content="{'message': 'ok_1'}",
+            event_status=WEBHOOK_EVENT_STATUS.IN_PROGRESS,
+        )
+        send_webhook_event(webhook_event_2)
+        webhook_event_2.refresh_from_db()
+        self.assertIn("IP 127.0.0.1 is blocked", webhook_event_2.response)
+        self.assertEqual(
+            webhook_event_2.status_code,
+            HTTP_403_FORBIDDEN,
+        )
+
+        webhook_event_3 = WebhookEventFactory(
+            webhook=self.webhook_0_0_0_0,
+            content="{'message': 'ok_1'}",
+            event_status=WEBHOOK_EVENT_STATUS.IN_PROGRESS,
+        )
+        send_webhook_event(webhook_event_3)
+        webhook_event_3.refresh_from_db()
+        self.assertIn("IP 0.0.0.0 is blocked", webhook_event_3.response)
+        self.assertEqual(
+            webhook_event_3.status_code,
+            HTTP_403_FORBIDDEN,
+        )
