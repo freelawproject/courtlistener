@@ -18,7 +18,7 @@ from cl.search.views import get_homepage_stats
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import APITestCase, TestCase
 from cl.tests.utils import make_client
-from cl.users.factories import UserProfileWithParentsFactory
+from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
 
 class NoteTest(SimpleUserDataMixin, TestCase):
@@ -328,6 +328,59 @@ class UserNotesTest(BaseSeleniumTest):
         opinions_pill.click()
         self.assert_text_in_node("Renamed Note", "body")
         self.assert_text_in_node("Modified Notes", "body")
+
+
+class FavoritesTest(TestCase):
+    """Fvorites app tests that don't require selenium"""
+
+    def test_revert_model_excluded_field(self) -> None:
+        # We can't revert an object being tracked with django-pghistory with an
+        # excluded field
+        tag_name = "test-tag"
+        params = {"username": "kramirez"}
+        test_user = UserFactory.create(
+            username=params["username"],
+            email="test@courtlistener.com",
+        )
+
+        # Object is created, new event object created
+        test_tag = UserTag.objects.create(
+            user=test_user,
+            name=tag_name,
+            title="Test tag",
+            description="Original description",
+        )
+
+        # Update object, new event object created
+        test_tag.description = "Description updated"
+        test_tag.save()
+
+        # Revert object to previous change, we use the second-to-last because
+        # the latest event always contains the current version of the model
+        # Trying to revert objects with untracked fields throws an exception
+        with self.assertRaises(RuntimeError):
+            test_tag.event.order_by("-pgh_id")[1].revert()
+
+    def test_revert_tracked_model(self):
+        # We can revert an object being tracked with django-pghistory
+
+        # Create test object, create event object
+        favorite_obj = FavoriteFactory.create(name="Original alert name")
+
+        # Update object's name, create event object
+        favorite_obj.name = "Updated alert name"
+        favorite_obj.save()
+
+        # Check that we updated the value
+        self.assertEqual(favorite_obj.name, "Updated alert name")
+
+        # Revert to previous event object, we use the second-to-last because
+        # the latest event always contains the current version of the model
+        favorite_obj = favorite_obj.event.order_by("-pgh_id")[1].revert()
+        favorite_obj.refresh_from_db()
+
+        # Check that the object name was reverted to original name
+        self.assertEqual(favorite_obj.name, "Original alert name")
 
 
 class APITests(APITestCase):
