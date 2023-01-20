@@ -1,3 +1,4 @@
+import pghistory
 from django.contrib.auth.models import User
 from django.core.validators import MaxLengthValidator
 from django.db import models
@@ -7,6 +8,7 @@ from cl.lib.models import AbstractDateTimeModel
 from cl.search.models import Docket, OpinionCluster, RECAPDocument
 
 
+@pghistory.track(pghistory.Snapshot())
 class Note(models.Model):
     date_created = models.DateTimeField(
         help_text="The original creation date for the item",
@@ -67,6 +69,7 @@ class Note(models.Model):
         )
 
 
+@pghistory.track(pghistory.Snapshot())
 class DocketTag(models.Model):
     """Through table linking dockets to tags"""
 
@@ -83,6 +86,7 @@ class DocketTag(models.Model):
         unique_together = (("docket", "tag"),)
 
 
+@pghistory.track(pghistory.Snapshot(), exclude=["view_count"])
 class UserTag(AbstractDateTimeModel):
     """Tags that can be added by users to various objects"""
 
@@ -125,6 +129,7 @@ class UserTag(AbstractDateTimeModel):
         index_together = (("user", "name"),)
 
 
+@pghistory.track(pghistory.Snapshot())
 class Prayer(models.Model):
     WAITING = 1
     GRANTED = 2
