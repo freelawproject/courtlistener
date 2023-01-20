@@ -1,0 +1,29 @@
+{% load humanize %}
+<div id="modal-introducing-notes"
+     class="modal hidden-print text-left"
+     role="dialog"
+     aria-hidden="true"
+     tabindex="-1">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal"
+                aria-label="Close"><span aria-hidden="true">&times;</span>
+        </button>
+        <h2 class="modal-title">Introducing <i class="fa fa-bookmark-o gray"></i> Notes</h2>
+      </div>
+      <div class="modal-body">
+        <p>You can use the <i class="fa fa-bookmark-o black"></i> <strong>Notes</strong> feature to save Dockets, RECAP Documents, Opinions, and Oral arguments to the <a href="{% url 'profile_notes' %}">Notes tab</a> in your account. You can add notes to each note item as well.</p>
+        <p>These used to be <i class="fa fa-star-o gray"></i> <strong>Favorites</strong>.</p>
+      </div>
+      <div class="modal-footer">
+        <p>
+          <a href="{% url 'tag_notes_help' %}#notes"
+          class="btn btn-success">Learn More&hellip;</a>
+          <button class="btn btn-primary" data-dismiss="modal">
+          <i class="fa fa-check"></i> Got  it</button>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
