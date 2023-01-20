@@ -141,6 +141,9 @@ class UserNotesTest(BaseSeleniumTest):
         self.browser.find_element(By.ID, "password").send_keys("password")
         self.browser.find_element(By.ID, "password").submit()
 
+        # Refresh page after sign in to avoid introducing notes modal
+        self.browser.refresh()
+
         # And is brought back to that item!
         self.assert_text_in_node(title.strip(), "body")
 
@@ -160,6 +163,9 @@ class UserNotesTest(BaseSeleniumTest):
         # Dora goes to CL, logs in, and does a search on her topic of interest
         self.browser.get(self.live_server_url)
         self.attempt_sign_in("pandora", "password")
+
+        # Refresh page after sign in to avoid introducing notes modal
+        self.browser.refresh()
 
         search_box = self.browser.find_element(By.ID, "id_q")
         search_box.send_keys("lissner")
@@ -213,6 +219,9 @@ class UserNotesTest(BaseSeleniumTest):
         # that note again, so she goes to Notes under the Profile menu
         self.get_url_and_wait(self.live_server_url)
         self.attempt_sign_in("pandora", "password")
+
+        # Refresh page after sign in to avoid introducing notes modal
+        self.browser.refresh()
 
         # TODO: Refactor. Same code used in
         #       test_basic_homepage_search_and_signin_and_signout
@@ -269,10 +278,8 @@ class UserNotesTest(BaseSeleniumTest):
         self.browser.get(self.live_server_url)
         self.attempt_sign_in("pandora", "password")
 
-        notes_modal = self.browser.find_elements(
-            By.CSS_SELECTOR, "close"
-        )[0] 
-        notes_modal.click()
+        # Refresh page after sign in to avoid introducing notes modal
+        self.browser.refresh()
 
         profile_dropdown = self.browser.find_elements(
             By.CSS_SELECTOR, "a.dropdown-toggle"

@@ -35,6 +35,9 @@ class VisualizationCrudTests(BaseSeleniumTest):
         self.browser.get(self.live_server_url)
         self.attempt_sign_in("user", "password")
 
+        # Refresh page after sign in to avoid introducing notes modal
+        self.browser.refresh()
+
         # She selects "New Visualization" from the new Visualization menu
         menu = self.browser.find_element(By.PARTIAL_LINK_TEXT, "Opinions")
         menu.click()
