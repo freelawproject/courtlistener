@@ -195,7 +195,7 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
         )
         reverse_params = [
             {"viewname": "view_settings"},
-            {"viewname": "profile_favorites"},
+            {"viewname": "profile_notes"},
             {"viewname": "profile_alerts"},
             {"viewname": "view_visualizations"},
             {"viewname": "view_deleted_visualizations"},

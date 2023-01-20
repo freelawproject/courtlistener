@@ -1,14 +1,14 @@
 from factory import Faker, SubFactory
 from factory.django import DjangoModelFactory
 
-from cl.favorites.models import Favorite, UserTag
+from cl.favorites.models import Note, UserTag
 from cl.search.factories import OpinionClusterWithParentsFactory
 from cl.users.factories import UserWithChildProfileFactory
 
 
-class FavoriteFactory(DjangoModelFactory):
+class NoteFactory(DjangoModelFactory):
     class Meta:
-        model = Favorite
+        model = Note
 
     user = SubFactory(UserWithChildProfileFactory)
     cluster_id = SubFactory(OpinionClusterWithParentsFactory)

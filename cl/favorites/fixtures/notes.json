@@ -11,7 +11,7 @@
       "docket_id": null,
       "recap_doc_id": null
     },
-    "model": "favorites.favorite",
+    "model": "favorites.note",
     "pk": 1
   }
 ]

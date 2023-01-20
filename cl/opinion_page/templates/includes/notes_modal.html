@@ -1,0 +1,71 @@
+{% if user.is_authenticated %}
+    {# Modal box for saving the note #}
+    <div id="modal-save-note"
+         class="modal hidden-print"
+         role="dialog"
+         aria-hidden="true"
+         data-id="{{ note_form.instance.id }}">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                {% if note_form.instance.id or edit %}
+                    <h2 id="save-note-title">Edit This Note</h2>
+                {% else %}
+                    <h2 id="save-note-title">Save Note</h2>
+                {% endif %}
+                <form action="" method="POST">{% csrf_token %}
+                    {{ note_form.cluster_id }}
+                    {{ note_form.audio_id }}
+                    {{ note_form.docket_id }}
+                    {{ note_form.recap_doc_id }}
+                    <div class="form-group">
+                        <label for="id_name">Name</label>
+                        {{ note_form.name }}
+                        {% if note_form.name.errors %}
+                            <p class="help-block">
+                                {% for error in note_form.name.errors %}
+                                    {{ error|escape }}
+                                {% endfor %}
+                            </p>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        <label for="id_note_notes">Notes</label>
+                        {{ note_form.notes }}
+                        {% if note_form.notes.errors %}
+                            <p class="help-block">
+                                {% for error in note_form.notes.errors %}
+                                    {{ error|escape }}
+                                {% endfor %}
+                            </p>
+                        {% endif %}
+                    </div>
+                    <p class="top right">
+                        <span id="characters-remaining"></span>
+                        Characters Remaining
+                    </p>
+
+                    <div id='notes-bottom-section'>
+                        <a id="save-note-delete"
+                           class="bottom inline cursor
+                           {% if not note_form.instance.id and not edit %}hidden{% endif %}">Delete</a>
+
+                        <div id="notes-buttons" class="v-offset-below-2">
+                            <button type="submit"
+                                    class="btn btn-default title close-note-button"
+                                    name="closeNote"
+                                    id="closeNote">Cancel</button>
+                            <button type="submit"
+                                    class="btn btn-primary title save-note-button"
+                                    name="saveNote"
+                                    id="saveNote">Save</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% else %}
+    {# user is not authenticated #}
+    {% include "includes/logged_out_modal.html" %}
+{% endif %}

@@ -4,7 +4,7 @@ from rest_framework.authtoken.models import Token
 
 from cl.alerts.admin import AlertInline, DocketAlertInline
 from cl.donate.admin import DonationInline, MonthlyDonationInline
-from cl.favorites.admin import FavoriteInline, UserTagInline
+from cl.favorites.admin import NoteInline, UserTagInline
 from cl.lib.admin import AdminTweaksMixin
 from cl.users.models import (
     BarMembership,
@@ -44,7 +44,7 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         MonthlyDonationInline,
         AlertInline,
         DocketAlertInline,
-        FavoriteInline,
+        NoteInline,
         UserTagInline,
         TokenInline,
     )
