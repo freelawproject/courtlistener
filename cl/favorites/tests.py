@@ -269,6 +269,11 @@ class UserNotesTest(BaseSeleniumTest):
         self.browser.get(self.live_server_url)
         self.attempt_sign_in("pandora", "password")
 
+        notes_modal = self.browser.find_elements(
+            By.CSS_SELECTOR, "close"
+        )[0] 
+        notes_modal.click()
+
         profile_dropdown = self.browser.find_elements(
             By.CSS_SELECTOR, "a.dropdown-toggle"
         )[0]
