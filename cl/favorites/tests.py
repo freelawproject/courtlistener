@@ -365,7 +365,7 @@ class FavoritesTest(TestCase):
         # We can revert an object being tracked with django-pghistory
 
         # Create test object, create event object
-        favorite_obj = FavoriteFactory.create(name="Original alert name")
+        favorite_obj = NoteFactory.create(name="Original alert name")
 
         # Update object's name, create event object
         favorite_obj.name = "Updated alert name"
