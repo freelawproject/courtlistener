@@ -233,12 +233,6 @@ a.button:active {
   }
 }
 
-@media (max-width: 1200px) {
-  #sort-buttons .hidden-sm{
-    display: none;
-  }
-}
-
 @media (min-width: 768px) {
   #main-query-box #id_q {
     width: 400px;
