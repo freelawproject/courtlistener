@@ -68,8 +68,6 @@
 
 
     <hr>
-
-
     <h2 id="recap-archive">PACER Data (The RECAP Archive)</h2>
     <p>Broadly speaking, the <a href="{% url "advanced_r" %}">RECAP Archive</a> consists of dockets, docket entries, documents, parties, and attorneys. Our goal with the RECAP Archive is to collect any PACER data that we can so that we can share it as widely as possible.
     </p>
@@ -120,7 +118,8 @@
     <hr>
 
     <h2 id="adding-updating">Adding or Updating PACER Data in Our System</h2>
-    <p>We do not have every court document or case and we often hear from folks that are distressed that particular documents or cases are not on CourtListener. Typically we do not purchase or upload content in response to user requests. Instead, if you wish to add something to our collection, the best way is usually to install the RECAP extension and purchase the item yourself on PACER.</p>
+    <p>It is cost-prohibitive for us to have every court document or case. If you wish to add something to our collection, the best way is to install the RECAP extension and purchase the item yourself on PACER.
+    </p>
     <hr>
 
 
@@ -197,6 +196,24 @@
       {% endfor %}
     </div>
     <hr>
+
+
+    <h2 id="financial-disclosures">Financial Disclosures</h2>
+    <p>All federal judges and many state judges must file financial disclosure documents to indicate any real or perceived biases they may have. We have collected
+      {{ count_fds|intcomma|default:"tens of thousands" }} of these records containing {{ count_investments|intcomma|default:"more than a million" }} investments. See our page on this topic for more details.
+    </p>
+    <p><a href="{% url "coverage_fds" %}" class="btn btn-default btn-lg">Disclosure Coverage</a>
+    </p>
+    <hr>
+
+
+    <h2 id="judges">Judges</h2>
+    <p>We host a database of {{ count_people|intcomma|default:"thousands of" }} state and federal judges including their biographical, professional, judicial, and political information. See our page on this topic for more details.
+    </p>
+    <p><a href="{% url "advanced_p" %}" class="btn btn-default btn-lg">Judge Homepage</a>
+    </p>
+    <hr>
+
 
     <h2 id="oral-arguments">Oral Argument Recordings</h2>
     <p>Although we have the largest collection of oral argument recordings on the Internet, we currently only have support for the Supreme Court and the Federal Circuit Courts listed below. For the courts listed below, we gather their oral argument recordings within about an hour of when the files are posted.
