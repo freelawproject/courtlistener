@@ -28,8 +28,6 @@ from cl.simple_pages.views import (
 urlpatterns = [
     # Footer stuff
     path("faq/", faq, name="faq"),
-    path("coverage/", coverage_graph, name="coverage"),
-    path("coverage/financial-disclosures/", coverage_fds, name="coverage_fds"),
     path("feeds/", feeds, name="feeds_info"),
     path("podcasts/", podcasts, name="podcasts"),
     path("contribute/", contribute, name="contribute"),
@@ -37,6 +35,12 @@ urlpatterns = [
     path("contact/thanks/", contact_thanks, name="contact_thanks"),
     # Help pages
     path("help/", help_home, name="help_home"),
+    path("help/coverage/", coverage_graph, name="coverage"),
+    path(
+        "help/coverage/financial-disclosures/",
+        coverage_fds,
+        name="coverage_fds",
+    ),
     path("help/markdown/", markdown_help, name="markdown_help"),
     path("help/alerts/", alert_help, name="alert_help"),
     path("help/donations/", donation_help, name="donation_help"),
@@ -49,6 +53,16 @@ urlpatterns = [
     path(
         "search/advanced-techniques/",
         RedirectView.as_view(pattern_name="advanced_search", permanent=True),
+    ),
+    # Redirect coverage pages from /coverage/ to /help/coverage/
+    # Started: 2023-01-17
+    path(
+        "coverage/",
+        RedirectView.as_view(pattern_name="coverage", permanent=True),
+    ),
+    path(
+        "coverage/financial-disclosures/",
+        RedirectView.as_view(pattern_name="coverage_fds", permanent=True),
     ),
     path("terms/v/<int:v>/", old_terms, name="old_terms"),
     path("terms/", latest_terms, name="terms"),
