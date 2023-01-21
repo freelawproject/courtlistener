@@ -8,12 +8,23 @@
 
 
 {% block content %}
-  <div class="hidden-xs col-sm-2 col-md-3"></div>
-  <div class="col-xs-12 col-sm-8 col-md-6">
-    <h1>CourtListener Database Replication&nbsp;<i class="fa fa-code-fork gray"></i></h1>
+  <div class="hidden-xs hidden-sm col-md-3">
+    <div id="toc">
+      <h3>Table of Contents</h3>
+      <ul>
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#how">How it Works</a></li>
+        <li><a href="#setup">Our Process</a></li>
+        <li><a href="#faqs">FAQs</a></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="col-xs-12 col-md-8 col-lg-6">
+    <h1 id="overview">CourtListener Database Replication&nbsp;<i class="fa fa-code-fork gray"></i></h1>
     <p class="lead">The CourtListener Database Replication service is for researchers and organizations that need high-speed, granular access to the CourtListener database on an ongoing basis.
     </p>
-    <p>This service works by using PostgreSQL to create and maintain a table-based <a href="https://www.postgresql.org/docs/10/logical-replication.html">logical replica</a> of our database to a server that you control, inside your network. Once the replica has completed its first sync, you can query your replica of the CourtListener database using standard SQL commands. This provides an incredibly powerful way to access one of the largest open collections of American legal data.
+    <p>This service works by using PostgreSQL to create and maintain a table-based <a href="https://www.postgresql.org/docs/10/logical-replication.html">logical replica</a> of our database allocated specifically for you. Once the replica has completed its first sync, you can query your replica of the CourtListener database using standard SQL commands. This provides an incredibly powerful way to access one of the largest open collections of American legal data.
     </p>
     <p>The following types of data are currently available as part of this service:</p>
     <ul>
@@ -21,45 +32,40 @@
       <li><p><a href="{% url "advanced_r" %}">RECAP Archive of PACER data</a></p></li>
       <li><p>The <a href="https://www.fjc.gov/research/idb">FJC Integrated Database</a> civil data</p></li>
       <li><p><a href="{% url "advanced_oa" %}">Oral Arguments</a></p></li>
+      <li><p><a href="{% url "financial_disclosures_home" %}">Financial Disclosures</a></p></li>
       <li><p><a href="{% url "advanced_p" %}">Judge and Appointer data</a></p></li>
     </ul>
     <p>User data will never be shared as part of this service.
     </p>
-    <p>Setting up this service is complicated. You will need to create a dedicated server that can support the kinds of data syncing requirements that a large active server like ours demands. We currently make hundreds of thousands changes or additions per day to tables with tens of millions of rows. As these commands occur on our server, they will be streamed to yours as well, keeping yours perfectly in sync, nearly instantly.
-    </p>
     <p>If you are interested in this service, please get in touch to learn more. We will be happy to discuss the technical details.
     </p>
-    <p class="text-right"><a href="{% url "contact" %}" class="btn btn-primary btn-xl">Get Started</a></p>
+    <p class="text-right"><a href="{% url "contact" %}" class="btn btn-primary btn-lg">Get Started</a></p>
 
     <hr>
-    <h2>How Logical Replication Works</h2>
+    <h2 id="how">How Logical Replication Works</h2>
     <p><a href="https://www.postgresql.org/docs/10/logical-replication.html">Logical replication</a> is a system supported by recent versions of PostgreSQL. Unlike older methods of database replication, which worked by shipping the database binary files across the network (so&#8209;called physical replication), logical replication works by streaming SQL commands from a "publisher" server to a "subscriber" server.
     </p>
     <p>This form of replication provides a number of benefits over physical replication including the ability to have slightly different versions of the database installed, and the ability to only replicate certain tables from the publisher to the subscriber.
     </p>
 
     <hr>
-    <h2>Our Process</h2>
-    <p>When we engage with you to set up logical replication, you will begin by creating a server in your private cloud that has a compatible version of PostgreSQL installed. This server can be set up in AWS or similar cloud providers if their version of PostgreSQL supports logical replication. This server will need sufficient drive space to hold the tables we plan to replicate, and will need sufficient memory and compute resources to support the level of traffic you expect.
+    <h2 id="setup">Our Process</h2>
+    <p>When we engage with you to set up logical replication, we will set up a new server for you in our cloud, and we will provide access to you from a specific IP address in your network.
     </p>
-    <p>Once that server is set up, we will provide a <a href="https://www.postgresql.org/docs/10/logical-replication-publication.html">PostgreSQL PUBLICATION</a> for you on our server. You will subscribe to it, and the data will begin copying over until your server is synced. Once the first sync is complete, ongoing changes will be streamed to your server as they occur on CourtListener.
-    </p>
-    <p>Your server will always be in sync. You can query and scale it however you please.</p>
+    <p>Once it's set up, your server will always be in sync and we can work together to scale the server however you need.</p>
 
     <hr>
-    <h2>Frequently Asked Questions</h2>
+    <h2 id="faqs">Frequently Asked Questions</h2>
     <h3>What about schema changes?</h3>
-    <p>Logical replication allows for some schema differences between the publisher and the subscriber, but, in general, the less you change your schema, the better. Best is if you don't change your schema at all.
+    <p>Logical replication allows for some schema differences between the publisher and the subscriber, but in general, the less you change your schema, the better. Best is if you don't change your schema at all.
     </p>
-    <p>On our end, when we make schema changes, we will inform you and you will need to make them in order to continue receiving replicated data. As you might expect, replication will fail if the schemas are not sufficiently similar on both servers.
-    </p>
-    <p>We will provide SQL scripts for you to run whenever schema changes are needed or in some cases, we will be able to run them for you.
+    <p>On our end, when we make schema changes, we will give you advance notice and we will complete the work according to a pre-determined maintenance schedule.
     </p>
 
     <h3>What if my server goes down?</h3>
     <p>Whenever your server goes down, ours will keep track of changes until yours comes back online. As soon as your server is back and the subscription is re-established, all changes from your downtime will be synced to your server.
     </p>
-    <p>If you plan to take your server offline for an extended period of time, we need to know so that we can make a decision together as to whether to keep a log of all changes that occurred during your planned downtime.
+    <p>If your server goes offline for an extended period of time, we need to know so that we can make a decision together whether to keep a log of all changes that occurred during your planned downtime.
     </p>
     <p>Keeping these changes takes up space on our hard drive. If your server is down for too long, eventually we have to stop saving the information for you and a complete re-synchronization will be needed. We charge a fee for re-synchronization work.
     </p>
@@ -70,6 +76,6 @@
     <p>If you have more questions, please send us an email. This service is a complicated one and we look forward to working with organizations and researchers to make it a success.
     </p>
     <p class="text-right"><a href="{% url "contact" %}"
-                             class="btn btn-primary btn-xl">Contact Us</a></p>
+                             class="btn btn-primary btn-lg">Contact Us</a></p>
   </div>
 {% endblock %}
