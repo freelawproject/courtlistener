@@ -14,7 +14,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="hidden-xs col-sm-2 col-md-3">
+<div class="hidden-xs hidden-sm col-md-3">
   <div id="toc">
     <h3>Table of Contents</h3>
     <ul>
@@ -39,7 +39,7 @@
   </div>
 </div>
 
-<div class="col-xs-12 col-sm-8 col-md-6">
+<div class="col-xs-12 col-md-8 col-lg-6">
   <h1 id="about">Webhook API</h1>
   <p class="lead">CourtListener’s webhook system allows us to push information to you, enabling bi-directional APIs without polling.
   </p>
@@ -103,11 +103,17 @@
   </div>
   <hr>
   <h3 id="security">Webhook Security</h3>
-  <p>At present, our webhook system does not have an authentication mechanism to verify that a POST to your endpoint came from CourtListener. To provide some level of safety, <strong>we recommend you use a long, random URL as your endpoint</strong>, and we advise you to keep that URL secret.
+  <p>Our webhook events will be sent from one of two IP addresses:</p>
+  <ol>
+    <li><code>34.210.230.218</code></li>
+    <li><code>54.189.59.91</code></li>
+  </ol>
+  <p>We recommend adding these IP addresses to your network allow list and/or verifying that the webhook events you receive come from these addresses.
   </p>
-  <p>The <a href="https://github.com/freelawproject/courtlistener/issues/1650" rel="nofollow" target="_blank">decision not to support an authentication mechanism</a> was made after analyzing the risk of lacking authentication and after completing a review of the Stripe payments platform (which defaults to not using authentication despite being a high-risk environment).
+  <p>We also recommend you protect your webhook endpoints by giving them long, random, secret URLs instead of short preditable ones.</p>
+  <p>Beyond this, our webhook system does not have an authentication mechanism to verify that a POST to your endpoint came from CourtListener. The <a href="https://github.com/freelawproject/courtlistener/issues/1650" rel="nofollow" target="_blank">decision not to support an authentication mechanism</a> was made after analyzing the risk of lacking authentication and after completing a review of the Stripe payments platform (which defaults to not using authentication despite being a high-risk environment).
   </p>
-  <p>So far, none of our clients have requested that we add this feature nor demonstrated a need for it. If the need for webhook authentication is a blocker for your organization, <a href="{% url 'contact' %}">please let us know</a> and we can build a solution together.
+  <p>If the need for webhook authentication is a blocker for your organization, <a href="{% url 'contact' %}">please let us know</a> and we can revisit this decision.
   </p>
 
   <h3 id="retries">Retries and Automatic Endpoint Disablement</h3>
