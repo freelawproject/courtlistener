@@ -483,5 +483,18 @@
       src="https://plausible.io/js/plausible.js"></script>
   {% endif %}
 {% endif %}
+
+{% if user.is_authenticated and not request.COOKIES.introducing_notes %}
+  {% include "includes/introducing_notes_modal.html" %}
+  <script>
+    $(document).ready(function(){
+      $("#modal-introducing-notes").modal();
+      let date = new Date();
+      date.setTime(date.getTime() + 10 * 24 * 60 * 60 * 1000); //10 days
+      let expires = '; expires=' + date.toGMTString();
+      document.cookie = 'introducing_notes=true' + expires + '; path=/';
+    });
+  </script>
+{% endif %}
 </body>
 </html>

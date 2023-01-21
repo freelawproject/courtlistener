@@ -4,27 +4,35 @@
 <tr id="note-row-{{ note_form.instance.id }}">
   <td id="name-{{ note_form.instance.id }}">
     {% if note_form.instance.cluster_id %}
-      <i class="fa-book fa gray" title="{{ type }}"></i>
-      <a href="{{ note_form.instance.cluster_id.get_absolute_url }}">
-        {{note_form.instance.name }}
-      </a>
+      {% with instance=note_form.instance.cluster_id %}
+        <i class="fa-book fa gray" title="{{ type }}"></i>
+        <a href="{% url 'view_case' instance.pk instance.slug %}">
+          {{note_form.instance.name }}
+        </a>
+      {% endwith %}
     {% elif note_form.instance.audio_id %}
-      <i class="fa-volume-up fa grey" title="{{ type }}"></i>
-      <a href="{{ note_form.instance.audio_id.get_absolute_url }}">
-        {{ note_form.instance.name }}
-      </a>
+      {% with instance=note_form.instance.audio_id %}
+        <i class="fa-volume-up fa grey" title="{{ type }}"></i>
+        <a href="{% url 'view_audio_file' instance.pk instance.docket.slug %}">
+          {{ note_form.instance.name }}
+        </a>
+      {% endwith %}
     {% elif note_form.instance.docket_id %}
-      <i class="fa-list fa grey"
-         title="{{ type }}"></i>
-      <a href="{{ note_form.instance.docket_id.get_absolute_url }}?order_by=desc">
-        {{ note_form.instance.name }}
-      </a>
+      {% with instance=note_form.instance.docket_id %}
+        <i class="fa-list fa grey"
+           title="{{ type }}"></i>
+        <a href="{% url 'view_docket' instance.pk instance.slug %}?order_by=desc">
+          {{ note_form.instance.name }}
+        </a>
+      {% endwith %}
     {% elif note_form.instance.recap_doc_id %}
-      <i class="fa-file-text-o fa grey"
-         title="{{ type }}"></i>
-      <a href="{{ note_form.instance.recap_doc_id.get_absolute_url }}">
-        {{ note_form.instance.name }}
-      </a>
+      {% with instance=note_form.instance.recap_doc_id %}
+        <i class="fa-file-text-o fa grey"
+           title="{{ type }}"></i>
+        <a href="{% url 'view_recap_document' instance.docket_entry.docket.pk instance.document_number instance.docket_entry.docket.slug %}">
+          {{ note_form.instance.name }}
+        </a>
+      {% endwith %}
     {% endif %}
   </td>
   {% if type == "Dockets" %}

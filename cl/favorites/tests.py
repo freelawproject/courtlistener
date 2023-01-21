@@ -115,14 +115,14 @@ class UserNotesTest(BaseSeleniumTest):
         title_anchor.click()
 
         # On the detail page she now sees it might be useful later, so she
-        # clicks on the little star next to the result result title
+        # clicks on the little add note button next to the result title
         title = self.browser.find_element(By.CSS_SELECTOR, "article h2").text
-        star = self.browser.find_element(By.ID, "add-note-button")
+        add_note_button = self.browser.find_element(By.ID, "add-note-button")
         self.assertEqual(
-            star.get_attribute("title").strip(),
+            add_note_button.get_attribute("title").strip(),
             "Save this record as a note in your profile",
         )
-        star.click()
+        add_note_button.click()
 
         # Oops! She's not signed in and she sees a prompt telling her as such
         link = self.browser.find_element(
@@ -141,12 +141,15 @@ class UserNotesTest(BaseSeleniumTest):
         self.browser.find_element(By.ID, "password").send_keys("password")
         self.browser.find_element(By.ID, "password").submit()
 
+        # Refresh page after sign in to avoid introducing notes modal
+        self.browser.refresh()
+
         # And is brought back to that item!
         self.assert_text_in_node(title.strip(), "body")
 
-        # Clicking the star now brings up the "Save Note" dialog. Nice!
-        star = self.browser.find_element(By.ID, "add-note-button")
-        star.click()
+        # Clicking the add note button now brings up the "Save Note" dialog. Nice!
+        add_note_button = self.browser.find_element(By.ID, "add-note-button")
+        add_note_button.click()
 
         self.browser.find_element(By.ID, "modal-save-note")
         modal_title = self.browser.find_element(By.ID, "save-note-title")
@@ -161,6 +164,9 @@ class UserNotesTest(BaseSeleniumTest):
         self.browser.get(self.live_server_url)
         self.attempt_sign_in("pandora", "password")
 
+        # Refresh page after sign in to avoid introducing notes modal
+        self.browser.refresh()
+
         search_box = self.browser.find_element(By.ID, "id_q")
         search_box.send_keys("lissner")
         search_box.submit()
@@ -173,15 +179,15 @@ class UserNotesTest(BaseSeleniumTest):
         self.assertNotEqual(search_title, "")
         title_anchor.click()
 
-        # She has used CL before and knows to click the notes button save a note
-        star = self.browser.find_element(By.ID, "add-note-button")
+        # She has used CL before and knows to click the add a note button
+        add_note_button = self.browser.find_element(By.ID, "add-note-button")
         self.assertEqual(
-            star.get_attribute("title").strip(),
+            add_note_button.get_attribute("title").strip(),
             "Save this record as a note in your profile",
         )
-        self.assertIn("btn-success", star.get_attribute("class"))
-        self.assertNotIn("btn-warning", star.get_attribute("class"))
-        star.click()
+        add_note_icon = add_note_button.find_element(By.TAG_NAME, "i")
+        self.assertNotIn("gold", add_note_icon.get_attribute("class"))
+        add_note_button.click()
 
         # She is prompted to "Save Note". She notices the title is already
         # populated with the original title from the search and there's an
@@ -199,11 +205,11 @@ class UserNotesTest(BaseSeleniumTest):
         # She clicks 'Save'
         self.browser.find_element(By.ID, "saveNote").click()
 
-        # She now sees the star is full on yellow implying it's a note!
+        # She now sees the note icon is full on yellow implying it's a note!
         time.sleep(1)  # Selenium is sometimes faster than JS.
-        star = self.browser.find_element(By.ID, "add-note-button")
-        self.assertIn("btn-warning", star.get_attribute("class"))
-        self.assertNotIn("btn-success", star.get_attribute("class"))
+        add_note_button = self.browser.find_element(By.ID, "add-note-button")
+        add_note_icon = add_note_button.find_element(By.TAG_NAME, "i")
+        self.assertIn("gold", add_note_icon.get_attribute("class"))
 
         # She closes her browser and goes to the gym for a bit since it's
         # always leg day amiright
@@ -213,6 +219,9 @@ class UserNotesTest(BaseSeleniumTest):
         # that note again, so she goes to Notes under the Profile menu
         self.get_url_and_wait(self.live_server_url)
         self.attempt_sign_in("pandora", "password")
+
+        # Refresh page after sign in to avoid introducing notes modal
+        self.browser.refresh()
 
         # TODO: Refactor. Same code used in
         #       test_basic_homepage_search_and_signin_and_signout
@@ -268,6 +277,9 @@ class UserNotesTest(BaseSeleniumTest):
         # Dora already has some notes and she logs in and pulls them up
         self.browser.get(self.live_server_url)
         self.attempt_sign_in("pandora", "password")
+
+        # Refresh page after sign in to avoid introducing notes modal
+        self.browser.refresh()
 
         profile_dropdown = self.browser.find_elements(
             By.CSS_SELECTOR, "a.dropdown-toggle"
