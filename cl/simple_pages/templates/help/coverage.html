@@ -36,25 +36,37 @@
 {% endblock %}
 
 {% block content %}
-  <div class="hidden-xs col-sm-1 col-md-2"></div>
-  <div class="col-xs-12 col-sm-10 col-md-8">
-    <h1>Data Coverage &mdash; What's in CourtListener?</h1>
-    <p>CourtListener is a vast searchable collection of legal information. We have millions of judicial opinions including <a href="https://free.law/projects/supreme-court-data/">a detailed collection of SCOTUS opinions</a>, we have tens of millions of PACER docket entries in the <a href="{% url "advanced_r" %}">RECAP Archive</a>, and we have <a href="{% url "advanced_oa" %}">the largest collection of oral argument recordings</a> available on the Internet, with {{ oa_duration|intcomma }} minutes of recordings (and counting).
-    </p>
-    <p>The best way to think about our data is to consider where we get it from. The answer to that question depends on which kind of information you are interested in &mdash; PACER data (the RECAP Archive), opinions, or oral argument recordings. Read on to learn more or skip ahead to the section that interests you:
-    </p>
-    <ul>
-      <li><a href="#recap-archive">Coverage of PACER data (the RECAP Archive)</a></li>
-      <li><a href="#adding-updating">Adding or updating PACER data in our system</a></li>
+  <div class="hidden-xs hidden-sm col-md-3">
+    <div id="toc">
+      <h3>Table of Contents</h3>
+      <ul>
+      <li><a href="#recap-archive">PACER Data Coverage</a></li>
+      <ul>
+        <li><a href="#adding-updating">Adding PACER Data</a></li>
+      </ul>
       <li>
-        <a href="#opinions">Coverage of judicial opinions</a>
+        <a href="#opinions">Judicial Opinion Coverage</a>
         <ul>
-          <li><a href="#opinion-chart">Chart of judicial opinion coverage</a></li>
-          <li><a href="#scraped-jurisdictions">Which courts get daily content</a></li>
+          <li><a href="#opinion-chart">Coverage Chart</a></li>
+          <li><a href="#scraped-jurisdictions">Scheduled Updates</a></li>
         </ul>
       </li>
-      <li><a href="#oral-arguments">Coverage of oral argument recordings</a></li>
+      <li><a href="#financial-disclosures">Financial Disclosure Coverage</a></li>
+      <li><a href="#judges">Judge Coverage</a></li>
+      <li><a href="#oral-arguments">Oral Argument Coverage</a></li>
     </ul>
+    </div>
+  </div>
+
+  <div class="col-xs-12 col-md-8 col-lg-6">
+    <h1>Data Coverage &mdash; What's in CourtListener?</h1>
+    <p class="lead">CourtListener is a vast searchable collection of legal information.</p>
+    <p>We have millions of judicial opinions including <a href="https://free.law/projects/supreme-court-data/">a detailed collection of SCOTUS opinions</a>, we have tens of millions of PACER docket entries in the <a href="{% url "advanced_r" %}">RECAP Archive</a>, and we have <a href="{% url "advanced_oa" %}">the largest collection of oral argument recordings</a> available on the Internet, with {{ oa_duration|intcomma }} minutes of recordings (and counting).
+    </p>
+    <p>The best way to think about our data is to consider where we get it from. The answer to that question depends on which kind of information you are interested in &mdash; PACER data (the RECAP Archive), opinions, or oral argument recordings.
+    </p>
+
+
     <hr>
 
 
@@ -164,8 +176,8 @@
     <div id="chart" style="height: 400px;"></div>
   </div>
 
-  <div class="hidden-xs col-sm-1 col-md-2"></div>
-  <div class="col-xs-12 col-sm-10 col-md-8">
+  <div class="hidden-xs hidden-sm col-md-3"></div>
+  <div class="col-xs-12 col-md-8 col-lg-6">
     <h3 id="scraped-jurisdictions">Courts We Scrape for Opinions</h3>
     <p>As mentioned above, we gather opinions from hundreds of court websites every day. For each of these jurisdictions, we are able to provide <a href="{% url "alert_help" %}">instant, daily, weekly, or monthly alerts</a>. If you are setting up an alert, it's important to know that we do not yet have coverage for all of the courts on CourtListener. The courts for which we currently can provide alerts are:
     </p>
