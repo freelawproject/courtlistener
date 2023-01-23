@@ -19,6 +19,7 @@
     <h3>Table of Contents</h3>
     <ul>
       <li><a href="#getting-started">Getting Started</a></li>
+      <li><a href="#pricing">Pricing</a></li>
       <li><a href="#overview-of-events">Overview of Events</a></li>
       <ul>
         <li><a href="#headers">Headers</a></li>
@@ -46,6 +47,16 @@
   <p>To set this up, you create a URL on your server where CourtListener can send data. Then, whenever something important happens in CourtListener, we will POST an “event” to that URL as JSON data. When you receive the event, you can process it and perform whatever actions your system needs in response.
   </p>
   <p>Currently, CourtListener can send webhook events whenever dockets are updated, search alerts are triggered, docket alerts expire, or when RECAP Fetch tasks complete. If you have other events of interest, please get in touch.
+  </p>
+
+  <h2 id="pricing">Pricing</h2>
+  <p>CourtListener is hosted by <a href="https://free.law">Free Law Project</a>, a non-profit that has "Free" in its name, but we do charge reasonable fees to organizations using advanced features like Webhooks and APIs. We use these fees to maintain our paid and free services.
+  </p>
+  <p>When we see an organization starting a new project using Webhooks, we will get in touch to discuss the project and set up an agreement that works for everybody.
+  </p>
+  <p>Questions? Get in touch to start the conversation.</p>
+  <p>
+    <a href="{% url "contact" %}" class="btn btn-default">Contact Us</a>
   </p>
 
   <h2 id="getting-started">Getting Started With Webhooks</h2>
