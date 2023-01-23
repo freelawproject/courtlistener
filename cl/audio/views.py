@@ -1,4 +1,5 @@
 from django.core.exceptions import ObjectDoesNotExist
+from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.views.decorators.cache import never_cache
 
@@ -11,7 +12,7 @@ from cl.lib.string_utils import trunc
 
 
 @never_cache
-def view_audio_file(request, pk, _):
+def view_audio_file(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     """Using the ID, return the oral argument page.
 
     We also test if the item has a note and send data as such.
