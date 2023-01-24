@@ -2469,6 +2469,8 @@ class RecapEmailDocketAlerts(TestCase):
         pacer_doc_id = content["payload"]["results"][0]["recap_documents"][0][
             "pacer_doc_id"
         ]
+        docket_id = content["payload"]["results"][0]["docket"]
+        self.assertEqual(docket.pk, docket_id)
         self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
 
     @mock.patch(
