@@ -77,7 +77,7 @@ class DocketEntrySerializer(ModelSerializer):
 
     class Meta:
         model = DocketEntry
-        exclude = ("tags", "docket")
+        exclude = ("tags",)
 
 
 class OriginalCourtInformationSerializer(ModelSerializer):
