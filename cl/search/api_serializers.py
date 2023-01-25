@@ -49,7 +49,7 @@ class DocketSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
         view_name="court-detail",
         queryset=Court.objects.exclude(jurisdiction=Court.TESTING_COURT),
     )
-    court_id = serializers.CharField(read_only=True)
+    court_id = serializers.ReadOnlyField()
     original_court_info = OriginalCourtInformationSerializer(
         source="originating_court_information",
     )
