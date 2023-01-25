@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Dict
 
+import pghistory
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
@@ -39,6 +40,9 @@ class BarMembership(models.Model):
         ordering = ["barMembership"]
 
 
+@pghistory.track(
+    pghistory.Snapshot()
+)
 class UserProfile(models.Model):
     user = models.OneToOneField(
         User,
@@ -129,9 +133,9 @@ class UserProfile(models.Model):
     )
     auto_subscribe = models.BooleanField(
         help_text="If enabled, for every new case that comes in from the "
-        "user's recap.email address, a new docket subscription for the case "
-        "will be created; if disabled we'll ask users if they want to "
-        "subscribe to the case.",
+                  "user's recap.email address, a new docket subscription for the case "
+                  "will be created; if disabled we'll ask users if they want to "
+                  "subscribe to the case.",
         default=True,
     )
 
@@ -222,6 +226,17 @@ class UserProfile(models.Model):
         verbose_name_plural = "user profiles"
 
 
+@pghistory.track(
+    pghistory.Snapshot(),
+    obj_field=None,
+)
+class UserProfileBarMembership(UserProfile.barmembership.through):
+    """ A model class to track user profile barmembership m2m relation """
+
+    class Meta:
+        proxy = True
+
+
 class EMAIL_NOTIFICATIONS(object):
     """SES Email Notifications Subtypes"""
 
@@ -272,8 +287,8 @@ class EmailFlag(AbstractDateTimeModel):
     )
     flag_type = models.SmallIntegerField(
         help_text="The flag type assigned, "
-        "Email ban: ban an email address and avoid sending any email. "
-        "Email backoff event: an active backoff event.",
+                  "Email ban: ban an email address and avoid sending any email. "
+                  "Email backoff event: an active backoff event.",
         choices=FLAG_TYPES.TYPES,
         default=FLAG_TYPES.BAN,
     )
@@ -294,7 +309,7 @@ class EmailFlag(AbstractDateTimeModel):
     )
     checked = models.DateTimeField(
         help_text="The datetime the recipient's deliverability was checked"
-        " since the last bounce event.",
+                  " since the last bounce event.",
         blank=True,
         null=True,
     )
@@ -340,9 +355,9 @@ class EmailSent(AbstractDateTimeModel):
     user = models.ForeignKey(
         User,
         help_text="The user that this message is related to in case of users "
-        "change their email address we can send failed email to the user's "
-        "new email address, this is optional in case we send email to an"
-        "email address that doesn't belong to a CL user.",
+                  "change their email address we can send failed email to the user's "
+                  "new email address, this is optional in case we send email to an"
+                  "email address that doesn't belong to a CL user.",
         related_name="emails",
         on_delete=models.CASCADE,
         blank=True,
