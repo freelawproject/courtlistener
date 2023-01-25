@@ -1,3 +1,4 @@
+import pghistory
 from django.db import models
 from django.template import loader
 from django.urls import reverse
@@ -58,6 +59,9 @@ DATE_GRANULARITIES = (
 )
 
 
+@pghistory.track(
+    pghistory.Snapshot()
+)
 class Person(AbstractDateTimeModel):
     RELIGIONS = (
         ("ca", "Catholic"),
@@ -78,7 +82,7 @@ class Person(AbstractDateTimeModel):
     is_alias_of = models.ForeignKey(
         "self",
         help_text="Any nicknames or other aliases that a person has. For "
-        "example, William Jefferson Clinton has an alias to Bill",
+                  "example, William Jefferson Clinton has an alias to Bill",
         related_name="aliases",
         on_delete=models.SET_NULL,
         blank=True,
@@ -86,13 +90,13 @@ class Person(AbstractDateTimeModel):
     )
     date_completed = models.DateTimeField(
         help_text="Whenever an editor last decided that a profile was "
-        "complete in some sense.",
+                  "complete in some sense.",
         blank=True,
         null=True,
     )
     fjc_id = models.IntegerField(
         help_text="The ID of a judge as assigned by the Federal Judicial "
-        "Center.",
+                  "Center.",
         null=True,
         blank=True,
         unique=True,
@@ -100,7 +104,7 @@ class Person(AbstractDateTimeModel):
     )
     slug = models.SlugField(
         help_text="A generated path for this item as used in CourtListener "
-        "URLs",
+                  "URLs",
         max_length=158,  # len(self.name_full)
     )
     name_first = models.CharField(
@@ -187,7 +191,7 @@ class Person(AbstractDateTimeModel):
     )
     ftm_total_received = models.FloatField(
         help_text="The amount of money received by this person and logged by "
-        "Follow the Money.",
+                  "Follow the Money.",
         blank=True,
         null=True,
         db_index=True,
@@ -195,13 +199,13 @@ class Person(AbstractDateTimeModel):
     ftm_eid = models.CharField(
         max_length=30,
         help_text="The ID of a judge as assigned by the Follow the Money "
-        "database.",
+                  "database.",
         null=True,
         blank=True,
     )
     has_photo = models.BooleanField(
         help_text="Whether there is a photo corresponding to this person in "
-        "the judge pics project.",
+                  "the judge pics project.",
         default=False,
     )
 
@@ -231,11 +235,11 @@ class Person(AbstractDateTimeModel):
             [
                 v
                 for v in [
-                    self.name_first,
-                    self.name_middle,
-                    self.name_last,
-                    self.get_name_suffix_display(),
-                ]
+                self.name_first,
+                self.name_middle,
+                self.name_last,
+                self.get_name_suffix_display(),
+            ]
                 if v
             ]
         ).strip()
@@ -389,6 +393,9 @@ class Person(AbstractDateTimeModel):
         return normalize_search_dicts(out)
 
 
+@pghistory.track(
+    pghistory.Snapshot()
+)
 class School(AbstractDateTimeModel):
     is_alias_of = models.ForeignKey(
         "self",
@@ -429,6 +436,9 @@ class School(AbstractDateTimeModel):
         super(School, self).clean_fields(*args, **kwargs)
 
 
+@pghistory.track(
+    pghistory.Snapshot()
+)
 class Position(AbstractDateTimeModel):
     """A role held by a person, and the details about it."""
 
@@ -702,8 +712,8 @@ class Position(AbstractDateTimeModel):
     )
     position_type = models.CharField(
         help_text="If this is a judicial position, this indicates the role "
-        "the person had. This field may be blank if job_title is "
-        "complete instead.",
+                  "the person had. This field may be blank if job_title is "
+                  "complete instead.",
         choices=POSITION_TYPES,
         max_length=20,
         blank=True,
@@ -711,7 +721,7 @@ class Position(AbstractDateTimeModel):
     )
     job_title = models.CharField(
         help_text="If title isn't in position_type, a free-text position may "
-        "be entered here.",
+                  "be entered here.",
         max_length=100,
         blank=True,
     )
@@ -733,7 +743,7 @@ class Position(AbstractDateTimeModel):
     court = models.ForeignKey(
         Court,
         help_text="If this was a judicial position, this is the jurisdiction "
-        "where it was held.",
+                  "where it was held.",
         related_name="court_positions",
         on_delete=models.RESTRICT,
         blank=True,
@@ -742,14 +752,14 @@ class Position(AbstractDateTimeModel):
     school = models.ForeignKey(
         School,
         help_text="If this was an academic job, this is the school where the "
-        "person worked.",
+                  "person worked.",
         on_delete=models.RESTRICT,
         blank=True,
         null=True,
     )
     organization_name = models.CharField(
         help_text="If the organization where this position was held is not a "
-        "school or court, this is the place it was held.",
+                  "school or court, this is the place it was held.",
         max_length=120,
         blank=True,
         null=True,
@@ -766,10 +776,10 @@ class Position(AbstractDateTimeModel):
     appointer = models.ForeignKey(
         "self",
         help_text="If this is an appointed position, the person-position "
-        "responsible for the appointment. This field references "
-        "other positions instead of referencing people because that "
-        "allows you to know the position a person held when an "
-        "appointment was made.",
+                  "responsible for the appointment. This field references "
+                  "other positions instead of referencing people because that "
+                  "allows you to know the position a person held when an "
+                  "appointment was made.",
         related_name="appointed_positions",
         on_delete=models.RESTRICT,
         blank=True,
@@ -792,62 +802,62 @@ class Position(AbstractDateTimeModel):
     )
     date_nominated = models.DateField(
         help_text="The date recorded in the Senate Executive Journal when a "
-        "federal judge was nominated for their position or the date "
-        "a state judge nominated by the legislature. When a "
-        "nomination is by primary election, this is the date of the "
-        "election. When a nomination is from a merit commission, "
-        "this is the date the nomination was announced.",
+                  "federal judge was nominated for their position or the date "
+                  "a state judge nominated by the legislature. When a "
+                  "nomination is by primary election, this is the date of the "
+                  "election. When a nomination is from a merit commission, "
+                  "this is the date the nomination was announced.",
         null=True,
         blank=True,
         db_index=True,
     )
     date_elected = models.DateField(
         help_text="Judges are elected in most states. This is the date of their"
-        "first election. This field will be null if the judge was "
-        "initially selected by nomination.",
+                  "first election. This field will be null if the judge was "
+                  "initially selected by nomination.",
         null=True,
         blank=True,
         db_index=True,
     )
     date_recess_appointment = models.DateField(
         help_text="If a judge was appointed while congress was in recess, this "
-        "is the date of that appointment.",
+                  "is the date of that appointment.",
         null=True,
         blank=True,
         db_index=True,
     )
     date_referred_to_judicial_committee = models.DateField(
         help_text="Federal judges are usually referred to the Judicial "
-        "Committee before being nominated. This is the date of that "
-        "referral.",
+                  "Committee before being nominated. This is the date of that "
+                  "referral.",
         null=True,
         blank=True,
         db_index=True,
     )
     date_judicial_committee_action = models.DateField(
         help_text="The date that the Judicial Committee took action on the "
-        "referral.",
+                  "referral.",
         null=True,
         blank=True,
         db_index=True,
     )
     judicial_committee_action = models.CharField(
         help_text="The action that the judicial committee took in response to "
-        "a nomination",
+                  "a nomination",
         choices=JUDICIAL_COMMITTEE_ACTIONS,
         max_length=20,
         blank=True,
     )
     date_hearing = models.DateField(
         help_text="After being nominated, a judge is usually subject to a "
-        "hearing. This is the date of that hearing.",
+                  "hearing. This is the date of that hearing.",
         null=True,
         blank=True,
         db_index=True,
     )
     date_confirmation = models.DateField(
         help_text="After the hearing the senate will vote on judges. This is "
-        "the date of that vote.",
+                  "the date of that vote.",
         null=True,
         blank=True,
         db_index=True,
@@ -865,7 +875,7 @@ class Position(AbstractDateTimeModel):
     )
     date_termination = models.DateField(
         help_text="The last date of their employment. The compliment to "
-        "date_start",
+                  "date_start",
         null=True,
         blank=True,
         db_index=True,
@@ -883,14 +893,14 @@ class Position(AbstractDateTimeModel):
     )
     date_retirement = models.DateField(
         help_text="The date when they become a senior judge by going into "
-        "active retirement",
+                  "active retirement",
         null=True,
         blank=True,
         db_index=True,
     )
     nomination_process = models.CharField(
         help_text="The process by which a person was nominated into this "
-        "position.",
+                  "position.",
         choices=NOMINATION_PROCESSES,
         max_length=20,
         blank=True,
@@ -908,39 +918,39 @@ class Position(AbstractDateTimeModel):
     )
     votes_yes = models.PositiveIntegerField(
         help_text="If votes are an integer, this is the number of votes in "
-        "favor of a position.",
+                  "favor of a position.",
         null=True,
         blank=True,
     )
     votes_no = models.PositiveIntegerField(
         help_text="If votes are an integer, this is the number of votes "
-        "opposed to a position.",
+                  "opposed to a position.",
         null=True,
         blank=True,
     )
     votes_yes_percent = models.FloatField(
         help_text="If votes are a percentage, this is the percentage of votes "
-        "in favor of a position.",
+                  "in favor of a position.",
         null=True,
         blank=True,
     )
     votes_no_percent = models.FloatField(
         help_text="If votes are a percentage, this is the percentage of votes "
-        "opposed to a position.",
+                  "opposed to a position.",
         null=True,
         blank=True,
     )
     how_selected = models.CharField(
         help_text="The method that was used for selecting this judge for this "
-        "position (generally an election or appointment).",
+                  "position (generally an election or appointment).",
         choices=SELECTION_METHODS,
         max_length=20,
         blank=True,
     )
     has_inferred_values = models.BooleanField(
         help_text="Some or all of the values for this position were inferred "
-        "from a data source instead of manually added. See sources "
-        "field for more details.",
+                  "from a data source instead of manually added. See sources "
+                  "field for more details.",
         default=False,
     )
 
@@ -1057,6 +1067,9 @@ class Position(AbstractDateTimeModel):
         super(Position, self).clean_fields(*args, **kwargs)
 
 
+@pghistory.track(
+    pghistory.Snapshot()
+)
 class RetentionEvent(AbstractDateTimeModel):
     RETENTION_TYPES = (
         ("reapp_gov", "Governor Reappointment"),
@@ -1084,31 +1097,31 @@ class RetentionEvent(AbstractDateTimeModel):
     )
     votes_yes = models.PositiveIntegerField(
         help_text="If votes are an integer, this is the number of votes in "
-        "favor of a position.",
+                  "favor of a position.",
         null=True,
         blank=True,
     )
     votes_no = models.PositiveIntegerField(
         help_text="If votes are an integer, this is the number of votes "
-        "opposed to a position.",
+                  "opposed to a position.",
         null=True,
         blank=True,
     )
     votes_yes_percent = models.FloatField(
         help_text="If votes are a percentage, this is the percentage of votes "
-        "in favor of a position.",
+                  "in favor of a position.",
         null=True,
         blank=True,
     )
     votes_no_percent = models.FloatField(
         help_text="If votes are a percentage, this is the percentage of votes "
-        "opposed to a position.",
+                  "opposed to a position.",
         null=True,
         blank=True,
     )
     unopposed = models.BooleanField(
         help_text="Whether the position was unopposed at the time of "
-        "retention.",
+                  "retention.",
         null=True,
         blank=True,
     )
@@ -1128,6 +1141,9 @@ class RetentionEvent(AbstractDateTimeModel):
         super(RetentionEvent, self).clean_fields(*args, **kwargs)
 
 
+@pghistory.track(
+    pghistory.Snapshot()
+)
 class Education(AbstractDateTimeModel):
     DEGREE_LEVELS = (
         ("ba", "Bachelor's (e.g. B.A.)"),
@@ -1195,6 +1211,9 @@ class Education(AbstractDateTimeModel):
         super(Education, self).clean_fields(*args, **kwargs)
 
 
+@pghistory.track(
+    pghistory.Snapshot()
+)
 class Race(models.Model):
     RACES = (
         ("w", "White"),
@@ -1217,6 +1236,20 @@ class Race(models.Model):
         return f"{self.race}"
 
 
+@pghistory.track(
+    pghistory.Snapshot(),
+    obj_field=None,
+)
+class PersonRace(Person.race.through):
+    """ A model class to track person race m2m relation """
+
+    class Meta:
+        proxy = True
+
+
+@pghistory.track(
+    pghistory.Snapshot()
+)
 class PoliticalAffiliation(AbstractDateTimeModel):
     POLITICAL_AFFILIATION_SOURCE = (
         ("b", "Ballot"),
@@ -1250,7 +1283,7 @@ class PoliticalAffiliation(AbstractDateTimeModel):
     )
     source = models.CharField(
         help_text="The source of the political affiliation -- where it is "
-        "documented that this affiliation exists.",
+                  "documented that this affiliation exists.",
         choices=POLITICAL_AFFILIATION_SOURCE,
         max_length=5,
         blank=True,
@@ -1286,6 +1319,9 @@ class PoliticalAffiliation(AbstractDateTimeModel):
         super(PoliticalAffiliation, self).clean_fields(*args, **kwargs)
 
 
+@pghistory.track(
+    pghistory.Snapshot()
+)
 class Source(AbstractDateTimeModel):
     person = models.ForeignKey(
         Person,
@@ -1306,7 +1342,7 @@ class Source(AbstractDateTimeModel):
     )
     notes = models.TextField(
         help_text="Any additional notes about the data's provenance, in "
-        "Markdown format.",
+                  "Markdown format.",
         blank=True,
     )
 
@@ -1373,7 +1409,7 @@ class PartyType(models.Model):
     )
     date_terminated = models.DateField(
         help_text="The date that the party was terminated from the case, if "
-        "applicable.",
+                  "applicable.",
         null=True,
         blank=True,
     )
@@ -1384,12 +1420,12 @@ class PartyType(models.Model):
     )
     highest_offense_level_opening = models.TextField(
         help_text="In a criminal case, the highest offense level at the "
-        "opening of the case.",
+                  "opening of the case.",
         blank=True,
     )
     highest_offense_level_terminated = models.TextField(
         help_text="In a criminal case, the highest offense level at the end "
-        "of the case.",
+                  "of the case.",
         blank=True,
     )
 
@@ -1403,6 +1439,18 @@ class PartyType(models.Model):
             self.name,
             self.docket_id,
         )
+
+
+@pghistory.track(
+    pghistory.Snapshot(),
+    obj_field=None,
+)
+class Parties(PartyType):
+    """ A model class to track parties m2m relation in docket model in
+    search app"""
+
+    class Meta:
+        proxy = True
 
 
 class CriminalCount(models.Model):
@@ -1424,12 +1472,12 @@ class CriminalCount(models.Model):
     )
     name = models.TextField(
         help_text="The name of the count, such as '21:952 and 960 - "
-        "Importation of Marijuana(1)'.",
+                  "Importation of Marijuana(1)'.",
     )
     disposition = models.TextField(
         help_text="The disposition of the count, such as 'Custody of BOP for "
-        "60 months, followed by 4 years supervised release. No "
-        "fine. $100 penalty assessment.",
+                  "60 months, followed by 4 years supervised release. No "
+                  "fine. $100 penalty assessment.",
         # Can be blank if no disposition yet.
         blank=True,
     )
@@ -1460,7 +1508,7 @@ class CriminalComplaint(models.Model):
     )
     name = models.TextField(
         help_text="The name of the criminal complaint, for example, '8:1326 "
-        "Reentry of Deported Alien'",
+                  "Reentry of Deported Alien'",
     )
     disposition = models.TextField(
         help_text="The disposition of the criminal complaint.",
@@ -1482,10 +1530,10 @@ class Party(AbstractDateTimeModel):
     extra_info = models.TextField(
         # See: 7d4c916a34207c3c55b58cc385425a9fc7021004
         help_text="Prior to March, 2018, this field briefly held additional "
-        "info from PACER about particular parties. That was a modelling "
-        "mistake and the information has been moved to the "
-        "PartyType.extra_info field instead. This field will be removed in "
-        "October, 2020.",
+                  "info from PACER about particular parties. That was a modelling "
+                  "mistake and the information has been moved to the "
+                  "PartyType.extra_info field instead. This field will be removed in "
+                  "October, 2020.",
         db_index=True,
     )
 
@@ -1535,24 +1583,24 @@ class Role(models.Model):
     docket = models.ForeignKey(
         "search.Docket",
         help_text="The attorney represented the party on this docket in this "
-        "role.",
+                  "role.",
         on_delete=models.CASCADE,
     )
     role = models.SmallIntegerField(
         help_text="The name of the attorney's role. Used primarily in "
-        "district court cases.",
+                  "district court cases.",
         choices=ATTORNEY_ROLES,
         db_index=True,
         null=True,
     )
     role_raw = models.TextField(
         help_text="The raw value of the role, as a string. Items prior to "
-        "2018-06-06 may not have this value.",
+                  "2018-06-06 may not have this value.",
         blank=True,
     )
     date_action = models.DateField(
         help_text="The date the attorney was disbarred, suspended, "
-        "terminated...",
+                  "terminated...",
         null=True,
     )
 
@@ -1633,7 +1681,7 @@ class AttorneyOrganizationAssociation(models.Model):
     docket = models.ForeignKey(
         "search.Docket",
         help_text="The docket that the attorney worked on while at this "
-        "organization.",
+                  "organization.",
         on_delete=models.CASCADE,
     )
 
@@ -1673,12 +1721,12 @@ class AttorneyOrganization(AbstractDateTimeModel):
     )
     state = USPostalCodeField(
         help_text="The two-letter USPS postal abbreviation for the "
-        "organization",
+                  "organization",
         db_index=True,
     )
     zip_code = USZipCodeField(
         help_text="The zip code for the organization, XXXXX or XXXXX-XXXX "
-        "work.",
+                  "work.",
         db_index=True,
     )
 
