@@ -427,6 +427,32 @@ def convert_to_court_timezone(
     return do_timezone(datetime_filed, court_timezone)
 
 
+def set_docket_entry_date_and_time(
+    de: DocketEntry, date_filed: date | datetime
+) -> None:
+    """Set the docket entry date and time, if datetime is available, convert it
+    to the local court timezone, split it into date and time and save it to
+    date_filed and time_filed.
+
+    :param de: The docket entry to set date and time filed.
+    :date_filed: The date or datetime instance provided by the source.
+    :return: None
+    """
+
+    if isinstance(date_filed, datetime):
+        datetime_filed_local = convert_to_court_timezone(
+            date_filed, de.docket.court.pk
+        )
+        de.time_filed = datetime_filed_local.time()
+        date_filed = datetime_filed_local.date()
+    else:
+        # If not time data is available, compare if date_filed changed if so
+        # restart time_filed to None.
+        if de.date_filed != date_filed:
+            de.time_filed = None
+    de.date_filed = date_filed or de.date_filed
+
+
 def make_recap_sequence_number(de: dict, court_id: str) -> str:
     """Make a sequence number using a date and index.
 
@@ -666,19 +692,7 @@ def add_docket_entries(d, docket_entries, tags=None):
 
         de.description = docket_entry["description"] or de.description
         date_filed = docket_entry["date_filed"]
-        if isinstance(date_filed, datetime):
-            # If datetime is available, transform it to the local court
-            # timezone and store it separately in date_filed and time_filed.
-            datetime_filed_local = convert_to_court_timezone(
-                date_filed, d.court_id
-            )
-            de.time_filed = datetime_filed_local.time()
-            date_filed = datetime_filed_local.date()
-        else:
-            # If instance don't contain time data, make sure time_filed is null
-            de.time_filed = None
-
-        de.date_filed = date_filed or de.date_filed
+        set_docket_entry_date_and_time(de, date_filed)
         de.pacer_sequence_number = (
             docket_entry.get("pacer_seq_no") or de.pacer_sequence_number
         )

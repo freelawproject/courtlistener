@@ -1737,6 +1737,24 @@ class DocketEntriesTimezone(TestCase):
             ],
         )
 
+        cls.de_date_data_changes = DocketEntriesDataFactory(
+            docket_entries=[
+                DocketEntryDataFactory(
+                    date_filed=datetime.date(2021, 10, 16),
+                    document_number=1,
+                )
+            ],
+        )
+
+        cls.de_no_date = DocketEntriesDataFactory(
+            docket_entries=[
+                DocketEntryDataFactory(
+                    date_filed=None,
+                    document_number=1,
+                )
+            ],
+        )
+
         # DST entries in UTC
         cls.de_utc_data = DocketEntriesDataFactory(
             docket_entries=[
@@ -1748,6 +1766,18 @@ class DocketEntriesTimezone(TestCase):
                 )
             ],
         )
+
+        cls.de_utc_changes_time = DocketEntriesDataFactory(
+            docket_entries=[
+                DocketEntryDataFactory(
+                    date_filed=datetime.datetime(
+                        2021, 10, 16, 2, 50, 11, tzinfo=tzutc()
+                    ),
+                    document_number=1,
+                )
+            ],
+        )
+
         # DST entries in a different time offset
         cls.de_pdt_data = DocketEntriesDataFactory(
             docket_entries=[
@@ -1773,7 +1803,7 @@ class DocketEntriesTimezone(TestCase):
         )
 
     def test_add_docket_entries_with_no_time(self):
-        """Do the time_filed field and datetime_filed property are None when
+        """Do time_filed field and datetime_filed property are None when
         ingesting docket entries with no time info?
         """
 
@@ -1781,14 +1811,14 @@ class DocketEntriesTimezone(TestCase):
         de_cand_date = DocketEntry.objects.get(
             docket__court=self.cand, entry_number=1
         )
-
         self.assertEqual(de_cand_date.date_filed, datetime.date(2021, 10, 15))
         self.assertEqual(de_cand_date.time_filed, None)
         self.assertEqual(de_cand_date.datetime_filed, None)
 
     def test_add_docket_entries_with_time(self):
-        """Can we store the datetime in the local court timezone separately in
-        the date_filed and time_filed if we ingest docket entries with datetime?
+        """Can we store docket entries date_filed in the local court timezone
+        divided into date_filed and time_filed if we ingest
+        docket entries with datetime?
         """
 
         # Add docket entries with UTC datetime for CAND
@@ -1803,7 +1833,6 @@ class DocketEntriesTimezone(TestCase):
         de_cand_pdt = DocketEntry.objects.get(
             docket__court=self.cand, entry_number=2
         )
-
         # Compare both dates are stored in local court timezone PDT for CAND
         self.assertEqual(de_cand_utc.date_filed, datetime.date(2021, 10, 15))
         self.assertEqual(de_cand_utc.time_filed, datetime.time(19, 46, 51))
@@ -1823,7 +1852,6 @@ class DocketEntriesTimezone(TestCase):
         de_nyed_pdt = DocketEntry.objects.get(
             docket__court=self.nyed, entry_number=2
         )
-
         # Compare both dates are stored in local court timezone PDT for NYED
         self.assertEqual(de_nyed_utc.date_filed, datetime.date(2021, 10, 15))
         self.assertEqual(de_nyed_utc.time_filed, datetime.time(22, 46, 51))
@@ -1831,9 +1859,9 @@ class DocketEntriesTimezone(TestCase):
         self.assertEqual(de_nyed_pdt.date_filed, datetime.date(2021, 10, 16))
         self.assertEqual(de_nyed_pdt.time_filed, datetime.time(5, 46, 51))
 
-    def test_update_docket_entries_with_no_time_data(self):
-        """Does the time_filed is null after updating a docket entry with no
-        datetime available?
+    def test_update_docket_entries_without_date_or_time_data(self):
+        """Can we avoid updating docket entries date_filed and time_filed if
+        we ingest docket entries with no date_filed?
         """
 
         # Add docket entries with UTC datetime for CAND
@@ -1842,19 +1870,82 @@ class DocketEntriesTimezone(TestCase):
         de_cand = DocketEntry.objects.get(
             docket__court=self.cand, entry_number=1
         )
-
         # Compare both dates are stored in local court timezone PDT for CAND
         self.assertEqual(de_cand.date_filed, datetime.date(2021, 10, 15))
         self.assertEqual(de_cand.time_filed, datetime.time(19, 46, 51))
 
-        # Add docket entries with UTC datetime for CAND
-        add_docket_entries(self.d_cand, self.de_date_data["docket_entries"])
-
+        # Add docket entries with null date_filed
+        add_docket_entries(self.d_cand, self.de_no_date["docket_entries"])
         de_cand.refresh_from_db()
-        # After the docket entry is updated without time info, time_filed
-        # should be null.
+        # Docket entry date_filed and time_filed are remain the same
         self.assertEqual(de_cand.date_filed, datetime.date(2021, 10, 15))
+        self.assertEqual(de_cand.time_filed, datetime.time(19, 46, 51))
+
+    def test_update_docket_entries_with_no_time_data(self):
+        """Does time_filed is set to None only when the new date_filed doesn't
+        contain time data and the date differs from the previous one?
+        """
+
+        # Add docket entries with UTC datetime for CAND
+        add_docket_entries(self.d_cand, self.de_utc_data["docket_entries"])
+
+        de_cand = DocketEntry.objects.get(
+            docket__court=self.cand, entry_number=1
+        )
+        # Compare both dates are stored in local court timezone PDT for CAND
+        self.assertEqual(de_cand.date_filed, datetime.date(2021, 10, 15))
+        self.assertEqual(de_cand.time_filed, datetime.time(19, 46, 51))
+
+        # Add docket entries without time data but same date
+        add_docket_entries(self.d_cand, self.de_date_data["docket_entries"])
+        de_cand.refresh_from_db()
+        # Avoid updating date-time if the date doesn't change
+        self.assertEqual(de_cand.date_filed, datetime.date(2021, 10, 15))
+        self.assertEqual(de_cand.time_filed, datetime.time(19, 46, 51))
+
+        # Add docket entries without time data but different date
+        add_docket_entries(
+            self.d_cand, self.de_date_data_changes["docket_entries"]
+        )
+        de_cand.refresh_from_db()
+        # Docket entry date_filed is different from the previous one and,
+        # time_filed should be null.
+        self.assertEqual(de_cand.date_filed, datetime.date(2021, 10, 16))
         self.assertEqual(de_cand.time_filed, None)
+
+    def test_update_docket_entries_with_time_data(self):
+        """Does data_filed and time_filed are properly updated when ingesting
+        docket entries with date and time data?
+        """
+
+        # Add docket entries with UTC datetime for CAND
+        add_docket_entries(self.d_cand, self.de_utc_data["docket_entries"])
+
+        de_cand = DocketEntry.objects.get(
+            docket__court=self.cand, entry_number=1
+        )
+        # Compare both dates are stored in local court timezone PDT for CAND
+        self.assertEqual(de_cand.date_filed, datetime.date(2021, 10, 15))
+        self.assertEqual(de_cand.time_filed, datetime.time(19, 46, 51))
+
+        # Add docket entries with UTC datetime for CAND, time changes,
+        # date remains the same
+        add_docket_entries(
+            self.d_cand, self.de_utc_changes_time["docket_entries"]
+        )
+        de_cand.refresh_from_db()
+        # Time is properly updated.
+        self.assertEqual(de_cand.date_filed, datetime.date(2021, 10, 15))
+        self.assertEqual(de_cand.time_filed, datetime.time(19, 50, 11))
+
+        # Add docket entries with UTC datetime for CAND, date and time change.
+        add_docket_entries(
+            self.d_cand, self.de_utc_data_not_dst["docket_entries"]
+        )
+        de_cand.refresh_from_db()
+        # Date and time are updated accordingly.
+        self.assertEqual(de_cand.date_filed, datetime.date(2023, 1, 15))
+        self.assertEqual(de_cand.time_filed, datetime.time(18, 46, 51))
 
     def test_show_docket_entry_date_filed_according_court_timezone_dst(self):
         """Does the datetime_filed is shown to properly to users using the
