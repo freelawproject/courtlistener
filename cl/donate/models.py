@@ -1,3 +1,4 @@
+import pghistory
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator
@@ -41,6 +42,9 @@ class PROVIDERS(object):
     )
 
 
+@pghistory.track(
+    pghistory.Snapshot()
+)
 class Donation(AbstractDateTimeModel):
     # These statuses are shown on the profile page. Be warned.
     AWAITING_PAYMENT = 0
@@ -98,7 +102,7 @@ class Donation(AbstractDateTimeModel):
     )
     payment_id = models.CharField(
         help_text="Internal ID used during a transaction (used by PayPal and "
-        "Stripe).",
+                  "Stripe).",
         max_length=64,
     )
     transaction_id = models.CharField(
@@ -121,6 +125,9 @@ class Donation(AbstractDateTimeModel):
         ordering = ["-date_created"]
 
 
+@pghistory.track(
+    pghistory.Snapshot()
+)
 class MonthlyDonation(AbstractDateTimeModel):
     """The metadata needed to associate a monthly donation with a user."""
 
@@ -141,16 +148,16 @@ class MonthlyDonation(AbstractDateTimeModel):
     )
     monthly_donation_day = models.SmallIntegerField(
         help_text="The day of the month that the monthly donation should be "
-        "processed.",
+                  "processed.",
     )
     stripe_customer_id = models.CharField(
         help_text="The ID of the Stripe customer object that we use to charge "
-        "credit card users each month.",
+                  "credit card users each month.",
         max_length=200,
     )
     failure_count = models.SmallIntegerField(
         help_text="The number of times this customer ID has failed. If a "
-        "threshold is exceeded, we disable the subscription.",
+                  "threshold is exceeded, we disable the subscription.",
         default=0,
     )
 
