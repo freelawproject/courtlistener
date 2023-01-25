@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('pghistory', '0005_events_middlewareevents'),
-        ('search', '0011_pghistory_migrations'),
+        ('search', '0011_add_event_tables_and_triggers'),
         ('people_db', '0013_remove_cl_id'),
     ]
 

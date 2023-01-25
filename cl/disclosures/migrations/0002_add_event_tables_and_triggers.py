@@ -12,7 +12,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('pghistory', '0005_events_middlewareevents'),
-        ('people_db', '0014_pghistory_migrations'),
+        ('people_db', '0014_add_event_tables_and_triggers'),
         ('disclosures', '0001_initial'),
     ]
 
