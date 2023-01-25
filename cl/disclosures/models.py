@@ -1,5 +1,6 @@
 from typing import Dict, Optional, Union
 
+import pghistory
 from django.db import models
 from django.urls import reverse
 
@@ -26,7 +27,6 @@ class REPORT_TYPES(object):
 
 
 class CODES(object):
-
     # FORM CODES - these are used in multiple fields in different sections
     # of the disclosures.  For example liabilities/debts uses Gross Value
     # As well as investments.
@@ -175,6 +175,9 @@ disclosure_permissions = (
 )
 
 
+@pghistory.track(
+    pghistory.Snapshot()
+)
 class FinancialDisclosure(AbstractDateTimeModel):
     """A simple table to hold references to financial disclosure forms"""
 
@@ -190,7 +193,7 @@ class FinancialDisclosure(AbstractDateTimeModel):
     )
     download_filepath = models.TextField(
         help_text="The path to the original file collected on aws. If "
-        "split tiff, return url for page one of the disclosures",
+                  "split tiff, return url for page one of the disclosures",
     )
     filepath = models.FileField(
         help_text="The filepath to the disclosure normalized to a PDF.",
@@ -296,6 +299,9 @@ class FinancialDisclosure(AbstractDateTimeModel):
         permissions = disclosure_permissions
 
 
+@pghistory.track(
+    pghistory.Snapshot()
+)
 class Investment(AbstractDateTimeModel):
     """Financial Disclosure Investments Table"""
 
@@ -307,7 +313,7 @@ class Investment(AbstractDateTimeModel):
     )
     page_number = models.IntegerField(
         help_text="The page number the investment is listed on.  This is used"
-        " to generate links directly to the PDF page.",
+                  " to generate links directly to the PDF page.",
     )
     description = models.TextField(
         help_text="Name of investment (ex. APPL common stock).", blank=True
@@ -324,12 +330,12 @@ class Investment(AbstractDateTimeModel):
     )
     income_during_reporting_period_type = models.TextField(
         help_text="Type of investment (ex. Rent, Dividend). Typically "
-        "standardized but not universally.",
+                  "standardized but not universally.",
         blank=True,
     )
     gross_value_code = models.CharField(
         help_text="Investment total value code at end "
-        "of reporting period as code (ex. J (1-15,000)).",
+                  "of reporting period as code (ex. J (1-15,000)).",
         choices=CODES.GROSS_VALUE,
         blank=True,
         max_length=5,
@@ -344,7 +350,7 @@ class Investment(AbstractDateTimeModel):
     # during the reporting period
     transaction_during_reporting_period = models.TextField(
         help_text="Transaction of investment during "
-        "reporting period (ex. Buy, Sold)",
+                  "reporting period (ex. Buy, Sold)",
         blank=True,
     )
     transaction_date_raw = models.CharField(
@@ -372,9 +378,9 @@ class Investment(AbstractDateTimeModel):
     )
     has_inferred_values = models.BooleanField(
         help_text="If the investment name was inferred during extraction. "
-        "This is common because transactions usually list the first "
-        "purchase of a stock and leave the name value blank for "
-        "subsequent purchases or sales.",
+                  "This is common because transactions usually list the first "
+                  "purchase of a stock and leave the name value blank for "
+                  "subsequent purchases or sales.",
         default=False,
     )
 
@@ -382,13 +388,16 @@ class Investment(AbstractDateTimeModel):
         permissions = disclosure_permissions
 
 
+@pghistory.track(
+    pghistory.Snapshot()
+)
 class Position(AbstractDateTimeModel):
     """Financial Disclosure Position Table"""
 
     financial_disclosure = models.ForeignKey(
         FinancialDisclosure,
         help_text="The financial disclosure associated "
-        "with this financial position.",
+                  "with this financial position.",
         related_name="positions",
         on_delete=models.CASCADE,
     )
@@ -409,6 +418,9 @@ class Position(AbstractDateTimeModel):
         permissions = disclosure_permissions
 
 
+@pghistory.track(
+    pghistory.Snapshot()
+)
 class Agreement(AbstractDateTimeModel):
     """Financial Disclosure Agreements Table"""
 
@@ -424,7 +436,7 @@ class Agreement(AbstractDateTimeModel):
     )
     parties_and_terms = models.TextField(
         help_text="Parties and terms of agreement "
-        "(ex. Board Member NY Ballet)",
+                  "(ex. Board Member NY Ballet)",
         blank=True,
     )
     redacted = models.BooleanField(
@@ -436,13 +448,16 @@ class Agreement(AbstractDateTimeModel):
         permissions = disclosure_permissions
 
 
+@pghistory.track(
+    pghistory.Snapshot()
+)
 class NonInvestmentIncome(AbstractDateTimeModel):
     """Financial Disclosure Non Investment Income Table"""
 
     financial_disclosure = models.ForeignKey(
         FinancialDisclosure,
         help_text="The financial disclosure associated "
-        "with this non-investment income.",
+                  "with this non-investment income.",
         related_name="non_investment_incomes",
         on_delete=models.CASCADE,
     )
@@ -452,12 +467,12 @@ class NonInvestmentIncome(AbstractDateTimeModel):
     )
     source_type = models.TextField(
         help_text="Source and type of non-investment income for the judge "
-        "(ex. Teaching a class at U. Miami).",
+                  "(ex. Teaching a class at U. Miami).",
         blank=True,
     )
     income_amount = models.TextField(
         help_text="Amount earned by judge, often a number, but sometimes with "
-        "explanatory text (e.g. 'Income at firm: $xyz').",
+                  "explanatory text (e.g. 'Income at firm: $xyz').",
         blank=True,
     )
     redacted = models.BooleanField(
@@ -469,19 +484,22 @@ class NonInvestmentIncome(AbstractDateTimeModel):
         permissions = disclosure_permissions
 
 
+@pghistory.track(
+    pghistory.Snapshot()
+)
 class SpouseIncome(AbstractDateTimeModel):
     """Financial Disclosure Judge Spouse Income Table"""
 
     financial_disclosure = models.ForeignKey(
         FinancialDisclosure,
         help_text="The financial disclosure associated "
-        "with this spouse income.",
+                  "with this spouse income.",
         related_name="spouse_incomes",
         on_delete=models.CASCADE,
     )
     source_type = models.TextField(
         help_text="Source and type of income of judicial spouse "
-        "(ex. Salary from Bank job).",
+                  "(ex. Salary from Bank job).",
         blank=True,
     )
     date_raw = models.TextField(
@@ -497,13 +515,16 @@ class SpouseIncome(AbstractDateTimeModel):
         permissions = disclosure_permissions
 
 
+@pghistory.track(
+    pghistory.Snapshot()
+)
 class Reimbursement(AbstractDateTimeModel):
     """Reimbursements listed in judicial disclosure"""
 
     financial_disclosure = models.ForeignKey(
         FinancialDisclosure,
         help_text="The financial disclosure associated "
-        "with this reimbursement.",
+                  "with this reimbursement.",
         related_name="reimbursements",
         on_delete=models.CASCADE,
     )
@@ -513,12 +534,12 @@ class Reimbursement(AbstractDateTimeModel):
     )
     date_raw = models.TextField(
         help_text="Dates as a text string for the date of reimbursements. "
-        "This is often conference dates (ex. June 2-6, 2011).",
+                  "This is often conference dates (ex. June 2-6, 2011).",
         blank=True,
     )
     location = models.TextField(
         help_text="Location of the reimbursement "
-        "(ex. Harvard Law School, Cambridge, MA).",
+                  "(ex. Harvard Law School, Cambridge, MA).",
         blank=True,
     )
     purpose = models.TextField(
@@ -538,6 +559,9 @@ class Reimbursement(AbstractDateTimeModel):
         permissions = disclosure_permissions
 
 
+@pghistory.track(
+    pghistory.Snapshot()
+)
 class Gift(AbstractDateTimeModel):
     """Financial Disclosure Gifts Table"""
 
@@ -568,6 +592,9 @@ class Gift(AbstractDateTimeModel):
         permissions = disclosure_permissions
 
 
+@pghistory.track(
+    pghistory.Snapshot()
+)
 class Debt(AbstractDateTimeModel):
     """Financial Disclosure Judicial Debts/Liabilities Table"""
 
