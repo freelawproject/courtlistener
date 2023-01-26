@@ -21,9 +21,7 @@ HttpStatusCodes = models.IntegerChoices(  # type: ignore
 )
 
 
-@pghistory.track(
-    pghistory.Snapshot()
-)
+@pghistory.track(pghistory.Snapshot())
 class Webhook(AbstractDateTimeModel):
     user = models.ForeignKey(
         User,
@@ -48,7 +46,7 @@ class Webhook(AbstractDateTimeModel):
     )
     failure_count = models.IntegerField(
         help_text="The number of failures (400+ status) responses the webhook "
-                  "has received.",
+        "has received.",
         default=0,
     )
 
