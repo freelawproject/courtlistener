@@ -1,6 +1,7 @@
 import json
 from typing import Dict, List, Union
 
+import pghistory
 from django.db import models
 from django.template import loader
 from django.urls import NoReverseMatch, reverse
@@ -20,6 +21,9 @@ from cl.people_db.models import Person
 from cl.search.models import SOURCES, Docket
 
 
+@pghistory.track(
+    pghistory.Snapshot()
+)
 class Audio(AbstractDateTimeModel):
     """A class representing oral arguments and their associated metadata"""
 
@@ -42,14 +46,14 @@ class Audio(AbstractDateTimeModel):
     )
     source = models.CharField(
         help_text="the source of the audio file, one of: %s"
-        % ", ".join(["%s (%s)" % (t[0], t[1]) for t in SOURCES]),
+                  % ", ".join(["%s (%s)" % (t[0], t[1]) for t in SOURCES]),
         max_length=10,
         choices=SOURCES,
         blank=True,
     )
     case_name_short = models.TextField(
         help_text="The abridged name of the case, often a single word, e.g. "
-        "'Marsh'",
+                  "'Marsh'",
         blank=True,
     )
     case_name = models.TextField(
@@ -67,20 +71,20 @@ class Audio(AbstractDateTimeModel):
     )
     judges = models.TextField(
         help_text="The judges that heard the oral arguments as a simple text "
-        "string. This field is used when normalized judges cannot "
-        "be placed into the panel field.",
+                  "string. This field is used when normalized judges cannot "
+                  "be placed into the panel field.",
         blank=True,
         null=True,
     )
     sha1 = models.CharField(
         help_text="unique ID for the document, as generated via SHA1 of the "
-        "binary file or text data",
+                  "binary file or text data",
         max_length=40,
         db_index=True,
     )
     download_url = models.URLField(
         help_text="The URL on the court website where the document was "
-        "originally scraped",
+                  "originally scraped",
         max_length=500,
         db_index=True,
         null=True,
@@ -88,7 +92,7 @@ class Audio(AbstractDateTimeModel):
     )
     local_path_mp3 = models.FileField(
         help_text=f"The location in AWS S3 where our enhanced copy of the "
-        f"original audio file is stored. {s3_warning_note}",
+                  f"original audio file is stored. {s3_warning_note}",
         upload_to=make_upload_path,
         storage=IncrementingAWSMediaStorage(),
         blank=True,
@@ -96,7 +100,7 @@ class Audio(AbstractDateTimeModel):
     )
     local_path_original_file = models.FileField(
         help_text=f"The location in AWS S3 where the original audio file "
-        f"downloaded from the court is stored. {s3_warning_note}",
+                  f"downloaded from the court is stored. {s3_warning_note}",
         upload_to=make_upload_path,
         storage=IncrementingAWSMediaStorage(),
         db_index=True,
@@ -121,14 +125,14 @@ class Audio(AbstractDateTimeModel):
     )
     date_blocked = models.DateField(
         help_text="The date that this opinion was blocked from indexing by "
-        "search engines",
+                  "search engines",
         blank=True,
         null=True,
         db_index=True,
     )
     blocked = models.BooleanField(
         help_text="Should this item be blocked from indexing by "
-        "search engines?",
+                  "search engines?",
         db_index=True,
         default=False,
     )
@@ -261,3 +265,14 @@ class Audio(AbstractDateTimeModel):
         out["text"] = text_template.render({"item": self}).translate(null_map)
 
         return normalize_search_dicts(out)
+
+
+@pghistory.track(
+    pghistory.Snapshot(),
+    obj_field=None,
+)
+class AudioPanel(Audio.panel.through):
+    """ A model class to track audio panel m2m relation """
+
+    class Meta:
+        proxy = True
