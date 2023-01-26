@@ -271,7 +271,7 @@ class Audio(AbstractDateTimeModel):
     pghistory.Snapshot(),
     obj_field=None,
 )
-class AudioPanel(Audio.panel.through):
+class AudioPanel(Audio.panel.through):  # type: ignore
     """A model class to track audio panel m2m relation"""
 
     class Meta:
