@@ -1,5 +1,22 @@
 BEGIN;
 --
+-- Create model WebhookHistoryEvent
+--
+CREATE TABLE "api_webhookhistoryevent"
+(
+    "pgh_id"         serial                   NOT NULL PRIMARY KEY,
+    "pgh_created_at" timestamp with time zone NOT NULL,
+    "pgh_label"      text                     NOT NULL,
+    "id"             integer                  NOT NULL,
+    "date_created"   timestamp with time zone NOT NULL,
+    "date_modified"  timestamp with time zone NOT NULL,
+    "event_type"     integer                  NOT NULL,
+    "url"            varchar(2000)            NOT NULL,
+    "enabled"        boolean                  NOT NULL,
+    "version"        integer                  NOT NULL,
+    "failure_count"  integer                  NOT NULL
+);
+--
 -- Create trigger snapshot_insert on model webhook
 --
 
@@ -39,10 +56,11 @@ BEGIN
             RETURN NEW;
         END IF;
     END IF;
-    INSERT INTO "api_webhookevent" ("date_created", "date_modified", "enabled",
-                                    "event_type", "failure_count", "id",
-                                    "pgh_context_id", "pgh_created_at", "pgh_label",
-                                    "pgh_obj_id", "url", "user_id", "version")
+    INSERT INTO "api_webhookhistoryevent" ("date_created", "date_modified", "enabled",
+                                           "event_type", "failure_count", "id",
+                                           "pgh_context_id", "pgh_created_at",
+                                           "pgh_label", "pgh_obj_id", "url", "user_id",
+                                           "version")
     VALUES (NEW."date_created", NEW."date_modified", NEW."enabled", NEW."event_type",
             NEW."failure_count", NEW."id", _pgh_attach_context(), NOW(), 'snapshot',
             NEW."id", NEW."url", NEW."user_id", NEW."version");
@@ -59,7 +77,7 @@ CREATE TRIGGER pgtrigger_snapshot_insert_81718
     FOR EACH ROW
 EXECUTE PROCEDURE pgtrigger_snapshot_insert_81718();
 
-COMMENT ON TRIGGER pgtrigger_snapshot_insert_81718 ON "api_webhook" IS 'a2420e8215cc7e2ed382545cb396ce141e00c1db';
+COMMENT ON TRIGGER pgtrigger_snapshot_insert_81718 ON "api_webhook" IS 'd6d8359832eed68e0e3aa21cd83aa53fb32d1ff9';
 ;
 --
 -- Create trigger snapshot_update on model webhook
@@ -101,10 +119,11 @@ BEGIN
             RETURN NEW;
         END IF;
     END IF;
-    INSERT INTO "api_webhookevent" ("date_created", "date_modified", "enabled",
-                                    "event_type", "failure_count", "id",
-                                    "pgh_context_id", "pgh_created_at", "pgh_label",
-                                    "pgh_obj_id", "url", "user_id", "version")
+    INSERT INTO "api_webhookhistoryevent" ("date_created", "date_modified", "enabled",
+                                           "event_type", "failure_count", "id",
+                                           "pgh_context_id", "pgh_created_at",
+                                           "pgh_label", "pgh_obj_id", "url", "user_id",
+                                           "version")
     VALUES (NEW."date_created", NEW."date_modified", NEW."enabled", NEW."event_type",
             NEW."failure_count", NEW."id", _pgh_attach_context(), NOW(), 'snapshot',
             NEW."id", NEW."url", NEW."user_id", NEW."version");
@@ -122,6 +141,24 @@ CREATE TRIGGER pgtrigger_snapshot_update_980eb
     WHEN (OLD.* IS DISTINCT FROM NEW.*)
 EXECUTE PROCEDURE pgtrigger_snapshot_update_980eb();
 
-COMMENT ON TRIGGER pgtrigger_snapshot_update_980eb ON "api_webhook" IS '7e7e23e049b7f1a61d745a0efd9175d140a5f6cc';
+COMMENT ON TRIGGER pgtrigger_snapshot_update_980eb ON "api_webhook" IS 'e8013d2a078cc8311e3fb1c81e247c09db921251';
 ;
+--
+-- Add field pgh_context to webhookhistoryevent
+--
+ALTER TABLE "api_webhookhistoryevent"
+    ADD COLUMN "pgh_context_id" uuid NULL;
+--
+-- Add field pgh_obj to webhookhistoryevent
+--
+ALTER TABLE "api_webhookhistoryevent"
+    ADD COLUMN "pgh_obj_id" integer NOT NULL;
+--
+-- Add field user to webhookhistoryevent
+--
+ALTER TABLE "api_webhookhistoryevent"
+    ADD COLUMN "user_id" integer NOT NULL;
+CREATE INDEX "api_webhookhistoryevent_pgh_context_id_cc48bf3f" ON "api_webhookhistoryevent" ("pgh_context_id");
+CREATE INDEX "api_webhookhistoryevent_pgh_obj_id_1175efd1" ON "api_webhookhistoryevent" ("pgh_obj_id");
+CREATE INDEX "api_webhookhistoryevent_user_id_ef198c77" ON "api_webhookhistoryevent" ("user_id");
 COMMIT;
