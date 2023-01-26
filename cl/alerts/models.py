@@ -1,3 +1,4 @@
+import pghistory
 from django.contrib.auth.models import User
 from django.db import models
 from django.utils.crypto import get_random_string
@@ -6,6 +7,9 @@ from cl.lib.models import AbstractDateTimeModel
 from cl.search.models import SEARCH_TYPES, Docket
 
 
+@pghistory.track(
+    pghistory.Snapshot()
+)
 class Alert(AbstractDateTimeModel):
     REAL_TIME = "rt"
     DAILY = "dly"
@@ -40,8 +44,8 @@ class Alert(AbstractDateTimeModel):
     )
     secret_key = models.CharField(
         verbose_name="A key to be used in links to access the alert without "
-        "having to log in. Can be used for a variety of "
-        "purposes.",
+                     "having to log in. Can be used for a variety of "
+                     "purposes.",
         max_length=40,
     )
 
@@ -63,6 +67,9 @@ class DocketAlertManager(models.Manager):
         return self.filter(alert_type=DocketAlert.SUBSCRIPTION)
 
 
+@pghistory.track(
+    pghistory.Snapshot()
+)
 class DocketAlert(AbstractDateTimeModel):
     UNSUBSCRIPTION = 0
     SUBSCRIPTION = 1
@@ -87,13 +94,13 @@ class DocketAlert(AbstractDateTimeModel):
     )
     secret_key = models.CharField(
         verbose_name="A key to be used in links to access the alert without "
-        "having to log in. Can be used for a variety of "
-        "purposes.",
+                     "having to log in. Can be used for a variety of "
+                     "purposes.",
         max_length=40,
     )
     alert_type = models.SmallIntegerField(
         help_text="The subscription type assigned, "
-        "Unsubscription or Subscription.",
+                  "Unsubscription or Subscription.",
         default=SUBSCRIPTION,
         choices=TYPES,
     )
@@ -131,7 +138,8 @@ class RealTimeQueue(models.Model):
     )
     item_type = models.CharField(
         help_text="the type of item this is, one of: %s"
-        % ", ".join(["%s (%s)" % (t[0], t[1]) for t in SEARCH_TYPES.NAMES]),
+                  % ", ".join(
+            ["%s (%s)" % (t[0], t[1]) for t in SEARCH_TYPES.NAMES]),
         max_length=3,
         choices=SEARCH_TYPES.NAMES,
         db_index=True,
