@@ -1,6 +1,7 @@
 import json
 from typing import Dict, List, Union
 
+import pghistory
 from django.db import models
 from django.template import loader
 from django.urls import NoReverseMatch, reverse
@@ -20,6 +21,7 @@ from cl.people_db.models import Person
 from cl.search.models import SOURCES, Docket
 
 
+@pghistory.track(pghistory.Snapshot())
 class Audio(AbstractDateTimeModel):
     """A class representing oral arguments and their associated metadata"""
 
@@ -261,3 +263,14 @@ class Audio(AbstractDateTimeModel):
         out["text"] = text_template.render({"item": self}).translate(null_map)
 
         return normalize_search_dicts(out)
+
+
+@pghistory.track(
+    pghistory.Snapshot(),
+    obj_field=None,
+)
+class AudioPanel(Audio.panel.through):  # type: ignore
+    """A model class to track audio panel m2m relation"""
+
+    class Meta:
+        proxy = True

@@ -4,8 +4,9 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Dict
 
+import pghistory
 from django.conf import settings
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, Permission, User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import FieldError
 from django.core.mail import EmailMessage, EmailMultiAlternatives
@@ -39,6 +40,9 @@ class BarMembership(models.Model):
         ordering = ["barMembership"]
 
 
+@pghistory.track(
+    pghistory.Snapshot(),
+)
 class UserProfile(models.Model):
     user = models.OneToOneField(
         User,
@@ -220,6 +224,17 @@ class UserProfile(models.Model):
     class Meta:
         verbose_name = "user profile"
         verbose_name_plural = "user profiles"
+
+
+@pghistory.track(
+    pghistory.Snapshot(),
+    obj_field=None,
+)
+class UserProfileBarMembership(UserProfile.barmembership.through):
+    """A model class to track user profile barmembership m2m relation"""
+
+    class Meta:
+        proxy = True
 
 
 class EMAIL_NOTIFICATIONS(object):
@@ -505,3 +520,66 @@ def generate_recap_email(user_profile: UserProfile, append: int = None) -> str:
     elif len(user_profiles_with_match) > 0:
         return generate_recap_email(user_profile, (append or 0) + 1)
     return recap_email
+
+
+@pghistory.track(
+    pghistory.Snapshot(),
+)
+class UserProxy(User):
+    """A proxy model class to track auth user model"""
+
+    class Meta:
+        proxy = True
+
+
+@pghistory.track(
+    pghistory.Snapshot(),
+)
+class GroupProxy(Group):
+    """A proxy model class to track auth group model"""
+
+    class Meta:
+        proxy = True
+
+
+@pghistory.track(
+    pghistory.Snapshot(),
+)
+class PermissionProxy(Permission):
+    """A proxy model class to track auth permission model"""
+
+    class Meta:
+        proxy = True
+
+
+@pghistory.track(
+    pghistory.Snapshot(),
+    obj_field=None,
+)
+class GroupPermissions(Group.permissions.through):
+    """A proxy model class to track group permissions m2m relation"""
+
+    class Meta:
+        proxy = True
+
+
+@pghistory.track(
+    pghistory.Snapshot(),
+    obj_field=None,
+)
+class UserGroups(User.groups.through):
+    """A proxy model class to track user groups m2m relation"""
+
+    class Meta:
+        proxy = True
+
+
+@pghistory.track(
+    pghistory.Snapshot(),
+    obj_field=None,
+)
+class UserPermissions(User.user_permissions.through):
+    """A proxy model class to track user permissions m2m relation"""
+
+    class Meta:
+        proxy = True
