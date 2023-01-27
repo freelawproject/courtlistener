@@ -1,29 +1,38 @@
 BEGIN;
 --
--- Create model CitationEvent
+-- Create model Claim
 --
-CREATE TABLE "search_citationevent"
+CREATE TABLE "search_claim"
 (
-    "pgh_id"         serial                   NOT NULL PRIMARY KEY,
-    "pgh_created_at" timestamp with time zone NOT NULL,
-    "pgh_label"      text                     NOT NULL,
-    "id"             integer                  NOT NULL,
-    "volume"         smallint                 NOT NULL,
-    "reporter"       text                     NOT NULL,
-    "page"           text                     NOT NULL,
-    "type"           smallint                 NOT NULL
+    "id"                          serial                   NOT NULL PRIMARY KEY,
+    "date_created"                timestamp with time zone NOT NULL,
+    "date_modified"               timestamp with time zone NOT NULL,
+    "date_claim_modified"         timestamp with time zone NULL,
+    "date_original_entered"       timestamp with time zone NULL,
+    "date_original_filed"         timestamp with time zone NULL,
+    "date_last_amendment_entered" timestamp with time zone NULL,
+    "date_last_amendment_filed"   timestamp with time zone NULL,
+    "claim_number"                varchar(10)              NOT NULL,
+    "creditor_details"            text                     NOT NULL,
+    "creditor_id"                 varchar(50)              NOT NULL,
+    "status"                      varchar(1000)            NOT NULL,
+    "entered_by"                  varchar(1000)            NOT NULL,
+    "filed_by"                    varchar(1000)            NOT NULL,
+    "amount_claimed"              varchar(100)             NOT NULL,
+    "unsecured_claimed"           varchar(100)             NOT NULL,
+    "secured_claimed"             varchar(100)             NOT NULL,
+    "priority_claimed"            varchar(100)             NOT NULL,
+    "description"                 text                     NOT NULL,
+    "remarks"                     text                     NOT NULL
 );
 --
--- Create model CourtEvent
+-- Create model Court
 --
-CREATE TABLE "search_courtevent"
+CREATE TABLE "search_court"
 (
-    "pgh_id"                    serial                   NOT NULL PRIMARY KEY,
-    "pgh_created_at"            timestamp with time zone NOT NULL,
-    "pgh_label"                 text                     NOT NULL,
-    "id"                        varchar(15)              NOT NULL,
-    "pacer_court_id"            smallint NULL CHECK ("pacer_court_id" >= 0),
-    "pacer_has_rss_feed"        boolean NULL,
+    "id"                        varchar(15)              NOT NULL PRIMARY KEY,
+    "pacer_court_id"            smallint                 NULL CHECK ("pacer_court_id" >= 0),
+    "pacer_has_rss_feed"        boolean                  NULL,
     "pacer_rss_entry_types"     text                     NOT NULL,
     "date_last_pacer_contact"   timestamp with time zone NULL,
     "fjc_court_id"              varchar(3)               NOT NULL,
@@ -31,25 +40,22 @@ CREATE TABLE "search_courtevent"
     "in_use"                    boolean                  NOT NULL,
     "has_opinion_scraper"       boolean                  NOT NULL,
     "has_oral_argument_scraper" boolean                  NOT NULL,
-    "position"                  double precision         NOT NULL,
+    "position"                  double precision         NOT NULL UNIQUE,
     "citation_string"           varchar(100)             NOT NULL,
     "short_name"                varchar(100)             NOT NULL,
     "full_name"                 varchar(200)             NOT NULL,
     "url"                       varchar(500)             NOT NULL,
-    "start_date"                date NULL,
-    "end_date"                  date NULL,
+    "start_date"                date                     NULL,
+    "end_date"                  date                     NULL,
     "jurisdiction"              varchar(3)               NOT NULL,
     "notes"                     text                     NOT NULL
 );
 --
--- Create model DocketEvent
+-- Create model Docket
 --
-CREATE TABLE "search_docketevent"
+CREATE TABLE "search_docket"
 (
-    "pgh_id"                          serial                   NOT NULL PRIMARY KEY,
-    "pgh_created_at"                  timestamp with time zone NOT NULL,
-    "pgh_label"                       text                     NOT NULL,
-    "id"                              integer                  NOT NULL,
+    "id"                              serial                   NOT NULL PRIMARY KEY,
     "date_created"                    timestamp with time zone NOT NULL,
     "date_modified"                   timestamp with time zone NOT NULL,
     "source"                          smallint                 NOT NULL,
@@ -58,21 +64,21 @@ CREATE TABLE "search_docketevent"
     "referred_to_str"                 text                     NOT NULL,
     "panel_str"                       text                     NOT NULL,
     "date_last_index"                 timestamp with time zone NULL,
-    "date_cert_granted"               date NULL,
-    "date_cert_denied"                date NULL,
-    "date_argued"                     date NULL,
-    "date_reargued"                   date NULL,
-    "date_reargument_denied"          date NULL,
-    "date_filed"                      date NULL,
-    "date_terminated"                 date NULL,
-    "date_last_filing"                date NULL,
+    "date_cert_granted"               date                     NULL,
+    "date_cert_denied"                date                     NULL,
+    "date_argued"                     date                     NULL,
+    "date_reargued"                   date                     NULL,
+    "date_reargument_denied"          date                     NULL,
+    "date_filed"                      date                     NULL,
+    "date_terminated"                 date                     NULL,
+    "date_last_filing"                date                     NULL,
     "case_name_short"                 text                     NOT NULL,
     "case_name"                       text                     NOT NULL,
     "case_name_full"                  text                     NOT NULL,
     "slug"                            varchar(75)              NOT NULL,
-    "docket_number"                   text NULL,
+    "docket_number"                   text                     NULL,
     "docket_number_core"              varchar(20)              NOT NULL,
-    "pacer_case_id"                   varchar(100) NULL,
+    "pacer_case_id"                   varchar(100)             NULL,
     "cause"                           varchar(2000)            NOT NULL,
     "nature_of_suit"                  varchar(1000)            NOT NULL,
     "jury_demand"                     varchar(500)             NOT NULL,
@@ -83,55 +89,153 @@ CREATE TABLE "search_docketevent"
     "filepath_local"                  varchar(1000)            NOT NULL,
     "filepath_ia"                     varchar(1000)            NOT NULL,
     "filepath_ia_json"                varchar(1000)            NOT NULL,
-    "ia_upload_failure_count"         smallint NULL,
-    "ia_needs_upload"                 boolean NULL,
+    "ia_upload_failure_count"         smallint                 NULL,
+    "ia_needs_upload"                 boolean                  NULL,
     "ia_date_first_change"            timestamp with time zone NULL,
     "view_count"                      integer                  NOT NULL,
-    "date_blocked"                    date NULL,
-    "blocked"                         boolean                  NOT NULL
+    "date_blocked"                    date                     NULL,
+    "blocked"                         boolean                  NOT NULL,
+    "appeal_from_id"                  varchar(15)              NULL,
+    "assigned_to_id"                  integer                  NULL,
+    "court_id"                        varchar(15)              NOT NULL,
+    "idb_data_id"                     integer                  NULL UNIQUE
 );
 --
--- Create model DocketPanelEvent
+-- Create model DocketEntry
 --
-CREATE TABLE "search_docketpanelevent"
+CREATE TABLE "search_docketentry"
 (
-    "pgh_id"         serial                   NOT NULL PRIMARY KEY,
-    "pgh_created_at" timestamp with time zone NOT NULL,
-    "pgh_label"      text                     NOT NULL,
-    "id"             integer                  NOT NULL
+    "id"                    serial                   NOT NULL PRIMARY KEY,
+    "date_created"          timestamp with time zone NOT NULL,
+    "date_modified"         timestamp with time zone NOT NULL,
+    "date_filed"            date                     NULL,
+    "entry_number"          bigint                   NULL,
+    "recap_sequence_number" varchar(50)              NOT NULL,
+    "pacer_sequence_number" integer                  NULL,
+    "description"           text                     NOT NULL,
+    "docket_id"             integer                  NOT NULL
 );
 --
--- Create model DocketTagsEvent
+-- Create model Opinion
 --
-CREATE TABLE "search_dockettagsevent"
+CREATE TABLE "search_opinion"
 (
-    "pgh_id"         serial                   NOT NULL PRIMARY KEY,
-    "pgh_created_at" timestamp with time zone NOT NULL,
-    "pgh_label"      text                     NOT NULL,
-    "id"             integer                  NOT NULL
+    "id"                  serial                   NOT NULL PRIMARY KEY,
+    "date_created"        timestamp with time zone NOT NULL,
+    "date_modified"       timestamp with time zone NOT NULL,
+    "author_str"          text                     NOT NULL,
+    "per_curiam"          boolean                  NOT NULL,
+    "joined_by_str"       text                     NOT NULL,
+    "type"                varchar(20)              NOT NULL,
+    "sha1"                varchar(40)              NOT NULL,
+    "page_count"          integer                  NULL,
+    "download_url"        varchar(500)             NULL,
+    "local_path"          varchar(100)             NOT NULL,
+    "plain_text"          text                     NOT NULL,
+    "html"                text                     NOT NULL,
+    "html_lawbox"         text                     NOT NULL,
+    "html_columbia"       text                     NOT NULL,
+    "html_anon_2020"      text                     NOT NULL,
+    "xml_harvard"         text                     NOT NULL,
+    "html_with_citations" text                     NOT NULL,
+    "extracted_by_ocr"    boolean                  NOT NULL,
+    "author_id"           integer                  NULL
 );
 --
--- Create model OpinionClusterEvent
+-- Create model Tag
 --
-CREATE TABLE "search_opinionclusterevent"
+CREATE TABLE "search_tag"
 (
-    "pgh_id"                    serial                   NOT NULL PRIMARY KEY,
-    "pgh_created_at"            timestamp with time zone NOT NULL,
-    "pgh_label"                 text                     NOT NULL,
-    "id"                        integer                  NOT NULL,
+    "id"            serial                   NOT NULL PRIMARY KEY,
+    "date_created"  timestamp with time zone NOT NULL,
+    "date_modified" timestamp with time zone NOT NULL,
+    "name"          varchar(50)              NOT NULL UNIQUE
+);
+--
+-- Create model RECAPDocument
+--
+CREATE TABLE "search_recapdocument"
+(
+    "id"                      serial                   NOT NULL PRIMARY KEY,
+    "date_created"            timestamp with time zone NOT NULL,
+    "date_modified"           timestamp with time zone NOT NULL,
+    "sha1"                    varchar(40)              NOT NULL,
+    "page_count"              integer                  NULL,
+    "file_size"               integer                  NULL,
+    "filepath_local"          varchar(1000)            NOT NULL,
+    "filepath_ia"             varchar(1000)            NOT NULL,
+    "ia_upload_failure_count" smallint                 NULL,
+    "thumbnail"               varchar(100)             NULL,
+    "thumbnail_status"        smallint                 NOT NULL,
+    "plain_text"              text                     NOT NULL,
+    "ocr_status"              smallint                 NULL,
+    "date_upload"             timestamp with time zone NULL,
+    "document_number"         varchar(32)              NOT NULL,
+    "attachment_number"       smallint                 NULL,
+    "pacer_doc_id"            varchar(32)              NOT NULL,
+    "is_available"            boolean                  NULL,
+    "is_free_on_pacer"        boolean                  NULL,
+    "is_sealed"               boolean                  NULL,
+    "document_type"           integer                  NOT NULL,
+    "description"             text                     NOT NULL,
+    "docket_entry_id"         integer                  NOT NULL
+);
+CREATE TABLE "search_recapdocument_tags"
+(
+    "id"               serial  NOT NULL PRIMARY KEY,
+    "recapdocument_id" integer NOT NULL,
+    "tag_id"           integer NOT NULL
+);
+--
+-- Create model OriginatingCourtInformation
+--
+CREATE TABLE "search_originatingcourtinformation"
+(
+    "id"                 serial                   NOT NULL PRIMARY KEY,
+    "date_created"       timestamp with time zone NOT NULL,
+    "date_modified"      timestamp with time zone NOT NULL,
+    "docket_number"      text                     NOT NULL,
+    "assigned_to_str"    text                     NOT NULL,
+    "ordering_judge_str" text                     NOT NULL,
+    "court_reporter"     text                     NOT NULL,
+    "date_disposed"      date                     NULL,
+    "date_filed"         date                     NULL,
+    "date_judgment"      date                     NULL,
+    "date_judgment_eod"  date                     NULL,
+    "date_filed_noa"     date                     NULL,
+    "date_received_coa"  date                     NULL,
+    "assigned_to_id"     integer                  NULL,
+    "ordering_judge_id"  integer                  NULL
+);
+--
+-- Create model OpinionsCited
+--
+CREATE TABLE "search_opinionscited"
+(
+    "id"                serial  NOT NULL PRIMARY KEY,
+    "depth"             integer NOT NULL,
+    "cited_opinion_id"  integer NOT NULL,
+    "citing_opinion_id" integer NOT NULL
+);
+--
+-- Create model OpinionCluster
+--
+CREATE TABLE "search_opinioncluster"
+(
+    "id"                        serial                   NOT NULL PRIMARY KEY,
     "date_created"              timestamp with time zone NOT NULL,
     "date_modified"             timestamp with time zone NOT NULL,
     "judges"                    text                     NOT NULL,
     "date_filed"                date                     NOT NULL,
     "date_filed_is_approximate" boolean                  NOT NULL,
-    "slug"                      varchar(75) NULL,
+    "slug"                      varchar(75)              NULL,
     "case_name_short"           text                     NOT NULL,
     "case_name"                 text                     NOT NULL,
     "case_name_full"            text                     NOT NULL,
     "scdb_id"                   varchar(10)              NOT NULL,
-    "scdb_decision_direction"   integer NULL,
-    "scdb_votes_majority"       integer NULL,
-    "scdb_votes_minority"       integer NULL,
+    "scdb_decision_direction"   integer                  NULL,
+    "scdb_votes_majority"       integer                  NULL,
+    "scdb_votes_minority"       integer                  NULL,
     "source"                    varchar(10)              NOT NULL,
     "procedural_history"        text                     NOT NULL,
     "attorneys"                 text                     NOT NULL,
@@ -147,1960 +251,388 @@ CREATE TABLE "search_opinionclusterevent"
     "correction"                text                     NOT NULL,
     "citation_count"            integer                  NOT NULL,
     "precedential_status"       varchar(50)              NOT NULL,
-    "date_blocked"              date NULL,
+    "date_blocked"              date                     NULL,
     "blocked"                   boolean                  NOT NULL,
-    "filepath_json_harvard"     varchar(1000)            NOT NULL
+    "filepath_json_harvard"     varchar(1000)            NOT NULL,
+    "docket_id"                 integer                  NOT NULL
 );
---
--- Create model OpinionClusterNonParticipatingJudgesEvent
---
-CREATE TABLE "search_opinionclusternonparticipatingjudgesevent"
+CREATE TABLE "search_opinioncluster_non_participating_judges"
 (
-    "pgh_id"         serial                   NOT NULL PRIMARY KEY,
-    "pgh_created_at" timestamp with time zone NOT NULL,
-    "pgh_label"      text                     NOT NULL,
-    "id"             integer                  NOT NULL
+    "id"                serial  NOT NULL PRIMARY KEY,
+    "opinioncluster_id" integer NOT NULL,
+    "person_id"         integer NOT NULL
 );
---
--- Create model OpinionClusterPanelEvent
---
-CREATE TABLE "search_opinionclusterpanelevent"
+CREATE TABLE "search_opinioncluster_panel"
 (
-    "pgh_id"         serial                   NOT NULL PRIMARY KEY,
-    "pgh_created_at" timestamp with time zone NOT NULL,
-    "pgh_label"      text                     NOT NULL,
-    "id"             integer                  NOT NULL
+    "id"                serial  NOT NULL PRIMARY KEY,
+    "opinioncluster_id" integer NOT NULL,
+    "person_id"         integer NOT NULL
 );
 --
--- Create model OpinionEvent
+-- Add field cluster to opinion
 --
-CREATE TABLE "search_opinionevent"
+ALTER TABLE "search_opinion"
+    ADD COLUMN "cluster_id" integer NOT NULL
+        CONSTRAINT "search_opinion_cluster_id_09bd537a_fk_search_opinioncluster_id" REFERENCES "search_opinioncluster" ("id") DEFERRABLE INITIALLY DEFERRED;
+SET CONSTRAINTS "search_opinion_cluster_id_09bd537a_fk_search_opinioncluster_id" IMMEDIATE;
+--
+-- Add field joined_by to opinion
+--
+CREATE TABLE "search_opinion_joined_by"
 (
-    "pgh_id"              serial                   NOT NULL PRIMARY KEY,
-    "pgh_created_at"      timestamp with time zone NOT NULL,
-    "pgh_label"           text                     NOT NULL,
-    "id"                  integer                  NOT NULL,
-    "date_created"        timestamp with time zone NOT NULL,
-    "date_modified"       timestamp with time zone NOT NULL,
-    "author_str"          text                     NOT NULL,
-    "per_curiam"          boolean                  NOT NULL,
-    "joined_by_str"       text                     NOT NULL,
-    "type"                varchar(20)              NOT NULL,
-    "sha1"                varchar(40)              NOT NULL,
-    "page_count"          integer NULL,
-    "download_url"        varchar(500) NULL,
-    "local_path"          varchar(100)             NOT NULL,
-    "plain_text"          text                     NOT NULL,
-    "html"                text                     NOT NULL,
-    "html_lawbox"         text                     NOT NULL,
-    "html_columbia"       text                     NOT NULL,
-    "html_anon_2020"      text                     NOT NULL,
-    "xml_harvard"         text                     NOT NULL,
-    "html_with_citations" text                     NOT NULL,
-    "extracted_by_ocr"    boolean                  NOT NULL
+    "id"         serial  NOT NULL PRIMARY KEY,
+    "opinion_id" integer NOT NULL,
+    "person_id"  integer NOT NULL
 );
 --
--- Create model OpinionJoinedByEvent
+-- Add field opinions_cited to opinion
 --
-CREATE TABLE "search_opinionjoinedbyevent"
+--
+-- Add field tags to docketentry
+--
+CREATE TABLE "search_docketentry_tags"
 (
-    "pgh_id"         serial                   NOT NULL PRIMARY KEY,
-    "pgh_created_at" timestamp with time zone NOT NULL,
-    "pgh_label"      text                     NOT NULL,
-    "id"             integer                  NOT NULL
+    "id"             serial  NOT NULL PRIMARY KEY,
+    "docketentry_id" integer NOT NULL,
+    "tag_id"         integer NOT NULL
 );
 --
--- Create model OpinionOpinionsCitedEvent
+-- Add field originating_court_information to docket
 --
-CREATE TABLE "search_opinionopinionscitedevent"
+ALTER TABLE "search_docket"
+    ADD COLUMN "originating_court_information_id" integer NULL UNIQUE
+        CONSTRAINT "search_docket_originating_court_in_6f8d0fbd_fk_search_or" REFERENCES "search_originatingcourtinformation" ("id") DEFERRABLE INITIALLY DEFERRED;
+SET CONSTRAINTS "search_docket_originating_court_in_6f8d0fbd_fk_search_or" IMMEDIATE;
+--
+-- Add field panel to docket
+--
+CREATE TABLE "search_docket_panel"
 (
-    "pgh_id"         serial                   NOT NULL PRIMARY KEY,
-    "pgh_created_at" timestamp with time zone NOT NULL,
-    "pgh_label"      text                     NOT NULL,
-    "id"             integer                  NOT NULL,
-    "depth"          integer                  NOT NULL
+    "id"        serial  NOT NULL PRIMARY KEY,
+    "docket_id" integer NOT NULL,
+    "person_id" integer NOT NULL
 );
 --
--- Create proxy model DocketPanel
---
---
--- Create proxy model DocketTags
---
---
--- Create proxy model OpinionClusterNonParticipatingJudges
---
---
--- Create proxy model OpinionClusterPanel
---
---
--- Create proxy model OpinionJoinedBy
---
---
--- Create proxy model OpinionOpinionsCited
---
---
--- Create trigger snapshot_insert on model citation
---
-
-CREATE
-OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
-                trigger_name NAME
-            )
-            RETURNS BOOLEAN AS $$
-                DECLARE
-_pgtrigger_ignore TEXT[];
-                    _result BOOLEAN;
-BEGIN
-BEGIN
-SELECT
-INTO _pgtrigger_ignore
-                            CURRENT_SETTING('pgtrigger.ignore');
-EXCEPTION WHEN OTHERS THEN
-END;
-                    IF
-_pgtrigger_ignore IS NOT NULL THEN
-SELECT trigger_name = ANY (_pgtrigger_ignore)
-INTO _ result;
-RETURN
-_
-result;
-ELSE
-                        RETURN FALSE;
-END IF;
-END;
-            $$
-LANGUAGE plpgsql;
-
-            CREATE
-OR REPLACE FUNCTION pgtrigger_snapshot_insert_596d3()
-            RETURNS TRIGGER AS $$
-
-BEGIN
-                    IF
-("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
-                        IF (TG_OP = 'DELETE') THEN
-                            RETURN OLD;
-ELSE
-                            RETURN NEW;
-END IF;
-END IF;
-INSERT INTO "search_citationevent" ("cluster_id", "id", "page", "pgh_context_id",
-                                    "pgh_created_at", "pgh_label", "pgh_obj_id",
-                                    "reporter", "type", "volume")
-VALUES (NEW."cluster_id", NEW."id", NEW."page", _
-        pgh_attach_context(), NOW(), 'snapshot', NEW."id", NEW."reporter", NEW."type", NEW."volume");
-RETURN NULL;
-END;
-            $$
-LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS pgtrigger_snapshot_insert_596d3 ON "search_citation";
-CREATE TRIGGER pgtrigger_snapshot_insert_596d3
-    AFTER INSERT
-    ON "search_citation"
-
-
-    FOR EACH ROW
-    EXECUTE PROCEDURE pgtrigger_snapshot_insert_596d3();
-
-COMMENT
-ON TRIGGER pgtrigger_snapshot_insert_596d3 ON "search_citation" IS '6754ba8bbf994aee87c5236c0cb63f6ac2dedba0';
-        ;
---
--- Create trigger snapshot_update on model citation
---
-
-            CREATE
-OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
-                trigger_name NAME
-            )
-            RETURNS BOOLEAN AS $$
-                DECLARE
-_pgtrigger_ignore TEXT[];
-                    _result BOOLEAN;
-BEGIN
-BEGIN
-SELECT
-INTO _pgtrigger_ignore
-                            CURRENT_SETTING('pgtrigger.ignore');
-EXCEPTION WHEN OTHERS THEN
-END;
-                    IF
-_pgtrigger_ignore IS NOT NULL THEN
-SELECT trigger_name = ANY (_pgtrigger_ignore)
-INTO _ result;
-RETURN
-_
-result;
-ELSE
-                        RETURN FALSE;
-END IF;
-END;
-            $$
-LANGUAGE plpgsql;
-
-            CREATE
-OR REPLACE FUNCTION pgtrigger_snapshot_update_31b3d()
-            RETURNS TRIGGER AS $$
-
-BEGIN
-                    IF
-("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
-                        IF (TG_OP = 'DELETE') THEN
-                            RETURN OLD;
-ELSE
-                            RETURN NEW;
-END IF;
-END IF;
-INSERT INTO "search_citationevent" ("cluster_id", "id", "page", "pgh_context_id",
-                                    "pgh_created_at", "pgh_label", "pgh_obj_id",
-                                    "reporter", "type", "volume")
-VALUES (NEW."cluster_id", NEW."id", NEW."page", _
-        pgh_attach_context(), NOW(), 'snapshot', NEW."id", NEW."reporter", NEW."type", NEW."volume");
-RETURN NULL;
-END;
-            $$
-LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS pgtrigger_snapshot_update_31b3d ON "search_citation";
-CREATE TRIGGER pgtrigger_snapshot_update_31b3d
-    AFTER UPDATE
-    ON "search_citation"
-
-
-    FOR EACH ROW WHEN (OLD.* IS DISTINCT FROM NEW.*)
-                EXECUTE PROCEDURE pgtrigger_snapshot_update_31b3d();
-
-COMMENT
-ON TRIGGER pgtrigger_snapshot_update_31b3d ON "search_citation" IS 'b2b27f069bb64eddfd351add29fc2dbe8243da86';
-        ;
---
--- Create trigger snapshot_insert on model court
---
-
-            CREATE
-OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
-                trigger_name NAME
-            )
-            RETURNS BOOLEAN AS $$
-                DECLARE
-_pgtrigger_ignore TEXT[];
-                    _result BOOLEAN;
-BEGIN
-BEGIN
-SELECT
-INTO _pgtrigger_ignore
-                            CURRENT_SETTING('pgtrigger.ignore');
-EXCEPTION WHEN OTHERS THEN
-END;
-                    IF
-_pgtrigger_ignore IS NOT NULL THEN
-SELECT trigger_name = ANY (_pgtrigger_ignore)
-INTO _ result;
-RETURN
-_
-result;
-ELSE
-                        RETURN FALSE;
-END IF;
-END;
-            $$
-LANGUAGE plpgsql;
-
-            CREATE
-OR REPLACE FUNCTION pgtrigger_snapshot_insert_82101()
-            RETURNS TRIGGER AS $$
-
-BEGIN
-                    IF
-("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
-                        IF (TG_OP = 'DELETE') THEN
-                            RETURN OLD;
-ELSE
-                            RETURN NEW;
-END IF;
-END IF;
-INSERT INTO "search_courtevent" ("citation_string", "date_last_pacer_contact",
-                                 "date_modified", "end_date", "fjc_court_id",
-                                 "full_name", "has_opinion_scraper",
-                                 "has_oral_argument_scraper", "id", "in_use",
-                                 "jurisdiction", "notes", "pacer_court_id",
-                                 "pacer_has_rss_feed", "pacer_rss_entry_types",
-                                 "pgh_context_id", "pgh_created_at", "pgh_label",
-                                 "pgh_obj_id", "position", "short_name", "start_date",
-                                 "url")
-VALUES (NEW."citation_string", NEW."date_last_pacer_contact", NEW."date_modified",
-        NEW."end_date", NEW."fjc_court_id", NEW."full_name", NEW."has_opinion_scraper",
-        NEW."has_oral_argument_scraper", NEW."id", NEW."in_use", NEW."jurisdiction",
-        NEW."notes", NEW."pacer_court_id", NEW."pacer_has_rss_feed",
-        NEW."pacer_rss_entry_types", _
-        pgh_attach_context(), NOW(), 'snapshot', NEW."id", NEW."position", NEW."short_name", NEW."start_date", NEW."url");
-RETURN NULL;
-END;
-            $$
-LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS pgtrigger_snapshot_insert_82101 ON "search_court";
-CREATE TRIGGER pgtrigger_snapshot_insert_82101
-    AFTER INSERT
-    ON "search_court"
-
-
-    FOR EACH ROW
-    EXECUTE PROCEDURE pgtrigger_snapshot_insert_82101();
-
-COMMENT
-ON TRIGGER pgtrigger_snapshot_insert_82101 ON "search_court" IS 'ed2bc4b44e37b73726ebde31bf3c78f4c3619d98';
-        ;
---
--- Create trigger snapshot_update on model court
---
-
-            CREATE
-OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
-                trigger_name NAME
-            )
-            RETURNS BOOLEAN AS $$
-                DECLARE
-_pgtrigger_ignore TEXT[];
-                    _result BOOLEAN;
-BEGIN
-BEGIN
-SELECT
-INTO _pgtrigger_ignore
-                            CURRENT_SETTING('pgtrigger.ignore');
-EXCEPTION WHEN OTHERS THEN
-END;
-                    IF
-_pgtrigger_ignore IS NOT NULL THEN
-SELECT trigger_name = ANY (_pgtrigger_ignore)
-INTO _ result;
-RETURN
-_
-result;
-ELSE
-                        RETURN FALSE;
-END IF;
-END;
-            $$
-LANGUAGE plpgsql;
-
-            CREATE
-OR REPLACE FUNCTION pgtrigger_snapshot_update_cc9e2()
-            RETURNS TRIGGER AS $$
-
-BEGIN
-                    IF
-("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
-                        IF (TG_OP = 'DELETE') THEN
-                            RETURN OLD;
-ELSE
-                            RETURN NEW;
-END IF;
-END IF;
-INSERT INTO "search_courtevent" ("citation_string", "date_last_pacer_contact",
-                                 "date_modified", "end_date", "fjc_court_id",
-                                 "full_name", "has_opinion_scraper",
-                                 "has_oral_argument_scraper", "id", "in_use",
-                                 "jurisdiction", "notes", "pacer_court_id",
-                                 "pacer_has_rss_feed", "pacer_rss_entry_types",
-                                 "pgh_context_id", "pgh_created_at", "pgh_label",
-                                 "pgh_obj_id", "position", "short_name", "start_date",
-                                 "url")
-VALUES (NEW."citation_string", NEW."date_last_pacer_contact", NEW."date_modified",
-        NEW."end_date", NEW."fjc_court_id", NEW."full_name", NEW."has_opinion_scraper",
-        NEW."has_oral_argument_scraper", NEW."id", NEW."in_use", NEW."jurisdiction",
-        NEW."notes", NEW."pacer_court_id", NEW."pacer_has_rss_feed",
-        NEW."pacer_rss_entry_types", _
-        pgh_attach_context(), NOW(), 'snapshot', NEW."id", NEW."position", NEW."short_name", NEW."start_date", NEW."url");
-RETURN NULL;
-END;
-            $$
-LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS pgtrigger_snapshot_update_cc9e2 ON "search_court";
-CREATE TRIGGER pgtrigger_snapshot_update_cc9e2
-    AFTER UPDATE
-    ON "search_court"
-
-
-    FOR EACH ROW WHEN (OLD.* IS DISTINCT FROM NEW.*)
-                EXECUTE PROCEDURE pgtrigger_snapshot_update_cc9e2();
-
-COMMENT
-ON TRIGGER pgtrigger_snapshot_update_cc9e2 ON "search_court" IS '51eac3389569bbe20caaf3d42566643bf6b7c091';
-        ;
---
--- Create trigger snapshot_insert on model docket
---
-
-            CREATE
-OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
-                trigger_name NAME
-            )
-            RETURNS BOOLEAN AS $$
-                DECLARE
-_pgtrigger_ignore TEXT[];
-                    _result BOOLEAN;
-BEGIN
-BEGIN
-SELECT
-INTO _pgtrigger_ignore
-                            CURRENT_SETTING('pgtrigger.ignore');
-EXCEPTION WHEN OTHERS THEN
-END;
-                    IF
-_pgtrigger_ignore IS NOT NULL THEN
-SELECT trigger_name = ANY (_pgtrigger_ignore)
-INTO _ result;
-RETURN
-_
-result;
-ELSE
-                        RETURN FALSE;
-END IF;
-END;
-            $$
-LANGUAGE plpgsql;
-
-            CREATE
-OR REPLACE FUNCTION pgtrigger_snapshot_insert_fe9ff()
-            RETURNS TRIGGER AS $$
-
-BEGIN
-                    IF
-("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
-                        IF (TG_OP = 'DELETE') THEN
-                            RETURN OLD;
-ELSE
-                            RETURN NEW;
-END IF;
-END IF;
-INSERT INTO "search_docketevent" ("appeal_from_id", "appeal_from_str",
-                                  "appellate_case_type_information",
-                                  "appellate_fee_status", "assigned_to_id",
-                                  "assigned_to_str", "blocked", "case_name",
-                                  "case_name_full", "case_name_short", "cause",
-                                  "court_id", "date_argued", "date_blocked",
-                                  "date_cert_denied", "date_cert_granted",
-                                  "date_created", "date_filed", "date_last_filing",
-                                  "date_last_index", "date_modified", "date_reargued",
-                                  "date_reargument_denied", "date_terminated",
-                                  "docket_number", "docket_number_core", "filepath_ia",
-                                  "filepath_ia_json", "filepath_local",
-                                  "ia_date_first_change", "ia_needs_upload",
-                                  "ia_upload_failure_count", "id", "idb_data_id",
-                                  "jurisdiction_type", "jury_demand", "mdl_status",
-                                  "nature_of_suit", "originating_court_information_id",
-                                  "pacer_case_id", "panel_str", "pgh_context_id",
-                                  "pgh_created_at", "pgh_label", "pgh_obj_id",
-                                  "referred_to_id", "referred_to_str", "slug", "source",
-                                  "view_count")
-VALUES (NEW."appeal_from_id", NEW."appeal_from_str",
-        NEW."appellate_case_type_information", NEW."appellate_fee_status",
-        NEW."assigned_to_id", NEW."assigned_to_str", NEW."blocked", NEW."case_name",
-        NEW."case_name_full", NEW."case_name_short", NEW."cause", NEW."court_id",
-        NEW."date_argued", NEW."date_blocked", NEW."date_cert_denied",
-        NEW."date_cert_granted", NEW."date_created", NEW."date_filed",
-        NEW."date_last_filing", NEW."date_last_index", NEW."date_modified",
-        NEW."date_reargued", NEW."date_reargument_denied", NEW."date_terminated",
-        NEW."docket_number", NEW."docket_number_core", NEW."filepath_ia",
-        NEW."filepath_ia_json", NEW."filepath_local", NEW."ia_date_first_change",
-        NEW."ia_needs_upload", NEW."ia_upload_failure_count", NEW."id",
-        NEW."idb_data_id", NEW."jurisdiction_type", NEW."jury_demand", NEW."mdl_status",
-        NEW."nature_of_suit", NEW."originating_court_information_id",
-        NEW."pacer_case_id", NEW."panel_str", _
-        pgh_attach_context(), NOW(), 'snapshot', NEW."id", NEW."referred_to_id", NEW."referred_to_str", NEW."slug", NEW."source", NEW."view_count");
-RETURN NULL;
-END;
-            $$
-LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS pgtrigger_snapshot_insert_fe9ff ON "search_docket";
-CREATE TRIGGER pgtrigger_snapshot_insert_fe9ff
-    AFTER INSERT
-    ON "search_docket"
-
-
-    FOR EACH ROW
-    EXECUTE PROCEDURE pgtrigger_snapshot_insert_fe9ff();
-
-COMMENT
-ON TRIGGER pgtrigger_snapshot_insert_fe9ff ON "search_docket" IS '8177d4bbd7e4bede9a2a5e821fa582d48728a9a3';
-        ;
---
--- Create trigger snapshot_update on model docket
---
-
-            CREATE
-OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
-                trigger_name NAME
-            )
-            RETURNS BOOLEAN AS $$
-                DECLARE
-_pgtrigger_ignore TEXT[];
-                    _result BOOLEAN;
-BEGIN
-BEGIN
-SELECT
-INTO _pgtrigger_ignore
-                            CURRENT_SETTING('pgtrigger.ignore');
-EXCEPTION WHEN OTHERS THEN
-END;
-                    IF
-_pgtrigger_ignore IS NOT NULL THEN
-SELECT trigger_name = ANY (_pgtrigger_ignore)
-INTO _ result;
-RETURN
-_
-result;
-ELSE
-                        RETURN FALSE;
-END IF;
-END;
-            $$
-LANGUAGE plpgsql;
-
-            CREATE
-OR REPLACE FUNCTION pgtrigger_snapshot_update_1e722()
-            RETURNS TRIGGER AS $$
-
-BEGIN
-                    IF
-("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
-                        IF (TG_OP = 'DELETE') THEN
-                            RETURN OLD;
-ELSE
-                            RETURN NEW;
-END IF;
-END IF;
-INSERT INTO "search_docketevent" ("appeal_from_id", "appeal_from_str",
-                                  "appellate_case_type_information",
-                                  "appellate_fee_status", "assigned_to_id",
-                                  "assigned_to_str", "blocked", "case_name",
-                                  "case_name_full", "case_name_short", "cause",
-                                  "court_id", "date_argued", "date_blocked",
-                                  "date_cert_denied", "date_cert_granted",
-                                  "date_created", "date_filed", "date_last_filing",
-                                  "date_last_index", "date_modified", "date_reargued",
-                                  "date_reargument_denied", "date_terminated",
-                                  "docket_number", "docket_number_core", "filepath_ia",
-                                  "filepath_ia_json", "filepath_local",
-                                  "ia_date_first_change", "ia_needs_upload",
-                                  "ia_upload_failure_count", "id", "idb_data_id",
-                                  "jurisdiction_type", "jury_demand", "mdl_status",
-                                  "nature_of_suit", "originating_court_information_id",
-                                  "pacer_case_id", "panel_str", "pgh_context_id",
-                                  "pgh_created_at", "pgh_label", "pgh_obj_id",
-                                  "referred_to_id", "referred_to_str", "slug", "source",
-                                  "view_count")
-VALUES (NEW."appeal_from_id", NEW."appeal_from_str",
-        NEW."appellate_case_type_information", NEW."appellate_fee_status",
-        NEW."assigned_to_id", NEW."assigned_to_str", NEW."blocked", NEW."case_name",
-        NEW."case_name_full", NEW."case_name_short", NEW."cause", NEW."court_id",
-        NEW."date_argued", NEW."date_blocked", NEW."date_cert_denied",
-        NEW."date_cert_granted", NEW."date_created", NEW."date_filed",
-        NEW."date_last_filing", NEW."date_last_index", NEW."date_modified",
-        NEW."date_reargued", NEW."date_reargument_denied", NEW."date_terminated",
-        NEW."docket_number", NEW."docket_number_core", NEW."filepath_ia",
-        NEW."filepath_ia_json", NEW."filepath_local", NEW."ia_date_first_change",
-        NEW."ia_needs_upload", NEW."ia_upload_failure_count", NEW."id",
-        NEW."idb_data_id", NEW."jurisdiction_type", NEW."jury_demand", NEW."mdl_status",
-        NEW."nature_of_suit", NEW."originating_court_information_id",
-        NEW."pacer_case_id", NEW."panel_str", _
-        pgh_attach_context(), NOW(), 'snapshot', NEW."id", NEW."referred_to_id", NEW."referred_to_str", NEW."slug", NEW."source", NEW."view_count");
-RETURN NULL;
-END;
-            $$
-LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS pgtrigger_snapshot_update_1e722 ON "search_docket";
-CREATE TRIGGER pgtrigger_snapshot_update_1e722
-    AFTER UPDATE
-    ON "search_docket"
-
-
-    FOR EACH ROW WHEN (OLD.* IS DISTINCT FROM NEW.*)
-                EXECUTE PROCEDURE pgtrigger_snapshot_update_1e722();
-
-COMMENT
-ON TRIGGER pgtrigger_snapshot_update_1e722 ON "search_docket" IS '6e02e752adaf37d3f63141796444c9e12edcf00d';
-        ;
---
--- Create trigger snapshot_insert on model opinion
---
-
-            CREATE
-OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
-                trigger_name NAME
-            )
-            RETURNS BOOLEAN AS $$
-                DECLARE
-_pgtrigger_ignore TEXT[];
-                    _result BOOLEAN;
-BEGIN
-BEGIN
-SELECT
-INTO _pgtrigger_ignore
-                            CURRENT_SETTING('pgtrigger.ignore');
-EXCEPTION WHEN OTHERS THEN
-END;
-                    IF
-_pgtrigger_ignore IS NOT NULL THEN
-SELECT trigger_name = ANY (_pgtrigger_ignore)
-INTO _ result;
-RETURN
-_
-result;
-ELSE
-                        RETURN FALSE;
-END IF;
-END;
-            $$
-LANGUAGE plpgsql;
-
-            CREATE
-OR REPLACE FUNCTION pgtrigger_snapshot_insert_6ae1e()
-            RETURNS TRIGGER AS $$
-
-BEGIN
-                    IF
-("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
-                        IF (TG_OP = 'DELETE') THEN
-                            RETURN OLD;
-ELSE
-                            RETURN NEW;
-END IF;
-END IF;
-INSERT INTO "search_opinionevent" ("author_id", "author_str", "cluster_id",
-                                   "date_created", "date_modified", "download_url",
-                                   "extracted_by_ocr", "html", "html_anon_2020",
-                                   "html_columbia", "html_lawbox",
-                                   "html_with_citations", "id", "joined_by_str",
-                                   "local_path", "page_count", "per_curiam",
-                                   "pgh_context_id", "pgh_created_at", "pgh_label",
-                                   "pgh_obj_id", "plain_text", "sha1", "type",
-                                   "xml_harvard")
-VALUES (NEW."author_id", NEW."author_str", NEW."cluster_id", NEW."date_created",
-        NEW."date_modified", NEW."download_url", NEW."extracted_by_ocr", NEW."html",
-        NEW."html_anon_2020", NEW."html_columbia", NEW."html_lawbox",
-        NEW."html_with_citations", NEW."id", NEW."joined_by_str", NEW."local_path",
-        NEW."page_count", NEW."per_curiam", _
-        pgh_attach_context(), NOW(), 'snapshot', NEW."id", NEW."plain_text", NEW."sha1", NEW."type", NEW."xml_harvard");
-RETURN NULL;
-END;
-            $$
-LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS pgtrigger_snapshot_insert_6ae1e ON "search_opinion";
-CREATE TRIGGER pgtrigger_snapshot_insert_6ae1e
-    AFTER INSERT
-    ON "search_opinion"
-
-
-    FOR EACH ROW
-    EXECUTE PROCEDURE pgtrigger_snapshot_insert_6ae1e();
-
-COMMENT
-ON TRIGGER pgtrigger_snapshot_insert_6ae1e ON "search_opinion" IS 'c65912952e99b1fa6f54facaa7d46c04ea1fabed';
-        ;
---
--- Create trigger snapshot_update on model opinion
---
-
-            CREATE
-OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
-                trigger_name NAME
-            )
-            RETURNS BOOLEAN AS $$
-                DECLARE
-_pgtrigger_ignore TEXT[];
-                    _result BOOLEAN;
-BEGIN
-BEGIN
-SELECT
-INTO _pgtrigger_ignore
-                            CURRENT_SETTING('pgtrigger.ignore');
-EXCEPTION WHEN OTHERS THEN
-END;
-                    IF
-_pgtrigger_ignore IS NOT NULL THEN
-SELECT trigger_name = ANY (_pgtrigger_ignore)
-INTO _ result;
-RETURN
-_
-result;
-ELSE
-                        RETURN FALSE;
-END IF;
-END;
-            $$
-LANGUAGE plpgsql;
-
-            CREATE
-OR REPLACE FUNCTION pgtrigger_snapshot_update_cdf06()
-            RETURNS TRIGGER AS $$
-
-BEGIN
-                    IF
-("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
-                        IF (TG_OP = 'DELETE') THEN
-                            RETURN OLD;
-ELSE
-                            RETURN NEW;
-END IF;
-END IF;
-INSERT INTO "search_opinionevent" ("author_id", "author_str", "cluster_id",
-                                   "date_created", "date_modified", "download_url",
-                                   "extracted_by_ocr", "html", "html_anon_2020",
-                                   "html_columbia", "html_lawbox",
-                                   "html_with_citations", "id", "joined_by_str",
-                                   "local_path", "page_count", "per_curiam",
-                                   "pgh_context_id", "pgh_created_at", "pgh_label",
-                                   "pgh_obj_id", "plain_text", "sha1", "type",
-                                   "xml_harvard")
-VALUES (NEW."author_id", NEW."author_str", NEW."cluster_id", NEW."date_created",
-        NEW."date_modified", NEW."download_url", NEW."extracted_by_ocr", NEW."html",
-        NEW."html_anon_2020", NEW."html_columbia", NEW."html_lawbox",
-        NEW."html_with_citations", NEW."id", NEW."joined_by_str", NEW."local_path",
-        NEW."page_count", NEW."per_curiam", _
-        pgh_attach_context(), NOW(), 'snapshot', NEW."id", NEW."plain_text", NEW."sha1", NEW."type", NEW."xml_harvard");
-RETURN NULL;
-END;
-            $$
-LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS pgtrigger_snapshot_update_cdf06 ON "search_opinion";
-CREATE TRIGGER pgtrigger_snapshot_update_cdf06
-    AFTER UPDATE
-    ON "search_opinion"
-
-
-    FOR EACH ROW WHEN (OLD.* IS DISTINCT FROM NEW.*)
-                EXECUTE PROCEDURE pgtrigger_snapshot_update_cdf06();
-
-COMMENT
-ON TRIGGER pgtrigger_snapshot_update_cdf06 ON "search_opinion" IS '31abe6319b984ddbc8ee374a72c87b915099904c';
-        ;
---
--- Create trigger snapshot_insert on model opinioncluster
---
-
-            CREATE
-OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
-                trigger_name NAME
-            )
-            RETURNS BOOLEAN AS $$
-                DECLARE
-_pgtrigger_ignore TEXT[];
-                    _result BOOLEAN;
-BEGIN
-BEGIN
-SELECT
-INTO _pgtrigger_ignore
-                            CURRENT_SETTING('pgtrigger.ignore');
-EXCEPTION WHEN OTHERS THEN
-END;
-                    IF
-_pgtrigger_ignore IS NOT NULL THEN
-SELECT trigger_name = ANY (_pgtrigger_ignore)
-INTO _ result;
-RETURN
-_
-result;
-ELSE
-                        RETURN FALSE;
-END IF;
-END;
-            $$
-LANGUAGE plpgsql;
-
-            CREATE
-OR REPLACE FUNCTION pgtrigger_snapshot_insert_b55e2()
-            RETURNS TRIGGER AS $$
-
-BEGIN
-                    IF
-("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
-                        IF (TG_OP = 'DELETE') THEN
-                            RETURN OLD;
-ELSE
-                            RETURN NEW;
-END IF;
-END IF;
-INSERT INTO "search_opinionclusterevent" ("attorneys", "blocked", "case_name",
-                                          "case_name_full", "case_name_short",
-                                          "citation_count", "correction",
-                                          "cross_reference", "date_blocked",
-                                          "date_created", "date_filed",
-                                          "date_filed_is_approximate", "date_modified",
-                                          "disposition", "docket_id",
-                                          "filepath_json_harvard", "headnotes",
-                                          "history", "id", "judges", "nature_of_suit",
-                                          "other_dates", "pgh_context_id",
-                                          "pgh_created_at", "pgh_label", "pgh_obj_id",
-                                          "posture", "precedential_status",
-                                          "procedural_history",
-                                          "scdb_decision_direction", "scdb_id",
-                                          "scdb_votes_majority", "scdb_votes_minority",
-                                          "slug", "source", "summary", "syllabus")
-VALUES (NEW."attorneys", NEW."blocked", NEW."case_name", NEW."case_name_full",
-        NEW."case_name_short", NEW."citation_count", NEW."correction",
-        NEW."cross_reference", NEW."date_blocked", NEW."date_created", NEW."date_filed",
-        NEW."date_filed_is_approximate", NEW."date_modified", NEW."disposition",
-        NEW."docket_id", NEW."filepath_json_harvard", NEW."headnotes", NEW."history",
-        NEW."id", NEW."judges", NEW."nature_of_suit", NEW."other_dates", _
-        pgh_attach_context(), NOW(), 'snapshot', NEW."id", NEW."posture", NEW."precedential_status", NEW."procedural_history", NEW."scdb_decision_direction", NEW."scdb_id", NEW."scdb_votes_majority", NEW."scdb_votes_minority", NEW."slug", NEW."source", NEW."summary", NEW."syllabus");
-RETURN NULL;
-END;
-            $$
-LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS pgtrigger_snapshot_insert_b55e2 ON "search_opinioncluster";
-CREATE TRIGGER pgtrigger_snapshot_insert_b55e2
-    AFTER INSERT
-    ON "search_opinioncluster"
-
-
-    FOR EACH ROW
-    EXECUTE PROCEDURE pgtrigger_snapshot_insert_b55e2();
-
-COMMENT
-ON TRIGGER pgtrigger_snapshot_insert_b55e2 ON "search_opinioncluster" IS '2cf587c27dec64b1d23bbacd51e65724a3b5b306';
-        ;
---
--- Create trigger snapshot_update on model opinioncluster
---
-
-            CREATE
-OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
-                trigger_name NAME
-            )
-            RETURNS BOOLEAN AS $$
-                DECLARE
-_pgtrigger_ignore TEXT[];
-                    _result BOOLEAN;
-BEGIN
-BEGIN
-SELECT
-INTO _pgtrigger_ignore
-                            CURRENT_SETTING('pgtrigger.ignore');
-EXCEPTION WHEN OTHERS THEN
-END;
-                    IF
-_pgtrigger_ignore IS NOT NULL THEN
-SELECT trigger_name = ANY (_pgtrigger_ignore)
-INTO _ result;
-RETURN
-_
-result;
-ELSE
-                        RETURN FALSE;
-END IF;
-END;
-            $$
-LANGUAGE plpgsql;
-
-            CREATE
-OR REPLACE FUNCTION pgtrigger_snapshot_update_f129e()
-            RETURNS TRIGGER AS $$
-
-BEGIN
-                    IF
-("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
-                        IF (TG_OP = 'DELETE') THEN
-                            RETURN OLD;
-ELSE
-                            RETURN NEW;
-END IF;
-END IF;
-INSERT INTO "search_opinionclusterevent" ("attorneys", "blocked", "case_name",
-                                          "case_name_full", "case_name_short",
-                                          "citation_count", "correction",
-                                          "cross_reference", "date_blocked",
-                                          "date_created", "date_filed",
-                                          "date_filed_is_approximate", "date_modified",
-                                          "disposition", "docket_id",
-                                          "filepath_json_harvard", "headnotes",
-                                          "history", "id", "judges", "nature_of_suit",
-                                          "other_dates", "pgh_context_id",
-                                          "pgh_created_at", "pgh_label", "pgh_obj_id",
-                                          "posture", "precedential_status",
-                                          "procedural_history",
-                                          "scdb_decision_direction", "scdb_id",
-                                          "scdb_votes_majority", "scdb_votes_minority",
-                                          "slug", "source", "summary", "syllabus")
-VALUES (NEW."attorneys", NEW."blocked", NEW."case_name", NEW."case_name_full",
-        NEW."case_name_short", NEW."citation_count", NEW."correction",
-        NEW."cross_reference", NEW."date_blocked", NEW."date_created", NEW."date_filed",
-        NEW."date_filed_is_approximate", NEW."date_modified", NEW."disposition",
-        NEW."docket_id", NEW."filepath_json_harvard", NEW."headnotes", NEW."history",
-        NEW."id", NEW."judges", NEW."nature_of_suit", NEW."other_dates", _
-        pgh_attach_context(), NOW(), 'snapshot', NEW."id", NEW."posture", NEW."precedential_status", NEW."procedural_history", NEW."scdb_decision_direction", NEW."scdb_id", NEW."scdb_votes_majority", NEW."scdb_votes_minority", NEW."slug", NEW."source", NEW."summary", NEW."syllabus");
-RETURN NULL;
-END;
-            $$
-LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS pgtrigger_snapshot_update_f129e ON "search_opinioncluster";
-CREATE TRIGGER pgtrigger_snapshot_update_f129e
-    AFTER UPDATE
-    ON "search_opinioncluster"
-
-
-    FOR EACH ROW WHEN (OLD.* IS DISTINCT FROM NEW.*)
-                EXECUTE PROCEDURE pgtrigger_snapshot_update_f129e();
-
-COMMENT
-ON TRIGGER pgtrigger_snapshot_update_f129e ON "search_opinioncluster" IS 'aab40c6b0b890403f82c3934397e16526f1f9753';
-        ;
---
--- Add field cited_opinion to opinionopinionscitedevent
---
-ALTER TABLE "search_opinionopinionscitedevent"
-    ADD COLUMN "cited_opinion_id" integer NOT NULL;
---
--- Add field citing_opinion to opinionopinionscitedevent
---
-ALTER TABLE "search_opinionopinionscitedevent"
-    ADD COLUMN "citing_opinion_id" integer NOT NULL;
---
--- Add field pgh_context to opinionopinionscitedevent
---
-ALTER TABLE "search_opinionopinionscitedevent"
-    ADD COLUMN "pgh_context_id" uuid NULL;
---
--- Add field opinion to opinionjoinedbyevent
---
-ALTER TABLE "search_opinionjoinedbyevent"
-    ADD COLUMN "opinion_id" integer NOT NULL;
---
--- Add field person to opinionjoinedbyevent
---
-ALTER TABLE "search_opinionjoinedbyevent"
-    ADD COLUMN "person_id" integer NOT NULL;
---
--- Add field pgh_context to opinionjoinedbyevent
---
-ALTER TABLE "search_opinionjoinedbyevent"
-    ADD COLUMN "pgh_context_id" uuid NULL;
---
--- Add field author to opinionevent
---
-ALTER TABLE "search_opinionevent"
-    ADD COLUMN "author_id" integer NULL;
---
--- Add field cluster to opinionevent
---
-ALTER TABLE "search_opinionevent"
-    ADD COLUMN "cluster_id" integer NOT NULL;
---
--- Add field pgh_context to opinionevent
---
-ALTER TABLE "search_opinionevent"
-    ADD COLUMN "pgh_context_id" uuid NULL;
---
--- Add field pgh_obj to opinionevent
---
-ALTER TABLE "search_opinionevent"
-    ADD COLUMN "pgh_obj_id" integer NOT NULL;
---
--- Add field opinioncluster to opinionclusterpanelevent
---
-ALTER TABLE "search_opinionclusterpanelevent"
-    ADD COLUMN "opinioncluster_id" integer NOT NULL;
---
--- Add field person to opinionclusterpanelevent
---
-ALTER TABLE "search_opinionclusterpanelevent"
-    ADD COLUMN "person_id" integer NOT NULL;
---
--- Add field pgh_context to opinionclusterpanelevent
---
-ALTER TABLE "search_opinionclusterpanelevent"
-    ADD COLUMN "pgh_context_id" uuid NULL;
---
--- Add field opinioncluster to opinionclusternonparticipatingjudgesevent
---
-ALTER TABLE "search_opinionclusternonparticipatingjudgesevent"
-    ADD COLUMN "opinioncluster_id" integer NOT NULL;
---
--- Add field person to opinionclusternonparticipatingjudgesevent
---
-ALTER TABLE "search_opinionclusternonparticipatingjudgesevent"
-    ADD COLUMN "person_id" integer NOT NULL;
---
--- Add field pgh_context to opinionclusternonparticipatingjudgesevent
---
-ALTER TABLE "search_opinionclusternonparticipatingjudgesevent"
-    ADD COLUMN "pgh_context_id" uuid NULL;
---
--- Add field docket to opinionclusterevent
---
-ALTER TABLE "search_opinionclusterevent"
-    ADD COLUMN "docket_id" integer NOT NULL;
---
--- Add field pgh_context to opinionclusterevent
---
-ALTER TABLE "search_opinionclusterevent"
-    ADD COLUMN "pgh_context_id" uuid NULL;
---
--- Add field pgh_obj to opinionclusterevent
---
-ALTER TABLE "search_opinionclusterevent"
-    ADD COLUMN "pgh_obj_id" integer NOT NULL;
---
--- Add field docket to dockettagsevent
---
-ALTER TABLE "search_dockettagsevent"
-    ADD COLUMN "docket_id" integer NOT NULL;
---
--- Add field pgh_context to dockettagsevent
---
-ALTER TABLE "search_dockettagsevent"
-    ADD COLUMN "pgh_context_id" uuid NULL;
---
--- Add field tag to dockettagsevent
---
-ALTER TABLE "search_dockettagsevent"
-    ADD COLUMN "tag_id" integer NOT NULL;
---
--- Add field docket to docketpanelevent
---
-ALTER TABLE "search_docketpanelevent"
-    ADD COLUMN "docket_id" integer NOT NULL;
---
--- Add field person to docketpanelevent
---
-ALTER TABLE "search_docketpanelevent"
-    ADD COLUMN "person_id" integer NOT NULL;
---
--- Add field pgh_context to docketpanelevent
---
-ALTER TABLE "search_docketpanelevent"
-    ADD COLUMN "pgh_context_id" uuid NULL;
---
--- Add field appeal_from to docketevent
---
-ALTER TABLE "search_docketevent"
-    ADD COLUMN "appeal_from_id" varchar(15) NULL;
---
--- Add field assigned_to to docketevent
---
-ALTER TABLE "search_docketevent"
-    ADD COLUMN "assigned_to_id" integer NULL;
---
--- Add field court to docketevent
---
-ALTER TABLE "search_docketevent"
-    ADD COLUMN "court_id" varchar(15) NOT NULL;
---
--- Add field idb_data to docketevent
---
-ALTER TABLE "search_docketevent"
-    ADD COLUMN "idb_data_id" integer NULL;
---
--- Add field originating_court_information to docketevent
---
-ALTER TABLE "search_docketevent"
-    ADD COLUMN "originating_court_information_id" integer NULL;
---
--- Add field pgh_context to docketevent
---
-ALTER TABLE "search_docketevent"
-    ADD COLUMN "pgh_context_id" uuid NULL;
---
--- Add field pgh_obj to docketevent
---
-ALTER TABLE "search_docketevent"
-    ADD COLUMN "pgh_obj_id" integer NOT NULL;
---
--- Add field referred_to to docketevent
---
-ALTER TABLE "search_docketevent"
-    ADD COLUMN "referred_to_id" integer NULL;
---
--- Add field pgh_context to courtevent
---
-ALTER TABLE "search_courtevent"
-    ADD COLUMN "pgh_context_id" uuid NULL;
---
--- Add field pgh_obj to courtevent
---
-ALTER TABLE "search_courtevent"
-    ADD COLUMN "pgh_obj_id" varchar(15) NOT NULL;
---
--- Add field cluster to citationevent
---
-ALTER TABLE "search_citationevent"
-    ADD COLUMN "cluster_id" integer NOT NULL;
---
--- Add field pgh_context to citationevent
---
-ALTER TABLE "search_citationevent"
-    ADD COLUMN "pgh_context_id" uuid NULL;
---
--- Add field pgh_obj to citationevent
---
-ALTER TABLE "search_citationevent"
-    ADD COLUMN "pgh_obj_id" integer NOT NULL;
---
--- Create trigger snapshot_insert on model docketpanel
---
-
-CREATE
-OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
-                trigger_name NAME
-            )
-            RETURNS BOOLEAN AS $$
-                DECLARE
-_pgtrigger_ignore TEXT[];
-                    _result BOOLEAN;
-BEGIN
-BEGIN
-SELECT
-INTO _pgtrigger_ignore
-                            CURRENT_SETTING('pgtrigger.ignore');
-EXCEPTION WHEN OTHERS THEN
-END;
-                    IF
-_pgtrigger_ignore IS NOT NULL THEN
-SELECT trigger_name = ANY (_pgtrigger_ignore)
-INTO _ result;
-RETURN
-_
-result;
-ELSE
-                        RETURN FALSE;
-END IF;
-END;
-            $$
-LANGUAGE plpgsql;
-
-            CREATE
-OR REPLACE FUNCTION pgtrigger_snapshot_insert_23fa7()
-            RETURNS TRIGGER AS $$
-
-BEGIN
-                    IF
-("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
-                        IF (TG_OP = 'DELETE') THEN
-                            RETURN OLD;
-ELSE
-                            RETURN NEW;
-END IF;
-END IF;
-INSERT INTO "search_docketpanelevent" ("docket_id", "id", "person_id", "pgh_context_id",
-                                       "pgh_created_at", "pgh_label")
-VALUES (NEW."docket_id", NEW."id", NEW."person_id", _
-        pgh_attach_context(), NOW(), 'snapshot');
-RETURN NULL;
-END;
-            $$
-LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS pgtrigger_snapshot_insert_23fa7 ON "search_docket_panel";
-CREATE TRIGGER pgtrigger_snapshot_insert_23fa7
-    AFTER INSERT
-    ON "search_docket_panel"
-
-
-    FOR EACH ROW
-    EXECUTE PROCEDURE pgtrigger_snapshot_insert_23fa7();
-
-COMMENT
-ON TRIGGER pgtrigger_snapshot_insert_23fa7 ON "search_docket_panel" IS '74d42fd24f3900652a09c52ff42225b822c3e4c4';
-        ;
---
--- Create trigger snapshot_update on model docketpanel
---
-
-            CREATE
-OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
-                trigger_name NAME
-            )
-            RETURNS BOOLEAN AS $$
-                DECLARE
-_pgtrigger_ignore TEXT[];
-                    _result BOOLEAN;
-BEGIN
-BEGIN
-SELECT
-INTO _pgtrigger_ignore
-                            CURRENT_SETTING('pgtrigger.ignore');
-EXCEPTION WHEN OTHERS THEN
-END;
-                    IF
-_pgtrigger_ignore IS NOT NULL THEN
-SELECT trigger_name = ANY (_pgtrigger_ignore)
-INTO _ result;
-RETURN
-_
-result;
-ELSE
-                        RETURN FALSE;
-END IF;
-END;
-            $$
-LANGUAGE plpgsql;
-
-            CREATE
-OR REPLACE FUNCTION pgtrigger_snapshot_update_e0bd2()
-            RETURNS TRIGGER AS $$
-
-BEGIN
-                    IF
-("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
-                        IF (TG_OP = 'DELETE') THEN
-                            RETURN OLD;
-ELSE
-                            RETURN NEW;
-END IF;
-END IF;
-INSERT INTO "search_docketpanelevent" ("docket_id", "id", "person_id", "pgh_context_id",
-                                       "pgh_created_at", "pgh_label")
-VALUES (NEW."docket_id", NEW."id", NEW."person_id", _
-        pgh_attach_context(), NOW(), 'snapshot');
-RETURN NULL;
-END;
-            $$
-LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS pgtrigger_snapshot_update_e0bd2 ON "search_docket_panel";
-CREATE TRIGGER pgtrigger_snapshot_update_e0bd2
-    AFTER UPDATE
-    ON "search_docket_panel"
-
-
-    FOR EACH ROW WHEN (OLD.* IS DISTINCT FROM NEW.*)
-                EXECUTE PROCEDURE pgtrigger_snapshot_update_e0bd2();
-
-COMMENT
-ON TRIGGER pgtrigger_snapshot_update_e0bd2 ON "search_docket_panel" IS 'cabe688dcbfa55a212287ebe5d52037924bead84';
-        ;
---
--- Create trigger snapshot_insert on model dockettags
---
-
-            CREATE
-OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
-                trigger_name NAME
-            )
-            RETURNS BOOLEAN AS $$
-                DECLARE
-_pgtrigger_ignore TEXT[];
-                    _result BOOLEAN;
-BEGIN
-BEGIN
-SELECT
-INTO _pgtrigger_ignore
-                            CURRENT_SETTING('pgtrigger.ignore');
-EXCEPTION WHEN OTHERS THEN
-END;
-                    IF
-_pgtrigger_ignore IS NOT NULL THEN
-SELECT trigger_name = ANY (_pgtrigger_ignore)
-INTO _ result;
-RETURN
-_
-result;
-ELSE
-                        RETURN FALSE;
-END IF;
-END;
-            $$
-LANGUAGE plpgsql;
-
-            CREATE
-OR REPLACE FUNCTION pgtrigger_snapshot_insert_b723b()
-            RETURNS TRIGGER AS $$
-
-BEGIN
-                    IF
-("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
-                        IF (TG_OP = 'DELETE') THEN
-                            RETURN OLD;
-ELSE
-                            RETURN NEW;
-END IF;
-END IF;
-INSERT INTO "search_dockettagsevent" ("docket_id", "id", "pgh_context_id",
-                                      "pgh_created_at", "pgh_label", "tag_id")
-VALUES (NEW."docket_id", NEW."id", _
-        pgh_attach_context(), NOW(), 'snapshot', NEW."tag_id");
-RETURN NULL;
-END;
-            $$
-LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS pgtrigger_snapshot_insert_b723b ON "search_docket_tags";
-CREATE TRIGGER pgtrigger_snapshot_insert_b723b
-    AFTER INSERT
-    ON "search_docket_tags"
-
-
-    FOR EACH ROW
-    EXECUTE PROCEDURE pgtrigger_snapshot_insert_b723b();
-
-COMMENT
-ON TRIGGER pgtrigger_snapshot_insert_b723b ON "search_docket_tags" IS '34cb6117e99c4cc416d306e94c46f4d38a27f14c';
-        ;
---
--- Create trigger snapshot_update on model dockettags
---
-
-            CREATE
-OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
-                trigger_name NAME
-            )
-            RETURNS BOOLEAN AS $$
-                DECLARE
-_pgtrigger_ignore TEXT[];
-                    _result BOOLEAN;
-BEGIN
-BEGIN
-SELECT
-INTO _pgtrigger_ignore
-                            CURRENT_SETTING('pgtrigger.ignore');
-EXCEPTION WHEN OTHERS THEN
-END;
-                    IF
-_pgtrigger_ignore IS NOT NULL THEN
-SELECT trigger_name = ANY (_pgtrigger_ignore)
-INTO _ result;
-RETURN
-_
-result;
-ELSE
-                        RETURN FALSE;
-END IF;
-END;
-            $$
-LANGUAGE plpgsql;
-
-            CREATE
-OR REPLACE FUNCTION pgtrigger_snapshot_update_59839()
-            RETURNS TRIGGER AS $$
-
-BEGIN
-                    IF
-("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
-                        IF (TG_OP = 'DELETE') THEN
-                            RETURN OLD;
-ELSE
-                            RETURN NEW;
-END IF;
-END IF;
-INSERT INTO "search_dockettagsevent" ("docket_id", "id", "pgh_context_id",
-                                      "pgh_created_at", "pgh_label", "tag_id")
-VALUES (NEW."docket_id", NEW."id", _
-        pgh_attach_context(), NOW(), 'snapshot', NEW."tag_id");
-RETURN NULL;
-END;
-            $$
-LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS pgtrigger_snapshot_update_59839 ON "search_docket_tags";
-CREATE TRIGGER pgtrigger_snapshot_update_59839
-    AFTER UPDATE
-    ON "search_docket_tags"
-
-
-    FOR EACH ROW WHEN (OLD.* IS DISTINCT FROM NEW.*)
-                EXECUTE PROCEDURE pgtrigger_snapshot_update_59839();
-
-COMMENT
-ON TRIGGER pgtrigger_snapshot_update_59839 ON "search_docket_tags" IS 'b25d863b87575dfdfb93a36dd16afc3d3ac115e9';
-        ;
---
--- Create trigger snapshot_insert on model opinionclusternonparticipatingjudges
---
-
-            CREATE
-OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
-                trigger_name NAME
-            )
-            RETURNS BOOLEAN AS $$
-                DECLARE
-_pgtrigger_ignore TEXT[];
-                    _result BOOLEAN;
-BEGIN
-BEGIN
-SELECT
-INTO _pgtrigger_ignore
-                            CURRENT_SETTING('pgtrigger.ignore');
-EXCEPTION WHEN OTHERS THEN
-END;
-                    IF
-_pgtrigger_ignore IS NOT NULL THEN
-SELECT trigger_name = ANY (_pgtrigger_ignore)
-INTO _ result;
-RETURN
-_
-result;
-ELSE
-                        RETURN FALSE;
-END IF;
-END;
-            $$
-LANGUAGE plpgsql;
-
-            CREATE
-OR REPLACE FUNCTION pgtrigger_snapshot_insert_0000e()
-            RETURNS TRIGGER AS $$
-
-BEGIN
-                    IF
-("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
-                        IF (TG_OP = 'DELETE') THEN
-                            RETURN OLD;
-ELSE
-                            RETURN NEW;
-END IF;
-END IF;
-INSERT INTO "search_opinionclusternonparticipatingjudgesevent" ("id",
-                                                                "opinioncluster_id",
-                                                                "person_id",
-                                                                "pgh_context_id",
-                                                                "pgh_created_at",
-                                                                "pgh_label")
-VALUES (NEW."id", NEW."opinioncluster_id", NEW."person_id", _
-        pgh_attach_context(), NOW(), 'snapshot');
-RETURN NULL;
-END;
-            $$
-LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS pgtrigger_snapshot_insert_0000e ON "search_opinioncluster_non_participating_judges";
-CREATE TRIGGER pgtrigger_snapshot_insert_0000e
-    AFTER INSERT
-    ON "search_opinioncluster_non_participating_judges"
-
-
-    FOR EACH ROW
-    EXECUTE PROCEDURE pgtrigger_snapshot_insert_0000e();
-
-COMMENT
-ON TRIGGER pgtrigger_snapshot_insert_0000e ON "search_opinioncluster_non_participating_judges" IS 'c98991c93dda9f29eeab5e9126470e25f4ec7ea8';
-        ;
---
--- Create trigger snapshot_update on model opinionclusternonparticipatingjudges
---
-
-            CREATE
-OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
-                trigger_name NAME
-            )
-            RETURNS BOOLEAN AS $$
-                DECLARE
-_pgtrigger_ignore TEXT[];
-                    _result BOOLEAN;
-BEGIN
-BEGIN
-SELECT
-INTO _pgtrigger_ignore
-                            CURRENT_SETTING('pgtrigger.ignore');
-EXCEPTION WHEN OTHERS THEN
-END;
-                    IF
-_pgtrigger_ignore IS NOT NULL THEN
-SELECT trigger_name = ANY (_pgtrigger_ignore)
-INTO _ result;
-RETURN
-_
-result;
-ELSE
-                        RETURN FALSE;
-END IF;
-END;
-            $$
-LANGUAGE plpgsql;
-
-            CREATE
-OR REPLACE FUNCTION pgtrigger_snapshot_update_8f2d1()
-            RETURNS TRIGGER AS $$
-
-BEGIN
-                    IF
-("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
-                        IF (TG_OP = 'DELETE') THEN
-                            RETURN OLD;
-ELSE
-                            RETURN NEW;
-END IF;
-END IF;
-INSERT INTO "search_opinionclusternonparticipatingjudgesevent" ("id",
-                                                                "opinioncluster_id",
-                                                                "person_id",
-                                                                "pgh_context_id",
-                                                                "pgh_created_at",
-                                                                "pgh_label")
-VALUES (NEW."id", NEW."opinioncluster_id", NEW."person_id", _
-        pgh_attach_context(), NOW(), 'snapshot');
-RETURN NULL;
-END;
-            $$
-LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS pgtrigger_snapshot_update_8f2d1 ON "search_opinioncluster_non_participating_judges";
-CREATE TRIGGER pgtrigger_snapshot_update_8f2d1
-    AFTER UPDATE
-    ON "search_opinioncluster_non_participating_judges"
-
-
-    FOR EACH ROW WHEN (OLD.* IS DISTINCT FROM NEW.*)
-                EXECUTE PROCEDURE pgtrigger_snapshot_update_8f2d1();
-
-COMMENT
-ON TRIGGER pgtrigger_snapshot_update_8f2d1 ON "search_opinioncluster_non_participating_judges" IS '22f3de5e60619ba7e4b1c57941a63fd0183abd28';
-        ;
---
--- Create trigger snapshot_insert on model opinionclusterpanel
---
-
-            CREATE
-OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
-                trigger_name NAME
-            )
-            RETURNS BOOLEAN AS $$
-                DECLARE
-_pgtrigger_ignore TEXT[];
-                    _result BOOLEAN;
-BEGIN
-BEGIN
-SELECT
-INTO _pgtrigger_ignore
-                            CURRENT_SETTING('pgtrigger.ignore');
-EXCEPTION WHEN OTHERS THEN
-END;
-                    IF
-_pgtrigger_ignore IS NOT NULL THEN
-SELECT trigger_name = ANY (_pgtrigger_ignore)
-INTO _ result;
-RETURN
-_
-result;
-ELSE
-                        RETURN FALSE;
-END IF;
-END;
-            $$
-LANGUAGE plpgsql;
-
-            CREATE
-OR REPLACE FUNCTION pgtrigger_snapshot_insert_3e719()
-            RETURNS TRIGGER AS $$
-
-BEGIN
-                    IF
-("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
-                        IF (TG_OP = 'DELETE') THEN
-                            RETURN OLD;
-ELSE
-                            RETURN NEW;
-END IF;
-END IF;
-INSERT INTO "search_opinionclusterpanelevent" ("id", "opinioncluster_id", "person_id",
-                                               "pgh_context_id", "pgh_created_at",
-                                               "pgh_label")
-VALUES (NEW."id", NEW."opinioncluster_id", NEW."person_id", _
-        pgh_attach_context(), NOW(), 'snapshot');
-RETURN NULL;
-END;
-            $$
-LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS pgtrigger_snapshot_insert_3e719 ON "search_opinioncluster_panel";
-CREATE TRIGGER pgtrigger_snapshot_insert_3e719
-    AFTER INSERT
-    ON "search_opinioncluster_panel"
-
-
-    FOR EACH ROW
-    EXECUTE PROCEDURE pgtrigger_snapshot_insert_3e719();
-
-COMMENT
-ON TRIGGER pgtrigger_snapshot_insert_3e719 ON "search_opinioncluster_panel" IS '55685fc2e1efbfb7ba7a63a64ad0a14fcde37817';
-        ;
---
--- Create trigger snapshot_update on model opinionclusterpanel
---
-
-            CREATE
-OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
-                trigger_name NAME
-            )
-            RETURNS BOOLEAN AS $$
-                DECLARE
-_pgtrigger_ignore TEXT[];
-                    _result BOOLEAN;
-BEGIN
-BEGIN
-SELECT
-INTO _pgtrigger_ignore
-                            CURRENT_SETTING('pgtrigger.ignore');
-EXCEPTION WHEN OTHERS THEN
-END;
-                    IF
-_pgtrigger_ignore IS NOT NULL THEN
-SELECT trigger_name = ANY (_pgtrigger_ignore)
-INTO _ result;
-RETURN
-_
-result;
-ELSE
-                        RETURN FALSE;
-END IF;
-END;
-            $$
-LANGUAGE plpgsql;
-
-            CREATE
-OR REPLACE FUNCTION pgtrigger_snapshot_update_2a689()
-            RETURNS TRIGGER AS $$
-
-BEGIN
-                    IF
-("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
-                        IF (TG_OP = 'DELETE') THEN
-                            RETURN OLD;
-ELSE
-                            RETURN NEW;
-END IF;
-END IF;
-INSERT INTO "search_opinionclusterpanelevent" ("id", "opinioncluster_id", "person_id",
-                                               "pgh_context_id", "pgh_created_at",
-                                               "pgh_label")
-VALUES (NEW."id", NEW."opinioncluster_id", NEW."person_id", _
-        pgh_attach_context(), NOW(), 'snapshot');
-RETURN NULL;
-END;
-            $$
-LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS pgtrigger_snapshot_update_2a689 ON "search_opinioncluster_panel";
-CREATE TRIGGER pgtrigger_snapshot_update_2a689
-    AFTER UPDATE
-    ON "search_opinioncluster_panel"
-
-
-    FOR EACH ROW WHEN (OLD.* IS DISTINCT FROM NEW.*)
-                EXECUTE PROCEDURE pgtrigger_snapshot_update_2a689();
-
-COMMENT
-ON TRIGGER pgtrigger_snapshot_update_2a689 ON "search_opinioncluster_panel" IS '2d92289ef7590f116a68817146315937e25b2715';
-        ;
---
--- Create trigger snapshot_insert on model opinionjoinedby
---
-
-            CREATE
-OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
-                trigger_name NAME
-            )
-            RETURNS BOOLEAN AS $$
-                DECLARE
-_pgtrigger_ignore TEXT[];
-                    _result BOOLEAN;
-BEGIN
-BEGIN
-SELECT
-INTO _pgtrigger_ignore
-                            CURRENT_SETTING('pgtrigger.ignore');
-EXCEPTION WHEN OTHERS THEN
-END;
-                    IF
-_pgtrigger_ignore IS NOT NULL THEN
-SELECT trigger_name = ANY (_pgtrigger_ignore)
-INTO _ result;
-RETURN
-_
-result;
-ELSE
-                        RETURN FALSE;
-END IF;
-END;
-            $$
-LANGUAGE plpgsql;
-
-            CREATE
-OR REPLACE FUNCTION pgtrigger_snapshot_insert_541c3()
-            RETURNS TRIGGER AS $$
-
-BEGIN
-                    IF
-("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
-                        IF (TG_OP = 'DELETE') THEN
-                            RETURN OLD;
-ELSE
-                            RETURN NEW;
-END IF;
-END IF;
-INSERT INTO "search_opinionjoinedbyevent" ("id", "opinion_id", "person_id",
-                                           "pgh_context_id", "pgh_created_at",
-                                           "pgh_label")
-VALUES (NEW."id", NEW."opinion_id", NEW."person_id", _
-        pgh_attach_context(), NOW(), 'snapshot');
-RETURN NULL;
-END;
-            $$
-LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS pgtrigger_snapshot_insert_541c3 ON "search_opinion_joined_by";
-CREATE TRIGGER pgtrigger_snapshot_insert_541c3
-    AFTER INSERT
-    ON "search_opinion_joined_by"
-
-
-    FOR EACH ROW
-    EXECUTE PROCEDURE pgtrigger_snapshot_insert_541c3();
-
-COMMENT
-ON TRIGGER pgtrigger_snapshot_insert_541c3 ON "search_opinion_joined_by" IS 'ab71a7d9bdeab2baa3568b2659edb83ba5653725';
-        ;
---
--- Create trigger snapshot_update on model opinionjoinedby
---
-
-            CREATE
-OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
-                trigger_name NAME
-            )
-            RETURNS BOOLEAN AS $$
-                DECLARE
-_pgtrigger_ignore TEXT[];
-                    _result BOOLEAN;
-BEGIN
-BEGIN
-SELECT
-INTO _pgtrigger_ignore
-                            CURRENT_SETTING('pgtrigger.ignore');
-EXCEPTION WHEN OTHERS THEN
-END;
-                    IF
-_pgtrigger_ignore IS NOT NULL THEN
-SELECT trigger_name = ANY (_pgtrigger_ignore)
-INTO _ result;
-RETURN
-_
-result;
-ELSE
-                        RETURN FALSE;
-END IF;
-END;
-            $$
-LANGUAGE plpgsql;
-
-            CREATE
-OR REPLACE FUNCTION pgtrigger_snapshot_update_23a70()
-            RETURNS TRIGGER AS $$
-
-BEGIN
-                    IF
-("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
-                        IF (TG_OP = 'DELETE') THEN
-                            RETURN OLD;
-ELSE
-                            RETURN NEW;
-END IF;
-END IF;
-INSERT INTO "search_opinionjoinedbyevent" ("id", "opinion_id", "person_id",
-                                           "pgh_context_id", "pgh_created_at",
-                                           "pgh_label")
-VALUES (NEW."id", NEW."opinion_id", NEW."person_id", _
-        pgh_attach_context(), NOW(), 'snapshot');
-RETURN NULL;
-END;
-            $$
-LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS pgtrigger_snapshot_update_23a70 ON "search_opinion_joined_by";
-CREATE TRIGGER pgtrigger_snapshot_update_23a70
-    AFTER UPDATE
-    ON "search_opinion_joined_by"
-
-
-    FOR EACH ROW WHEN (OLD.* IS DISTINCT FROM NEW.*)
-                EXECUTE PROCEDURE pgtrigger_snapshot_update_23a70();
-
-COMMENT
-ON TRIGGER pgtrigger_snapshot_update_23a70 ON "search_opinion_joined_by" IS '694b606ec9b855311a850bf376434611982b334c';
-        ;
---
--- Create trigger snapshot_insert on model opinionopinionscited
---
-
-            CREATE
-OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
-                trigger_name NAME
-            )
-            RETURNS BOOLEAN AS $$
-                DECLARE
-_pgtrigger_ignore TEXT[];
-                    _result BOOLEAN;
-BEGIN
-BEGIN
-SELECT
-INTO _pgtrigger_ignore
-                            CURRENT_SETTING('pgtrigger.ignore');
-EXCEPTION WHEN OTHERS THEN
-END;
-                    IF
-_pgtrigger_ignore IS NOT NULL THEN
-SELECT trigger_name = ANY (_pgtrigger_ignore)
-INTO _ result;
-RETURN
-_
-result;
-ELSE
-                        RETURN FALSE;
-END IF;
-END;
-            $$
-LANGUAGE plpgsql;
-
-            CREATE
-OR REPLACE FUNCTION pgtrigger_snapshot_insert_89103()
-            RETURNS TRIGGER AS $$
-
-BEGIN
-                    IF
-("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
-                        IF (TG_OP = 'DELETE') THEN
-                            RETURN OLD;
-ELSE
-                            RETURN NEW;
-END IF;
-END IF;
-INSERT INTO "search_opinionopinionscitedevent" ("cited_opinion_id", "citing_opinion_id",
-                                                "depth", "id", "pgh_context_id",
-                                                "pgh_created_at", "pgh_label")
-VALUES (NEW."cited_opinion_id", NEW."citing_opinion_id", NEW."depth", NEW."id", _
-        pgh_attach_context(), NOW(), 'snapshot');
-RETURN NULL;
-END;
-            $$
-LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS pgtrigger_snapshot_insert_89103 ON "search_opinionscited";
-CREATE TRIGGER pgtrigger_snapshot_insert_89103
-    AFTER INSERT
-    ON "search_opinionscited"
-
-
-    FOR EACH ROW
-    EXECUTE PROCEDURE pgtrigger_snapshot_insert_89103();
-
-COMMENT
-ON TRIGGER pgtrigger_snapshot_insert_89103 ON "search_opinionscited" IS 'f91e95831640ad3589cb7d1dc1cc1a2983af00d9';
-        ;
---
--- Create trigger snapshot_update on model opinionopinionscited
---
-
-            CREATE
-OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
-                trigger_name NAME
-            )
-            RETURNS BOOLEAN AS $$
-                DECLARE
-_pgtrigger_ignore TEXT[];
-                    _result BOOLEAN;
-BEGIN
-BEGIN
-SELECT
-INTO _pgtrigger_ignore
-                            CURRENT_SETTING('pgtrigger.ignore');
-EXCEPTION WHEN OTHERS THEN
-END;
-                    IF
-_pgtrigger_ignore IS NOT NULL THEN
-SELECT trigger_name = ANY (_pgtrigger_ignore)
-INTO _ result;
-RETURN
-_
-result;
-ELSE
-                        RETURN FALSE;
-END IF;
-END;
-            $$
-LANGUAGE plpgsql;
-
-            CREATE
-OR REPLACE FUNCTION pgtrigger_snapshot_update_6ec56()
-            RETURNS TRIGGER AS $$
-
-BEGIN
-                    IF
-("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
-                        IF (TG_OP = 'DELETE') THEN
-                            RETURN OLD;
-ELSE
-                            RETURN NEW;
-END IF;
-END IF;
-INSERT INTO "search_opinionopinionscitedevent" ("cited_opinion_id", "citing_opinion_id",
-                                                "depth", "id", "pgh_context_id",
-                                                "pgh_created_at", "pgh_label")
-VALUES (NEW."cited_opinion_id", NEW."citing_opinion_id", NEW."depth", NEW."id", _
-        pgh_attach_context(), NOW(), 'snapshot');
-RETURN NULL;
-END;
-            $$
-LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS pgtrigger_snapshot_update_6ec56 ON "search_opinionscited";
-CREATE TRIGGER pgtrigger_snapshot_update_6ec56
-    AFTER UPDATE
-    ON "search_opinionscited"
-
-
-    FOR EACH ROW WHEN (OLD.* IS DISTINCT FROM NEW.*)
-                EXECUTE PROCEDURE pgtrigger_snapshot_update_6ec56();
-
-COMMENT
-ON TRIGGER pgtrigger_snapshot_update_6ec56 ON "search_opinionscited" IS 'a9363eda8800fd5daa11ef4119ede0e8d576fd9f';
-        ;
-CREATE INDEX "search_opinionopinionscitedevent_cited_opinion_id_d147b66f" ON "search_opinionopinionscitedevent" ("cited_opinion_id");
-CREATE INDEX "search_opinionopinionscitedevent_citing_opinion_id_5b43099b" ON "search_opinionopinionscitedevent" ("citing_opinion_id");
-CREATE INDEX "search_opinionopinionscitedevent_pgh_context_id_f93ba49c" ON "search_opinionopinionscitedevent" ("pgh_context_id");
-CREATE INDEX "search_opinionjoinedbyevent_opinion_id_9271b281" ON "search_opinionjoinedbyevent" ("opinion_id");
-CREATE INDEX "search_opinionjoinedbyevent_person_id_dffa9dcb" ON "search_opinionjoinedbyevent" ("person_id");
-CREATE INDEX "search_opinionjoinedbyevent_pgh_context_id_48acc9ad" ON "search_opinionjoinedbyevent" ("pgh_context_id");
-CREATE INDEX "search_opinionevent_author_id_43b0c67a" ON "search_opinionevent" ("author_id");
-CREATE INDEX "search_opinionevent_cluster_id_1205465b" ON "search_opinionevent" ("cluster_id");
-CREATE INDEX "search_opinionevent_pgh_context_id_723082e0" ON "search_opinionevent" ("pgh_context_id");
-CREATE INDEX "search_opinionevent_pgh_obj_id_63a2bc5f" ON "search_opinionevent" ("pgh_obj_id");
-CREATE INDEX "search_opinionclusterpanelevent_opinioncluster_id_7128c9e4" ON "search_opinionclusterpanelevent" ("opinioncluster_id");
-CREATE INDEX "search_opinionclusterpanelevent_person_id_b1c6a4a7" ON "search_opinionclusterpanelevent" ("person_id");
-CREATE INDEX "search_opinionclusterpanelevent_pgh_context_id_8dcb8078" ON "search_opinionclusterpanelevent" ("pgh_context_id");
-CREATE INDEX "search_opinionclusternonpa_opinioncluster_id_cc505710" ON "search_opinionclusternonparticipatingjudgesevent" ("opinioncluster_id");
-CREATE INDEX "search_opinionclusternonpa_person_id_7bf4f773" ON "search_opinionclusternonparticipatingjudgesevent" ("person_id");
-CREATE INDEX "search_opinionclusternonpa_pgh_context_id_aef74bea" ON "search_opinionclusternonparticipatingjudgesevent" ("pgh_context_id");
-CREATE INDEX "search_opinionclusterevent_docket_id_165932da" ON "search_opinionclusterevent" ("docket_id");
-CREATE INDEX "search_opinionclusterevent_pgh_context_id_273003da" ON "search_opinionclusterevent" ("pgh_context_id");
-CREATE INDEX "search_opinionclusterevent_pgh_obj_id_f1ea380d" ON "search_opinionclusterevent" ("pgh_obj_id");
-CREATE INDEX "search_dockettagsevent_docket_id_b1874f82" ON "search_dockettagsevent" ("docket_id");
-CREATE INDEX "search_dockettagsevent_pgh_context_id_69b62450" ON "search_dockettagsevent" ("pgh_context_id");
-CREATE INDEX "search_dockettagsevent_tag_id_728990f4" ON "search_dockettagsevent" ("tag_id");
-CREATE INDEX "search_docketpanelevent_docket_id_1a9e206c" ON "search_docketpanelevent" ("docket_id");
-CREATE INDEX "search_docketpanelevent_person_id_97094b3d" ON "search_docketpanelevent" ("person_id");
-CREATE INDEX "search_docketpanelevent_pgh_context_id_03019aa7" ON "search_docketpanelevent" ("pgh_context_id");
-CREATE INDEX "search_docketevent_appeal_from_id_388367c7" ON "search_docketevent" ("appeal_from_id");
-CREATE INDEX "search_docketevent_appeal_from_id_388367c7_like" ON "search_docketevent" ("appeal_from_id" varchar_pattern_ops);
-CREATE INDEX "search_docketevent_assigned_to_id_13bac477" ON "search_docketevent" ("assigned_to_id");
-CREATE INDEX "search_docketevent_court_id_c6baeb82" ON "search_docketevent" ("court_id");
-CREATE INDEX "search_docketevent_court_id_c6baeb82_like" ON "search_docketevent" ("court_id" varchar_pattern_ops);
-CREATE INDEX "search_docketevent_idb_data_id_62179a0f" ON "search_docketevent" ("idb_data_id");
-CREATE INDEX "search_docketevent_originating_court_information_id_47acc418" ON "search_docketevent" ("originating_court_information_id");
-CREATE INDEX "search_docketevent_pgh_context_id_72300038" ON "search_docketevent" ("pgh_context_id");
-CREATE INDEX "search_docketevent_pgh_obj_id_5d06013e" ON "search_docketevent" ("pgh_obj_id");
-CREATE INDEX "search_docketevent_referred_to_id_ba58a272" ON "search_docketevent" ("referred_to_id");
-CREATE INDEX "search_courtevent_pgh_context_id_7a93b57e" ON "search_courtevent" ("pgh_context_id");
-CREATE INDEX "search_courtevent_pgh_obj_id_a86c8348" ON "search_courtevent" ("pgh_obj_id");
-CREATE INDEX "search_courtevent_pgh_obj_id_a86c8348_like" ON "search_courtevent" ("pgh_obj_id" varchar_pattern_ops);
-CREATE INDEX "search_citationevent_cluster_id_3cc4bdde" ON "search_citationevent" ("cluster_id");
-CREATE INDEX "search_citationevent_pgh_context_id_a721796b" ON "search_citationevent" ("pgh_context_id");
-CREATE INDEX "search_citationevent_pgh_obj_id_74bef0e4" ON "search_citationevent" ("pgh_obj_id");
+-- Add field parties to docket
+--
+--
+-- Add field referred_to to docket
+--
+ALTER TABLE "search_docket"
+    ADD COLUMN "referred_to_id" integer NULL
+        CONSTRAINT "search_docket_referred_to_id_cf6332e0_fk_people_db_person_id" REFERENCES "people_db_person" ("id") DEFERRABLE INITIALLY DEFERRED;
+SET CONSTRAINTS "search_docket_referred_to_id_cf6332e0_fk_people_db_person_id" IMMEDIATE;
+--
+-- Add field tags to docket
+--
+CREATE TABLE "search_docket_tags"
+(
+    "id"        serial  NOT NULL PRIMARY KEY,
+    "docket_id" integer NOT NULL,
+    "tag_id"    integer NOT NULL
+);
+--
+-- Create model ClaimHistory
+--
+CREATE TABLE "search_claimhistory"
+(
+    "id"                      serial                   NOT NULL PRIMARY KEY,
+    "date_created"            timestamp with time zone NOT NULL,
+    "date_modified"           timestamp with time zone NOT NULL,
+    "sha1"                    varchar(40)              NOT NULL,
+    "page_count"              integer                  NULL,
+    "file_size"               integer                  NULL,
+    "filepath_local"          varchar(1000)            NOT NULL,
+    "filepath_ia"             varchar(1000)            NOT NULL,
+    "ia_upload_failure_count" smallint                 NULL,
+    "thumbnail"               varchar(100)             NULL,
+    "thumbnail_status"        smallint                 NOT NULL,
+    "plain_text"              text                     NOT NULL,
+    "ocr_status"              smallint                 NULL,
+    "date_upload"             timestamp with time zone NULL,
+    "document_number"         varchar(32)              NOT NULL,
+    "attachment_number"       smallint                 NULL,
+    "pacer_doc_id"            varchar(32)              NOT NULL,
+    "is_available"            boolean                  NULL,
+    "is_free_on_pacer"        boolean                  NULL,
+    "is_sealed"               boolean                  NULL,
+    "date_filed"              date                     NULL,
+    "claim_document_type"     integer                  NOT NULL,
+    "description"             text                     NOT NULL,
+    "claim_doc_id"            varchar(32)              NOT NULL,
+    "pacer_dm_id"             integer                  NULL,
+    "pacer_case_id"           varchar(100)             NOT NULL,
+    "claim_id"                integer                  NOT NULL
+);
+--
+-- Add field docket to claim
+--
+ALTER TABLE "search_claim"
+    ADD COLUMN "docket_id" integer NOT NULL
+        CONSTRAINT "search_claim_docket_id_b37171a9_fk_search_docket_id" REFERENCES "search_docket" ("id") DEFERRABLE INITIALLY DEFERRED;
+SET CONSTRAINTS "search_claim_docket_id_b37171a9_fk_search_docket_id" IMMEDIATE;
+--
+-- Add field tags to claim
+--
+CREATE TABLE "search_claim_tags"
+(
+    "id"       serial  NOT NULL PRIMARY KEY,
+    "claim_id" integer NOT NULL,
+    "tag_id"   integer NOT NULL
+);
+--
+-- Create model Citation
+--
+CREATE TABLE "search_citation"
+(
+    "id"         serial   NOT NULL PRIMARY KEY,
+    "volume"     smallint NOT NULL,
+    "reporter"   text     NOT NULL,
+    "page"       text     NOT NULL,
+    "type"       smallint NOT NULL,
+    "cluster_id" integer  NOT NULL
+);
+--
+-- Create model BankruptcyInformation
+--
+CREATE TABLE "search_bankruptcyinformation"
+(
+    "id"                       serial                   NOT NULL PRIMARY KEY,
+    "date_created"             timestamp with time zone NOT NULL,
+    "date_modified"            timestamp with time zone NOT NULL,
+    "date_converted"           timestamp with time zone NULL,
+    "date_last_to_file_claims" timestamp with time zone NULL,
+    "date_last_to_file_govt"   timestamp with time zone NULL,
+    "date_debtor_dismissed"    timestamp with time zone NULL,
+    "chapter"                  varchar(10)              NOT NULL,
+    "trustee_str"              text                     NOT NULL,
+    "docket_id"                integer                  NOT NULL UNIQUE
+);
+--
+-- Create index search_recapdocument_filepath_local_7dc6b0e53ccf753_uniq on field(s) filepath_local of model recapdocument
+--
+CREATE INDEX "search_recapdocument_filepath_local_7dc6b0e53ccf753_uniq" ON "search_recapdocument" ("filepath_local");
+--
+-- Alter unique_together for recapdocument (1 constraint(s))
+--
+ALTER TABLE "search_recapdocument"
+    ADD CONSTRAINT "search_recapdocument_docket_entry_id_document_3a7bbbba_uniq" UNIQUE ("docket_entry_id",
+                                                                                         "document_number",
+                                                                                         "attachment_number");
+--
+-- Alter index_together for recapdocument (1 constraint(s))
+--
+CREATE INDEX "search_recapdocument_document_type_document_n_f531242f_idx" ON "search_recapdocument" ("document_type",
+                                                                                                     "document_number",
+                                                                                                     "attachment_number");
+--
+-- Alter unique_together for opinionscited (1 constraint(s))
+--
+ALTER TABLE "search_opinionscited"
+    ADD CONSTRAINT "search_opinionscited_citing_opinion_id_cited__ece0ff2a_uniq" UNIQUE ("citing_opinion_id", "cited_opinion_id");
+--
+-- Alter index_together for docketentry (1 constraint(s))
+--
+CREATE INDEX "search_docketentry_recap_sequence_number_en_da10a2c8_idx" ON "search_docketentry" ("recap_sequence_number", "entry_number");
+--
+-- Create index search_dock_court_i_a043ae_idx on field(s) court_id, id of model docket
+--
+CREATE INDEX "search_dock_court_i_a043ae_idx" ON "search_docket" ("court_id", "id");
+--
+-- Alter unique_together for docket (1 constraint(s))
+--
+ALTER TABLE "search_docket"
+    ADD CONSTRAINT "search_docket_docket_number_pacer_case_a3184727_uniq" UNIQUE ("docket_number", "pacer_case_id", "court_id");
+--
+-- Alter index_together for docket (1 constraint(s))
+--
+CREATE INDEX "search_docket_ia_upload_failure_count__1da403a6_idx" ON "search_docket" ("ia_upload_failure_count",
+                                                                                       "ia_needs_upload",
+                                                                                       "ia_date_first_change");
+--
+-- Alter unique_together for citation (1 constraint(s))
+--
+ALTER TABLE "search_citation"
+    ADD CONSTRAINT "search_citation_cluster_id_volume_reporter_page_1987e27b_uniq" UNIQUE ("cluster_id", "volume", "reporter", "page");
+--
+-- Alter index_together for citation (2 constraint(s))
+--
+CREATE INDEX "search_citation_volume_reporter_page_2606b024_idx" ON "search_citation" ("volume", "reporter", "page");
+CREATE INDEX "search_citation_volume_reporter_a3a77c16_idx" ON "search_citation" ("volume", "reporter");
+CREATE INDEX "search_claim_date_created_8c2e998c" ON "search_claim" ("date_created");
+CREATE INDEX "search_claim_date_modified_f38130a2" ON "search_claim" ("date_modified");
+CREATE INDEX "search_claim_claim_number_263236b3" ON "search_claim" ("claim_number");
+CREATE INDEX "search_claim_claim_number_263236b3_like" ON "search_claim" ("claim_number" varchar_pattern_ops);
+CREATE INDEX "search_court_id_61737e1f_like" ON "search_court" ("id" varchar_pattern_ops);
+CREATE INDEX "search_court_date_modified_593d1692" ON "search_court" ("date_modified");
+ALTER TABLE "search_docket"
+    ADD CONSTRAINT "search_docket_appeal_from_id_e8bffa28_fk_search_court_id" FOREIGN KEY ("appeal_from_id") REFERENCES "search_court" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "search_docket"
+    ADD CONSTRAINT "search_docket_assigned_to_id_167c3921_fk_people_db_person_id" FOREIGN KEY ("assigned_to_id") REFERENCES "people_db_person" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "search_docket"
+    ADD CONSTRAINT "search_docket_court_id_2bc55eb7_fk_search_court_id" FOREIGN KEY ("court_id") REFERENCES "search_court" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "search_docket"
+    ADD CONSTRAINT "search_docket_idb_data_id_eff93778_fk_recap_fjc" FOREIGN KEY ("idb_data_id") REFERENCES "recap_fjcintegrateddatabase" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "search_docket_date_created_27b493ee" ON "search_docket" ("date_created");
+CREATE INDEX "search_docket_date_modified_4a377f1d" ON "search_docket" ("date_modified");
+CREATE INDEX "search_docket_date_cert_granted_3778fc78" ON "search_docket" ("date_cert_granted");
+CREATE INDEX "search_docket_date_cert_denied_b2518866" ON "search_docket" ("date_cert_denied");
+CREATE INDEX "search_docket_date_argued_57937f24" ON "search_docket" ("date_argued");
+CREATE INDEX "search_docket_date_reargued_fb8ef0ca" ON "search_docket" ("date_reargued");
+CREATE INDEX "search_docket_date_reargument_denied_7b248c40" ON "search_docket" ("date_reargument_denied");
+CREATE INDEX "search_docket_docket_number_b2afb9d6" ON "search_docket" ("docket_number");
+CREATE INDEX "search_docket_docket_number_b2afb9d6_like" ON "search_docket" ("docket_number" text_pattern_ops);
+CREATE INDEX "search_docket_docket_number_core_9278e62b" ON "search_docket" ("docket_number_core");
+CREATE INDEX "search_docket_docket_number_core_9278e62b_like" ON "search_docket" ("docket_number_core" varchar_pattern_ops);
+CREATE INDEX "search_docket_pacer_case_id_f40edfdc" ON "search_docket" ("pacer_case_id");
+CREATE INDEX "search_docket_pacer_case_id_f40edfdc_like" ON "search_docket" ("pacer_case_id" varchar_pattern_ops);
+CREATE INDEX "search_docket_ia_date_first_change_0052482f" ON "search_docket" ("ia_date_first_change");
+CREATE INDEX "search_docket_date_blocked_32120f9d" ON "search_docket" ("date_blocked");
+CREATE INDEX "search_docket_appeal_from_id_e8bffa28" ON "search_docket" ("appeal_from_id");
+CREATE INDEX "search_docket_appeal_from_id_e8bffa28_like" ON "search_docket" ("appeal_from_id" varchar_pattern_ops);
+CREATE INDEX "search_docket_assigned_to_id_167c3921" ON "search_docket" ("assigned_to_id");
+CREATE INDEX "search_docket_court_id_2bc55eb7" ON "search_docket" ("court_id");
+CREATE INDEX "search_docket_court_id_2bc55eb7_like" ON "search_docket" ("court_id" varchar_pattern_ops);
+ALTER TABLE "search_docketentry"
+    ADD CONSTRAINT "search_docketentry_docket_id_1b1cfd82_fk_search_docket_id" FOREIGN KEY ("docket_id") REFERENCES "search_docket" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "search_docketentry_date_created_178219dc" ON "search_docketentry" ("date_created");
+CREATE INDEX "search_docketentry_date_modified_3f6cd940" ON "search_docketentry" ("date_modified");
+CREATE INDEX "search_docketentry_docket_id_1b1cfd82" ON "search_docketentry" ("docket_id");
+ALTER TABLE "search_opinion"
+    ADD CONSTRAINT "search_opinion_author_id_69e3caa8_fk_people_db_person_id" FOREIGN KEY ("author_id") REFERENCES "people_db_person" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "search_opinion_date_created_76a4ddf9" ON "search_opinion" ("date_created");
+CREATE INDEX "search_opinion_date_modified_524fb7ff" ON "search_opinion" ("date_modified");
+CREATE INDEX "search_opinion_sha1_62196033" ON "search_opinion" ("sha1");
+CREATE INDEX "search_opinion_sha1_62196033_like" ON "search_opinion" ("sha1" varchar_pattern_ops);
+CREATE INDEX "search_opinion_download_url_8428ad91" ON "search_opinion" ("download_url");
+CREATE INDEX "search_opinion_download_url_8428ad91_like" ON "search_opinion" ("download_url" varchar_pattern_ops);
+CREATE INDEX "search_opinion_local_path_8c124953" ON "search_opinion" ("local_path");
+CREATE INDEX "search_opinion_local_path_8c124953_like" ON "search_opinion" ("local_path" varchar_pattern_ops);
+CREATE INDEX "search_opinion_extracted_by_ocr_122ced11" ON "search_opinion" ("extracted_by_ocr");
+CREATE INDEX "search_opinion_author_id_69e3caa8" ON "search_opinion" ("author_id");
+CREATE INDEX "search_tag_date_created_2f7686f6" ON "search_tag" ("date_created");
+CREATE INDEX "search_tag_date_modified_7cca5217" ON "search_tag" ("date_modified");
+CREATE INDEX "search_tag_name_593bfca8_like" ON "search_tag" ("name" varchar_pattern_ops);
+ALTER TABLE "search_recapdocument"
+    ADD CONSTRAINT "search_recapdocument_docket_entry_id_75b4ffaa_fk_search_do" FOREIGN KEY ("docket_entry_id") REFERENCES "search_docketentry" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "search_recapdocument_date_created_370bf4c4" ON "search_recapdocument" ("date_created");
+CREATE INDEX "search_recapdocument_date_modified_1859a140" ON "search_recapdocument" ("date_modified");
+CREATE INDEX "search_recapdocument_document_number_9f9ef00c" ON "search_recapdocument" ("document_number");
+CREATE INDEX "search_recapdocument_document_number_9f9ef00c_like" ON "search_recapdocument" ("document_number" varchar_pattern_ops);
+CREATE INDEX "search_recapdocument_is_free_on_pacer_fa7086fc" ON "search_recapdocument" ("is_free_on_pacer");
+CREATE INDEX "search_recapdocument_docket_entry_id_75b4ffaa" ON "search_recapdocument" ("docket_entry_id");
+ALTER TABLE "search_recapdocument_tags"
+    ADD CONSTRAINT "search_recapdocument_tags_recapdocument_id_tag_id_7ede4f9a_uniq" UNIQUE ("recapdocument_id", "tag_id");
+ALTER TABLE "search_recapdocument_tags"
+    ADD CONSTRAINT "search_recapdocument_recapdocument_id_015bbc3b_fk_search_re" FOREIGN KEY ("recapdocument_id") REFERENCES "search_recapdocument" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "search_recapdocument_tags"
+    ADD CONSTRAINT "search_recapdocument_tags_tag_id_979de8eb_fk_search_tag_id" FOREIGN KEY ("tag_id") REFERENCES "search_tag" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "search_recapdocument_tags_recapdocument_id_015bbc3b" ON "search_recapdocument_tags" ("recapdocument_id");
+CREATE INDEX "search_recapdocument_tags_tag_id_979de8eb" ON "search_recapdocument_tags" ("tag_id");
+ALTER TABLE "search_originatingcourtinformation"
+    ADD CONSTRAINT "search_originatingco_assigned_to_id_80fa4306_fk_people_db" FOREIGN KEY ("assigned_to_id") REFERENCES "people_db_person" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "search_originatingcourtinformation"
+    ADD CONSTRAINT "search_originatingco_ordering_judge_id_33089265_fk_people_db" FOREIGN KEY ("ordering_judge_id") REFERENCES "people_db_person" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "search_originatingcourtinformation_date_created_bba63222" ON "search_originatingcourtinformation" ("date_created");
+CREATE INDEX "search_originatingcourtinformation_date_modified_dc93df7f" ON "search_originatingcourtinformation" ("date_modified");
+CREATE INDEX "search_originatingcourtinformation_assigned_to_id_80fa4306" ON "search_originatingcourtinformation" ("assigned_to_id");
+CREATE INDEX "search_originatingcourtinformation_ordering_judge_id_33089265" ON "search_originatingcourtinformation" ("ordering_judge_id");
+ALTER TABLE "search_opinionscited"
+    ADD CONSTRAINT "search_opinionscited_cited_opinion_id_7e2e0ebe_fk_search_op" FOREIGN KEY ("cited_opinion_id") REFERENCES "search_opinion" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "search_opinionscited"
+    ADD CONSTRAINT "search_opinionscited_citing_opinion_id_232c9279_fk_search_op" FOREIGN KEY ("citing_opinion_id") REFERENCES "search_opinion" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "search_opinionscited_depth_46bacaef" ON "search_opinionscited" ("depth");
+CREATE INDEX "search_opinionscited_cited_opinion_id_7e2e0ebe" ON "search_opinionscited" ("cited_opinion_id");
+CREATE INDEX "search_opinionscited_citing_opinion_id_232c9279" ON "search_opinionscited" ("citing_opinion_id");
+ALTER TABLE "search_opinioncluster"
+    ADD CONSTRAINT "search_opinioncluster_docket_id_9f294661_fk_search_docket_id" FOREIGN KEY ("docket_id") REFERENCES "search_docket" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "search_opinioncluster_date_created_d7f23b11" ON "search_opinioncluster" ("date_created");
+CREATE INDEX "search_opinioncluster_date_modified_50202208" ON "search_opinioncluster" ("date_modified");
+CREATE INDEX "search_opinioncluster_date_filed_2b868d4e" ON "search_opinioncluster" ("date_filed");
+CREATE INDEX "search_opinioncluster_scdb_id_b253d0c1" ON "search_opinioncluster" ("scdb_id");
+CREATE INDEX "search_opinioncluster_scdb_id_b253d0c1_like" ON "search_opinioncluster" ("scdb_id" varchar_pattern_ops);
+CREATE INDEX "search_opinioncluster_citation_count_1cba641a" ON "search_opinioncluster" ("citation_count");
+CREATE INDEX "search_opinioncluster_precedential_status_5e76e77d" ON "search_opinioncluster" ("precedential_status");
+CREATE INDEX "search_opinioncluster_precedential_status_5e76e77d_like" ON "search_opinioncluster" ("precedential_status" varchar_pattern_ops);
+CREATE INDEX "search_opinioncluster_date_blocked_6b067122" ON "search_opinioncluster" ("date_blocked");
+CREATE INDEX "search_opinioncluster_blocked_a24109d7" ON "search_opinioncluster" ("blocked");
+CREATE INDEX "search_opinioncluster_filepath_json_harvard_4b8057d0" ON "search_opinioncluster" ("filepath_json_harvard");
+CREATE INDEX "search_opinioncluster_filepath_json_harvard_4b8057d0_like" ON "search_opinioncluster" ("filepath_json_harvard" varchar_pattern_ops);
+CREATE INDEX "search_opinioncluster_docket_id_9f294661" ON "search_opinioncluster" ("docket_id");
+ALTER TABLE "search_opinioncluster_non_participating_judges"
+    ADD CONSTRAINT "search_opinioncluster_no_opinioncluster_id_person_af3516e2_uniq" UNIQUE ("opinioncluster_id", "person_id");
+ALTER TABLE "search_opinioncluster_non_participating_judges"
+    ADD CONSTRAINT "search_opinioncluste_opinioncluster_id_a4aa0f49_fk_search_op" FOREIGN KEY ("opinioncluster_id") REFERENCES "search_opinioncluster" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "search_opinioncluster_non_participating_judges"
+    ADD CONSTRAINT "search_opinioncluste_person_id_7b9957f6_fk_people_db" FOREIGN KEY ("person_id") REFERENCES "people_db_person" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "search_opinioncluster_non__opinioncluster_id_a4aa0f49" ON "search_opinioncluster_non_participating_judges" ("opinioncluster_id");
+CREATE INDEX "search_opinioncluster_non__person_id_7b9957f6" ON "search_opinioncluster_non_participating_judges" ("person_id");
+ALTER TABLE "search_opinioncluster_panel"
+    ADD CONSTRAINT "search_opinioncluster_pa_opinioncluster_id_person_e77a1e9d_uniq" UNIQUE ("opinioncluster_id", "person_id");
+ALTER TABLE "search_opinioncluster_panel"
+    ADD CONSTRAINT "search_opinioncluste_opinioncluster_id_b0a8bd25_fk_search_op" FOREIGN KEY ("opinioncluster_id") REFERENCES "search_opinioncluster" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "search_opinioncluster_panel"
+    ADD CONSTRAINT "search_opinioncluste_person_id_3030c7a7_fk_people_db" FOREIGN KEY ("person_id") REFERENCES "people_db_person" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "search_opinioncluster_panel_opinioncluster_id_b0a8bd25" ON "search_opinioncluster_panel" ("opinioncluster_id");
+CREATE INDEX "search_opinioncluster_panel_person_id_3030c7a7" ON "search_opinioncluster_panel" ("person_id");
+CREATE INDEX "search_opinion_cluster_id_09bd537a" ON "search_opinion" ("cluster_id");
+ALTER TABLE "search_opinion_joined_by"
+    ADD CONSTRAINT "search_opinion_joined_by_opinion_id_person_id_4ec29de1_uniq" UNIQUE ("opinion_id", "person_id");
+ALTER TABLE "search_opinion_joined_by"
+    ADD CONSTRAINT "search_opinion_joine_opinion_id_4c5b0f4d_fk_search_op" FOREIGN KEY ("opinion_id") REFERENCES "search_opinion" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "search_opinion_joined_by"
+    ADD CONSTRAINT "search_opinion_joine_person_id_0a318600_fk_people_db" FOREIGN KEY ("person_id") REFERENCES "people_db_person" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "search_opinion_joined_by_opinion_id_4c5b0f4d" ON "search_opinion_joined_by" ("opinion_id");
+CREATE INDEX "search_opinion_joined_by_person_id_0a318600" ON "search_opinion_joined_by" ("person_id");
+ALTER TABLE "search_docketentry_tags"
+    ADD CONSTRAINT "search_docketentry_tags_docketentry_id_tag_id_20f48773_uniq" UNIQUE ("docketentry_id", "tag_id");
+ALTER TABLE "search_docketentry_tags"
+    ADD CONSTRAINT "search_docketentry_t_docketentry_id_1c1ec392_fk_search_do" FOREIGN KEY ("docketentry_id") REFERENCES "search_docketentry" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "search_docketentry_tags"
+    ADD CONSTRAINT "search_docketentry_tags_tag_id_6e1780db_fk_search_tag_id" FOREIGN KEY ("tag_id") REFERENCES "search_tag" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "search_docketentry_tags_docketentry_id_1c1ec392" ON "search_docketentry_tags" ("docketentry_id");
+CREATE INDEX "search_docketentry_tags_tag_id_6e1780db" ON "search_docketentry_tags" ("tag_id");
+ALTER TABLE "search_docket_panel"
+    ADD CONSTRAINT "search_docket_panel_docket_id_person_id_90a9d8a2_uniq" UNIQUE ("docket_id", "person_id");
+ALTER TABLE "search_docket_panel"
+    ADD CONSTRAINT "search_docket_panel_docket_id_d3e42a51_fk_search_docket_id" FOREIGN KEY ("docket_id") REFERENCES "search_docket" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "search_docket_panel"
+    ADD CONSTRAINT "search_docket_panel_person_id_866a42fc_fk_people_db_person_id" FOREIGN KEY ("person_id") REFERENCES "people_db_person" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "search_docket_panel_docket_id_d3e42a51" ON "search_docket_panel" ("docket_id");
+CREATE INDEX "search_docket_panel_person_id_866a42fc" ON "search_docket_panel" ("person_id");
+CREATE INDEX "search_docket_referred_to_id_cf6332e0" ON "search_docket" ("referred_to_id");
+ALTER TABLE "search_docket_tags"
+    ADD CONSTRAINT "search_docket_tags_docket_id_tag_id_8675bd10_uniq" UNIQUE ("docket_id", "tag_id");
+ALTER TABLE "search_docket_tags"
+    ADD CONSTRAINT "search_docket_tags_docket_id_38bcf847_fk_search_docket_id" FOREIGN KEY ("docket_id") REFERENCES "search_docket" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "search_docket_tags"
+    ADD CONSTRAINT "search_docket_tags_tag_id_751c8e09_fk_search_tag_id" FOREIGN KEY ("tag_id") REFERENCES "search_tag" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "search_docket_tags_docket_id_38bcf847" ON "search_docket_tags" ("docket_id");
+CREATE INDEX "search_docket_tags_tag_id_751c8e09" ON "search_docket_tags" ("tag_id");
+ALTER TABLE "search_claimhistory"
+    ADD CONSTRAINT "search_claimhistory_claim_id_e130e572_fk_search_claim_id" FOREIGN KEY ("claim_id") REFERENCES "search_claim" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "search_claimhistory_date_created_586d545e" ON "search_claimhistory" ("date_created");
+CREATE INDEX "search_claimhistory_date_modified_5f6ec339" ON "search_claimhistory" ("date_modified");
+CREATE INDEX "search_claimhistory_document_number_6316c155" ON "search_claimhistory" ("document_number");
+CREATE INDEX "search_claimhistory_document_number_6316c155_like" ON "search_claimhistory" ("document_number" varchar_pattern_ops);
+CREATE INDEX "search_claimhistory_is_free_on_pacer_81332a2c" ON "search_claimhistory" ("is_free_on_pacer");
+CREATE INDEX "search_claimhistory_claim_id_e130e572" ON "search_claimhistory" ("claim_id");
+CREATE INDEX "search_claim_docket_id_b37171a9" ON "search_claim" ("docket_id");
+ALTER TABLE "search_claim_tags"
+    ADD CONSTRAINT "search_claim_tags_claim_id_tag_id_2f236693_uniq" UNIQUE ("claim_id", "tag_id");
+ALTER TABLE "search_claim_tags"
+    ADD CONSTRAINT "search_claim_tags_claim_id_2cf554b5_fk_search_claim_id" FOREIGN KEY ("claim_id") REFERENCES "search_claim" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "search_claim_tags"
+    ADD CONSTRAINT "search_claim_tags_tag_id_73b6bd4d_fk_search_tag_id" FOREIGN KEY ("tag_id") REFERENCES "search_tag" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "search_claim_tags_claim_id_2cf554b5" ON "search_claim_tags" ("claim_id");
+CREATE INDEX "search_claim_tags_tag_id_73b6bd4d" ON "search_claim_tags" ("tag_id");
+ALTER TABLE "search_citation"
+    ADD CONSTRAINT "search_citation_cluster_id_a075f179_fk_search_opinioncluster_id" FOREIGN KEY ("cluster_id") REFERENCES "search_opinioncluster" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "search_citation_reporter_792f5533" ON "search_citation" ("reporter");
+CREATE INDEX "search_citation_reporter_792f5533_like" ON "search_citation" ("reporter" text_pattern_ops);
+CREATE INDEX "search_citation_cluster_id_a075f179" ON "search_citation" ("cluster_id");
+ALTER TABLE "search_bankruptcyinformation"
+    ADD CONSTRAINT "search_bankruptcyinf_docket_id_91fa3275_fk_search_do" FOREIGN KEY ("docket_id") REFERENCES "search_docket" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "search_bankruptcyinformation_date_created_60f180b0" ON "search_bankruptcyinformation" ("date_created");
+CREATE INDEX "search_bankruptcyinformation_date_modified_c1b76dd9" ON "search_bankruptcyinformation" ("date_modified");
 COMMIT;

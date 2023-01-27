@@ -1,5 +1,19 @@
 BEGIN;
 --
+-- Create model ABARatingEvent
+--
+CREATE TABLE "people_db_abaratingevent"
+(
+    "pgh_id"         serial                   NOT NULL PRIMARY KEY,
+    "pgh_created_at" timestamp with time zone NOT NULL,
+    "pgh_label"      text                     NOT NULL,
+    "id"             integer                  NOT NULL,
+    "date_created"   timestamp with time zone NOT NULL,
+    "date_modified"  timestamp with time zone NOT NULL,
+    "year_rated"     smallint                 NULL CHECK ("year_rated" >= 0),
+    "rating"         varchar(5)               NOT NULL
+);
+--
 -- Create model EducationEvent
 --
 CREATE TABLE "people_db_educationevent"
@@ -13,21 +27,6 @@ CREATE TABLE "people_db_educationevent"
     "degree_level"   varchar(4)               NOT NULL,
     "degree_detail"  varchar(100)             NOT NULL,
     "degree_year"    smallint                 NULL CHECK ("degree_year" >= 0)
-);
---
--- Create model PartiesEvent
---
-CREATE TABLE "people_db_partiesevent"
-(
-    "pgh_id"                           serial                   NOT NULL PRIMARY KEY,
-    "pgh_created_at"                   timestamp with time zone NOT NULL,
-    "pgh_label"                        text                     NOT NULL,
-    "id"                               integer                  NOT NULL,
-    "name"                             varchar(100)             NOT NULL,
-    "date_terminated"                  date                     NULL,
-    "extra_info"                       text                     NOT NULL,
-    "highest_offense_level_opening"    text                     NOT NULL,
-    "highest_offense_level_terminated" text                     NOT NULL
 );
 --
 -- Create model PersonEvent
@@ -193,11 +192,133 @@ CREATE TABLE "people_db_sourceevent"
     "notes"          text                     NOT NULL
 );
 --
--- Create proxy model Parties
---
---
 -- Create proxy model PersonRace
 --
+--
+-- Create trigger snapshot_insert on model abarating
+--
+
+CREATE OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
+    trigger_name NAME
+)
+    RETURNS BOOLEAN AS
+$$
+DECLARE
+    _pgtrigger_ignore TEXT[];
+    _result           BOOLEAN;
+BEGIN
+    BEGIN
+        SELECT INTO _pgtrigger_ignore CURRENT_SETTING('pgtrigger.ignore');
+    EXCEPTION
+        WHEN OTHERS THEN
+    END;
+    IF _pgtrigger_ignore IS NOT NULL THEN
+        SELECT trigger_name = ANY (_pgtrigger_ignore)
+        INTO _result;
+        RETURN _result;
+    ELSE
+        RETURN FALSE;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION pgtrigger_snapshot_insert_26a9a()
+    RETURNS TRIGGER AS
+$$
+
+BEGIN
+    IF ("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
+        IF (TG_OP = 'DELETE') THEN
+            RETURN OLD;
+        ELSE
+            RETURN NEW;
+        END IF;
+    END IF;
+    INSERT INTO "people_db_abaratingevent" ("date_created", "date_modified", "id",
+                                            "person_id", "pgh_context_id",
+                                            "pgh_created_at", "pgh_label", "pgh_obj_id",
+                                            "rating", "year_rated")
+    VALUES (NEW."date_created", NEW."date_modified", NEW."id", NEW."person_id",
+            _pgh_attach_context(), NOW(), 'snapshot', NEW."id", NEW."rating",
+            NEW."year_rated");
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS pgtrigger_snapshot_insert_26a9a ON "people_db_abarating";
+CREATE TRIGGER pgtrigger_snapshot_insert_26a9a
+    AFTER INSERT
+    ON "people_db_abarating"
+
+
+    FOR EACH ROW
+EXECUTE PROCEDURE pgtrigger_snapshot_insert_26a9a();
+
+COMMENT ON TRIGGER pgtrigger_snapshot_insert_26a9a ON "people_db_abarating" IS '38afbd91cac2db46932d6d07aaed7d9803567549';
+;
+--
+-- Create trigger snapshot_update on model abarating
+--
+
+CREATE OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
+    trigger_name NAME
+)
+    RETURNS BOOLEAN AS
+$$
+DECLARE
+    _pgtrigger_ignore TEXT[];
+    _result           BOOLEAN;
+BEGIN
+    BEGIN
+        SELECT INTO _pgtrigger_ignore CURRENT_SETTING('pgtrigger.ignore');
+    EXCEPTION
+        WHEN OTHERS THEN
+    END;
+    IF _pgtrigger_ignore IS NOT NULL THEN
+        SELECT trigger_name = ANY (_pgtrigger_ignore)
+        INTO _result;
+        RETURN _result;
+    ELSE
+        RETURN FALSE;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION pgtrigger_snapshot_update_1a35c()
+    RETURNS TRIGGER AS
+$$
+
+BEGIN
+    IF ("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
+        IF (TG_OP = 'DELETE') THEN
+            RETURN OLD;
+        ELSE
+            RETURN NEW;
+        END IF;
+    END IF;
+    INSERT INTO "people_db_abaratingevent" ("date_created", "date_modified", "id",
+                                            "person_id", "pgh_context_id",
+                                            "pgh_created_at", "pgh_label", "pgh_obj_id",
+                                            "rating", "year_rated")
+    VALUES (NEW."date_created", NEW."date_modified", NEW."id", NEW."person_id",
+            _pgh_attach_context(), NOW(), 'snapshot', NEW."id", NEW."rating",
+            NEW."year_rated");
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS pgtrigger_snapshot_update_1a35c ON "people_db_abarating";
+CREATE TRIGGER pgtrigger_snapshot_update_1a35c
+    AFTER UPDATE
+    ON "people_db_abarating"
+
+
+    FOR EACH ROW
+    WHEN (OLD.* IS DISTINCT FROM NEW.*)
+EXECUTE PROCEDURE pgtrigger_snapshot_update_1a35c();
+
+COMMENT ON TRIGGER pgtrigger_snapshot_update_1a35c ON "people_db_abarating" IS 'e0e91c8cc51f3f412a9971507acd01a7d5d90f6c';
+;
 --
 -- Create trigger snapshot_insert on model education
 --
@@ -1437,21 +1558,6 @@ ALTER TABLE "people_db_personevent"
 ALTER TABLE "people_db_personevent"
     ADD COLUMN "pgh_obj_id" integer NOT NULL;
 --
--- Add field docket to partiesevent
---
-ALTER TABLE "people_db_partiesevent"
-    ADD COLUMN "docket_id" integer NOT NULL;
---
--- Add field party to partiesevent
---
-ALTER TABLE "people_db_partiesevent"
-    ADD COLUMN "party_id" integer NOT NULL;
---
--- Add field pgh_context to partiesevent
---
-ALTER TABLE "people_db_partiesevent"
-    ADD COLUMN "pgh_context_id" uuid NULL;
---
 -- Add field person to educationevent
 --
 ALTER TABLE "people_db_educationevent"
@@ -1472,134 +1578,20 @@ ALTER TABLE "people_db_educationevent"
 ALTER TABLE "people_db_educationevent"
     ADD COLUMN "school_id" integer NOT NULL;
 --
--- Create trigger snapshot_insert on model parties
+-- Add field person to abaratingevent
 --
-
-CREATE OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
-    trigger_name NAME
-)
-    RETURNS BOOLEAN AS
-$$
-DECLARE
-    _pgtrigger_ignore TEXT[];
-    _result           BOOLEAN;
-BEGIN
-    BEGIN
-        SELECT INTO _pgtrigger_ignore CURRENT_SETTING('pgtrigger.ignore');
-    EXCEPTION
-        WHEN OTHERS THEN
-    END;
-    IF _pgtrigger_ignore IS NOT NULL THEN
-        SELECT trigger_name = ANY (_pgtrigger_ignore)
-        INTO _result;
-        RETURN _result;
-    ELSE
-        RETURN FALSE;
-    END IF;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION pgtrigger_snapshot_insert_f73de()
-    RETURNS TRIGGER AS
-$$
-
-BEGIN
-    IF ("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
-        IF (TG_OP = 'DELETE') THEN
-            RETURN OLD;
-        ELSE
-            RETURN NEW;
-        END IF;
-    END IF;
-    INSERT INTO "people_db_partiesevent" ("date_terminated", "docket_id", "extra_info",
-                                          "highest_offense_level_opening",
-                                          "highest_offense_level_terminated", "id",
-                                          "name", "party_id", "pgh_context_id",
-                                          "pgh_created_at", "pgh_label")
-    VALUES (NEW."date_terminated", NEW."docket_id", NEW."extra_info",
-            NEW."highest_offense_level_opening", NEW."highest_offense_level_terminated",
-            NEW."id", NEW."name", NEW."party_id", _pgh_attach_context(), NOW(),
-            'snapshot');
-    RETURN NULL;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS pgtrigger_snapshot_insert_f73de ON "people_db_partytype";
-CREATE TRIGGER pgtrigger_snapshot_insert_f73de
-    AFTER INSERT
-    ON "people_db_partytype"
-
-
-    FOR EACH ROW
-EXECUTE PROCEDURE pgtrigger_snapshot_insert_f73de();
-
-COMMENT ON TRIGGER pgtrigger_snapshot_insert_f73de ON "people_db_partytype" IS '17eb7f8b615107e6c29b2cbb50101f680fb23557';
-;
+ALTER TABLE "people_db_abaratingevent"
+    ADD COLUMN "person_id" integer NULL;
 --
--- Create trigger snapshot_update on model parties
+-- Add field pgh_context to abaratingevent
 --
-
-CREATE OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
-    trigger_name NAME
-)
-    RETURNS BOOLEAN AS
-$$
-DECLARE
-    _pgtrigger_ignore TEXT[];
-    _result           BOOLEAN;
-BEGIN
-    BEGIN
-        SELECT INTO _pgtrigger_ignore CURRENT_SETTING('pgtrigger.ignore');
-    EXCEPTION
-        WHEN OTHERS THEN
-    END;
-    IF _pgtrigger_ignore IS NOT NULL THEN
-        SELECT trigger_name = ANY (_pgtrigger_ignore)
-        INTO _result;
-        RETURN _result;
-    ELSE
-        RETURN FALSE;
-    END IF;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION pgtrigger_snapshot_update_a07b5()
-    RETURNS TRIGGER AS
-$$
-
-BEGIN
-    IF ("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
-        IF (TG_OP = 'DELETE') THEN
-            RETURN OLD;
-        ELSE
-            RETURN NEW;
-        END IF;
-    END IF;
-    INSERT INTO "people_db_partiesevent" ("date_terminated", "docket_id", "extra_info",
-                                          "highest_offense_level_opening",
-                                          "highest_offense_level_terminated", "id",
-                                          "name", "party_id", "pgh_context_id",
-                                          "pgh_created_at", "pgh_label")
-    VALUES (NEW."date_terminated", NEW."docket_id", NEW."extra_info",
-            NEW."highest_offense_level_opening", NEW."highest_offense_level_terminated",
-            NEW."id", NEW."name", NEW."party_id", _pgh_attach_context(), NOW(),
-            'snapshot');
-    RETURN NULL;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS pgtrigger_snapshot_update_a07b5 ON "people_db_partytype";
-CREATE TRIGGER pgtrigger_snapshot_update_a07b5
-    AFTER UPDATE
-    ON "people_db_partytype"
-
-
-    FOR EACH ROW
-    WHEN (OLD.* IS DISTINCT FROM NEW.*)
-EXECUTE PROCEDURE pgtrigger_snapshot_update_a07b5();
-
-COMMENT ON TRIGGER pgtrigger_snapshot_update_a07b5 ON "people_db_partytype" IS '62f6fd044b826bfcaecb962ade08a728c9a27af3';
-;
+ALTER TABLE "people_db_abaratingevent"
+    ADD COLUMN "pgh_context_id" uuid NULL;
+--
+-- Add field pgh_obj to abaratingevent
+--
+ALTER TABLE "people_db_abaratingevent"
+    ADD COLUMN "pgh_obj_id" integer NOT NULL;
 --
 -- Create trigger snapshot_insert on model personrace
 --
@@ -1748,11 +1740,11 @@ CREATE INDEX "people_db_personraceevent_race_id_ec19c576" ON "people_db_personra
 CREATE INDEX "people_db_personevent_is_alias_of_id_dff0de5e" ON "people_db_personevent" ("is_alias_of_id");
 CREATE INDEX "people_db_personevent_pgh_context_id_8c18edc2" ON "people_db_personevent" ("pgh_context_id");
 CREATE INDEX "people_db_personevent_pgh_obj_id_3a44721c" ON "people_db_personevent" ("pgh_obj_id");
-CREATE INDEX "people_db_partiesevent_docket_id_31f21921" ON "people_db_partiesevent" ("docket_id");
-CREATE INDEX "people_db_partiesevent_party_id_dbaa93bc" ON "people_db_partiesevent" ("party_id");
-CREATE INDEX "people_db_partiesevent_pgh_context_id_612f476f" ON "people_db_partiesevent" ("pgh_context_id");
 CREATE INDEX "people_db_educationevent_person_id_86892be3" ON "people_db_educationevent" ("person_id");
 CREATE INDEX "people_db_educationevent_pgh_context_id_93dac561" ON "people_db_educationevent" ("pgh_context_id");
 CREATE INDEX "people_db_educationevent_pgh_obj_id_242c5dea" ON "people_db_educationevent" ("pgh_obj_id");
 CREATE INDEX "people_db_educationevent_school_id_5d83b038" ON "people_db_educationevent" ("school_id");
+CREATE INDEX "people_db_abaratingevent_person_id_976485e8" ON "people_db_abaratingevent" ("person_id");
+CREATE INDEX "people_db_abaratingevent_pgh_context_id_60d3496a" ON "people_db_abaratingevent" ("pgh_context_id");
+CREATE INDEX "people_db_abaratingevent_pgh_obj_id_0e6a9bc3" ON "people_db_abaratingevent" ("pgh_obj_id");
 COMMIT;
