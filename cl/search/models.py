@@ -183,10 +183,7 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
         verbose_name_plural = "Originating Court Information"
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-    exclude=["view_count"]
-)
+@pghistory.track(pghistory.Snapshot(), exclude=["view_count"])
 class Docket(AbstractDateTimeModel):
     """A class to sit above OpinionClusters, Audio files, and Docket Entries,
     and link them together.
@@ -437,7 +434,7 @@ class Docket(AbstractDateTimeModel):
     )
     case_name_short = models.TextField(
         help_text="The abridged name of the case, often a single word, e.g. "
-                  "'Marsh'",
+        "'Marsh'",
         blank=True,
     )
     case_name = models.TextField(
@@ -454,9 +451,9 @@ class Docket(AbstractDateTimeModel):
     )
     docket_number = models.TextField(  # nosemgrep
         help_text="The docket numbers of a case, can be consolidated and "
-                  "quite long. In some instances they are too long to be "
-                  "indexed by postgres and we store the full docket in "
-                  "the correction field on the Opinion Cluster.",
+        "quite long. In some instances they are too long to be "
+        "indexed by postgres and we store the full docket in "
+        "the correction field on the Opinion Cluster.",
         blank=True,
         null=True,
         db_index=True,
@@ -524,14 +521,14 @@ class Docket(AbstractDateTimeModel):
     )
     mdl_status = models.CharField(
         help_text="The MDL status of a case before the Judicial Panel for "
-                  "Multidistrict Litigation",
+        "Multidistrict Litigation",
         max_length=100,
         blank=True,
     )
     filepath_local = models.FileField(
         help_text=f"Path to RECAP's Docket XML page as provided by the "
-                  f"original RECAP architecture. These fields are for backup purposes "
-                  f"only. {s3_warning_note}",
+        f"original RECAP architecture. These fields are for backup purposes "
+        f"only. {s3_warning_note}",
         upload_to=make_recap_path,
         storage=IncrementingAWSMediaStorage(),
         max_length=1000,
@@ -1686,10 +1683,10 @@ class ClaimHistory(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
     )
     claim_document_type = models.IntegerField(
         help_text=(
-                      "The type of document that is used in the history row for "
-                      "the claim. One of: %s"
-                  )
-                  % ", ".join([f"{t[0]} ({t[1]})" for t in CLAIM_TYPES]),
+            "The type of document that is used in the history row for "
+            "the claim. One of: %s"
+        )
+        % ", ".join([f"{t[0]} ({t[1]})" for t in CLAIM_TYPES]),
         choices=CLAIM_TYPES,
     )
     description = models.TextField(
@@ -1900,7 +1897,7 @@ class Court(models.Model):
     )
     date_last_pacer_contact = models.DateTimeField(
         help_text="The last time the PACER website for the court was "
-                  "successfully contacted",
+        "successfully contacted",
         blank=True,
         null=True,
     )
@@ -1947,7 +1944,7 @@ class Court(models.Model):
     )
     citation_string = models.CharField(
         help_text="the citation abbreviation for the court "
-                  "as dictated by Blue Book",
+        "as dictated by Blue Book",
         max_length=100,
         blank=True,
     )
@@ -1974,14 +1971,13 @@ class Court(models.Model):
     )
     jurisdiction = models.CharField(
         help_text="the jurisdiction of the court, one of: %s"
-                  % ", ".join(
-            ["%s (%s)" % (t[0], t[1]) for t in JURISDICTIONS]),
+        % ", ".join(["%s (%s)" % (t[0], t[1]) for t in JURISDICTIONS]),
         max_length=3,
         choices=JURISDICTIONS,
     )
     notes = models.TextField(
         help_text="any notes about coverage or anything else (currently very "
-                  "raw)",
+        "raw)",
         blank=True,
     )
 
@@ -2068,7 +2064,7 @@ class OpinionCluster(AbstractDateTimeModel):
     non_participating_judges = models.ManyToManyField(
         "people_db.Person",
         help_text="The judges that heard the case, but did not participate in "
-                  "the opinion",
+        "the opinion",
         related_name="opinion_clusters_non_participating_judges",
         blank=True,
     )
@@ -2100,7 +2096,7 @@ class OpinionCluster(AbstractDateTimeModel):
     )
     case_name_short = models.TextField(
         help_text="The abridged name of the case, often a single word, e.g. "
-                  "'Marsh'",
+        "'Marsh'",
         blank=True,
     )
     case_name = models.TextField(
@@ -2145,7 +2141,7 @@ class OpinionCluster(AbstractDateTimeModel):
     )
     source = models.CharField(
         help_text="the source of the cluster, one of: %s"
-                  % ", ".join(["%s (%s)" % (t[0], t[1]) for t in SOURCES]),
+        % ", ".join(["%s (%s)" % (t[0], t[1]) for t in SOURCES]),
         max_length=10,
         choices=SOURCES,
         blank=True,
@@ -2258,7 +2254,7 @@ class OpinionCluster(AbstractDateTimeModel):
     )
     precedential_status = models.CharField(
         help_text="The precedential status of document, one of: "
-                  "%s" % ", ".join([t[0] for t in PRECEDENTIAL_STATUS.NAMES]),
+        "%s" % ", ".join([t[0] for t in PRECEDENTIAL_STATUS.NAMES]),
         max_length=50,
         blank=True,
         choices=PRECEDENTIAL_STATUS.NAMES,
@@ -3013,7 +3009,7 @@ class OpinionsCited(models.Model):
     )
     depth = models.IntegerField(
         help_text="The number of times the cited opinion was cited "
-                  "in the citing opinion",
+        "in the citing opinion",
         default=1,
         db_index=True,
     )
@@ -3043,7 +3039,7 @@ class OpinionsCitedByRECAPDocument(models.Model):
     )
     depth = models.IntegerField(
         help_text="The number of times the cited opinion was cited "
-                  "in the citing document",
+        "in the citing document",
         default=1,
     )
 
@@ -3074,13 +3070,13 @@ class Parenthetical(models.Model):
     )
     text = models.TextField(
         help_text="The text of the description as written in the describing "
-                  "opinion",
+        "opinion",
     )
     score = models.FloatField(
         db_index=True,
         default=0.0,
         help_text="A score between 0 and 1 representing how descriptive the "
-                  "parenthetical is",
+        "parenthetical is",
     )
 
     def __str__(self) -> str:
@@ -3109,12 +3105,12 @@ class ParentheticalGroup(models.Model):
         related_name="represented_group",
         on_delete=models.CASCADE,
         help_text="The representative (i.e. high-ranked and similar to the "
-                  "cluster as a whole) parenthetical for the group",
+        "cluster as a whole) parenthetical for the group",
     )
     score = models.FloatField(
         default=0.0,
         help_text="A score between 0 and 1 representing the quality of the "
-                  "parenthetical group",
+        "parenthetical group",
     )
     size = models.IntegerField(
         help_text="The number of parentheticals that belong to the group"
