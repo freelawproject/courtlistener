@@ -309,6 +309,12 @@
                     {% endfor %}
                 </p>
             {% endif %}
+          {% if cluster.judges %}
+                <p class="bottom">
+                    <span class="meta-data-header">Judges:</span>
+                    {{ cluster.judges }}
+                </p>
+            {% endif %}
             {% if cluster.non_participating_judges.all.count > 0 %}
                 <p class="bottom">
                     <span class="meta-data-header">Non-Participating Judges:</span>
@@ -330,11 +336,6 @@
                     <p class="bottom">
                         <span class="meta-data-header">Author:</span>
                         <span class="meta-data-value">{{ opinion.author_str }}</span>
-                    </p>
-                {% elif cluster.judges %}
-                    <p class="bottom">
-                        <span class="meta-data-header">Judges:</span>
-                        <span class="meta-data-value">{{ cluster.judges }}</span>
                     </p>
                 {% endif %}
 
@@ -430,11 +431,6 @@
                                 <p class="bottom">
                                     <span class="meta-data-header">Author:</span>
                                     <span class="meta-data-value">{{ sub_opinion.author_str }}</span>
-                                </p>
-                            {% elif cluster.judges %}
-                                <p class="bottom">
-                                    <span class="meta-data-header">Judges:</span>
-                                    <span class="meta-data-value">{{ cluster.judges }}</span>
                                 </p>
                             {% endif %}
 
