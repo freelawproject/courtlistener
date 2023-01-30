@@ -215,7 +215,8 @@ class Docket(AbstractDateTimeModel):
     COLUMBIA_AND_SCRAPER_AND_IDB = 14
     COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB = 15
     HARVARD = 16
-    SCRAPER_AND_HARVARD = 17  # This should be 18; 17 s/b HARVARD_AND_RECAP.
+    HARVARD_AND_RECAP = 17
+    SCRAPER_AND_HARVARD = 18
     DIRECT_INPUT = 32
     ANON_2020 = 64
     ANON_2020_AND_SCRAPER = 66
@@ -242,6 +243,7 @@ class Docket(AbstractDateTimeModel):
             "Columbia, RECAP, Scraper, and IDB",
         ),
         (HARVARD, "Harvard"),
+        (HARVARD_AND_RECAP, "Harvard and RECAP"),
         (SCRAPER_AND_HARVARD, "Scraper and Harvard"),
         (DIRECT_INPUT, "Direct court input"),
         (ANON_2020, "2020 anonymous database"),
@@ -634,6 +636,7 @@ class Docket(AbstractDateTimeModel):
             self.SCRAPER_AND_IDB,
             self.COLUMBIA_AND_IDB,
             self.COLUMBIA_AND_SCRAPER_AND_IDB,
+            self.HARVARD,
         ]:
             # Simply add the RECAP value to the other value.
             self.source = self.source + self.RECAP

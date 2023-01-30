@@ -1893,6 +1893,17 @@ class RecapDocketTaskTest(TestCase):
         self.assertTrue(d.case_name)
         self.assertEqual(existing_d.pacer_case_id, d.pacer_case_id)
 
+    def test_adding_harvard_and_recap_source(self) -> None:
+        """Is the HARVARD_AND_RECAP source properly added when updating a
+        docket by RECAP, originally added by Harvard?
+        """
+        Docket.objects.create(
+            source=Docket.HARVARD, pacer_case_id="asdf", court_id="scotus"
+        )
+        returned_data = process_recap_docket(self.pq.pk)
+        d = Docket.objects.get(pk=returned_data["docket_pk"])
+        self.assertEqual(d.source, Docket.HARVARD_AND_RECAP)
+
     def test_docket_and_de_already_exist(self) -> None:
         """Can we parse if the docket and the docket entry already exist?"""
         existing_d = Docket.objects.create(
