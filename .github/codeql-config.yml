@@ -1,4 +1,5 @@
 name: CodeQL custom scanning
 
 paths-ignore:
+  - cl/**/migrations
   - 'cl/**/tests.py'
