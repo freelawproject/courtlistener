@@ -4,7 +4,7 @@ from factory import RelatedFactoryList
 
 
 class RelatedFactoryVariableList(RelatedFactoryList):
-    """ This factory allows you to specify how many related objects do you
+    """This factory allows you to specify how many related objects do you
     want to create, but also allows you to define the data for each related
     object
 
@@ -43,12 +43,13 @@ class RelatedFactoryVariableList(RelatedFactoryList):
     """
 
     def call(self, instance, step, context):
-        size = context.extra.pop('size', None)
-        data = context.extra.pop('data', [])
+        size = context.extra.pop("size", None)
+        data = context.extra.pop("data", [])
         if size and data:
             if size != len(data):
                 raise TypeError(
-                    "RelatedFactoryVariableList you can only use data or size, not both.")
+                    "RelatedFactoryVariableList you can only use data or size, not both."
+                )
 
         if not size and not data:
             size = self.size
@@ -57,7 +58,8 @@ class RelatedFactoryVariableList(RelatedFactoryList):
             # Generate size number of objects
             return [
                 super(RelatedFactoryList, self).call(instance, step, context)
-                for i in range(size)]
+                for i in range(size)
+            ]
         results = []
         for d in data:
             # Create copy of PostGenerationContext object
@@ -66,6 +68,8 @@ class RelatedFactoryVariableList(RelatedFactoryList):
                 # Update data for each factory instance
                 copied_context.extra.update(d)
             results.append(
-                super(RelatedFactoryList, self).call(instance, step,
-                                                     copied_context))
+                super(RelatedFactoryList, self).call(
+                    instance, step, copied_context
+                )
+            )
         return results
