@@ -1,0 +1,4 @@
+name: CodeQL custom scanning
+
+paths-ignore:
+  - 'cl/**/tests.py'

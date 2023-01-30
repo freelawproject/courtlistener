@@ -1,6 +1,9 @@
 name: "CodeQL"
 
 on:
+  push:
+    branches:
+      - main
   schedule:
     - cron: '0 2 * * *'
 
@@ -27,6 +30,7 @@ jobs:
       uses: github/codeql-action/init@v2
       with:
         languages: python
+        config-file: ./.github/codeql-config.yml
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v2
