@@ -5,7 +5,8 @@ from factory import (
     LazyAttribute,
     RelatedFactory,
     SelfAttribute,
-    SubFactory, )
+    SubFactory,
+)
 from factory.django import DjangoModelFactory, FileField
 from factory.fuzzy import FuzzyChoice, FuzzyText
 from juriscraper.lib.string_utils import CaseNameTweaker
@@ -67,7 +68,8 @@ class OpinionFactory(DjangoModelFactory):
 
     author = SubFactory(PersonFactory)
     author_str = LazyAttribute(
-        lambda self: self.author.name_full if self.author else "")
+        lambda self: self.author.name_full if self.author else ""
+    )
     type = FuzzyChoice(Opinion.OPINION_TYPES, getter=lambda c: c[0])
     sha1 = Faker("sha1")
     plain_text = Faker("text", max_nb_chars=2000)
@@ -226,12 +228,14 @@ class DocketWithChildrenFactory(DocketFactory):
     )
 
 
-class OpinionClusterFactoryMultipleOpinions(OpinionClusterFactory,
-                                            DocketParentMixin):
+class OpinionClusterFactoryMultipleOpinions(
+    OpinionClusterFactory, DocketParentMixin
+):
     """Make an OpinionCluster with Docket parent and multiple opinions"""
+
     sub_opinions = RelatedFactoryVariableList(
         factory=OpinionWithChildrenFactory,
         factory_related_name="cluster",
-        size=3  # by default create 3 opinions
+        size=3,  # by default create 3 opinions
     )
     precedential_status = ("Published", "Precedential")

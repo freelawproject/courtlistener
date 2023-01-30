@@ -25,8 +25,11 @@ from cl.lib.string_utils import normalize_dashes, trunc
 from cl.lib.utils import alphanumeric_sort
 from cl.people_db.models import Role
 from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
-from cl.search.factories import DocketFactory, \
-    OpinionClusterFactoryMultipleOpinions, CourtFactory
+from cl.search.factories import (
+    CourtFactory,
+    DocketFactory,
+    OpinionClusterFactoryMultipleOpinions,
+)
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
 from cl.tests.cases import SimpleTestCase, TestCase
 from cl.users.factories import UserProfileWithParentsFactory
@@ -48,7 +51,7 @@ class TestPacerUtils(TestCase):
         self.assertFalse(
             blocked,
             msg="Bankruptcy dockets with many entries "
-                "should not be blocked",
+            "should not be blocked",
         )
         # This should stay blocked even though it's a big bankruptcy docket.
         d.blocked = True
@@ -56,7 +59,7 @@ class TestPacerUtils(TestCase):
         self.assertTrue(
             blocked,
             msg="Bankruptcy dockets that start blocked "
-                "should stay blocked.",
+            "should stay blocked.",
         )
 
 
@@ -98,13 +101,13 @@ class TestStringUtils(SimpleTestCase):
                 result,
                 test_dict["result"],
                 msg="Failed with dict: %s.\n"
-                    "%s != %s" % (test_dict, result, test_dict["result"]),
+                "%s != %s" % (test_dict, result, test_dict["result"]),
             )
             self.assertTrue(
                 len(result) <= test_dict["length"],
                 msg="Failed with dict: %s.\n"
-                    "%s is longer than %s"
-                    % (test_dict, result, test_dict["length"]),
+                "%s is longer than %s"
+                % (test_dict, result, test_dict["length"]),
             )
 
     def test_anonymize(self) -> None:
@@ -351,7 +354,7 @@ class TestPACERPartyParsing(SimpleTestCase):
                     "role": None,
                     "date_action": None,
                     "role_raw": "Designation: ADR Pro Bono Limited Scope "
-                                "Counsel",
+                    "Counsel",
                 },
             },
             {
@@ -433,10 +436,10 @@ class TestPACERPartyParsing(SimpleTestCase):
             {
                 # Email and phone number
                 "q": "Landye Bennett Blumstein LLP\n"
-                     "701 West Eighth Avenue, Suite 1200\n"
-                     "Anchorage, AK 99501\n"
-                     "907-276-5152\n"
-                     "Email: brucem@lbblawyers.com",
+                "701 West Eighth Avenue, Suite 1200\n"
+                "Anchorage, AK 99501\n"
+                "907-276-5152\n"
+                "Email: brucem@lbblawyers.com",
                 "a": (
                     {
                         "name": "Landye Bennett Blumstein LLP",
@@ -457,9 +460,9 @@ class TestPACERPartyParsing(SimpleTestCase):
             {
                 # PO Box
                 "q": "Sands Anderson PC\n"
-                     "P.O. Box 2188\n"
-                     "Richmond, VA 23218-2188\n"
-                     "(804) 648-1636",
+                "P.O. Box 2188\n"
+                "Richmond, VA 23218-2188\n"
+                "(804) 648-1636",
                 "a": (
                     {
                         "name": "Sands Anderson PC",
@@ -479,9 +482,9 @@ class TestPACERPartyParsing(SimpleTestCase):
             {
                 # Lowercase state (needs normalization)
                 "q": "Sands Anderson PC\n"
-                     "P.O. Box 2188\n"
-                     "Richmond, va 23218-2188\n"
-                     "(804) 648-1636",
+                "P.O. Box 2188\n"
+                "Richmond, va 23218-2188\n"
+                "(804) 648-1636",
                 "a": (
                     {
                         "name": "Sands Anderson PC",
@@ -501,11 +504,11 @@ class TestPACERPartyParsing(SimpleTestCase):
             {
                 # Phone, fax, and email -- the whole package.
                 "q": "Susman Godfrey, LLP\n"
-                     "1201 Third Avenue, Suite 3800\n"
-                     "Seattle, WA 98101\n"
-                     "206-373-7381\n"
-                     "Fax: 206-516-3883\n"
-                     "Email: fshort@susmangodfrey.com",
+                "1201 Third Avenue, Suite 3800\n"
+                "Seattle, WA 98101\n"
+                "206-373-7381\n"
+                "Fax: 206-516-3883\n"
+                "Email: fshort@susmangodfrey.com",
                 "a": (
                     {
                         "name": "Susman Godfrey, LLP",
@@ -526,9 +529,9 @@ class TestPACERPartyParsing(SimpleTestCase):
             {
                 # No recipient name
                 "q": "211 E. Livingston Ave\n"
-                     "Columbus, OH 43215\n"
-                     "(614) 228-3727\n"
-                     "Email:",
+                "Columbus, OH 43215\n"
+                "(614) 228-3727\n"
+                "Email:",
                 "a": (
                     {
                         "address1": "211 E. Livingston Ave",
@@ -823,7 +826,6 @@ class TestLibUtils(TestCase):
 
 
 class TestFactoriesClasses(TestCase):
-
     def test_related_factory_variable_list(self):
         court_scotus = CourtFactory(id="scotus")
 
@@ -853,16 +855,23 @@ class TestFactoriesClasses(TestCase):
             sub_opinions__data=[
                 {"type": "010combined"},
                 {"type": "025plurality"},
-                {"type": "070rehearing"}]
+                {"type": "070rehearing"},
+            ],
         )
 
         # Check that 3 opinions were created
         self.assertEqual(cluster_2.sub_opinions.all().count(), 3)
 
         # Check that each created opinion matches the specified type
-        self.assertEqual(cluster_2.sub_opinions.all().order_by("type")[0].type,
-                         "010combined")
-        self.assertEqual(cluster_2.sub_opinions.all().order_by("type")[1].type,
-                         "025plurality")
-        self.assertEqual(cluster_2.sub_opinions.all().order_by("type")[2].type,
-                         "070rehearing")
+        self.assertEqual(
+            cluster_2.sub_opinions.all().order_by("type")[0].type,
+            "010combined",
+        )
+        self.assertEqual(
+            cluster_2.sub_opinions.all().order_by("type")[1].type,
+            "025plurality",
+        )
+        self.assertEqual(
+            cluster_2.sub_opinions.all().order_by("type")[2].type,
+            "070rehearing",
+        )
