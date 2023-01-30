@@ -31,6 +31,7 @@ jobs:
       with:
         languages: python
         config-file: ./.github/codeql-config.yml
+        setup-python-dependencies: false
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v2
