@@ -636,6 +636,7 @@ class Docket(AbstractDateTimeModel):
             self.SCRAPER_AND_IDB,
             self.COLUMBIA_AND_IDB,
             self.COLUMBIA_AND_SCRAPER_AND_IDB,
+            self.HARVARD,
         ]:
             # Simply add the RECAP value to the other value.
             self.source = self.source + self.RECAP
