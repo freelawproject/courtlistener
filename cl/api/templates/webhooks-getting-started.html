@@ -13,7 +13,14 @@
 {% endblock %}
 
 {% block content %}
-<div class="hidden-xs col-sm-2 col-md-3">
+<div class="col-xs-12 hidden-md hidden-lg">
+  <h4 class="v-offset-below-2">
+    <i class="fa fa-arrow-circle-o-left gray"></i>
+    <a href="{% url "webhooks_docs" %}">Back to Webhooks Docs</a>
+  </h4>
+</div>
+
+<div class="hidden-xs hidden-sm col-md-3">
   <h4 class="v-offset-below-3">
     <i class="fa fa-arrow-circle-o-left gray"></i>
     <a href="{% url "webhooks_docs" %}">Back to Webhooks Docs</a>
@@ -28,7 +35,7 @@
   </div>
 </div>
 
-<div class="col-xs-12 col-sm-8 col-md-6">
+<div class="col-xs-12 col-md-8 col-lg-6">
   <h1 id="about">Getting Started With Webhooks</h1>
   <p class="lead">To create your first webhook, there are a handful of steps you will need to take:
   </p>
@@ -51,6 +58,8 @@
   </p>
   <ul>
     <li>Our webhook system <a href="{% url 'webhooks_docs' %}#security">does not support authentication</a>, so the URL you create should be long and random.
+    </li>
+    <li>Our POST requests will come from one of two static IP addresses, <code>34.210.230.218</code> and <code>54.189.59.91</code>. We recommend only allowing traffic from these addresses.
     </li>
     <li>Your URL must receive POST requests and should not accept any other HTTP verbs.</li>
     <li>If you are using a web framework like Django or Ruby on Rails, the webhook URL will need to be exempted from the cross site request forgery (CSRF) protection system. If this is not done, most web frameworks will block POST requests from outside domains like ours.

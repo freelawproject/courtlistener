@@ -387,6 +387,7 @@ def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
         {
             "non_deleted_map_count": non_deleted_map_count,
             "delete_form": delete_form,
+            "page": "profile_settings",
             "private": True,
         },
     )

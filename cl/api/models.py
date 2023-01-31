@@ -1,6 +1,7 @@
 import uuid
 from http import HTTPStatus
 
+import pghistory
 from django.contrib.auth.models import User
 from django.core.validators import URLValidator
 from django.db import models
@@ -20,6 +21,7 @@ HttpStatusCodes = models.IntegerChoices(  # type: ignore
 )
 
 
+@pghistory.track(pghistory.Snapshot(), model_name="WebhookHistoryEvent")
 class Webhook(AbstractDateTimeModel):
     user = models.ForeignKey(
         User,

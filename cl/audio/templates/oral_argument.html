@@ -102,14 +102,8 @@
 
         <h3>{{ af.docket.court }}</h3>
         <p>
-          <button id="add-note-button"
-           class="btn {% if note_form.instance.audio_id %}btn-warning{% else %}btn-success{% endif %} pointer hidden-print"
-           data-toggle="modal"
-           data-target="#modal-save-note, #modal-logged-out"
-           title="{% if note_form.instance.audio_id %}Edit this note{% else %}Save this record as a note in your profile{% endif %}">
-            <i class="fa fa-bookmark "></i> <span>{% if note_form.instance.audio_id %}Edit Note{% else %}Add Note{% endif %}</span></button>
+          {% include "includes/add_note_button.html" with form_instance_id=note_form.instance.audio_id %}
         </p>
-
         <p class="bottom">
             <span class="meta-data-header">Date Argued:</span>
             <span class="meta-data-value">

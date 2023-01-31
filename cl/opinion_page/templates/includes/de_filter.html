@@ -71,7 +71,7 @@
                            value="asc"
                            name="order_by"
                            {% if v == "asc" or not v %}checked="checked"{% endif %}/><i class="fa fa-sort-numeric-asc"></i>&nbsp;<span
-                          class="hidden-xs hidden-sm">Ascending</span></label>
+                          class="hidden-xs hidden-sm hidden-md">Ascending</span></label>
                   <label for="id_order_by_1"
                          class="btn btn-default {% if v == "desc" %}active{% endif %}">
                     <input type="radio"
@@ -79,7 +79,7 @@
                            {% if v == "desc" %}checked=checked{% endif %}
                            value="desc"
                            name="order_by"/><i
-                          class="fa fa-sort-numeric-desc"></i>&nbsp;<span class="hidden-xs hidden-sm">Descending</span></label>
+                          class="fa fa-sort-numeric-desc"></i>&nbsp;<span class="hidden-xs hidden-sm hidden-md">Descending</span></label>
                 {% endwith %}
               </div>
             </div>

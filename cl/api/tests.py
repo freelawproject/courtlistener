@@ -1009,6 +1009,11 @@ class WebhooksProxySecurityTest(TestCase):
         )
         send_webhook_event(webhook_event)
         webhook_event.refresh_from_db()
+        self.assertNotEqual(
+            webhook_event.response,
+            "",
+            msg="Empty response from insecure webhook post. Is cl-webhook-sentry up?",
+        )
         self.assertIn("IP 127.0.0.1 is blocked", webhook_event.response)
         self.assertEqual(
             webhook_event.status_code,
@@ -1022,6 +1027,11 @@ class WebhooksProxySecurityTest(TestCase):
         )
         send_webhook_event(webhook_event_2)
         webhook_event_2.refresh_from_db()
+        self.assertNotEqual(
+            webhook_event.response,
+            "",
+            msg="Empty response from insecure webhook post. Is cl-webhook-sentry up?",
+        )
         self.assertIn("IP 127.0.0.1 is blocked", webhook_event_2.response)
         self.assertEqual(
             webhook_event_2.status_code,
@@ -1035,6 +1045,11 @@ class WebhooksProxySecurityTest(TestCase):
         )
         send_webhook_event(webhook_event_3)
         webhook_event_3.refresh_from_db()
+        self.assertNotEqual(
+            webhook_event.response,
+            "",
+            msg="Empty response from insecure webhook post. Is cl-webhook-sentry up?",
+        )
         self.assertIn("IP 0.0.0.0 is blocked", webhook_event_3.response)
         self.assertEqual(
             webhook_event_3.status_code,

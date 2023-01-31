@@ -39,9 +39,8 @@ $(function () {
         $('#modal-save-note').modal('hide');
 
         // Fill in the star and reset its title attr
-        $('#add-note-button')
-          .removeClass('btn-success')
-          .addClass('btn-warning');
+        $('#add-note-button i')
+          .addClass('gold');
         // Toggle the note text button
         $('#add-note-button span').text('Edit Note');
 
@@ -82,9 +81,8 @@ $(function () {
         // Hide the modal box
         $('#modal-save-note').modal('hide');
         // Empty the star and reset its titles
-        $('#add-note-button')
-          .removeClass('btn-warning')
-          .addClass('btn-success');
+        $('#add-note-button i')
+          .removeClass('gold')
         // Toggle the note text button
         $('#add-note-button span').text('Add Note');
 
