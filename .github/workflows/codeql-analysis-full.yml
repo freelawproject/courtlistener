@@ -1,0 +1,12 @@
+name: "CodeQL full analysis"
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+
+jobs:
+  call-workflow-passing-data:
+    uses: ./.github/workflows/codeql-analysis-base.yml
+    with:
+      setup-python-deps: true
+      trigger-event: ${{ github.event_name }}
