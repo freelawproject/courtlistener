@@ -182,9 +182,6 @@ class AudioBlockedFromSearchEnginesTest(Base412Test):
         self.browser.get(self.live_server_url)
         self.attempt_sign_in("admin", "password")
 
-        # Refresh page after sign in to avoid introducing notes modal
-        self.browser.refresh()
-
         # She selects Oral Arguments to toggle the results to audio
         self.browser.find_element(By.CSS_SELECTOR, "#navbar-oa a").click()
 
@@ -210,9 +207,6 @@ class AudioBlockedFromSearchEnginesTest(Base412Test):
         self.browser.get(self.live_server_url)
         self.attempt_sign_in("pandora", "password")
 
-        # Refresh page after sign in to avoid introducing notes modal
-        self.browser.refresh()
-
         # She selects Oral Arguments to toggle the results to audio
         self.browser.find_element(By.CSS_SELECTOR, "#navbar-oa a").click()
 
@@ -234,9 +228,6 @@ class AudioBlockedFromSearchEnginesTest(Base412Test):
         # Admin logs into CL using her admin account
         self.browser.get(self.live_server_url)
         self.attempt_sign_in("admin", "password")
-
-        # Refresh page after sign in to avoid introducing notes modal
-        self.browser.refresh()
 
         # She selects Oral Arguments to toggle the results to audio
         self.browser.find_element(By.CSS_SELECTOR, "#navbar-oa a").click()
