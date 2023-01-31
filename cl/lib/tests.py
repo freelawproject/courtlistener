@@ -25,7 +25,11 @@ from cl.lib.string_utils import normalize_dashes, trunc
 from cl.lib.utils import alphanumeric_sort
 from cl.people_db.models import Role
 from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
-from cl.search.factories import DocketFactory
+from cl.search.factories import (
+    CourtFactory,
+    DocketFactory,
+    OpinionClusterFactoryMultipleOpinions,
+)
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
 from cl.tests.cases import SimpleTestCase, TestCase
 from cl.users.factories import UserProfileWithParentsFactory
@@ -797,7 +801,6 @@ class TestRateLimiters(SimpleTestCase):
 
 
 class TestLibUtils(TestCase):
-
     fixtures = ["test_objects_search.json", "judge_judy.json"]
     citation = {"reporter": "F.2d", "volume": "56"}
 
@@ -820,3 +823,55 @@ class TestLibUtils(TestCase):
         sorted_cases = alphanumeric_sort(cases_in_volume, "cite_page")
         self.assertIn("56 F.2d 9", sorted_cases[0].citation_string)
         self.assertIn("56 F.2d 11", sorted_cases[1].citation_string)
+
+
+class TestFactoriesClasses(TestCase):
+    def test_related_factory_variable_list(self):
+        court_scotus = CourtFactory(id="scotus")
+
+        # Create 3 opinions by default
+        cluster_1 = OpinionClusterFactoryMultipleOpinions(
+            docket=DocketFactory(
+                court=court_scotus,
+                case_name="Foo v. Bar",
+                case_name_full="Foo v. Bar",
+            ),
+            case_name="Foo v. Bar",
+            date_filed=datetime.date.today(),
+        )
+
+        # Check that 3 opinions were created
+        self.assertEqual(cluster_1.sub_opinions.all().count(), 3)
+
+        # Create 3 opinions specifying type for each one
+        cluster_2 = OpinionClusterFactoryMultipleOpinions(
+            docket=DocketFactory(
+                court=court_scotus,
+                case_name="Lorem v. Ipsum",
+                case_name_full="Lorem v. Ipsum",
+            ),
+            case_name="Lorem v. Ipsum",
+            date_filed=datetime.date.today(),
+            sub_opinions__data=[
+                {"type": "010combined"},
+                {"type": "025plurality"},
+                {"type": "070rehearing"},
+            ],
+        )
+
+        # Check that 3 opinions were created
+        self.assertEqual(cluster_2.sub_opinions.all().count(), 3)
+
+        # Check that each created opinion matches the specified type
+        self.assertEqual(
+            cluster_2.sub_opinions.all().order_by("type")[0].type,
+            "010combined",
+        )
+        self.assertEqual(
+            cluster_2.sub_opinions.all().order_by("type")[1].type,
+            "025plurality",
+        )
+        self.assertEqual(
+            cluster_2.sub_opinions.all().order_by("type")[2].type,
+            "070rehearing",
+        )
