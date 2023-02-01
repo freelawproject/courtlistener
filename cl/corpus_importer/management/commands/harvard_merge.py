@@ -96,7 +96,7 @@ def combine_non_overlapping_data(
     return clean_dictionary
 
 
-def merge_long_fields(cluster_id, key, data):
+def merge_long_fields(cluster_id, key, data) -> None:
     """Merge two long text fields
 
     :param cluster_id: Cluster id to update
@@ -116,7 +116,7 @@ def merge_long_fields(cluster_id, key, data):
             )
 
 
-def merge_judges(cluster_id, key, data):
+def merge_judges(cluster_id, key, data) -> None:
     """Merge overlapping judge values
 
     :param cluster_id: Cluster id to update
@@ -144,7 +144,7 @@ def merge_judges(cluster_id, key, data):
         )
 
 
-def merge_dates(cluster_id, key, data):
+def merge_dates(cluster_id, key, data) -> None:
     """Compare two dates and choose the best to update the opinion cluster
     the value if one value is better than the other
 
@@ -163,7 +163,7 @@ def merge_dates(cluster_id, key, data):
         )
 
 
-def merge_strings(cluster_id, key, data):
+def merge_strings(cluster_id, key, data) -> None:
     """Compare two strings and choose the largest
 
     :param cluster_id: Cluster id to update
@@ -179,7 +179,7 @@ def merge_strings(cluster_id, key, data):
         )
 
 
-def merge_bool_values(cluster_id, key, data):
+def merge_bool_values(cluster_id, key, data) -> None:
     """Compare two boolean values and update the value in opinion cluster
     if this changed
 
@@ -242,7 +242,7 @@ def merge_opinion_clusters(cluster_id: str) -> None:
         logging.info(f"Cluster id: {cluster_id} doesn't have a json file.")
 
 
-def start_merger(cluster_id=None):
+def start_merger(cluster_id=None) -> None:
     """Start the merger
 
     Query the database for a list of opinions that have not been merged yet
@@ -334,7 +334,7 @@ def map_and_merge_opinions(cluster: str, harvard_data: Dict[str, Any]) -> None:
 class Command(VerboseCommand):
     help = "Merge harvard opinions into CL opinions"
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser) -> None:
         parser.add_argument(
             "--cluster-id",
             type=str,
@@ -347,6 +347,6 @@ class Command(VerboseCommand):
             help="Turn off debug logging",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options) -> None:
         if options["no_debug"]:
             logging.disable(logging.DEBUG)
