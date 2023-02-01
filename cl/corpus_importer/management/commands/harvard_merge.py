@@ -18,17 +18,22 @@ from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.search.models import Docket, Opinion, OpinionCluster
 
 
-def read_json(cluster_id: str) -> Dict[str, Any]:
+def read_json(cluster_id: str) -> Dict[str, Any] | None:
     """Helper method to read json into object
-
     :param cluster_id: the cluster to fetch the filepath for
-    :return: Harvard data as a json object
+    :return: Harvard data as a json object or None
     """
     cluster = OpinionCluster.objects.get(id=cluster_id)
-    return json.load(cluster.filepath_json_harvard)
+    if cluster.filepath_json_harvard:
+        return json.load(cluster.filepath_json_harvard)
+    return None
 
 
 def fetch_non_harvard_data(harvard_data: Dict[str, Any]) -> Dict[str, Any]:
+    """ Get data from harvard casebody and preprocess it
+    :param harvard_data:
+    :return: dict with values extracted from casebody
+    """
     soup = BeautifulSoup(harvard_data["casebody"]["data"], "lxml")
 
     # Some documents contain images in the HTML
@@ -68,7 +73,6 @@ def combine_non_overlapping_data(
     cluster_id: str, harvard_data: Dict[str, Any]
 ) -> Dict[str, Tuple]:
     """Combine non overlapping data and return dictionary of data for merging
-
     :param cluster_id: Cluster id to merge
     :param harvard_data: The harvard data as json
     :return: Optional dictionary of data to continue to merge
@@ -89,20 +93,33 @@ def combine_non_overlapping_data(
 
 
 def merge_long_fields(cluster_id, key, data):
+    """ Compare two long text fields and update opinion cluster with the best
+    value
+    :param cluster_id: Cluster id to update
+    :param key: field name to update in opinion cluster
+    :param data: data to compare
+    :return: None
+    """
     harvard_data = data[0]
     cl_data = data[1]
     # Do some text comparison
     similarity = get_cosine_similarity(harvard_data,
                                        cl_data)
-    print(f"{key} similarity: {similarity}")
     if similarity < 0.9:
-        # which one is best? the longest?
+        # they are not too similar, choose the larger one
         if len(harvard_data) > len(cl_data):
             OpinionCluster.objects.filter(id=cluster_id).update(
                 **{key: harvard_data})
 
 
 def merge_judges(cluster_id, key, data):
+    """ Compare the judges values from harvard and courtlistener and update
+    the value if one value is better than the other
+    :param cluster_id: Cluster id to update
+    :param key: field name to update in opinion cluster
+    :param data: data to compare
+    :return: None
+    """
     harvard_data = data[0]
     cl_data = data[1]
     # let's normalize cl data, if it is already normalized, we will
@@ -118,7 +135,6 @@ def merge_judges(cluster_id, key, data):
     )
     cl_data = titlecase(judges)
     similarity = get_cosine_similarity(harvard_data, cl_data)
-    print("Judges similarity", similarity)
     if 0.51 <= similarity <= 0.81:
         # Contains some judge names but not all of them, update
         # data with normalized judges names
@@ -127,7 +143,13 @@ def merge_judges(cluster_id, key, data):
 
 
 def merge_dates(cluster_id, key, data):
-    # Which date is better?
+    """ Compare two dates and choose the best to update the opinion cluster
+    the value if one value is better than the other
+    :param cluster_id: Cluster id to update
+    :param key: field name to update in opinion cluster
+    :param data: data to compare
+    :return: None
+    """
     harvard_data = data[0]
     cluster = OpinionCluster.objects.filter(id=cluster_id).first()
     harvard_date, harvard_date_is_approximate = validate_dt(harvard_data)
@@ -138,6 +160,12 @@ def merge_dates(cluster_id, key, data):
 
 
 def merge_strings(cluster_id, key, data):
+    """Compare two strings and choose the largest
+    :param cluster_id: Cluster id to update
+    :param key: field name to update in opinion cluster
+    :param data: data to compare
+    :return: None
+    """
     harvard_data = data[0]
     cl_data = data[1]
     if len(harvard_data) > len(cl_data):
@@ -146,57 +174,67 @@ def merge_strings(cluster_id, key, data):
 
 
 def merge_bool_values(cluster_id, key, data):
+    """Compare two boolean values and update the value in opinion cluster
+    if this changed
+    :param key: field name to update in opinion cluster
+    :param data: data to compare
+    :return: None
+    """
     harvard_data = data[0]
     cl_data = data[1]
     if harvard_data != cl_data:
-        # bool value changed, keep the one in harvard data
+        # Boolean value changed, keep the one in harvard data
         OpinionCluster.objects.filter(id=cluster_id).update(
             **{key: harvard_data})
 
 
 def merge_opinion_clusters(cluster_id: str) -> None:
     """Merge opinion cluster, docket and opinion data from Harvard
-
     :param cluster_id: The cluster ID to merger
     :return: None
     """
     harvard_data = read_json(cluster_id)
-    with transaction.atomic():
-        map_and_merge_opinions(cluster_id, harvard_data)
-        clean_dictionary = combine_non_overlapping_data(
-            cluster_id, harvard_data
-        )
-        if clean_dictionary != {}:
-            logging.info(f"Merging complete for: {cluster_id}")
+    if harvard_data:
+        with transaction.atomic():
+            map_and_merge_opinions(cluster_id, harvard_data)
+            clean_dictionary = combine_non_overlapping_data(
+                cluster_id, harvard_data
+            )
+            if clean_dictionary != {}:
+                logging.info(f"Merging complete for: {cluster_id}")
 
-        long_fields = [
-            "syllabus",
-            "summary",
-            "history",
-            "headnotes",
-            "correction",
-        ]
+            long_fields = [
+                "syllabus",
+                "summary",
+                "history",
+                "headnotes",
+                "correction",
+            ]
 
-        # TODO what about case name fields, date filed or docker number field from harvard?
+            # TODO what about case name fields, date filed or docker number
+            #  field from harvard?
 
-        for key in clean_dictionary.keys():
-            if key in long_fields.extend(["seealso", "disposition"]):
-                merge_long_fields(cluster_id, key, clean_dictionary.get(key))
-            elif key in ["date_filed", "otherdate"]:
-                merge_dates(cluster_id, key, clean_dictionary.get(key))
-            elif key == "judges":
-                merge_judges(cluster_id, key, clean_dictionary.get(key))
-            elif key == "attorneys":
-                merge_strings(cluster_id, key, clean_dictionary.get(key))
-            else:
-                logging.info(f"Field not considered in the proccess: {key}")
+            for key in clean_dictionary.keys():
+                if key in long_fields.extend(["seealso", "disposition"]):
+                    merge_long_fields(cluster_id, key,
+                                      clean_dictionary.get(key))
+                elif key in ["date_filed", "otherdate"]:
+                    merge_dates(cluster_id, key, clean_dictionary.get(key))
+                elif key == "judges":
+                    merge_judges(cluster_id, key, clean_dictionary.get(key))
+                elif key == "attorneys":
+                    merge_strings(cluster_id, key, clean_dictionary.get(key))
+                else:
+                    logging.info(
+                        f"Field not considered in the proccess: {key}")
+    else:
+        logging.info(f"Cluster id: {cluster_id} doesn't have a json file.")
 
 
 def start_merger(cluster_id=None):
     """Start the merger
 
     Query the database for a list of opinions that have not been merged yet
-
     :param cluster_id: Cluster ID if available
     :return: None
     """
@@ -222,7 +260,6 @@ def fetch_cl_opinion_content(sub_opinions: [Opinion]) -> [str]:
 
     This is a simple helper function to grab an opinion content to compare
     against the harvard xml
-
     :param sub_opinions: Sub opinions for a cluster
     :return: Opinion text as a list
     """
@@ -249,7 +286,6 @@ def fetch_cl_opinion_content(sub_opinions: [Opinion]) -> [str]:
 
 def map_and_merge_opinions(cluster: str, harvard_data: Dict[str, Any]) -> None:
     """Map and merge opinion data
-
     :param cluster: Cluster ID
     :return: None
     """
