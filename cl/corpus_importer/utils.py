@@ -1,8 +1,14 @@
 from datetime import date
-from typing import Optional
+from typing import Any, Optional
 
 from django.utils.timezone import now
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
+from cl.corpus_importer.management.commands.harvard_opinions import (
+    compare_documents,
+)
+from cl.lib.string_diff import get_cosine_similarity
 from cl.search.models import Docket
 
 
@@ -42,3 +48,51 @@ def get_start_of_quarter(d: Optional[date] = None) -> date:
         date(d_year, 10, 1),
     ]
     return max([q for q in quarter_dates if q <= d])
+
+
+def similarity_scores(list1: [str], list2: [str]) -> list[list[float]]:
+    """Get similiarity scores between two sets of lists
+
+    Using TF-IDF/Term Frequency-Inverse Document Frequency
+    we use word frequency to generate a similarity score between the corpora
+
+    :param list1: List of text to compare
+    :param list2: List of text to compare
+    :return: Return similarity scores
+    """
+    X = TfidfVectorizer().fit_transform(list1 + list2)
+    scores = cosine_similarity(X[: len(list1)], X[len(list1) :])
+    return scores
+
+
+def match_lists(list1: [str], list2: [str]) -> bool | dict[int, Any]:
+    """Generate matching lists above threshold
+
+    :param list1: Harvard Opinions
+    :param list2: CL opinions
+    :return: Matches if found or False
+    """
+    scores = similarity_scores(list1, list2)
+
+    matches = {}
+    for i, row in enumerate(scores):
+        j = row.argmax()
+        if get_cosine_similarity(list1[i], list2[j]) < 0.85:
+            # .89 something occurred ... maybe lower
+            # this is for testing purposes - remove later
+            print("CO SINE TOO LOW", get_cosine_similarity(list1[i], list2[j]))
+            continue
+        percent_match = compare_documents(list1[i], list2[j])
+        if percent_match < 60:
+            # this is to be removed later
+            print("TOO LOW OF A MATCH", percent_match)
+            continue
+        matches[i] = j
+
+    if (
+        not list(range(0, len(list1)))
+        == sorted(list(matches.keys()))
+        == sorted(list(matches.values()))
+    ):
+        return False
+    return matches

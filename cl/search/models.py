@@ -207,7 +207,13 @@ class Docket(AbstractDateTimeModel):
     COLUMBIA_AND_SCRAPER_AND_IDB = 14
     COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB = 15
     HARVARD = 16
-    SCRAPER_AND_HARVARD = 17  # This should be 18; 17 s/b HARVARD_AND_RECAP.
+    RECAP_AND_HARVARD = 17
+    SCRAPER_AND_HARVARD = 18
+    RECAP_AND_SCRAPER_AND_HARVARD = 19
+    COLUMBIA_AND_HARVARD = 20
+    COLUMBIA_AND_RECAP_AND_HARVARD = 21
+    COLUMBIA_AND_SCRAPER_AND_HARVARD = 22
+    COLUMBIA_AND_RECAP_AND_SCRAPER_AND_HARVARD = 23
     DIRECT_INPUT = 32
     ANON_2020 = 64
     ANON_2020_AND_SCRAPER = 66
@@ -234,7 +240,16 @@ class Docket(AbstractDateTimeModel):
             "Columbia, RECAP, Scraper, and IDB",
         ),
         (HARVARD, "Harvard"),
+        (RECAP_AND_HARVARD, "RECAP and Harvard"),
         (SCRAPER_AND_HARVARD, "Scraper and Harvard"),
+        (RECAP_AND_SCRAPER_AND_HARVARD, "RECAP, Scraper and Harvard"),
+        (COLUMBIA_AND_HARVARD, "Columbia and Harvard"),
+        (COLUMBIA_AND_RECAP_AND_HARVARD, "Columbia, RECAP and Harvard"),
+        (COLUMBIA_AND_SCRAPER_AND_HARVARD, "Columbia, Scraper and Harvard"),
+        (
+            COLUMBIA_AND_RECAP_AND_SCRAPER_AND_HARVARD,
+            "Columbia, Recap, Scraper and Harvard",
+        ),
         (DIRECT_INPUT, "Direct court input"),
         (ANON_2020, "2020 anonymous database"),
         (ANON_2020_AND_SCRAPER, "2020 anonymous database and Scraper"),
