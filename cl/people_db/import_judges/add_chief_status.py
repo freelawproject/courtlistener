@@ -61,7 +61,6 @@ def make_title(item):
 
 
 if __name__ == "__main__":
-
     import pandas as pd
 
     df = pd.read_excel("_")

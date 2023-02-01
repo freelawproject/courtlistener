@@ -6,7 +6,6 @@ from cl.lib.admin import AdminTweaksMixin
 
 
 class Base(CursorPaginatorAdmin, AdminTweaksMixin):
-
     readonly_fields = (
         "date_created",
         "date_modified",
@@ -20,7 +19,6 @@ class DocumentFiledInline(admin.TabularInline, AdminTweaksMixin):
 
 @admin.register(Docket)
 class DocketAdmin(Base):
-
     inlines = [
         DocumentFiledInline,
     ]

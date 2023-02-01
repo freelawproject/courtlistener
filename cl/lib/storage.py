@@ -72,7 +72,6 @@ class AWSMediaStorage(S3Boto3Storage):
 
 
 class IncrementingAWSMediaStorage(AWSMediaStorage):
-
     file_overwrite = False
 
     def get_available_name(

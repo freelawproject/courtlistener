@@ -1190,7 +1190,7 @@ class DescriptionScoreTest(SimpleTestCase):
         ]
         num_correct = 0
         failed_cases = []
-        for (desc_a, desc_b, correct_idx) in test_cases:
+        for desc_a, desc_b, correct_idx in test_cases:
             score_a, score_b = (
                 parenthetical_score(
                     desc[0], OpinionCluster(citation_count=desc[1])

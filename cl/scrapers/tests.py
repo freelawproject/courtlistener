@@ -78,7 +78,6 @@ class ScraperIngestionTest(TestCase):
 
 
 class IngestionTest(TestCase):
-
     fixtures = [
         "test_court.json",
         "judge_judy.json",

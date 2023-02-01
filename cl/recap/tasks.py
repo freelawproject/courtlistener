@@ -759,7 +759,6 @@ def process_recap_claims_register(self, pk):
     bind=True, max_retries=3, interval_start=5 * 60, interval_step=5 * 60
 )
 def process_recap_docket_history_report(self, pk):
-
     """Process the docket history report.
 
     :param pk: The primary key of the processing queue item you want to work on
@@ -1859,7 +1858,6 @@ def download_pacer_pdf_and_save_to_pq(
     appellate: bool,
     attachment_number: int = None,
 ) -> ProcessingQueue:
-
     """Try to download a PACER document from the notification via the magic
     link and store it in a ProcessingQueue object. So it can be copied to every
     Case/RECAPDocument (multi-docket NEFs). In case of a failure/retry in any
@@ -1884,7 +1882,10 @@ def download_pacer_pdf_and_save_to_pq(
     """
 
     with transaction.atomic():
-        (pq, created,) = ProcessingQueue.objects.get_or_create(
+        (
+            pq,
+            created,
+        ) = ProcessingQueue.objects.get_or_create(
             uploader_id=user_pk,
             pacer_doc_id=pacer_doc_id,
             pacer_case_id=pacer_case_id,

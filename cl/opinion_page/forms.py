@@ -98,7 +98,6 @@ class DocketEntryFilterForm(forms.Form):
 
 
 class CourtUploadForm(forms.Form):
-
     court_str = forms.CharField(required=True, widget=forms.HiddenInput())
     case_title = forms.CharField(
         label="Caption",
