@@ -9,10 +9,11 @@ from juriscraper.lib.string_utils import titlecase
 from lxml.html import fromstring
 
 from cl.corpus_importer.management.commands.harvard_opinions import (
-    parse_extra_fields,
+    parse_extra_fields, validate_dt,
 )
 from cl.corpus_importer.utils import match_lists
 from cl.lib.command_utils import VerboseCommand
+from cl.lib.string_diff import get_cosine_similarity
 from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.search.models import Docket, Opinion, OpinionCluster
 
@@ -83,8 +84,74 @@ def combine_non_overlapping_data(
         else:
             # harvard data vs. cl data to decide what to do
             clean_dictionary[key] = (value, cl_value)
-    clean_dictionary = {"attorney": ("HARVARd VALUE", "CL VALUE")}
+
     return clean_dictionary
+
+
+def merge_long_fields(cluster_id, key, data):
+    harvard_data = data[0]
+    cl_data = data[1]
+    # Do some text comparison
+    similarity = get_cosine_similarity(harvard_data,
+                                       cl_data)
+    print(f"{key} similarity: {similarity}")
+    if similarity < 0.9:
+        # which one is best? the longest?
+        if len(harvard_data) > len(cl_data):
+            OpinionCluster.objects.filter(id=cluster_id).update(
+                **{key: harvard_data})
+
+
+def merge_judges(cluster_id, key, data):
+    harvard_data = data[0]
+    cl_data = data[1]
+    # let's normalize cl data, if it is already normalized, we will
+    # get similar string, if not, then this is a good chance to
+    # do it and then compare
+    judges_last_names = [extract_judge_last_name(cl_data)]
+    # Flatten and dedupe list of judges
+    judges = ", ".join(
+        sorted(
+            list(set(itertools.chain.from_iterable(
+                judges_last_names)))
+        )
+    )
+    cl_data = titlecase(judges)
+    similarity = get_cosine_similarity(harvard_data, cl_data)
+    print("Judges similarity", similarity)
+    if 0.51 <= similarity <= 0.81:
+        # Contains some judge names but not all of them, update
+        # data with normalized judges names
+        OpinionCluster.objects.filter(id=cluster_id).update(
+            **{key: harvard_data})
+
+
+def merge_dates(cluster_id, key, data):
+    # Which date is better?
+    harvard_data = data[0]
+    cluster = OpinionCluster.objects.filter(id=cluster_id).first()
+    harvard_date, harvard_date_is_approximate = validate_dt(harvard_data)
+    if cluster.date_filed_is_approximate and not harvard_date_is_approximate:
+        # if harvard date is not approximate, it should be better
+        OpinionCluster.objects.filter(id=cluster_id).update(
+            **{key: harvard_date})
+
+
+def merge_strings(cluster_id, key, data):
+    harvard_data = data[0]
+    cl_data = data[1]
+    if len(harvard_data) > len(cl_data):
+        OpinionCluster.objects.filter(id=cluster_id).update(
+            **{key: harvard_data})
+
+
+def merge_bool_values(cluster_id, key, data):
+    harvard_data = data[0]
+    cl_data = data[1]
+    if harvard_data != cl_data:
+        # bool value changed, keep the one in harvard data
+        OpinionCluster.objects.filter(id=cluster_id).update(
+            **{key: harvard_data})
 
 
 def merge_opinion_clusters(cluster_id: str) -> None:
@@ -102,15 +169,27 @@ def merge_opinion_clusters(cluster_id: str) -> None:
         if clean_dictionary != {}:
             logging.info(f"Merging complete for: {cluster_id}")
 
-        # TODO Merging code
-        # if "attorney" in clean_dictionary.keys():
-        # merge_attorneys()
-        # if "headnotes" in clean_dictionary.keys():
-        # merge_headnotes()
-        # if "summary" in clean_dictionary.keys():
-        # merge_summary()
-        # if "judges" in clean_dictionary.keys():
-        # merge_judges()
+        long_fields = [
+            "syllabus",
+            "summary",
+            "history",
+            "headnotes",
+            "correction",
+        ]
+
+        # TODO what about case name fields, date filed or docker number field from harvard?
+
+        for key in clean_dictionary.keys():
+            if key in long_fields.extend(["seealso", "disposition"]):
+                merge_long_fields(cluster_id, key, clean_dictionary.get(key))
+            elif key in ["date_filed", "otherdate"]:
+                merge_dates(cluster_id, key, clean_dictionary.get(key))
+            elif key == "judges":
+                merge_judges(cluster_id, key, clean_dictionary.get(key))
+            elif key == "attorneys":
+                merge_strings(cluster_id, key, clean_dictionary.get(key))
+            else:
+                logging.info(f"Field not considered in the proccess: {key}")
 
 
 def start_merger(cluster_id=None):
@@ -208,7 +287,6 @@ class Command(VerboseCommand):
     help = "Merge harvard opinions into CL opinions"
 
     def add_arguments(self, parser):
-
         parser.add_argument(
             "--cluster-id",
             type=str,
