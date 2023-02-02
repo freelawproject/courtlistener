@@ -64,7 +64,7 @@ cnt = CaseNameTweaker()
 
 def confirm_docket_number_core_lookup_match(
     kwargs: dict[str, str | None], docket: Docket, docket_number: str
-):
+) -> Docket | None:
     """Confirm if the docket_number_core lookup match returns the right docket
     when pacer_case_id is None, by confirming the docket_number also matches.
 
@@ -105,9 +105,7 @@ def find_docket_object(
             "pacer_case_id": pacer_case_id,
             "docket_number_core": docket_number_core,
         },
-        {
-            "pacer_case_id": pacer_case_id
-        },  # check if when this lookup is used, docket_number_core is not required in confirm_docket_number_core_lookup_match
+        {"pacer_case_id": pacer_case_id},
     ]
     if docket_number_core:
         # Sometimes we don't know how to make core docket numbers. If that's
@@ -134,7 +132,7 @@ def find_docket_object(
                 kwargs, d, docket_number
             )
             if d:
-                break
+                break  # Nailed it!
         elif count > 1:
             # Choose the oldest one and live with it.
             d = ds.earliest("date_created")
