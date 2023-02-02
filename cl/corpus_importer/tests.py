@@ -1092,14 +1092,20 @@ class HarvardMergerTests(TestCase):
         cluster = OpinionClusterWithParentsFactory(
             judges="Barbera",
         )
-        # Can we merge judges appropriately
+        # clean_dictionary after preprocess {"judges":(harvard_data, cl_data)}
         cd = {
             "judges": (
                 "Adkins, Barbera, Getty, Greene, Hotten, McDonald, Watts",
                 "Barbera",
             )
         }
-        merge_judges(cluster.pk, "judges", cd.get("judges"))
+
+        # Original value from harvard case without preprocess
+        raw_judges_harvard = "Argued before Barbera, C.J., Greene,* Adkins, " \
+                             "McDonald, Watts, Hotten, Getty, JJ. "
+
+        merge_judges(cluster.pk, "judges", cd.get("judges"),
+                     raw_judges_harvard)
         cluster.refresh_from_db()
 
         # Test best option selected for judges is in harvard data
@@ -1108,20 +1114,24 @@ class HarvardMergerTests(TestCase):
             "Adkins, Barbera, Getty, Greene, Hotten, McDonald, Watts",
         )
 
-        # Test 2: best option for judges is already in courtlistener
-        # From cluster id 4573873
+        # Test 2: Example from CL #4573873
         cluster_2 = OpinionClusterWithParentsFactory(
             judges="Simpson, J. ~ Concurring Opinion by Pellegrini, Senior Judge",
         )
 
+        # preprocessed values {"judges":(harvard_data, cl_data)}
         cd = {
             "judges": (
                 "Simpson",
-                "Simpson, J. ~ Concurring Opinion by Pellegrini, Senior Judge",
+                "Pellegrini, Simpson",
             )
         }
 
-        merge_judges(cluster_2.pk, "judges", cd.get("judges"))
+        # Original value from harvard case without preprocess
+        raw_judges_harvard = "OPINION BY JUDGE SIMPSON"
+
+        merge_judges(cluster_2.pk, "judges", cd.get("judges"),
+                     raw_judges_harvard)
         cluster_2.refresh_from_db()
 
         # Best option selected for judges is already in cl
@@ -1130,12 +1140,12 @@ class HarvardMergerTests(TestCase):
             "Simpson, J. ~ Concurring Opinion by Pellegrini, Senior Judge",
         )
 
-        # Test 3: best option for judges is in harvard data
-        # From cluster id 4576003
+        # Test 3: Example from CL #4576003
         cluster_3 = OpinionClusterWithParentsFactory(
             judges="French, J.",
         )
 
+        # preprocessed values {"judges":(harvard_data, cl_data)}
         cd = {
             "judges": (
                 "Fischer, French, Kennedy",
@@ -1143,11 +1153,39 @@ class HarvardMergerTests(TestCase):
             )
         }
 
-        merge_judges(cluster_3.pk, "judges", cd.get("judges"))
+        # Original value from harvard case without preprocess
+        raw_judges_harvard = "Fischer, J., dissenting., French, J., Kennedy, J., dissenting."
+
+        merge_judges(cluster_3.pk, "judges", cd.get("judges"),
+                     raw_judges_harvard)
         cluster_3.refresh_from_db()
 
         # Test best option selected for judges is in harvard data
         self.assertEqual(cluster_3.judges, "Fischer, French, Kennedy")
+
+        # Test 4: Example from CL #4571591
+        cluster_4 = OpinionClusterWithParentsFactory(
+            judges="Leavitt, President Judge",
+        )
+
+        # preprocessed values {"judges":(harvard_data, cl_data)}
+        cd = {
+            "judges": (
+                "Leavitt",
+                "Leavitt",
+            )
+        }
+
+        # Original value from harvard case without preprocess
+        raw_judges_harvard = "OPINION BY PRESIDENT JUDGE LEAVITT"
+
+        merge_judges(cluster_4.pk, "judges", cd.get("judges"),
+                     raw_judges_harvard)
+        cluster_4.refresh_from_db()
+
+        # Test best option selected for judges is in harvard data
+        self.assertEqual(cluster_4.judges,
+                         "Opinion by President Judge Leavitt")
 
     # class HarvardMergerTests(TestCase):
     #     def setUp(self):
