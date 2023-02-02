@@ -84,15 +84,13 @@ def combine_non_overlapping_data(
     opinion_cluster = OpinionCluster.objects.get(id=cluster_id)
     all_data = fetch_non_harvard_data(harvard_data)
     clean_dictionary = {}
-    for key, value in list(all_data.items()):
+    for key, value in all_data.items():
         cl_value = getattr(opinion_cluster, key)
         if not cl_value:
             OpinionCluster.objects.filter(id=cluster_id).update(**{key: value})
-            del all_data[key]
         else:
-            # harvard data vs. cl data to decide what to do
-            clean_dictionary[key] = (value, cl_value)
-
+            if value != cl_value:
+                clean_dictionary[key] = (value, cl_value)
     return clean_dictionary
 
 
