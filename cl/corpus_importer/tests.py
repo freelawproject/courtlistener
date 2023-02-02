@@ -991,6 +991,99 @@ class CorpusImporterManagementCommmandsTests(TestCase):
 
 
 class HarvardMergerTests(TestCase):
+    def setUp(self):
+        """Setup harvard tests
+
+        This setup is a little distinct from normal ones.  Here we are actually
+        setting up our patches which are used by the majority of the tests.
+        Each one can be used or turned off.  See the teardown for more.
+        :return:
+        """
+        self.read_json_patch = patch(
+            "cl.corpus_importer.management.commands.harvard_merge.read_json"
+        )
+        self.read_json_func = self.read_json_patch.start()
+
+    def tearDown(self) -> None:
+        """Tear down patches and remove added objects"""
+        Docket.objects.all().delete()
+        self.read_json_patch.stop()
+
+    def test_merger(self):
+        """Can we identify opinions correctly even when they are slightly different."""
+
+        case_data = {
+            "name": "CANNON v. THE STATE",
+            "name_abbreviation": "Cannon v. State",
+            "decision_date": "1944-11-18",
+            "docket_number": "30614",
+            "casebody": {
+                "status": "ok",
+                "data": '<casebody firstpage="757" lastpage="758" xmlns="http://nrs.harvard.edu/urn-3:HLS.Libr.US_Case_Law.Schema.Case_Body:v1">\n  <docketnumber id="b795-7">30614.</docketnumber>\n  <parties id="AAY">CANNON <em>v. </em>THE STATE.</parties>\n  <decisiondate id="b795-9">Decided November 18, 1944.</decisiondate>\n  <attorneys id="b796-4"><page-number citation-index="1" label="758">*758</page-number><em>B. B. Giles, </em>for plaintiff in error.</attorneys>\n  <attorneys id="b796-5"><em>Lindley W. Gamp, solicitor, John A. Boyhin, solicitor-general,. Durwood T. Bye, </em>contra.</attorneys>\n  <opinion type="majority">\n    <author id="b796-6">Broyles, C. J.</author>\n    <p id="Auq">(After stating the foregoing facts.) After the-disposal of counts 2 and 3, the only charge before the court and jury was that the defendant had sold distilled spirits and alcohol as a retail dealer, without first obtaining a license from the State Revenue Commissioner. The evidence adduced to show the guilt, of the accused on count 1 was wholly circumstantial, and was insufficient to exclude every reasonable hypothesis except that of his-guilt, and it failed to show beyond a reasonable doubt that he had sold distilled spirits or alcohol. The cases of <em>Thomas </em>v. <em>State, </em>65 <em>Ga. App. </em>749 (16 S. E. 2d, 447), and <em>Martin </em>v. <em>State, </em>68 <em>Ga. App. </em>169 (22 S. E. 2d, 193), cited in behalf of the defendant in error, are distinguished by their facts from this case. The verdict was-contrary to law and the evidence; and the overruling of the certiorari was error. <em>Judgment reversed.</em></p>\n    <judges id="Ae85">\n      <em>MacIntyre, J., concurs.</em>\n    </judges>\n  </opinion>\n  <opinion type="concurrence">\n    <author id="b796-7">Gardner, J.,</author>\n    <p id="AK2">concurring specially: Under the record the judgment should be reversed for another reason. Since the jury, based on the same evidence, found the defendant not guilty on count 2 for possessing liquors, and a verdict finding him guilty on count 1 for selling intoxicating liquors, the verdicts are repugnant and void as being inconsistent verdicts by the same jury based on the same \'evidence. <em>Britt </em>v. <em>State, </em>36 <em>Ga. App. </em>668 (137 S. E. 791), and cit.; <em>Kuck </em>v. <em>State, </em>149 <em>Ga. </em>191 (99 S. E. 622). I concur in the reversal for this additional reason.</p>\n  </opinion>\n</casebody>\n',
+            },
+        }
+        self.read_json_func.return_value = case_data
+
+        lead = """<p>The overruling of the certiorari was error.</p>
+            <p><center>                       DECIDED NOVEMBER 18, 1944.</center>
+            John Cannon was tried in the criminal court of Fulton County on an accusation containing three counts. Count I charged that in said county on July 24, 1943, he "did engage in and sell, as a retail dealer, distilled spirits and alcohol, without first obtaining a license from the State Revenue Commissioner of the State of Georgia." Count 2 charged that on July 24, 1943, he possessed forty-eight half pints and three pints of whisky in Fulton County, and had not been licensed by the State Revenue Commissioner to sell whisky as a retail or wholesale dealer. Count 3 charged that on September 24, 1943, in said county, he sold malt beverages as a retail dealer, without first securing a license from the State Revenue Commissioner. On the trial, after the close of the State's evidence, counsel for the accused made a motion that count 2 be stricken, and that a verdict for the defendant be directed on counts 1 and 3. The court sustained the motion as to counts 2 and 3, but overruled it as to count 1. The jury returned a verdict of guilty on count 1, and of not guilty on counts 2 and 3. Subsequently the defendant's certiorari was overruled by a judge of the superior court and that judgment is assigned as error. <span class="star-pagination">*Page 758</span>
+            After the disposal of counts 2 and 3, the only charge before the court and jury was that the defendant had sold distilled spirits and alcohol as a retail dealer, without first obtaining a license from the State Revenue Commissioner. The evidence adduced to show the guilt of the accused on count 1 was wholly circumstantial, and was insufficient to exclude every reasonable hypothesis except that of his guilt, and it failed to show beyond a reasonable doubt that he had sold distilled spirits or alcohol. The cases of <em>Thomas</em> v. <em>State,</em> <cross_reference><span class="citation no-link">65 Ga. App. 749</span></cross_reference> (<cross_reference><span class="citation" data-id="3407553"><a href="/opinion/3412403/thomas-v-state/">16 S.E.2d 447</a></span></cross_reference>), and <em>Martin</em> v. <em>State,</em> <cross_reference><span class="citation no-link">68 Ga. App. 169</span></cross_reference> (<cross_reference><span class="citation" data-id="3405716"><a href="/opinion/3410794/martin-v-state/">22 S.E.2d 193</a></span></cross_reference>), cited in behalf of the defendant in error, are distinguished by their facts from this case. The verdict was contrary to law and the evidence; and the overruling of the certiorari was error.</p>
+            <p><em>Judgment reversed. MacIntyre, J., concurs.</em></p>"""
+        concurrence = """<p>Under the record the judgment should be reversed for another reason. Since the jury, based on the same evidence, found the defendant not guilty on count 2 for possessing liquors, and a verdict finding him guilty on count 1 for selling intoxicating liquors, the verdicts are repugnant and void as being inconsistent verdicts by the same jury based on the same evidence. <em>Britt</em> v. <em>State,</em> <cross_reference><span class="citation no-link">36 Ga. App. 668</span></cross_reference>
+            (<cross_reference><span class="citation no-link">137 S.E. 791</span></cross_reference>), and cit.; <em>Kuck</em> v. <em>State,</em> <cross_reference><span class="citation" data-id="5582722"><a href="/opinion/5732248/kuck-v-state/">149 Ga. 191</a></span></cross_reference>
+            (<cross_reference><span class="citation no-link">99 S.E. 622</span></cross_reference>). I concur in the reversal for this additional reason.</p>"""
+
+        cluster = OpinionClusterFactoryMultipleOpinions(
+            docket=DocketFactory(),
+            sub_opinions__data=[
+                {"type": "020lead", "html_with_citations": lead},
+                {"type": "030concurrence", "html_with_citations": concurrence},
+            ],
+        )
+
+        self.assertEqual(
+            OpinionCluster.objects.get(id=cluster.id).attorneys, "", msg="WHAT"
+        )
+
+        self.assertEqual(Opinion.objects.all().count(), 2)
+        merge_opinion_clusters(cluster_id=cluster.id)
+        self.assertEqual(Opinion.objects.all().count(), 2)
+
+    def test_non_overlapping(self):
+        """Can we find fields that need merging"""
+
+        case_data = {
+            "casebody": {
+                "status": "ok",
+                "data": '<casebody> <attorneys><page-number citation-index="1" label="758">*758</page-number><em>B. B. Giles, </em>for plaintiff in error.</attorneys>\n  <attorneys id="b796-5"><em>Lindley W. Gamp, solicitor, John A. Boyhin, solicitor-general,. Durwood T. Bye, </em>contra.</attorneys>\n  <opinion type="majority"> a simple opinion</opinion>\n</casebody>\n',
+            },
+        }
+        self.read_json_func.return_value = case_data
+
+        cluster = OpinionClusterFactoryMultipleOpinions(
+            docket=DocketFactory(),
+            attorneys="B. B. Giles, Lindley W. Gamp, and John A. Boyhin",  # cl value
+        )
+        clean_dictionary = combine_non_overlapping_data(cluster.id, case_data)
+        self.assertEqual(
+            clean_dictionary,
+            {
+                "attorneys": (
+                    "B. B. Giles, for plaintiff in error., Lindley W. Gamp, solicitor, John A. Boyhin, solicitor-general,. Durwood T. Bye, contra.",
+                    "B. B. Giles, Lindley W. Gamp, and John A. Boyhin",
+                )
+            },
+            msg="Should find differences to merge",
+        )
+
+        # Test that we can ignore matching fields
+        cluster = OpinionClusterFactoryMultipleOpinions(
+            docket=DocketFactory(),
+            attorneys="B. B. Giles, for plaintiff in error., Lindley W. Gamp, solicitor, John A. Boyhin, solicitor-general,. Durwood T. Bye, contra.",
+        )
+        clean_dictionary = combine_non_overlapping_data(cluster.id, case_data)
+        self.assertEqual(clean_dictionary, {}, msg="Attorneys are the same")
+
     def test_merge_overlap_judges(self):
         """Test merge judge names when overlap exist"""
         for court in ["md", "pacommwct", "ohio"]:
