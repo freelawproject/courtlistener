@@ -1,3 +1,4 @@
+import datetime
 import itertools
 import json
 import logging
@@ -94,36 +95,36 @@ def combine_non_overlapping_data(
     return clean_dictionary
 
 
-def merge_long_fields(cluster_id, key, data) -> None:
+def merge_long_fields(cluster_id: str, field_name: str,
+                      overlapping_data: Tuple[str, str]) -> None:
     """Merge two long text fields
 
     :param cluster_id: Cluster id to update
-    :param key: field name to update in opinion cluster
-    :param data: data to compare
+    :param field_name: field name to update in opinion cluster
+    :param overlapping_data: data to compare from harvard and courtlistener
     :return: None
     """
-    harvard_data = data[0]
-    cl_data = data[1]
+    harvard_data, cl_data = overlapping_data[0], overlapping_data[1]
     # Do some text comparison
     similarity = get_cosine_similarity(harvard_data, cl_data)
     if similarity < 0.9:
         # they are not too similar, choose the larger one
         if len(harvard_data) > len(cl_data):
             OpinionCluster.objects.filter(id=cluster_id).update(
-                **{key: harvard_data}
+                **{field_name: harvard_data}
             )
 
 
-def merge_judges(cluster_id, key, data) -> None:
+def merge_judges(cluster_id: str, field_name: str,
+                 overlapping_data: Tuple[str, str]) -> None:
     """Merge overlapping judge values
 
     :param cluster_id: Cluster id to update
-    :param key: field name to update in opinion cluster
-    :param data: data to compare
+    :param field_name: field name to update in opinion cluster
+    :param overlapping_data: data to compare from harvard and courtlistener
     :return: None
     """
-    harvard_data = data[0]
-    cl_data = data[1]
+    harvard_data, cl_data = overlapping_data[0], overlapping_data[1]
     # let's normalize cl data, if it is already normalized, we will
     # get similar string, if not, then this is a good chance to
     # do it and then compare
@@ -141,59 +142,60 @@ def merge_judges(cluster_id, key, data) -> None:
         if harvard_judges_count > cl_judges_count:
             # Harvard judges count is bigger than cl count, then update judges
             OpinionCluster.objects.filter(id=cluster_id).update(
-                **{key: harvard_data}
+                **{field_name: harvard_data}
             )
 
 
-def merge_dates(cluster_id, key, data) -> None:
+def merge_dates(cluster_id: str, field_name: str,
+                overlapping_data: Tuple[str, datetime.date]) -> None:
     """Compare two dates and choose the best to update the opinion cluster
     the value if one value is better than the other
 
     :param cluster_id: Cluster id to update
-    :param key: field name to update in opinion cluster
-    :param data: data to compare
+    :param field_name: field name to update in opinion cluster
+    :param overlapping_data: data to compare
     :return: None
     """
-    harvard_data = data[0]
+    harvard_data = overlapping_data[0]
     cluster = OpinionCluster.objects.filter(id=cluster_id).first()
     harvard_date, harvard_date_is_approximate = validate_dt(harvard_data)
     if cluster.date_filed_is_approximate and not harvard_date_is_approximate:
         # if harvard date is not approximate, it should be better
         OpinionCluster.objects.filter(id=cluster_id).update(
-            **{key: harvard_date}
+            **{field_name: harvard_date}
         )
 
 
-def merge_strings(cluster_id, key, data) -> None:
+def merge_strings(cluster_id: str, field_name: str,
+                  overlapping_data: Tuple[str, str]) -> None:
     """Compare two strings and choose the largest
 
     :param cluster_id: Cluster id to update
-    :param key: field name to update in opinion cluster
-    :param data: data to compare
+    :param field_name: field name to update in opinion cluster
+    :param overlapping_data: data to compare from harvard and courtlistener
     :return: None
     """
-    harvard_data = data[0]
-    cl_data = data[1]
+    harvard_data, cl_data = overlapping_data[0], overlapping_data[1]
     if len(harvard_data) > len(cl_data):
         OpinionCluster.objects.filter(id=cluster_id).update(
-            **{key: harvard_data}
+            **{field_name: harvard_data}
         )
 
 
-def merge_bool_values(cluster_id, key, data) -> None:
+def merge_bool_values(cluster_id: str, field_name: str,
+                      overlapping_data: Tuple[bool, bool]) -> None:
     """Compare two boolean values and update the value in opinion cluster
     if this changed
 
-    :param key: field name to update in opinion cluster
-    :param data: data to compare
+    :param field_name: field name to update in opinion cluster
+    :param overlapping_data: data to compare from harvard and courtlistener
     :return: None
     """
-    harvard_data = data[0]
-    cl_data = data[1]
+    harvard_data, cl_data = overlapping_data[0], overlapping_data[1]
     if harvard_data != cl_data:
         # Boolean value changed, keep the one in harvard data
         OpinionCluster.objects.filter(id=cluster_id).update(
-            **{key: harvard_data}
+            **{field_name: harvard_data}
         )
 
 
@@ -225,7 +227,7 @@ def merge_opinion_clusters(cluster_id: str) -> None:
             #  field from harvard?
 
             for key in clean_dictionary.keys():
-                if key in long_fields.extend(["seealso", "disposition"]):
+                if key in long_fields.extend(["disposition"]):
                     merge_long_fields(
                         cluster_id, key, clean_dictionary.get(key)
                     )
