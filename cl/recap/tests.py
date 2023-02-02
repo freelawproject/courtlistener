@@ -454,7 +454,6 @@ class RecapUploadsTest(TestCase):
             "cl.recap.tasks.get_data_from_appellate_att_report",
             side_effect=lambda x, y: self.att_data,
         ):
-
             process_recap_appellate_attachment(pq_1.pk)
 
         # Process the attachment page again, no new attachments should be added
@@ -5248,7 +5247,6 @@ class WebhooksRetries(TestCase):
             # Deliver webhook_e1 successfully.
             next_retry_date = fake_now + timedelta(minutes=3)
             with time_machine.travel(next_retry_date, tick=False):
-
                 webhooks_to_retry = retry_webhook_events()
                 self.assertEqual(webhooks_to_retry, 1)
                 self.assertEqual(

@@ -270,7 +270,6 @@ class ViewRecapDocketTest(TestCase):
 
 
 class OgRedirectLookupViewTest(TestCase):
-
     fixtures = ["recap_docs.json"]
 
     def setUp(self) -> None:

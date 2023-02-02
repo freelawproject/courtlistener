@@ -218,7 +218,6 @@ def clone_docket(
             del docket_data[f]
 
         with transaction.atomic():
-
             # Get or create required objects
             docket_data["court"] = (
                 clone_court(session, [get_id_from_url(docket_data["court"])])[

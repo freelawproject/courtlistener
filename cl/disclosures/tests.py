@@ -28,7 +28,6 @@ from cl.tests.cases import TestCase
 
 
 class DisclosureIngestionTest(TestCase):
-
     test_file = os.path.join(
         settings.INSTALL_ROOT,
         "cl",

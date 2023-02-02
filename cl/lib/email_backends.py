@@ -39,7 +39,6 @@ class EmailBackend(BaseEmailBackend):
         self,
         email_messages: Sequence[EmailMessage | EmailMultiAlternatives],
     ) -> int:
-
         if not email_messages:
             return 0
         # Open a connection to the BASE_BACKEND set in settings (e.g: SES).

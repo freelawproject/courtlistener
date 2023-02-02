@@ -43,7 +43,6 @@ def cached_sitemap(
     template_name: str = "sitemap.xml",
     content_type: str = "application/xml",
 ) -> HttpResponse:
-
     """Copy the django sitemap code, but cache URLs
 
     See Django documentation for parameter details.

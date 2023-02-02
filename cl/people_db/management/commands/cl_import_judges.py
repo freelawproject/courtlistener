@@ -110,7 +110,6 @@ class Command(VerboseCommand):
             make_federal_judge(dict(row), testing=self.debug)
 
     def process_mag_bk_entries(self, df):
-
         bad_record = []
 
         textfields = [
@@ -143,7 +142,6 @@ class Command(VerboseCommand):
             print(b)
 
     def import_mag_bk_judges(self, infile=None):
-
         if infile is None:
             self.ensure_input_file()
             infile = self.options["input_file"]

@@ -52,7 +52,6 @@ from cl.users.factories import UserProfileWithParentsFactory
 
 
 class UpdateIndexCommandTest(SolrTestCase):
-
     args = [
         "--type",
         "search.Opinion",
@@ -889,7 +888,6 @@ class RelatedSearchTest(IndexedSolrTestCase):
 
 
 class GroupedSearchTest(EmptySolrTestCase):
-
     fixtures = ["opinions-issue-550.json"]
 
     def setUp(self) -> None:
