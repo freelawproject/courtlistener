@@ -18,6 +18,7 @@ from cl.corpus_importer.import_columbia.parse_opinions import (
 )
 from cl.corpus_importer.management.commands.harvard_merge import (
     combine_non_overlapping_data,
+    merge_docket_numbers,
     merge_judges,
     merge_opinion_clusters,
 )
@@ -297,7 +298,7 @@ class CourtMatchingTest(SimpleTestCase):
                 got,
                 d["answer"],
                 msg="\nDid not get court we expected: '%s'.\n"
-                    "               Instead we got: '%s'" % (d["answer"], got),
+                "               Instead we got: '%s'" % (d["answer"], got),
             )
 
     def test_get_fed_court_object_from_string(self) -> None:
@@ -478,12 +479,12 @@ class IAUploaderTest(TestCase):
             expected_num_attorneys,
             actual_num_attorneys,
             msg="Got wrong number of attorneys when making IA JSON. "
-                "Got %s, expected %s: \n%s"
-                % (
-                    actual_num_attorneys,
-                    expected_num_attorneys,
-                    first_party_attorneys,
-                ),
+            "Got %s, expected %s: \n%s"
+            % (
+                actual_num_attorneys,
+                expected_num_attorneys,
+                first_party_attorneys,
+            ),
         )
 
         first_attorney = first_party_attorneys[0]
@@ -494,7 +495,7 @@ class IAUploaderTest(TestCase):
             actual_num_roles,
             expected_num_roles,
             msg="Got wrong number of roles on attorneys when making IA JSON. "
-                "Got %s, expected %s" % (actual_num_roles, expected_num_roles),
+            "Got %s, expected %s" % (actual_num_roles, expected_num_roles),
         )
 
     def test_num_queries_ok(self) -> None:
@@ -669,7 +670,7 @@ Appeals, No. 19667-4-III, October 31, 2002. Denied September 30, 2003."
         self.read_json_func.return_value = CaseLawFactory(
             court=CaseLawCourtFactory.create(
                 name="United States Bankruptcy Court for the Northern "
-                     "District of Alabama "
+                "District of Alabama "
             )
         )
         self.assertSuccessfulParse(0)
@@ -723,7 +724,7 @@ delivered the opinion of the Court.</p></opinion> </casebody>'
         case_law = CaseLawFactory.create(
             casebody=CaseBodyFactory.create(
                 data='<casebody><opinion type="majority"><author '
-                     'id="b56-3">PER CURIAM:</author></casebody> '
+                'id="b56-3">PER CURIAM:</author></casebody> '
             ),
         )
         self.read_json_func.return_value = case_law
@@ -858,8 +859,8 @@ label="194">*194</page-number>
         # Check against itself, there must be an overlap
         case_1_data = {
             "case_name_full": "In the matter of S.J.S., a minor child. "
-                              "D.L.M. and D.E.M., Petitioners/Respondents v."
-                              " T.J.S.",
+            "D.L.M. and D.E.M., Petitioners/Respondents v."
+            " T.J.S.",
             "case_name_abbreviation": "D.L.M. v. T.J.S.",
             "case_name_cl": "D.L.M. v. T.J.S.",
             "overlaps": 2,
@@ -875,9 +876,9 @@ label="194">*194</page-number>
         # Check against different case name, there shouldn't be an overlap
         case_3_data = {
             "case_name_full": "Henry B. Wesselman et al., as Executors of "
-                              "Blanche Wesselman, Deceased, Respondents, "
-                              "v. The Engel Company, Inc., et al., "
-                              "Appellants, et al., Defendants",
+            "Blanche Wesselman, Deceased, Respondents, "
+            "v. The Engel Company, Inc., et al., "
+            "Appellants, et al., Defendants",
             "case_name_abbreviation": "Wesselman v. Engel Co.",
             "case_name_cl": " McQuillan v. Schechter",
             "overlaps": 0,
@@ -1085,6 +1086,14 @@ class HarvardMergerTests(TestCase):
         clean_dictionary = combine_non_overlapping_data(cluster.id, case_data)
         self.assertEqual(clean_dictionary, {}, msg="Attorneys are the same")
 
+    def test_docket_number_merger(self):
+        """Can we choose the correct docket number"""
+        docket = DocketFactory(docket_number="17-3000")
+        cluster = OpinionClusterWithParentsFactory(docket=docket)
+        merge_docket_numbers(cluster.id, "Master Docket No. 17-3000L")
+        docket.refresh_from_db()
+        self.assertEqual(docket.docket_number, "Master Docket No. 17-3000L")
+
     def test_merge_overlap_judges(self):
         """Test merge judge names when overlap exist"""
 
@@ -1101,11 +1110,14 @@ class HarvardMergerTests(TestCase):
         }
 
         # Original value from harvard case without preprocess
-        raw_judges_harvard = "Argued before Barbera, C.J., Greene,* Adkins, " \
-                             "McDonald, Watts, Hotten, Getty, JJ. "
+        raw_judges_harvard = (
+            "Argued before Barbera, C.J., Greene,* Adkins, "
+            "McDonald, Watts, Hotten, Getty, JJ. "
+        )
 
-        merge_judges(cluster.pk, "judges", cd.get("judges"),
-                     raw_judges_harvard)
+        merge_judges(
+            cluster.pk, "judges", cd.get("judges"), raw_judges_harvard
+        )
         cluster.refresh_from_db()
 
         # Test best option selected for judges is in harvard data
@@ -1130,8 +1142,9 @@ class HarvardMergerTests(TestCase):
         # Original value from harvard case without preprocess
         raw_judges_harvard = "OPINION BY JUDGE SIMPSON"
 
-        merge_judges(cluster_2.pk, "judges", cd.get("judges"),
-                     raw_judges_harvard)
+        merge_judges(
+            cluster_2.pk, "judges", cd.get("judges"), raw_judges_harvard
+        )
         cluster_2.refresh_from_db()
 
         # Best option selected for judges is already in cl
@@ -1154,10 +1167,13 @@ class HarvardMergerTests(TestCase):
         }
 
         # Original value from harvard case without preprocess
-        raw_judges_harvard = "Fischer, J., dissenting., French, J., Kennedy, J., dissenting."
+        raw_judges_harvard = (
+            "Fischer, J., dissenting., French, J., Kennedy, J., dissenting."
+        )
 
-        merge_judges(cluster_3.pk, "judges", cd.get("judges"),
-                     raw_judges_harvard)
+        merge_judges(
+            cluster_3.pk, "judges", cd.get("judges"), raw_judges_harvard
+        )
         cluster_3.refresh_from_db()
 
         # Test best option selected for judges is in harvard data
@@ -1179,13 +1195,15 @@ class HarvardMergerTests(TestCase):
         # Original value from harvard case without preprocess
         raw_judges_harvard = "OPINION BY PRESIDENT JUDGE LEAVITT"
 
-        merge_judges(cluster_4.pk, "judges", cd.get("judges"),
-                     raw_judges_harvard)
+        merge_judges(
+            cluster_4.pk, "judges", cd.get("judges"), raw_judges_harvard
+        )
         cluster_4.refresh_from_db()
 
         # Test best option selected for judges is in harvard data
-        self.assertEqual(cluster_4.judges,
-                         "Opinion by President Judge Leavitt")
+        self.assertEqual(
+            cluster_4.judges, "Opinion by President Judge Leavitt"
+        )
 
     # class HarvardMergerTests(TestCase):
     #     def setUp(self):

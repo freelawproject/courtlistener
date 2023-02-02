@@ -10,6 +10,7 @@ from juriscraper.lib.string_utils import titlecase
 from lxml.html import fromstring
 
 from cl.corpus_importer.management.commands.harvard_opinions import (
+    clean_docket_number,
     parse_extra_fields,
     validate_dt,
 )
@@ -243,6 +244,30 @@ def get_judges_data(harvard_data: Dict[str, Any]) -> str:
     return judges_str
 
 
+def merge_docket_numbers(cluster_id: str, harvard_docket_number: str) -> None:
+    """Merge Docket Numbers
+
+    :param cluster_id: The cluster id of the merging item
+    :param harvard_docket_number: The harvard docket number
+    :return: None
+    """
+    cl_docket_number = Docket.objects.get(
+        id=OpinionCluster.objects.get(id=cluster_id).id
+    ).docket_number
+    if cl_docket_number in harvard_docket_number:
+        Docket.objects.update(docket_number=harvard_docket_number)
+    else:
+        cl_clean_docket = clean_docket_number(cl_docket_number)
+        h_clean_docket = clean_docket_number(harvard_docket_number)
+
+        # Check if their relatively similar and if so save the harvard one
+        # if its longer
+        similarity = get_cosine_similarity(cl_clean_docket, h_clean_docket)
+        if similarity > 0.8:
+            if len(harvard_docket_number) > len(cl_docket_number):
+                Docket.objects.update(docket_number=harvard_docket_number)
+
+
 def merge_opinion_clusters(cluster_id: str) -> None:
     """Merge opinion cluster, docket and opinion data from Harvard
 
@@ -256,6 +281,7 @@ def merge_opinion_clusters(cluster_id: str) -> None:
             clean_dictionary = combine_non_overlapping_data(
                 cluster_id, harvard_data
             )
+            merge_docket_numbers(cluster_id, harvard_data["docket_number"])
             if clean_dictionary != {}:
                 logging.info(f"Merging complete for: {cluster_id}")
 
