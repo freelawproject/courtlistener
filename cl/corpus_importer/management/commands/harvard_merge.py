@@ -116,12 +116,14 @@ def merge_long_fields(cluster_id: str, field_name: str,
 
 
 def merge_judges(cluster_id: str, field_name: str,
-                 overlapping_data: Tuple[str, str]) -> None:
+                 overlapping_data: Tuple[str, str],
+                 judges_raw_data: str) -> None:
     """Merge overlapping judge values
 
     :param cluster_id: Cluster id to update
     :param field_name: field name to update in opinion cluster
     :param overlapping_data: data to compare from harvard and courtlistener
+    :param judges_raw_data: unprocessed judges data
     :return: None
     """
     harvard_data, cl_data = overlapping_data[0], overlapping_data[1]
@@ -135,15 +137,36 @@ def merge_judges(cluster_id: str, field_name: str,
     )
     cl_data = titlecase(judges)
     similarity = get_cosine_similarity(harvard_data, cl_data)
+    cl_judges_count = len(judges.split(", "))
+    harvard_judges_count = len(harvard_data.split(", "))
     if 0.37 <= similarity <= 0.81:
-        # Contains some judge names but not all of them
-        cl_judges_count = len(judges.split(", "))
-        harvard_judges_count = len(harvard_data.split(", "))
-        if harvard_judges_count > cl_judges_count:
+        if harvard_judges_count == 1 and cl_judges_count == 1:
+            # There is only one judge, get raw value from object
+            opinion_cluster_judges = OpinionCluster.objects.get(
+                id=cluster_id).judges
+            if len(judges_raw_data) > len(opinion_cluster_judges):
+                # Judges data in harvard is better than the one in CL
+                OpinionCluster.objects.filter(id=cluster_id).update(
+                    **{field_name: titlecase(judges_raw_data)}
+                )
+
+        elif harvard_judges_count > cl_judges_count:
             # Harvard judges count is bigger than cl count, then update judges
             OpinionCluster.objects.filter(id=cluster_id).update(
                 **{field_name: harvard_data}
             )
+    elif similarity >= 1.0:
+        # Both names are similar because were preprocessed, but lets use raw
+        # string from harvard and cl to pick the best
+        if harvard_judges_count == 1 and cl_judges_count == 1:
+            # There is only one judge, use raw strings to pick best
+            opinion_cluster_judges = OpinionCluster.objects.get(
+                id=cluster_id).judges
+            if len(judges_raw_data) > len(opinion_cluster_judges):
+                # Judges data in harvard is better than the one in CL
+                OpinionCluster.objects.filter(id=cluster_id).update(
+                    **{field_name: titlecase(judges_raw_data)}
+                )
 
 
 def merge_dates(cluster_id: str, field_name: str,
@@ -187,6 +210,7 @@ def merge_bool_values(cluster_id: str, field_name: str,
     """Compare two boolean values and update the value in opinion cluster
     if this changed
 
+    :param cluster_id: Cluster id to update
     :param field_name: field name to update in opinion cluster
     :param overlapping_data: data to compare from harvard and courtlistener
     :return: None
@@ -197,6 +221,34 @@ def merge_bool_values(cluster_id: str, field_name: str,
         OpinionCluster.objects.filter(id=cluster_id).update(
             **{field_name: harvard_data}
         )
+
+
+def get_judges_data(harvard_data: Dict[str, Any]) -> str:
+    """Get judges raw data from harvard data
+
+    :param harvard_data: json data from harvard case
+    :return: string with unprocessed ajudges from harvard data
+    """
+    soup = BeautifulSoup(harvard_data["casebody"]["data"], "lxml")
+
+    # List of unprocessed judges names
+    judge_unprocessed_list = [
+        x.text for x in soup.find_all("judges")
+    ]
+
+    # List of unprocessed authors names
+    author_unprocessed_list = [
+        x.text for x in soup.find_all("author")
+    ]
+
+    # Remove duplicates and join all names
+    judges_str = ", ".join(
+        sorted(
+            list(set(judge_unprocessed_list + author_unprocessed_list))
+        )
+    )
+
+    return judges_str
 
 
 def merge_opinion_clusters(cluster_id: str) -> None:
@@ -226,20 +278,25 @@ def merge_opinion_clusters(cluster_id: str) -> None:
             # TODO what about case name fields, date filed or docker number
             #  field from harvard?
 
-            for key in clean_dictionary.keys():
-                if key in long_fields.extend(["disposition"]):
+            for field_name in clean_dictionary.keys():
+                if field_name in long_fields.extend(["disposition"]):
                     merge_long_fields(
-                        cluster_id, key, clean_dictionary.get(key)
+                        cluster_id, field_name,
+                        clean_dictionary.get(field_name)
                     )
-                elif key in ["date_filed", "otherdate"]:
-                    merge_dates(cluster_id, key, clean_dictionary.get(key))
-                elif key == "judges":
-                    merge_judges(cluster_id, key, clean_dictionary.get(key))
-                elif key == "attorneys":
-                    merge_strings(cluster_id, key, clean_dictionary.get(key))
+                elif field_name in ["date_filed", "otherdate"]:
+                    merge_dates(cluster_id, field_name,
+                                clean_dictionary.get(field_name))
+                elif field_name == "judges":
+                    judges_data = get_judges_data(harvard_data)
+                    merge_judges(cluster_id, field_name,
+                                 clean_dictionary.get(field_name), judges_data)
+                elif field_name == "attorneys":
+                    merge_strings(cluster_id, field_name,
+                                  clean_dictionary.get(field_name))
                 else:
                     logging.info(
-                        f"Field not considered in the proccess: {key}"
+                        f"Field not considered in the proccess: {field_name}"
                     )
     else:
         logging.info(f"Cluster id: {cluster_id} doesn't have a json file.")
@@ -302,6 +359,7 @@ def map_and_merge_opinions(cluster: str, harvard_data: Dict[str, Any]) -> None:
     """Map and merge opinion data
 
     :param cluster: Cluster ID
+    :param harvard_data: json data from harvard case
     :return: None
     """
     # TODO also handle authors ... here.... okay.
