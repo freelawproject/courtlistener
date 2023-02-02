@@ -136,12 +136,15 @@ def merge_judges(cluster_id, key, data) -> None:
     )
     cl_data = titlecase(judges)
     similarity = get_cosine_similarity(harvard_data, cl_data)
-    if 0.51 <= similarity <= 0.81:
-        # Contains some judge names but not all of them, update
-        # data with normalized judges names
-        OpinionCluster.objects.filter(id=cluster_id).update(
-            **{key: harvard_data}
-        )
+    if 0.37 <= similarity <= 0.81:
+        # Contains some judge names but not all of them
+        cl_judges_count = len(judges.split(", "))
+        harvard_judges_count = len(harvard_data.split(", "))
+        if harvard_judges_count > cl_judges_count:
+            # Harvard judges count is bigger than cl count, then update judges
+            OpinionCluster.objects.filter(id=cluster_id).update(
+                **{key: harvard_data}
+            )
 
 
 def merge_dates(cluster_id, key, data) -> None:
