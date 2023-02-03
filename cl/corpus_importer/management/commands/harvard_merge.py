@@ -139,27 +139,15 @@ def merge_judges(
     harvard_data, cl_data = overlapping_data
 
     # Get last names from each source
-    cl_clean = extract_judge_last_name(cl_data)
-    harvard_clean = extract_judge_last_name(harvard_data)
-    # Use sets to ignore list order
-    if set(cl_clean) == set(harvard_clean):
-        return
-    elif set(cl_clean).issubset(set(harvard_clean)):
-        update_data = titlecase(", ".join(harvard_clean))
-    elif set(harvard_clean).issubset(set(cl_clean)):
-        return
-    elif harvard_clean and not cl_clean:
-        update_data = titlecase(", ".join(harvard_clean))
-    elif cl_clean and not harvard_clean:
-        return
-    else:
+    cl_clean = set(extract_judge_last_name(cl_data))
+    harvard_clean = set(extract_judge_last_name(harvard_data))
+    judges = titlecase(", ".join(extract_judge_last_name(harvard_data)))
+
+    if harvard_clean.issuperset(cl_clean) and harvard_clean != cl_clean:
+        OpinionCluster.objects.filter(id=cluster_id).update(judges=judges)
+    elif not harvard_clean.intersection(cl_clean):
         logging.warning(msg="Judges are completely different.")
         raise Exception("Judges are completely different.")
-
-    if update_data:
-        OpinionCluster.objects.filter(id=cluster_id).update(
-            **{"judges": update_data}
-        )
 
 
 def merge_dates(
