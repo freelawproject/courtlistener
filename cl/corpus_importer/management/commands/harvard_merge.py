@@ -180,7 +180,7 @@ def merge_cluster_dates(
     cluster = OpinionCluster.objects.filter(id=cluster_id).first()
     harvard_date, harvard_date_is_approximate = validate_dt(harvard_data)
     if cluster.docket.source == Docket.SCRAPER:
-        # Give harvard data preference
+        # Give preference to harvard data
         if harvard_date != cl_date:
             OpinionCluster.objects.filter(id=cluster_id).update(
                 **{field_name: harvard_date}
@@ -359,7 +359,7 @@ def merge_overlapping_data(
             logging.info(f"Field not considered in the process: {field_name}")
 
 
-def update_docket(cluster_id: int):
+def update_docket_source(cluster_id: int) -> None:
     """Update docket source and complete
 
     :param cluster_id: the cluster id
@@ -369,6 +369,21 @@ def update_docket(cluster_id: int):
     source = docket.source
     docket.source = Docket.HARVARD + source
     docket.save()
+
+
+def update_cluster_source(cluster_id: int) -> None:
+    """Update cluster source
+
+    :param cluster_id: cluster id to update
+    :return: None
+    """
+    cluster = OpinionCluster.objects.get(id=cluster_id)
+    if cluster.source == "C":
+        # court website source updated to court website merged with Harvard
+        cluster.source = "CU"
+        cluster.save()
+
+    # TODO what to do when source is different? is possible?
 
 
 def merge_opinion_clusters(cluster_id: Optional[int]) -> None:
@@ -389,7 +404,8 @@ def merge_opinion_clusters(cluster_id: Optional[int]) -> None:
                 merge_case_names(cluster_id, harvard_data)
                 merge_date_filed(cluster_id, harvard_data)
                 merge_overlapping_data(cluster_id, clean_dictionary)
-                update_docket(cluster_id=cluster_id)
+                update_docket_source(cluster_id=cluster_id)
+                update_cluster_source(cluster_id=cluster_id)
                 logging.info(msg=f"Finished merging cluster: {cluster_id}")
 
         except AuthorException:
