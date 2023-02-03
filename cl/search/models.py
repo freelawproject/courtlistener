@@ -686,25 +686,38 @@ class Docket(AbstractDateTimeModel):
             self.pacer_case_id,
         )
 
+    def pacer_appellate_url_with_caseId(self, path):
+        return (
+            f"https://ecf.{self.pacer_court_id}.uscourts.gov"
+            f"{path}"
+            f"servlet=CaseSummary.jsp&"
+            f"caseId={self.pacer_case_id}&"
+            f"incOrigDkt=Y&"
+            f"incDktEntries=Y"
+        )
+
+    def pacer_appellate_url_with_caseNum(self, path):
+        return (
+            f"https://ecf.{self.pacer_court_id}.uscourts.gov"
+            f"{path}"
+            f"servlet=CaseSummary.jsp&"
+            f"caseNum={self.docket_number}&"
+            f"incOrigDkt=Y&"
+            f"incDktEntries=Y"
+        )
+
     @property
     def pacer_docket_url(self):
-        if not self.pacer_case_id:
-            return None
-
         if self.court.jurisdiction == Court.FEDERAL_APPELLATE:
             if self.court.pk in ["ca5", "ca7", "ca11"]:
                 path = "/cmecf/servlet/TransportRoom?"
             else:
                 path = "/n/beam/servlet/TransportRoom?"
 
-            return (
-                f"https://ecf.{self.pacer_court_id}.uscourts.gov"
-                f"{path}"
-                f"servlet=CaseSummary.jsp&"
-                f"caseId={self.pacer_case_id}&"
-                f"incOrigDkt=Y&"
-                f"incDktEntries=Y"
-            )
+            if not self.pacer_case_id:
+                return self.pacer_appellate_url_with_caseNum(path)
+            else:
+                return self.pacer_appellate_url_with_caseId(path)
         else:
             return self.pacer_district_url("DktRpt.pl")
 
