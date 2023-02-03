@@ -18,6 +18,7 @@ from cl.corpus_importer.import_columbia.parse_opinions import (
 )
 from cl.corpus_importer.management.commands.harvard_merge import (
     combine_non_overlapping_data,
+    merge_case_names,
     merge_docket_numbers,
     merge_judges,
     merge_opinion_clusters,
@@ -1268,7 +1269,7 @@ class HarvardMergerTests(TestCase):
         cd = {
             "judges": (
                 "Adkins, Barbera, Getty, Greene, Hotten, McDonald, Watts",
-                "Barbera",
+                cluster.judges,
             )
         }
 
@@ -1298,7 +1299,7 @@ class HarvardMergerTests(TestCase):
         cd = {
             "judges": (
                 "Simpson",
-                "Pellegrini, Simpson",
+                cluster_2.judges,
             )
         }
 
@@ -1325,7 +1326,7 @@ class HarvardMergerTests(TestCase):
         cd = {
             "judges": (
                 "Fischer, French, Kennedy",
-                "French, J.",
+                cluster_3.judges,
             )
         }
 
@@ -1351,7 +1352,7 @@ class HarvardMergerTests(TestCase):
         cd = {
             "judges": (
                 "Leavitt",
-                "Leavitt",
+                cluster_4.judges,
             )
         }
 
