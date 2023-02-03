@@ -613,7 +613,12 @@ class Docket(AbstractDateTimeModel):
             self.docket_number_core = make_docket_number_core(
                 self.docket_number
             )
-        if self.source in self.RECAP_SOURCES:
+
+        update_fields = kwargs.get("update_fields")
+        incremented_view_count = (
+            True if update_fields and "view_count" in update_fields else False
+        )
+        if self.source in self.RECAP_SOURCES and not incremented_view_count:
             for field in ["pacer_case_id", "docket_number"]:
                 if not getattr(self, field, None):
                     raise ValidationError(
