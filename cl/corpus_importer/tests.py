@@ -21,6 +21,7 @@ from cl.corpus_importer.management.commands.harvard_merge import (
     merge_docket_numbers,
     merge_judges,
     merge_opinion_clusters,
+    start_merger,
 )
 from cl.corpus_importer.management.commands.harvard_opinions import (
     clean_body_content,
@@ -1035,7 +1036,7 @@ class HarvardMergerTests(TestCase):
             (<cross_reference><span class="citation no-link">99 S.E. 622</span></cross_reference>). I concur in the reversal for this additional reason.</p>"""
 
         cluster = OpinionClusterFactoryMultipleOpinions(
-            docket=DocketFactory(),
+            docket=DocketFactory(source=Docket.COLUMBIA),
             sub_opinions__data=[
                 {"type": "020lead", "html_with_citations": lead},
                 {"type": "030concurrence", "html_with_citations": concurrence},
@@ -1055,7 +1056,6 @@ class HarvardMergerTests(TestCase):
 
         case_data = {
             "casebody": {
-                "status": "ok",
                 "data": '<casebody> <attorneys><page-number citation-index="1" label="758">*758</page-number><em>B. B. Giles, </em>for plaintiff in error.</attorneys>\n  <attorneys id="b796-5"><em>Lindley W. Gamp, solicitor, John A. Boyhin, solicitor-general,. Durwood T. Bye, </em>contra.</attorneys>\n  <opinion type="majority"> a simple opinion</opinion>\n</casebody>\n',
             },
         }
@@ -1093,6 +1093,169 @@ class HarvardMergerTests(TestCase):
         merge_docket_numbers(cluster.id, "Master Docket No. 17-3000L")
         docket.refresh_from_db()
         self.assertEqual(docket.docket_number, "Master Docket No. 17-3000L")
+
+    def test_sources_query(self):
+        """Test query for Non Harvard Sources"""
+        OpinionClusterFactory(
+            docket=DocketFactory(source=Docket.COLUMBIA),
+            id=1,
+            filepath_json_harvard="/the/file/path.json",
+        )
+        OpinionClusterFactory(
+            docket=DocketFactory(source=Docket.HARVARD),
+            id=2,
+            filepath_json_harvard="/a/file/path.json",
+        )
+        OpinionClusterFactory(
+            docket=DocketFactory(source=Docket.COLUMBIA_AND_HARVARD),
+            id=3,
+            filepath_json_harvard="/some/file/path.json",
+        )
+        OpinionClusterFactory(
+            docket=DocketFactory(source=Docket.SCRAPER),
+            id=4,
+            filepath_json_harvard="/my/file/path.json",
+        )
+        OpinionClusterFactory(
+            docket=DocketFactory(source=Docket.SCRAPER),
+            id=5,
+            filepath_json_harvard=None,
+        )
+        OpinionClusterFactory(
+            docket=DocketFactory(source=Docket.HARVARD),
+            id=6,
+            filepath_json_harvard="",
+        )
+
+        SC = Docket.SOURCE_CHOICES
+        cluster_ids = (
+            OpinionCluster.objects.filter(
+                docket__source__in=[s[0] for s in SC if "Harvard" not in s[1]],
+                filepath_json_harvard__isnull=False,
+            )
+            .exclude(filepath_json_harvard__exact="")
+            .values_list("id", flat=True)
+        )
+        # Find the two opinions we want to import
+        self.assertEqual([1, 4], list(cluster_ids))
+        case_data = {
+            "docket_number": "345",
+            "name_abbreviation": "A v. B",
+            "name": "A v. B",
+            "casebody": {
+                "data": "<casebody><opinion>An opinion</opinion></casebody>"
+            },
+        }
+        self.read_json_func.return_value = case_data
+        start_merger(cluster_id=None)
+        cluster_ids = OpinionCluster.objects.filter(
+            docket__source__in=[s[0] for s in SC if "Harvard" not in s[1]],
+            filepath_json_harvard__isnull=False,
+        ).values_list("id", flat=True)
+        # Validate that our two opinions were imported and no more exist
+        self.assertEqual([], list(cluster_ids))
+
+    def test_add_opinions_without_authors_in_cl(self):
+        """Can we add opinion and update authors"""
+        cluster = OpinionClusterFactoryMultipleOpinions(
+            docket=DocketFactory(source=Docket.COLUMBIA),
+            sub_opinions__data=[
+                {"author_str": "", "plain_text": "My opinion"},
+                {"author_str": "", "plain_text": "I disagree"},
+            ],
+        )
+        case_data = {
+            "docket_number": "345",
+            "name_abbreviation": "A v. B",
+            "name": "A v. B",
+            "casebody": {
+                "data": '<casebody> <opinion type="majority"> '
+                "<author>Broyles, C. J.</author>My opinion</opinion>"
+                ' <opinion type="dissent"><author>Gardner, J.,</author>'
+                "I disagree </opinion>"
+                "</casebody>",
+            },
+        }
+        self.read_json_func.return_value = case_data
+        author_query = Opinion.objects.filter(
+            cluster_id=cluster.id
+        ).values_list("author_str", flat=True)
+        authors = list(author_query)
+
+        self.assertEqual(authors, ["", ""])
+        start_merger(cluster_id=None)  # allow the system to find the cluster
+        cluster.refresh_from_db()
+
+        author_query = Opinion.objects.filter(
+            cluster_id=cluster.id
+        ).values_list("author_str", flat=True)
+        authors = list(author_query)
+        # Validate we didnt create a new opinion
+        self.assertEqual(
+            Opinion.objects.filter(cluster_id=cluster.id).count(),
+            2,
+            msg="Oops",
+        )
+        # Check that we added xml
+        self.assertNotEqual(
+            Opinion.objects.filter(cluster_id=cluster.id)[0].xml_harvard, ""
+        )
+        # Make sure we updated our source
+        self.assertEqual(cluster.docket.source, Docket.COLUMBIA_AND_HARVARD)
+        # Check judges were added to our opinions
+        self.assertEqual(authors, ["Broyles, C. J.", "Gardner, J.,"])
+
+    def test_add_opinions_with_authors_in_cl(self):
+        """Can we update an opinion and leave author_str alone if already assigned"""
+        cluster = OpinionClusterFactoryMultipleOpinions(
+            docket=DocketFactory(source=Docket.COLUMBIA),
+            sub_opinions__data=[
+                {"author_str": "Broyles", "plain_text": "My opinion"},
+                {"author_str": "Gardner", "plain_text": "I disagree"},
+            ],
+        )
+        case_data = {
+            "docket_number": "345",
+            "name_abbreviation": "A v. B",
+            "name": "A v. B",
+            "casebody": {
+                "data": '<casebody> <opinion type="majority"> '
+                "<author>Broyles, C. J.</author>My opinion</opinion>"
+                ' <opinion type="dissent"><author>Gardner, J.,</author>'
+                "I disagree </opinion>"
+                "</casebody>",
+            },
+        }
+
+        self.read_json_func.return_value = case_data
+        author_query = Opinion.objects.filter(
+            cluster_id=cluster.id
+        ).values_list("author_str", flat=True)
+        authors = sorted(list(author_query))
+
+        self.assertEqual(authors, ["Broyles", "Gardner"])
+        # Import the opinion
+        start_merger(cluster_id=cluster.id)
+
+        cluster.refresh_from_db()
+        author_query = Opinion.objects.filter(
+            cluster_id=cluster.id
+        ).values_list("author_str", flat=True)
+        authors = sorted(list(author_query))
+        # Validate we didnt create a new opinion
+        self.assertEqual(
+            Opinion.objects.filter(cluster_id=cluster.id).count(),
+            2,
+            msg="Oops",
+        )
+        # Check that we added xml
+        self.assertNotEqual(
+            Opinion.objects.filter(cluster_id=cluster.id)[0].xml_harvard, ""
+        )
+        # Make sure we updated our source
+        self.assertEqual(cluster.docket.source, Docket.COLUMBIA_AND_HARVARD)
+        # Check judges were added to our opinions
+        self.assertEqual(authors, ["Broyles", "Gardner"])
 
     def test_merge_overlap_judges(self):
         """Test merge judge names when overlap exist"""

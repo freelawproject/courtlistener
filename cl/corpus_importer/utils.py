@@ -72,20 +72,18 @@ def match_lists(list1: [str], list2: [str]) -> bool | dict[int, Any]:
     :param list2: CL opinions
     :return: Matches if found or False
     """
+    # Convert harvard HTML to Text to compare
+    list1 = [h.text_content() for h in list1]
     scores = similarity_scores(list1, list2)
 
     matches = {}
     for i, row in enumerate(scores):
         j = row.argmax()
-        if get_cosine_similarity(list1[i], list2[j]) < 0.85:
-            # .89 something occurred ... maybe lower
-            # this is for testing purposes - remove later
-            print("CO SINE TOO LOW", get_cosine_similarity(list1[i], list2[j]))
+        # Lower threshold for small opinions.
+        if get_cosine_similarity(list1[i], list2[j]) < 0.60:
             continue
         percent_match = compare_documents(list1[i], list2[j])
         if percent_match < 60:
-            # this is to be removed later
-            print("TOO LOW OF A MATCH", percent_match)
             continue
         matches[i] = j
 

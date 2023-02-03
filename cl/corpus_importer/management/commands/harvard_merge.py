@@ -2,11 +2,12 @@ import datetime
 import itertools
 import json
 import logging
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from bs4 import BeautifulSoup
 from django.db import transaction
-from juriscraper.lib.string_utils import titlecase, harmonize
+from juriscraper.lib.html_utils import get_html_from_element
+from juriscraper.lib.string_utils import harmonize, titlecase
 from lxml.html import fromstring
 
 from cl.corpus_importer.management.commands.harvard_opinions import (
@@ -21,7 +22,7 @@ from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.search.models import Docket, Opinion, OpinionCluster
 
 
-def read_json(cluster_id: str) -> Dict[str, Any] | None:
+def read_json(cluster_id: int) -> Dict[str, Any] | None:
     """Helper method to read json into object
 
     :param cluster_id: the cluster to fetch the filepath for
@@ -56,7 +57,6 @@ def fetch_non_harvard_data(harvard_data: Dict[str, Any]) -> Dict[str, Any]:
         )
     )
     judges = titlecase(judges)
-    # docket_string = harvard_data["docket_number"].strip()
     all_data = {"judges": judges}
     short_fields = ["attorneys", "disposition", "otherdate", "seealso"]
     long_fields = [
@@ -121,6 +121,9 @@ def merge_long_fields(
             OpinionCluster.objects.filter(id=cluster_id).update(
                 **{field_name: harvard_data}
             )
+    else:
+        pass
+        # should we log long data not really being similar?
 
 
 def merge_judges(
@@ -252,7 +255,8 @@ def merge_docket_numbers(cluster_id: str, harvard_docket_number: str) -> None:
     :return: None
     """
     cl_docket_number = OpinionCluster.objects.get(
-        id=cluster_id).docket.docket_number
+        id=cluster_id
+    ).docket.docket_number
 
     if cl_docket_number:
         # Check if docket number exists
@@ -326,7 +330,7 @@ def merge_case_names(cluster_id: str, harvard_data: Dict[str, Any]) -> None:
         OpinionCluster.objects.filter(id=cluster_id).update(**update_dict)
 
 
-def merge_opinion_clusters(cluster_id: str) -> None:
+def merge_opinion_clusters(cluster_id: Optional[int]) -> None:
     """Merge opinion cluster, docket and opinion data from Harvard
 
     :param cluster_id: The cluster ID to merger
@@ -334,6 +338,7 @@ def merge_opinion_clusters(cluster_id: str) -> None:
     """
     harvard_data = read_json(cluster_id)
     if harvard_data:
+        # Wrap everything inside a transaction to avoid partial merges.
         with transaction.atomic():
             map_and_merge_opinions(cluster_id, harvard_data)
             clean_dictionary = combine_non_overlapping_data(
@@ -351,7 +356,7 @@ def merge_opinion_clusters(cluster_id: str) -> None:
                 "headnotes",
                 "correction",
                 "cross_reference",
-                "disposition"
+                "disposition",
             ]
 
             # TODO what about case name fields, date filed or docker number
@@ -388,8 +393,16 @@ def merge_opinion_clusters(cluster_id: str) -> None:
                     logging.info(
                         f"Field not considered in the process: {field_name}"
                     )
+
+            # Update docket source and complete
+            docket = OpinionCluster.objects.get(id=cluster_id).docket
+            source = docket.source
+            docket.source = Docket.HARVARD + source
+            docket.save()
+            logging.info(msg=f"Finished merging cluster: {cluster_id}")
     else:
-        logging.info(f"Cluster id: {cluster_id} doesn't have a json file.")
+        logging.warning(msg=f"No Harvard json for cluster: {cluster_id}")
+    print("THE END")
 
 
 def start_merger(cluster_id=None) -> None:
@@ -445,20 +458,18 @@ def fetch_cl_opinion_content(sub_opinions: [Opinion]) -> [str]:
     return cl_opinions
 
 
-def map_and_merge_opinions(cluster: str, harvard_data: Dict[str, Any]) -> None:
+def map_and_merge_opinions(cluster: int, harvard_data: Dict[str, Any]) -> None:
     """Map and merge opinion data
 
     :param cluster: Cluster ID
     :param harvard_data: json data from harvard case
     :return: None
     """
-    # TODO also handle authors ... here.... okay.
     used_combined_opinions = False
     case_body = harvard_data["casebody"]["data"]
-
     sub_opinions = Opinion.objects.filter(cluster__id=cluster)
     harvard_html = fromstring(case_body.encode()).xpath(".//opinion")
-    harvard_opinions = [op.text_content() for op in harvard_html]
+    harvard_opinions = [op for op in harvard_html]
     cl_opinions = fetch_cl_opinion_content(sub_opinions=sub_opinions)
     if len(harvard_opinions) != len(cl_opinions):
         used_combined_opinions = True
@@ -471,10 +482,24 @@ def map_and_merge_opinions(cluster: str, harvard_data: Dict[str, Any]) -> None:
         if not used_combined_opinions:
             for k, v in matches.items():
                 op = sub_opinions[k]
-                op.xml_harvard = harvard_opinions[v]
+                if op.author_str != "" and op.author is None:
+                    hvd = harvard_opinions[v].xpath(".//author/text()")[0]
+                    if extract_judge_last_name(
+                        op.author_str
+                    ) != extract_judge_last_name(hvd):
+                        logging.warning(msg="Authors don't match, log error")
+                        raise Exception("Authors don't match - log error")
+                    op.author_str = harvard_opinions[v].xpath(
+                        ".//author/text()"
+                    )[0]
+                op.xml_harvard = str(
+                    get_html_from_element(harvard_opinions[v])
+                )
                 op.save()
 
     if used_combined_opinions:
+        # If we cant quite merge the opinions. Create combined opinion.
+        # This occurs when the harvard data or CL data is slightly askew.
         Opinion.objects.create(
             xml_harvard=case_body,
             cluster=OpinionCluster.objects.get(id=cluster),
@@ -501,3 +526,4 @@ class Command(VerboseCommand):
     def handle(self, *args, **options) -> None:
         if options["no_debug"]:
             logging.disable(logging.DEBUG)
+        start_merger(cluster_id=options["cluster_id"])
