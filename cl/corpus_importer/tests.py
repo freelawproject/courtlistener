@@ -23,6 +23,7 @@ from cl.corpus_importer.management.commands.harvard_merge import (
     merge_judges,
     merge_opinion_clusters,
     start_merger,
+    merge_cluster_dates,
 )
 from cl.corpus_importer.management.commands.harvard_opinions import (
     clean_body_content,
@@ -1394,3 +1395,27 @@ class HarvardMergerTests(TestCase):
             self.assertEqual(
                 cluster.case_name_full, item[2].get("expected_case_name_full")
             )
+
+    def test_merge_date_filed(self):
+        """Can we merge date filed?"""
+
+        # Test that harvard date is different that cl date, if docket
+        # source is SCRAPER then use harvard data
+        # Item format: (harvard_decision_date, cl date_filed, expected output)
+        for item in [
+            # CL item #4549197
+            ("2018-10-23", date(2018, 11, 1), date(2018, 10, 23)),
+            # CL item #4549214
+            ("2018-10-19", date(2018, 11, 1), date(2018, 10, 19)),
+            # CL item #4548724
+            ("2018-10-30", date(2018, 11, 6), date(2018, 10, 30)),
+        ]:
+            cluster = OpinionClusterWithParentsFactory(
+                date_filed=item[1], docket=DocketFactory(source=Docket.SCRAPER)
+            )
+
+            merge_cluster_dates(cluster.pk, "date_filed", (item[0], item[1]))
+            cluster.refresh_from_db()
+
+            # Check case_name_full
+            self.assertEqual(cluster.date_filed, item[2])

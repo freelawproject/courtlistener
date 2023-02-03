@@ -163,7 +163,7 @@ def merge_judges(
         raise JudgeException("Judges are completely different.")
 
 
-def merge_dates(
+def merge_cluster_dates(
     cluster_id: int,
     field_name: str,
     overlapping_data: Tuple[str, datetime.date],
@@ -176,10 +176,18 @@ def merge_dates(
     :param overlapping_data: data to compare
     :return: None
     """
-    harvard_data = overlapping_data[0]
+    harvard_data, cl_date = overlapping_data
     cluster = OpinionCluster.objects.filter(id=cluster_id).first()
     harvard_date, harvard_date_is_approximate = validate_dt(harvard_data)
-    if cluster.date_filed_is_approximate and not harvard_date_is_approximate:
+    if cluster.docket.source == Docket.SCRAPER:
+        # Give harvard data preference
+        if harvard_date != cl_date:
+            OpinionCluster.objects.filter(id=cluster_id).update(
+                **{field_name: harvard_date}
+            )
+    elif cluster.date_filed_is_approximate and not harvard_date_is_approximate:
+        # For some reason docket source is different, then check if one date
+        # is approximate and the other is not
         # if harvard date is not approximate, it should be better
         OpinionCluster.objects.filter(id=cluster_id).update(
             **{field_name: harvard_date}
@@ -285,6 +293,21 @@ def merge_case_names(cluster_id: int, harvard_data: Dict[str, Any]) -> None:
         OpinionCluster.objects.filter(id=cluster_id).update(**update_dict)
 
 
+def merge_date_filed(cluster_id: int, harvard_data: Dict[str, Any]) -> None:
+    """Merge date filed
+
+    :param cluster_id: The cluster id of the merging item
+    :param harvard_data: json data from harvard case
+    :return: None
+    """
+    cluster = OpinionCluster.objects.get(id=cluster_id)
+    harvard_date_filed = harvard_data.get("decision_date")
+    cluster_date_filed = cluster.date_filed
+    merge_cluster_dates(
+        cluster_id, "date_filed", (harvard_date_filed, cluster_date_filed)
+    )
+
+
 def merge_overlapping_data(
     cluster_id: int, clean_dictionary: Dict[str, Any]
 ) -> None:
@@ -315,8 +338,8 @@ def merge_overlapping_data(
                 field_name,
                 clean_dictionary.get(field_name),
             )
-        elif field_name in ["date_filed", "other_dates"]:
-            merge_dates(
+        elif field_name in ["other_dates"]:
+            merge_cluster_dates(
                 cluster_id,
                 field_name,
                 clean_dictionary.get(field_name),
@@ -364,6 +387,7 @@ def merge_opinion_clusters(cluster_id: Optional[int]) -> None:
                 )
                 merge_docket_numbers(cluster_id, harvard_data["docket_number"])
                 merge_case_names(cluster_id, harvard_data)
+                merge_date_filed(cluster_id, harvard_data)
                 merge_overlapping_data(cluster_id, clean_dictionary)
                 update_docket(cluster_id=cluster_id)
                 logging.info(msg=f"Finished merging cluster: {cluster_id}")
