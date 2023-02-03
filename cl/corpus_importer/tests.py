@@ -300,7 +300,7 @@ class CourtMatchingTest(SimpleTestCase):
                 got,
                 d["answer"],
                 msg="\nDid not get court we expected: '%s'.\n"
-                "               Instead we got: '%s'" % (d["answer"], got),
+                    "               Instead we got: '%s'" % (d["answer"], got),
             )
 
     def test_get_fed_court_object_from_string(self) -> None:
@@ -481,12 +481,12 @@ class IAUploaderTest(TestCase):
             expected_num_attorneys,
             actual_num_attorneys,
             msg="Got wrong number of attorneys when making IA JSON. "
-            "Got %s, expected %s: \n%s"
-            % (
-                actual_num_attorneys,
-                expected_num_attorneys,
-                first_party_attorneys,
-            ),
+                "Got %s, expected %s: \n%s"
+                % (
+                    actual_num_attorneys,
+                    expected_num_attorneys,
+                    first_party_attorneys,
+                ),
         )
 
         first_attorney = first_party_attorneys[0]
@@ -497,7 +497,7 @@ class IAUploaderTest(TestCase):
             actual_num_roles,
             expected_num_roles,
             msg="Got wrong number of roles on attorneys when making IA JSON. "
-            "Got %s, expected %s" % (actual_num_roles, expected_num_roles),
+                "Got %s, expected %s" % (actual_num_roles, expected_num_roles),
         )
 
     def test_num_queries_ok(self) -> None:
@@ -672,7 +672,7 @@ Appeals, No. 19667-4-III, October 31, 2002. Denied September 30, 2003."
         self.read_json_func.return_value = CaseLawFactory(
             court=CaseLawCourtFactory.create(
                 name="United States Bankruptcy Court for the Northern "
-                "District of Alabama "
+                     "District of Alabama "
             )
         )
         self.assertSuccessfulParse(0)
@@ -726,7 +726,7 @@ delivered the opinion of the Court.</p></opinion> </casebody>'
         case_law = CaseLawFactory.create(
             casebody=CaseBodyFactory.create(
                 data='<casebody><opinion type="majority"><author '
-                'id="b56-3">PER CURIAM:</author></casebody> '
+                     'id="b56-3">PER CURIAM:</author></casebody> '
             ),
         )
         self.read_json_func.return_value = case_law
@@ -861,8 +861,8 @@ label="194">*194</page-number>
         # Check against itself, there must be an overlap
         case_1_data = {
             "case_name_full": "In the matter of S.J.S., a minor child. "
-            "D.L.M. and D.E.M., Petitioners/Respondents v."
-            " T.J.S.",
+                              "D.L.M. and D.E.M., Petitioners/Respondents v."
+                              " T.J.S.",
             "case_name_abbreviation": "D.L.M. v. T.J.S.",
             "case_name_cl": "D.L.M. v. T.J.S.",
             "overlaps": 2,
@@ -878,9 +878,9 @@ label="194">*194</page-number>
         # Check against different case name, there shouldn't be an overlap
         case_3_data = {
             "case_name_full": "Henry B. Wesselman et al., as Executors of "
-            "Blanche Wesselman, Deceased, Respondents, "
-            "v. The Engel Company, Inc., et al., "
-            "Appellants, et al., Defendants",
+                              "Blanche Wesselman, Deceased, Respondents, "
+                              "v. The Engel Company, Inc., et al., "
+                              "Appellants, et al., Defendants",
             "case_name_abbreviation": "Wesselman v. Engel Co.",
             "case_name_cl": " McQuillan v. Schechter",
             "overlaps": 0,
@@ -1171,10 +1171,10 @@ class HarvardMergerTests(TestCase):
             "name": "A v. B",
             "casebody": {
                 "data": '<casebody> <opinion type="majority"> '
-                "<author>Broyles, C. J.</author>My opinion</opinion>"
-                ' <opinion type="dissent"><author>Gardner, J.,</author>'
-                "I disagree </opinion>"
-                "</casebody>",
+                        "<author>Broyles, C. J.</author>My opinion</opinion>"
+                        ' <opinion type="dissent"><author>Gardner, J.,</author>'
+                        "I disagree </opinion>"
+                        "</casebody>",
             },
         }
         self.read_json_func.return_value = case_data
@@ -1221,10 +1221,10 @@ class HarvardMergerTests(TestCase):
             "name": "A v. B",
             "casebody": {
                 "data": '<casebody> <opinion type="majority"> '
-                "<author>Broyles, C. J.</author>My opinion</opinion>"
-                ' <opinion type="dissent"><author>Gardner, J.,</author>'
-                "I disagree </opinion>"
-                "</casebody>",
+                        "<author>Broyles, C. J.</author>My opinion</opinion>"
+                        ' <opinion type="dissent"><author>Gardner, J.,</author>'
+                        "I disagree </opinion>"
+                        "</casebody>",
             },
         }
 
@@ -1261,110 +1261,32 @@ class HarvardMergerTests(TestCase):
     def test_merge_overlap_judges(self):
         """Test merge judge names when overlap exist"""
 
-        # Test 1: Example from CL #4575556
-        cluster = OpinionClusterWithParentsFactory(
-            judges="Barbera",
-        )
-        # clean_dictionary after preprocess {"judges":(harvard_data, cl_data)}
-        cd = {
-            "judges": (
-                "Adkins, Barbera, Getty, Greene, Hotten, McDonald, Watts",
-                cluster.judges,
+        for item in [
+            # Format: (cl judge, harvard prepared data, expected output)
+            # CL item #4575556
+            ("Barbera",
+             "Adkins, Barbera, Getty, Greene, Hotten, McDonald, Watts",
+             "Adkins, Barbera, Getty, Greene, Hotten, McDonald, Watts",
+             ),
+            # CL item #4573873
+            ("Simpson, J. ~ Concurring Opinion by Pellegrini, Senior Judge",
+             "Simpson",
+             "Simpson, J. ~ Concurring Opinion by Pellegrini, Senior Judge",
+             ),
+            # CL item #4576003
+            ("French, J.",
+             "Fischer, French, Kennedy",
+             "Fischer, French, Kennedy",
+             ),
+            # CL item #4576003
+            ("Leavitt, President Judge",
+             "Leavitt",
+             "Leavitt, President Judge",
+             )
+        ]:
+            cluster = OpinionClusterWithParentsFactory(
+                judges=item[0],
             )
-        }
-
-        # Original value from harvard case without preprocess
-        raw_judges_harvard = (
-            "Argued before Barbera, C.J., Greene,* Adkins, "
-            "McDonald, Watts, Hotten, Getty, JJ. "
-        )
-
-        merge_judges(
-            cluster.pk, "judges", cd.get("judges"), raw_judges_harvard
-        )
-        cluster.refresh_from_db()
-
-        # Test best option selected for judges is in harvard data
-        self.assertEqual(
-            cluster.judges,
-            "Adkins, Barbera, Getty, Greene, Hotten, McDonald, Watts",
-        )
-
-        # Test 2: Example from CL #4573873
-        cluster_2 = OpinionClusterWithParentsFactory(
-            judges="Simpson, J. ~ Concurring Opinion by Pellegrini, Senior Judge",
-        )
-
-        # preprocessed values {"judges":(harvard_data, cl_data)}
-        cd = {
-            "judges": (
-                "Simpson",
-                cluster_2.judges,
-            )
-        }
-
-        # Original value from harvard case without preprocess
-        raw_judges_harvard = "OPINION BY JUDGE SIMPSON"
-
-        merge_judges(
-            cluster_2.pk, "judges", cd.get("judges"), raw_judges_harvard
-        )
-        cluster_2.refresh_from_db()
-
-        # Best option selected for judges is already in cl
-        self.assertEqual(
-            cluster_2.judges,
-            "Simpson, J. ~ Concurring Opinion by Pellegrini, Senior Judge",
-        )
-
-        # Test 3: Example from CL #4576003
-        cluster_3 = OpinionClusterWithParentsFactory(
-            judges="French, J.",
-        )
-
-        # preprocessed values {"judges":(harvard_data, cl_data)}
-        cd = {
-            "judges": (
-                "Fischer, French, Kennedy",
-                cluster_3.judges,
-            )
-        }
-
-        # Original value from harvard case without preprocess
-        raw_judges_harvard = (
-            "Fischer, J., dissenting., French, J., Kennedy, J., dissenting."
-        )
-
-        merge_judges(
-            cluster_3.pk, "judges", cd.get("judges"), raw_judges_harvard
-        )
-        cluster_3.refresh_from_db()
-
-        # Test best option selected for judges is in harvard data
-        self.assertEqual(cluster_3.judges, "Fischer, French, Kennedy")
-
-        # Test 4: Example from CL #4571591
-        cluster_4 = OpinionClusterWithParentsFactory(
-            judges="Leavitt, President Judge",
-        )
-
-        # preprocessed values {"judges":(harvard_data, cl_data)}
-        cd = {
-            "judges": (
-                "Leavitt",
-                cluster_4.judges,
-            )
-        }
-
-        # Original value from harvard case without preprocess
-        raw_judges_harvard = "OPINION BY PRESIDENT JUDGE LEAVITT"
-
-        merge_judges(
-            cluster_4.pk, "judges", cd.get("judges"), raw_judges_harvard
-        )
-        cluster_4.refresh_from_db()
-
-        # Test best option selected for judges is in harvard data
-        self.assertEqual(
-            cluster_4.judges, "Opinion by President Judge Leavitt"
-        )
+            merge_judges(cluster.pk, (item[1], item[0]))
+            cluster.refresh_from_db()
+            self.assertEqual(cluster.judges, item[2])
