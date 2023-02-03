@@ -239,11 +239,10 @@ def merge_case_names(cluster_id: int, harvard_data: Dict[str, Any]) -> None:
     :return: None
     """
     cluster = OpinionCluster.objects.get(id=cluster_id)
-    harvard_case_name = harmonize(harvard_data["name_abbreviation"])
-    harvard_case_name_full = harmonize(harvard_data["name"])
-    # Make sure case names are harmonized
-    cluster_case_name = harmonize(cluster.case_name)
-    cluster_case_name_full = harmonize(cluster.case_name_full)
+    harvard_case_name = titlecase(harmonize(harvard_data["name_abbreviation"]))
+    harvard_case_name_full = titlecase(harvard_data["name"])
+    cluster_case_name = titlecase(harmonize(cluster.case_name))
+    cluster_case_name_full = titlecase(cluster.case_name_full)
 
     update_dict = {}
     # Case with full case names

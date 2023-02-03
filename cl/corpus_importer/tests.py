@@ -1259,7 +1259,7 @@ class HarvardMergerTests(TestCase):
         self.assertEqual(authors, ["Broyles", "Gardner"])
 
     def test_merge_overlap_judges(self):
-        """Test merge judge names when overlap exist"""
+        """Can we merge overlap judge names?"""
 
         for item in [
             # Format: (cl judge, harvard prepared data, expected output)
@@ -1277,7 +1277,8 @@ class HarvardMergerTests(TestCase):
             ),
             (
                 "January 1st 2020",  # CL  #bad data example
-                "Simpson, J. ~ Concurring Opinion by Pellegrini, Senior Judge",  # Harvard
+                "Simpson, J. ~ Concurring Opinion by Pellegrini, Senior Judge",
+                # Harvard
                 "Simpson, Pellegrini",  # Expected result
             ),
             # CL item #4576003
@@ -1301,57 +1302,95 @@ class HarvardMergerTests(TestCase):
             self.assertEqual(cluster.judges, item[2])
 
     def test_merge_overlap_casenames(self):
-        """Test merge case names"""
+        """Can we merge overlap case names?"""
 
         for item in [
-            # Format: (cl case_name, cl case_name_full, harvard
-            # name_abbreviation, harvard case name, expected case_name,
-            # expected case_name_full)
             # CL item #4571581
+            # Test that the case name is not changed,
+            # but the full case name is filled
             (
-                "Perez v. Metropolitan District Commisssion",
-                "",
-                "Perez v. Metro. Dist. Comm'n",
-                "Vivian PEREZ, Administratrix (Estate of Andres Burgos) v. "
-                "METROPOLITAN DISTRICT COMMISSION",
-                "Perez v. Metropolitan District Commisssion",
-                "Vivian PEREZ, Administratrix (Estate of Andres Burgos) v. "
-                "METROPOLITAN DISTRICT COMMISSION",
+                {
+                    "name": "Vivian PEREZ, Administratrix (Estate of Andres "
+                    "Burgos) v. METROPOLITAN DISTRICT COMMISSION",
+                    "name_abbreviation": "Perez v. Metro. Dist. Comm'n",
+                },
+                {
+                    "cl_case_name": "Perez v. Metropolitan District Commisssion",
+                    "cl_case_name_full": "",
+                },
+                {
+                    "expected_case_name": "Perez v. Metropolitan District "
+                    "Commisssion",
+                    "expected_case_name_full": "Vivian PEREZ, Administratrix "
+                    "(Estate of Andres Burgos) v. "
+                    "METROPOLITAN DISTRICT "
+                    "COMMISSION",
+                },
             ),
             # CL item #4574207
+            # Test that we can override the cluster case name when the
+            # harvard case name is better and also fill in the full case
+            # name when empty
             (
-                "Weyerman v. Freeman Expositions",
-                "",
-                "Weyerman v. Freeman Expositions, Inc.",
-                "Randy WEYERMAN v. FREEMAN EXPOSITIONS, INC., Employer, and Old "
-                "Republic Insurance Company, Insurance Carrier",
-                "Weyerman v. Freeman Expositions, Inc.",
-                "Randy WEYERMAN v. FREEMAN EXPOSITIONS, INC., Employer, and Old "
-                "Republic Insurance Company, Insurance Carrier",
+                {
+                    "name": "Randy WEYERMAN v. FREEMAN EXPOSITIONS, INC., "
+                    "Employer, and Old Republic Insurance Company, "
+                    "Insurance Carrier",
+                    "name_abbreviation": "Weyerman v. Freeman Expositions, "
+                    "Inc.",
+                },
+                {
+                    "cl_case_name": "Weyerman v. Freeman Expositions",
+                    "cl_case_name_full": "",
+                },
+                {
+                    "expected_case_name": "Weyerman v. Freeman Expositions, "
+                    "Inc.",
+                    "expected_case_name_full": "Randy WEYERMAN v. FREEMAN "
+                    "EXPOSITIONS, INC., Employer, "
+                    "and Old Republic Insurance "
+                    "Company, Insurance Carrier",
+                },
             ),
             # CL item #4576005
+            # Test that we can find the best case name but
+            # also swap data when the case name is longer than the full case
+            # name
             (
-                "State ex rel. Murray v. State Emp. Relations Bd. (Slip Opinion)",
-                "",
-                "State ex rel. Murray v. State Emp't Relations Bd",
-                "The STATE EX REL. MURRAY v. STATE EMPLOYMENT RELATIONS BOARD",
-                "The STATE EX REL. MURRAY v. STATE EMPLOYMENT RELATIONS BOARD",
-                "State ex rel. Murray v. State Emp. Relations Bd. (Slip Opinion)",
+                {
+                    "name": "The STATE EX REL. MURRAY v. STATE EMPLOYMENT "
+                    "RELATIONS BOARD",
+                    "name_abbreviation": "State ex rel. Murray v. State "
+                    "Emp't Relations Bd",
+                },
+                {
+                    "cl_case_name": "State ex rel. Murray v. State Emp. "
+                    "Relations Bd. (Slip Opinion)",
+                    "cl_case_name_full": "",
+                },
+                {
+                    "expected_case_name": "The State Ex Rel. Murray v. State "
+                    "Employment Relations Board",
+                    "expected_case_name_full": "State Ex Rel. Murray v. "
+                    "State Emp. Relations Bd. ("
+                    "Slip Opinion)",
+                },
             ),
         ]:
             # Create cluster with case_name and case_name_full
             cluster = OpinionClusterWithParentsFactory(
-                case_name=item[0],
-                case_name_full=item[1],
+                case_name=item[1].get("cl_case_name"),
+                case_name_full=item[1].get("cl_case_name_full"),
             )
 
-            # json harvard case
-            hd = {"name_abbreviation": item[2], "name": item[3]}
-
-            merge_case_names(cluster.pk, hd)
+            merge_case_names(cluster.pk, item[0])
             cluster.refresh_from_db()
 
             # Check case_name
-            self.assertEqual(cluster.case_name, item[4])
+            self.assertEqual(
+                cluster.case_name, item[2].get("expected_case_name")
+            )
             # Check case_name_full
-            self.assertEqual(cluster.case_name_full, item[5])
+            self.assertEqual(
+                cluster.case_name_full, item[2].get("expected_case_name_full")
+            )
