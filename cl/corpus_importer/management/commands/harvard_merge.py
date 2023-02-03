@@ -22,6 +22,20 @@ from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.search.models import Docket, Opinion, OpinionCluster
 
 
+class AuthorException(Exception):
+    """Error found in author merger."""
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+
+class JudgeException(Exception):
+    """An exception for wrong judges"""
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+
 def read_json(cluster_id: int) -> Dict[str, Any] | None:
     """Helper method to read json into object
 
@@ -146,8 +160,7 @@ def merge_judges(
     if harvard_clean.issuperset(cl_clean) and harvard_clean != cl_clean:
         OpinionCluster.objects.filter(id=cluster_id).update(judges=judges)
     elif not harvard_clean.intersection(cl_clean):
-        logging.warning(msg="Judges are completely different.")
-        raise Exception("Judges are completely different.")
+        raise JudgeException("Judges are completely different.")
 
 
 def merge_dates(
@@ -273,6 +286,69 @@ def merge_case_names(cluster_id: int, harvard_data: Dict[str, Any]) -> None:
         OpinionCluster.objects.filter(id=cluster_id).update(**update_dict)
 
 
+def merge_overlapping_data(
+    cluster_id: int, clean_dictionary: Dict[str, Any]
+) -> None:
+    """Merge overlapping data
+
+    :param cluster_id: the cluster id
+    :param clean_dictionary: the dictionary of data to merge
+    :return: None
+    """
+    if clean_dictionary != {}:
+        logging.info(f"Merging complete for: {cluster_id}")
+        return
+
+    long_fields = [
+        "syllabus",
+        "summary",
+        "history",
+        "headnotes",
+        "correction",
+        "cross_reference",
+        "disposition",
+    ]
+
+    for field_name in clean_dictionary.keys():
+        if field_name in long_fields:
+            merge_long_fields(
+                cluster_id,
+                field_name,
+                clean_dictionary.get(field_name),
+            )
+        elif field_name in ["date_filed", "other_dates"]:
+            merge_dates(
+                cluster_id,
+                field_name,
+                clean_dictionary.get(field_name),
+            )
+        elif field_name == "judges":
+            merge_judges(
+                cluster_id,
+                clean_dictionary.get(field_name),
+            )
+        elif field_name == "attorneys":
+            merge_strings(
+                cluster_id,
+                field_name,
+                clean_dictionary.get(field_name),
+            )
+        else:
+            logging.info(f"Field not considered in the process: {field_name}")
+
+
+def update_docket(cluster_id: int):
+    """Update docket source and complete
+
+    :param cluster_id: the cluster id
+    :return: None
+    """
+    docket = OpinionCluster.objects.get(id=cluster_id).docket
+    source = docket.source
+    docket.source = Docket.HARVARD + source
+    docket.save()
+
+
 def merge_opinion_clusters(cluster_id: Optional[int]) -> None:
     """Merge opinion cluster, docket and opinion data from Harvard
 
@@ -281,65 +357,24 @@ def merge_opinion_clusters(cluster_id: Optional[int]) -> None:
     """
     harvard_data = read_json(cluster_id)
     if harvard_data:
-        # Wrap everything inside a transaction to avoid partial merges.
-        with transaction.atomic():
-            map_and_merge_opinions(cluster_id, harvard_data)
-            clean_dictionary = combine_non_overlapping_data(
-                cluster_id, harvard_data
-            )
-            merge_docket_numbers(cluster_id, harvard_data["docket_number"])
-            merge_case_names(cluster_id, harvard_data)
-            if clean_dictionary != {}:
-                logging.info(f"Merging complete for: {cluster_id}")
+        try:
+            with transaction.atomic():
+                map_and_merge_opinions(cluster_id, harvard_data)
+                clean_dictionary = combine_non_overlapping_data(
+                    cluster_id, harvard_data
+                )
+                merge_docket_numbers(cluster_id, harvard_data["docket_number"])
+                merge_case_names(cluster_id, harvard_data)
+                merge_overlapping_data(cluster_id, clean_dictionary)
+                update_docket(cluster_id=cluster_id)
+                logging.info(msg=f"Finished merging cluster: {cluster_id}")
 
-            long_fields = [
-                "syllabus",
-                "summary",
-                "history",
-                "headnotes",
-                "correction",
-                "cross_reference",
-                "disposition",
-            ]
-
-            for field_name in clean_dictionary.keys():
-                if field_name in long_fields:
-                    merge_long_fields(
-                        cluster_id,
-                        field_name,
-                        clean_dictionary.get(field_name),
-                    )
-                elif field_name in ["date_filed", "other_dates"]:
-                    merge_dates(
-                        cluster_id,
-                        field_name,
-                        clean_dictionary.get(field_name),
-                    )
-                elif field_name == "judges":
-                    merge_judges(
-                        cluster_id,
-                        clean_dictionary.get(field_name),
-                    )
-                elif field_name == "attorneys":
-                    merge_strings(
-                        cluster_id,
-                        field_name,
-                        clean_dictionary.get(field_name),
-                    )
-                else:
-                    logging.info(
-                        f"Field not considered in the process: {field_name}"
-                    )
-
-            # Update docket source and complete
-            docket = OpinionCluster.objects.get(id=cluster_id).docket
-            source = docket.source
-            docket.source = Docket.HARVARD + source
-            docket.save()
-            logging.info(msg=f"Finished merging cluster: {cluster_id}")
+        except AuthorException:
+            logging.warning(msg=f"Author Exception for cluster {cluster_id}")
+        except JudgeException:
+            logging.warning(msg=f"Judge exception for: {cluster_id}")
     else:
         logging.warning(msg=f"No Harvard json for cluster: {cluster_id}")
-    print("THE END")
 
 
 def start_merger(cluster_id=None) -> None:
@@ -424,8 +459,10 @@ def map_and_merge_opinions(cluster: int, harvard_data: Dict[str, Any]) -> None:
                     if extract_judge_last_name(
                         op.author_str
                     ) != extract_judge_last_name(hvd):
-                        logging.warning(msg="Authors don't match, log error")
-                        raise Exception("Authors don't match - log error")
+                        raise AuthorException(
+                            "Authors don't match - log error"
+                        )
+
                     op.author_str = harvard_opinions[v].xpath(
                         ".//author/text()"
                     )[0]

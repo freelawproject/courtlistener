@@ -300,7 +300,7 @@ class CourtMatchingTest(SimpleTestCase):
                 got,
                 d["answer"],
                 msg="\nDid not get court we expected: '%s'.\n"
-                    "               Instead we got: '%s'" % (d["answer"], got),
+                "               Instead we got: '%s'" % (d["answer"], got),
             )
 
     def test_get_fed_court_object_from_string(self) -> None:
@@ -481,12 +481,12 @@ class IAUploaderTest(TestCase):
             expected_num_attorneys,
             actual_num_attorneys,
             msg="Got wrong number of attorneys when making IA JSON. "
-                "Got %s, expected %s: \n%s"
-                % (
-                    actual_num_attorneys,
-                    expected_num_attorneys,
-                    first_party_attorneys,
-                ),
+            "Got %s, expected %s: \n%s"
+            % (
+                actual_num_attorneys,
+                expected_num_attorneys,
+                first_party_attorneys,
+            ),
         )
 
         first_attorney = first_party_attorneys[0]
@@ -497,7 +497,7 @@ class IAUploaderTest(TestCase):
             actual_num_roles,
             expected_num_roles,
             msg="Got wrong number of roles on attorneys when making IA JSON. "
-                "Got %s, expected %s" % (actual_num_roles, expected_num_roles),
+            "Got %s, expected %s" % (actual_num_roles, expected_num_roles),
         )
 
     def test_num_queries_ok(self) -> None:
@@ -672,7 +672,7 @@ Appeals, No. 19667-4-III, October 31, 2002. Denied September 30, 2003."
         self.read_json_func.return_value = CaseLawFactory(
             court=CaseLawCourtFactory.create(
                 name="United States Bankruptcy Court for the Northern "
-                     "District of Alabama "
+                "District of Alabama "
             )
         )
         self.assertSuccessfulParse(0)
@@ -726,7 +726,7 @@ delivered the opinion of the Court.</p></opinion> </casebody>'
         case_law = CaseLawFactory.create(
             casebody=CaseBodyFactory.create(
                 data='<casebody><opinion type="majority"><author '
-                     'id="b56-3">PER CURIAM:</author></casebody> '
+                'id="b56-3">PER CURIAM:</author></casebody> '
             ),
         )
         self.read_json_func.return_value = case_law
@@ -861,8 +861,8 @@ label="194">*194</page-number>
         # Check against itself, there must be an overlap
         case_1_data = {
             "case_name_full": "In the matter of S.J.S., a minor child. "
-                              "D.L.M. and D.E.M., Petitioners/Respondents v."
-                              " T.J.S.",
+            "D.L.M. and D.E.M., Petitioners/Respondents v."
+            " T.J.S.",
             "case_name_abbreviation": "D.L.M. v. T.J.S.",
             "case_name_cl": "D.L.M. v. T.J.S.",
             "overlaps": 2,
@@ -878,9 +878,9 @@ label="194">*194</page-number>
         # Check against different case name, there shouldn't be an overlap
         case_3_data = {
             "case_name_full": "Henry B. Wesselman et al., as Executors of "
-                              "Blanche Wesselman, Deceased, Respondents, "
-                              "v. The Engel Company, Inc., et al., "
-                              "Appellants, et al., Defendants",
+            "Blanche Wesselman, Deceased, Respondents, "
+            "v. The Engel Company, Inc., et al., "
+            "Appellants, et al., Defendants",
             "case_name_abbreviation": "Wesselman v. Engel Co.",
             "case_name_cl": " McQuillan v. Schechter",
             "overlaps": 0,
@@ -1171,10 +1171,10 @@ class HarvardMergerTests(TestCase):
             "name": "A v. B",
             "casebody": {
                 "data": '<casebody> <opinion type="majority"> '
-                        "<author>Broyles, C. J.</author>My opinion</opinion>"
-                        ' <opinion type="dissent"><author>Gardner, J.,</author>'
-                        "I disagree </opinion>"
-                        "</casebody>",
+                "<author>Broyles, C. J.</author>My opinion</opinion>"
+                ' <opinion type="dissent"><author>Gardner, J.,</author>'
+                "I disagree </opinion>"
+                "</casebody>",
             },
         }
         self.read_json_func.return_value = case_data
@@ -1221,10 +1221,10 @@ class HarvardMergerTests(TestCase):
             "name": "A v. B",
             "casebody": {
                 "data": '<casebody> <opinion type="majority"> '
-                        "<author>Broyles, C. J.</author>My opinion</opinion>"
-                        ' <opinion type="dissent"><author>Gardner, J.,</author>'
-                        "I disagree </opinion>"
-                        "</casebody>",
+                "<author>Broyles, C. J.</author>My opinion</opinion>"
+                ' <opinion type="dissent"><author>Gardner, J.,</author>'
+                "I disagree </opinion>"
+                "</casebody>",
             },
         }
 
@@ -1264,25 +1264,34 @@ class HarvardMergerTests(TestCase):
         for item in [
             # Format: (cl judge, harvard prepared data, expected output)
             # CL item #4575556
-            ("Barbera",
-             "Adkins, Barbera, Getty, Greene, Hotten, McDonald, Watts",
-             "Adkins, Barbera, Getty, Greene, Hotten, McDonald, Watts",
-             ),
+            (
+                "Barbera",
+                "Adkins, Barbera, Getty, Greene, Hotten, McDonald, Watts",
+                "Adkins, Barbera, Getty, Greene, Hotten, McDonald, Watts",
+            ),
             # CL item #4573873
-            ("Simpson, J. ~ Concurring Opinion by Pellegrini, Senior Judge",
-             "Simpson",
-             "Simpson, J. ~ Concurring Opinion by Pellegrini, Senior Judge",
-             ),
+            (
+                "Simpson, J. ~ Concurring Opinion by Pellegrini, Senior Judge",
+                "Simpson",
+                "Simpson, J. ~ Concurring Opinion by Pellegrini, Senior Judge",
+            ),
+            (
+                "January 1st 2020",  # CL  #bad data example
+                "Simpson, J. ~ Concurring Opinion by Pellegrini, Senior Judge",  # Harvard
+                "Simpson, Pellegrini",  # Expected result
+            ),
             # CL item #4576003
-            ("French, J.",
-             "Fischer, French, Kennedy",
-             "Fischer, French, Kennedy",
-             ),
+            (
+                "French, J.",
+                "Fischer, French, Kennedy",
+                "Fischer, French, Kennedy",
+            ),
             # CL item #4576003
-            ("Leavitt, President Judge",
-             "Leavitt",
-             "Leavitt, President Judge",
-             )
+            (
+                "Leavitt, President Judge",
+                "Leavitt",
+                "Leavitt, President Judge",
+            ),
         ]:
             cluster = OpinionClusterWithParentsFactory(
                 judges=item[0],
@@ -1298,35 +1307,37 @@ class HarvardMergerTests(TestCase):
             # Format: (cl case_name, cl case_name_full, harvard
             # name_abbreviation, harvard case name, expected case_name,
             # expected case_name_full)
-
             # CL item #4571581
-            ("Perez v. Metropolitan District Commisssion",
-             "",
-             "Perez v. Metro. Dist. Comm'n",
-             "Vivian PEREZ, Administratrix (Estate of Andres Burgos) v. "
-             "METROPOLITAN DISTRICT COMMISSION",
-             "Perez v. Metropolitan District Commisssion",
-             "Vivian PEREZ, Administratrix (Estate of Andres Burgos) v. "
-             "METROPOLITAN DISTRICT COMMISSION"
-             ),
+            (
+                "Perez v. Metropolitan District Commisssion",
+                "",
+                "Perez v. Metro. Dist. Comm'n",
+                "Vivian PEREZ, Administratrix (Estate of Andres Burgos) v. "
+                "METROPOLITAN DISTRICT COMMISSION",
+                "Perez v. Metropolitan District Commisssion",
+                "Vivian PEREZ, Administratrix (Estate of Andres Burgos) v. "
+                "METROPOLITAN DISTRICT COMMISSION",
+            ),
             # CL item #4574207
-            ("Weyerman v. Freeman Expositions",
-             "",
-             "Weyerman v. Freeman Expositions, Inc.",
-             "Randy WEYERMAN v. FREEMAN EXPOSITIONS, INC., Employer, and Old "
-             "Republic Insurance Company, Insurance Carrier",
-             "Weyerman v. Freeman Expositions, Inc.",
-             "Randy WEYERMAN v. FREEMAN EXPOSITIONS, INC., Employer, and Old "
-             "Republic Insurance Company, Insurance Carrier"
-             ),
+            (
+                "Weyerman v. Freeman Expositions",
+                "",
+                "Weyerman v. Freeman Expositions, Inc.",
+                "Randy WEYERMAN v. FREEMAN EXPOSITIONS, INC., Employer, and Old "
+                "Republic Insurance Company, Insurance Carrier",
+                "Weyerman v. Freeman Expositions, Inc.",
+                "Randy WEYERMAN v. FREEMAN EXPOSITIONS, INC., Employer, and Old "
+                "Republic Insurance Company, Insurance Carrier",
+            ),
             # CL item #4576005
-            ("State ex rel. Murray v. State Emp. Relations Bd. (Slip Opinion)",
-             "",
-             "State ex rel. Murray v. State Emp't Relations Bd",
-             "The STATE EX REL. MURRAY v. STATE EMPLOYMENT RELATIONS BOARD",
-             "The STATE EX REL. MURRAY v. STATE EMPLOYMENT RELATIONS BOARD",
-             "State ex rel. Murray v. State Emp. Relations Bd. (Slip Opinion)"
-             ),
+            (
+                "State ex rel. Murray v. State Emp. Relations Bd. (Slip Opinion)",
+                "",
+                "State ex rel. Murray v. State Emp't Relations Bd",
+                "The STATE EX REL. MURRAY v. STATE EMPLOYMENT RELATIONS BOARD",
+                "The STATE EX REL. MURRAY v. STATE EMPLOYMENT RELATIONS BOARD",
+                "State ex rel. Murray v. State Emp. Relations Bd. (Slip Opinion)",
+            ),
         ]:
             # Create cluster with case_name and case_name_full
             cluster = OpinionClusterWithParentsFactory(
@@ -1335,10 +1346,7 @@ class HarvardMergerTests(TestCase):
             )
 
             # json harvard case
-            hd = {
-                "name_abbreviation": item[2],
-                "name": item[3]
-            }
+            hd = {"name_abbreviation": item[2], "name": item[3]}
 
             merge_case_names(cluster.pk, hd)
             cluster.refresh_from_db()
