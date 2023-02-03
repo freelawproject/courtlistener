@@ -349,14 +349,16 @@ def merge_opinion_clusters(cluster_id: str) -> None:
                 "summary",
                 "history",
                 "headnotes",
-                "correction" "cross_reference",
+                "correction",
+                "cross_reference",
+                "disposition"
             ]
 
             # TODO what about case name fields, date filed or docker number
             #  field from harvard?
 
             for field_name in clean_dictionary.keys():
-                if field_name in long_fields.extend(["disposition"]):
+                if field_name in long_fields:
                     merge_long_fields(
                         cluster_id,
                         field_name,
