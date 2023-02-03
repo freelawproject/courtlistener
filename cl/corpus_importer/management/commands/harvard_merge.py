@@ -6,7 +6,7 @@ from typing import Any, Dict, Tuple
 
 from bs4 import BeautifulSoup
 from django.db import transaction
-from juriscraper.lib.string_utils import titlecase
+from juriscraper.lib.string_utils import titlecase, harmonize
 from lxml.html import fromstring
 
 from cl.corpus_importer.management.commands.harvard_opinions import (
@@ -251,21 +251,79 @@ def merge_docket_numbers(cluster_id: str, harvard_docket_number: str) -> None:
     :param harvard_docket_number: The harvard docket number
     :return: None
     """
-    cl_docket_number = Docket.objects.get(
-        id=OpinionCluster.objects.get(id=cluster_id).id
-    ).docket_number
-    if cl_docket_number in harvard_docket_number:
-        Docket.objects.update(docket_number=harvard_docket_number)
-    else:
-        cl_clean_docket = clean_docket_number(cl_docket_number)
-        h_clean_docket = clean_docket_number(harvard_docket_number)
+    cl_docket_number = OpinionCluster.objects.get(
+        id=cluster_id).docket.docket_number
 
-        # Check if their relatively similar and if so save the harvard one
-        # if its longer
-        similarity = get_cosine_similarity(cl_clean_docket, h_clean_docket)
-        if similarity > 0.8:
-            if len(harvard_docket_number) > len(cl_docket_number):
-                Docket.objects.update(docket_number=harvard_docket_number)
+    if cl_docket_number:
+        # Check if docket number exists
+        # e.g. CL docket id #3952066 doesn't have
+        if cl_docket_number in harvard_docket_number:
+            Docket.objects.update(docket_number=harvard_docket_number)
+        else:
+            cl_clean_docket = clean_docket_number(cl_docket_number)
+            h_clean_docket = clean_docket_number(harvard_docket_number)
+
+            # Check if their relatively similar and if so save the harvard one
+            # if its longer
+            similarity = get_cosine_similarity(cl_clean_docket, h_clean_docket)
+            if similarity > 0.8:
+                if len(harvard_docket_number) > len(cl_docket_number):
+                    Docket.objects.update(docket_number=harvard_docket_number)
+
+
+def merge_case_names(cluster_id: str, harvard_data: Dict[str, Any]) -> None:
+    """Merge case names
+
+    :param cluster_id: The cluster id of the merging item
+    :param harvard_data: json data from harvard case
+    :return: None
+    """
+    cluster = OpinionCluster.objects.get(id=cluster_id)
+    harvard_case_name = harmonize(harvard_data["name_abbreviation"])
+    harvard_case_name_full = harmonize(harvard_data["name"])
+    # Make sure case names are harmonized
+    cluster_case_name = harmonize(cluster.case_name)
+    cluster_case_name_full = harmonize(cluster.case_name_full)
+
+    update_dict = {}
+    # Case with full case names
+    if not cluster_case_name_full and harvard_case_name_full:
+        update_dict["case_name_full"] = harvard_case_name_full
+        # Change stored value to new
+        cluster_case_name_full = harvard_case_name_full
+    elif cluster_case_name_full and harvard_case_name_full:
+        if len(harvard_case_name_full) > len(cluster_case_name_full):
+            # Select best case name based on string length
+            update_dict["case_name_full"] = harvard_case_name_full
+            # Change stored value to new
+            cluster_case_name_full = harvard_case_name_full
+    else:
+        # We don't care if harvard data is empty or both are empty
+        pass
+
+    # Case with abbreviated case names
+    if not cluster_case_name and harvard_case_name:
+        update_dict["case_name"] = harvard_case_name
+        # Change stored value to new
+        cluster_case_name = harvard_case_name
+    elif cluster_case_name and harvard_case_name:
+        if len(harvard_case_name) > len(cluster_case_name):
+            # Select best case name based on string length
+            update_dict["case_name"] = harvard_case_name
+            # Change stored value to new
+            cluster_case_name = harvard_case_name
+    else:
+        # We don't care if harvard data is empty or both are empty
+        pass
+
+    if cluster_case_name_full and cluster_case_name:
+        if len(cluster_case_name) > len(cluster_case_name_full):
+            # Swap field values
+            update_dict["case_name"] = cluster_case_name_full
+            update_dict["case_name_full"] = cluster_case_name
+
+    if update_dict:
+        OpinionCluster.objects.filter(id=cluster_id).update(**update_dict)
 
 
 def merge_opinion_clusters(cluster_id: str) -> None:
@@ -282,6 +340,7 @@ def merge_opinion_clusters(cluster_id: str) -> None:
                 cluster_id, harvard_data
             )
             merge_docket_numbers(cluster_id, harvard_data["docket_number"])
+            merge_case_names(cluster_id, harvard_data)
             if clean_dictionary != {}:
                 logging.info(f"Merging complete for: {cluster_id}")
 
