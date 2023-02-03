@@ -1290,3 +1290,60 @@ class HarvardMergerTests(TestCase):
             merge_judges(cluster.pk, (item[1], item[0]))
             cluster.refresh_from_db()
             self.assertEqual(cluster.judges, item[2])
+
+    def test_merge_overlap_casenames(self):
+        """Test merge case names"""
+
+        for item in [
+            # Format: (cl case_name, cl case_name_full, harvard
+            # name_abbreviation, harvard case name, expected case_name,
+            # expected case_name_full)
+
+            # CL item #4571581
+            ("Perez v. Metropolitan District Commisssion",
+             "",
+             "Perez v. Metro. Dist. Comm'n",
+             "Vivian PEREZ, Administratrix (Estate of Andres Burgos) v. "
+             "METROPOLITAN DISTRICT COMMISSION",
+             "Perez v. Metropolitan District Commisssion",
+             "Vivian PEREZ, Administratrix (Estate of Andres Burgos) v. "
+             "METROPOLITAN DISTRICT COMMISSION"
+             ),
+            # CL item #4574207
+            ("Weyerman v. Freeman Expositions",
+             "",
+             "Weyerman v. Freeman Expositions, Inc.",
+             "Randy WEYERMAN v. FREEMAN EXPOSITIONS, INC., Employer, and Old "
+             "Republic Insurance Company, Insurance Carrier",
+             "Weyerman v. Freeman Expositions, Inc.",
+             "Randy WEYERMAN v. FREEMAN EXPOSITIONS, INC., Employer, and Old "
+             "Republic Insurance Company, Insurance Carrier"
+             ),
+            # CL item #4576005
+            ("State ex rel. Murray v. State Emp. Relations Bd. (Slip Opinion)",
+             "",
+             "State ex rel. Murray v. State Emp't Relations Bd",
+             "The STATE EX REL. MURRAY v. STATE EMPLOYMENT RELATIONS BOARD",
+             "The STATE EX REL. MURRAY v. STATE EMPLOYMENT RELATIONS BOARD",
+             "State ex rel. Murray v. State Emp. Relations Bd. (Slip Opinion)"
+             ),
+        ]:
+            # Create cluster with case_name and case_name_full
+            cluster = OpinionClusterWithParentsFactory(
+                case_name=item[0],
+                case_name_full=item[1],
+            )
+
+            # json harvard case
+            hd = {
+                "name_abbreviation": item[2],
+                "name": item[3]
+            }
+
+            merge_case_names(cluster.pk, hd)
+            cluster.refresh_from_db()
+
+            # Check case_name
+            self.assertEqual(cluster.case_name, item[4])
+            # Check case_name_full
+            self.assertEqual(cluster.case_name_full, item[5])
