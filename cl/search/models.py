@@ -614,12 +614,14 @@ class Docket(AbstractDateTimeModel):
                 self.docket_number
             )
 
-        update_fields = kwargs.get("update_fields")
-        incremented_view_count = (
-            True if update_fields and "view_count" in update_fields else False
-        )
-        if self.source in self.RECAP_SOURCES and not incremented_view_count:
+        if self.source in self.RECAP_SOURCES:
             for field in ["pacer_case_id", "docket_number"]:
+                if (
+                    field == "pacer_case_id"
+                    and getattr(self, "court", None)
+                    and self.court.jurisdiction == Court.FEDERAL_APPELLATE
+                ):
+                    continue
                 if not getattr(self, field, None):
                     raise ValidationError(
                         f"'{field}' cannot be Null or empty in RECAP dockets."

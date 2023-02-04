@@ -255,6 +255,11 @@ class ViewRecapDocketTest(TestCase):
             court=cls.court,
             source=Docket.RECAP,
         )
+        cls.court_appellate = CourtFactory(id="ca1", jurisdiction="F")
+        cls.docket_appellate = DocketFactory(
+            court=cls.court_appellate,
+            source=Docket.RECAP,
+        )
 
     def test_regular_docket_url(self) -> None:
         """Can we load a regular docket sheet?"""
@@ -290,20 +295,27 @@ class ViewRecapDocketTest(TestCase):
         self.docket.refresh_from_db(fields=["view_count"])
         self.assertEqual(old_view_count + 1, self.docket.view_count)
 
-    def test_recap_docket_no_pacer_case_id_increment_view_count_(self) -> None:
+    def test_appellate_docket_no_pacer_case_id_increment_view_count(
+        self,
+    ) -> None:
         """Test the view count for a RECAP Docket without pacer_case_id
         increments on page view
         """
 
         # Set pacer_case_id blank
-        Docket.objects.filter(pk=self.docket.pk).update(pacer_case_id=None)
-        old_view_count = self.docket.view_count
+        Docket.objects.filter(pk=self.docket_appellate.pk).update(
+            pacer_case_id=None
+        )
+        old_view_count = self.docket_appellate.view_count
         r = self.client.get(
-            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+            reverse(
+                "view_docket",
+                args=[self.docket_appellate.pk, self.docket_appellate.slug],
+            )
         )
         self.assertEqual(r.status_code, HTTP_200_OK)
-        self.docket.refresh_from_db(fields=["view_count"])
-        self.assertEqual(old_view_count + 1, self.docket.view_count)
+        self.docket_appellate.refresh_from_db(fields=["view_count"])
+        self.assertEqual(old_view_count + 1, self.docket_appellate.view_count)
 
 
 class OgRedirectLookupViewTest(TestCase):
