@@ -29,6 +29,7 @@ from cl.lib.test_helpers import (
     SolrTestCase,
 )
 from cl.scrapers.factories import PACERFreeDocumentLogFactory
+from cl.search.factories import CourtFactory
 from cl.search.feeds import JurisdictionFeed
 from cl.search.management.commands.cl_calculate_pagerank import Command
 from cl.search.models import (
@@ -249,7 +250,10 @@ class ModelTest(TestCase):
 
 
 class DocketValidationTest(TestCase):
-    fixtures = ["test_court.json"]
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.court_appellate = CourtFactory(id="ca1", jurisdiction="F")
 
     def tearDown(self) -> None:
         Docket.objects.all().delete()
@@ -259,13 +263,40 @@ class DocketValidationTest(TestCase):
         with self.assertRaises(ValidationError):
             Docket.objects.create(source=Docket.RECAP)
 
+    def test_creating_a_recap_docket_with_pacer_case_id_blank(self) -> None:
+        """Is blank pacer_case_id denied in not appellate dockets?"""
+        with self.assertRaises(ValidationError):
+            Docket.objects.create(
+                source=Docket.RECAP, court=self.court, docket_number="12-1233"
+            )
+
+        appellate = Docket.objects.create(
+            source=Docket.RECAP,
+            court=self.court_appellate,
+            docket_number="12-1234",
+        )
+        self.assertEqual(appellate.docket_number, "12-1234")
+
+    def test_creating_a_recap_docket_with_docket_number_blank(self) -> None:
+        """Is blank docket_number denied?"""
+        with self.assertRaises(ValidationError):
+            Docket.objects.create(
+                source=Docket.RECAP, court=self.court, pacer_case_id="1234"
+            )
+        with self.assertRaises(ValidationError):
+            Docket.objects.create(
+                source=Docket.RECAP,
+                court=self.court_appellate,
+                pacer_case_id="1234",
+            )
+
     def test_cannot_create_duplicate(self) -> None:
         """Do duplicate values throw an error?"""
         Docket.objects.create(
             source=Docket.RECAP,
             docket_number="asdf",
             pacer_case_id="asdf",
-            court_id="test",
+            court_id=self.court.pk,
         )
         with transaction.atomic():
             with self.assertRaises(IntegrityError):
@@ -273,7 +304,7 @@ class DocketValidationTest(TestCase):
                     source=Docket.RECAP_AND_SCRAPER,
                     docket_number="asdf",
                     pacer_case_id="asdf",
-                    court_id="test",
+                    court_id=self.court.pk,
                 )
 
 

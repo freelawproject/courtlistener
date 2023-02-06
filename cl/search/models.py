@@ -613,8 +613,15 @@ class Docket(AbstractDateTimeModel):
             self.docket_number_core = make_docket_number_core(
                 self.docket_number
             )
+
         if self.source in self.RECAP_SOURCES:
             for field in ["pacer_case_id", "docket_number"]:
+                if (
+                    field == "pacer_case_id"
+                    and getattr(self, "court", None)
+                    and self.court.jurisdiction == Court.FEDERAL_APPELLATE
+                ):
+                    continue
                 if not getattr(self, field, None):
                     raise ValidationError(
                         f"'{field}' cannot be Null or empty in RECAP dockets."
