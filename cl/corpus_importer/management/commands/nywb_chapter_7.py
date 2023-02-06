@@ -20,8 +20,8 @@ from cl.search.tasks import add_or_update_recap_docket
 PACER_USERNAME = os.environ.get("PACER_USERNAME", "UNKNOWN!")
 PACER_PASSWORD = os.environ.get("PACER_PASSWORD", "UNKNOWN!")
 
-TAG = "nywb-bankr-ch7"
-TAG_PETITIONS = 'nywb-bankr-ch7-petitions"'
+TAG = "nywb-bankr-ch7-round-2"
+TAG_PETITIONS = 'nywb-bankr-ch7-petitions-round-2"'
 
 
 def get_dockets(options):
