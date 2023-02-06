@@ -31,13 +31,17 @@ Some of the highlights of CourtListener and RECAP are:
 
        https://www.courtlistener.com{% url "advanced_oa" %}
 
-Everything we do here is open source, and we always do our best to share
-everything we can with the public. Right now for example, we're uploading
-around 2,000 PDFs to Internet Archive every night!
+As a non-profit, everything we do here is open source, and we always do our
+best to share everything we can with the public. If you like our work, we would
+love your support in the form of a donation:
+
+    https://www.courtlistener.com/donate/
+
+Every bit helps us do more.
 
 You've got my email address now. Let me know if you can't figure something out
 or if you have a suggestion on how things could be better. I hope you enjoy
-using CourtListener and RECAP!
+using CourtListener, RECAP, and all our services!
 
 
 Mike Lissner

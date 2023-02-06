@@ -3,7 +3,6 @@ import csv
 import os
 
 from celery.canvas import chain
-from django.conf import settings
 from juriscraper.pacer import PacerSession
 
 from cl.corpus_importer.bulk_utils import (
@@ -18,11 +17,11 @@ from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.search.tasks import add_or_update_recap_docket
 
-PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
-PACER_PASSWORD = os.environ.get("PACER_PASSWORD", settings.PACER_PASSWORD)
+PACER_USERNAME = os.environ.get("PACER_USERNAME", "UNKNOWN!")
+PACER_PASSWORD = os.environ.get("PACER_PASSWORD", "UNKNOWN!")
 
-TAG = "nywb-bankr-ch7"
-TAG_PETITIONS = 'nywb-bankr-ch7-petitions"'
+TAG = "nywb-bankr-ch7-round-2"
+TAG_PETITIONS = 'nywb-bankr-ch7-petitions-round-2"'
 
 
 def get_dockets(options):
@@ -77,7 +76,7 @@ def get_dockets(options):
 
 
 class Command(VerboseCommand):
-    help = "Purchase dockets and bankrupcy filings from PACER"
+    help = "Purchase dockets and bankruptcy filings from PACER"
 
     allowed_tasks = [
         "get_dockets",
