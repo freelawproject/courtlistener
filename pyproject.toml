@@ -105,8 +105,8 @@ sentry-sdk = "^1.9.0"
 selenium = "4.0.0.a7"
 ipython = "^8.5.0"
 time-machine = "^2.8.2"
-juriscraper = "^2.5.33"
 lxml-stubs = "0.2.0"
+juriscraper = {git = "https://github.com/freelawproject/juriscraper", rev = "646-add-appellate-rss-scrapers"}
 
 [tool.poetry.dev-dependencies]
 pylint = "^2.7.2"

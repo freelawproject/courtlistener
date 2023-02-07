@@ -101,6 +101,7 @@ from cl.recap.tasks import (
     process_recap_pdf,
     process_recap_zip,
 )
+from cl.recap_rss.tasks import merge_rss_feed_contents
 from cl.search.factories import (
     CourtFactory,
     DocketEntryWithParentsFactory,
@@ -1838,6 +1839,21 @@ class RecapMinuteEntriesTest(TestCase):
         )
         expected_item_count = 1
         self.assertEqual(d.docket_entries.count(), expected_item_count)
+
+    def test_appellate_rss_feed_ingestion(self) -> None:
+        """Can we ingest Appellate RSS feeds?"""
+
+        court_ca10 = CourtFactory(id="ca10", jurisdiction="F")
+        rss_feed = PacerRssFeed(court_ca10.pk)
+        with open(self.make_path("rss_ca10.xml"), "rb") as f:
+            text = f.read().decode()
+        rss_feed._parse_text(text)
+        merge_rss_feed_contents(rss_feed.data, court_ca10.pk)
+
+        dockets = Docket.objects.all()
+        self.assertEqual(dockets.count(), 3)
+        for docket in dockets:
+            self.assertEqual(docket.docket_entries.count(), 1)
 
 
 class DescriptionCleanupTest(SimpleTestCase):

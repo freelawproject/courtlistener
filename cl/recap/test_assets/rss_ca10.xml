@@ -1,0 +1,35 @@
+<?xml version='1.0' encoding='ISO-8859-1'?>
+
+<rss version="2.0" xmlns:blogChannel="http://backend.userland.com/blogChannelModule">
+
+<channel>
+	<title>Tenth Circuit Court of Appeals - Recent Entries</title>
+	<link>https://ecf.ca10.uscourts.gov</link>
+	<description>Docket entries of type: opinions</description>
+	<lastBuildDate>Mon, 06 Feb 2023 15:01:37 MST</lastBuildDate>
+<item>
+	<title>22-2127 Navarette v. Horton, et al</title>
+	<link>https://ecf.ca10.uscourts.gov/n/beam/servlet/TransportRoom?servlet=DocketReportFilter.jsp&amp;caseNum=22-2127</link>
+	<description>[Case termination for COA] (&lt;a href='https://ecf.ca10.uscourts.gov/docs1/010010808570'>Document&lt;/a>)</description>
+	<guid isPermaLink="true">https://ecf.ca10.uscourts.gov/n/beam/servlet/TransportRoom?servlet=DocketReportFilter.jsp&amp;caseNum=22-2127&amp;partId=10974672</guid>
+	<pubDate>Mon, 06 Feb 2023 09:05:12 MST</pubDate>
+
+</item>
+<item>
+	<title>22-2040 United States v. Chavez</title>
+	<link>https://ecf.ca10.uscourts.gov/n/beam/servlet/TransportRoom?servlet=DocketReportFilter.jsp&amp;caseNum=22-2040</link>
+	<description>[Case termination for order and judgment] (&lt;a href='https://ecf.ca10.uscourts.gov/docs1/010010808566'>Document&lt;/a>)</description>
+	<guid isPermaLink="true">https://ecf.ca10.uscourts.gov/n/beam/servlet/TransportRoom?servlet=DocketReportFilter.jsp&amp;caseNum=22-2040&amp;partId=10974668</guid>
+	<pubDate>Mon, 06 Feb 2023 09:01:55 MST</pubDate>
+
+</item>
+<item>
+	<title>22-6180 Wyatt v. Crow</title>
+	<link>https://ecf.ca10.uscourts.gov/n/beam/servlet/TransportRoom?servlet=DocketReportFilter.jsp&amp;caseNum=22-6180</link>
+	<description>[Case termination for COA] (&lt;a href='https://ecf.ca10.uscourts.gov/docs1/010010808502'>Document&lt;/a>)</description>
+	<guid isPermaLink="true">https://ecf.ca10.uscourts.gov/n/beam/servlet/TransportRoom?servlet=DocketReportFilter.jsp&amp;caseNum=22-6180&amp;partId=10974639</guid>
+	<pubDate>Mon, 06 Feb 2023 08:07:08 MST</pubDate>
+
+</item>
+</channel>
+</rss>

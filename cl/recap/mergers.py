@@ -63,7 +63,7 @@ cnt = CaseNameTweaker()
 
 def find_docket_object(
     court_id: str,
-    pacer_case_id: str,
+    pacer_case_id: str | None,
     docket_number: str,
     using: str = "default",
 ) -> Docket:
@@ -80,13 +80,17 @@ def find_docket_object(
     # pacer_case_id is required for Docket and Docket History uploads.
     d = None
     docket_number_core = make_docket_number_core(docket_number)
-    lookups = [
-        {
-            "pacer_case_id": pacer_case_id,
-            "docket_number_core": docket_number_core,
-        },
-        {"pacer_case_id": pacer_case_id},
-    ]
+    lookups = []
+    if pacer_case_id:
+        # Appellate RSS feeds don't contain a pacer_case_id, avoid lookups by
+        # blank pacer_case_id values.
+        lookups = [
+            {
+                "pacer_case_id": pacer_case_id,
+                "docket_number_core": docket_number_core,
+            },
+            {"pacer_case_id": pacer_case_id},
+        ]
     if docket_number_core:
         # Sometimes we don't know how to make core docket numbers. If that's
         # the case, we will have a blank value for the field. We must not do

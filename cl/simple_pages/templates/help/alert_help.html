@@ -127,6 +127,7 @@
     <ul class="nav nav-tabs" role="tablist">
       <li role="presentation" class="active"><a href="#full-feeds-FD" aria-controls="full-feeds-district" role="tab" data-toggle="tab">District Courts</a></li>
       <li role="presentation"><a href="#full-feeds-FB" aria-controls="full-feeds-bankr" role="tab" data-toggle="tab">Bankruptcy Courts</a></li>
+      <li role="presentation"><a href="#full-feeds-F" aria-controls="full-feeds-appellate" role="tab" data-toggle="tab">Appellate Courts</a></li>
     </ul>
 
     {% regroup full_feeds|dictsort:"jurisdiction" by jurisdiction as full_feed_courts %}
@@ -153,6 +154,7 @@
     <ul class="nav nav-tabs" role="tablist">
       <li role="presentation" class="active"><a href="#partial-feeds-FD" aria-controls="partial-feeds-district" role="tab" data-toggle="tab">District Courts</a></li>
       <li role="presentation"><a href="#partial-feeds-FB" aria-controls="partial-feeds-bankr" role="tab" data-toggle="tab">Bankruptcy Courts</a></li>
+      <li role="presentation"><a href="#partial-feeds-F" aria-controls="partial-feeds-appellate" role="tab" data-toggle="tab">Appellate Courts</a></li>
     </ul>
 
     {% regroup partial_feeds|dictsort:"jurisdiction" by jurisdiction as partial_feed_courts %}
@@ -181,6 +183,7 @@
     <ul class="nav nav-tabs" role="tablist">
       <li role="presentation" class="active"><a href="#no-feeds-FD" aria-controls="no-feeds-district" role="tab" data-toggle="tab">District Courts</a></li>
       <li role="presentation"><a href="#no-feeds-FB" aria-controls="no-feeds-bankr" role="tab" data-toggle="tab">Bankruptcy Courts</a></li>
+      <li role="presentation"><a href="#no-feeds-F" aria-controls="no-feeds-appellate" role="tab" data-toggle="tab">Appellate Courts</a></li>
     </ul>
 
     {% regroup no_feeds|dictsort:"jurisdiction" by jurisdiction as no_feed_courts %}
