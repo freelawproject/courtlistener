@@ -354,4 +354,12 @@ troller_ids = {
     "888": "wied",
     "891": "wiwd",
     "894": "wyd",
+    # Appellate
+    "609": "ca6",
+    "619": "ca10",
+    "625": "cadc",
+    "628": "cafc",
+    # I don't think we currently crawl these. Worth checking.
+    "633": "uscfc",
+    "636": "cit",
 }
