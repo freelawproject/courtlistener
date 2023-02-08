@@ -1840,7 +1840,8 @@ class RecapMinuteEntriesTest(TestCase):
         expected_item_count = 1
         self.assertEqual(d.docket_entries.count(), expected_item_count)
 
-    def test_appellate_rss_feed_ingestion(self) -> None:
+    @mock.patch("cl.recap_rss.tasks.enqueue_docket_alert")
+    def test_appellate_rss_feed_ingestion(self, mock_enqueue_de) -> None:
         """Can we ingest Appellate RSS feeds?"""
 
         court_ca10 = CourtFactory(id="ca10", jurisdiction="F")
