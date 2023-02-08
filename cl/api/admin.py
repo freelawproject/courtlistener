@@ -17,12 +17,15 @@ class WebhookAdmin(admin.ModelAdmin):
         "enabled",
         "event_type",
         "version",
-        "failure_count",
     )
     readonly_fields = (
         "date_created",
         "date_modified",
     )
+
+
+class WebhookInline(admin.TabularInline):
+    model = Webhook
 
 
 @admin.register(WebhookEvent)
