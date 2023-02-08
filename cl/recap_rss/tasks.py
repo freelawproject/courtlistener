@@ -94,7 +94,7 @@ def get_last_build_date(b: bytes) -> Optional[datetime]:
     if m is None:
         return None
     last_build_date_b = m.group(2)
-    return parse(last_build_date_b)
+    return parse(last_build_date_b.decode())
 
 
 def alert_on_staleness(

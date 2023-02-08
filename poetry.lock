@@ -3703,6 +3703,18 @@ trio = ">=0.11"
 wsproto = ">=0.14"
 
 [[package]]
+name = "types-dateparser"
+version = "1.1.4.6"
+description = "Typing stubs for dateparser"
+category = "main"
+optional = false
+python-versions = "*"
+files = [
+    {file = "types-dateparser-1.1.4.6.tar.gz", hash = "sha256:c6dbe4ed5a3b23ec200e23b55f52fc6c62e1e6ed4fd7fe4f2af9544ea01c465c"},
+    {file = "types_dateparser-1.1.4.6-py3-none-any.whl", hash = "sha256:c9d28c4d2953f54068d63521c1b92775e61c059363dbd37c77f0a524dd838b23"},
+]
+
+[[package]]
 name = "types-python-dateutil"
 version = "2.8.9"
 description = "Typing stubs for python-dateutil"
@@ -3983,4 +3995,4 @@ h11 = ">=0.9.0,<1"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10, <3.11"
-content-hash = "a1690098271b2847d51004ab9db9fcb340799d46687116bb81b6e7822a1bf8ba"
+content-hash = "39dfcb3af5eed16e071a1f408353642ead1f97db5db533f5fb98196ed2196b26"
