@@ -9,13 +9,12 @@ from typing import Optional
 
 import requests
 from celery import Task
-from dateutil import parser
+from dateparser import parse
 from django.core.files.base import ContentFile
 from django.core.mail import send_mail
 from django.db import IntegrityError, transaction
 from django.utils.timezone import now
 from juriscraper.pacer import PacerRssFeed
-from juriscraper.pacer.utils import parse_datetime_for_us_timezone
 from pytz import timezone
 from requests import HTTPError
 
@@ -95,7 +94,7 @@ def get_last_build_date(b: bytes) -> Optional[datetime]:
     if m is None:
         return None
     last_build_date_b = m.group(2)
-    return parse_datetime_for_us_timezone(last_build_date_b)
+    return parse(last_build_date_b)
 
 
 def alert_on_staleness(

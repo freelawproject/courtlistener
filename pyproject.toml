@@ -106,7 +106,8 @@ selenium = "4.0.0.a7"
 ipython = "^8.5.0"
 time-machine = "^2.8.2"
 lxml-stubs = "0.2.0"
-juriscraper = {git = "https://github.com/freelawproject/juriscraper", rev = "646-add-appellate-rss-scrapers"}
+juriscraper = {git = "https://github.com/freelawproject/juriscraper", rev = "main"}
+dateparser = "1.1.6"
 
 [tool.poetry.dev-dependencies]
 pylint = "^2.7.2"
