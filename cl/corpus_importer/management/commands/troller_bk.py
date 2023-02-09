@@ -1,36 +1,59 @@
 # Import the troller BK RSS feeds
 import argparse
 import re
-from typing import Any, TypedDict
+from datetime import datetime
+from typing import Any, Mapping, TypedDict
 from urllib.parse import unquote
 
 from django.db import IntegrityError, transaction
+from django.utils.timezone import make_aware, utc
 from juriscraper.pacer import PacerRssFeed
 
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.pacer import map_pacer_to_cl_id
+from cl.lib.redis_utils import make_redis_interface
 from cl.lib.storage import S3PrivateUUIDStorage
 from cl.recap.mergers import (
     add_bankruptcy_data_to_docket,
     add_docket_entries,
     find_docket_object,
+    update_docket_metadata,
 )
+from cl.recap_rss.tasks import get_last_build_date
+from cl.search.models import Court
 from cl.search.tasks import add_items_to_solr
 
 
 def merge_rss_data(
     feed_data: list[dict[str, Any]],
     court_id: str,
-) -> list[int]:
+    build_date: datetime,
+) -> tuple[list[int], int]:
     """Merge the RSS data into the database
 
     :param feed_data: Data from an RSS feed file
     :param court_id: The PACER court ID for the item
     :return: A list of RECAPDocument PKs that can be passed to Solr
     """
+
+    dockets_created = 0
     all_rds_created = []
+    district_court_ids = (
+        Court.federal_courts.district_pacer_courts().values_list(
+            "pk", flat=True
+        )
+    )
+
+    if (
+        build_date > make_aware(datetime(year=2018, month=4, day=18), utc)
+        and court_id in district_court_ids
+    ):
+        # Avoid parsing/adding feeds after we start scraping RSS Feeds for
+        # district and bankruptcy courts.
+        return all_rds_created, dockets_created
+
     for docket in feed_data:
-        if not docket["pacer_case_id"] and docket["docket_number"]:
+        if not docket["pacer_case_id"] and not docket["docket_number"]:
             continue
         with transaction.atomic():
             d = find_docket_object(
@@ -43,6 +66,10 @@ def merge_rss_data(
                 continue
 
             d.add_recap_source()
+            if not d.pk:
+                update_docket_metadata(d, docket)
+                dockets_created += 1
+
             if not d.pacer_case_id:
                 d.pacer_case_id = docket["pacer_case_id"]
             try:
@@ -61,13 +88,13 @@ def merge_rss_data(
     logger.info(
         f"Finished adding docket {d}. Added {len(all_rds_created)} RDs."
     )
-    return all_rds_created
+    return all_rds_created, dockets_created
 
 
 def download_and_parse(
     item_path: str,
     court_id: str,
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], datetime]:
     """Get an item from S3, parse it, and return the data
 
     :param item_path: The path to the item in the private S3 bucket
@@ -77,8 +104,11 @@ def download_and_parse(
     bucket = S3PrivateUUIDStorage()
     with bucket.open(item_path, mode="rb") as f:
         feed = PacerRssFeed(court_id)
-        feed._parse_text(f.read().decode("utf-8"))
-    return feed.data
+        binary_content = f.read()
+        content = binary_content.decode("utf-8")
+        feed._parse_text(content)
+        build_date = get_last_build_date(binary_content)
+    return feed.data, build_date
 
 
 def get_court_from_line(line: str) -> None | str:
@@ -88,6 +118,7 @@ def get_court_from_line(line: str) -> None | str:
 
         sources/troller-files/o-894|1599853056
         sources/troller-files/o-DCCF0395-BDBA-C444-149D8D8EFA2EC03D|1576082101
+        sources/troller-files/w-88AC552F-BDBA-C444-1BD52598BA252265|1435103773
 
     The court_id is based on the part between the "/o-" and the "|". Match it,
     look it up in our table of court IDs, and return the correct PACER ID.
@@ -96,10 +127,11 @@ def get_court_from_line(line: str) -> None | str:
     :return: The PACER court ID for the feed
     """
     try:
-        court = m = re.search(r"/o\-(.*)\|", line).group(1)
+        court = m = re.search(r"\/[a-zA-Z]-(.*)\|", line).group(1)
     except AttributeError:
         # Couldn't find a match
         return None
+    court = troller_ids.get(court, None)
     return court
 
 
@@ -109,6 +141,38 @@ class OptionsType(TypedDict):
     file: str
 
 
+def log_added_items_to_redis(
+    dockets_created: int, rds_created: int
+) -> Mapping[str, int | str]:
+    """Log the number of dockets and recap documents created to redis.
+    Get the previous stored values and add the new ones.
+
+    :param dockets_created: The dockets created.
+    :param rds_created: The recap documents created.
+    :return: The data logged to redis.
+    """
+
+    r = make_redis_interface("STATS")
+    pipe = r.pipeline()
+    log_key = "troller_bk:log"
+    pipe.hgetall(log_key)
+    stored_values = pipe.execute()
+    current_total_dockets = int(stored_values[0].get("total_dockets", 0))
+    current_total_rds = int(stored_values[0].get("total_rds", 0))
+
+    total_dockets_created = dockets_created + current_total_dockets
+    total_rds_created = rds_created + current_total_rds
+    log_info: Mapping[str, int | str] = {
+        "total_dockets": total_dockets_created,
+        "total_rds": total_rds_created,
+        "date_time": datetime.now().isoformat(),
+    }
+    pipe.hset(log_key, mapping=log_info)
+    pipe.expire(log_key, 60 * 60 * 24 * 28)  # 4 weeks
+    pipe.execute()
+    return log_info
+
+
 def iterate_and_import_files(options: OptionsType) -> None:
     """Iterate over the inventory file and import all new items.
 
@@ -116,30 +180,45 @@ def iterate_and_import_files(options: OptionsType) -> None:
      - Add to solr
      - Do not send alerts or webhooks
      - Do not touch dockets with entries (troller data is old)
-     - Do not do circuit courts (we're not ready for their feeds)
+     - Do not parse (add) district/bankruptcy courts feeds after 2018-4-18
+     that is the RSS feeds started being scraped by RECAP.
 
     :param options: The command line options
     :return: None
     """
-    f = open(options["file"], "r")
 
+    f = open(options["file"], "r")
+    line_counter = 0
+    total_dockets_created = 0
+    total_rds_created = 0
     for i, line in enumerate(f):
         if i < options["offset"]:
             continue
-        if i >= options["limit"]:
+        if i >= options["limit"] > 0:
             break
 
         # The first column of the CSV should be a
-        item_path = unquote(line)
-        court_id = get_court_from_line(line)
+        item_path = unquote(line).replace("\n", "")
+        court_id = get_court_from_line(item_path)
         logger.info(f"Attempting: {item_path=} with {court_id=}")
         if not court_id:
-            # Probably a court we don't know or a circuit court
+            # Probably a court we don't know
             continue
 
-        feed_data = download_and_parse(item_path, court_id)
-        rds_for_solr = merge_rss_data(feed_data, court_id)
+        feed_data, build_date = download_and_parse(item_path, court_id)
+        rds_for_solr, dockets_created = merge_rss_data(
+            feed_data, court_id, build_date
+        )
         add_items_to_solr(rds_for_solr, "search.RECAPDocument")
+
+        line_counter += 1
+        logger.info(f"Last line imported: {line_counter}")
+        total_dockets_created = total_dockets_created + dockets_created
+        total_rds_created = total_rds_created + len(rds_for_solr)
+
+        if total_rds_created % 1000:
+            # Log every 1000 RDs added.
+            log_added_items_to_redis(total_dockets_created, total_rds_created)
 
     f.close()
 
@@ -164,7 +243,7 @@ class Command(VerboseCommand):
         )
         parser.add_argument(
             "--file",
-            type=argparse.FileType("r"),
+            type=str,
             help="Where is the text file that has the list of paths from the "
             "bucket? Create this from an S3 inventory file, by removing "
             "all but the path column",
