@@ -98,6 +98,9 @@ def find_docket_object(
         lookups.append(
             {"pacer_case_id": None, "docket_number_core": docket_number_core},
         )
+        lookups.append(
+            {"docket_number_core": docket_number_core},
+        )
     else:
         # Finally, as a last resort, we can try the docket number. It might not
         # match b/c of punctuation or whatever, but we can try.
