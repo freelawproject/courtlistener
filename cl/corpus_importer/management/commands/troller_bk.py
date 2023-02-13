@@ -187,7 +187,7 @@ def iterate_and_import_files(options: OptionsType) -> None:
     :return: None
     """
 
-    f = open(options["file"], "r")
+    f = open(options["file"], "r", encoding="utf-8")
     line_counter = 0
     total_dockets_created = 0
     total_rds_created = 0
