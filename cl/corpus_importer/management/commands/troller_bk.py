@@ -111,28 +111,44 @@ def download_and_parse(
     return feed.data, build_date
 
 
-def get_court_from_line(line: str) -> None | str:
+def get_court_from_line(line: str):
     """Get the court_id from the line.
 
     This is a bit annoying. Each file name looks something like:
 
         sources/troller-files/o-894|1599853056
+        sources/troller-files/w-w-894|1599853056
         sources/troller-files/o-DCCF0395-BDBA-C444-149D8D8EFA2EC03D|1576082101
         sources/troller-files/w-88AC552F-BDBA-C444-1BD52598BA252265|1435103773
+        sources/troller-files/w-w-DCCF049E-BDBA-C444-107C577164350B1E|1638858935
+        sources/troller-files/w-88AC552F-BDBA-C444-1BD52598BA252265-1399913581
+        sources/troller-files/w-w-Mariana|1638779760
 
-    The court_id is based on the part between the "/o-" and the "|". Match it,
-    look it up in our table of court IDs, and return the correct PACER ID.
+    The court_id is based on the part between the "/o-" and the "|" or "-".
+    Match it, look it up in our table of court IDs, and return the correct PACER ID.
 
     :param line: A line to a file in S3
     :return: The PACER court ID for the feed
     """
-    try:
-        court = m = re.search(r"\/[a-zA-Z]-(.*)\|", line).group(1)
-    except AttributeError:
-        # Couldn't find a match
+
+    court = None
+    regex = re.compile(
+        r"([A-Z0-9]{8}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{16})|-([0-9]{3})\||-([0-9]{3})-|(Mariana)"
+    )
+    match = re.search(regex, line)
+
+    if match.group(1):
+        court = match.group(1)
+    if match.group(2):
+        court = match.group(2)
+    if match.group(3):
+        court = match.group(3)
+    if match.group(4):
+        court = match.group(4)
+
+    if not court:
         return None
-    court = troller_ids.get(court, None)
-    return court
+    return troller_ids.get(court, None)
 
 
 class OptionsType(TypedDict):
