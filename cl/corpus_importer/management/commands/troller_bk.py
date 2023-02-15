@@ -27,17 +27,18 @@ from cl.search.tasks import add_items_to_solr
 def merge_rss_data(
     feed_data: list[dict[str, Any]],
     court_id: str,
-    build_date: datetime,
+    build_date: datetime | None,
 ) -> tuple[list[int], int]:
     """Merge the RSS data into the database
 
     :param feed_data: Data from an RSS feed file
     :param court_id: The PACER court ID for the item
+    :param build_date: The RSS date build.
     :return: A list of RECAPDocument PKs that can be passed to Solr
     """
 
     dockets_created = 0
-    all_rds_created = []
+    all_rds_created: list[int] = []
     district_court_ids = (
         Court.federal_courts.district_pacer_courts().values_list(
             "pk", flat=True
@@ -45,7 +46,8 @@ def merge_rss_data(
     )
 
     if (
-        build_date > make_aware(datetime(year=2018, month=4, day=18), utc)
+        build_date
+        and build_date > make_aware(datetime(year=2018, month=4, day=18), utc)
         and court_id in district_court_ids
     ):
         # Avoid parsing/adding feeds after we start scraping RSS Feeds for
@@ -94,7 +96,7 @@ def merge_rss_data(
 def download_and_parse(
     item_path: str,
     court_id: str,
-) -> tuple[list[dict[str, Any]], datetime]:
+) -> tuple[Any, datetime | None]:
     """Get an item from S3, parse it, and return the data
 
     :param item_path: The path to the item in the private S3 bucket
@@ -136,7 +138,8 @@ def get_court_from_line(line: str):
         r"([A-Z0-9]{8}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{16})|-([0-9]{3})\||-([0-9]{3})-|(Mariana)"
     )
     match = re.search(regex, line)
-
+    if match is None:
+        return None
     if match.group(1):
         court = match.group(1)
     if match.group(2):
@@ -159,7 +162,7 @@ class OptionsType(TypedDict):
 
 def log_added_items_to_redis(
     dockets_created: int, rds_created: int
-) -> Mapping[str, int | str]:
+) -> Mapping[str | bytes, int | str]:
     """Log the number of dockets and recap documents created to redis.
     Get the previous stored values and add the new ones.
 
@@ -178,7 +181,7 @@ def log_added_items_to_redis(
 
     total_dockets_created = dockets_created + current_total_dockets
     total_rds_created = rds_created + current_total_rds
-    log_info: Mapping[str, int | str] = {
+    log_info: Mapping[str | bytes, int | str] = {
         "total_dockets": total_dockets_created,
         "total_rds": total_rds_created,
         "date_time": datetime.now().isoformat(),
