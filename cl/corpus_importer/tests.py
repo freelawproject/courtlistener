@@ -1598,11 +1598,33 @@ class TrollerBKTests(TestCase):
         """Can we log dockets and rds added to redis, adding the previous
         value?
         """
-        last_values = log_added_items_to_redis(100, 100)
+        recover_previous_value = True
+        last_values = log_added_items_to_redis(
+            100, 100, recover_previous_value
+        )
         self.assertEqual(last_values["total_dockets"], 100)
         self.assertEqual(last_values["total_rds"], 100)
 
-        last_values = log_added_items_to_redis(50, 80)
+        # Store the value as received
+        recover_previous_value = False
+        last_values = log_added_items_to_redis(
+            150, 180, recover_previous_value
+        )
+        self.assertEqual(last_values["total_dockets"], 150)
+        self.assertEqual(last_values["total_rds"], 180)
+
+        self.r.flushdb()
+
+        recover_previous_value = True
+        last_values = log_added_items_to_redis(
+            100, 100, recover_previous_value
+        )
+        self.assertEqual(last_values["total_dockets"], 100)
+        self.assertEqual(last_values["total_rds"], 100)
+
+        # Store the value adding the previous one.
+        recover_previous_value = True
+        last_values = log_added_items_to_redis(50, 80, recover_previous_value)
         self.assertEqual(last_values["total_dockets"], 150)
         self.assertEqual(last_values["total_rds"], 180)
 

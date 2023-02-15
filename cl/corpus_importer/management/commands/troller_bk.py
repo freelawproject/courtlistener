@@ -158,7 +158,7 @@ class OptionsType(TypedDict):
 
 
 def log_added_items_to_redis(
-    dockets_created: int, rds_created: int
+    dockets_created: int, rds_created: int, recover_previous_value: bool
 ) -> Mapping[str, int | str]:
     """Log the number of dockets and recap documents created to redis.
     Get the previous stored values and add the new ones.
@@ -176,8 +176,12 @@ def log_added_items_to_redis(
     current_total_dockets = int(stored_values[0].get("total_dockets", 0))
     current_total_rds = int(stored_values[0].get("total_rds", 0))
 
-    total_dockets_created = dockets_created + current_total_dockets
-    total_rds_created = rds_created + current_total_rds
+    if recover_previous_value:
+        total_dockets_created = dockets_created + current_total_dockets
+        total_rds_created = rds_created + current_total_rds
+    else:
+        total_dockets_created = dockets_created
+        total_rds_created = rds_created
     log_info: Mapping[str, int | str] = {
         "total_dockets": total_dockets_created,
         "total_rds": total_rds_created,
@@ -204,7 +208,6 @@ def iterate_and_import_files(options: OptionsType) -> None:
     """
 
     f = open(options["file"], "r", encoding="utf-8")
-    line_counter = 0
     total_dockets_created = 0
     total_rds_created = 0
     for i, line in enumerate(f):
@@ -227,14 +230,20 @@ def iterate_and_import_files(options: OptionsType) -> None:
         )
         add_items_to_solr(rds_for_solr, "search.RECAPDocument")
 
-        line_counter += 1
-        logger.info(f"Last line imported: {line_counter}")
-        total_dockets_created = total_dockets_created + dockets_created
-        total_rds_created = total_rds_created + len(rds_for_solr)
+        logger.info(f"Last line imported: {i}")
+        total_dockets_created += dockets_created
+        total_rds_created += len(rds_for_solr)
 
-        if total_rds_created % 1000:
-            # Log every 1000 RDs added.
-            log_added_items_to_redis(total_dockets_created, total_rds_created)
+        if not i % 1000:
+            # Log every 1000 lines.
+            recover_previous_value = False
+            if i == 0 or i == options["offset"]:
+                recover_previous_value = True
+            log_added_items_to_redis(
+                total_dockets_created,
+                total_rds_created,
+                recover_previous_value,
+            )
 
     f.close()
 
