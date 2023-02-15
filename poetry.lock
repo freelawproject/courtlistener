@@ -661,6 +661,29 @@ redis = ["redis (>=2.10.0)"]
 test = ["cassandra-driver (>=3.20)", "coverage", "mock (>=2.0.0)", "mockredispy", "nose (>=1.3.7)", "nose-exclude (>=0.5.0)", "pymongo (>=3.9.0)", "redis (>=2.10.0)"]
 
 [[package]]
+name = "dateparser"
+version = "1.1.6"
+description = "Date parsing library designed to parse dates from HTML pages"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "dateparser-1.1.6-py2.py3-none-any.whl", hash = "sha256:c47b6e4b8c4b2b2a21690111b6571b6991295ba327ec6503753abeebf5e80696"},
+    {file = "dateparser-1.1.6.tar.gz", hash = "sha256:e703db1815270c020552f4b3e3a981937b48b2cbcfcef5347071b74788dd9214"},
+]
+
+[package.dependencies]
+python-dateutil = "*"
+pytz = "*"
+regex = "<2019.02.19 || >2019.02.19,<2021.8.27 || >2021.8.27"
+tzlocal = "*"
+
+[package.extras]
+calendars = ["convertdate", "hijri-converter"]
+fasttext = ["fasttext"]
+langdetect = ["langdetect"]
+
+[[package]]
 name = "decorator"
 version = "5.1.1"
 description = "Decorators for Humans"
@@ -1827,10 +1850,8 @@ description = "An API to scrape American court websites for metadata."
 category = "main"
 optional = false
 python-versions = "*"
-files = [
-    {file = "juriscraper-2.5.33-py27-none-any.whl", hash = "sha256:daf8bce9a23f8aed28c8e0cd6e24ae2d3099bcee390b12219eb24231a30711ad"},
-    {file = "juriscraper-2.5.33.tar.gz", hash = "sha256:0f1e9905121feaa2f35d3e308ba1428306f169a4d4eacc50580f6be0e240bb0b"},
-]
+files = []
+develop = false
 
 [package.dependencies]
 argparse = "*"
@@ -1838,6 +1859,7 @@ cchardet = ">=1.1.2"
 certifi = ">=2017.4.17"
 chardet = ">=3.0.2,<5.2.0"
 cssselect = "*"
+dateparser = "1.1.6"
 feedparser = "6.0.8"
 geonamescache = "1.5.0"
 html5lib = "*"
@@ -1846,6 +1868,12 @@ python-dateutil = "2.8.2"
 requests = ">=2.20.0"
 selenium = "4.0.0.a7"
 tldextract = "*"
+
+[package.source]
+type = "git"
+url = "https://github.com/freelawproject/juriscraper"
+reference = "main"
+resolved_reference = "ce2dcb05e10221e06e6f6fd3f3d6c87887d9d5a0"
 
 [[package]]
 name = "kdtree"
@@ -2940,6 +2968,21 @@ files = [
 ]
 
 [[package]]
+name = "pytz-deprecation-shim"
+version = "0.1.0.post0"
+description = "Shims to make deprecation of pytz easier"
+category = "main"
+optional = false
+python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,>=2.7"
+files = [
+    {file = "pytz_deprecation_shim-0.1.0.post0-py2.py3-none-any.whl", hash = "sha256:8314c9692a636c8eb3bda879b9f119e350e93223ae83e70e80c31675a0fdc1a6"},
+    {file = "pytz_deprecation_shim-0.1.0.post0.tar.gz", hash = "sha256:af097bae1b616dde5c5744441e2ddc69e74dfdcb0c263129610d85b87445a59d"},
+]
+
+[package.dependencies]
+tzdata = {version = "*", markers = "python_version >= \"3.6\""}
+
+[[package]]
 name = "pyyaml"
 version = "5.4.1"
 description = "YAML parser and emitter for Python"
@@ -3660,6 +3703,18 @@ trio = ">=0.11"
 wsproto = ">=0.14"
 
 [[package]]
+name = "types-dateparser"
+version = "1.1.4.6"
+description = "Typing stubs for dateparser"
+category = "main"
+optional = false
+python-versions = "*"
+files = [
+    {file = "types-dateparser-1.1.4.6.tar.gz", hash = "sha256:c6dbe4ed5a3b23ec200e23b55f52fc6c62e1e6ed4fd7fe4f2af9544ea01c465c"},
+    {file = "types_dateparser-1.1.4.6-py3-none-any.whl", hash = "sha256:c9d28c4d2953f54068d63521c1b92775e61c059363dbd37c77f0a524dd838b23"},
+]
+
+[[package]]
 name = "types-python-dateutil"
 version = "2.8.9"
 description = "Typing stubs for python-dateutil"
@@ -3757,6 +3812,38 @@ files = [
     {file = "typing_extensions-4.1.1-py3-none-any.whl", hash = "sha256:21c85e0fe4b9a155d0799430b0ad741cdce7e359660ccbd8b530613e8df88ce2"},
     {file = "typing_extensions-4.1.1.tar.gz", hash = "sha256:1a9462dcc3347a79b1f1c0271fbe79e844580bb598bafa1ed208b94da3cdcd42"},
 ]
+
+[[package]]
+name = "tzdata"
+version = "2022.7"
+description = "Provider of IANA time zone data"
+category = "main"
+optional = false
+python-versions = ">=2"
+files = [
+    {file = "tzdata-2022.7-py2.py3-none-any.whl", hash = "sha256:2b88858b0e3120792a3c0635c23daf36a7d7eeeca657c323da299d2094402a0d"},
+    {file = "tzdata-2022.7.tar.gz", hash = "sha256:fe5f866eddd8b96e9fcba978f8e503c909b19ea7efda11e52e39494bad3a7bfa"},
+]
+
+[[package]]
+name = "tzlocal"
+version = "4.2"
+description = "tzinfo object for the local timezone"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "tzlocal-4.2-py3-none-any.whl", hash = "sha256:89885494684c929d9191c57aa27502afc87a579be5cdd3225c77c463ea043745"},
+    {file = "tzlocal-4.2.tar.gz", hash = "sha256:ee5842fa3a795f023514ac2d801c4a81d1743bbe642e3940143326b3a00addd7"},
+]
+
+[package.dependencies]
+pytz-deprecation-shim = "*"
+tzdata = {version = "*", markers = "platform_system == \"Windows\""}
+
+[package.extras]
+devenv = ["black", "pyroma", "pytest-cov", "zest.releaser"]
+test = ["pytest (>=4.3)", "pytest-mock (>=3.3)"]
 
 [[package]]
 name = "unidecode"
@@ -3908,4 +3995,4 @@ h11 = ">=0.9.0,<1"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10, <3.11"
-content-hash = "401a77095e385308c0337b6627561ea141317dc2ee8714d164239ae59568740a"
+content-hash = "11ff893c546df8005abf0d0480f9702a8349b29ff644ff3776f59acc963aec2a"
