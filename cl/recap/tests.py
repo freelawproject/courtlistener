@@ -5712,6 +5712,7 @@ class CalculateRecapsSequenceNumbersTest(TestCase):
     def setUpTestData(cls):
         cls.cand = CourtFactory(id="cand", jurisdiction="FB")
         cls.nyed = CourtFactory(id="nyed", jurisdiction="FB")
+        cls.nysd = CourtFactory(id="nysd", jurisdiction="FB")
 
         cls.d_cand = DocketFactory(
             source=Docket.RECAP,
@@ -5722,6 +5723,11 @@ class CalculateRecapsSequenceNumbersTest(TestCase):
             source=Docket.RECAP,
             court=cls.nyed,
             pacer_case_id="104491",
+        )
+        cls.d_nysd = DocketFactory(
+            source=Docket.RECAP,
+            court=cls.nysd,
+            pacer_case_id="104492",
         )
 
         cls.de_date_asc = DocketEntriesDataFactory(
@@ -5764,6 +5770,29 @@ class CalculateRecapsSequenceNumbersTest(TestCase):
             ],
         )
 
+        cls.de_datetime_prev_differs = DocketEntriesDataFactory(
+            docket_entries=[
+                DocketEntryDataFactory(
+                    date_filed=datetime(
+                        2021, 10, 17, 2, 46, 51, tzinfo=tzutc()
+                    ),
+                    document_number=3,
+                ),
+                DocketEntryDataFactory(
+                    date_filed=datetime(
+                        2021, 10, 16, 2, 46, 51, tzinfo=tzutc()
+                    ),
+                    document_number=2,
+                ),
+                DocketEntryDataFactory(
+                    date_filed=datetime(
+                        2021, 10, 16, 2, 46, 51, tzinfo=tzutc()
+                    ),
+                    document_number=1,
+                ),
+            ],
+        )
+
     def test_get_order_of_docket(self):
         """Test get_order_of_docket method"""
 
@@ -5783,13 +5812,11 @@ class CalculateRecapsSequenceNumbersTest(TestCase):
         add_docket_entries(
             self.d_nyed, self.de_datetime_desc["docket_entries"]
         )
-        add_docket_entries(self.d_cand, self.de_date_asc["docket_entries"])
-
         docket_entries_nyed = DocketEntry.objects.filter(
             docket__court=self.nyed
         ).order_by("recap_sequence_number")
-
         entry_number = 1
+        # Validate recap_sequence_number generated from entries in desc order
         for de in docket_entries_nyed:
             self.assertEqual(de.entry_number, entry_number)
             self.assertEqual(
@@ -5797,14 +5824,36 @@ class CalculateRecapsSequenceNumbersTest(TestCase):
             )
             entry_number += 1
 
+        add_docket_entries(self.d_cand, self.de_date_asc["docket_entries"])
         docket_entries_cand = DocketEntry.objects.filter(
             docket__court=self.cand
         ).order_by("recap_sequence_number")
-
         entry_number = 1
+        # Validate recap_sequence_number generated from entries in asc order
         for de in docket_entries_cand:
             self.assertEqual(de.entry_number, entry_number)
             self.assertEqual(
                 de.recap_sequence_number, f"2021-10-15.00{entry_number}"
             )
             entry_number += 1
+
+        add_docket_entries(
+            self.d_nysd, self.de_datetime_prev_differs["docket_entries"]
+        )
+        docket_entries_nysd = DocketEntry.objects.filter(
+            docket__court=self.nysd
+        ).order_by("recap_sequence_number")
+        # Validate recap_sequence_number changes if the previous entry date
+        # differs
+        entry_number = 1
+        prev_de = None
+        for de in docket_entries_nysd:
+            if not prev_de or de.date_filed == prev_de.date_filed:
+                self.assertEqual(
+                    de.recap_sequence_number, f"2021-10-15.00{entry_number}"
+                )
+            else:
+                self.assertEqual(de.recap_sequence_number, f"2021-10-16.001")
+            self.assertEqual(de.entry_number, entry_number)
+            entry_number += 1
+            prev_de = de

@@ -2,15 +2,13 @@
 import logging
 import re
 from copy import deepcopy
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-import pytz
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, OperationalError, transaction
 from django.db.models import Prefetch, Q, QuerySet
-from django.templatetags.tz import do_timezone
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer import AppellateAttachmentPage, AttachmentPage
@@ -27,6 +25,7 @@ from cl.lib.pacer import (
     normalize_attorney_role,
 )
 from cl.lib.privacy_tools import anonymize
+from cl.lib.timezone_helpers import localize_date_and_time
 from cl.lib.utils import previous_and_next, remove_duplicate_dicts
 from cl.people_db.lookup_utils import lookup_judge_by_full_name_and_set_attr
 from cl.people_db.models import (
@@ -39,7 +38,6 @@ from cl.people_db.models import (
     PartyType,
     Role,
 )
-from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.models import (
     PROCESSING_STATUS,
     UPLOAD_TYPE,
@@ -412,70 +410,21 @@ def get_order_of_docket(docket_entries):
     return order
 
 
-def convert_to_court_timezone(
-    datetime_filed: datetime, court_id: str
-) -> datetime:
-    """Convert a docket entry datetime filed to the court timezone it belongs
-    to.
-
-    :param datetime_filed: The docket entry datetime filed
-    :param court_id: The court id to which docket entries belong, used for
-    timezone conversion.
-    :return: A date object in the court timezone.
-    """
-    court_timezone = COURT_TIMEZONES.get(court_id, "US/Eastern")
-    return do_timezone(datetime_filed, court_timezone)
-
-
-def set_docket_entry_date_and_time(
-    de: DocketEntry, date_filed: date | datetime
-) -> None:
-    """Set the docket entry date and time, if datetime is available, convert it
-    to the local court timezone, split it into date and time and save it to
-    date_filed and time_filed.
-
-    :param de: The docket entry to set date and time filed.
-    :date_filed: The date or datetime instance provided by the source.
-    :return: None
-    """
-
-    if isinstance(date_filed, datetime):
-        datetime_filed_local = convert_to_court_timezone(
-            date_filed, de.docket.court.pk
-        )
-        de.time_filed = datetime_filed_local.time()
-        date_filed = datetime_filed_local.date()
-    else:
-        # If not time data is available, compare if date_filed changed if so
-        # restart time_filed to None.
-        if de.date_filed != date_filed:
-            de.time_filed = None
-    de.date_filed = date_filed or de.date_filed
-
-
-def make_recap_sequence_number(de: dict, court_id: str) -> str:
+def make_recap_sequence_number(
+    date_filed: date, recap_sequence_index: int
+) -> str:
     """Make a sequence number using a date and index.
 
-    :param de: A docket entry provided as either a Juriscraper dict.
-    Regardless of which is provided, there must be a
-    key/attribute named recap_sequence_index, which will be used to populate
-    the returned sequence number.
-    :param court_id: The court id to which docket entries belong, used for
-    timezone conversion.
-    :return a str to use as the recap_sequence_number
+    :param date_filed: The entry date_filed used to make the sequence number.
+    :param recap_sequence_index: This index will be used to populate the
+    returned sequence number.
+    :return: A str to use as the recap_sequence_number
     """
     template = "%s.%03d"
-    if type(de) == dict:
-        date_filed = de["date_filed"]
-        if isinstance(de["date_filed"], datetime):
-            date_filed = convert_to_court_timezone(
-                de["date_filed"], court_id
-            ).date()
-
-        return template % (
-            date_filed.isoformat(),
-            de["recap_sequence_index"],
-        )
+    return template % (
+        date_filed.isoformat(),
+        recap_sequence_index,
+    )
 
 
 def calculate_recap_sequence_numbers(docket_entries: list, court_id: str):
@@ -511,25 +460,19 @@ def calculate_recap_sequence_numbers(docket_entries: list, court_id: str):
 
     # Assign sequence numbers
     for prev, de, _ in previous_and_next(docket_entries):
-        current_date_filed = de["date_filed"]
-        if isinstance(de["date_filed"], datetime):
-            current_date_filed = convert_to_court_timezone(
-                de["date_filed"], court_id
-            ).date()
-
+        current_date_filed, current_time_filed = localize_date_and_time(
+            court_id, de["date_filed"]
+        )
         prev_date_filed = None
         if prev is not None:
-            prev_date_filed = prev["date_filed"]
-        if prev is not None and isinstance(prev["date_filed"], datetime):
-            prev_date_filed = convert_to_court_timezone(
-                prev["date_filed"], court_id
-            ).date()
-
+            prev_date_filed, prev_time_filed = localize_date_and_time(
+                court_id, prev["date_filed"]
+            )
         if prev is not None and current_date_filed == prev_date_filed:
             # Previous item has same date. Increment the sequence number.
             de["recap_sequence_index"] = prev["recap_sequence_index"] + 1
             de["recap_sequence_number"] = make_recap_sequence_number(
-                de, court_id
+                current_date_filed, de["recap_sequence_index"]
             )
             continue
         else:
@@ -538,7 +481,7 @@ def calculate_recap_sequence_numbers(docket_entries: list, court_id: str):
             # Take same action: Reset the index & assign it.
             de["recap_sequence_index"] = 1
             de["recap_sequence_number"] = make_recap_sequence_number(
-                de, court_id
+                current_date_filed, de["recap_sequence_index"]
             )
             continue
 
@@ -691,8 +634,17 @@ def add_docket_entries(d, docket_entries, tags=None):
             de, de_created = response[0], response[1]
 
         de.description = docket_entry["description"] or de.description
-        date_filed = docket_entry["date_filed"]
-        set_docket_entry_date_and_time(de, date_filed)
+        date_filed, time_filed = localize_date_and_time(
+            de.docket.court.pk, docket_entry["date_filed"]
+        )
+        if not time_filed:
+            # If not time data is available, compare if date_filed changed if
+            # so restart time_filed to None, otherwise keep the current time.
+            if de.date_filed != docket_entry["date_filed"]:
+                de.time_filed = None
+        else:
+            de.time_filed = time_filed
+        de.date_filed = date_filed
         de.pacer_sequence_number = (
             docket_entry.get("pacer_seq_no") or de.pacer_sequence_number
         )
