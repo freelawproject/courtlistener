@@ -11,6 +11,7 @@ from factory.django import DjangoModelFactory, FileField
 from factory.fuzzy import FuzzyChoice, FuzzyText
 from juriscraper.lib.string_utils import CaseNameTweaker
 
+from cl.lib.factories import RelatedFactoryVariableList
 from cl.people_db.factories import PersonFactory
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
@@ -66,14 +67,15 @@ class OpinionFactory(DjangoModelFactory):
         model = Opinion
 
     author = SubFactory(PersonFactory)
-    author_str = LazyAttribute(lambda self: self.author.name_full)
+    author_str = LazyAttribute(
+        lambda self: self.author.name_full if self.author else ""
+    )
     type = FuzzyChoice(Opinion.OPINION_TYPES, getter=lambda c: c[0])
     sha1 = Faker("sha1")
     plain_text = Faker("text", max_nb_chars=2000)
 
 
 class OpinionWithChildrenFactory(OpinionFactory):
-
     parentheticals = RelatedFactory(
         ParentheticalFactory,
         factory_related_name="described_opinion",
@@ -224,3 +226,16 @@ class DocketWithChildrenFactory(DocketFactory):
         OpinionClusterFactoryWithChildren,
         factory_related_name="docket",
     )
+
+
+class OpinionClusterFactoryMultipleOpinions(
+    OpinionClusterFactory, DocketParentMixin
+):
+    """Make an OpinionCluster with Docket parent and multiple opinions"""
+
+    sub_opinions = RelatedFactoryVariableList(
+        factory=OpinionWithChildrenFactory,
+        factory_related_name="cluster",
+        size=3,  # by default create 3 opinions
+    )
+    precedential_status = ("Published", "Precedential")

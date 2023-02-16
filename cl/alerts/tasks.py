@@ -191,7 +191,6 @@ def make_alert_messages(
     }
     messages = []
     for recipient in da_recipients:
-
         notes, tags = get_docket_notes_and_tags_by_user(
             d.pk, recipient.user_pk
         )

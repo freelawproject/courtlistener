@@ -51,7 +51,6 @@ class DebtFilter(NoEmptyFilterSet):
 
 
 class FinancialDisclosureFilter(NoEmptyFilterSet):
-
     agreements = filters.RelatedFilter(
         AgreementFilter,
         queryset=Agreement.objects.all(),
@@ -102,7 +101,6 @@ class FinancialDisclosureFilter(NoEmptyFilterSet):
 
 
 class GiftFilter(NoEmptyFilterSet):
-
     financial_disclosure = filters.RelatedFilter(
         FinancialDisclosureFilter,
         queryset=FinancialDisclosure.objects.all(),

@@ -429,7 +429,6 @@ class Command(VerboseCommand):
     help = "Import anon 2020 DB."
 
     def add_arguments(self, parser):
-
         parser.add_argument(
             "--make-searchable",
             action="store_true",

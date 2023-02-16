@@ -959,6 +959,10 @@ a.gray:hover, a.gray:focus, a.grey:hover, a.grey:focus {
   font-size: 1.25em;
   font-weight: bold;
 }
+#lawbox p {
+  line-height: 2em;
+  font-size: 16px;
+}
 
 span.star-pagination {
   color: #555555;

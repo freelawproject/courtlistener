@@ -10,7 +10,6 @@ from cl.search.models import AppellateReview
 df = pd.read_excel("filename", 0)
 
 for i, row in df.iterrows():
-
     upper = row.upper_court
     lower = row.lower_court
 

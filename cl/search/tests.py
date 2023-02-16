@@ -61,7 +61,6 @@ from cl.users.factories import UserProfileWithParentsFactory
 
 
 class UpdateIndexCommandTest(SolrTestCase):
-
     args = [
         "--type",
         "search.Opinion",
@@ -259,7 +258,10 @@ class ModelTest(TestCase):
 
 
 class DocketValidationTest(TestCase):
-    fixtures = ["test_court.json"]
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.court_appellate = CourtFactory(id="ca1", jurisdiction="F")
 
     def tearDown(self) -> None:
         Docket.objects.all().delete()
@@ -269,13 +271,40 @@ class DocketValidationTest(TestCase):
         with self.assertRaises(ValidationError):
             Docket.objects.create(source=Docket.RECAP)
 
+    def test_creating_a_recap_docket_with_pacer_case_id_blank(self) -> None:
+        """Is blank pacer_case_id denied in not appellate dockets?"""
+        with self.assertRaises(ValidationError):
+            Docket.objects.create(
+                source=Docket.RECAP, court=self.court, docket_number="12-1233"
+            )
+
+        appellate = Docket.objects.create(
+            source=Docket.RECAP,
+            court=self.court_appellate,
+            docket_number="12-1234",
+        )
+        self.assertEqual(appellate.docket_number, "12-1234")
+
+    def test_creating_a_recap_docket_with_docket_number_blank(self) -> None:
+        """Is blank docket_number denied?"""
+        with self.assertRaises(ValidationError):
+            Docket.objects.create(
+                source=Docket.RECAP, court=self.court, pacer_case_id="1234"
+            )
+        with self.assertRaises(ValidationError):
+            Docket.objects.create(
+                source=Docket.RECAP,
+                court=self.court_appellate,
+                pacer_case_id="1234",
+            )
+
     def test_cannot_create_duplicate(self) -> None:
         """Do duplicate values throw an error?"""
         Docket.objects.create(
             source=Docket.RECAP,
             docket_number="asdf",
             pacer_case_id="asdf",
-            court_id="test",
+            court_id=self.court.pk,
         )
         with transaction.atomic():
             with self.assertRaises(IntegrityError):
@@ -283,7 +312,7 @@ class DocketValidationTest(TestCase):
                     source=Docket.RECAP_AND_SCRAPER,
                     docket_number="asdf",
                     pacer_case_id="asdf",
-                    court_id="test",
+                    court_id=self.court.pk,
                 )
 
 
@@ -898,7 +927,6 @@ class RelatedSearchTest(IndexedSolrTestCase):
 
 
 class GroupedSearchTest(EmptySolrTestCase):
-
     fixtures = ["opinions-issue-550.json"]
 
     def setUp(self) -> None:

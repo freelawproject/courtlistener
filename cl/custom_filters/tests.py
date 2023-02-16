@@ -108,7 +108,6 @@ class DummyObject(object):
 
 
 class TestExtras(SimpleTestCase):
-
     factory = RequestFactory()
 
     def test_get_full_host(self) -> None:

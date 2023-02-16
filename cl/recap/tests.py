@@ -456,7 +456,6 @@ class RecapUploadsTest(TestCase):
             "cl.recap.tasks.get_data_from_appellate_att_report",
             side_effect=lambda x, y: self.att_data,
         ):
-
             process_recap_appellate_attachment(pq_1.pk)
 
         # Process the attachment page again, no new attachments should be added
@@ -578,6 +577,23 @@ class RecapUploadsTest(TestCase):
         )
         r = self.client.get(path)
         self.assertEqual(r.status_code, HTTP_200_OK)
+
+    def test_recap_upload_validate_pacer_case_id(self, mock):
+        """Can we properly validate the pacer_case_id doesn't contain a dash -?"""
+        self.data.update(
+            {
+                "upload_type": UPLOAD_TYPE.DOCKET,
+                "document_number": "",
+                "pacer_case_id": "12-2334",
+            }
+        )
+        del self.data["pacer_doc_id"]
+        r = self.client.post(self.path, self.data)
+        j = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertIn(
+            "PACER case ID can not contains dashes -", j["non_field_errors"][0]
+        )
 
 
 @mock.patch("cl.recap.tasks.DocketReport", new=fakes.FakeDocketReport)
@@ -702,6 +718,7 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
         }
         cls.request = RequestFactory().request()
         cls.request.user = cls.user
+        cls.court = CourtFactory(id="canb", jurisdiction="FB", in_use=True)
 
     def test_simple_request_serialization(self, mock) -> None:
         """Can we serialize a simple request?"""
@@ -715,6 +732,22 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
         )
 
         serialized_fq.save()
+
+    def test_recap_fetch_validate_pacer_case_id(self, mock):
+        """Can we properly validate the pacer_case_id doesn't contain a dash -?"""
+        self.fetch_attributes.update(
+            {"pacer_case_id": "12-2334", "court": "canb"}
+        )
+        del self.fetch_attributes["docket_id"]
+        serialized_fq = PacerFetchQueueSerializer(
+            data=self.fetch_attributes,
+            context={"request": self.request},
+        )
+        serialized_fq.is_valid()
+        self.assertIn(
+            serialized_fq.errors["non_field_errors"][0],
+            "PACER case ID can not contains dashes -",
+        )
 
     def test_key_serialization_with_client_code(self, mock) -> None:
         """Does the API have the fields we expect?"""
@@ -1894,6 +1927,17 @@ class RecapDocketTaskTest(TestCase):
         self.assertEqual(d.source, Docket.RECAP_AND_SCRAPER)
         self.assertTrue(d.case_name)
         self.assertEqual(existing_d.pacer_case_id, d.pacer_case_id)
+
+    def test_adding_harvard_and_recap_source(self) -> None:
+        """Is the HARVARD_AND_RECAP source properly added when updating a
+        docket by RECAP, originally added by Harvard?
+        """
+        Docket.objects.create(
+            source=Docket.HARVARD, pacer_case_id="asdf", court_id="scotus"
+        )
+        returned_data = process_recap_docket(self.pq.pk)
+        d = Docket.objects.get(pk=returned_data["docket_pk"])
+        self.assertEqual(d.source, Docket.HARVARD_AND_RECAP)
 
     def test_docket_and_de_already_exist(self) -> None:
         """Can we parse if the docket and the docket entry already exist?"""
@@ -5239,7 +5283,6 @@ class WebhooksRetries(TestCase):
             # Deliver webhook_e1 successfully.
             next_retry_date = fake_now + timedelta(minutes=3)
             with time_machine.travel(next_retry_date, tick=False):
-
                 webhooks_to_retry = retry_webhook_events()
                 self.assertEqual(webhooks_to_retry, 1)
                 self.assertEqual(

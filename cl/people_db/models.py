@@ -1,3 +1,4 @@
+import pghistory
 from django.db import models
 from django.template import loader
 from django.urls import reverse
@@ -58,6 +59,9 @@ DATE_GRANULARITIES = (
 )
 
 
+@pghistory.track(
+    pghistory.Snapshot(),
+)
 class Person(AbstractDateTimeModel):
     RELIGIONS = (
         ("ca", "Catholic"),
@@ -389,6 +393,9 @@ class Person(AbstractDateTimeModel):
         return normalize_search_dicts(out)
 
 
+@pghistory.track(
+    pghistory.Snapshot(),
+)
 class School(AbstractDateTimeModel):
     is_alias_of = models.ForeignKey(
         "self",
@@ -429,6 +436,9 @@ class School(AbstractDateTimeModel):
         super(School, self).clean_fields(*args, **kwargs)
 
 
+@pghistory.track(
+    pghistory.Snapshot(),
+)
 class Position(AbstractDateTimeModel):
     """A role held by a person, and the details about it."""
 
@@ -1057,6 +1067,9 @@ class Position(AbstractDateTimeModel):
         super(Position, self).clean_fields(*args, **kwargs)
 
 
+@pghistory.track(
+    pghistory.Snapshot(),
+)
 class RetentionEvent(AbstractDateTimeModel):
     RETENTION_TYPES = (
         ("reapp_gov", "Governor Reappointment"),
@@ -1128,6 +1141,9 @@ class RetentionEvent(AbstractDateTimeModel):
         super(RetentionEvent, self).clean_fields(*args, **kwargs)
 
 
+@pghistory.track(
+    pghistory.Snapshot(),
+)
 class Education(AbstractDateTimeModel):
     DEGREE_LEVELS = (
         ("ba", "Bachelor's (e.g. B.A.)"),
@@ -1195,6 +1211,9 @@ class Education(AbstractDateTimeModel):
         super(Education, self).clean_fields(*args, **kwargs)
 
 
+@pghistory.track(
+    pghistory.Snapshot(),
+)
 class Race(models.Model):
     RACES = (
         ("w", "White"),
@@ -1217,6 +1236,20 @@ class Race(models.Model):
         return f"{self.race}"
 
 
+@pghistory.track(
+    pghistory.Snapshot(),
+    obj_field=None,
+)
+class PersonRace(Person.race.through):
+    """A model class to track person race m2m relation"""
+
+    class Meta:
+        proxy = True
+
+
+@pghistory.track(
+    pghistory.Snapshot(),
+)
 class PoliticalAffiliation(AbstractDateTimeModel):
     POLITICAL_AFFILIATION_SOURCE = (
         ("b", "Ballot"),
@@ -1286,6 +1319,9 @@ class PoliticalAffiliation(AbstractDateTimeModel):
         super(PoliticalAffiliation, self).clean_fields(*args, **kwargs)
 
 
+@pghistory.track(
+    pghistory.Snapshot(),
+)
 class Source(AbstractDateTimeModel):
     person = models.ForeignKey(
         Person,
@@ -1311,6 +1347,9 @@ class Source(AbstractDateTimeModel):
     )
 
 
+@pghistory.track(
+    pghistory.Snapshot(),
+)
 class ABARating(AbstractDateTimeModel):
     ABA_RATINGS = (
         ("ewq", "Exceptionally Well Qualified"),

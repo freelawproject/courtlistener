@@ -97,7 +97,6 @@ class SpouseIncomeSerializer(
 class FinancialDisclosureSerializer(
     DynamicFieldsMixin, HyperlinkedModelSerializerWithId
 ):
-
     agreements = AgreementSerializer(many=True, read_only=True)
     debts = DebtSerializer(many=True, read_only=True)
     gifts = GiftSerializer(many=True, read_only=True)

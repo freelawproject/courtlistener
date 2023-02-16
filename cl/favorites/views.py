@@ -131,7 +131,7 @@ def view_tag(request, username, tag_name):
 
     # Calculate the total tag count (as we add more types of taggables, add
     # them here).
-    enhanced_dockets = tag.dockets.all()
+    enhanced_dockets = tag.dockets.all().order_by("date_filed")
     total_tag_count = len(enhanced_dockets)
     for docket in enhanced_dockets:
         docket.association_id = DocketTag.objects.get(

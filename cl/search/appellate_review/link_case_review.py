@@ -10,7 +10,6 @@ opinion_list = []
 
 
 for opinion in opinion_list:
-
     # get list of cited opinions from reviewed courts
     cited = OpinionsCited.objects.filter(
         citing_opinion=opinion,
