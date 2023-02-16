@@ -15,10 +15,8 @@ from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db import IntegrityError, transaction
 from django.http import HttpRequest
-from django.templatetags.tz import do_timezone
 from django.test import RequestFactory, override_settings
 from django.urls import reverse
-from django.utils.timezone import make_aware
 from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
 from selenium.webdriver.common.by import By
@@ -1992,25 +1990,20 @@ class DocketEntriesTimezone(TestCase):
             docket__court=self.cand, entry_number=2
         )
 
-        court_timezone = COURT_TIMEZONES.get(
-            self.d_cand.court_id, "US/Eastern"
+        court_timezone = pytz.timezone(
+            COURT_TIMEZONES.get(self.d_cand.court_id, "US/Eastern")
         )
         # Compare date using local timezone, DST 7 hours of difference:
-        target_date_aware = make_aware(
-            datetime.datetime(2021, 10, 15, 19, 46, 51),
-            pytz.timezone(court_timezone),
+        target_date_aware = court_timezone.localize(
+            datetime.datetime(2021, 10, 15, 19, 46, 51)
         )
-        self.assertEqual(
-            do_timezone(de_cand_utc.datetime_filed, court_timezone),
-            target_date_aware,
-        )
+        self.assertEqual(de_cand_utc.datetime_filed, target_date_aware)
 
-        target_date_aware = make_aware(
-            datetime.datetime(2021, 10, 16, 2, 46, 51),
-            pytz.timezone(court_timezone),
+        target_date_aware = court_timezone.localize(
+            datetime.datetime(2021, 10, 16, 2, 46, 51)
         )
         self.assertEqual(
-            do_timezone(de_cand_pdt.datetime_filed, court_timezone),
+            de_cand_pdt.datetime_filed,
             target_date_aware,
         )
 
@@ -2026,27 +2019,19 @@ class DocketEntriesTimezone(TestCase):
             docket__court=self.nyed, entry_number=2
         )
 
-        court_timezone = COURT_TIMEZONES.get(
-            self.d_nyed.court_id, "US/Eastern"
+        court_timezone = pytz.timezone(
+            COURT_TIMEZONES.get(self.d_nyed.court_id, "US/Eastern")
         )
         # Compare date using local timezone, DST 4 hours of difference:
-        target_date_aware = make_aware(
-            datetime.datetime(2021, 10, 15, 22, 46, 51),
-            pytz.timezone(court_timezone),
+        target_date_aware = court_timezone.localize(
+            datetime.datetime(2021, 10, 15, 22, 46, 51)
         )
-        self.assertEqual(
-            do_timezone(de_nyed_utc.datetime_filed, court_timezone),
-            target_date_aware,
-        )
+        self.assertEqual(de_nyed_utc.datetime_filed, target_date_aware)
 
-        target_date_aware = make_aware(
-            datetime.datetime(2021, 10, 16, 5, 46, 51),
-            pytz.timezone(court_timezone),
+        target_date_aware = court_timezone.localize(
+            datetime.datetime(2021, 10, 16, 5, 46, 51)
         )
-        self.assertEqual(
-            do_timezone(de_nyed_pdt.datetime_filed, court_timezone),
-            target_date_aware,
-        )
+        self.assertEqual(de_nyed_pdt.datetime_filed, target_date_aware)
 
     def test_show_docket_entry_date_filed_according_court_timezone_not_dst(
         self,
@@ -2063,18 +2048,14 @@ class DocketEntriesTimezone(TestCase):
             docket__court=self.cand, entry_number=1
         )
 
-        court_timezone = COURT_TIMEZONES.get(
-            self.d_cand.court_id, "US/Eastern"
+        court_timezone = pytz.timezone(
+            COURT_TIMEZONES.get(self.d_cand.court_id, "US/Eastern")
         )
         # Compare date using local timezone, not DST 8 hours of difference:
-        target_date_aware = make_aware(
+        target_date_aware = court_timezone.localize(
             datetime.datetime(2023, 1, 15, 18, 46, 51),
-            pytz.timezone(court_timezone),
         )
-        self.assertEqual(
-            do_timezone(de_cand_utc.datetime_filed, court_timezone),
-            target_date_aware,
-        )
+        self.assertEqual(de_cand_utc.datetime_filed, target_date_aware)
 
         # Add docket entries for NYED filed in not DST time. US/Eastern
         add_docket_entries(
@@ -2084,15 +2065,11 @@ class DocketEntriesTimezone(TestCase):
             docket__court=self.nyed, entry_number=1
         )
 
-        court_timezone = COURT_TIMEZONES.get(
-            self.d_nyed.court_id, "US/Eastern"
+        court_timezone = pytz.timezone(
+            COURT_TIMEZONES.get(self.d_nyed.court_id, "US/Eastern")
         )
         # Compare date using local timezone, not DST 5 hours of difference:
-        target_date_aware = make_aware(
-            datetime.datetime(2023, 1, 15, 21, 46, 51),
-            pytz.timezone(court_timezone),
+        target_date_aware = court_timezone.localize(
+            datetime.datetime(2023, 1, 15, 21, 46, 51)
         )
-        self.assertEqual(
-            do_timezone(de_nyed_utc.datetime_filed, court_timezone),
-            target_date_aware,
-        )
+        self.assertEqual(de_nyed_utc.datetime_filed, target_date_aware)
