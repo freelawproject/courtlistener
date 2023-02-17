@@ -1,7 +1,9 @@
 import re
+from datetime import datetime
 from typing import Any, Dict, List, Tuple, TypeVar
 
 import pghistory
+import pytz
 from celery.canvas import chain
 from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
@@ -1014,7 +1016,18 @@ class DocketEntry(AbstractDateTimeModel):
         blank=True,
     )
     date_filed = models.DateField(
-        help_text="The created date of the Docket Entry.",
+        help_text=(
+            "The created date of the Docket Entry according to the "
+            "court timezone."
+        ),
+        null=True,
+        blank=True,
+    )
+    time_filed = models.TimeField(
+        help_text=(
+            "The created time of the Docket Entry according to the court "
+            "timezone, null if no time data is available."
+        ),
         null=True,
         blank=True,
     )
@@ -1071,6 +1084,19 @@ class DocketEntry(AbstractDateTimeModel):
 
     def __str__(self) -> str:
         return f"{self.pk} ---> {trunc(self.description, 50, ellipsis='...')}"
+
+    @property
+    def datetime_filed(self) -> datetime | None:
+        if self.time_filed:
+            from cl.recap.constants import COURT_TIMEZONES
+
+            local_timezone = pytz.timezone(
+                COURT_TIMEZONES.get(self.docket.court.id, "US/Eastern")
+            )
+            return local_timezone.localize(
+                datetime.combine(self.date_filed, self.time_filed)
+            )
+        return None
 
 
 @pghistory.track(
