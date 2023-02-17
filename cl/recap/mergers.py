@@ -63,21 +63,20 @@ cnt = CaseNameTweaker()
 
 
 def confirm_docket_number_core_lookup_match(
-    kwargs: dict[str, str | None], docket: Docket, docket_number: str
+    docket: Docket,
+    docket_number: str,
 ) -> Docket | None:
     """Confirm if the docket_number_core lookup match returns the right docket
-    when pacer_case_id is None, by confirming the docket_number also matches.
+    by confirming the docket_number also matches.
 
-    :param kwargs: The lookup kwargs
     :param docket: The docket matched by the lookup
     :param docket_number: The incoming docket_number to lookup.
+    :return: The docket object if both dockets matched or otherwise None.
     """
-    docket_number_core = kwargs.get("docket_number_core", None)
-    if kwargs["pacer_case_id"] is None and docket_number_core:
-        existing_docket_number = clean_docket_number(docket.docket_number)
-        incoming_docket_number = clean_docket_number(docket_number)
-        if existing_docket_number != incoming_docket_number:
-            return None
+    existing_docket_number = clean_docket_number(docket.docket_number)
+    incoming_docket_number = clean_docket_number(docket_number)
+    if existing_docket_number != incoming_docket_number:
+        return None
     return docket
 
 
@@ -128,17 +127,19 @@ def find_docket_object(
             continue  # Try a looser lookup.
         if count == 1:
             d = ds[0]
-            d = confirm_docket_number_core_lookup_match(
-                kwargs, d, docket_number
-            )
+            if kwargs["pacer_case_id"] is None and kwargs.get(
+                "docket_number_core", None
+            ):
+                d = confirm_docket_number_core_lookup_match(d, docket_number)
             if d:
                 break  # Nailed it!
         elif count > 1:
             # Choose the oldest one and live with it.
             d = ds.earliest("date_created")
-            d = confirm_docket_number_core_lookup_match(
-                kwargs, d, docket_number
-            )
+            if kwargs["pacer_case_id"] is None and kwargs.get(
+                "docket_number_core", None
+            ):
+                d = confirm_docket_number_core_lookup_match(d, docket_number)
             if d:
                 break
     if d is None:

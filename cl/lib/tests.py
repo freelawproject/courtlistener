@@ -279,15 +279,18 @@ class TestModelHelpers(TestCase):
         # One valid docket number, return the cleaned number
         self.assertEqual(
             clean_docket_number("CIVIL ACTION NO. 7:17-CV-00426"),
-            "7:17-CV-00426",
+            "7:17-cv-00426",
         )
         self.assertEqual(
-            clean_docket_number("Case No.1:19-CV-00118-MRB"), "1:19-CV-00118"
+            clean_docket_number("Case No.1:19-CV-00118-MRB"), "1:19-cv-00118"
         )
         self.assertEqual(clean_docket_number("Case 12-33112"), "12-33112")
         self.assertEqual(clean_docket_number("12-33112"), "12-33112")
         self.assertEqual(
             clean_docket_number("12-cv-01032-JKG-MJL"), "12-cv-01032"
+        )
+        self.assertEqual(
+            clean_docket_number("Nos. 212-213, Dockets 27264, 27265"), ""
         )
         self.assertEqual(
             clean_docket_number("Nos. 12-213, Dockets 27264, 27265"), "12-213"

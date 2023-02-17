@@ -33,6 +33,10 @@ def clean_docket_number(docket_number: str | None) -> str:
     if docket_number is None:
         return ""
 
+    # Normalize dashes
+    docket_number = normalize_dashes(docket_number)
+    # Normalize to lowercase
+    docket_number = docket_number.lower()
     # Match all the valid district docket numbers in a string.
     district_m = re.findall(r"\b(?:\d:)?\d\d-..-\d+", docket_number)
     if len(district_m) == 1:
@@ -71,7 +75,6 @@ def make_docket_number_core(docket_number: Optional[str]) -> str:
     if docket_number is None:
         return ""
 
-    docket_number = normalize_dashes(docket_number)
     cleaned_docket_number = clean_docket_number(docket_number)
 
     district_m = re.search(r"(?:\d:)?(\d\d)-..-(\d+)", cleaned_docket_number)
