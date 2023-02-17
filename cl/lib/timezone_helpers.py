@@ -6,7 +6,7 @@ from cl.recap.constants import COURT_TIMEZONES
 
 
 def convert_to_court_timezone(
-    datetime_filed: datetime, court_id: str
+    court_id: str, datetime_filed: datetime
 ) -> datetime:
     """Convert a docket entry datetime filed to the court timezone it belongs
     to.
@@ -14,7 +14,7 @@ def convert_to_court_timezone(
     :param datetime_filed: The docket entry datetime filed
     :param court_id: The court id to which docket entries belong, used for
     timezone conversion.
-    :return: A date object in the court timezone.
+    :return: A datetime object in the court timezone.
     """
     court_timezone = pytz.timezone(COURT_TIMEZONES.get(court_id, "US/Eastern"))
     return datetime_filed.astimezone(court_timezone)
@@ -31,7 +31,7 @@ def localize_date_and_time(
     :return: A tuple of date_filed and time_filed or None if no time available.
     """
     if isinstance(date_filed, datetime):
-        datetime_filed_local = convert_to_court_timezone(date_filed, court_id)
+        datetime_filed_local = convert_to_court_timezone(court_id, date_filed)
         time_filed = datetime_filed_local.time()
         date_filed = datetime_filed_local.date()
         return date_filed, time_filed
