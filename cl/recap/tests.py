@@ -137,8 +137,12 @@ class RecapUploadsTest(TestCase):
 
         cls.att_data = AppellateAttachmentPageFactory(
             attachments=[
-                AppellateAttachmentFactory(pacer_doc_id="04505578698"),
-                AppellateAttachmentFactory(),
+                AppellateAttachmentFactory(
+                    pacer_doc_id="04505578698", attachment_number=1
+                ),
+                AppellateAttachmentFactory(
+                    pacer_doc_id="04505578699", attachment_number=2
+                ),
             ],
             pacer_doc_id="04505578698",
             pacer_case_id="104490",
