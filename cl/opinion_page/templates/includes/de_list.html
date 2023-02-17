@@ -19,7 +19,13 @@
             {% endif %}
     >
       <div class="col-xs-1 text-center"><p>{{ de.entry_number|default_if_none:"" }}</p></div>
-      <div class="col-xs-3 col-sm-2"><p>{{ de.date_filed|date:"M j, Y"|default:'<em class="gray">Unknown</em>' }}</p></div>
+      <div class="col-xs-3 col-sm-2"><p>
+        {% if de.datetime_filed %}
+          <span title="{{ de.datetime_filed|timezone:timezone}}">{{ de.datetime_filed|timezone:timezone|date:"M j, Y" }}</span>
+        {% else %}
+          {{ de.date_filed|date:"M j, Y"|default:'<em class="gray">Unknown</em>' }}
+        {% endif %}
+      </p></div>
       <div class="col-xs-8 col-lg-7">
         {% if de.description %}
           <p>{{ de.description|safe }}</p>
