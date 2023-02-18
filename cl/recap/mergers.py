@@ -96,11 +96,14 @@ def find_docket_object(
         # Sometimes we don't know how to make core docket numbers. If that's
         # the case, we will have a blank value for the field. We must not do
         # lookups by blank values. See: freelawproject/courtlistener#1531
-        lookups.append(
-            {"pacer_case_id": None, "docket_number_core": docket_number_core},
-        )
-        lookups.append(
-            {"docket_number_core": docket_number_core},
+        lookups.extend(
+            [
+                {
+                    "pacer_case_id": None,
+                    "docket_number_core": docket_number_core,
+                },
+                {"docket_number_core": docket_number_core},
+            ]
         )
     else:
         # Finally, as a last resort, we can try the docket number. It might not
