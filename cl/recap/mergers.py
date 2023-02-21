@@ -16,7 +16,7 @@ from juriscraper.pacer import AppellateAttachmentPage, AttachmentPage
 from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.lib.decorators import retry
 from cl.lib.filesizes import convert_size_to_bytes
-from cl.lib.model_helpers import make_docket_number_core
+from cl.lib.model_helpers import clean_docket_number, make_docket_number_core
 from cl.lib.pacer import (
     get_blocked_status,
     map_cl_to_pacer_id,
@@ -60,6 +60,24 @@ from cl.search.tasks import add_items_to_solr
 logger = logging.getLogger(__name__)
 
 cnt = CaseNameTweaker()
+
+
+def confirm_docket_number_core_lookup_match(
+    docket: Docket,
+    docket_number: str,
+) -> Docket | None:
+    """Confirm if the docket_number_core lookup match returns the right docket
+    by confirming the docket_number also matches.
+
+    :param docket: The docket matched by the lookup
+    :param docket_number: The incoming docket_number to lookup.
+    :return: The docket object if both dockets matched or otherwise None.
+    """
+    existing_docket_number = clean_docket_number(docket.docket_number)
+    incoming_docket_number = clean_docket_number(docket_number)
+    if existing_docket_number != incoming_docket_number:
+        return None
+    return docket
 
 
 def find_docket_object(
@@ -109,12 +127,21 @@ def find_docket_object(
             continue  # Try a looser lookup.
         if count == 1:
             d = ds[0]
-            break  # Nailed it!
+            if kwargs["pacer_case_id"] is None and kwargs.get(
+                "docket_number_core", None
+            ):
+                d = confirm_docket_number_core_lookup_match(d, docket_number)
+            if d:
+                break  # Nailed it!
         elif count > 1:
             # Choose the oldest one and live with it.
             d = ds.earliest("date_created")
-            break
-
+            if kwargs["pacer_case_id"] is None and kwargs.get(
+                "docket_number_core", None
+            ):
+                d = confirm_docket_number_core_lookup_match(d, docket_number)
+            if d:
+                break
     if d is None:
         # Couldn't find a docket. Return a new one.
         return Docket(
