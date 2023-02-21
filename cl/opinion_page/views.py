@@ -484,6 +484,9 @@ def view_recap_document(
             "title": title,
             "note_form": note_form,
             "private": True,  # Always True for RECAP docs.
+            "timezone": COURT_TIMEZONES.get(
+                rd.docket_entry.docket.court_id, "US/Eastern"
+            ),
         },
     )
 
