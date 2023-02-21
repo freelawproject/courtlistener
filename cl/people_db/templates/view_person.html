@@ -626,7 +626,7 @@ $(document).ready(function(){
           {% if o.docketNumber %}
             <div class="inline nowrap">
               <span class="meta-data-header">Docket Number:</span>
-              <span class="meta-data-value">{{ o.docketNumber|safe }}</span>
+              <span class="meta-data-value select-all">{{ o.docketNumber|safe }}</span>
             </div>
           {% endif %}
           {% if o.citeCount > 0 %}
@@ -686,7 +686,7 @@ $(document).ready(function(){
             {% if doc0.docketNumber %}
               <div class="inline nowrap">
                 <span class="meta-data-header">Docket Number:</span>
-                <span class="meta-data-value">{{ doc0.docketNumber|safe }}</span>
+                <span class="meta-data-value select-all">{{ doc0.docketNumber|safe }}</span>
               </div>
             {% endif %}
           {% endwith %}
@@ -744,7 +744,7 @@ $(document).ready(function(){
           {% if oa.docketNumber %}
             <div class="inline nowrap">
               <span class="meta-data-header">Docket Number:</span>
-              <span class="meta-data-value">{{ oa.docketNumber|safe }}</span>
+              <span class="meta-data-value select-all">{{ oa.docketNumber|safe }}</span>
             </div>
           {% endif %}
           </article>

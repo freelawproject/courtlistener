@@ -1,4 +1,10 @@
-def base_bot_matcher(request, known_bots):
+from django.http import HttpRequest
+
+
+def base_bot_matcher(
+    request: HttpRequest,
+    known_bots: list[str],
+) -> bool:
     """Detect if a request's user agent is in a list of user agents
 
     Matching is done by seeing if any of the items in the list of known_bots
@@ -11,7 +17,7 @@ def base_bot_matcher(request, known_bots):
     return False
 
 
-def is_bot(request):
+def is_bot(request: HttpRequest) -> bool:
     """Checks if the thing making a request is a crawler."""
     known_bots = [
         "baiduspider",
@@ -31,12 +37,13 @@ def is_bot(request):
     return base_bot_matcher(request, known_bots)
 
 
-def is_og_bot(request):
+def is_og_bot(request: HttpRequest) -> bool:
     """Check if it's a bot that understands opengraph / twitter cards"""
     known_bots = [
         "facebookexternalhit",
         "iframely",  # A service for getting open graph data?
         "LinkedInBot",
+        "mastodon",
         "skypeuripreview",
         "slackbot-linkexpanding",
         "twitterbot",
