@@ -575,6 +575,9 @@ mark {
   margin-right: 2em;
 }
 
+.select-all {
+  user-select: all;
+}
 
 /* layout */
 body {
