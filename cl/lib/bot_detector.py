@@ -37,6 +37,7 @@ def is_og_bot(request):
         "facebookexternalhit",
         "iframely",  # A service for getting open graph data?
         "LinkedInBot",
+        "mastodon",
         "skypeuripreview",
         "slackbot-linkexpanding",
         "twitterbot",
