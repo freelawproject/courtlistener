@@ -137,8 +137,8 @@ def find_docket_object(
             continue  # Try a looser lookup.
         if count == 1:
             d = ds[0]
-            if kwargs["pacer_case_id"] is None and kwargs.get(
-                "docket_number_core", None
+            if kwargs.get("pacer_case_id") is None and kwargs.get(
+                "docket_number_core"
             ):
                 d = confirm_docket_number_core_lookup_match(d, docket_number)
             if d:
@@ -146,8 +146,8 @@ def find_docket_object(
         elif count > 1:
             # Choose the oldest one and live with it.
             d = ds.earliest("date_created")
-            if kwargs["pacer_case_id"] is None and kwargs.get(
-                "docket_number_core", None
+            if kwargs.get("pacer_case_id") is None and kwargs.get(
+                "docket_number_core"
             ):
                 d = confirm_docket_number_core_lookup_match(d, docket_number)
             if d:
