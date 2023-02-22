@@ -865,13 +865,14 @@ Django = ">=2.2"
 
 [[package]]
 name = "django-hcaptcha"
-version = "0.1.0"
+version = "0.2.0"
 description = "Django hCaptcha provides a simple way to protect your django forms using hCaptcha"
 category = "main"
 optional = false
 python-versions = "*"
 files = [
-    {file = "django-hCaptcha-0.1.0.tar.gz", hash = "sha256:2b80197c07bb8444249bcce3758b0472d369cca309fb02d7abcd0a856431b76b"},
+    {file = "django-hCaptcha-0.2.0.tar.gz", hash = "sha256:b2519eaf0cc97865ac72f825301122c5cf61e1e4852d6895994160222acb6c1a"},
+    {file = "django_hCaptcha-0.2.0-py3-none-any.whl", hash = "sha256:18804fb38a01827b6c65d111bac31265c1b96fcf52d7a54c3e2d2cb1c62ddcde"},
 ]
 
 [[package]]
@@ -3992,4 +3993,4 @@ h11 = ">=0.9.0,<1"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10, <3.11"
-content-hash = "c8c55c02fe7170aeb4e776fb6933bb02f16cd3f6f9b94cc8b4ade044e425cc8d"
+content-hash = "565307c1dfdac6b940ba1bc604f694849fdffb8e55ade99aaa99b9b6b2d8c3e5"
