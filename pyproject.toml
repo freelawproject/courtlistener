@@ -105,8 +105,10 @@ sentry-sdk = "^1.9.0"
 selenium = "4.0.0.a7"
 ipython = "^8.10.0"
 time-machine = "^2.8.2"
-juriscraper = "^2.5.33"
 lxml-stubs = "0.2.0"
+dateparser = "1.1.6"
+types-dateparser = "^1.1.4.6"
+juriscraper = "^2.5.34"
 
 [tool.poetry.dev-dependencies]
 pylint = "^2.7.2"

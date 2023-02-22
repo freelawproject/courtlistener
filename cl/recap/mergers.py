@@ -82,7 +82,7 @@ def confirm_docket_number_core_lookup_match(
 
 def find_docket_object(
     court_id: str,
-    pacer_case_id: str,
+    pacer_case_id: str | None,
     docket_number: str,
     using: str = "default",
 ) -> Docket:
@@ -99,19 +99,29 @@ def find_docket_object(
     # pacer_case_id is required for Docket and Docket History uploads.
     d = None
     docket_number_core = make_docket_number_core(docket_number)
-    lookups = [
-        {
-            "pacer_case_id": pacer_case_id,
-            "docket_number_core": docket_number_core,
-        },
-        {"pacer_case_id": pacer_case_id},
-    ]
+    lookups = []
+    if pacer_case_id:
+        # Appellate RSS feeds don't contain a pacer_case_id, avoid lookups by
+        # blank pacer_case_id values.
+        lookups = [
+            {
+                "pacer_case_id": pacer_case_id,
+                "docket_number_core": docket_number_core,
+            },
+            {"pacer_case_id": pacer_case_id},
+        ]
     if docket_number_core:
         # Sometimes we don't know how to make core docket numbers. If that's
         # the case, we will have a blank value for the field. We must not do
         # lookups by blank values. See: freelawproject/courtlistener#1531
-        lookups.append(
-            {"pacer_case_id": None, "docket_number_core": docket_number_core},
+        lookups.extend(
+            [
+                {
+                    "pacer_case_id": None,
+                    "docket_number_core": docket_number_core,
+                },
+                {"docket_number_core": docket_number_core},
+            ]
         )
     else:
         # Finally, as a last resort, we can try the docket number. It might not
@@ -127,8 +137,8 @@ def find_docket_object(
             continue  # Try a looser lookup.
         if count == 1:
             d = ds[0]
-            if kwargs["pacer_case_id"] is None and kwargs.get(
-                "docket_number_core", None
+            if kwargs.get("pacer_case_id") is None and kwargs.get(
+                "docket_number_core"
             ):
                 d = confirm_docket_number_core_lookup_match(d, docket_number)
             if d:
@@ -136,8 +146,8 @@ def find_docket_object(
         elif count > 1:
             # Choose the oldest one and live with it.
             d = ds.earliest("date_created")
-            if kwargs["pacer_case_id"] is None and kwargs.get(
-                "docket_number_core", None
+            if kwargs.get("pacer_case_id") is None and kwargs.get(
+                "docket_number_core"
             ):
                 d = confirm_docket_number_core_lookup_match(d, docket_number)
             if d:

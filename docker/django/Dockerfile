@@ -61,7 +61,7 @@ ADD https://raw.githubusercontent.com/freelawproject/courtlistener/main/poetry.l
 ADD https://raw.githubusercontent.com/freelawproject/courtlistener/main/pyproject.toml /opt/pyproject.toml
 
 # install runtime deps - uses $POETRY_VIRTUALENVS_IN_PROJECT internally
-RUN poetry install --no-root
+RUN poetry install --no-root --without dev
 
 ADD https://github.com/freelawproject/courtlistener/archive/main.tar.gz /opt/courtlistener.tar.gz
 WORKDIR /opt
