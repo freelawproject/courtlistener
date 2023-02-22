@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load extras static %}
+{% load extras static humanize %}
 
 {% block title %}Bulk Legal Data – CourtListener.com{% endblock %}
 {% block description %}
@@ -34,6 +34,7 @@ and comprehensive database of American judges.
         <li><a href="#schemas">Schema Diagrams</a></li>
         <ul>
           <li><a href="#opinions-db">Opinions Data</a></li>
+          <li><a href="#disclosures">Disclosures Data</a></li>
           <li><a href="#people-db">Judge Data</a></li>
           <li><a href="#audio-db">Oral Argument Data</a></li>
         </ul>
@@ -67,9 +68,9 @@ and comprehensive database of American judges.
 
 
     <h2 id="formats">Data Format and Field Definitions</h2>
-    <p>Files are generated using the PostgreSQL <a href="https://www.postgresql.org/docs/current/sql-copy.html"><code>COPY TO</code></a> command. This generates CSV files that correspond with the tables in our database. Files are provided using the CSV output format, in the UTF-8 encoding, with a header row on the top. If you are using PostgreSQL, the easiest way to import these files is to use the <code>COPY FROM</code> command. Details about the CSVs we generate can be found in the COPY documentation.
+    <p>Files are generated using the PostgreSQL <a href="https://www.postgresql.org/docs/current/sql-copy.html"><code>COPY TO</code></a> command. This generates CSV files that correspond with the tables in our database. Files are provided using the CSV output format, in the UTF-8 encoding, with a header row on the top. If you are using PostgreSQL, the easiest way to import these files is to use the <code>COPY FROM</code> command. Details about the CSVs we generate can be found in the <a href="https://www.postgresql.org/docs/current/sql-copy.html">COPY documentation</a> or by reading <a href="https://github.com/freelawproject/courtlistener/blob/main/scripts/make_bulk_data.sh">the code we use to generate these files</a>.
     </p>
-    <p>SQL commands to generate our database schema (including tables, columns, indexes, and constraints) are dumped whenever we generate the bulk data files. You can import the schema file into your own database with something like:
+    <p>The SQL commands to generate our database schema (including tables, columns, indexes, and constraints) are dumped whenever we generate the bulk data files. You can import the schema file into your own database with something like:
     </p>
     <blockquote>
       <code>psql [various connection parameters] < schema.sql</code>
@@ -135,8 +136,15 @@ and comprehensive database of American judges.
         <p><strong>Parentheticals</strong> &mdash; Parentheticals are short summaries of opinions written by the Court. <a href="https://free.law/2022/03/17/summarizing-important-cases">Learn more about them from our blog</a>.
         </p>
       </li>
+      <li>
+        <p><strong>Integrated DB</strong> — We regularly import the <a href="https://www.fjc.gov/research/idb">FJC Integrated Database</a> into our database, merging it with the data we have.
+        </p>
+      </li>
     </ul>
 
+    <h3 id="disclosures">Financial Disclosure Data</h3>
+    <p>We have built a database of {{ disclosures|intcomma }} financial disclosure documents containing {{ investments|intcomma }} investments. To learn more about this data, please read the <a href="{% url "rest_docs" %}">REST API documentation</a> or the <a href="{% url "coverage_fds" %}">disclosures coverage page</a>.
+    </p>
 
     <h3 id="people-db">Judge Data</h3>
     <p>Our judge database is described in detail in our <a href="{% url "rest_docs" %}">REST API documentation</a>. To learn more about that data, we suggest you read that documentation. Before you can import this data, you will need to import the court data.
