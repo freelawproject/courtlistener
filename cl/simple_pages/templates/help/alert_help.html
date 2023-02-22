@@ -125,7 +125,6 @@
     <p>The courts below have complete RSS feeds.</p>
 
     <ul class="nav nav-tabs" role="tablist">
-      <li role="presentation" class="active"><a href="#full-feeds-F" aria-controls="full-feeds-appellate" role="tab" data-toggle="tab">Appellate Courts</a></li>
       <li role="presentation"><a href="#full-feeds-FD" aria-controls="full-feeds-district" role="tab" data-toggle="tab">District Courts</a></li>
       <li role="presentation"><a href="#full-feeds-FB" aria-controls="full-feeds-bankr" role="tab" data-toggle="tab">Bankruptcy Courts</a></li>
     </ul>
@@ -160,7 +159,7 @@
     {% regroup partial_feeds|dictsort:"jurisdiction" by jurisdiction as partial_feed_courts %}
     <div class="tab-content">
       {% for group in partial_feed_courts %}
-        <div role="tabpanel" class="tab-pane {% if group.grouper == "FD" %}active{% endif %}" id="partial-feeds-{{ group.grouper }}">
+        <div role="tabpanel" class="tab-pane {% if group.grouper == "F" %}active{% endif %}" id="partial-feeds-{{ group.grouper }}">
           <table class="table table-striped">
             {% for court in group.list %}
               <tr>
@@ -189,7 +188,7 @@
     {% regroup no_feeds|dictsort:"jurisdiction" by jurisdiction as no_feed_courts %}
     <div class="tab-content">
       {% for group in no_feed_courts %}
-        <div role="tabpanel" class="tab-pane {% if group.grouper == "FD" %}active{% endif %}" id="no-feeds-{{ group.grouper }}">
+        <div role="tabpanel" class="tab-pane {% if group.grouper == "F" %}active{% endif %}" id="no-feeds-{{ group.grouper }}">
           <div class="row v-offset-above-1">
             {% for row in group.list|rows:2 %}
               <div class="col-xs-12 col-sm-6">
