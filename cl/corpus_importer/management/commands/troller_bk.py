@@ -109,7 +109,7 @@ def merge_rss_data(
             des_returned, rds_created, content_updated = add_docket_entries(
                 d,
                 docket["docket_entries"],
-                create_only=True,
+                do_not_update_existing=True,
             )
             if content_updated:
                 # Only add recap source if a docket entry was created.
