@@ -644,13 +644,17 @@ def get_or_make_docket_entry(d, docket_entry):
     return de, de_created
 
 
-def add_docket_entries(d, docket_entries, tags=None):
+def add_docket_entries(
+    d, docket_entries, tags=None, do_not_update_existing=False
+):
     """Update or create the docket entries and documents.
 
     :param d: The docket object to add things to and use for lookups.
     :param docket_entries: A list of dicts containing docket entry data.
     :param tags: A list of tag objects to apply to the recap documents and
     docket entries created or updated in this function.
+    :param do_not_update_existing: Whether docket entries should only be created and avoid
+    updating an existing one.
     :returns tuple of a list of created or existing
     DocketEntry objects,  a list of RECAPDocument objects created, whether
     any docket entry was created.
@@ -686,8 +690,10 @@ def add_docket_entries(d, docket_entries, tags=None):
             docket_entry.get("pacer_seq_no") or de.pacer_sequence_number
         )
         de.recap_sequence_number = docket_entry["recap_sequence_number"]
-        de.save()
         des_returned.append(de)
+        if do_not_update_existing and not de_created:
+            return des_returned, rds_created, content_updated
+        de.save()
         if tags:
             for tag in tags:
                 tag.tag_object(de)

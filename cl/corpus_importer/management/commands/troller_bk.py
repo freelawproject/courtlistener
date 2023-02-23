@@ -19,7 +19,12 @@ from cl.recap.mergers import (
     find_docket_object,
     update_docket_metadata,
 )
-from cl.recap_rss.tasks import get_last_build_date
+from cl.recap_rss.tasks import (
+    cache_hash,
+    get_last_build_date,
+    hash_item,
+    is_cached,
+)
 from cl.search.models import Court
 from cl.search.tasks import add_items_to_solr
 
@@ -37,6 +42,7 @@ def merge_rss_data(
     :return: A list of RECAPDocument PKs that can be passed to Solr
     """
 
+    court_id = map_pacer_to_cl_id(court_id)
     dockets_created = 0
     all_rds_created: list[int] = []
     district_court_ids = (
@@ -44,30 +50,49 @@ def merge_rss_data(
             "pk", flat=True
         )
     )
-
+    courts_exceptions_no_rss = ["miwb", "nceb", "pamd", "cit"]
     if (
         build_date
-        and build_date > make_aware(datetime(year=2018, month=4, day=18), utc)
+        and build_date > make_aware(datetime(year=2018, month=4, day=20), utc)
         and court_id in district_court_ids
+        and court_id not in courts_exceptions_no_rss
     ):
         # Avoid parsing/adding feeds after we start scraping RSS Feeds for
         # district and bankruptcy courts.
         return all_rds_created, dockets_created
-
     for docket in feed_data:
-        if not docket["pacer_case_id"] and not docket["docket_number"]:
+        item_hash = hash_item(docket)
+        if is_cached(item_hash):
             continue
+
+        if (
+            not docket["pacer_case_id"]
+            and not docket["docket_number"]
+            or not len(docket["docket_entries"])
+        ):
+            continue
+
         with transaction.atomic():
+            cached_ok = cache_hash(item_hash)
+            if not cached_ok:
+                # The item is already in the cache, ergo it's getting processed
+                # in another thread/process and we had a race condition.
+                continue
+
             d = find_docket_object(
-                map_pacer_to_cl_id(court_id),
+                court_id,
                 docket["pacer_case_id"],
                 docket["docket_number"],
             )
-            if d.docket_entries.count() > 0:
-                # It's an existing docket; let's not update it.
+            document_number = docket["docket_entries"][0]["document_number"]
+            if (
+                document_number
+                and d.docket_entries.filter(
+                    entry_number=document_number
+                ).exists()
+            ):
+                # It's an existing docket entry; let's not add it.
                 continue
-
-            d.add_recap_source()
             if not d.pk:
                 update_docket_metadata(d, docket)
                 dockets_created += 1
@@ -82,13 +107,23 @@ def merge_rss_data(
                 logger.warn(f"Got IntegrityError while saving docket.")
 
             des_returned, rds_created, content_updated = add_docket_entries(
-                d, docket["docket_entries"]
+                d,
+                docket["docket_entries"],
+                do_not_update_existing=True,
             )
+            if content_updated:
+                # Only add recap source if a docket entry was created.
+                d.add_recap_source()
+                try:
+                    d.save()
+                except IntegrityError as exc:
+                    # Trouble. Log and move on
+                    logger.warn(f"Got IntegrityError while saving docket.")
 
         all_rds_created.extend([rd.pk for rd in rds_created])
 
     logger.info(
-        f"Finished adding docket {d}. Added {len(all_rds_created)} RDs."
+        f"Finished adding {court_id} feed. Added {len(all_rds_created)} RDs."
     )
     return all_rds_created, dockets_created
 
@@ -199,7 +234,7 @@ def iterate_and_import_files(options: OptionsType) -> None:
      - Add to solr
      - Do not send alerts or webhooks
      - Do not touch dockets with entries (troller data is old)
-     - Do not parse (add) district/bankruptcy courts feeds after 2018-4-18
+     - Do not parse (add) district/bankruptcy courts feeds after 2018-4-20
      that is the RSS feeds started being scraped by RECAP.
 
     :param options: The command line options
@@ -233,8 +268,8 @@ def iterate_and_import_files(options: OptionsType) -> None:
         total_dockets_created += dockets_created
         total_rds_created += len(rds_for_solr)
 
-        if not i % 1000:
-            # Log every 1000 lines.
+        if not i % 25:
+            # Log every 25 lines.
             log_added_items_to_redis(total_dockets_created, total_rds_created)
             # Restart counters after logging into redis.
             total_dockets_created = 0
@@ -377,8 +412,8 @@ troller_ids = {
     "645": "alsd",
     "648": "akd",
     "651": "azd",
-    "653": "aked",
-    "656": "akwd",
+    "653": "ared",
+    "656": "arwd",
     "659": "cacd",
     "662": "caed",
     "664": "cand",

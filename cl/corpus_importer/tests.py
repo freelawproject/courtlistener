@@ -50,6 +50,7 @@ from cl.search.factories import (
     OpinionClusterFactoryWithChildrenAndParents,
     OpinionClusterWithParentsFactory,
     OpinionWithChildrenFactory,
+    RECAPDocumentFactory,
 )
 from cl.search.models import (
     Citation,
@@ -997,6 +998,8 @@ class TrollerBKTests(TestCase):
     def setUpTestData(cls) -> None:
         # District factories
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.court_neb = CourtFactory(id="nebraskab", jurisdiction="FD")
+        cls.court_pamd = CourtFactory(id="pamd", jurisdiction="FD")
         cls.docket_d_before_2018 = DocketFactory(
             case_name="Young v. State",
             docket_number="3:17-CV-01477",
@@ -1020,6 +1023,7 @@ class TrollerBKTests(TestCase):
             docket__source=Docket.HARVARD,
             docket__pacer_case_id="9038",
             entry_number=1,
+            date_filed=make_aware(datetime(year=2018, month=1, day=4), utc),
         )
 
         # Appellate factories
@@ -1045,6 +1049,7 @@ class TrollerBKTests(TestCase):
             docket__source=Docket.HARVARD,
             docket__pacer_case_id=None,
             entry_number=1,
+            date_filed=make_aware(datetime(year=2018, month=1, day=4), utc),
         )
         cls.docket_a_2018_case_id = DocketFactory(
             case_name="Young v. State",
@@ -1059,10 +1064,10 @@ class TrollerBKTests(TestCase):
         self.r.flushdb()
 
     def test_merge_district_rss_before_2018(self):
-        """1 Test merge district RSS file before 2018-4-18 into an existing
+        """1 Test merge district RSS file before 2018-4-20 into an existing
         docket
 
-        Before 2018-4-18
+        Before 2018-4-20
         District
         Docket exists
         No docket entries
@@ -1105,9 +1110,9 @@ class TrollerBKTests(TestCase):
         )
 
     def test_avoid_merging_district_rss_after_2018(self):
-        """2 Test avoid merging district RSS file after 2018-4-18
+        """2 Test avoid merging district RSS file after 2018-4-20
 
-        After 2018-4-18
+        After 2018-4-20
         District
         Docket exists
         No docket entries
@@ -1122,7 +1127,7 @@ class TrollerBKTests(TestCase):
             docket_entries=[
                 RssDocketEntryDataFactory(
                     date_filed=make_aware(
-                        datetime(year=2018, month=4, day=19), utc
+                        datetime(year=2018, month=4, day=21), utc
                     )
                 )
             ],
@@ -1143,16 +1148,51 @@ class TrollerBKTests(TestCase):
         self.assertEqual(len(self.docket_d_after_2018.docket_entries.all()), 0)
         self.assertEqual(self.docket_d_after_2018.source, Docket.HARVARD)
 
-    def test_avoid_merging_rss_docket_with_entries_district_before_2018(self):
-        """3 Test avoid merging district RSS file before 2018-4-18 into a
+    def test_merge_district_courts_rss_exceptions_after_2018(self):
+        """Test merging district RSS exceptions after 2018-4-20
+
+        After 2018-4-20
+        District ["miwb", "nceb", "pamd", "cit"]
+        Docket doesn't exists
+        No docket entries
+
+        Create docket, merge docket entries.
+        """
+        d_rss_data_after_2018 = RssDocketDataFactory(
+            court_id=self.court_pamd.pk,
+            case_name="Dragon 1 v. State",
+            docket_number="3:15-CV-01456",
+            pacer_case_id="5431",
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    date_filed=make_aware(
+                        datetime(year=2018, month=4, day=21), utc
+                    )
+                )
+            ],
+        )
+
+        build_date = d_rss_data_after_2018["docket_entries"][0]["date_filed"]
+        self.assertEqual(len(self.docket_d_after_2018.docket_entries.all()), 0)
+        rds_created, d_created = merge_rss_data(
+            [d_rss_data_after_2018], self.court_pamd.pk, build_date
+        )
+        dockets = Docket.objects.filter(pacer_case_id="5431")
+        self.assertEqual(len(rds_created), 1)
+        self.assertEqual(d_created, 1)
+        self.assertEqual(dockets[0].case_name, "Dragon 1 v. State")
+        self.assertEqual(dockets[0].docket_number, "3:15-CV-01456")
+
+    def test_merging_district_docket_with_entries_before_2018(self):
+        """3 Test merge district RSS file before 2018-4-20 into a
         docket with entries.
 
-        Before 2018-4-18
+        Before 2018-4-20
         District
         Docket exists
         Docket entries
 
-        Don't merge docket entries, avoid updating metadata.
+        Only merge entry if it doesn't exist, avoid updating metadata.
         """
         d_rss_data_before_2018 = RssDocketDataFactory(
             court_id=self.court.pk,
@@ -1176,7 +1216,7 @@ class TrollerBKTests(TestCase):
         rds_created, d_created = merge_rss_data(
             [d_rss_data_before_2018], self.court.pk, build_date
         )
-        self.assertEqual(len(rds_created), 0)
+        self.assertEqual(len(rds_created), 1)
         self.assertEqual(d_created, 0)
         self.de_d_before_2018.refresh_from_db()
         self.assertEqual(
@@ -1186,14 +1226,46 @@ class TrollerBKTests(TestCase):
             self.de_d_before_2018.docket.docket_number, "3:87-CV-01400"
         )
         self.assertEqual(
+            len(self.de_d_before_2018.docket.docket_entries.all()), 2
+        )
+        self.assertEqual(
+            self.de_d_before_2018.docket.source, Docket.HARVARD_AND_RECAP
+        )
+
+    def test_avoid_merging_updating_docket_item_without_docket_entries(
+        self,
+    ):
+        """Test avoid merging or updating the docket when the RSS item doesn't
+        contain entries.
+
+        Docket exists
+        Docket entries
+
+        Avoid updating metadata.
+        """
+        d_rss_data_before_2018 = RssDocketDataFactory(
+            court_id=self.court.pk,
+            case_name="Young v. Dragon",
+            docket_number="3:17-CV-01473",
+            pacer_case_id="9038",
+            docket_entries=[],
+        )
+
+        build_date = make_aware(datetime(year=2017, month=1, day=4), utc)
+        self.assertEqual(
             len(self.de_d_before_2018.docket.docket_entries.all()), 1
         )
+        rds_created, d_created = merge_rss_data(
+            [d_rss_data_before_2018], self.court.pk, build_date
+        )
+        self.assertEqual(len(rds_created), 0)
+        self.assertEqual(d_created, 0)
         self.assertEqual(self.de_d_before_2018.docket.source, Docket.HARVARD)
 
     def test_add_new_district_rss_before_2018(self):
-        """4 Test adds a district RSS file before 2018-4-18, new docket.
+        """4 Test adds a district RSS file before 2018-4-20, new docket.
 
-        Before: 2018-4-18
+        Before: 2018-4-20
         District
         Docket doesn't exist
         No docket entries
@@ -1228,10 +1300,10 @@ class TrollerBKTests(TestCase):
         self.assertEqual(dockets[0].source, Docket.RECAP)
 
     def test_avoid_merging_rss_docket_with_entries_district_after_2018(self):
-        """5 Test avoid merging district RSS file after 2018-4-18 into a
+        """5 Test avoid merging district RSS file after 2018-4-20 into a
         docket with entries.
 
-        After 2018-4-18
+        After 2018-4-20
         District
         Docket exists
         Docket entries
@@ -1275,9 +1347,9 @@ class TrollerBKTests(TestCase):
         self.assertEqual(self.de_d_before_2018.docket.source, Docket.HARVARD)
 
     def test_avoid_adding_new_district_rss_after_2018(self):
-        """6 Test avoid adding district RSS file after 2018-4-18.
+        """6 Test avoid adding district RSS file after 2018-4-20.
 
-        After 2018-4-18
+        After 2018-4-20
         District
         Docket doesn't exist
         No docket entries
@@ -1307,9 +1379,9 @@ class TrollerBKTests(TestCase):
 
     # Appellate
     def test_merge_appellate_rss_before_2018(self):
-        """7 Test merge an appellate RSS file before 2018-4-18
+        """7 Test merge an appellate RSS file before 2018-4-20
 
-        Before 2018-4-18
+        Before 2018-4-20
         Appellate
         Docket exists
         No docket entries
@@ -1350,9 +1422,9 @@ class TrollerBKTests(TestCase):
         )
 
     def test_merging_appellate_rss_after_2018(self):
-        """8 Test appellate RSS file after 2018-4-18
+        """8 Test appellate RSS file after 2018-4-20
 
-        After 2018-4-18
+        After 2018-4-20
         Appellate
         Docket exists
         No docket entries
@@ -1367,7 +1439,7 @@ class TrollerBKTests(TestCase):
             docket_entries=[
                 RssDocketEntryDataFactory(
                     date_filed=make_aware(
-                        datetime(year=2018, month=4, day=19), utc
+                        datetime(year=2018, month=4, day=21), utc
                     )
                 )
             ],
@@ -1388,11 +1460,11 @@ class TrollerBKTests(TestCase):
             self.docket_a_after_2018.source, Docket.HARVARD_AND_RECAP
         )
 
-    def test_avoid_merging_appellate_docket_with_entries_before_2018(self):
-        """9 Test avoid merging appellate RSS file before 2018-4-18, docket
+    def test_avoid_merging_existing_appellate_entry_before_2018(self):
+        """9 Test avoid merging appellate RSS file before 2018-4-20, docket
         with entries.
 
-        Before 2018-4-18
+        Before 2018-4-20
         Appellate
         Docket exists
         Docket entries
@@ -1421,7 +1493,7 @@ class TrollerBKTests(TestCase):
         rds_created, d_created = merge_rss_data(
             [a_rss_data_before_2018], self.court_appellate.pk, build_date
         )
-        self.assertEqual(len(rds_created), 0)
+        self.assertEqual(len(rds_created), 1)
         self.assertEqual(d_created, 0)
         self.de_a_before_2018.refresh_from_db()
         self.assertEqual(
@@ -1429,14 +1501,16 @@ class TrollerBKTests(TestCase):
         )
         self.assertEqual(self.de_a_before_2018.docket.docket_number, "12-3242")
         self.assertEqual(
-            len(self.de_a_before_2018.docket.docket_entries.all()), 1
+            len(self.de_a_before_2018.docket.docket_entries.all()), 2
         )
-        self.assertEqual(self.de_a_before_2018.docket.source, Docket.HARVARD)
+        self.assertEqual(
+            self.de_a_before_2018.docket.source, Docket.HARVARD_AND_RECAP
+        )
 
     def test_merge_new_appellate_rss_before_2018(self):
-        """10 Merge a new appellate RSS file before 2018-4-18
+        """10 Merge a new appellate RSS file before 2018-4-20
 
-        Before: 2018-4-18
+        Before: 2018-4-20
         Appellate
         Docket doesn't exist
         No docket entries
@@ -1470,16 +1544,52 @@ class TrollerBKTests(TestCase):
         self.assertEqual(len(dockets[0].docket_entries.all()), 1)
         self.assertEqual(dockets[0].source, Docket.RECAP)
 
-    def test_avoid_merging_appellate_docket_with_entries_after_2018(self):
-        """11 Test avoid merging appellate RSS file after 2018-4-18, docket with
+    def test_avoid_merging_existing_appellate_entry_after_2018(self):
+        """11 Test avoid merging appellate RSS file after 2018-4-20, docket with
         entries.
 
-        After: 2018-4-18
+        After: 2018-4-20
+        Appellate
+        Docket exists
+        Docket entry exist
+
+        Don't merge the existing entry, avoid updating metadata.
+        """
+        a_rss_data_before_2018 = RssDocketDataFactory(
+            court_id=self.court_appellate.pk,
+            case_name="Young v. Dragon",
+            docket_number="12-3242",
+            pacer_case_id=None,
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    document_number="1",
+                    date_filed=make_aware(
+                        datetime(year=2019, month=1, day=4), utc
+                    ),
+                )
+            ],
+        )
+
+        build_date = a_rss_data_before_2018["docket_entries"][0]["date_filed"]
+        self.assertEqual(
+            len(self.de_a_before_2018.docket.docket_entries.all()), 1
+        )
+        rds_created, d_created = merge_rss_data(
+            [a_rss_data_before_2018], self.court_appellate.pk, build_date
+        )
+        self.assertEqual(len(rds_created), 0)
+        self.assertEqual(d_created, 0)
+
+    def test_merging_appellate_docket_with_entries_after_2018(self):
+        """Test merge appellate RSS file after 2018-4-20, docket with
+        entries.
+
+        After: 2018-4-20
         Appellate
         Docket exists
         Docket entries
 
-        Don't merge docket entries, avoid updating metadata.
+        Only merge entry if it doesn't exist, avoid updating metadata.
         """
         a_rss_data_before_2018 = RssDocketDataFactory(
             court_id=self.court_appellate.pk,
@@ -1503,7 +1613,7 @@ class TrollerBKTests(TestCase):
         rds_created, d_created = merge_rss_data(
             [a_rss_data_before_2018], self.court_appellate.pk, build_date
         )
-        self.assertEqual(len(rds_created), 0)
+        self.assertEqual(len(rds_created), 1)
         self.assertEqual(d_created, 0)
         self.de_a_before_2018.refresh_from_db()
         self.assertEqual(
@@ -1511,14 +1621,16 @@ class TrollerBKTests(TestCase):
         )
         self.assertEqual(self.de_a_before_2018.docket.docket_number, "12-3242")
         self.assertEqual(
-            len(self.de_a_before_2018.docket.docket_entries.all()), 1
+            len(self.de_a_before_2018.docket.docket_entries.all()), 2
         )
-        self.assertEqual(self.de_a_before_2018.docket.source, Docket.HARVARD)
+        self.assertEqual(
+            self.de_a_before_2018.docket.source, Docket.HARVARD_AND_RECAP
+        )
 
     def test_merge_new_appellate_rss_after_2018(self):
-        """12 Merge a new appellate RSS file after 2018-4-18
+        """12 Merge a new appellate RSS file after 2018-4-20
 
-        After: 2018-4-18
+        After: 2018-4-20
         Appellate
         Docket doesn't exist
         No docket entries
@@ -1607,3 +1719,139 @@ class TrollerBKTests(TestCase):
         self.assertEqual(last_values["total_rds"], 180)
 
         self.r.flushdb()
+
+    def test_merge_mapped_court_rss_before_2018(self):
+        """Merge a court mapped RSS file before 2018-4-20
+
+        before: 2018-4-20
+        District neb -> nebraskab
+        Docket doesn't exist
+        No docket entries
+
+        Create docket, merge docket entries, verify is assigned to nebraskab.
+        """
+
+        d_rss_data_before_2018 = RssDocketDataFactory(
+            court_id="neb",
+            case_name="Youngs v. Dragon",
+            docket_number="3:20-CV-01473",
+            pacer_case_id="43565",
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    date_filed=make_aware(
+                        datetime(year=2017, month=1, day=4), utc
+                    )
+                )
+            ],
+        )
+
+        build_date = d_rss_data_before_2018["docket_entries"][0]["date_filed"]
+        dockets = Docket.objects.filter(docket_number="3:20-CV-01473")
+        self.assertEqual(dockets.count(), 0)
+        rds_created, d_created = merge_rss_data(
+            [d_rss_data_before_2018], "neb", build_date
+        )
+        self.assertEqual(len(rds_created), 1)
+        self.assertEqual(d_created, 1)
+        self.assertEqual(dockets.count(), 1)
+        self.assertEqual(dockets[0].case_name, "Youngs v. Dragon")
+        self.assertEqual(dockets[0].docket_number, "3:20-CV-01473")
+        self.assertEqual(len(dockets[0].docket_entries.all()), 1)
+        self.assertEqual(dockets[0].source, Docket.RECAP)
+        self.assertEqual(dockets[0].court.pk, "nebraskab")
+
+    def test_avoid_merging_district_mapped_court_rss_after_2018(self):
+        """Avoid merging a new district RSS file with mapped court
+        after 2018-4-20.
+
+        After: 2018-4-20
+        District neb -> nebraskab
+        Docket doesn't exist
+        No docket entries
+
+        Don't merge.
+        """
+
+        d_rss_data_after_2018 = RssDocketDataFactory(
+            court_id="neb",
+            case_name="Youngs v. Dragon",
+            docket_number="3:20-CV-01473",
+            pacer_case_id="43565",
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    date_filed=make_aware(
+                        datetime(year=2019, month=1, day=4), utc
+                    )
+                )
+            ],
+        )
+        build_date = d_rss_data_after_2018["docket_entries"][0]["date_filed"]
+        rds_created, d_created = merge_rss_data(
+            [d_rss_data_after_2018], "neb", build_date
+        )
+        self.assertEqual(len(rds_created), 0)
+        self.assertEqual(d_created, 0)
+
+    def test_avoid_updating_docket_entry_metadata(self):
+        """Test merge appellate RSS file after 2018-4-20, docket with
+        entries.
+
+        After: 2018-4-20
+        Appellate
+        Docket exists
+        Docket entries
+
+        Only merge entry if it doesn't exist, avoid updating metadata.
+        """
+
+        de_a_unnumbered = DocketEntryWithParentsFactory(
+            docket__court=self.court_appellate,
+            docket__case_name="Young Entry v. Dragon",
+            docket__docket_number="12-3245",
+            docket__source=Docket.HARVARD,
+            docket__pacer_case_id=None,
+            entry_number=None,
+            description="Original docket entry description",
+            date_filed=make_aware(datetime(year=2018, month=1, day=5), utc),
+        )
+        RECAPDocumentFactory(
+            docket_entry=de_a_unnumbered, description="Opinion Issued"
+        )
+
+        a_rss_data_unnumbered = RssDocketDataFactory(
+            court_id=self.court_appellate.pk,
+            case_name="Young v. Dragon",
+            docket_number="12-3245",
+            pacer_case_id=None,
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    document_number=None,
+                    description="New docket entry description",
+                    short_description="Opinion Issued",
+                    date_filed=make_aware(
+                        datetime(year=2018, month=1, day=5), utc
+                    ),
+                )
+            ],
+        )
+        build_date = a_rss_data_unnumbered["docket_entries"][0]["date_filed"]
+        self.assertEqual(len(de_a_unnumbered.docket.docket_entries.all()), 1)
+        rds_created, d_created = merge_rss_data(
+            [a_rss_data_unnumbered], self.court_appellate.pk, build_date
+        )
+        self.assertEqual(len(rds_created), 0)
+        self.assertEqual(d_created, 0)
+        de_a_unnumbered.refresh_from_db()
+        self.assertEqual(
+            de_a_unnumbered.docket.case_name, "Young Entry v. Dragon"
+        )
+        self.assertEqual(de_a_unnumbered.docket.docket_number, "12-3245")
+        self.assertEqual(
+            de_a_unnumbered.description, "Original docket entry description"
+        )
+        self.assertEqual(len(de_a_unnumbered.docket.docket_entries.all()), 1)
+        self.assertEqual(
+            de_a_unnumbered.date_filed,
+            datetime(year=2018, month=1, day=4).date(),
+        )
+        self.assertEqual(de_a_unnumbered.docket.source, Docket.HARVARD)
