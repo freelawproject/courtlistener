@@ -1064,10 +1064,10 @@ class TrollerBKTests(TestCase):
         self.r.flushdb()
 
     def test_merge_district_rss_before_2018(self):
-        """1 Test merge district RSS file before 2018-4-18 into an existing
+        """1 Test merge district RSS file before 2018-4-20 into an existing
         docket
 
-        Before 2018-4-18
+        Before 2018-4-20
         District
         Docket exists
         No docket entries
@@ -1110,9 +1110,9 @@ class TrollerBKTests(TestCase):
         )
 
     def test_avoid_merging_district_rss_after_2018(self):
-        """2 Test avoid merging district RSS file after 2018-4-18
+        """2 Test avoid merging district RSS file after 2018-4-20
 
-        After 2018-4-18
+        After 2018-4-20
         District
         Docket exists
         No docket entries
@@ -1127,7 +1127,7 @@ class TrollerBKTests(TestCase):
             docket_entries=[
                 RssDocketEntryDataFactory(
                     date_filed=make_aware(
-                        datetime(year=2018, month=4, day=19), utc
+                        datetime(year=2018, month=4, day=21), utc
                     )
                 )
             ],
@@ -1149,9 +1149,9 @@ class TrollerBKTests(TestCase):
         self.assertEqual(self.docket_d_after_2018.source, Docket.HARVARD)
 
     def test_merge_district_courts_rss_exceptions_after_2018(self):
-        """Test merging district RSS exceptions after 2018-4-18
+        """Test merging district RSS exceptions after 2018-4-20
 
-        After 2018-4-18
+        After 2018-4-20
         District ["miwb", "nceb", "pamd", "cit"]
         Docket doesn't exists
         No docket entries
@@ -1166,7 +1166,7 @@ class TrollerBKTests(TestCase):
             docket_entries=[
                 RssDocketEntryDataFactory(
                     date_filed=make_aware(
-                        datetime(year=2018, month=4, day=19), utc
+                        datetime(year=2018, month=4, day=21), utc
                     )
                 )
             ],
@@ -1184,10 +1184,10 @@ class TrollerBKTests(TestCase):
         self.assertEqual(dockets[0].docket_number, "3:15-CV-01456")
 
     def test_merging_district_docket_with_entries_before_2018(self):
-        """3 Test merge district RSS file before 2018-4-18 into a
+        """3 Test merge district RSS file before 2018-4-20 into a
         docket with entries.
 
-        Before 2018-4-18
+        Before 2018-4-20
         District
         Docket exists
         Docket entries
@@ -1263,9 +1263,9 @@ class TrollerBKTests(TestCase):
         self.assertEqual(self.de_d_before_2018.docket.source, Docket.HARVARD)
 
     def test_add_new_district_rss_before_2018(self):
-        """4 Test adds a district RSS file before 2018-4-18, new docket.
+        """4 Test adds a district RSS file before 2018-4-20, new docket.
 
-        Before: 2018-4-18
+        Before: 2018-4-20
         District
         Docket doesn't exist
         No docket entries
@@ -1300,10 +1300,10 @@ class TrollerBKTests(TestCase):
         self.assertEqual(dockets[0].source, Docket.RECAP)
 
     def test_avoid_merging_rss_docket_with_entries_district_after_2018(self):
-        """5 Test avoid merging district RSS file after 2018-4-18 into a
+        """5 Test avoid merging district RSS file after 2018-4-20 into a
         docket with entries.
 
-        After 2018-4-18
+        After 2018-4-20
         District
         Docket exists
         Docket entries
@@ -1347,9 +1347,9 @@ class TrollerBKTests(TestCase):
         self.assertEqual(self.de_d_before_2018.docket.source, Docket.HARVARD)
 
     def test_avoid_adding_new_district_rss_after_2018(self):
-        """6 Test avoid adding district RSS file after 2018-4-18.
+        """6 Test avoid adding district RSS file after 2018-4-20.
 
-        After 2018-4-18
+        After 2018-4-20
         District
         Docket doesn't exist
         No docket entries
@@ -1379,9 +1379,9 @@ class TrollerBKTests(TestCase):
 
     # Appellate
     def test_merge_appellate_rss_before_2018(self):
-        """7 Test merge an appellate RSS file before 2018-4-18
+        """7 Test merge an appellate RSS file before 2018-4-20
 
-        Before 2018-4-18
+        Before 2018-4-20
         Appellate
         Docket exists
         No docket entries
@@ -1422,9 +1422,9 @@ class TrollerBKTests(TestCase):
         )
 
     def test_merging_appellate_rss_after_2018(self):
-        """8 Test appellate RSS file after 2018-4-18
+        """8 Test appellate RSS file after 2018-4-20
 
-        After 2018-4-18
+        After 2018-4-20
         Appellate
         Docket exists
         No docket entries
@@ -1439,7 +1439,7 @@ class TrollerBKTests(TestCase):
             docket_entries=[
                 RssDocketEntryDataFactory(
                     date_filed=make_aware(
-                        datetime(year=2018, month=4, day=19), utc
+                        datetime(year=2018, month=4, day=21), utc
                     )
                 )
             ],
@@ -1461,10 +1461,10 @@ class TrollerBKTests(TestCase):
         )
 
     def test_avoid_merging_existing_appellate_entry_before_2018(self):
-        """9 Test avoid merging appellate RSS file before 2018-4-18, docket
+        """9 Test avoid merging appellate RSS file before 2018-4-20, docket
         with entries.
 
-        Before 2018-4-18
+        Before 2018-4-20
         Appellate
         Docket exists
         Docket entries
@@ -1508,9 +1508,9 @@ class TrollerBKTests(TestCase):
         )
 
     def test_merge_new_appellate_rss_before_2018(self):
-        """10 Merge a new appellate RSS file before 2018-4-18
+        """10 Merge a new appellate RSS file before 2018-4-20
 
-        Before: 2018-4-18
+        Before: 2018-4-20
         Appellate
         Docket doesn't exist
         No docket entries
@@ -1545,10 +1545,10 @@ class TrollerBKTests(TestCase):
         self.assertEqual(dockets[0].source, Docket.RECAP)
 
     def test_avoid_merging_existing_appellate_entry_after_2018(self):
-        """11 Test avoid merging appellate RSS file after 2018-4-18, docket with
+        """11 Test avoid merging appellate RSS file after 2018-4-20, docket with
         entries.
 
-        After: 2018-4-18
+        After: 2018-4-20
         Appellate
         Docket exists
         Docket entry exist
@@ -1581,10 +1581,10 @@ class TrollerBKTests(TestCase):
         self.assertEqual(d_created, 0)
 
     def test_merging_appellate_docket_with_entries_after_2018(self):
-        """Test merge appellate RSS file after 2018-4-18, docket with
+        """Test merge appellate RSS file after 2018-4-20, docket with
         entries.
 
-        After: 2018-4-18
+        After: 2018-4-20
         Appellate
         Docket exists
         Docket entries
@@ -1628,9 +1628,9 @@ class TrollerBKTests(TestCase):
         )
 
     def test_merge_new_appellate_rss_after_2018(self):
-        """12 Merge a new appellate RSS file after 2018-4-18
+        """12 Merge a new appellate RSS file after 2018-4-20
 
-        After: 2018-4-18
+        After: 2018-4-20
         Appellate
         Docket doesn't exist
         No docket entries
@@ -1721,9 +1721,9 @@ class TrollerBKTests(TestCase):
         self.r.flushdb()
 
     def test_merge_mapped_court_rss_before_2018(self):
-        """Merge a court mapped RSS file before 2018-4-18
+        """Merge a court mapped RSS file before 2018-4-20
 
-        before: 2018-4-18
+        before: 2018-4-20
         District neb -> nebraskab
         Docket doesn't exist
         No docket entries
@@ -1762,9 +1762,9 @@ class TrollerBKTests(TestCase):
 
     def test_avoid_merging_district_mapped_court_rss_after_2018(self):
         """Avoid merging a new district RSS file with mapped court
-        after 2018-4-18.
+        after 2018-4-20.
 
-        After: 2018-4-18
+        After: 2018-4-20
         District neb -> nebraskab
         Docket doesn't exist
         No docket entries
@@ -1793,10 +1793,10 @@ class TrollerBKTests(TestCase):
         self.assertEqual(d_created, 0)
 
     def test_avoid_updating_docket_entry_metadata(self):
-        """Test merge appellate RSS file after 2018-4-18, docket with
+        """Test merge appellate RSS file after 2018-4-20, docket with
         entries.
 
-        After: 2018-4-18
+        After: 2018-4-20
         Appellate
         Docket exists
         Docket entries

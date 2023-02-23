@@ -53,7 +53,7 @@ def merge_rss_data(
     courts_exceptions_no_rss = ["miwb", "nceb", "pamd", "cit"]
     if (
         build_date
-        and build_date > make_aware(datetime(year=2018, month=4, day=18), utc)
+        and build_date > make_aware(datetime(year=2018, month=4, day=20), utc)
         and court_id in district_court_ids
         and court_id not in courts_exceptions_no_rss
     ):
@@ -234,7 +234,7 @@ def iterate_and_import_files(options: OptionsType) -> None:
      - Add to solr
      - Do not send alerts or webhooks
      - Do not touch dockets with entries (troller data is old)
-     - Do not parse (add) district/bankruptcy courts feeds after 2018-4-18
+     - Do not parse (add) district/bankruptcy courts feeds after 2018-4-20
      that is the RSS feeds started being scraped by RECAP.
 
     :param options: The command line options
