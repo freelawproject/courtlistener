@@ -43,6 +43,7 @@ from cl.people_db.factories import PersonWithChildrenFactory, PositionFactory
 from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
 from cl.recap.models import UPLOAD_TYPE
+from cl.recap_rss.models import RssItemCache
 from cl.search.factories import (
     CourtFactory,
     DocketEntryWithParentsFactory,
@@ -1710,13 +1711,15 @@ class TrollerBKTests(TestCase):
         """Can we log dockets and rds added to redis, adding the previous
         value?
         """
-        last_values = log_added_items_to_redis(100, 100)
+        last_values = log_added_items_to_redis(100, 100, 50)
         self.assertEqual(last_values["total_dockets"], 100)
         self.assertEqual(last_values["total_rds"], 100)
+        self.assertEqual(last_values["last_line"], 50)
 
-        last_values = log_added_items_to_redis(50, 80)
+        last_values = log_added_items_to_redis(50, 80, 100)
         self.assertEqual(last_values["total_dockets"], 150)
         self.assertEqual(last_values["total_rds"], 180)
+        self.assertEqual(last_values["last_line"], 100)
 
         self.r.flushdb()
 
@@ -1855,3 +1858,76 @@ class TrollerBKTests(TestCase):
             datetime(year=2018, month=1, day=4).date(),
         )
         self.assertEqual(de_a_unnumbered.docket.source, Docket.HARVARD)
+
+    @patch("cl.corpus_importer.management.commands.troller_bk.logger")
+    def test_avoid_cached_items(self, mock_logger):
+        """Can we skip a whole file when a cached item is hit?"""
+
+        a_rss_data_0 = RssDocketDataFactory(
+            court_id=self.court_appellate.pk,
+            docket_number="12-3247",
+            pacer_case_id=None,
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    document_number=1,
+                    date_filed=make_aware(
+                        datetime(year=2018, month=1, day=5), utc
+                    ),
+                ),
+            ],
+        )
+
+        a_rss_data_1 = RssDocketDataFactory(
+            court_id=self.court_appellate.pk,
+            docket_number="12-3245",
+            pacer_case_id=None,
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    document_number=1,
+                    date_filed=make_aware(
+                        datetime(year=2018, month=1, day=5), utc
+                    ),
+                )
+            ],
+        )
+        a_rss_data_2 = RssDocketDataFactory(
+            court_id=self.court_appellate.pk,
+            docket_number="12-3246",
+            pacer_case_id=None,
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    document_number=1,
+                    date_filed=make_aware(
+                        datetime(year=2018, month=1, day=5), utc
+                    ),
+                )
+            ],
+        )
+
+        list_rss_data_1 = [a_rss_data_1, a_rss_data_2]
+        list_rss_data_2 = [a_rss_data_0, a_rss_data_1]
+
+        cached_items = RssItemCache.objects.all()
+        self.assertEqual(cached_items.count(), 0)
+        build_date = a_rss_data_0["docket_entries"][0]["date_filed"]
+        rds_created, d_created = merge_rss_data(
+            list_rss_data_1, self.court_appellate.pk, build_date
+        )
+        self.assertEqual(len(rds_created), 2)
+        self.assertEqual(d_created, 2)
+        self.assertEqual(cached_items.count(), 2)
+
+        # Remove recap_sequence_number from the dict to simulate the same item
+        del a_rss_data_1["docket_entries"][0]["recap_sequence_number"]
+        rds_created, d_created = merge_rss_data(
+            list_rss_data_2, self.court_appellate.pk, build_date
+        )
+
+        # The file is aborted when a cached item is hit
+        self.assertEqual(len(rds_created), 1)
+        self.assertEqual(d_created, 1)
+        self.assertEqual(cached_items.count(), 3)
+        mock_logger.info.assert_called_with(
+            f"Hit a cached item, finished adding {self.court_appellate.pk} feed. "
+            f"Added {len(rds_created)} RDs."
+        )

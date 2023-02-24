@@ -63,7 +63,11 @@ def merge_rss_data(
     for docket in feed_data:
         item_hash = hash_item(docket)
         if is_cached(item_hash):
-            continue
+            logger.info(
+                f"Hit a cached item, finished adding {court_id} feed. "
+                f"Added {len(all_rds_created)} RDs."
+            )
+            return all_rds_created, dockets_created
 
         if (
             not docket["pacer_case_id"]
@@ -196,13 +200,14 @@ class OptionsType(TypedDict):
 
 
 def log_added_items_to_redis(
-    dockets_created: int, rds_created: int
+    dockets_created: int, rds_created: int, line: int
 ) -> Mapping[str | bytes, int | str]:
     """Log the number of dockets and recap documents created to redis.
     Get the previous stored values and add the new ones.
 
     :param dockets_created: The dockets created.
     :param rds_created: The recap documents created.
+    :param line: The last line imported.
     :return: The data logged to redis.
     """
 
@@ -219,6 +224,7 @@ def log_added_items_to_redis(
     log_info: Mapping[str | bytes, int | str] = {
         "total_dockets": total_dockets_created,
         "total_rds": total_rds_created,
+        "last_line": line,
         "date_time": datetime.now().isoformat(),
     }
     pipe.hset(log_key, mapping=log_info)
@@ -270,7 +276,9 @@ def iterate_and_import_files(options: OptionsType) -> None:
 
         if not i % 25:
             # Log every 25 lines.
-            log_added_items_to_redis(total_dockets_created, total_rds_created)
+            log_added_items_to_redis(
+                total_dockets_created, total_rds_created, i
+            )
             # Restart counters after logging into redis.
             total_dockets_created = 0
             total_rds_created = 0
