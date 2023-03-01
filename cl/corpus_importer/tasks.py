@@ -1700,6 +1700,29 @@ def get_document_number_for_appellate(
     return document_number
 
 
+def is_pacer_doc_sealed(court_id: str, pacer_doc_id: str) -> bool:
+    """Check if a pacer doc is sealed, querying the document in PACER.
+    If a receipt is returned the document is not sealed, otherwise is sealed.
+
+    :param court_id: A CourtListener court ID to query the confirmation page.
+    :param pacer_doc_id: The pacer_doc_id to query the confirmation page.
+    :return: True if the document is sealed on PACER, False otherwise.
+    """
+
+    recap_email_user = User.objects.get(username="recap-email")
+    cookies = get_or_cache_pacer_cookies(
+        recap_email_user.pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
+    )
+
+    s = PacerSession(cookies=cookies)
+    receipt_report = DownloadConfirmationPage(court_id, s)
+    receipt_report.query(pacer_doc_id)
+    data = receipt_report.data
+    if data == {}:
+        return True
+    return False
+
+
 def update_rd_metadata(
     self: Task,
     rd_pk: int,
