@@ -154,18 +154,6 @@ files = [
 ]
 
 [[package]]
-name = "backports.csv"
-version = "1.0.7"
-description = "Backport of Python 3 csv module"
-category = "main"
-optional = false
-python-versions = "*"
-files = [
-    {file = "backports.csv-1.0.7-py2.py3-none-any.whl", hash = "sha256:21f6e09bab589e6c1f877edbc40277b65e626262a86e69a70137db714eaac5ce"},
-    {file = "backports.csv-1.0.7.tar.gz", hash = "sha256:1277dfff73130b2e106bf3dd347adb3c5f6c4340882289d88f31240da92cbd6d"},
-]
-
-[[package]]
 name = "beautifulsoup4"
 version = "4.9.3"
 description = "Screen-scraping library"
@@ -1649,24 +1637,29 @@ test = ["networkx (>=2.5)", "numpy (>=1.19.0)", "pandas (>=1.1.0)", "pytest (>=6
 
 [[package]]
 name = "internetarchive"
-version = "1.9.9"
+version = "3.3.0"
 description = "A Python interface to archive.org."
 category = "main"
 optional = false
-python-versions = "*"
+python-versions = ">=3.7"
 files = [
-    {file = "internetarchive-1.9.9-py2.py3-none-any.whl", hash = "sha256:094b95349e5794365ba93e63df671ad268d38bb3fe11f482152ff33c57ab05bb"},
-    {file = "internetarchive-1.9.9.tar.gz", hash = "sha256:a1614cbf35499d833e07699ddfd344764f86959fd5535aa9ce1203f57a77f970"},
+    {file = "internetarchive-3.3.0.tar.gz", hash = "sha256:3cb7fe3cc21795aa0bf7be1eedca10090287e9c54160e0cf8640f16b6be14c1d"},
 ]
 
 [package.dependencies]
-"backports.csv" = "<1.07"
 docopt = ">=0.6.0,<0.7.0"
 jsonpatch = ">=0.4"
-requests = ">=2.9.1,<3.0.0"
+requests = ">=2.25.0,<3.0.0"
 schema = ">=0.4.0"
-six = ">=1.13.0,<2.0.0"
 tqdm = ">=4.0.0"
+urllib3 = ">=1.26.0"
+
+[package.extras]
+all = ["black", "flake8", "flake8 (==6.0.0)", "flake8-2020", "flake8-bugbear", "flake8-comprehensions", "mypy", "pre-commit", "pytest", "pytest (==7.1.2)", "pyupgrade", "responses (==0.20.0)", "safety", "setuptools", "tqdm-stubs (>=0.2.0)", "types-colorama", "types-docopt (>=0.6.10,<0.7.0)", "types-jsonpatch (>=0.1.0a0)", "types-pygments", "types-requests (>=2.25.0,<3.0.0)", "types-setuptools", "types-ujson (>=4.2.0)", "types-urllib3 (>=1.26.0)"]
+dev = ["black", "flake8", "flake8-2020", "flake8-bugbear", "flake8-comprehensions", "mypy", "pre-commit", "pytest", "pyupgrade", "safety", "setuptools"]
+docs = ["alabaster (==0.7.12)", "docutils (<0.18)", "sphinx (==4.5.0)", "sphinx-autodoc-typehints (==1.18.1)"]
+test = ["flake8 (==6.0.0)", "pytest (==7.1.2)", "responses (==0.20.0)"]
+types = ["tqdm-stubs (>=0.2.0)", "types-colorama", "types-docopt (>=0.6.10,<0.7.0)", "types-jsonpatch (>=0.1.0a0)", "types-pygments", "types-requests (>=2.25.0,<3.0.0)", "types-setuptools", "types-ujson (>=4.2.0)", "types-urllib3 (>=1.26.0)"]
 
 [[package]]
 name = "ipaddress"
