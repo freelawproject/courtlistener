@@ -1,11 +1,15 @@
 # Import the troller BK RSS feeds
 import argparse
+import concurrent.futures
+import linecache
 import re
+import threading
 from datetime import datetime
+from queue import Queue
 from typing import Any, Mapping, TypedDict
 from urllib.parse import unquote
 
-from django.db import IntegrityError, transaction
+from django.db import DataError, IntegrityError, transaction
 from django.utils.timezone import make_aware, utc
 from juriscraper.pacer import PacerRssFeed
 
@@ -27,6 +31,8 @@ from cl.recap_rss.tasks import (
 )
 from cl.search.models import Court
 from cl.search.tasks import add_items_to_solr
+
+FILES_BUFFER_THRESHOLD = 3
 
 
 def merge_rss_data(
@@ -106,9 +112,11 @@ def merge_rss_data(
             try:
                 d.save()
                 add_bankruptcy_data_to_docket(d, docket)
-            except IntegrityError as exc:
+            except (DataError, IntegrityError) as exc:
                 # Trouble. Log and move on
-                logger.warn(f"Got IntegrityError while saving docket.")
+                logger.warn(
+                    f"Got DataError or IntegrityError while saving docket."
+                )
 
             des_returned, rds_created, content_updated = add_docket_entries(
                 d,
@@ -132,23 +140,21 @@ def merge_rss_data(
     return all_rds_created, dockets_created
 
 
-def download_and_parse(
-    item_path: str,
+def parse_file(
+    binary_content: bytes,
     court_id: str,
 ) -> tuple[Any, datetime | None]:
-    """Get an item from S3, parse it, and return the data
+    """Parse a RSS file and return the data.
 
-    :param item_path: The path to the item in the private S3 bucket
+    :param binary_content: The binary content of the file to parse.
     :param court_id: The PACER court ID for the item
     :return The parsed data from the retrieved XML feed.
     """
-    bucket = S3PrivateUUIDStorage()
-    with bucket.open(item_path, mode="rb") as f:
-        feed = PacerRssFeed(court_id)
-        binary_content = f.read()
-        content = binary_content.decode("utf-8")
-        feed._parse_text(content)
-        build_date = get_last_build_date(binary_content)
+
+    feed = PacerRssFeed(court_id)
+    content = binary_content.decode("utf-8")
+    feed._parse_text(content)
+    build_date = get_last_build_date(binary_content)
     return feed.data, build_date
 
 
@@ -233,6 +239,88 @@ def log_added_items_to_redis(
     return log_info
 
 
+def download_file(item_path: str, order: int) -> tuple[bytes, str, int]:
+    """Small wrapper to download and read a file from S3.
+    :param item_path: The file path to download.
+    :param order: The original order of the file to keep in the queue.
+    :return: A tuple of the binary content of the file, the file path and the
+    file order.
+    """
+    bucket = S3PrivateUUIDStorage()
+    with bucket.open(item_path, mode="rb") as f:
+        binary_content = f.read()
+    return binary_content, item_path, order
+
+
+def download_files_from_paths(
+    item_paths: list[str], files_queue: Queue
+) -> None:
+    """Download multiple files concurrently and store them to a Queue.
+    :param item_paths: The list of file paths to download.
+    :param files_queue: The Queue where store the downloaded files.
+    :return: None
+    """
+
+    order = 0
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        concurrent_downloads = []
+        for item_path in item_paths:
+            concurrent_downloads.append(
+                executor.submit(download_file, item_path, order)
+            )
+            order += 1
+
+        # Wait for all the downloads to complete.
+        completed_downloads = concurrent.futures.as_completed(
+            concurrent_downloads
+        )
+        # Order the downloads to preserver their original chron order.
+        completed_and_ordered = sorted(
+            list(completed_downloads), key=lambda a: a.result()[2]
+        )
+        # Add files to the Queue
+        for download in completed_and_ordered:
+            files_queue.put(download.result())
+
+
+def download_files_concurrently(
+    files_queue: Queue,
+    file_path: str,
+    files_downloaded_offset: int,
+    threads: list[threading.Thread],
+) -> int:
+    """Get the next files to download and start a thread to download them.
+    :param files_queue: The Queue where store the downloaded files.
+    :param file_path: The file containing the list of paths to download.
+    :param files_downloaded_offset: The files that have been already downloaded
+    :param threads: The list of threads.
+    :return: The files_downloaded_offset updated
+    """
+
+    files_to_download = []
+    linecache.clearcache()
+    linecache.checkcache(file_path)
+    if files_queue.qsize() < FILES_BUFFER_THRESHOLD:
+        for j in range(FILES_BUFFER_THRESHOLD):
+            # Get the next paths to download.
+            next_line = linecache.getline(
+                file_path, files_downloaded_offset + 1
+            )
+            if next_line:
+                files_to_download.append(unquote(next_line).replace("\n", ""))
+                files_downloaded_offset += 1
+
+        # Download the files concurrently.
+        download_thread = threading.Thread(
+            target=download_files_from_paths,
+            args=(files_to_download, files_queue),
+        )
+        download_thread.start()
+        threads.append(download_thread)
+
+    return files_downloaded_offset
+
+
 def iterate_and_import_files(options: OptionsType) -> None:
     """Iterate over the inventory file and import all new items.
 
@@ -250,29 +338,56 @@ def iterate_and_import_files(options: OptionsType) -> None:
     f = open(options["file"], "r", encoding="utf-8")
     total_dockets_created = 0
     total_rds_created = 0
+
+    files_queue = Queue()
+    threads = []
+
+    files_downloaded_offset = options["offset"]
     for i, line in enumerate(f):
         if i < options["offset"]:
             continue
         if i >= options["limit"] > 0:
             break
 
-        # The first column of the CSV should be a
-        item_path = unquote(line).replace("\n", "")
+        # If the files_queue has less than FILES_BUFFER_THRESHOLD files, then
+        # download more files ahead and store them to the queue.
+        files_downloaded_offset = download_files_concurrently(
+            files_queue, f.name, files_downloaded_offset, threads
+        )
+
+        # If the files_queue gets empty, wait for it to refill until there are
+        # at least FILES_BUFFER_THRESHOLD files in the queue.
+        if files_queue.qsize() == 0:
+            while True:
+                if files_queue.qsize() >= FILES_BUFFER_THRESHOLD:
+                    break
+
+        # Process a file from the queue.
+        binary, item_path, order = files_queue.get()
         court_id = get_court_from_line(item_path)
-        logger.info(f"Attempting: {item_path=} with {court_id=}")
+        logger.info(f"Attempting: {item_path=} with {court_id=} \n")
         if not court_id:
             # Probably a court we don't know
             continue
 
-        feed_data, build_date = download_and_parse(item_path, court_id)
+        feed_data, build_date = parse_file(binary, court_id)
         rds_for_solr, dockets_created = merge_rss_data(
             feed_data, court_id, build_date
         )
         add_items_to_solr(rds_for_solr, "search.RECAPDocument")
 
-        logger.info(f"Last line imported: {i}")
         total_dockets_created += dockets_created
         total_rds_created += len(rds_for_solr)
+
+        # Mark the file as completed and remove it from the queue.
+        files_queue.task_done()
+
+        # Remove completed download threads from the list of threads.
+        for thread in threads:
+            if not thread.is_alive():
+                threads.remove(thread)
+
+        logger.info(f"Last line imported: {i} \n")
 
         if not i % 25:
             # Log every 25 lines.
@@ -282,6 +397,7 @@ def iterate_and_import_files(options: OptionsType) -> None:
             # Restart counters after logging into redis.
             total_dockets_created = 0
             total_rds_created = 0
+
     f.close()
 
 
