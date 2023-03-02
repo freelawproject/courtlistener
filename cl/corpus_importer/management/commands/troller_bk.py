@@ -253,11 +253,14 @@ def download_file(item_path: str, order: int) -> tuple[bytes, str, int]:
 
 
 def download_files_from_paths(
-    item_paths: list[str], files_queue: Queue
+    item_paths: list[str],
+    files_queue: Queue,
+    last_thread: threading.Thread | None,
 ) -> None:
     """Download multiple files concurrently and store them to a Queue.
     :param item_paths: The list of file paths to download.
     :param files_queue: The Queue where store the downloaded files.
+    :param last_thread: The previous thread launched.
     :return: None
     """
 
@@ -278,8 +281,13 @@ def download_files_from_paths(
         completed_and_ordered = sorted(
             list(completed_downloads), key=lambda a: a.result()[2]
         )
+
         # Add files to the Queue
         for download in completed_and_ordered:
+            if last_thread:
+                # # Wait until the last thread completes, so we don't mess up
+                # the chronological order.
+                last_thread.join()
             files_queue.put(download.result())
 
 
@@ -311,12 +319,16 @@ def download_files_concurrently(
                 files_downloaded_offset += 1
 
         # Download the files concurrently.
-        download_thread = threading.Thread(
-            target=download_files_from_paths,
-            args=(files_to_download, files_queue),
-        )
-        download_thread.start()
-        threads.append(download_thread)
+        if files_to_download:
+            last_thread = None
+            if threads:
+                last_thread = threads[-1]
+            download_thread = threading.Thread(
+                target=download_files_from_paths,
+                args=(files_to_download, files_queue, last_thread),
+            )
+            download_thread.start()
+            threads.append(download_thread)
 
     return files_downloaded_offset
 
@@ -341,7 +353,6 @@ def iterate_and_import_files(options: OptionsType) -> None:
 
     files_queue = Queue()
     threads = []
-
     files_downloaded_offset = options["offset"]
     for i, line in enumerate(f):
         if i < options["offset"]:
@@ -354,13 +365,6 @@ def iterate_and_import_files(options: OptionsType) -> None:
         files_downloaded_offset = download_files_concurrently(
             files_queue, f.name, files_downloaded_offset, threads
         )
-
-        # If the files_queue gets empty, wait for it to refill until there are
-        # at least FILES_BUFFER_THRESHOLD files in the queue.
-        if files_queue.qsize() == 0:
-            while True:
-                if files_queue.qsize() >= FILES_BUFFER_THRESHOLD:
-                    break
 
         # Process a file from the queue.
         binary, item_path, order = files_queue.get()
@@ -386,7 +390,6 @@ def iterate_and_import_files(options: OptionsType) -> None:
         for thread in threads:
             if not thread.is_alive():
                 threads.remove(thread)
-
         logger.info(f"Last line imported: {i} \n")
 
         if not i % 25:

@@ -1971,23 +1971,48 @@ class TrollerBKTests(TestCase):
             files_downloaded_offset = download_files_concurrently(
                 files_queue, f.name, files_downloaded_offset, threads
             )
+            self.assertEqual(len(threads), 1)
+            self.assertEqual(files_downloaded_offset, 3)
+            files_downloaded_offset = download_files_concurrently(
+                files_queue, f.name, files_downloaded_offset, threads
+            )
 
         for thread in threads:
             thread.join()
 
-        self.assertEqual(len(threads), 1)
-        self.assertEqual(files_downloaded_offset, 3)
-        self.assertEqual(files_queue.qsize(), 3)
+        self.assertEqual(len(threads), 2)
+        self.assertEqual(files_downloaded_offset, 6)
+        self.assertEqual(files_queue.qsize(), 6)
 
         # Verifies original chronological order.
         binary, item_path, order = files_queue.get()
         self.assertEqual(order, 0)
+        self.assertEqual(item_path.split("|")[1], "1575330086")
         files_queue.task_done()
 
         binary, item_path, order = files_queue.get()
         self.assertEqual(order, 1)
+        self.assertEqual(item_path.split("|")[1], "1575333374")
         files_queue.task_done()
 
         binary, item_path, order = files_queue.get()
         self.assertEqual(order, 2)
+        self.assertEqual(item_path.split("|")[1], "1575336978")
         files_queue.task_done()
+
+        binary, item_path, order = files_queue.get()
+        self.assertEqual(order, 0)
+        self.assertEqual(item_path.split("|")[1], "1575340576")
+        files_queue.task_done()
+
+        binary, item_path, order = files_queue.get()
+        self.assertEqual(order, 1)
+        self.assertEqual(item_path.split("|")[1], "1575344176")
+        files_queue.task_done()
+
+        binary, item_path, order = files_queue.get()
+        self.assertEqual(order, 2)
+        self.assertEqual(item_path.split("|")[1], "1575380176")
+        files_queue.task_done()
+
+        self.assertEqual(files_queue.qsize(), 0)
