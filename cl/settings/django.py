@@ -117,7 +117,7 @@ MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
-    "ratelimit.middleware.RatelimitMiddleware",
+    "django_ratelimit.middleware.RatelimitMiddleware",
     "waffle.middleware.WaffleMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "cl.lib.middleware.RobotsHeaderMiddleware",
