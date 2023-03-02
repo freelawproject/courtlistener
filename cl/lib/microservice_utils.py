@@ -10,10 +10,10 @@ from cl.search.models import Opinion, RECAPDocument
 def microservice(
     service: str,
     method: str = "POST",
-    item: models.Model = None,
-    file: bytes = None,
-    file_type: str = None,
-    filepath: str = None,
+    item: models.Model | None = None,
+    file: bytes | None = None,
+    file_type: str | None = None,
+    filepath: str | None = None,
     data=None,
     params=None,
 ) -> Response:

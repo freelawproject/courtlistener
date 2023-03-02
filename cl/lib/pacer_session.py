@@ -13,7 +13,7 @@ session_key = "session:pacer:cookies:user.%s"
 def log_into_pacer(
     username: str,
     password: str,
-    client_code: str = None,
+    client_code: str | None = None,
 ) -> RequestsCookieJar:
     """Log into PACER and return the cookie jar
 
@@ -35,7 +35,7 @@ def get_or_cache_pacer_cookies(
     user_pk: Union[str, int],
     username: str,
     password: str,
-    client_code: str = None,
+    client_code: str | None = None,
     refresh: bool = False,
 ) -> RequestsCookieJar:
     """Get PACER cookies for a user or create and cache fresh ones
@@ -71,7 +71,10 @@ def get_or_cache_pacer_cookies(
     return cookies
 
 
-def get_pacer_cookie_from_cache(user_pk: Union[str, int], r: Redis = None):
+def get_pacer_cookie_from_cache(
+    user_pk: Union[str, int],
+    r: Redis | None = None,
+):
     """Get the cookie for a user from the cache.
 
     :param user_pk: The ID of the user, can be a string or an ID
