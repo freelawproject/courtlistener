@@ -7,9 +7,9 @@ from django.conf import settings
 from django.core.cache import caches
 from django.http import HttpRequest
 from django_ratelimit import UNSAFE
+from django_ratelimit.core import get_header
 from django_ratelimit.decorators import ratelimit
 from django_ratelimit.exceptions import Ratelimited
-from django_ratelimit.utils import get_header
 from redis import ConnectionError
 
 
