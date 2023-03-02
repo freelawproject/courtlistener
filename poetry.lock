@@ -973,14 +973,14 @@ django = ">=2"
 
 [[package]]
 name = "django-ratelimit"
-version = "3.0.1"
+version = "4.0.0"
 description = "Cache-based rate-limiting for Django."
 category = "main"
 optional = false
-python-versions = ">=3.4"
+python-versions = ">=3.7"
 files = [
-    {file = "django-ratelimit-3.0.1.tar.gz", hash = "sha256:73223d860abd5c5d7b9a807fabb39a6220068129b514be8d78044b52607ab154"},
-    {file = "django_ratelimit-3.0.1-py2.py3-none-any.whl", hash = "sha256:857e797f23de948b204a31dba9d88aea3ce731b7a5d926d0240c772e19b5486f"},
+    {file = "django-ratelimit-4.0.0.tar.gz", hash = "sha256:19cba9e8101277f28c7a974c54c997067341ab30175431d3739e8ffb63cdd2b2"},
+    {file = "django_ratelimit-4.0.0-py2.py3-none-any.whl", hash = "sha256:a610b5fd052c843a589084f6934bc6d827ec6242d5965110ebd436ca5a59ef39"},
 ]
 
 [[package]]
@@ -3995,4 +3995,4 @@ h11 = ">=0.9.0,<1"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10, <3.11"
-content-hash = "aff6b2c657de4fb30a4a634503edb6465b4b1ee23a24c957d5cc137f9f7d6bd8"
+content-hash = "1172e47ed2b1e528556621321ca5409175d5157a3a5725634d2c7e41ab41160f"
