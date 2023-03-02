@@ -1,3 +1,4 @@
+import typing
 from typing import Any, Optional
 
 from django import forms
@@ -87,6 +88,7 @@ class EmptyModelChoiceField(forms.ModelChoiceField):
     XYZ.objects.none() by overriding the to_python method in ModelChoiceField.
     """
 
+    @typing.no_type_check
     def to_python(self, value: Optional[Any]) -> Any:
         if value in self.empty_values:
             return None
