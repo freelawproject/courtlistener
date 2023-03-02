@@ -32,7 +32,7 @@ def send_webhook_event(
     the webhook is sent.
     """
     proxy_server = {
-        "http": settings.EGRESS_PROXY_HOST,
+        "http": settings.EGRESS_PROXY_HOST,  # type: ignore
     }
     headers = {
         "Content-type": "application/json",
