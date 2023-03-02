@@ -37,7 +37,8 @@ def strip_port_to_make_ip_key(group: str, request: HttpRequest) -> str:
 
 
 ratelimiter_all_250_per_h = ratelimit(
-    key=strip_port_to_make_ip_key, rate="250/h", block=True
+    key=strip_port_to_make_ip_key,
+    rate="250/h",
 )
 # Decorators can't easily be mocked, and we need to not trigger this decorator
 # during tests or else the first test works and the rest are blocked. So,
@@ -48,19 +49,18 @@ if "test" in sys.argv:
     ratelimiter_unsafe_10_per_m = lambda func: func
 else:
     ratelimiter_all_2_per_m = ratelimit(
-        key=strip_port_to_make_ip_key, rate="2/m", block=True
+        key=strip_port_to_make_ip_key,
+        rate="2/m",
     )
     ratelimiter_unsafe_3_per_m = ratelimit(
         key=strip_port_to_make_ip_key,
         rate="3/m",
         method=UNSAFE,
-        block=True,
     )
     ratelimiter_unsafe_10_per_m = ratelimit(
         key=strip_port_to_make_ip_key,
         rate="10/m",
         method=UNSAFE,
-        block=True,
     )
 
 # See: https://www.bing.com/webmaster/help/how-to-verify-bingbot-3905dc26
