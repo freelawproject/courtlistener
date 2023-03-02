@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import Any
+from typing import Any, MutableMapping
 
 from django import forms
 from django.core.exceptions import ValidationError
@@ -98,6 +98,8 @@ class DocketEntryFilterForm(forms.Form):
 
 
 class CourtUploadForm(forms.Form):
+    initial: MutableMapping[str, Any]
+
     court_str = forms.CharField(required=True, widget=forms.HiddenInput())
     case_title = forms.CharField(
         label="Caption",
@@ -359,7 +361,7 @@ class CourtUploadForm(forms.Form):
                 )
 
     def clean_pdf_upload(self) -> bytes:
-        pdf_data = self.cleaned_data.get("pdf_upload").read()
+        pdf_data = self.cleaned_data["pdf_upload"].read()
         sha1_hash = sha1(force_bytes(pdf_data))
         ops = Opinion.objects.filter(sha1=sha1_hash)
         if len(ops) > 0:
@@ -406,7 +408,7 @@ class CourtUploadForm(forms.Form):
             "precedential_statuses": "Published",
             "docket_numbers": self.cleaned_data["docket_number"],
             "judges": ", ".join(
-                [j.name_full for j in self.cleaned_data.get("panel")]
+                [j.name_full for j in self.cleaned_data["panel"]]
             ),
             "author_id": lead_author.id if lead_author else None,
             "author": lead_author,
