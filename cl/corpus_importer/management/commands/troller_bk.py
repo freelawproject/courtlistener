@@ -351,8 +351,8 @@ def iterate_and_import_files(options: OptionsType) -> None:
     total_dockets_created = 0
     total_rds_created = 0
 
-    files_queue = Queue()
-    threads = []
+    files_queue: Queue = Queue()
+    threads: list[threading.Thread] = []
     files_downloaded_offset = options["offset"]
     for i, line in enumerate(f):
         if i < options["offset"]:
