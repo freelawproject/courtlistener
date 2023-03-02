@@ -273,8 +273,8 @@ class CourtUploadForm(forms.Form):
             "third_judge",
             "panel",
         ]:
-            self.fields[field_name].queryset = q_judges
-            self.fields[field_name].label_from_instance = self.person_label
+            self.fields[field_name].queryset = q_judges  # type: ignore[attr-defined]
+            self.fields[field_name].label_from_instance = self.person_label  # type: ignore[attr-defined]
 
         if self.pk == "tennworkcompcl":
             self.fields["cite_reporter"].widget = forms.Select(
