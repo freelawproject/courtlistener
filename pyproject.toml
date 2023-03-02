@@ -77,7 +77,7 @@ requests = "^2.28.1"
 simplejson = "^3.18.3"
 stripe = "^5.2.0"
 timeout-decorator = "*"
-tldextract = "*"
+tldextract = "^3.4.0"
 unidecode = "*"
 usaddress = "^0.5.10"
 scorched = {git = "https://github.com/freelawproject/scorched.git", branch="main"}
