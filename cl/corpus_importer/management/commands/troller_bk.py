@@ -374,7 +374,7 @@ def iterate_and_import_files(options: OptionsType) -> None:
         rds_for_solr, dockets_created = merge_rss_data(
             feed_data, court_id, build_date
         )
-        add_items_to_solr(rds_for_solr, "search.RECAPDocument")
+        add_items_to_solr.delay(rds_for_solr, "search.RECAPDocument")
 
         total_dockets_created += dockets_created
         total_rds_created += len(rds_for_solr)
