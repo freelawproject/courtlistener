@@ -1,9 +1,16 @@
 import json
+import os
+import time
 from datetime import date, datetime
+from pathlib import Path
+from queue import Queue
+from random import randint
 from unittest.mock import patch
 
 import eyecite
 import pytest
+from django.conf import settings
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils.timezone import make_aware, utc
 from factory import RelatedFactory
 
@@ -32,6 +39,7 @@ from cl.corpus_importer.management.commands.normalize_judges_opinions import (
     normalize_panel_in_opinioncluster,
 )
 from cl.corpus_importer.management.commands.troller_bk import (
+    download_files_concurrently,
     log_added_items_to_redis,
     merge_rss_data,
 )
@@ -994,6 +1002,11 @@ class CorpusImporterManagementCommmandsTests(TestCase):
         self.assertEqual(len(cluster.panel.all()), 2)
 
 
+def mock_download_file(item_path, order):
+    time.sleep(randint(1, 10) / 100)
+    return b"", item_path, order
+
+
 class TrollerBKTests(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
@@ -1931,3 +1944,75 @@ class TrollerBKTests(TestCase):
             f"Hit a cached item, finished adding {self.court_appellate.pk} feed. "
             f"Added {len(rds_created)} RDs."
         )
+
+    @patch(
+        "cl.corpus_importer.management.commands.troller_bk.download_file",
+        side_effect=mock_download_file,
+    )
+    def test_download_files_concurrently(self, mock_download):
+        """Test the download_files_concurrently method to verify proper
+        fetching of the next paths to download from a file. Concurrently
+        download these paths and add them to a queue in the original chronological order.
+        """
+        test_dir = (
+            Path(settings.INSTALL_ROOT)
+            / "cl"
+            / "corpus_importer"
+            / "test_assets"
+        )
+        import_filename = "import.csv"
+        import_path = os.path.join(test_dir, import_filename)
+
+        files_queue = Queue()
+        threads = []
+        files_downloaded_offset = 0
+
+        with open(import_path, "rb") as f:
+            files_downloaded_offset = download_files_concurrently(
+                files_queue, f.name, files_downloaded_offset, threads
+            )
+            self.assertEqual(len(threads), 1)
+            self.assertEqual(files_downloaded_offset, 3)
+            files_downloaded_offset = download_files_concurrently(
+                files_queue, f.name, files_downloaded_offset, threads
+            )
+
+        for thread in threads:
+            thread.join()
+
+        self.assertEqual(len(threads), 2)
+        self.assertEqual(files_downloaded_offset, 6)
+        self.assertEqual(files_queue.qsize(), 6)
+
+        # Verifies original chronological order.
+        binary, item_path, order = files_queue.get()
+        self.assertEqual(order, 0)
+        self.assertEqual(item_path.split("|")[1], "1575330086")
+        files_queue.task_done()
+
+        binary, item_path, order = files_queue.get()
+        self.assertEqual(order, 1)
+        self.assertEqual(item_path.split("|")[1], "1575333374")
+        files_queue.task_done()
+
+        binary, item_path, order = files_queue.get()
+        self.assertEqual(order, 2)
+        self.assertEqual(item_path.split("|")[1], "1575336978")
+        files_queue.task_done()
+
+        binary, item_path, order = files_queue.get()
+        self.assertEqual(order, 0)
+        self.assertEqual(item_path.split("|")[1], "1575340576")
+        files_queue.task_done()
+
+        binary, item_path, order = files_queue.get()
+        self.assertEqual(order, 1)
+        self.assertEqual(item_path.split("|")[1], "1575344176")
+        files_queue.task_done()
+
+        binary, item_path, order = files_queue.get()
+        self.assertEqual(order, 2)
+        self.assertEqual(item_path.split("|")[1], "1575380176")
+        files_queue.task_done()
+
+        self.assertEqual(files_queue.qsize(), 0)
