@@ -205,7 +205,7 @@ def get_blocked_status(docket, count_override=None):
 def process_docket_data(
     d: Docket,
     report_type: int,
-    filepath: str = None,
+    filepath: str | None = None,
 ) -> Optional[int]:
     """Process docket data file.
 

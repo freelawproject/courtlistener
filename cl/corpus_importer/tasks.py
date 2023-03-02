@@ -1005,7 +1005,7 @@ def do_case_query_by_pacer_case_id(
     data: TaskData,
     court_id: str,
     cookies: RequestsCookieJar,
-    tag_names: List[str] = None,
+    tag_names: List[str] | None = None,
 ) -> Optional[TaskData]:
     """Run a case query (iquery.pl) query on a case and save the data
 

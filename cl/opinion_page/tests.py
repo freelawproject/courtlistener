@@ -1,3 +1,4 @@
+# mypy: disable-error-code=attr-defined
 import datetime
 import os
 import shutil

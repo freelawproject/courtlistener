@@ -37,7 +37,7 @@ from cl.search.models import Court
 logger = logging.getLogger(__name__)
 
 
-def update_entry_types(court_pk, description):
+def update_entry_types(court_pk: str, description: str) -> None:
     """Check the entry types of a feed. If changed update our record and
     send an email.
 
