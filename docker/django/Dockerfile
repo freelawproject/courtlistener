@@ -122,7 +122,7 @@ CMD gunicorn cl_wsgi:application \
     # Reset each worker once in a while
     --max-requests 10000 \
     --max-requests-jitter 100 \
-    --timeout 180 \
+    --timeout 1800 \
     --bind 0.0.0.0:8000
 
 #freelawproject/courtlistener:latest-scrape-rss
