@@ -5,6 +5,7 @@ from django.forms import ModelForm
 from django.http import HttpRequest
 
 from cl.alerts.admin import DocketAlertInline
+from cl.lib.cloud_front import invalidate_cloudfront
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.recap.management.commands.delete_document_from_ia import delete_from_ia
 from cl.search.models import (
@@ -184,6 +185,11 @@ class RECAPDocumentAdmin(CursorPaginatorAdmin):
         # Update solr
         add_items_to_solr.delay(
             [rd.pk for rd in queryset], "search.RECAPDocument"
+        )
+
+        # Do a CloudFront invalidation
+        invalidate_cloudfront(
+            [f"/{rd.filepath_local.name}" for rd in queryset]
         )
 
         if ia_failures:
