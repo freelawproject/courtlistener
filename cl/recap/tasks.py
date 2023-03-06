@@ -1818,15 +1818,11 @@ def set_rd_sealed_status(
         rd.save()
         return
 
-    if magic_number:
-        rd.is_sealed = True
-    else:
-        if is_pacer_doc_sealed(
-            rd.docket_entry.docket.court.pk, rd.pacer_doc_id
-        ):
-            rd.is_sealed = True
-        else:
-            rd.is_sealed = False
+    rd.is_sealed = True
+    if not magic_number and not is_pacer_doc_sealed(
+        rd.docket_entry.docket.court.pk, rd.pacer_doc_id
+    ):
+        rd.is_sealed = False
     rd.save()
 
 
