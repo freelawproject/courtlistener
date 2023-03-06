@@ -138,6 +138,10 @@ def find_and_fix_mis_matched_dockets(fix: bool) -> list[Docket]:
                     related_opinion.docket = docket_fixed
                     related_opinion.save()
 
+                    # Fix mis matched docket source, set it to RECAP.
+                    d.source = Docket.RECAP
+                    d.save()
+
     logger.info("List of mis matched dockets: ")
     for md in mis_matched_dockets:
         print(f"https://www.courtlistener.com{md.get_absolute_url()}")

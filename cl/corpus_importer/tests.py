@@ -2084,15 +2084,22 @@ class CleanUpMisMatchedDockets(TestCase):
 
     def test_find_and_fix_mis_matched_dockets(self, mock_download_ia):
         """Test find and fix mis matched dockets"""
+
+        cluster = self.cluster[0]
+        mis_matched_docket = cluster.docket
         dockets = Docket.objects.all()
         self.assertEqual(dockets.count(), 2)
         mis_matched_dockets = find_and_fix_mis_matched_dockets(fix=True)
         self.assertEqual(len(mis_matched_dockets), 1)
         self.assertEqual(dockets.count(), 3)
 
-        cluster = self.cluster[0]
         cluster.refresh_from_db()
         self.assertEqual(
             cluster.docket.docket_number, "Civil Action No. 3:17–cv–109"
         )
         self.assertEqual(cluster.docket.case_name, "Benedict v. Hankook")
+        self.assertEqual(cluster.docket.source, Docket.HARVARD)
+
+        # The mis matched docket is preserved, fix its source to RECAP.
+        mis_matched_docket.refresh_from_db()
+        self.assertEqual(mis_matched_docket.source, Docket.RECAP)
