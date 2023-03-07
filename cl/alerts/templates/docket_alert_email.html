@@ -114,6 +114,8 @@
                 {% if rd.filepath_local %}
                   <a href="{{ rd.filepath_local.url }}">For free from RECAP
                   </a>
+                 {% elif rd.is_sealed %}
+                  <span>Sealed on PACER</span>
                 {% else %}
                   <a href="https://www.courtlistener.com{{ rd.get_absolute_url }}?redirect_to_download=True">From RECAP with PACER fallback
                   </a>
