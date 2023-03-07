@@ -3294,7 +3294,10 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d: (
+            MockResponse(200, b""),
+            "OK",
+        ),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -3367,6 +3370,8 @@ class RecapEmailDocketAlerts(TestCase):
             "recap_documents"
         ]
         self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
+        # Document available from magic link, not sealed.
+        self.assertEqual(recap_document[0].is_sealed, False)
         # We should send 10 recap documents in this webhook example
         self.assertEqual(len(recap_documents_webhook), 10)
         # Compare content for the main document and the first attachment
@@ -3388,6 +3393,12 @@ class RecapEmailDocketAlerts(TestCase):
         )
         self.assertEqual(recap_documents_webhook[1]["document_number"], "16")
         self.assertEqual(recap_documents_webhook[1]["attachment_number"], 1)
+
+        # Confirm documents are not sealed in the webhook payload
+        is_sealed = content["payload"]["results"][0]["recap_documents"][0][
+            "is_sealed"
+        ]
+        self.assertEqual(is_sealed, False)
 
         # Trigger the recap.email notification again for the same user, it
         # should be processed.
@@ -3784,6 +3795,10 @@ class RecapEmailDocketAlerts(TestCase):
         "cl.recap.tasks.get_document_number_for_appellate",
         side_effect=lambda z, x, y: "011112443447",
     )
+    @mock.patch(
+        "cl.recap.tasks.is_pacer_doc_sealed",
+        side_effect=lambda z, x: False,
+    )
     def test_recap_email_no_magic_number(
         self,
         mock_bucket_open,
@@ -3792,6 +3807,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
         mock_get_document_number_appellate,
+        mock_is_pacer_doc_sealed,
     ):
         """Can we add docket entries from a recap email notification that don't
         contain a valid magic number?
@@ -3832,6 +3848,154 @@ class RecapEmailDocketAlerts(TestCase):
             pq[0].error_message,
             "No magic number available to download the document.",
         )
+
+        # Mock returns the document is not sealed.
+        self.assertEqual(recap_document[0].is_sealed, False)
+        webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
+        content = webhook_triggered.first().content
+        # Confirm document is not sealed in the webhook payload.
+        is_sealed = content["payload"]["results"][0]["recap_documents"][0][
+            "is_sealed"
+        ]
+        self.assertEqual(is_sealed, False)
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (
+            None,
+            "Document not available from magic link.",
+        ),
+    )
+    @mock.patch(
+        "cl.corpus_importer.tasks.get_document_number_from_confirmation_page",
+        side_effect=lambda z, x: "",
+    )
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_mark_as_sealed_nda_document_not_available_from_magic_link(
+        self,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+        mock_download_pdf,
+        mock_get_document_number_from_confirmation_page,
+        mock_webhook_post,
+    ):
+        """This test checks if we can mark as sealed a NDA document when the
+        download is not available through the magic link.
+        """
+
+        # Trigger a new nda recap.email notification from testing_1@recap.email
+        self.client.post(self.path, self.data_5, format="json")
+
+        recap_document = RECAPDocument.objects.all()
+        self.assertEqual(len(recap_document), 1)
+
+        # Confirm the document is marked as sealed.
+        self.assertEqual(recap_document[0].is_sealed, True)
+        webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
+        content = webhook_triggered.first().content
+        # Is the document sealed in the webhook payload?
+        is_sealed = content["payload"]["results"][0]["recap_documents"][0][
+            "is_sealed"
+        ]
+        self.assertEqual(is_sealed, True)
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (None, ""),
+    )
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    @mock.patch(
+        "cl.recap.tasks.requests.get",
+        side_effect=lambda *args, **kwargs: MockResponse(
+            200, mock_bucket_open("nyed_123019137279.html", "r", True)
+        ),
+    )
+    def test_mark_as_sealed_nef_documents_not_available_from_magic_link(
+        self,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+        mock_download_pacer_pdf_by_rd,
+        mock_webhook_post,
+        mock_att_response,
+    ):
+        """This test verifies if a recap.email notification with attachments
+        comes in and the documents are not available from the magic link,
+        documents are mark as sealed.
+        """
+
+        # Trigger a new recap.email notification
+        self.client.post(self.path, self.data_4, format="json")
+
+        recap_document = RECAPDocument.objects.all()
+        # Main document is marked as sealed.
+        self.assertEqual(recap_document[0].is_sealed, True)
+        self.assertEqual(len(recap_document), 10)
+
+        webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
+        content = webhook_triggered.first().content
+        # Compare the content of the webhook to the recap document
+        recap_documents_webhook = content["payload"]["results"][0][
+            "recap_documents"
+        ]
+        # We should send 10 recap documents in this webhook example
+        self.assertEqual(len(recap_documents_webhook), 10)
+        # All the documents including the attachments should be sealed.
+        for rd in recap_documents_webhook:
+            self.assertEqual(rd["is_sealed"], True)
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    @mock.patch(
+        "cl.recap.tasks.get_document_number_for_appellate",
+        side_effect=lambda z, x, y: "011112443447",
+    )
+    @mock.patch(
+        "cl.recap.tasks.is_pacer_doc_sealed",
+        side_effect=lambda z, x: True,
+    )
+    def test_recap_email_no_magic_number_sealed_document(
+        self,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+        mock_get_document_number_appellate,
+        mock_webhook_post,
+        mock_is_pacer_doc_sealed,
+    ):
+        """This test checks if a document without magic number that is not
+        available on PACER is marked as sealed.
+        """
+
+        with mock.patch(
+            "cl.recap.tasks.open_and_validate_email_notification",
+            side_effect=lambda x, y: (self.no_magic_number_data, "HTML"),
+        ):
+            # Trigger a new recap.email notification from testing_1@recap.email
+            # auto-subscription option enabled
+            self.client.post(self.path, self.data, format="json")
+
+        recap_document = RECAPDocument.objects.all()
+        self.assertEqual(len(recap_document), 1)
+
+        # Document is marked as sealed.
+        self.assertEqual(recap_document[0].is_sealed, True)
+        webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
+        content = webhook_triggered.first().content
+        # Confirm the document is sealed in webhook payload.
+        is_sealed = content["payload"]["results"][0]["recap_documents"][0][
+            "is_sealed"
+        ]
+        self.assertEqual(is_sealed, True)
 
 
 class GetAndCopyRecapAttachments(TestCase):

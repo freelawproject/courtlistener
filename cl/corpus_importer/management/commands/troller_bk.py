@@ -1,8 +1,10 @@
 # Import the troller BK RSS feeds
 import argparse
 import concurrent.futures
+import gc
 import linecache
 import re
+import sys
 import threading
 from datetime import datetime
 from queue import Queue
@@ -274,16 +276,13 @@ def download_files_from_paths(
             order += 1
 
         # Wait for all the downloads to complete.
-        completed_downloads = concurrent.futures.as_completed(
-            concurrent_downloads
+        completed_downloads = list(
+            concurrent.futures.as_completed(concurrent_downloads)
         )
         # Order the downloads to preserver their original chron order.
-        completed_and_ordered = sorted(
-            list(completed_downloads), key=lambda a: a.result()[2]
-        )
-
+        completed_downloads.sort(key=lambda a: a.result()[2])
         # Add files to the Queue
-        for download in completed_and_ordered:
+        for download in completed_downloads:
             if last_thread:
                 # # Wait until the last thread completes, so we don't mess up
                 # the chronological order.
@@ -308,7 +307,7 @@ def download_files_concurrently(
     files_to_download = []
     linecache.clearcache()
     linecache.checkcache(file_path)
-    if files_queue.qsize() < FILES_BUFFER_THRESHOLD:
+    if files_queue.qsize() < FILES_BUFFER_THRESHOLD - 1:
         for j in range(FILES_BUFFER_THRESHOLD):
             # Get the next paths to download.
             next_line = linecache.getline(
@@ -333,7 +332,9 @@ def download_files_concurrently(
     return files_downloaded_offset
 
 
-def iterate_and_import_files(options: OptionsType) -> None:
+def iterate_and_import_files(
+    options: OptionsType, threads: list[threading.Thread]
+) -> None:
     """Iterate over the inventory file and import all new items.
 
      - Merge into the DB
@@ -344,15 +345,17 @@ def iterate_and_import_files(options: OptionsType) -> None:
      that is the RSS feeds started being scraped by RECAP.
 
     :param options: The command line options
+    :param threads: A list of Threads.
     :return: None
     """
 
+    # Enable automatic garbage collection.
+    gc.enable()
     f = open(options["file"], "r", encoding="utf-8")
     total_dockets_created = 0
     total_rds_created = 0
 
-    files_queue: Queue = Queue()
-    threads: list[threading.Thread] = []
+    files_queue: Queue = Queue(maxsize=FILES_BUFFER_THRESHOLD)
     files_downloaded_offset = options["offset"]
     for i, line in enumerate(f):
         if i < options["offset"]:
@@ -401,6 +404,8 @@ def iterate_and_import_files(options: OptionsType) -> None:
             total_dockets_created = 0
             total_rds_created = 0
 
+        # Ensure garbage collector is called at the end of each iteration.
+        gc.collect()
     f.close()
 
 
@@ -437,7 +442,14 @@ class Command(VerboseCommand):
                 "The 'file' argument is required for that action."
             )
 
-        iterate_and_import_files(options)
+        threads: list[threading.Thread] = []
+        try:
+            iterate_and_import_files(options, threads)
+        except KeyboardInterrupt:
+            logger.info("The importer has stopped, waiting threads to exit.")
+            for thread in threads:
+                thread.join()
+            sys.exit(1)
 
 
 troller_ids = {
