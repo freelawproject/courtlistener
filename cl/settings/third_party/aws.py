@@ -3,6 +3,7 @@ import environ
 env = environ.FileAwareEnv()
 DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
 
+
 # S3
 if DEVELOPMENT:
     AWS_ACCESS_KEY_ID = env("AWS_DEV_ACCESS_KEY_ID", default="")
@@ -22,9 +23,15 @@ if DEVELOPMENT:
     AWS_STORAGE_BUCKET_NAME = "dev-com-courtlistener-storage"
     AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
 
+
+# Cloudfront
 CLOUDFRONT_DOMAIN = env("CLOUDFRONT_DOMAIN", default="")
+CLOUDFRONT_DISTRIBUTION_ID = env(
+    "CLOUDFRONT_DISTRIBUTION_ID", default="E1ZASFI222UR2O"
+)
 
 AWS_LAMBDA_PROXY_URL = env("AWS_LAMBDA_PROXY_URL", default="")
+
 
 # SES
 AWS_SES_ACCESS_KEY_ID = env("AWS_SES_ACCESS_KEY_ID", default="")
