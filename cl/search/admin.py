@@ -153,13 +153,16 @@ class RECAPDocumentAdmin(CursorPaginatorAdmin):
     @admin.action(description="Seal Document")
     def seal_documents(self, request: HttpRequest, queryset: QuerySet) -> None:
         ia_failures = []
+        deleted_filepaths = []
         for rd in queryset:
             # Thumbnail
             if rd.thumbnail:
+                deleted_filepaths.append(rd.thumbnail.name)
                 rd.thumbnail.delete()
 
             # PDF
             if rd.filepath_local:
+                deleted_filepaths.append(rd.filepath_local.name)
                 rd.filepath_local.delete()
 
             # Internet Archive
@@ -188,9 +191,7 @@ class RECAPDocumentAdmin(CursorPaginatorAdmin):
         )
 
         # Do a CloudFront invalidation
-        invalidate_cloudfront(
-            [f"/{rd.filepath_local.name}" for rd in queryset]
-        )
+        invalidate_cloudfront([f"/{path}" for path in deleted_filepaths])
 
         if ia_failures:
             self.message_user(
