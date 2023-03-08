@@ -2068,6 +2068,7 @@ def open_and_validate_email_notification(
         data == {}
         or len(data["dockets"]) == 0
         or len(data["dockets"][0]["docket_entries"]) == 0
+        or data["dockets"][0]["docket_entries"][0]["pacer_case_id"] is None
     ):
         msg = "Not a valid notification email. No message content."
         mark_pq_status(
