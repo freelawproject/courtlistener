@@ -1847,13 +1847,15 @@ requests = ">=2.0,<3.0"
 
 [[package]]
 name = "juriscraper"
-version = "2.5.36"
+version = "2.5.37"
 description = "An API to scrape American court websites for metadata."
 category = "main"
 optional = false
 python-versions = "*"
-files = []
-develop = false
+files = [
+    {file = "juriscraper-2.5.37-py27-none-any.whl", hash = "sha256:2de7cf1d118250b51a27ef35e4a6ee9bbc1328ad8650d88d198a373343980e38"},
+    {file = "juriscraper-2.5.37.tar.gz", hash = "sha256:f500190281549f6e4d0d4a531b4cd19735a5ead61125d062b0a754bf3376ea25"},
+]
 
 [package.dependencies]
 argparse = "*"
@@ -1870,12 +1872,6 @@ python-dateutil = "2.8.2"
 requests = ">=2.20.0"
 selenium = "4.0.0.a7"
 tldextract = "*"
-
-[package.source]
-type = "git"
-url = "https://github.com/freelawproject/juriscraper"
-reference = "nefs-parse-case-id-from-case-url"
-resolved_reference = "8404226bc701f06a4d8bb90740c8c29ac2f6d588"
 
 [[package]]
 name = "kdtree"
@@ -4056,4 +4052,4 @@ h11 = ">=0.9.0,<1"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10, <3.11"
-content-hash = "332dae30511ff7f23d2bd957b92edb0860ae157b6221256b9efb09177fb9e6d0"
+content-hash = "ad498599d3ba1270a03f25573a0e75e43ee831759e099bb2c8a254f92f14edf7"
