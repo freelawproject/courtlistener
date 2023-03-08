@@ -27,6 +27,8 @@ from cl.search.models import (
     OpinionCluster,
     OpinionsCited,
     Parenthetical,
+    RECAPDocument,
+    OpinionsCitedByRECAPDocument,
 )
 from cl.search.tasks import add_items_to_solr
 
@@ -75,6 +77,15 @@ def identify_parallel_citations(
 
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
+def find_citations_and_parantheticals_for_recap_documents(
+    self, doc_ids: List[int], index: bool = True
+):
+    documents: List[RECAPDocument] = RECAPDocument.objects.filter(
+        pk__in=doc_ids
+    )
+
+
+@app.task(bind=True, max_retries=5, ignore_result=True)
 def find_citations_and_parentheticals_for_opinion_by_pks(
     self,
     opinion_pks: List[int],
@@ -97,7 +108,6 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
         # If no citations are found, continue
         if not citations:
             continue
-
         # Resolve all those different citation objects to Opinion objects,
         # using a variety of heuristics.
         try:
@@ -205,3 +215,69 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
     # pks of the passed opinions
     if index:
         add_items_to_solr.delay(opinion_pks, "search.Opinion")
+
+
+def store_opinion_citations_and_update_parentheticals(opinion: Opinion):
+    get_and_clean_opinion_text(opinion)
+    citations: List[CitationBase] = get_citations(opinion.cleaned_text)
+
+    # If no citations are found, then there is nothing else to do for now.
+    if not citations:
+        return
+
+    # try:
+    citation_resolutions: Dict[
+        MatchedResourceType, List[SupportedCitationType]
+    ] = do_resolve_citations(citations, opinion)
+    # except ResponseNotReady as e:
+    #     # Threading problem in httplib, which is used in the Solr query.
+    #     raise self.retry(exc=e, countdown=2)
+
+    # Generate the citing opinion's new HTML with inline citation links
+    opinion.html_with_citations = create_cited_html(
+        opinion, citation_resolutions
+    )
+
+    # Delete the unmatched citations
+    citation_resolutions.pop(NO_MATCH_RESOURCE, None)
+
+    currently_cited_opinions = opinion.opinions_cited.all().values_list(
+        "pk", flat=True
+    )
+
+    # opinion_ids_to_update = set()
+    # for _opinion in citation_resolutions.keys():
+    #     if _opinion.pk not in currently_cited_opinions:
+    #         opinion_ids_to_update.add(_opinion.pk)
+
+    opinion_ids_to_update = set(
+        [
+            o.pk
+            for o in citation_resolutions.keys()
+            if o.pk not in currently_cited_opinions
+        ]
+    )
+
+    clusters_to_update_par_groups_for = set()
+    parentheticals: List[Parenthetical] = []
+
+    for _opinion, _citations in citation_resolutions.items():
+        parenthetical_texts = set()
+
+        for c in _citations:
+            if (
+                (par_text := c.metadata.parenthetical)
+                and par_text not in parenthetical_texts
+                and is_parenthetical_descriptive(par_text)
+            ):
+                clusters_to_update_par_groups_for.add(_opinion.cluster_id)
+                parenthetical_texts.add(par_text)
+                clean = clean_parenthetical_text(par_text)
+                parentheticals.append(
+                    Parenthetical(
+                        describing_opinion_id=opinion.pk,
+                        described_opinion_id=_opinion.pk,
+                        text=clean,
+                        score=parenthetical_score(clean, opinion.cluster),
+                    )
+                )

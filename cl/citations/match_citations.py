@@ -290,3 +290,6 @@ def do_resolve_citations(
         resolve_shortcase_citation=resolve_shortcase_citation,
         resolve_supra_citation=resolve_supra_citation,
     )
+
+
+# def get_resolved_citations()
