@@ -1677,7 +1677,7 @@ def get_document_number_for_appellate(
         if dn_response.ok and dn_response.text:
             document_number = dn_response.text
 
-    if not document_number:
+    if not document_number and pacer_doc_id:
         # If we still don't have the document number fall back on the
         # download confirmation page
         document_number = get_document_number_from_confirmation_page(
