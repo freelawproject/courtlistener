@@ -1813,6 +1813,9 @@ def set_rd_sealed_status(
     """
 
     rd.refresh_from_db()
+    if not rd.pacer_doc_id:
+        return
+
     if not potentially_sealed:
         rd.is_sealed = False
         rd.save()
@@ -1889,7 +1892,7 @@ def download_pacer_pdf_and_save_to_pq(
     cutoff_date: datetime,
     magic_number: str | None,
     pacer_case_id: str,
-    pacer_doc_id: str,
+    pacer_doc_id: str | None,
     user_pk: int,
     appellate: bool,
     attachment_number: int = None,
@@ -1916,6 +1919,10 @@ def download_pacer_pdf_and_save_to_pq(
      request belongs to an attachment document.
     :return: The ProcessingQueue object that's created or returned if existed.
     """
+
+    # If pacer_doc_id is None, probably a minute entry, set it to ""
+    if pacer_doc_id is None:
+        pacer_doc_id = ""
 
     with transaction.atomic():
         (
@@ -2061,7 +2068,6 @@ def open_and_validate_email_notification(
         data == {}
         or len(data["dockets"]) == 0
         or len(data["dockets"][0]["docket_entries"]) == 0
-        or data["dockets"][0]["docket_entries"][0]["pacer_doc_id"] is None
     ):
         msg = "Not a valid notification email. No message content."
         mark_pq_status(

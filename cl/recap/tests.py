@@ -2504,6 +2504,39 @@ class RecapEmailDocketAlerts(TestCase):
             ],
         )
 
+        minute_entry_data = RECAPEmailDocketEntryDataFactory(
+            pacer_magic_num=None,
+            document_number=None,
+            document_url=None,
+            pacer_doc_id=None,
+            pacer_seq_no=None,
+            pacer_case_id="12345",
+        )
+
+        cls.minute_entry_data = RECAPEmailNotificationDataFactory(
+            contains_attachments=False,
+            dockets=[
+                RECAPEmailDocketDataFactory(
+                    docket_entries=[minute_entry_data],
+                )
+            ],
+        )
+
+        minute_entry_data_2 = minute_entry_data.copy()
+        minute_entry_data_2["pacer_case_id"] = "12346"
+        cls.multi_nef_minute_entry_data = RECAPEmailNotificationDataFactory(
+            contains_attachments=False,
+            appellate=False,
+            dockets=[
+                RECAPEmailDocketDataFactory(
+                    docket_entries=[minute_entry_data],
+                ),
+                RECAPEmailDocketDataFactory(
+                    docket_entries=[minute_entry_data_2],
+                ),
+            ],
+        )
+
     def setUp(self) -> None:
         self.client = APIClient()
         self.user = User.objects.get(username="recap-email")
@@ -3996,6 +4029,97 @@ class RecapEmailDocketAlerts(TestCase):
             "is_sealed"
         ]
         self.assertEqual(is_sealed, True)
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_recap_email_minute_entry(
+        self,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+        mock_webhook_post,
+    ):
+        """Can we add docket entries from a minute entry recap email
+        notification?
+        """
+
+        with mock.patch(
+            "cl.recap.tasks.open_and_validate_email_notification",
+            side_effect=lambda x, y: (self.minute_entry_data, "HTML"),
+        ):
+            # Trigger a new recap.email notification from testing_1@recap.email
+            # auto-subscription option enabled
+            self.client.post(self.path, self.data, format="json")
+
+        # Compare docket entry data.
+        recap_document = RECAPDocument.objects.all()
+        self.assertEqual(len(recap_document), 1)
+        docket = recap_document[0].docket_entry.docket
+        self.assertEqual(docket.pacer_case_id, "12345")
+        self.assertEqual(recap_document[0].pacer_doc_id, "")
+        self.assertEqual(recap_document[0].docket_entry.entry_number, None)
+
+        # A DocketAlert email for the recap.email user should go out
+        self.assertEqual(len(mail.outbox), 1)
+
+        # We can't set the seal status of a minute entry.
+        self.assertEqual(recap_document[0].is_sealed, None)
+        webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
+        content = webhook_triggered.first().content
+        is_sealed = content["payload"]["results"][0]["recap_documents"][0][
+            "is_sealed"
+        ]
+        self.assertEqual(is_sealed, None)
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (None, ""),
+    )
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_recap_email_minute_entry_multi_nef(
+        self,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+        mock_download_pacer_pdf_by_rd,
+        mock_webhook_post,
+    ):
+        """Can we add docket entries from a multi-nef minute entry recap email
+        notification?
+        """
+
+        with mock.patch(
+            "cl.recap.tasks.open_and_validate_email_notification",
+            side_effect=lambda x, y: (
+                self.multi_nef_minute_entry_data,
+                "HTML",
+            ),
+        ):
+            # Trigger a new nda recap.email notification from testing_1@recap.email
+            # Multi Docket NEF.
+            self.client.post(self.path, self.data, format="json")
+
+        # Compare docket entry data.
+        dockets = Docket.objects.all()
+        self.assertEqual(len(dockets), 2)
+        docket_entries = DocketEntry.objects.all()
+        self.assertEqual(len(docket_entries), 2)
+        recap_documents = RECAPDocument.objects.all()
+        self.assertEqual(len(recap_documents), 2)
+
+        for rd in recap_documents:
+            self.assertEqual(rd.pacer_doc_id, "")
+            self.assertEqual(rd.is_sealed, None)
+            self.assertEqual(rd.document_number, "")
+            self.assertEqual(rd.docket_entry.entry_number, None)
+
+        # A DocketAlert email for the recap.email user should go out
+        self.assertEqual(len(mail.outbox), 2)
 
 
 class GetAndCopyRecapAttachments(TestCase):
