@@ -2125,9 +2125,8 @@ class TrollerBKTests(TestCase):
                 self.assertEqual(docket.source, Docket.HARVARD_AND_RECAP)
             else:
                 self.assertEqual(docket.source, Docket.RECAP)
-
-            # Confirm date_last_filing is added to each docket.
-            self.assertEqual(docket.date_last_filing, date_filed)
+                # Confirm date_last_filing is added to each new docket.
+                self.assertEqual(docket.date_last_filing, date_filed)
 
         # BankruptcyInformation is added only on new dockets.
         bankr_objs_created = BankruptcyInformation.objects.all()

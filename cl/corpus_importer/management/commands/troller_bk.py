@@ -144,7 +144,7 @@ def merge_rss_data(
     dockets_to_create: list[Docket] = []
     unique_dockets: dict[str, Any] = {}
     des_to_add_existing_docket: list[tuple[int, dict[str, Any]]] = []
-    des_to_add_no_existing_docket: list[dict[str, Any]] = []
+    des_to_add_no_existing_docket: dict[str, Any] = {}
     for docket in feed_data:
         item_hash = hash_item(docket)
         if is_cached(item_hash):
@@ -201,7 +201,7 @@ def merge_rss_data(
         date_filed, time_filed = localize_date_and_time(
             court_id, docket_entry["date_filed"]
         )
-        d.date_last_filing = date_filed
+
         d.add_recap_source()
         if not d.pk:
             # Docket no exists
@@ -216,7 +216,7 @@ def merge_rss_data(
             update_docket_metadata(d, docket)
             d.pacer_case_id = docket["pacer_case_id"]
             d.slug = slugify(trunc(best_case_name(d), 75))
-
+            d.date_last_filing = date_filed
             if d.docket_number:
                 d.docket_number_core = make_docket_number_core(d.docket_number)
 
@@ -225,9 +225,17 @@ def merge_rss_data(
                 unique_dockets[docket["docket_number"]] = docket
                 dockets_to_create.append(d)
 
-            des_to_add_no_existing_docket.append(
-                {docket["docket_number"]: docket_entry}
+            existing_entry = des_to_add_no_existing_docket.get(
+                docket["docket_number"]
             )
+            if existing_entry:
+                des_to_add_no_existing_docket[docket["docket_number"]].append(
+                    docket_entry
+                )
+            else:
+                des_to_add_no_existing_docket[docket["docket_number"]] = [
+                    docket_entry
+                ]
             continue
 
         # Docket exists.
@@ -253,15 +261,11 @@ def merge_rss_data(
 
         # Find and assign the created docket pk to the list of docket entries
         # to add.
-        for de in des_to_add_no_existing_docket:
-            d = None
-            de_docket_number = list(de.keys())[0]
-            for d_created in d_bulk_created:
-                if d_created.docket_number == de_docket_number:
-                    d = d_created
-                    break
-            if d:
-                des_to_add_existing_docket.append((d.pk, de[de_docket_number]))
+        for d_created in d_bulk_created:
+            docket_number = d_created.docket_number
+            des_to_create = des_to_add_no_existing_docket[docket_number]
+            for de_entry in des_to_create:
+                des_to_add_existing_docket.append((d_created.pk, de_entry))
 
         # Create docket entries in bulk.
         docket_entries_to_add_bulk = get_docket_entries_to_add(
