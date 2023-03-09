@@ -29,8 +29,10 @@ class ContactForm(forms.Form):
 
     hcaptcha = hCaptchaField()
 
-    def clean(self) -> Dict[str, Any]:
-        cleaned_data = super().clean()
+    def clean(self) -> Dict[str, Any] | None:
+        cleaned_data: dict[str, Any] | None = super().clean()
+        if cleaned_data is None:
+            return cleaned_data
         subject = cleaned_data.get("phone_number", "")
         message = cleaned_data.get("message", "")
         regex = re.compile(

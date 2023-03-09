@@ -173,6 +173,15 @@ a.button:active {
   margin-top: 4em;
 }
 
+.filter-box #main-query-box {
+  margin-bottom: 0;
+  margin-top: 0;
+  padding-bottom: 1rem;
+}
+.filter-box #main-query-box .input-group {
+    vertical-align: middle;
+    display: flex;
+}
 
 @media (max-width: 767px) {
   #homepage #main-query-box {
@@ -229,6 +238,10 @@ a.button:active {
     width: 400px;
   }
 
+  .filter-box #main-query-box .input-group-btn {
+    width: auto;
+  }
+
   #above-main-query {
     margin-top: 6em;
   }
@@ -253,11 +266,24 @@ a.button:active {
   .dl-horizontal dd {
     margin-left: 120px;
   }
+
+  .filter-box #de-filter-search{
+  font-size: 12px;
+  }
+
+  #de-filter-search::placeholder{
+    font-size: 12px;
+  }
+
 }
 
 @media (min-width: 992px) {
   #main-query-box #id_q {
     width: 600px;
+  }
+
+  .filter-box #main-query-box {
+  padding-bottom: 0;
   }
 
   .lg-v-offset-below-3 {
@@ -549,6 +575,9 @@ mark {
   margin-right: 2em;
 }
 
+.select-all {
+  user-select: all;
+}
 
 /* layout */
 body {
@@ -562,7 +591,7 @@ body {
   border-right: 1px solid #c2c2c2;
 }
 
-#id_q {
+#id_q, #de-filter-search{
   border-color: #a6a6a6 #a6a6a6 #a6a6a6 #a6a6a6;
   border-style: solid none solid solid;
   border-width: 1px 0px 1px 1px;
@@ -933,6 +962,10 @@ a.gray:hover, a.gray:focus, a.grey:hover, a.grey:focus {
   font-size: 1.25em;
   font-weight: bold;
 }
+#lawbox p {
+  line-height: 2em;
+  font-size: 16px;
+}
 
 span.star-pagination {
   color: #555555;
@@ -972,7 +1005,7 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
   cursor: default;
 }
 
-/* Save favorites and modal box configs */
+/* Save notes and modal box configs */
 .modal {
   box-shadow: 2px 2px 5px #000000;
   border: 1px solid #dddddd;
@@ -1023,31 +1056,31 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
   text-transform: uppercase;
 }
 
-#modal-save-favorite .modal-dialog {
+#modal-save-note .modal-dialog {
   width: 430px;
 }
 
-#modal-save-favorite textarea, #modal-save-favorite input {
+#modal-save-note textarea, #modal-save-note input {
   width: 404px !important;
 }
 
-#save-favorite-text-area {
+#save-note-text-area {
   height: auto;
 }
 
-#modal-save-favorite .save-favorite-button {
+#modal-save-note .save-note-button {
   margin-right: 0;
 }
 
-#favorites-bottom-section {
+#notes-bottom-section {
   margin-top: 5.5em;
 }
 
-#save-favorite-delete {
+#save-note-delete {
   margin-bottom: 0.3em;
 }
 
-#favorites-buttons {
+#notes-buttons {
   position: absolute;
   right: 1em;
   bottom: 0.3em;
@@ -1080,11 +1113,6 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 
 #copy-input {
   width: 118px;
-}
-
-#favorites-star {
-  font-size: 1.5em;
-  margin-right: 0.5em;
 }
 
 .help-block {
@@ -1292,20 +1320,6 @@ emphasis {
   color: #333333 !important;
   font-family: Helvetica;
 }
-
-/* Buy on Pacerdash custom styles*/
-.btn-pacerdash {
-  padding: 0px 3px;
-  min-width: auto;
-  left: 16px;
-}
-
-.btn-pacerdash > li > a {
-  padding: 2px 5px;
-  font-size: 11px;
-}
-
-/* END  Buy on Pacerdash custom styles */
 
 /* Profile tabs styles */
 .centered-tabs {

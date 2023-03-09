@@ -129,7 +129,6 @@ class UserCreationFormExtended(UserCreationForm):
     """
 
     def __init__(self, *args, **kwargs):
-
         super(UserCreationFormExtended, self).__init__(*args, **kwargs)
 
         self.fields["username"].label = "User Name*"
@@ -284,7 +283,7 @@ class CustomPasswordResetForm(PasswordResetForm):
             }
         )
 
-    def save(self, *args, **kwargs):
+    def save(self, *args, **kwargs) -> None:
         """Override the usual password form to send a message if we don't find
         any accounts
         """

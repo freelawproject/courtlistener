@@ -3,6 +3,8 @@
 exclude: migrations
 default_language_version:
   python: "python3.10"
+ci:
+  autoupdate_schedule: quarterly
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.4.0
@@ -29,12 +31,12 @@ repos:
        args: [--line-length=79, --transform-concats]
 
   - repo: https://github.com/psf/black
-    rev: 22.12.0
+    rev: 23.1.0
     hooks:
      - id: black
 
   - repo: https://github.com/PyCQA/isort
-    rev: 5.11.4
+    rev: 5.12.0
     hooks:
      - id: isort
        name: isort (python)

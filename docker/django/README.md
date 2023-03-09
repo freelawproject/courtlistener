@@ -50,11 +50,3 @@ Each of the above will build the image if it's not already built.
 # In Practice
 
 1. Docker images are usually made by our continuous deployment pipeline.
-
-1. It is convenient to deploy both django and task-server together.  
-
-2. That can be accomplished by updating both version.txt files.
-
-3. Then running the following command to build and deploy both.
-
-        make push --file docker/django/Makefile && make push --file docker/task-server/Makefile -e VERSION=$(git rev-parse --short HEAD)

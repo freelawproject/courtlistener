@@ -82,7 +82,7 @@ class Command(VerboseCommand):
             if self.options["verbose"]:
                 print(f"User {up.user.username} deleted")
 
-    def notify_unconfirmed_accounts(self):
+    def notify_unconfirmed_accounts(self) -> None:
         """This function will notify people who have not confirmed their
         accounts that they must do so for fear of deletion.
 

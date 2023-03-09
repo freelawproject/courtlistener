@@ -204,14 +204,14 @@ def send_thank_you_email(
             body = email["body"] % (
                 user.first_name,
                 donation.amount,
-                settings.EIN_SECRET,
+                settings.EIN_SECRET,  # type: ignore
             )
             send_mail(
                 email["subject"], body, email["from_email"], [user.email]
             )
         elif payment_type == PAYMENT_TYPES.BADGE_SIGNUP:
             email = emails["badge_thanks"]
-            body = email["body"] % (user.first_name, settings.EIN_SECRET)
+            body = email["body"] % (user.first_name, settings.EIN_SECRET)  # type: ignore
             send_mail(
                 email["subject"], body, email["from_email"], [user.email]
             )
@@ -221,7 +221,7 @@ def send_thank_you_email(
             body = email["body"] % (
                 user.first_name,
                 donation.amount,
-                settings.EIN_SECRET,
+                settings.EIN_SECRET,  # type: ignore
             )
             send_mail(
                 email["subject"], body, email["from_email"], [user.email]

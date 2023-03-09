@@ -18,7 +18,7 @@
             src="{% static "js/jquery.NobleCount.min.js" %}"></script>
     <script src="{% static "js/jquery.bootstrap-growl.min.js" %}"></script>
     <script defer type="text/javascript"
-            src="{% static "js/save-favorites.js" %}"></script>
+            src="{% static "js/save-notes.js" %}"></script>
     {% if request.user.is_authenticated %}
       <script defer type="text/javascript"
               src="{% static "js/toggle_settings.js" %}"></script>
@@ -68,31 +68,20 @@
         {% endif %}
       </p>
     {% endif %}
-    <i id="favorites-star"
-       class="{% if favorite_form.instance.docket_id %}gold fa-star{% else %}gray fa-star-o bold{% endif %} pointer fa inline hidden-print"
-       data-toggle="modal"
-       data-target="#modal-save-favorite, #modal-logged-out"
-       title="{% if favorite_form.instance.docket_id %}Edit this favorite{% else %}Save this as a favorite in your profile{% endif %}"></i>
-
     <h1 class="bottom inline" data-type="search.Docket" data-id="{{ docket.pk }}">
       {{ docket|best_case_name|safe|v_wrapper }}
       {% if docket.docket_number %}
-        ({{ docket.docket_number }})
+        (<span class="select-all">{{ docket.docket_number }}</span>)
       {% endif %}
     </h1>
-    {% include "includes/favorites_modal.html" %}
+    {% include "includes/notes_modal.html" %}
     {% include "includes/docket_alerts_modal.html" %}
 
     <h2>{{ docket.court }}</h2>
 
     {% if docket.pacer_docket_url or docket_entries %}
       <div class="v-offset-above-2">
-        {% if docket_entries %}
-          <a href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}"
-             class="btn btn-success"
-             rel="nofollow"
-          ><i class="fa fa-search"></i>&nbsp;Search this Docket</a>
-        {% endif %}
+        {% include "includes/add_note_button.html" with form_instance_id=note_form.instance.docket_id %}
         <div class="btn-group"
              id="react-root"
              data-docket="{{ docket.id }}"

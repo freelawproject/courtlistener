@@ -22,6 +22,7 @@ jobs:
       - name: Install Poetry
         uses: snok/install-poetry@v1
         with:
+          version: 1.3.2
           virtualenvs-create: true
           virtualenvs-in-project: true
 
@@ -75,24 +76,25 @@ jobs:
           --follow-imports=skip \
           --exclude 'migrations/*' \
           cl/api/api_permissions.py \
-          cl/api/models.py \
           cl/api/management/commands/cl_retry_webhooks.py \
+          cl/api/models.py \
           cl/api/routers.py \
+          cl/api/tasks.py \
           cl/api/tests.py \
           cl/api/utils.py \
           cl/api/views.py \
-          cl/corpus_importer/management/commands/import_tn.py \
+          cl/api/webhooks.py \
           cl/donate/management/commands/charge_monthly_donors.py \
           cl/donate/utils.py \
           cl/tests/utils.py \
+          cl/users/email_handlers.py \
+          cl/users/forms.py \
           cl/users/management/commands/cl_account_management.py \
           cl/users/management/commands/cl_delete_old_emails.py \
           cl/users/management/commands/cl_retry_failed_email.py \
-          cl/users/forms.py \
-          cl/users/email_handlers.py \
-          cl/users/tasks.py \
-          cl/api/webhooks.py \
-          cl/api/tasks.py
+          cl/users/tasks.py
+
+
 
       - name: Flynt f-string Formatter
         run: >

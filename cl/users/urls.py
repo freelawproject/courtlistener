@@ -92,7 +92,12 @@ urlpatterns = [
     # Profile pages
     path("profile/settings/", views.view_settings, name="view_settings"),
     path("profile/", RedirectView.as_view(pattern_name="view_settings")),
-    path("profile/favorites/", views.view_favorites, name="profile_favorites"),
+    path("profile/notes/", views.view_notes, name="profile_notes"),
+    # Redirect old favorites to notes (2023-01-20)
+    path(
+        "profile/favorites/",
+        RedirectView.as_view(pattern_name="profile_notes", permanent=True),
+    ),
     path("profile/alerts/", views.view_search_alerts, name="profile_alerts"),
     path(
         "profile/docket-alerts/",

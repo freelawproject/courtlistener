@@ -43,7 +43,10 @@ def build_date_range(start_year: int, end_year: int) -> str:
     return date_range
 
 
-def make_name_param(defendant: str, plaintiff: str = None) -> Tuple[str, int]:
+def make_name_param(
+    defendant: str,
+    plaintiff: str | None = None,
+) -> Tuple[str, int]:
     """Remove punctuation and return cleaned string plus its length in tokens."""
     token_list = defendant.split()
     if plaintiff:

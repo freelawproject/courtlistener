@@ -1,3 +1,4 @@
+import pghistory
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator
@@ -41,6 +42,7 @@ class PROVIDERS(object):
     )
 
 
+@pghistory.track(pghistory.Snapshot())
 class Donation(AbstractDateTimeModel):
     # These statuses are shown on the profile page. Be warned.
     AWAITING_PAYMENT = 0
@@ -121,6 +123,7 @@ class Donation(AbstractDateTimeModel):
         ordering = ["-date_created"]
 
 
+@pghistory.track(pghistory.Snapshot())
 class MonthlyDonation(AbstractDateTimeModel):
     """The metadata needed to associate a monthly donation with a user."""
 

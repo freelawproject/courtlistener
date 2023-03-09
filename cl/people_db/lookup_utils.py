@@ -375,7 +375,6 @@ def lookup_judge_by_full_name(
         stripped_middle = name.middle.strip(".,")
         initial = len(stripped_middle) == 1
         if initial:
-
             filter_sets.append(
                 [
                     Q(name_middle__istartswith=stripped_middle)
@@ -519,7 +518,7 @@ def sort_judge_list(judges: QuerySet, search_terms: Set[str]) -> QuerySet:
 
     # Create list of Judge IDs that have the highest match count
     judge_pks = []
-    for (k, v) in judge_dict.items():
+    for k, v in judge_dict.items():
         if v == highest_match:
             judge_pks.append(k)
 

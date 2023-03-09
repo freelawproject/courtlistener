@@ -1,9 +1,12 @@
+import datetime
 import io
 import os
 from datetime import date
 from pathlib import Path
 from unittest import mock
 
+import pytz
+from dateutil.tz import tzoffset, tzutc
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import AnonymousUser
@@ -28,7 +31,11 @@ from cl.lib.test_helpers import (
     IndexedSolrTestCase,
     SolrTestCase,
 )
+from cl.recap.constants import COURT_TIMEZONES
+from cl.recap.factories import DocketEntriesDataFactory, DocketEntryDataFactory
+from cl.recap.mergers import add_docket_entries
 from cl.scrapers.factories import PACERFreeDocumentLogFactory
+from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.feeds import JurisdictionFeed
 from cl.search.management.commands.cl_calculate_pagerank import Command
 from cl.search.models import (
@@ -52,7 +59,6 @@ from cl.users.factories import UserProfileWithParentsFactory
 
 
 class UpdateIndexCommandTest(SolrTestCase):
-
     args = [
         "--type",
         "search.Opinion",
@@ -250,7 +256,10 @@ class ModelTest(TestCase):
 
 
 class DocketValidationTest(TestCase):
-    fixtures = ["test_court.json"]
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.court_appellate = CourtFactory(id="ca1", jurisdiction="F")
 
     def tearDown(self) -> None:
         Docket.objects.all().delete()
@@ -260,13 +269,40 @@ class DocketValidationTest(TestCase):
         with self.assertRaises(ValidationError):
             Docket.objects.create(source=Docket.RECAP)
 
+    def test_creating_a_recap_docket_with_pacer_case_id_blank(self) -> None:
+        """Is blank pacer_case_id denied in not appellate dockets?"""
+        with self.assertRaises(ValidationError):
+            Docket.objects.create(
+                source=Docket.RECAP, court=self.court, docket_number="12-1233"
+            )
+
+        appellate = Docket.objects.create(
+            source=Docket.RECAP,
+            court=self.court_appellate,
+            docket_number="12-1234",
+        )
+        self.assertEqual(appellate.docket_number, "12-1234")
+
+    def test_creating_a_recap_docket_with_docket_number_blank(self) -> None:
+        """Is blank docket_number denied?"""
+        with self.assertRaises(ValidationError):
+            Docket.objects.create(
+                source=Docket.RECAP, court=self.court, pacer_case_id="1234"
+            )
+        with self.assertRaises(ValidationError):
+            Docket.objects.create(
+                source=Docket.RECAP,
+                court=self.court_appellate,
+                pacer_case_id="1234",
+            )
+
     def test_cannot_create_duplicate(self) -> None:
         """Do duplicate values throw an error?"""
         Docket.objects.create(
             source=Docket.RECAP,
             docket_number="asdf",
             pacer_case_id="asdf",
-            court_id="test",
+            court_id=self.court.pk,
         )
         with transaction.atomic():
             with self.assertRaises(IntegrityError):
@@ -274,7 +310,7 @@ class DocketValidationTest(TestCase):
                     source=Docket.RECAP_AND_SCRAPER,
                     docket_number="asdf",
                     pacer_case_id="asdf",
-                    court_id="test",
+                    court_id=self.court.pk,
                 )
 
 
@@ -889,7 +925,6 @@ class RelatedSearchTest(IndexedSolrTestCase):
 
 
 class GroupedSearchTest(EmptySolrTestCase):
-
     fixtures = ["opinions-issue-550.json"]
 
     def setUp(self) -> None:
@@ -1696,3 +1731,345 @@ class CaptionTest(TestCase):
         # Now sort the messed up list, and check if it worked.
         cs_sorted = sorted(cs_shuffled, key=sort_cites)
         self.assertEqual(cs, cs_sorted)
+
+
+class DocketEntriesTimezone(TestCase):
+    """Test docket entries with time, store date and time in the local court
+    timezone and make datetime_filed aware to the local court timezone.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.cand = CourtFactory(id="cand", jurisdiction="FB")
+        cls.nyed = CourtFactory(id="nyed", jurisdiction="FB")
+        cls.d_cand = DocketFactory(
+            source=Docket.RECAP,
+            court=cls.cand,
+            pacer_case_id="104490",
+        )
+        cls.d_nyed = DocketFactory(
+            source=Docket.RECAP,
+            court=cls.nyed,
+            pacer_case_id="104491",
+        )
+
+        # No datetime
+        cls.de_date_data = DocketEntriesDataFactory(
+            docket_entries=[
+                DocketEntryDataFactory(
+                    date_filed=datetime.date(2021, 10, 15),
+                    document_number=1,
+                )
+            ],
+        )
+
+        cls.de_date_data_changes = DocketEntriesDataFactory(
+            docket_entries=[
+                DocketEntryDataFactory(
+                    date_filed=datetime.date(2021, 10, 16),
+                    document_number=1,
+                )
+            ],
+        )
+
+        cls.de_no_date = DocketEntriesDataFactory(
+            docket_entries=[
+                DocketEntryDataFactory(
+                    date_filed=None,
+                    document_number=1,
+                )
+            ],
+        )
+
+        # DST entries in UTC
+        cls.de_utc_data = DocketEntriesDataFactory(
+            docket_entries=[
+                DocketEntryDataFactory(
+                    date_filed=datetime.datetime(
+                        2021, 10, 16, 2, 46, 51, tzinfo=tzutc()
+                    ),
+                    document_number=1,
+                )
+            ],
+        )
+
+        cls.de_utc_changes_time = DocketEntriesDataFactory(
+            docket_entries=[
+                DocketEntryDataFactory(
+                    date_filed=datetime.datetime(
+                        2021, 10, 16, 2, 50, 11, tzinfo=tzutc()
+                    ),
+                    document_number=1,
+                )
+            ],
+        )
+
+        # DST entries in a different time offset
+        cls.de_pdt_data = DocketEntriesDataFactory(
+            docket_entries=[
+                DocketEntryDataFactory(
+                    date_filed=datetime.datetime(
+                        2021, 10, 16, 2, 46, 51, tzinfo=tzoffset(None, -25200)
+                    ),
+                    document_number=2,
+                )
+            ],
+        )
+
+        # Not DST entries in UTC
+        cls.de_utc_data_not_dst = DocketEntriesDataFactory(
+            docket_entries=[
+                DocketEntryDataFactory(
+                    date_filed=datetime.datetime(
+                        2023, 1, 16, 2, 46, 51, tzinfo=tzutc()
+                    ),
+                    document_number=1,
+                )
+            ],
+        )
+
+    def test_add_docket_entries_with_no_time(self):
+        """Do time_filed field and datetime_filed property are None when
+        ingesting docket entries with no time info?
+        """
+
+        add_docket_entries(self.d_cand, self.de_date_data["docket_entries"])
+        de_cand_date = DocketEntry.objects.get(
+            docket__court=self.cand, entry_number=1
+        )
+        self.assertEqual(de_cand_date.date_filed, datetime.date(2021, 10, 15))
+        self.assertEqual(de_cand_date.time_filed, None)
+        self.assertEqual(de_cand_date.datetime_filed, None)
+
+    def test_add_docket_entries_with_time(self):
+        """Can we store docket entries date_filed in the local court timezone
+        divided into date_filed and time_filed if we ingest
+        docket entries with datetime?
+        """
+
+        # Add docket entries with UTC datetime for CAND
+        add_docket_entries(self.d_cand, self.de_utc_data["docket_entries"])
+
+        # Add docket entries with a different time offset than UTC datetime
+        add_docket_entries(self.d_cand, self.de_pdt_data["docket_entries"])
+
+        de_cand_utc = DocketEntry.objects.get(
+            docket__court=self.cand, entry_number=1
+        )
+        de_cand_pdt = DocketEntry.objects.get(
+            docket__court=self.cand, entry_number=2
+        )
+        # Compare both dates are stored in local court timezone PDT for CAND
+        self.assertEqual(de_cand_utc.date_filed, datetime.date(2021, 10, 15))
+        self.assertEqual(de_cand_utc.time_filed, datetime.time(19, 46, 51))
+
+        self.assertEqual(de_cand_pdt.date_filed, datetime.date(2021, 10, 16))
+        self.assertEqual(de_cand_pdt.time_filed, datetime.time(2, 46, 51))
+
+        # Add docket entries with UTC datetime for NYED
+        add_docket_entries(self.d_nyed, self.de_utc_data["docket_entries"])
+
+        # Add docket entries with a different time offset than UTC datetime
+        add_docket_entries(self.d_nyed, self.de_pdt_data["docket_entries"])
+
+        de_nyed_utc = DocketEntry.objects.get(
+            docket__court=self.nyed, entry_number=1
+        )
+        de_nyed_pdt = DocketEntry.objects.get(
+            docket__court=self.nyed, entry_number=2
+        )
+        # Compare both dates are stored in local court timezone PDT for NYED
+        self.assertEqual(de_nyed_utc.date_filed, datetime.date(2021, 10, 15))
+        self.assertEqual(de_nyed_utc.time_filed, datetime.time(22, 46, 51))
+
+        self.assertEqual(de_nyed_pdt.date_filed, datetime.date(2021, 10, 16))
+        self.assertEqual(de_nyed_pdt.time_filed, datetime.time(5, 46, 51))
+
+    def test_update_docket_entries_without_date_or_time_data(self):
+        """Can we avoid updating docket entries date_filed and time_filed if
+        we ingest docket entries with no date_filed?
+        """
+
+        # Add docket entries with UTC datetime for CAND
+        add_docket_entries(self.d_cand, self.de_utc_data["docket_entries"])
+
+        de_cand = DocketEntry.objects.get(
+            docket__court=self.cand, entry_number=1
+        )
+        # Compare both dates are stored in local court timezone PDT for CAND
+        self.assertEqual(de_cand.date_filed, datetime.date(2021, 10, 15))
+        self.assertEqual(de_cand.time_filed, datetime.time(19, 46, 51))
+
+        # Add docket entries with null date_filed
+        add_docket_entries(self.d_cand, self.de_no_date["docket_entries"])
+        de_cand.refresh_from_db()
+        # Docket entry date_filed and time_filed are remain the same
+        self.assertEqual(de_cand.date_filed, datetime.date(2021, 10, 15))
+        self.assertEqual(de_cand.time_filed, datetime.time(19, 46, 51))
+
+    def test_update_docket_entries_with_no_time_data(self):
+        """Does time_filed is set to None only when the new date_filed doesn't
+        contain time data and the date differs from the previous one?
+        """
+
+        # Add docket entries with UTC datetime for CAND
+        add_docket_entries(self.d_cand, self.de_utc_data["docket_entries"])
+
+        de_cand = DocketEntry.objects.get(
+            docket__court=self.cand, entry_number=1
+        )
+        # Compare both dates are stored in local court timezone PDT for CAND
+        self.assertEqual(de_cand.date_filed, datetime.date(2021, 10, 15))
+        self.assertEqual(de_cand.time_filed, datetime.time(19, 46, 51))
+
+        # Add docket entries without time data but same date
+        add_docket_entries(self.d_cand, self.de_date_data["docket_entries"])
+        de_cand.refresh_from_db()
+        # Avoid updating date-time if the date doesn't change
+        self.assertEqual(de_cand.date_filed, datetime.date(2021, 10, 15))
+        self.assertEqual(de_cand.time_filed, datetime.time(19, 46, 51))
+
+        # Add docket entries without time data but different date
+        add_docket_entries(
+            self.d_cand, self.de_date_data_changes["docket_entries"]
+        )
+        de_cand.refresh_from_db()
+        # Docket entry date_filed is different from the previous one and,
+        # time_filed should be null.
+        self.assertEqual(de_cand.date_filed, datetime.date(2021, 10, 16))
+        self.assertEqual(de_cand.time_filed, None)
+
+    def test_update_docket_entries_with_time_data(self):
+        """Does data_filed and time_filed are properly updated when ingesting
+        docket entries with date and time data?
+        """
+
+        # Add docket entries with UTC datetime for CAND
+        add_docket_entries(self.d_cand, self.de_utc_data["docket_entries"])
+
+        de_cand = DocketEntry.objects.get(
+            docket__court=self.cand, entry_number=1
+        )
+        # Compare both dates are stored in local court timezone PDT for CAND
+        self.assertEqual(de_cand.date_filed, datetime.date(2021, 10, 15))
+        self.assertEqual(de_cand.time_filed, datetime.time(19, 46, 51))
+
+        # Add docket entries with UTC datetime for CAND, time changes,
+        # date remains the same
+        add_docket_entries(
+            self.d_cand, self.de_utc_changes_time["docket_entries"]
+        )
+        de_cand.refresh_from_db()
+        # Time is properly updated.
+        self.assertEqual(de_cand.date_filed, datetime.date(2021, 10, 15))
+        self.assertEqual(de_cand.time_filed, datetime.time(19, 50, 11))
+
+        # Add docket entries with UTC datetime for CAND, date and time change.
+        add_docket_entries(
+            self.d_cand, self.de_utc_data_not_dst["docket_entries"]
+        )
+        de_cand.refresh_from_db()
+        # Date and time are updated accordingly.
+        self.assertEqual(de_cand.date_filed, datetime.date(2023, 1, 15))
+        self.assertEqual(de_cand.time_filed, datetime.time(18, 46, 51))
+
+    def test_show_docket_entry_date_filed_according_court_timezone_dst(self):
+        """Does the datetime_filed is shown to properly to users using the
+        timezone template filter, considering DST time?
+        """
+
+        # Add docket entries for CAND US/Pacific filed in DST, in UTC and a
+        # different time offset.
+        add_docket_entries(self.d_cand, self.de_utc_data["docket_entries"])
+        add_docket_entries(self.d_cand, self.de_pdt_data["docket_entries"])
+
+        de_cand_utc = DocketEntry.objects.get(
+            docket__court=self.cand, entry_number=1
+        )
+        de_cand_pdt = DocketEntry.objects.get(
+            docket__court=self.cand, entry_number=2
+        )
+
+        court_timezone = pytz.timezone(
+            COURT_TIMEZONES.get(self.d_cand.court_id, "US/Eastern")
+        )
+        # Compare date using local timezone, DST 7 hours of difference:
+        target_date_aware = court_timezone.localize(
+            datetime.datetime(2021, 10, 15, 19, 46, 51)
+        )
+        self.assertEqual(de_cand_utc.datetime_filed, target_date_aware)
+
+        target_date_aware = court_timezone.localize(
+            datetime.datetime(2021, 10, 16, 2, 46, 51)
+        )
+        self.assertEqual(
+            de_cand_pdt.datetime_filed,
+            target_date_aware,
+        )
+
+        # Add docket entries for NYED US/Eastern filed in DST, in UTC and a
+        # different time offset.
+        add_docket_entries(self.d_nyed, self.de_utc_data["docket_entries"])
+        add_docket_entries(self.d_nyed, self.de_pdt_data["docket_entries"])
+
+        de_nyed_utc = DocketEntry.objects.get(
+            docket__court=self.nyed, entry_number=1
+        )
+        de_nyed_pdt = DocketEntry.objects.get(
+            docket__court=self.nyed, entry_number=2
+        )
+
+        court_timezone = pytz.timezone(
+            COURT_TIMEZONES.get(self.d_nyed.court_id, "US/Eastern")
+        )
+        # Compare date using local timezone, DST 4 hours of difference:
+        target_date_aware = court_timezone.localize(
+            datetime.datetime(2021, 10, 15, 22, 46, 51)
+        )
+        self.assertEqual(de_nyed_utc.datetime_filed, target_date_aware)
+
+        target_date_aware = court_timezone.localize(
+            datetime.datetime(2021, 10, 16, 5, 46, 51)
+        )
+        self.assertEqual(de_nyed_pdt.datetime_filed, target_date_aware)
+
+    def test_show_docket_entry_date_filed_according_court_timezone_not_dst(
+        self,
+    ):
+        """Does the datetime_filed is shown to properly to users using the
+        timezone template filter, considering a not DST time?
+        """
+
+        # Add docket entries for CAND filed in not DST time. US/Pacific
+        add_docket_entries(
+            self.d_cand, self.de_utc_data_not_dst["docket_entries"]
+        )
+        de_cand_utc = DocketEntry.objects.get(
+            docket__court=self.cand, entry_number=1
+        )
+
+        court_timezone = pytz.timezone(
+            COURT_TIMEZONES.get(self.d_cand.court_id, "US/Eastern")
+        )
+        # Compare date using local timezone, not DST 8 hours of difference:
+        target_date_aware = court_timezone.localize(
+            datetime.datetime(2023, 1, 15, 18, 46, 51),
+        )
+        self.assertEqual(de_cand_utc.datetime_filed, target_date_aware)
+
+        # Add docket entries for NYED filed in not DST time. US/Eastern
+        add_docket_entries(
+            self.d_nyed, self.de_utc_data_not_dst["docket_entries"]
+        )
+        de_nyed_utc = DocketEntry.objects.get(
+            docket__court=self.nyed, entry_number=1
+        )
+
+        court_timezone = pytz.timezone(
+            COURT_TIMEZONES.get(self.d_nyed.court_id, "US/Eastern")
+        )
+        # Compare date using local timezone, not DST 5 hours of difference:
+        target_date_aware = court_timezone.localize(
+            datetime.datetime(2023, 1, 15, 21, 46, 51)
+        )
+        self.assertEqual(de_nyed_utc.datetime_filed, target_date_aware)

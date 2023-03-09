@@ -36,28 +36,38 @@
 {% endblock %}
 
 {% block content %}
-  <div class="hidden-xs col-sm-1 col-md-2"></div>
-  <div class="col-xs-12 col-sm-10 col-md-8">
-    <h1>Data Coverage &mdash; What's in CourtListener?</h1>
-    <p>CourtListener is a vast searchable collection of legal information. We have millions of judicial opinions including <a href="https://free.law/projects/supreme-court-data/">a detailed collection of SCOTUS opinions</a>, we have tens of millions of PACER docket entries in the <a href="{% url "advanced_r" %}">RECAP Archive</a>, and we have <a href="{% url "advanced_oa" %}">the largest collection of oral argument recordings</a> available on the Internet, with {{ oa_duration|intcomma }} minutes of recordings (and counting).
-    </p>
-    <p>The best way to think about our data is to consider where we get it from. The answer to that question depends on which kind of information you are interested in &mdash; PACER data (the RECAP Archive), opinions, or oral argument recordings. Read on to learn more or skip ahead to the section that interests you:
-    </p>
-    <ul>
-      <li><a href="#recap-archive">Coverage of PACER data (the RECAP Archive)</a></li>
-      <li><a href="#adding-updating">Adding or updating PACER data in our system</a></li>
+  <div class="hidden-xs hidden-sm col-md-3">
+    <div id="toc">
+      <h3>Table of Contents</h3>
+      <ul>
+      <li><a href="#recap-archive">PACER Data Coverage</a></li>
+      <ul>
+        <li><a href="#adding-updating">Adding PACER Data</a></li>
+      </ul>
       <li>
-        <a href="#opinions">Coverage of judicial opinions</a>
+        <a href="#opinions">Judicial Opinion Coverage</a>
         <ul>
-          <li><a href="#opinion-chart">Chart of judicial opinion coverage</a></li>
-          <li><a href="#scraped-jurisdictions">Which courts get daily content</a></li>
+          <li><a href="#opinion-chart">Coverage Chart</a></li>
+          <li><a href="#scraped-jurisdictions">Scheduled Updates</a></li>
         </ul>
       </li>
-      <li><a href="#oral-arguments">Coverage of oral argument recordings</a></li>
+      <li><a href="#financial-disclosures">Financial Disclosure Coverage</a></li>
+      <li><a href="#judges">Judge Coverage</a></li>
+      <li><a href="#oral-arguments">Oral Argument Coverage</a></li>
     </ul>
+    </div>
+  </div>
+
+  <div class="col-xs-12 col-md-8 col-lg-6">
+    <h1>Data Coverage &mdash; What's in CourtListener?</h1>
+    <p class="lead">CourtListener is a vast searchable collection of legal information.</p>
+    <p>We have millions of judicial opinions including <a href="https://free.law/projects/supreme-court-data/">a detailed collection of SCOTUS opinions</a>, we have tens of millions of PACER docket entries in the <a href="{% url "advanced_r" %}">RECAP Archive</a>, and we have <a href="{% url "advanced_oa" %}">the largest collection of oral argument recordings</a> available on the Internet, with {{ oa_duration|intcomma }} minutes of recordings (and counting).
+    </p>
+    <p>The best way to think about our data is to consider where we get it from. The answer to that question depends on which kind of information you are interested in &mdash; PACER data (the RECAP Archive), opinions, or oral argument recordings.
+    </p>
+
+
     <hr>
-
-
     <h2 id="recap-archive">PACER Data (The RECAP Archive)</h2>
     <p>Broadly speaking, the <a href="{% url "advanced_r" %}">RECAP Archive</a> consists of dockets, docket entries, documents, parties, and attorneys. Our goal with the RECAP Archive is to collect any PACER data that we can so that we can share it as widely as possible.
     </p>
@@ -73,7 +83,7 @@
         <p><strong>@recap.email system:</strong> People that receive notification emails from PACER can use the <a href="{% url "recap_email_help" %}">@recap.email system</a> to add documents to the RECAP Archive. Each time they get a notification from PACER, we get it too, and we use it to add content to the RECAP Archive.
         </p>
       </li>
-      <li><p><strong>Special Case Scrapers:</strong> Special cases get additional monitoring via a system of scrapers that regularly gathers data from PACER. Examples of "special" cases are those that have active <a href="{% url "alert_help" %}#recap-alerts">RECAP Alerts for PACER</a>, are marked as favorites, or are otherwise popular or important.
+      <li><p><strong>Special Case Scrapers:</strong> Special cases get additional monitoring via a system of scrapers that regularly gathers data from PACER. Examples of "special" cases are those that have active <a href="{% url "alert_help" %}#recap-alerts">RECAP Alerts for PACER</a>, are saved in <a href="{% url "tag_notes_help" %}#notes">notes</a>, or are otherwise popular or important.
       </p></li>
       <li><p><strong>Our PACER Scraping Tools:</strong> We host <a href="https://free.law/2019/11/05/pacer-fetch-api/">free APIs that many organizations use to gather cases and documents from PACER</a>. Every day, many organizations rely on these automated tools to add innumerable cases and documents to our system.</p></li>
       <li>
@@ -108,7 +118,8 @@
     <hr>
 
     <h2 id="adding-updating">Adding or Updating PACER Data in Our System</h2>
-    <p>We do not have every court document or case and we often hear from folks that are distressed that particular documents or cases are not on CourtListener. Typically we do not purchase or upload content in response to user requests. Instead, if you wish to add something to our collection, the best way is usually to install the RECAP extension and purchase the item yourself on PACER.</p>
+    <p>It is cost-prohibitive for us to have every court document or case. If you wish to add something to our collection, the best way is to install the RECAP extension and purchase the item yourself on PACER.
+    </p>
     <hr>
 
 
@@ -164,8 +175,8 @@
     <div id="chart" style="height: 400px;"></div>
   </div>
 
-  <div class="hidden-xs col-sm-1 col-md-2"></div>
-  <div class="col-xs-12 col-sm-10 col-md-8">
+  <div class="hidden-xs hidden-sm col-md-3"></div>
+  <div class="col-xs-12 col-md-8 col-lg-6">
     <h3 id="scraped-jurisdictions">Courts We Scrape for Opinions</h3>
     <p>As mentioned above, we gather opinions from hundreds of court websites every day. For each of these jurisdictions, we are able to provide <a href="{% url "alert_help" %}">instant, daily, weekly, or monthly alerts</a>. If you are setting up an alert, it's important to know that we do not yet have coverage for all of the courts on CourtListener. The courts for which we currently can provide alerts are:
     </p>
@@ -185,6 +196,24 @@
       {% endfor %}
     </div>
     <hr>
+
+
+    <h2 id="financial-disclosures">Financial Disclosures</h2>
+    <p>All federal judges and many state judges must file financial disclosure documents to indicate any real or perceived biases they may have. We have collected
+      {{ count_fds|intcomma|default:"tens of thousands" }} of these records containing {{ count_investments|intcomma|default:"more than a million" }} investments. See our page on this topic for more details.
+    </p>
+    <p><a href="{% url "coverage_fds" %}" class="btn btn-default btn-lg">Disclosure Coverage</a>
+    </p>
+    <hr>
+
+
+    <h2 id="judges">Judges</h2>
+    <p>We host a database of {{ count_people|intcomma|default:"thousands of" }} state and federal judges including their biographical, professional, judicial, and political information. See our page on this topic for more details.
+    </p>
+    <p><a href="{% url "advanced_p" %}" class="btn btn-default btn-lg">Judge Homepage</a>
+    </p>
+    <hr>
+
 
     <h2 id="oral-arguments">Oral Argument Recordings</h2>
     <p>Although we have the largest collection of oral argument recordings on the Internet, we currently only have support for the Supreme Court and the Federal Circuit Courts listed below. For the courts listed below, we gather their oral argument recordings within about an hour of when the files are posted.

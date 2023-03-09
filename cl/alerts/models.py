@@ -1,3 +1,4 @@
+import pghistory
 from django.contrib.auth.models import User
 from django.db import models
 from django.utils.crypto import get_random_string
@@ -6,6 +7,7 @@ from cl.lib.models import AbstractDateTimeModel
 from cl.search.models import SEARCH_TYPES, Docket
 
 
+@pghistory.track(pghistory.Snapshot())
 class Alert(AbstractDateTimeModel):
     REAL_TIME = "rt"
     DAILY = "dly"
@@ -63,6 +65,7 @@ class DocketAlertManager(models.Manager):
         return self.filter(alert_type=DocketAlert.SUBSCRIPTION)
 
 
+@pghistory.track(pghistory.Snapshot())
 class DocketAlert(AbstractDateTimeModel):
     UNSUBSCRIPTION = 0
     SUBSCRIPTION = 1

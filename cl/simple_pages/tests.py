@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, cast
 from unittest.mock import MagicMock, patch
 
 from django.core import mail
@@ -122,7 +122,7 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
         """Make sure a page has a valid HTML title"""
         print("Checking for HTML title tag....", end="")
         html_tree = fromstring(content)
-        title = html_tree.xpath("//title/text()")
+        title = cast(list[str], html_tree.xpath("//title/text()"))
         self.assertGreater(
             len(title),
             0,
@@ -195,7 +195,7 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
         )
         reverse_params = [
             {"viewname": "view_settings"},
-            {"viewname": "profile_favorites"},
+            {"viewname": "profile_notes"},
             {"viewname": "profile_alerts"},
             {"viewname": "view_visualizations"},
             {"viewname": "view_deleted_visualizations"},

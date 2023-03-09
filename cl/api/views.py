@@ -17,6 +17,7 @@ from cl.lib.search_utils import (
 )
 from cl.search.forms import SearchForm
 from cl.search.models import Court
+from cl.simple_pages.views import get_coverage_data_fds
 
 logger = logging.getLogger(__name__)
 
@@ -87,10 +88,11 @@ def replication_docs(request: HttpRequest) -> HttpResponse:
 
 def bulk_data_index(request: HttpRequest) -> HttpResponse:
     """Shows an index page for the dumps."""
+    disclosure_coverage = get_coverage_data_fds()
     return render(
         request,
         "bulk-data.html",
-        {"private": False},
+        disclosure_coverage,
     )
 
 
@@ -207,7 +209,6 @@ def deprecated_api(request, v):
 
 
 def webhooks_getting_started(request):
-
     context = {"private": False}
     return render(request, "webhooks-getting-started.html", context)
 

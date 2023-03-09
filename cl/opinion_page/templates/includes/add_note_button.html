@@ -1,0 +1,6 @@
+<button id="add-note-button"
+ class="btn btn-success pointer hidden-print"
+ data-toggle="modal"
+ data-target="#modal-save-note, #modal-logged-out"
+ title="{% if form_instance_id %}Edit this note{% else %}Save this record as a note in your profile{% endif %}">
+  <i class="fa fa-bookmark {% if form_instance_id %}gold{% endif %}"></i> <span>{% if form_instance_id %}Edit Note{% else %}Add Note{% endif %}</span></button>

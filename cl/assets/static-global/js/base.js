@@ -282,6 +282,24 @@ $(document).ready(function () {
       document.cookie = "recap_install_plea" + "=" + 'true' + expires + "; path=/";
     }
   });
+
+  // Append the base docket query to the user input and submit the search.
+  function submit_search_query(selector_id) {
+    window.location = $(selector_id).attr('href') + ' ' + $('#de-filter-search').val();
+    return false;
+  }
+  // Make the docket entries search box work on click.
+  $('#search-button-de-filter').on('click', function (e) {
+    e.preventDefault();
+    submit_search_query('#search-button-de-filter');
+  });
+  // Make the docket entries search box work on "Enter".
+  $('#de-filter-search').on('keypress', function (e) {
+    if (e.keyCode == 13) {
+      submit_search_query('#search-button-de-filter');
+    }
+  });
+
 });
 
 
@@ -315,3 +333,12 @@ function copy_text(selector_id) {
   text_area.select();
   navigator.clipboard.writeText(text_area.value);
 }
+
+/*
+  Disable the signup form submit button on submit to avoid repeated submissions.
+*/
+const form = document.getElementById('register-form');
+let button = document.getElementById('register-button');
+form.addEventListener('submit', function () {
+  button.disabled = true;
+});

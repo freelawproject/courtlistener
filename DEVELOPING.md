@@ -105,6 +105,8 @@ To set up a development machine, do the following:
 
     If this does not make an object that you want for your work, you should update it so it does. It's a relatively new tool and it's growing as we use it.
 
+    If you need specific data from CourtListener (to debug something, say), you can use `clone_from_cl`, which pulls data from the CourtListener API into your dev database.
+
 1. Finally, create a new superuser login by running this command, and entering the required information:
 
     `docker exec -it cl-django python /opt/courtlistener/manage.py createsuperuser`
