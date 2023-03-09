@@ -12,7 +12,7 @@ if DEVELOPMENT:
     CELERY_WORKER_CONCURRENCY = 2
     # This makes the tasks run outside the async worker and is needed for tests
     # to pass
-    CELERY_TASK_ALWAYS_EAGER = False
+    CELERY_TASK_ALWAYS_EAGER = True
 else:
     # Celery settings for production sites
     CELERY_WORKER_CONCURRENCY = 20
