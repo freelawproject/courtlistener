@@ -47,6 +47,7 @@ from cl.corpus_importer.tasks import (
     download_pdf_by_magic_number,
     get_att_report_by_rd,
     get_document_number_for_appellate,
+    is_pacer_doc_sealed,
     make_attachment_pq_object,
     update_rd_metadata,
 )
@@ -1795,11 +1796,45 @@ def get_attachment_page_by_url(att_page_url: str, court_id: str) -> str | None:
     return att_response.text
 
 
+def set_rd_sealed_status(
+    rd: RECAPDocument, magic_number: str | None, potentially_sealed: bool
+) -> None:
+    """Set RD is_sealed status according to the following conditions:
+
+    If potentially_sealed is false, set as not sealed.
+    If potentially_sealed is True and there magic_number, set as sealed.
+    If potentially_sealed is True and no magic_number available, check on PACER
+    if the document is sealed.
+
+    :param rd: The RECAPDocument to set is sealed status.
+    :param magic_number: The magic number if available.
+    :param potentially_sealed: Weather the RD might be sealed or not.
+    :return: None
+    """
+
+    rd.refresh_from_db()
+    if not rd.pacer_doc_id:
+        return
+
+    if not potentially_sealed:
+        rd.is_sealed = False
+        rd.save()
+        return
+
+    rd.is_sealed = True
+    if not magic_number and not is_pacer_doc_sealed(
+        rd.docket_entry.docket.court.pk, rd.pacer_doc_id
+    ):
+        rd.is_sealed = False
+    rd.save()
+
+
 def save_pacer_doc_from_pq(
     self: Task,
     rd: RECAPDocument,
     fq: PacerFetchQueue,
     pq: ProcessingQueue,
+    magic_number: str | None,
 ) -> Optional[int]:
     """Save the PDF binary previously downloaded and stored in a PQ object to
     the corresponding RECAPDocument.
@@ -1808,6 +1843,7 @@ def save_pacer_doc_from_pq(
     :param rd: The RECAP Document to get.
     :param fq: The RECAP Fetch Queue to update.
     :param pq: The ProcessingQueue that contains the PDF document.
+    :param magic_number: The magic number to fetch PACER documents for free.
     :return: The RECAPDocument PK
     """
 
@@ -1817,6 +1853,7 @@ def save_pacer_doc_from_pq(
         return
 
     if pq.status == PROCESSING_STATUS.FAILED or not pq.filepath_local:
+        set_rd_sealed_status(rd, magic_number, potentially_sealed=True)
         mark_fq_status(fq, pq.error_message, PROCESSING_STATUS.FAILED)
         return
 
@@ -1838,12 +1875,14 @@ def save_pacer_doc_from_pq(
         rd.document_number,
         rd.attachment_number,
     )
+
     if success is False:
         mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
         return
 
     msg = "Successfully completed fetch and save."
     mark_fq_status(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
+    set_rd_sealed_status(rd, magic_number, potentially_sealed=False)
     return rd.pk
 
 
@@ -1851,9 +1890,9 @@ def download_pacer_pdf_and_save_to_pq(
     court_id: str,
     cookies: RequestsCookieJar,
     cutoff_date: datetime,
-    magic_number: str,
+    magic_number: str | None,
     pacer_case_id: str,
-    pacer_doc_id: str,
+    pacer_doc_id: str | None,
     user_pk: int,
     appellate: bool,
     attachment_number: int = None,
@@ -1880,6 +1919,10 @@ def download_pacer_pdf_and_save_to_pq(
      request belongs to an attachment document.
     :return: The ProcessingQueue object that's created or returned if existed.
     """
+
+    # If pacer_doc_id is None, probably a minute entry, set it to ""
+    if pacer_doc_id is None:
+        pacer_doc_id = ""
 
     with transaction.atomic():
         (
@@ -1928,7 +1971,7 @@ def get_and_copy_recap_attachment_docs(
     self: Task,
     att_rds: list[RECAPDocument],
     court_id: str,
-    magic_number: str,
+    magic_number: str | None,
     pacer_case_id: str,
     user_pk: int,
 ) -> None:
@@ -1965,7 +2008,7 @@ def get_and_copy_recap_attachment_docs(
             request_type=REQUEST_TYPE.PDF,
             recap_document=rd_att,
         )
-        save_pacer_doc_from_pq(self, rd_att, fq, pq)
+        save_pacer_doc_from_pq(self, rd_att, fq, pq, magic_number)
         if pq not in unique_pqs:
             unique_pqs.append(pq)
 
@@ -2025,7 +2068,7 @@ def open_and_validate_email_notification(
         data == {}
         or len(data["dockets"]) == 0
         or len(data["dockets"][0]["docket_entries"]) == 0
-        or data["dockets"][0]["docket_entries"][0]["pacer_doc_id"] is None
+        or data["dockets"][0]["docket_entries"][0]["pacer_case_id"] is None
     ):
         msg = "Not a valid notification email. No message content."
         mark_pq_status(
@@ -2220,7 +2263,7 @@ def process_recap_email(
                     request_type=REQUEST_TYPE.PDF,
                     recap_document=rd,
                 )
-                save_pacer_doc_from_pq(self, rd, fq, pq)
+                save_pacer_doc_from_pq(self, rd, fq, pq, magic_number)
 
         # After properly copying the PDF to the main RECAPDocuments,
         # mark the PQ object as successful and delete its filepath_local

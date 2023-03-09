@@ -601,6 +601,10 @@ class Docket(AbstractDateTimeModel):
         unique_together = ("docket_number", "pacer_case_id", "court")
         indexes = [
             models.Index(fields=["court_id", "id"]),
+            models.Index(
+                fields=["court_id", "docket_number_core", "pacer_case_id"],
+                name="district_court_docket_lookup_idx",
+            ),
         ]
 
     def __str__(self) -> str:

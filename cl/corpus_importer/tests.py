@@ -10,7 +10,7 @@ from unittest.mock import patch
 import eyecite
 import pytest
 from django.conf import settings
-from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.files.base import ContentFile
 from django.utils.timezone import make_aware, utc
 from factory import RelatedFactory
 
@@ -25,6 +25,9 @@ from cl.corpus_importer.factories import (
 )
 from cl.corpus_importer.import_columbia.parse_opinions import (
     get_state_court_object,
+)
+from cl.corpus_importer.management.commands.clean_up_mis_matched_dockets import (
+    find_and_fix_mis_matched_dockets,
 )
 from cl.corpus_importer.management.commands.harvard_opinions import (
     clean_body_content,
@@ -2016,3 +2019,87 @@ class TrollerBKTests(TestCase):
         files_queue.task_done()
 
         self.assertEqual(files_queue.qsize(), 0)
+
+
+@patch(
+    "cl.corpus_importer.management.commands.clean_up_mis_matched_dockets.download_file",
+    side_effect=lambda a: {
+        "name_abbreviation": "Benedict v. Hankook",
+        "name": "Robert BENEDICT, Plaintiff, v. HANKOOK",
+        "docket_number": "Civil Action No. 3:17\u2013cv\u2013109",
+    },
+)
+class CleanUpMisMatchedDockets(TestCase):
+    """Test find_and_fix_mis_matched_dockets method that finds and fixes mis
+    matched opinion dockets added by Harvard importer.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        # Opinion cluster with mis matched docket.
+        cls.cluster = (
+            OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(
+                    court=cls.court,
+                    source=Docket.HARVARD,
+                    case_name="Glover vs Pridemore",
+                    case_name_full="Glover vs Pridemore",
+                    docket_number="2:17-cv-00109",
+                    pacer_case_id="12345",
+                ),
+                case_name="Foo v. Bar",
+                date_filed=date.today(),
+            ),
+        )
+        cf = ContentFile(b"Hello World att 1")
+        cls.cluster[0].filepath_json_harvard.save("file.json", cf)
+
+        # Opinion cluster with correct docket
+        cluster_2 = (
+            OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(
+                    court=cls.court,
+                    source=Docket.HARVARD,
+                    case_name="Foo v. Bar",
+                    case_name_full="Foo v. Bar",
+                    docket_number="2:17-cv-00109",
+                    pacer_case_id=None,
+                ),
+                case_name="Foo v. Bar",
+                date_filed=date.today(),
+            ),
+        )
+        cf = ContentFile(b"Hello World att 1")
+        cluster_2[0].filepath_json_harvard.save("file.json", cf)
+
+    def test_find_mis_matched_docket(self, mock_download_ia):
+        """Test only find and report mis matched dockets."""
+
+        dockets = Docket.objects.all()
+        self.assertEqual(dockets.count(), 2)
+        mis_matched_dockets = find_and_fix_mis_matched_dockets(fix=False)
+        self.assertEqual(len(mis_matched_dockets), 1)
+        self.assertEqual(dockets.count(), 2)
+
+    def test_find_and_fix_mis_matched_dockets(self, mock_download_ia):
+        """Test find and fix mis matched dockets"""
+
+        cluster = self.cluster[0]
+        mis_matched_docket = cluster.docket
+        dockets = Docket.objects.all()
+        self.assertEqual(dockets.count(), 2)
+        mis_matched_dockets = find_and_fix_mis_matched_dockets(fix=True)
+        self.assertEqual(len(mis_matched_dockets), 1)
+        self.assertEqual(dockets.count(), 3)
+
+        cluster.refresh_from_db()
+        self.assertEqual(
+            cluster.docket.docket_number, "Civil Action No. 3:17–cv–109"
+        )
+        self.assertEqual(cluster.docket.case_name, "Benedict v. Hankook")
+        self.assertEqual(cluster.docket.source, Docket.HARVARD)
+
+        # The mis matched docket is preserved, fix its source to RECAP.
+        mis_matched_docket.refresh_from_db()
+        self.assertEqual(mis_matched_docket.source, Docket.RECAP)

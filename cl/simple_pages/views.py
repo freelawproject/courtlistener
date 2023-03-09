@@ -373,7 +373,7 @@ def contact_thanks(request: HttpRequest) -> HttpResponse:
 
 def advanced_search(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(
-        request, "advanced_search.html", {"private": False}
+        request, "help/advanced_search.html", {"private": False}
     )
 
 
