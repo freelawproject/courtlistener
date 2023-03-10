@@ -2130,7 +2130,7 @@ class TrollerBKTests(TestCase):
 
         # BankruptcyInformation is added only on new dockets.
         bankr_objs_created = BankruptcyInformation.objects.all()
-        self.assertEqual(len(bankr_objs_created), 2)
+        self.assertEqual(len(bankr_objs_created), 3)
 
         # Compare bankruptcy data is linked correctly to the parent docket.
         bankr_d_1 = BankruptcyInformation.objects.get(
@@ -2147,6 +2147,14 @@ class TrollerBKTests(TestCase):
         self.assertEqual(bankr_d_2.chapter, str(a_rss_data_1["chapter"]))
         self.assertEqual(
             bankr_d_2.trustee_str, str(a_rss_data_1["trustee_str"])
+        )
+
+        bankr_d_3 = BankruptcyInformation.objects.get(
+            docket__docket_number=a_rss_data_3["docket_number"]
+        )
+        self.assertEqual(bankr_d_3.chapter, str(a_rss_data_3["chapter"]))
+        self.assertEqual(
+            bankr_d_3.trustee_str, str(a_rss_data_3["trustee_str"])
         )
 
     def test_avoid_adding_district_dockets_no_pacer_case_id_in_bulk(self):
