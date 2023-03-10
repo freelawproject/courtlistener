@@ -9,7 +9,7 @@ import threading
 from collections import defaultdict
 from datetime import datetime
 from queue import Queue
-from typing import Any, Mapping, TypedDict
+from typing import Any, DefaultDict, Mapping, TypedDict
 from urllib.parse import unquote
 
 from django.db import DataError, IntegrityError, transaction
@@ -111,7 +111,7 @@ def do_bulk_additions(
     court_id: str,
     unique_dockets: dict[str, Any],
     dockets_to_create: list[Docket],
-    des_to_add_no_existing_docket: defaultdict[str, list[dict[str, Any]]],
+    des_to_add_no_existing_docket: DefaultDict[str, list[dict[str, Any]]],
     des_to_add_existing_docket: list[tuple[int, dict[str, Any]]],
 ) -> tuple[list[int], int]:
     """Create dockets, docket entries and recap documents in bulk.
@@ -119,7 +119,7 @@ def do_bulk_additions(
     :param court_id: The court the docket entries belong to.
     :param unique_dockets: The dict to keep track of unique dockets to add.
     :param dockets_to_create: The list of dockets to add in bulk.
-    :param des_to_add_no_existing_docket: A defaultdict containing entries to
+    :param des_to_add_no_existing_docket: A DefaultDict containing entries to
     add which its parent docket didn't exist, docket_number: [entries]
     :param des_to_add_existing_docket: A list of tuples containing entries to
     add which its parent docket exists, (docket.pk, docket_entry)
@@ -263,7 +263,7 @@ def merge_rss_data(
     dockets_to_create: list[Docket] = []
     unique_dockets: dict[str, Any] = {}
     des_to_add_existing_docket: list[tuple[int, dict[str, Any]]] = []
-    des_to_add_no_existing_docket: defaultdict[
+    des_to_add_no_existing_docket: DefaultDict[
         str, list[dict[str, Any]]
     ] = defaultdict(list)
     for docket in feed_data:
