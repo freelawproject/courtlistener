@@ -706,6 +706,10 @@ def update_webhook_event_after_request(
             webhook_event.event_status = WEBHOOK_EVENT_STATUS.FAILED
     else:
         webhook_event.event_status = WEBHOOK_EVENT_STATUS.SUCCESSFUL
+        if not webhook_event.debug:
+            # Only log successful webhook events and not debug.
+            results = log_webhook_event(webhook_event.webhook.user.pk)
+            handle_webhook_events(results, webhook_event.webhook.user)
     webhook_event.save()
 
 
@@ -723,3 +727,58 @@ def generate_webhook_key_content(webhook: Webhook) -> WebhookKeyType:
         "date_created": webhook.date_created.isoformat(),
         "deprecation_date": None,
     }
+
+
+def get_webhook_logging_prefix() -> str:
+    """Simple tool for getting the prefix for logging webhook requests.
+    Useful for mocking the logger.
+    """
+    return "webhook:v1"
+
+
+def log_webhook_event(webhook_user_id: int) -> list[int | float]:
+    """Log a successful webhook event to redis.
+
+    :param webhook_user_id: The webhook user id
+    :return: A list of successful webhook events' global count and the user's
+    webhook count.
+    """
+
+    r = make_redis_interface("STATS")
+    pipe = r.pipeline()
+    webhook_prefix = get_webhook_logging_prefix()
+
+    # Global tallies for all webhook endpoints and users.
+    pipe.incr(f"{webhook_prefix}.count")
+
+    # Use a sorted set to store the user stats, with the score representing
+    # the number of successful webhook request the user made in total.
+    pipe.zincrby(f"{webhook_prefix}.user.counts", 1, webhook_user_id)
+
+    results = pipe.execute()
+    return results
+
+
+def handle_webhook_events(results: list[int | float], user: User) -> None:
+    """Create global and user tracking events if a webhook milestone is
+    reached.
+
+    :param results: A list of successful webhook events' global count and the
+    user's webhook count.
+    :param user: The webhook user
+    :return: None
+    """
+    total_count = results[0]
+    user_count = results[1]
+
+    if total_count in MILESTONES_FLAT:
+        Event.objects.create(
+            description=f"Webhooks have logged {total_count} total successful events."
+        )
+
+    if user_count in MILESTONES_FLAT:
+        Event.objects.create(
+            description=f"User '{user.username}' has placed their "
+            f"{intcomma(ordinal(user_count))} webhook event.",
+            user=user,
+        )
