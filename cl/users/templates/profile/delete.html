@@ -36,6 +36,9 @@
     {% if non_deleted_map_count > 0 %}
       <li>All of your <a href="{% url "view_visualizations" %}">network visualizations</a> ({{ non_deleted_map_count }}).</li>
     {% endif %}
+  {% if request.user.webhooks.count > 0 %}
+      <li>All of your <a href="{% url "view_webhooks" %}">webhooks and webhook events</a> ({{ request.user.webhooks.count }}).</li>
+  {% endif %}
   </ul>
   {% endif %}
 
