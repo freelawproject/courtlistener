@@ -19,6 +19,7 @@ from django.http import (
     HttpResponseRedirect,
     QueryDict,
 )
+from django.shortcuts import get_object_or_404
 from django.template.defaultfilters import urlencode
 from django.template.response import TemplateResponse
 from django.urls import reverse
@@ -770,7 +771,9 @@ def view_webhook_logs_detail(
 ) -> HttpResponse:
     """Render the webhook event detail page"""
 
-    webhook_event = WebhookEvent.objects.get(webhook__user=request.user, pk=pk)
+    webhook_event = get_object_or_404(
+        WebhookEvent, webhook__user=request.user, pk=pk
+    )
     renderer = JSONRenderer()
     json_content = renderer.render(
         webhook_event.content,
