@@ -5,7 +5,6 @@ from django.db import models
 from django.urls import reverse
 
 from cl.lib.models import THUMBNAIL_STATUSES, AbstractDateTimeModel
-from cl.lib.pghistory import CustomSnapshot
 from cl.lib.storage import IncrementingAWSMediaStorage
 from cl.people_db.models import Person
 
@@ -176,7 +175,7 @@ disclosure_permissions = (
 )
 
 
-@pghistory.track(CustomSnapshot())
+@pghistory.track(pghistory.Snapshot())
 class FinancialDisclosure(AbstractDateTimeModel):
     """A simple table to hold references to financial disclosure forms"""
 
@@ -298,7 +297,7 @@ class FinancialDisclosure(AbstractDateTimeModel):
         permissions = disclosure_permissions
 
 
-@pghistory.track(CustomSnapshot())
+@pghistory.track(pghistory.Snapshot())
 class Investment(AbstractDateTimeModel):
     """Financial Disclosure Investments Table"""
 
@@ -385,7 +384,7 @@ class Investment(AbstractDateTimeModel):
         permissions = disclosure_permissions
 
 
-@pghistory.track(CustomSnapshot())
+@pghistory.track(pghistory.Snapshot())
 class Position(AbstractDateTimeModel):
     """Financial Disclosure Position Table"""
 
@@ -413,7 +412,7 @@ class Position(AbstractDateTimeModel):
         permissions = disclosure_permissions
 
 
-@pghistory.track(CustomSnapshot())
+@pghistory.track(pghistory.Snapshot())
 class Agreement(AbstractDateTimeModel):
     """Financial Disclosure Agreements Table"""
 
@@ -441,7 +440,7 @@ class Agreement(AbstractDateTimeModel):
         permissions = disclosure_permissions
 
 
-@pghistory.track(CustomSnapshot())
+@pghistory.track(pghistory.Snapshot())
 class NonInvestmentIncome(AbstractDateTimeModel):
     """Financial Disclosure Non Investment Income Table"""
 
@@ -475,7 +474,7 @@ class NonInvestmentIncome(AbstractDateTimeModel):
         permissions = disclosure_permissions
 
 
-@pghistory.track(CustomSnapshot())
+@pghistory.track(pghistory.Snapshot())
 class SpouseIncome(AbstractDateTimeModel):
     """Financial Disclosure Judge Spouse Income Table"""
 
@@ -504,7 +503,7 @@ class SpouseIncome(AbstractDateTimeModel):
         permissions = disclosure_permissions
 
 
-@pghistory.track(CustomSnapshot())
+@pghistory.track(pghistory.Snapshot())
 class Reimbursement(AbstractDateTimeModel):
     """Reimbursements listed in judicial disclosure"""
 
@@ -546,7 +545,7 @@ class Reimbursement(AbstractDateTimeModel):
         permissions = disclosure_permissions
 
 
-@pghistory.track(CustomSnapshot())
+@pghistory.track(pghistory.Snapshot())
 class Gift(AbstractDateTimeModel):
     """Financial Disclosure Gifts Table"""
 
@@ -577,7 +576,7 @@ class Gift(AbstractDateTimeModel):
         permissions = disclosure_permissions
 
 
-@pghistory.track(CustomSnapshot())
+@pghistory.track(pghistory.Snapshot())
 class Debt(AbstractDateTimeModel):
     """Financial Disclosure Judicial Debts/Liabilities Table"""
 

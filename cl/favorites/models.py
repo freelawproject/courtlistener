@@ -5,11 +5,10 @@ from django.db import models
 
 from cl.audio.models import Audio
 from cl.lib.models import AbstractDateTimeModel
-from cl.lib.pghistory import CustomSnapshot
 from cl.search.models import Docket, OpinionCluster, RECAPDocument
 
 
-@pghistory.track(CustomSnapshot())
+@pghistory.track(pghistory.Snapshot())
 class Note(models.Model):
     date_created = models.DateTimeField(
         help_text="The original creation date for the item",
@@ -70,7 +69,7 @@ class Note(models.Model):
         )
 
 
-@pghistory.track(CustomSnapshot())
+@pghistory.track(pghistory.Snapshot())
 class DocketTag(models.Model):
     """Through table linking dockets to tags"""
 
@@ -87,7 +86,7 @@ class DocketTag(models.Model):
         unique_together = (("docket", "tag"),)
 
 
-@pghistory.track(CustomSnapshot(), exclude=["view_count"])
+@pghistory.track(pghistory.Snapshot(), exclude=["view_count"])
 class UserTag(AbstractDateTimeModel):
     """Tags that can be added by users to various objects"""
 
@@ -130,7 +129,7 @@ class UserTag(AbstractDateTimeModel):
         index_together = (("user", "name"),)
 
 
-@pghistory.track(CustomSnapshot())
+@pghistory.track(pghistory.Snapshot())
 class Prayer(models.Model):
     WAITING = 1
     GRANTED = 2

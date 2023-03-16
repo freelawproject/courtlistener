@@ -24,7 +24,6 @@ from cl.lib.model_helpers import (
     validate_supervisor,
 )
 from cl.lib.models import AbstractDateTimeModel
-from cl.lib.pghistory import CustomSnapshot
 from cl.lib.search_index_utils import (
     normalize_search_dicts,
     null_map,
@@ -61,7 +60,7 @@ DATE_GRANULARITIES = (
 
 
 @pghistory.track(
-    CustomSnapshot(),
+    pghistory.Snapshot(),
 )
 class Person(AbstractDateTimeModel):
     RELIGIONS = (
@@ -395,7 +394,7 @@ class Person(AbstractDateTimeModel):
 
 
 @pghistory.track(
-    CustomSnapshot(),
+    pghistory.Snapshot(),
 )
 class School(AbstractDateTimeModel):
     is_alias_of = models.ForeignKey(
@@ -438,7 +437,7 @@ class School(AbstractDateTimeModel):
 
 
 @pghistory.track(
-    CustomSnapshot(),
+    pghistory.Snapshot(),
 )
 class Position(AbstractDateTimeModel):
     """A role held by a person, and the details about it."""
@@ -1069,7 +1068,7 @@ class Position(AbstractDateTimeModel):
 
 
 @pghistory.track(
-    CustomSnapshot(),
+    pghistory.Snapshot(),
 )
 class RetentionEvent(AbstractDateTimeModel):
     RETENTION_TYPES = (
@@ -1143,7 +1142,7 @@ class RetentionEvent(AbstractDateTimeModel):
 
 
 @pghistory.track(
-    CustomSnapshot(),
+    pghistory.Snapshot(),
 )
 class Education(AbstractDateTimeModel):
     DEGREE_LEVELS = (
@@ -1213,7 +1212,7 @@ class Education(AbstractDateTimeModel):
 
 
 @pghistory.track(
-    CustomSnapshot(),
+    pghistory.Snapshot(),
 )
 class Race(models.Model):
     RACES = (
@@ -1238,7 +1237,7 @@ class Race(models.Model):
 
 
 @pghistory.track(
-    CustomSnapshot(),
+    pghistory.Snapshot(),
     obj_field=None,
 )
 class PersonRace(Person.race.through):
@@ -1249,7 +1248,7 @@ class PersonRace(Person.race.through):
 
 
 @pghistory.track(
-    CustomSnapshot(),
+    pghistory.Snapshot(),
 )
 class PoliticalAffiliation(AbstractDateTimeModel):
     POLITICAL_AFFILIATION_SOURCE = (
@@ -1321,7 +1320,7 @@ class PoliticalAffiliation(AbstractDateTimeModel):
 
 
 @pghistory.track(
-    CustomSnapshot(),
+    pghistory.Snapshot(),
 )
 class Source(AbstractDateTimeModel):
     person = models.ForeignKey(
@@ -1349,7 +1348,7 @@ class Source(AbstractDateTimeModel):
 
 
 @pghistory.track(
-    CustomSnapshot(),
+    pghistory.Snapshot(),
 )
 class ABARating(AbstractDateTimeModel):
     ABA_RATINGS = (

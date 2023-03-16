@@ -5,7 +5,6 @@ from django.core.validators import MinValueValidator
 from django.db import models
 
 from cl.lib.models import AbstractDateTimeModel
-from cl.lib.pghistory import CustomSnapshot
 
 
 class PAYMENT_TYPES(object):
@@ -43,7 +42,7 @@ class PROVIDERS(object):
     )
 
 
-@pghistory.track(CustomSnapshot())
+@pghistory.track(pghistory.Snapshot())
 class Donation(AbstractDateTimeModel):
     # These statuses are shown on the profile page. Be warned.
     AWAITING_PAYMENT = 0
@@ -124,7 +123,7 @@ class Donation(AbstractDateTimeModel):
         ordering = ["-date_created"]
 
 
-@pghistory.track(CustomSnapshot())
+@pghistory.track(pghistory.Snapshot())
 class MonthlyDonation(AbstractDateTimeModel):
     """The metadata needed to associate a monthly donation with a user."""
 
