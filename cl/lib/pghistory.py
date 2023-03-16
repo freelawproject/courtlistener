@@ -13,6 +13,8 @@ class CustomSnapshot(DatabaseTracker):
     This code is a copy from pghistory.core.Snapshot
     """
 
+    label = "custom_snapshot"
+
     def __init__(self, label=None):
         return super().__init__(label=label)
 
