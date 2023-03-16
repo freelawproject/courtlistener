@@ -15,7 +15,7 @@ from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory
 from django.urls import reverse
-from django.utils.timezone import now
+from django.utils.timezone import make_aware, now, utc
 from juriscraper.pacer import PacerRssFeed
 from requests import ConnectionError, HTTPError
 from rest_framework.status import (
@@ -67,6 +67,9 @@ from cl.recap.factories import (
     RECAPEmailDocketEntryDataFactory,
     RECAPEmailNotificationDataFactory,
 )
+from cl.recap.management.commands.clean_up_appellate_entries import (
+    clean_up_duplicate_appellate_entries,
+)
 from cl.recap.management.commands.import_idb import Command
 from cl.recap.management.commands.reprocess_recap_dockets import (
     extract_unextracted_rds_and_add_to_solr,
@@ -106,6 +109,7 @@ from cl.recap.tasks import (
 from cl.recap_rss.tasks import merge_rss_feed_contents
 from cl.search.factories import (
     CourtFactory,
+    DocketEntryFactory,
     DocketEntryWithParentsFactory,
     DocketFactory,
     RECAPDocumentFactory,
@@ -6413,3 +6417,153 @@ class LookupDocketsTest(TestCase):
         new_d.save()
         # The existing docket is matched instead of creating a new one.
         self.assertEqual(new_d.pk, d.pk)
+
+
+class CleanUpDuplicateAppellateEntries(TestCase):
+    """Test clean_up_duplicate_appellate_entries method that finds and clean
+    duplicated entries after a court enables document numbers.
+    """
+
+    @mock.patch(
+        "cl.recap.management.commands.clean_up_appellate_entries.logger"
+    )
+    def test_clean_duplicate_appellate_entries(self, mock_logger):
+        """Test clean duplicated entries by document number and description"""
+
+        court = CourtFactory(id="ca5", jurisdiction="F")
+        docket = DocketFactory(
+            court=court,
+            case_name="Foo v. Bar",
+            docket_number="12-40601",
+            pacer_case_id="12345",
+        )
+
+        # Duplicated entry by pacer_doc_id as number
+        de1 = DocketEntryFactory(
+            docket=docket,
+            entry_number=506585234,
+        )
+        RECAPDocumentFactory(
+            docket_entry=de1,
+            pacer_doc_id="00506585234",
+            document_number="00506585234",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+        # This entry should be preserved.
+        de1_2 = DocketEntryFactory(
+            docket=docket,
+            entry_number=1,
+        )
+        RECAPDocumentFactory(
+            docket_entry=de1_2,
+            pacer_doc_id="00506585234",
+            document_number="1",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+
+        # Duplicated entry with no entry number and no pacer_doc_id
+        de2 = DocketEntryFactory(
+            docket=docket,
+            entry_number=None,
+            description="Lorem ipsum dolor sit amet",
+        )
+        RECAPDocumentFactory(
+            docket_entry=de2,
+            pacer_doc_id="",
+            document_number="",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+        # This entry should be preserved.
+        de2_2 = DocketEntryFactory(
+            docket=docket,
+            entry_number=2,
+            description="Lorem ipsum dolor sit amet",
+        )
+        RECAPDocumentFactory(
+            docket_entry=de2_2,
+            pacer_doc_id="",
+            document_number="2",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+
+        # No duplicated entry with pacer_doc_id as number
+        de3 = DocketEntryFactory(
+            docket=docket,
+            entry_number=506585238,
+        )
+        RECAPDocumentFactory(
+            docket_entry=de3,
+            pacer_doc_id="00506585238",
+            document_number="00506585238",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+
+        # No duplicated entry with document number.
+        de4 = DocketEntryFactory(
+            docket=docket,
+            entry_number=105,
+        )
+        RECAPDocumentFactory(
+            docket_entry=de4,
+            pacer_doc_id="00506585239",
+            document_number="105",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+
+        docket_entries = DocketEntry.objects.all()
+        recap_documents = RECAPDocument.objects.all()
+        self.assertEqual(docket_entries.count(), 6)
+        self.assertEqual(recap_documents.count(), 6)
+
+        # Clean up duplicated entries.
+        clean_up_duplicate_appellate_entries([court.pk], None, True)
+
+        # After the cleanup, 2 entries should be removed.
+        mock_logger.info.assert_called_with(
+            f"Cleaned 2 entries in {court.pk} after 2023-01-08."
+        )
+        self.assertEqual(docket_entries.count(), 4)
+        self.assertEqual(recap_documents.count(), 4)
+
+        # Confirm the right entries are preserved.
+        pass_test = True
+        for de in docket_entries:
+            if not de.entry_number in [105, 506585238, 1, 2]:
+                pass_test = False
+        self.assertEqual(pass_test, True)
+
+    @mock.patch(
+        "cl.recap.management.commands.clean_up_appellate_entries.logger"
+    )
+    def test_skip_entries_before_date(self, mock_logger):
+        """Test skip looking for duplicated entries created before the date
+        the court enabled document numbers
+        """
+
+        court = CourtFactory(id="ca11", jurisdiction="F")
+        docket = DocketFactory(
+            court=court,
+            case_name="Foo v. ca11",
+            docket_number="12-40601",
+            pacer_case_id="12345",
+        )
+        with time_machine.travel(
+            datetime(year=2022, month=9, day=4), tick=False
+        ):
+            de1 = DocketEntryFactory(
+                docket=docket,
+                entry_number=506585234,
+            )
+            RECAPDocumentFactory(
+                docket_entry=de1,
+                pacer_doc_id="00506585234",
+                document_number="00506585234",
+                document_type=RECAPDocument.PACER_DOCUMENT,
+            )
+
+        clean_up_duplicate_appellate_entries([court.pk], None, True)
+        mock_logger.info.assert_called_with(
+            f"Skipping {court.pk}, no entries created after 2022-10-01 found."
+        )
+        docket_entries = DocketEntry.objects.all()
+        self.assertEqual(docket_entries.count(), 1)
