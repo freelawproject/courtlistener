@@ -10,6 +10,7 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.date_time import midnight_pst
 from cl.lib.model_helpers import make_upload_path
 from cl.lib.models import AbstractDateTimeModel, s3_warning_note
+from cl.lib.pghistory import CustomSnapshot
 from cl.lib.search_index_utils import (
     InvalidDocumentError,
     normalize_search_dicts,
@@ -21,7 +22,7 @@ from cl.people_db.models import Person
 from cl.search.models import SOURCES, Docket
 
 
-@pghistory.track(pghistory.Snapshot())
+@pghistory.track(CustomSnapshot(ignore_auto_now_fields=True))
 class Audio(AbstractDateTimeModel):
     """A class representing oral arguments and their associated metadata"""
 
@@ -266,7 +267,7 @@ class Audio(AbstractDateTimeModel):
 
 
 @pghistory.track(
-    pghistory.Snapshot(),
+    CustomSnapshot(),
     obj_field=None,
 )
 class AudioPanel(Audio.panel.through):  # type: ignore
