@@ -15,7 +15,7 @@ from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory
 from django.urls import reverse
-from django.utils.timezone import make_aware, now, utc
+from django.utils.timezone import now
 from juriscraper.pacer import PacerRssFeed
 from requests import ConnectionError, HTTPError
 from rest_framework.status import (
