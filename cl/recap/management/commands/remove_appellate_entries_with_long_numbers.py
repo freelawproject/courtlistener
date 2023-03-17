@@ -5,12 +5,13 @@ from datetime import datetime
 
 from django.db.models import Q
 
+from cl.lib.argparse_types import valid_date_time
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.search.models import Docket, DocketEntry, RECAPDocument
 
 
 def clean_up_duplicate_appellate_entries(
-    courts_ids: list[str], after_date: str | None, clean: bool
+    courts_ids: list[str], after_date: datetime | None, clean: bool
 ) -> None:
     """Find and clean duplicated appellate entries after courts enabled
     document numbers.
@@ -24,31 +25,31 @@ def clean_up_duplicate_appellate_entries(
 
     # Default dates when courts enabled document numbers, used to look for
     # duplicates after these dates.
-    default_court_dates = {"ca5": "2023-01-08", "ca11": "2022-10-01"}
+    default_after_date_times = {"ca5": "2023-01-08", "ca11": "2022-10-01"}
     for court in courts_ids:
         duplicated_entries_count = 0
         duplicated_entries = []
-        if not default_court_dates.get(court) and not after_date:
+        if not default_after_date_times.get(court) and not after_date:
             # No default after_date defined for court.
             logger.info(f"No default after_date defined for {court}.")
             continue
 
         if after_date:
-            court_date = datetime.strptime(after_date, "%Y-%m-%d")
+            after_date_time = after_date
         else:
-            court_date = datetime.strptime(
-                default_court_dates[court], "%Y-%m-%d"
+            after_date_time = datetime.strptime(
+                default_after_date_times[court], "%Y-%m-%d"
             )
 
         # Only check dockets with entries created after the courts enabled
         # numbers or the date provided.
         docket_with_entries = Docket.objects.filter(
-            court_id=court, docket_entries__date_created__gte=court_date
+            court_id=court, docket_entries__date_created__gte=after_date_time
         ).distinct()
 
         if not docket_with_entries:
             logger.info(
-                f"Skipping {court}, no entries created after {court_date.date()} found."
+                f"Skipping {court}, no entries created after {after_date_time.date()} found."
             )
             continue
 
@@ -71,24 +72,20 @@ def clean_up_duplicate_appellate_entries(
                         description=de.description,
                         date_filed=de.date_filed,
                     ).exclude(pk=de.pk)
-                    if not duplicated_des.exists():
-                        continue
-                    duplicated_entries_count += 1
-                    duplicated_entries.append(de.pk)
-                    if clean:
-                        de.delete()
+
                 else:
                     # Look for duplicates by pacer_doc_id if available.
                     duplicated_des = DocketEntry.objects.filter(
                         docket=docket,
                         recap_documents__pacer_doc_id=related_rd.pacer_doc_id,
                     ).exclude(pk=de.pk)
-                    if not duplicated_des.exists():
-                        continue
-                    duplicated_entries.append(de.pk)
-                    duplicated_entries_count += 1
-                    if clean:
-                        de.delete()
+
+                if not duplicated_des.exists():
+                    continue
+                duplicated_entries.append(de.pk)
+                duplicated_entries_count += 1
+                if clean:
+                    de.delete()
 
         print("List of duplicated entries:", duplicated_entries)
         action = "Found"
@@ -96,7 +93,7 @@ def clean_up_duplicate_appellate_entries(
             action = "Cleaned"
         logger.info(
             f"{action} {duplicated_entries_count} entries in {court} "
-            f"after {court_date.date()}."
+            f"after {after_date_time.date()}."
         )
 
 
@@ -117,23 +114,19 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--courts",
             required=True,
-            help="A comma-separated list of courts to find duplicates.",
+            help="A list of courts to find duplicates.",
+            nargs="+",
         )
 
         parser.add_argument(
             "--after_date",
             help="Look for duplicated entries after this date Y-m-d.",
+            type=valid_date_time,
             default=None,
         )
 
     def handle(self, *args, **options):
-        courts = options["courts"].split(",")
         after_date = options["after_date"]
-        if options["clean"]:
-            clean_up_duplicate_appellate_entries(
-                courts, after_date, clean=True
-            )
-        else:
-            clean_up_duplicate_appellate_entries(
-                courts, after_date, clean=False
-            )
+        clean_up_duplicate_appellate_entries(
+            options["courts"], after_date, clean=options["clean"]
+        )

@@ -67,10 +67,10 @@ from cl.recap.factories import (
     RECAPEmailDocketEntryDataFactory,
     RECAPEmailNotificationDataFactory,
 )
-from cl.recap.management.commands.clean_up_appellate_entries import (
+from cl.recap.management.commands.import_idb import Command
+from cl.recap.management.commands.remove_appellate_entries_with_long_numbers import (
     clean_up_duplicate_appellate_entries,
 )
-from cl.recap.management.commands.import_idb import Command
 from cl.recap.management.commands.reprocess_recap_dockets import (
     extract_unextracted_rds_and_add_to_solr,
 )
@@ -6425,7 +6425,7 @@ class CleanUpDuplicateAppellateEntries(TestCase):
     """
 
     @mock.patch(
-        "cl.recap.management.commands.clean_up_appellate_entries.logger"
+        "cl.recap.management.commands.remove_appellate_entries_with_long_numbers.logger"
     )
     def test_clean_duplicate_appellate_entries(self, mock_logger):
         """Test clean duplicated entries by document number and description"""
@@ -6533,7 +6533,7 @@ class CleanUpDuplicateAppellateEntries(TestCase):
         self.assertEqual(pass_test, True)
 
     @mock.patch(
-        "cl.recap.management.commands.clean_up_appellate_entries.logger"
+        "cl.recap.management.commands.remove_appellate_entries_with_long_numbers.logger"
     )
     def test_skip_entries_before_date(self, mock_logger):
         """Test skip looking for duplicated entries created before the date
