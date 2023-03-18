@@ -32,11 +32,6 @@ DROP TRIGGER IF EXISTS pgtrigger_snapshot_insert_38cf8 ON "favorites_usertag";
 --
 DROP TRIGGER IF EXISTS pgtrigger_snapshot_update_8ec9c ON "favorites_usertag";
 --
--- Remove field status from prayerevent
---
-ALTER TABLE "favorites_prayerevent"
-    DROP COLUMN "status" CASCADE;
---
 -- Create trigger update_or_delete_snapshot_update on model dockettag
 --
 
@@ -324,9 +319,9 @@ BEGIN
         END IF;
     END IF;
     INSERT INTO "favorites_prayerevent" ("date_created", "id", "pgh_context_id", "pgh_created_at", "pgh_label",
-                                         "pgh_obj_id", "recap_document_id", "user_id")
+                                         "pgh_obj_id", "recap_document_id", "status", "user_id")
     VALUES (OLD."date_created", OLD."id", _pgh_attach_context(), NOW(), 'update_or_delete_snapshot', OLD."id",
-            OLD."recap_document_id", OLD."user_id");
+            OLD."recap_document_id", OLD."status", OLD."user_id");
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
@@ -338,12 +333,10 @@ CREATE TRIGGER pgtrigger_update_or_delete_snapshot_update_67cd0
 
 
     FOR EACH ROW
-    WHEN (OLD."id" IS DISTINCT FROM NEW."id" OR OLD."date_created" IS DISTINCT FROM NEW."date_created" OR
-          OLD."user_id" IS DISTINCT FROM NEW."user_id" OR
-          OLD."recap_document_id" IS DISTINCT FROM NEW."recap_document_id")
+    WHEN (OLD.* IS DISTINCT FROM NEW.*)
 EXECUTE PROCEDURE pgtrigger_update_or_delete_snapshot_update_67cd0();
 
-COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_update_67cd0 ON "favorites_prayer" IS 'e42a6a5598ddff89e57948b099881f01be7d1ae6';
+COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_update_67cd0 ON "favorites_prayer" IS '3bc4cc39bc791dfeb8fff181e29662e13ceae902';
 ;
 --
 -- Create trigger update_or_delete_snapshot_delete on model prayer
@@ -386,9 +379,9 @@ BEGIN
         END IF;
     END IF;
     INSERT INTO "favorites_prayerevent" ("date_created", "id", "pgh_context_id", "pgh_created_at", "pgh_label",
-                                         "pgh_obj_id", "recap_document_id", "user_id")
+                                         "pgh_obj_id", "recap_document_id", "status", "user_id")
     VALUES (OLD."date_created", OLD."id", _pgh_attach_context(), NOW(), 'update_or_delete_snapshot', OLD."id",
-            OLD."recap_document_id", OLD."user_id");
+            OLD."recap_document_id", OLD."status", OLD."user_id");
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
@@ -402,7 +395,7 @@ CREATE TRIGGER pgtrigger_update_or_delete_snapshot_delete_89611
     FOR EACH ROW
 EXECUTE PROCEDURE pgtrigger_update_or_delete_snapshot_delete_89611();
 
-COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_delete_89611 ON "favorites_prayer" IS 'bcc156e7d8aa54c45556d82c5a88792d6be2dc9e';
+COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_delete_89611 ON "favorites_prayer" IS 'e37fb648af3bce037c4d52a45d4202357da1ca8c';
 ;
 --
 -- Create trigger update_or_delete_snapshot_update on model usertag

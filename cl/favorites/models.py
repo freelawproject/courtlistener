@@ -133,10 +133,7 @@ class UserTag(AbstractDateTimeModel):
         index_together = (("user", "name"),)
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
-    exclude=["status"],
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True))
 class Prayer(models.Model):
     WAITING = 1
     GRANTED = 2
