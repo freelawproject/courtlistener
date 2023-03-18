@@ -18,7 +18,7 @@ from localflavor.us.models import USStateField
 from cl.api.utils import invert_user_logs
 from cl.lib.model_helpers import invert_choices_group_lookup
 from cl.lib.models import AbstractDateTimeModel
-from cl.lib.pghistory import CustomSnapshot
+from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
 
 donation_exclusion_codes = [
     1,  # Unknown error
@@ -42,7 +42,7 @@ class BarMembership(models.Model):
 
 
 @pghistory.track(
-    CustomSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
 )
 class UserProfile(models.Model):
     user = models.OneToOneField(
@@ -228,7 +228,7 @@ class UserProfile(models.Model):
 
 
 @pghistory.track(
-    CustomSnapshot(),
+    AfterUpdateOrDeleteSnapshot(),
     obj_field=None,
 )
 class UserProfileBarMembership(UserProfile.barmembership.through):
@@ -524,7 +524,7 @@ def generate_recap_email(user_profile: UserProfile, append: int = None) -> str:
 
 
 @pghistory.track(
-    CustomSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
 )
 class UserProxy(User):
     """A proxy model class to track auth user model"""
@@ -534,7 +534,7 @@ class UserProxy(User):
 
 
 @pghistory.track(
-    CustomSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
 )
 class GroupProxy(Group):
     """A proxy model class to track auth group model"""
@@ -544,7 +544,7 @@ class GroupProxy(Group):
 
 
 @pghistory.track(
-    CustomSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
 )
 class PermissionProxy(Permission):
     """A proxy model class to track auth permission model"""
@@ -554,7 +554,7 @@ class PermissionProxy(Permission):
 
 
 @pghistory.track(
-    CustomSnapshot(),
+    AfterUpdateOrDeleteSnapshot(),
     obj_field=None,
 )
 class GroupPermissions(Group.permissions.through):
@@ -565,7 +565,7 @@ class GroupPermissions(Group.permissions.through):
 
 
 @pghistory.track(
-    CustomSnapshot(),
+    AfterUpdateOrDeleteSnapshot(),
     obj_field=None,
 )
 class UserGroups(User.groups.through):
@@ -576,7 +576,7 @@ class UserGroups(User.groups.through):
 
 
 @pghistory.track(
-    CustomSnapshot(),
+    AfterUpdateOrDeleteSnapshot(),
     obj_field=None,
 )
 class UserPermissions(User.user_permissions.through):

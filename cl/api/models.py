@@ -7,7 +7,7 @@ from django.core.validators import URLValidator
 from django.db import models
 
 from cl.lib.models import AbstractDateTimeModel
-from cl.lib.pghistory import CustomSnapshot
+from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
 
 
 class WebhookEventType(models.IntegerChoices):
@@ -23,7 +23,7 @@ HttpStatusCodes = models.IntegerChoices(  # type: ignore
 
 
 @pghistory.track(
-    CustomSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
     model_name="WebhookHistoryEvent",
 )
 class Webhook(AbstractDateTimeModel):

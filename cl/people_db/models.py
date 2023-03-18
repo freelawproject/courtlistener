@@ -24,7 +24,7 @@ from cl.lib.model_helpers import (
     validate_supervisor,
 )
 from cl.lib.models import AbstractDateTimeModel
-from cl.lib.pghistory import CustomSnapshot
+from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
 from cl.lib.search_index_utils import (
     normalize_search_dicts,
     null_map,
@@ -61,7 +61,7 @@ DATE_GRANULARITIES = (
 
 
 @pghistory.track(
-    CustomSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
 )
 class Person(AbstractDateTimeModel):
     RELIGIONS = (
@@ -395,7 +395,7 @@ class Person(AbstractDateTimeModel):
 
 
 @pghistory.track(
-    CustomSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
 )
 class School(AbstractDateTimeModel):
     is_alias_of = models.ForeignKey(
@@ -438,7 +438,7 @@ class School(AbstractDateTimeModel):
 
 
 @pghistory.track(
-    CustomSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
 )
 class Position(AbstractDateTimeModel):
     """A role held by a person, and the details about it."""
@@ -1069,7 +1069,7 @@ class Position(AbstractDateTimeModel):
 
 
 @pghistory.track(
-    CustomSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
 )
 class RetentionEvent(AbstractDateTimeModel):
     RETENTION_TYPES = (
@@ -1143,7 +1143,7 @@ class RetentionEvent(AbstractDateTimeModel):
 
 
 @pghistory.track(
-    CustomSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
 )
 class Education(AbstractDateTimeModel):
     DEGREE_LEVELS = (
@@ -1213,7 +1213,7 @@ class Education(AbstractDateTimeModel):
 
 
 @pghistory.track(
-    CustomSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
 )
 class Race(models.Model):
     RACES = (
@@ -1238,7 +1238,7 @@ class Race(models.Model):
 
 
 @pghistory.track(
-    CustomSnapshot(),
+    AfterUpdateOrDeleteSnapshot(),
     obj_field=None,
 )
 class PersonRace(Person.race.through):
@@ -1249,7 +1249,7 @@ class PersonRace(Person.race.through):
 
 
 @pghistory.track(
-    CustomSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
 )
 class PoliticalAffiliation(AbstractDateTimeModel):
     POLITICAL_AFFILIATION_SOURCE = (
@@ -1321,7 +1321,7 @@ class PoliticalAffiliation(AbstractDateTimeModel):
 
 
 @pghistory.track(
-    CustomSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
 )
 class Source(AbstractDateTimeModel):
     person = models.ForeignKey(
@@ -1349,7 +1349,7 @@ class Source(AbstractDateTimeModel):
 
 
 @pghistory.track(
-    CustomSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
 )
 class ABARating(AbstractDateTimeModel):
     ABA_RATINGS = (

@@ -1,4 +1,4 @@
-BEGIN;
+﻿BEGIN;
 --
 -- Remove trigger snapshot_insert from model dockettag
 --
@@ -34,213 +34,498 @@ DROP TRIGGER IF EXISTS pgtrigger_snapshot_update_8ec9c ON "favorites_usertag";
 --
 -- Remove field status from prayerevent
 --
-ALTER TABLE "favorites_prayerevent" DROP COLUMN "status" CASCADE;
+ALTER TABLE "favorites_prayerevent"
+    DROP COLUMN "status" CASCADE;
 --
--- Create trigger custom_snapshot_update on model dockettag
---
-
-            CREATE OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
-                trigger_name NAME
-            )
-            RETURNS BOOLEAN AS $$
-                DECLARE
-                    _pgtrigger_ignore TEXT[];
-                    _result BOOLEAN;
-                BEGIN
-                    BEGIN
-                        SELECT INTO _pgtrigger_ignore
-                            CURRENT_SETTING('pgtrigger.ignore');
-                        EXCEPTION WHEN OTHERS THEN
-                    END;
-                    IF _pgtrigger_ignore IS NOT NULL THEN
-                        SELECT trigger_name = ANY(_pgtrigger_ignore)
-                        INTO _result;
-                        RETURN _result;
-                    ELSE
-                        RETURN FALSE;
-                    END IF;
-                END;
-            $$ LANGUAGE plpgsql;
-
-            CREATE OR REPLACE FUNCTION pgtrigger_custom_snapshot_update_c954a()
-            RETURNS TRIGGER AS $$
-                
-                BEGIN
-                    IF ("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
-                        IF (TG_OP = 'DELETE') THEN
-                            RETURN OLD;
-                        ELSE
-                            RETURN NEW;
-                        END IF;
-                    END IF;
-                    INSERT INTO "favorites_dockettagevent" ("docket_id", "id", "pgh_context_id", "pgh_created_at", "pgh_label", "pgh_obj_id", "tag_id") VALUES (OLD."docket_id", OLD."id", _pgh_attach_context(), NOW(), 'custom_snapshot', OLD."id", OLD."tag_id"); RETURN NULL;
-                END;
-            $$ LANGUAGE plpgsql;
-
-            DROP TRIGGER IF EXISTS pgtrigger_custom_snapshot_update_c954a ON "favorites_dockettag";
-            CREATE  TRIGGER pgtrigger_custom_snapshot_update_c954a
-                AFTER UPDATE ON "favorites_dockettag"
-                
-                
-                FOR EACH ROW WHEN (OLD.* IS DISTINCT FROM NEW.*)
-                EXECUTE PROCEDURE pgtrigger_custom_snapshot_update_c954a();
-
-            COMMENT ON TRIGGER pgtrigger_custom_snapshot_update_c954a ON "favorites_dockettag" IS '0d5e0dea082de5be16a88c01949c94c0769b4a8f';
-        ;
---
--- Create trigger custom_snapshot_update on model note
+-- Create trigger update_or_delete_snapshot_update on model dockettag
 --
 
-            CREATE OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
-                trigger_name NAME
-            )
-            RETURNS BOOLEAN AS $$
-                DECLARE
-                    _pgtrigger_ignore TEXT[];
-                    _result BOOLEAN;
-                BEGIN
-                    BEGIN
-                        SELECT INTO _pgtrigger_ignore
-                            CURRENT_SETTING('pgtrigger.ignore');
-                        EXCEPTION WHEN OTHERS THEN
-                    END;
-                    IF _pgtrigger_ignore IS NOT NULL THEN
-                        SELECT trigger_name = ANY(_pgtrigger_ignore)
-                        INTO _result;
-                        RETURN _result;
-                    ELSE
-                        RETURN FALSE;
-                    END IF;
-                END;
-            $$ LANGUAGE plpgsql;
+CREATE OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
+    trigger_name NAME
+)
+    RETURNS BOOLEAN AS
+$$
+DECLARE
+    _pgtrigger_ignore TEXT[];
+    _result           BOOLEAN;
+BEGIN
+    BEGIN
+        SELECT INTO _pgtrigger_ignore CURRENT_SETTING('pgtrigger.ignore');
+    EXCEPTION
+        WHEN OTHERS THEN
+    END;
+    IF _pgtrigger_ignore IS NOT NULL THEN
+        SELECT trigger_name = ANY (_pgtrigger_ignore)
+        INTO _result;
+        RETURN _result;
+    ELSE
+        RETURN FALSE;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
 
-            CREATE OR REPLACE FUNCTION pgtrigger_custom_snapshot_update_f3950()
-            RETURNS TRIGGER AS $$
-                
-                BEGIN
-                    IF ("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
-                        IF (TG_OP = 'DELETE') THEN
-                            RETURN OLD;
-                        ELSE
-                            RETURN NEW;
-                        END IF;
-                    END IF;
-                    INSERT INTO "favorites_noteevent" ("audio_id_id", "cluster_id_id", "date_created", "date_modified", "docket_id_id", "id", "name", "notes", "pgh_context_id", "pgh_created_at", "pgh_label", "pgh_obj_id", "recap_doc_id_id", "user_id") VALUES (OLD."audio_id_id", OLD."cluster_id_id", OLD."date_created", OLD."date_modified", OLD."docket_id_id", OLD."id", OLD."name", OLD."notes", _pgh_attach_context(), NOW(), 'custom_snapshot', OLD."id", OLD."recap_doc_id_id", OLD."user_id"); RETURN NULL;
-                END;
-            $$ LANGUAGE plpgsql;
+CREATE OR REPLACE FUNCTION pgtrigger_update_or_delete_snapshot_update_88501()
+    RETURNS TRIGGER AS
+$$
 
-            DROP TRIGGER IF EXISTS pgtrigger_custom_snapshot_update_f3950 ON "favorites_note";
-            CREATE  TRIGGER pgtrigger_custom_snapshot_update_f3950
-                AFTER UPDATE ON "favorites_note"
-                
-                
-                FOR EACH ROW WHEN (OLD."id" IS DISTINCT FROM NEW."id" OR OLD."date_created" IS DISTINCT FROM NEW."date_created" OR OLD."user_id" IS DISTINCT FROM NEW."user_id" OR OLD."cluster_id_id" IS DISTINCT FROM NEW."cluster_id_id" OR OLD."audio_id_id" IS DISTINCT FROM NEW."audio_id_id" OR OLD."docket_id_id" IS DISTINCT FROM NEW."docket_id_id" OR OLD."recap_doc_id_id" IS DISTINCT FROM NEW."recap_doc_id_id" OR OLD."name" IS DISTINCT FROM NEW."name" OR OLD."notes" IS DISTINCT FROM NEW."notes")
-                EXECUTE PROCEDURE pgtrigger_custom_snapshot_update_f3950();
+BEGIN
+    IF ("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
+        IF (TG_OP = 'DELETE') THEN
+            RETURN OLD;
+        ELSE
+            RETURN NEW;
+        END IF;
+    END IF;
+    INSERT INTO "favorites_dockettagevent" ("docket_id", "id", "pgh_context_id", "pgh_created_at", "pgh_label",
+                                            "pgh_obj_id", "tag_id")
+    VALUES (OLD."docket_id", OLD."id", _pgh_attach_context(), NOW(), 'update_or_delete_snapshot', OLD."id",
+            OLD."tag_id");
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
 
-            COMMENT ON TRIGGER pgtrigger_custom_snapshot_update_f3950 ON "favorites_note" IS 'd16a9903da4f7207e85cef197b16404ab23ab0b8';
-        ;
+DROP TRIGGER IF EXISTS pgtrigger_update_or_delete_snapshot_update_88501 ON "favorites_dockettag";
+CREATE TRIGGER pgtrigger_update_or_delete_snapshot_update_88501
+    AFTER UPDATE
+    ON "favorites_dockettag"
+
+
+    FOR EACH ROW
+    WHEN (OLD.* IS DISTINCT FROM NEW.*)
+EXECUTE PROCEDURE pgtrigger_update_or_delete_snapshot_update_88501();
+
+COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_update_88501 ON "favorites_dockettag" IS '8f1df53f9cd8f17eb461118f6b48459fbf9db58e';
+;
 --
--- Create trigger custom_snapshot_update on model prayer
---
-
-            CREATE OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
-                trigger_name NAME
-            )
-            RETURNS BOOLEAN AS $$
-                DECLARE
-                    _pgtrigger_ignore TEXT[];
-                    _result BOOLEAN;
-                BEGIN
-                    BEGIN
-                        SELECT INTO _pgtrigger_ignore
-                            CURRENT_SETTING('pgtrigger.ignore');
-                        EXCEPTION WHEN OTHERS THEN
-                    END;
-                    IF _pgtrigger_ignore IS NOT NULL THEN
-                        SELECT trigger_name = ANY(_pgtrigger_ignore)
-                        INTO _result;
-                        RETURN _result;
-                    ELSE
-                        RETURN FALSE;
-                    END IF;
-                END;
-            $$ LANGUAGE plpgsql;
-
-            CREATE OR REPLACE FUNCTION pgtrigger_custom_snapshot_update_2ec38()
-            RETURNS TRIGGER AS $$
-                
-                BEGIN
-                    IF ("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
-                        IF (TG_OP = 'DELETE') THEN
-                            RETURN OLD;
-                        ELSE
-                            RETURN NEW;
-                        END IF;
-                    END IF;
-                    INSERT INTO "favorites_prayerevent" ("date_created", "id", "pgh_context_id", "pgh_created_at", "pgh_label", "pgh_obj_id", "recap_document_id", "user_id") VALUES (OLD."date_created", OLD."id", _pgh_attach_context(), NOW(), 'custom_snapshot', OLD."id", OLD."recap_document_id", OLD."user_id"); RETURN NULL;
-                END;
-            $$ LANGUAGE plpgsql;
-
-            DROP TRIGGER IF EXISTS pgtrigger_custom_snapshot_update_2ec38 ON "favorites_prayer";
-            CREATE  TRIGGER pgtrigger_custom_snapshot_update_2ec38
-                AFTER UPDATE ON "favorites_prayer"
-                
-                
-                FOR EACH ROW WHEN (OLD."id" IS DISTINCT FROM NEW."id" OR OLD."date_created" IS DISTINCT FROM NEW."date_created" OR OLD."user_id" IS DISTINCT FROM NEW."user_id" OR OLD."recap_document_id" IS DISTINCT FROM NEW."recap_document_id")
-                EXECUTE PROCEDURE pgtrigger_custom_snapshot_update_2ec38();
-
-            COMMENT ON TRIGGER pgtrigger_custom_snapshot_update_2ec38 ON "favorites_prayer" IS '1526ae403d2c34a5827cd3b5008b89e7a560f831';
-        ;
---
--- Create trigger custom_snapshot_update on model usertag
+-- Create trigger update_or_delete_snapshot_delete on model dockettag
 --
 
-            CREATE OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
-                trigger_name NAME
-            )
-            RETURNS BOOLEAN AS $$
-                DECLARE
-                    _pgtrigger_ignore TEXT[];
-                    _result BOOLEAN;
-                BEGIN
-                    BEGIN
-                        SELECT INTO _pgtrigger_ignore
-                            CURRENT_SETTING('pgtrigger.ignore');
-                        EXCEPTION WHEN OTHERS THEN
-                    END;
-                    IF _pgtrigger_ignore IS NOT NULL THEN
-                        SELECT trigger_name = ANY(_pgtrigger_ignore)
-                        INTO _result;
-                        RETURN _result;
-                    ELSE
-                        RETURN FALSE;
-                    END IF;
-                END;
-            $$ LANGUAGE plpgsql;
+CREATE OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
+    trigger_name NAME
+)
+    RETURNS BOOLEAN AS
+$$
+DECLARE
+    _pgtrigger_ignore TEXT[];
+    _result           BOOLEAN;
+BEGIN
+    BEGIN
+        SELECT INTO _pgtrigger_ignore CURRENT_SETTING('pgtrigger.ignore');
+    EXCEPTION
+        WHEN OTHERS THEN
+    END;
+    IF _pgtrigger_ignore IS NOT NULL THEN
+        SELECT trigger_name = ANY (_pgtrigger_ignore)
+        INTO _result;
+        RETURN _result;
+    ELSE
+        RETURN FALSE;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
 
-            CREATE OR REPLACE FUNCTION pgtrigger_custom_snapshot_update_ee5b4()
-            RETURNS TRIGGER AS $$
-                
-                BEGIN
-                    IF ("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
-                        IF (TG_OP = 'DELETE') THEN
-                            RETURN OLD;
-                        ELSE
-                            RETURN NEW;
-                        END IF;
-                    END IF;
-                    INSERT INTO "favorites_usertagevent" ("date_created", "date_modified", "description", "id", "name", "pgh_context_id", "pgh_created_at", "pgh_label", "pgh_obj_id", "published", "title", "user_id") VALUES (OLD."date_created", OLD."date_modified", OLD."description", OLD."id", OLD."name", _pgh_attach_context(), NOW(), 'custom_snapshot', OLD."id", OLD."published", OLD."title", OLD."user_id"); RETURN NULL;
-                END;
-            $$ LANGUAGE plpgsql;
+CREATE OR REPLACE FUNCTION pgtrigger_update_or_delete_snapshot_delete_1a570()
+    RETURNS TRIGGER AS
+$$
 
-            DROP TRIGGER IF EXISTS pgtrigger_custom_snapshot_update_ee5b4 ON "favorites_usertag";
-            CREATE  TRIGGER pgtrigger_custom_snapshot_update_ee5b4
-                AFTER UPDATE ON "favorites_usertag"
-                
-                
-                FOR EACH ROW WHEN (OLD."id" IS DISTINCT FROM NEW."id" OR OLD."date_created" IS DISTINCT FROM NEW."date_created" OR OLD."user_id" IS DISTINCT FROM NEW."user_id" OR OLD."name" IS DISTINCT FROM NEW."name" OR OLD."title" IS DISTINCT FROM NEW."title" OR OLD."description" IS DISTINCT FROM NEW."description" OR OLD."published" IS DISTINCT FROM NEW."published")
-                EXECUTE PROCEDURE pgtrigger_custom_snapshot_update_ee5b4();
+BEGIN
+    IF ("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
+        IF (TG_OP = 'DELETE') THEN
+            RETURN OLD;
+        ELSE
+            RETURN NEW;
+        END IF;
+    END IF;
+    INSERT INTO "favorites_dockettagevent" ("docket_id", "id", "pgh_context_id", "pgh_created_at", "pgh_label",
+                                            "pgh_obj_id", "tag_id")
+    VALUES (OLD."docket_id", OLD."id", _pgh_attach_context(), NOW(), 'update_or_delete_snapshot', OLD."id",
+            OLD."tag_id");
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
 
-            COMMENT ON TRIGGER pgtrigger_custom_snapshot_update_ee5b4 ON "favorites_usertag" IS '1ffbd033a649407382f27b0b23bdaaffba58140a';
-        ;
+DROP TRIGGER IF EXISTS pgtrigger_update_or_delete_snapshot_delete_1a570 ON "favorites_dockettag";
+CREATE TRIGGER pgtrigger_update_or_delete_snapshot_delete_1a570
+    AFTER DELETE
+    ON "favorites_dockettag"
+
+
+    FOR EACH ROW
+EXECUTE PROCEDURE pgtrigger_update_or_delete_snapshot_delete_1a570();
+
+COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_delete_1a570 ON "favorites_dockettag" IS 'be481286dac59ff8609039001c4d5c0079f533c7';
+;
+--
+-- Create trigger update_or_delete_snapshot_update on model note
+--
+
+CREATE OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
+    trigger_name NAME
+)
+    RETURNS BOOLEAN AS
+$$
+DECLARE
+    _pgtrigger_ignore TEXT[];
+    _result           BOOLEAN;
+BEGIN
+    BEGIN
+        SELECT INTO _pgtrigger_ignore CURRENT_SETTING('pgtrigger.ignore');
+    EXCEPTION
+        WHEN OTHERS THEN
+    END;
+    IF _pgtrigger_ignore IS NOT NULL THEN
+        SELECT trigger_name = ANY (_pgtrigger_ignore)
+        INTO _result;
+        RETURN _result;
+    ELSE
+        RETURN FALSE;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION pgtrigger_update_or_delete_snapshot_update_ed3a1()
+    RETURNS TRIGGER AS
+$$
+
+BEGIN
+    IF ("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
+        IF (TG_OP = 'DELETE') THEN
+            RETURN OLD;
+        ELSE
+            RETURN NEW;
+        END IF;
+    END IF;
+    INSERT INTO "favorites_noteevent" ("audio_id_id", "cluster_id_id", "date_created", "date_modified", "docket_id_id",
+                                       "id", "name", "notes", "pgh_context_id", "pgh_created_at", "pgh_label",
+                                       "pgh_obj_id", "recap_doc_id_id", "user_id")
+    VALUES (OLD."audio_id_id", OLD."cluster_id_id", OLD."date_created", OLD."date_modified", OLD."docket_id_id",
+            OLD."id", OLD."name", OLD."notes", _pgh_attach_context(), NOW(), 'update_or_delete_snapshot', OLD."id",
+            OLD."recap_doc_id_id", OLD."user_id");
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS pgtrigger_update_or_delete_snapshot_update_ed3a1 ON "favorites_note";
+CREATE TRIGGER pgtrigger_update_or_delete_snapshot_update_ed3a1
+    AFTER UPDATE
+    ON "favorites_note"
+
+
+    FOR EACH ROW
+    WHEN (OLD."id" IS DISTINCT FROM NEW."id" OR OLD."date_created" IS DISTINCT FROM NEW."date_created" OR
+          OLD."user_id" IS DISTINCT FROM NEW."user_id" OR OLD."cluster_id_id" IS DISTINCT FROM NEW."cluster_id_id" OR
+          OLD."audio_id_id" IS DISTINCT FROM NEW."audio_id_id" OR
+          OLD."docket_id_id" IS DISTINCT FROM NEW."docket_id_id" OR
+          OLD."recap_doc_id_id" IS DISTINCT FROM NEW."recap_doc_id_id" OR OLD."name" IS DISTINCT FROM NEW."name" OR
+          OLD."notes" IS DISTINCT FROM NEW."notes")
+EXECUTE PROCEDURE pgtrigger_update_or_delete_snapshot_update_ed3a1();
+
+COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_update_ed3a1 ON "favorites_note" IS 'fcd6d536ae66f06cea145de113f778913b839c34';
+;
+--
+-- Create trigger update_or_delete_snapshot_delete on model note
+--
+
+CREATE OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
+    trigger_name NAME
+)
+    RETURNS BOOLEAN AS
+$$
+DECLARE
+    _pgtrigger_ignore TEXT[];
+    _result           BOOLEAN;
+BEGIN
+    BEGIN
+        SELECT INTO _pgtrigger_ignore CURRENT_SETTING('pgtrigger.ignore');
+    EXCEPTION
+        WHEN OTHERS THEN
+    END;
+    IF _pgtrigger_ignore IS NOT NULL THEN
+        SELECT trigger_name = ANY (_pgtrigger_ignore)
+        INTO _result;
+        RETURN _result;
+    ELSE
+        RETURN FALSE;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION pgtrigger_update_or_delete_snapshot_delete_b6726()
+    RETURNS TRIGGER AS
+$$
+
+BEGIN
+    IF ("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
+        IF (TG_OP = 'DELETE') THEN
+            RETURN OLD;
+        ELSE
+            RETURN NEW;
+        END IF;
+    END IF;
+    INSERT INTO "favorites_noteevent" ("audio_id_id", "cluster_id_id", "date_created", "date_modified", "docket_id_id",
+                                       "id", "name", "notes", "pgh_context_id", "pgh_created_at", "pgh_label",
+                                       "pgh_obj_id", "recap_doc_id_id", "user_id")
+    VALUES (OLD."audio_id_id", OLD."cluster_id_id", OLD."date_created", OLD."date_modified", OLD."docket_id_id",
+            OLD."id", OLD."name", OLD."notes", _pgh_attach_context(), NOW(), 'update_or_delete_snapshot', OLD."id",
+            OLD."recap_doc_id_id", OLD."user_id");
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS pgtrigger_update_or_delete_snapshot_delete_b6726 ON "favorites_note";
+CREATE TRIGGER pgtrigger_update_or_delete_snapshot_delete_b6726
+    AFTER DELETE
+    ON "favorites_note"
+
+
+    FOR EACH ROW
+EXECUTE PROCEDURE pgtrigger_update_or_delete_snapshot_delete_b6726();
+
+COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_delete_b6726 ON "favorites_note" IS '4c1d04b7683ae122c2497aeee499ec9ac1025f4a';
+;
+--
+-- Create trigger update_or_delete_snapshot_update on model prayer
+--
+
+CREATE OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
+    trigger_name NAME
+)
+    RETURNS BOOLEAN AS
+$$
+DECLARE
+    _pgtrigger_ignore TEXT[];
+    _result           BOOLEAN;
+BEGIN
+    BEGIN
+        SELECT INTO _pgtrigger_ignore CURRENT_SETTING('pgtrigger.ignore');
+    EXCEPTION
+        WHEN OTHERS THEN
+    END;
+    IF _pgtrigger_ignore IS NOT NULL THEN
+        SELECT trigger_name = ANY (_pgtrigger_ignore)
+        INTO _result;
+        RETURN _result;
+    ELSE
+        RETURN FALSE;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION pgtrigger_update_or_delete_snapshot_update_67cd0()
+    RETURNS TRIGGER AS
+$$
+
+BEGIN
+    IF ("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
+        IF (TG_OP = 'DELETE') THEN
+            RETURN OLD;
+        ELSE
+            RETURN NEW;
+        END IF;
+    END IF;
+    INSERT INTO "favorites_prayerevent" ("date_created", "id", "pgh_context_id", "pgh_created_at", "pgh_label",
+                                         "pgh_obj_id", "recap_document_id", "user_id")
+    VALUES (OLD."date_created", OLD."id", _pgh_attach_context(), NOW(), 'update_or_delete_snapshot', OLD."id",
+            OLD."recap_document_id", OLD."user_id");
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS pgtrigger_update_or_delete_snapshot_update_67cd0 ON "favorites_prayer";
+CREATE TRIGGER pgtrigger_update_or_delete_snapshot_update_67cd0
+    AFTER UPDATE
+    ON "favorites_prayer"
+
+
+    FOR EACH ROW
+    WHEN (OLD."id" IS DISTINCT FROM NEW."id" OR OLD."date_created" IS DISTINCT FROM NEW."date_created" OR
+          OLD."user_id" IS DISTINCT FROM NEW."user_id" OR
+          OLD."recap_document_id" IS DISTINCT FROM NEW."recap_document_id")
+EXECUTE PROCEDURE pgtrigger_update_or_delete_snapshot_update_67cd0();
+
+COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_update_67cd0 ON "favorites_prayer" IS 'e42a6a5598ddff89e57948b099881f01be7d1ae6';
+;
+--
+-- Create trigger update_or_delete_snapshot_delete on model prayer
+--
+
+CREATE OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
+    trigger_name NAME
+)
+    RETURNS BOOLEAN AS
+$$
+DECLARE
+    _pgtrigger_ignore TEXT[];
+    _result           BOOLEAN;
+BEGIN
+    BEGIN
+        SELECT INTO _pgtrigger_ignore CURRENT_SETTING('pgtrigger.ignore');
+    EXCEPTION
+        WHEN OTHERS THEN
+    END;
+    IF _pgtrigger_ignore IS NOT NULL THEN
+        SELECT trigger_name = ANY (_pgtrigger_ignore)
+        INTO _result;
+        RETURN _result;
+    ELSE
+        RETURN FALSE;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION pgtrigger_update_or_delete_snapshot_delete_89611()
+    RETURNS TRIGGER AS
+$$
+
+BEGIN
+    IF ("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
+        IF (TG_OP = 'DELETE') THEN
+            RETURN OLD;
+        ELSE
+            RETURN NEW;
+        END IF;
+    END IF;
+    INSERT INTO "favorites_prayerevent" ("date_created", "id", "pgh_context_id", "pgh_created_at", "pgh_label",
+                                         "pgh_obj_id", "recap_document_id", "user_id")
+    VALUES (OLD."date_created", OLD."id", _pgh_attach_context(), NOW(), 'update_or_delete_snapshot', OLD."id",
+            OLD."recap_document_id", OLD."user_id");
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS pgtrigger_update_or_delete_snapshot_delete_89611 ON "favorites_prayer";
+CREATE TRIGGER pgtrigger_update_or_delete_snapshot_delete_89611
+    AFTER DELETE
+    ON "favorites_prayer"
+
+
+    FOR EACH ROW
+EXECUTE PROCEDURE pgtrigger_update_or_delete_snapshot_delete_89611();
+
+COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_delete_89611 ON "favorites_prayer" IS 'bcc156e7d8aa54c45556d82c5a88792d6be2dc9e';
+;
+--
+-- Create trigger update_or_delete_snapshot_update on model usertag
+--
+
+CREATE OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
+    trigger_name NAME
+)
+    RETURNS BOOLEAN AS
+$$
+DECLARE
+    _pgtrigger_ignore TEXT[];
+    _result           BOOLEAN;
+BEGIN
+    BEGIN
+        SELECT INTO _pgtrigger_ignore CURRENT_SETTING('pgtrigger.ignore');
+    EXCEPTION
+        WHEN OTHERS THEN
+    END;
+    IF _pgtrigger_ignore IS NOT NULL THEN
+        SELECT trigger_name = ANY (_pgtrigger_ignore)
+        INTO _result;
+        RETURN _result;
+    ELSE
+        RETURN FALSE;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION pgtrigger_update_or_delete_snapshot_update_9deec()
+    RETURNS TRIGGER AS
+$$
+
+BEGIN
+    IF ("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
+        IF (TG_OP = 'DELETE') THEN
+            RETURN OLD;
+        ELSE
+            RETURN NEW;
+        END IF;
+    END IF;
+    INSERT INTO "favorites_usertagevent" ("date_created", "date_modified", "description", "id", "name",
+                                          "pgh_context_id", "pgh_created_at", "pgh_label", "pgh_obj_id", "published",
+                                          "title", "user_id")
+    VALUES (OLD."date_created", OLD."date_modified", OLD."description", OLD."id", OLD."name", _pgh_attach_context(),
+            NOW(), 'update_or_delete_snapshot', OLD."id", OLD."published", OLD."title", OLD."user_id");
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS pgtrigger_update_or_delete_snapshot_update_9deec ON "favorites_usertag";
+CREATE TRIGGER pgtrigger_update_or_delete_snapshot_update_9deec
+    AFTER UPDATE
+    ON "favorites_usertag"
+
+
+    FOR EACH ROW
+    WHEN (OLD."id" IS DISTINCT FROM NEW."id" OR OLD."date_created" IS DISTINCT FROM NEW."date_created" OR
+          OLD."user_id" IS DISTINCT FROM NEW."user_id" OR OLD."name" IS DISTINCT FROM NEW."name" OR
+          OLD."title" IS DISTINCT FROM NEW."title" OR OLD."description" IS DISTINCT FROM NEW."description" OR
+          OLD."published" IS DISTINCT FROM NEW."published")
+EXECUTE PROCEDURE pgtrigger_update_or_delete_snapshot_update_9deec();
+
+COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_update_9deec ON "favorites_usertag" IS '1f0b6589dbf1673b54b022f55026d469b7497e06';
+;
+--
+-- Create trigger update_or_delete_snapshot_delete on model usertag
+--
+
+CREATE OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
+    trigger_name NAME
+)
+    RETURNS BOOLEAN AS
+$$
+DECLARE
+    _pgtrigger_ignore TEXT[];
+    _result           BOOLEAN;
+BEGIN
+    BEGIN
+        SELECT INTO _pgtrigger_ignore CURRENT_SETTING('pgtrigger.ignore');
+    EXCEPTION
+        WHEN OTHERS THEN
+    END;
+    IF _pgtrigger_ignore IS NOT NULL THEN
+        SELECT trigger_name = ANY (_pgtrigger_ignore)
+        INTO _result;
+        RETURN _result;
+    ELSE
+        RETURN FALSE;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION pgtrigger_update_or_delete_snapshot_delete_e4ac4()
+    RETURNS TRIGGER AS
+$$
+
+BEGIN
+    IF ("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
+        IF (TG_OP = 'DELETE') THEN
+            RETURN OLD;
+        ELSE
+            RETURN NEW;
+        END IF;
+    END IF;
+    INSERT INTO "favorites_usertagevent" ("date_created", "date_modified", "description", "id", "name",
+                                          "pgh_context_id", "pgh_created_at", "pgh_label", "pgh_obj_id", "published",
+                                          "title", "user_id")
+    VALUES (OLD."date_created", OLD."date_modified", OLD."description", OLD."id", OLD."name", _pgh_attach_context(),
+            NOW(), 'update_or_delete_snapshot', OLD."id", OLD."published", OLD."title", OLD."user_id");
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS pgtrigger_update_or_delete_snapshot_delete_e4ac4 ON "favorites_usertag";
+CREATE TRIGGER pgtrigger_update_or_delete_snapshot_delete_e4ac4
+    AFTER DELETE
+    ON "favorites_usertag"
+
+
+    FOR EACH ROW
+EXECUTE PROCEDURE pgtrigger_update_or_delete_snapshot_delete_e4ac4();
+
+COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_delete_e4ac4 ON "favorites_usertag" IS 'ae91cd3be4454f2f23f7e656d244f63d8d79ff18';
+;
 COMMIT;

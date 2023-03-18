@@ -3,7 +3,7 @@ from pghistory import trigger
 from pghistory.core import DatabaseTracker, _get_name_from_label
 
 
-class CustomSnapshot(DatabaseTracker):
+class AfterUpdateOrDeleteSnapshot(DatabaseTracker):
     """Custom database tracker that allows you to save OLD data when you do an
     update and avoid duplicates
 
@@ -13,7 +13,7 @@ class CustomSnapshot(DatabaseTracker):
     This code is partially a copy from pghistory.core.Snapshot
     """
 
-    label = "custom_snapshot"
+    label = "update_or_delete_snapshot"
 
     @staticmethod
     def prepare_event_fields(event_model, ignore_auto_now_fields):
@@ -76,4 +76,17 @@ class CustomSnapshot(DatabaseTracker):
             condition=condition,
         )
 
-        pgtrigger.register(update_trigger)(event_model.pgh_tracked_model)
+        # Handle delete event
+        delete_trigger = trigger.Event(
+            event_model=event_model,
+            label=self.label,
+            name=_get_name_from_label(f"{self.label}_delete"),
+            snapshot="OLD",
+            when=pgtrigger.After,
+            operation=pgtrigger.Delete,
+            condition=None,
+        )
+
+        pgtrigger.register(update_trigger, delete_trigger)(
+            event_model.pgh_tracked_model
+        )

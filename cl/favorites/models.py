@@ -5,11 +5,11 @@ from django.db import models
 
 from cl.audio.models import Audio
 from cl.lib.models import AbstractDateTimeModel
-from cl.lib.pghistory import CustomSnapshot
+from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
 from cl.search.models import Docket, OpinionCluster, RECAPDocument
 
 
-@pghistory.track(CustomSnapshot(ignore_auto_now_fields=True))
+@pghistory.track(AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True))
 class Note(models.Model):
     date_created = models.DateTimeField(
         help_text="The original creation date for the item",
@@ -70,7 +70,7 @@ class Note(models.Model):
         )
 
 
-@pghistory.track(CustomSnapshot(ignore_auto_now_fields=True))
+@pghistory.track(AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True))
 class DocketTag(models.Model):
     """Through table linking dockets to tags"""
 
@@ -88,7 +88,8 @@ class DocketTag(models.Model):
 
 
 @pghistory.track(
-    CustomSnapshot(ignore_auto_now_fields=True), exclude=["view_count"]
+    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
+    exclude=["view_count"],
 )
 class UserTag(AbstractDateTimeModel):
     """Tags that can be added by users to various objects"""
@@ -133,7 +134,8 @@ class UserTag(AbstractDateTimeModel):
 
 
 @pghistory.track(
-    CustomSnapshot(ignore_auto_now_fields=True), exclude=["status"]
+    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
+    exclude=["status"],
 )
 class Prayer(models.Model):
     WAITING = 1

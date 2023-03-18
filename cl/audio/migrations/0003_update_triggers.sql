@@ -16,7 +16,7 @@ DROP TRIGGER IF EXISTS pgtrigger_snapshot_insert_0141b ON "audio_audio_panel";
 --
 DROP TRIGGER IF EXISTS pgtrigger_snapshot_update_17291 ON "audio_audio_panel";
 --
--- Create trigger custom_snapshot_update on model audio
+-- Create trigger update_or_delete_snapshot_update on model audio
 --
 
 CREATE OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
@@ -43,7 +43,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION pgtrigger_custom_snapshot_update_ad0df()
+CREATE OR REPLACE FUNCTION pgtrigger_update_or_delete_snapshot_update_63362()
     RETURNS TRIGGER AS
 $$
 
@@ -64,14 +64,14 @@ BEGIN
     VALUES (OLD."blocked", OLD."case_name", OLD."case_name_full", OLD."case_name_short", OLD."date_blocked",
             OLD."date_created", OLD."date_modified", OLD."docket_id", OLD."download_url", OLD."duration",
             OLD."filepath_ia", OLD."ia_upload_failure_count", OLD."id", OLD."judges", OLD."local_path_mp3",
-            OLD."local_path_original_file", _pgh_attach_context(), NOW(), 'custom_snapshot', OLD."id",
+            OLD."local_path_original_file", _pgh_attach_context(), NOW(), 'update_or_delete_snapshot', OLD."id",
             OLD."processing_complete", OLD."sha1", OLD."source", OLD."stt_google_response", OLD."stt_status");
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS pgtrigger_custom_snapshot_update_ad0df ON "audio_audio";
-CREATE TRIGGER pgtrigger_custom_snapshot_update_ad0df
+DROP TRIGGER IF EXISTS pgtrigger_update_or_delete_snapshot_update_63362 ON "audio_audio";
+CREATE TRIGGER pgtrigger_update_or_delete_snapshot_update_63362
     AFTER UPDATE
     ON "audio_audio"
 
@@ -92,12 +92,12 @@ CREATE TRIGGER pgtrigger_custom_snapshot_update_ad0df
           OLD."date_blocked" IS DISTINCT FROM NEW."date_blocked" OR OLD."blocked" IS DISTINCT FROM NEW."blocked" OR
           OLD."stt_status" IS DISTINCT FROM NEW."stt_status" OR
           OLD."stt_google_response" IS DISTINCT FROM NEW."stt_google_response")
-EXECUTE PROCEDURE pgtrigger_custom_snapshot_update_ad0df();
+EXECUTE PROCEDURE pgtrigger_update_or_delete_snapshot_update_63362();
 
-COMMENT ON TRIGGER pgtrigger_custom_snapshot_update_ad0df ON "audio_audio" IS '664d09f59831d49a18f2c06a77f04d88810d224d';
+COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_update_63362 ON "audio_audio" IS '7ef321a055255b671442addc460e459a3449f479';
 ;
 --
--- Create trigger custom_snapshot_update on model audiopanel
+-- Create trigger update_or_delete_snapshot_delete on model audio
 --
 
 CREATE OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
@@ -124,7 +124,73 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION pgtrigger_custom_snapshot_update_2497c()
+CREATE OR REPLACE FUNCTION pgtrigger_update_or_delete_snapshot_delete_63666()
+    RETURNS TRIGGER AS
+$$
+
+BEGIN
+    IF ("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
+        IF (TG_OP = 'DELETE') THEN
+            RETURN OLD;
+        ELSE
+            RETURN NEW;
+        END IF;
+    END IF;
+    INSERT INTO "audio_audioevent" ("blocked", "case_name", "case_name_full", "case_name_short", "date_blocked",
+                                    "date_created", "date_modified", "docket_id", "download_url", "duration",
+                                    "filepath_ia", "ia_upload_failure_count", "id", "judges", "local_path_mp3",
+                                    "local_path_original_file", "pgh_context_id", "pgh_created_at", "pgh_label",
+                                    "pgh_obj_id", "processing_complete", "sha1", "source", "stt_google_response",
+                                    "stt_status")
+    VALUES (OLD."blocked", OLD."case_name", OLD."case_name_full", OLD."case_name_short", OLD."date_blocked",
+            OLD."date_created", OLD."date_modified", OLD."docket_id", OLD."download_url", OLD."duration",
+            OLD."filepath_ia", OLD."ia_upload_failure_count", OLD."id", OLD."judges", OLD."local_path_mp3",
+            OLD."local_path_original_file", _pgh_attach_context(), NOW(), 'update_or_delete_snapshot', OLD."id",
+            OLD."processing_complete", OLD."sha1", OLD."source", OLD."stt_google_response", OLD."stt_status");
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS pgtrigger_update_or_delete_snapshot_delete_63666 ON "audio_audio";
+CREATE TRIGGER pgtrigger_update_or_delete_snapshot_delete_63666
+    AFTER DELETE
+    ON "audio_audio"
+
+
+    FOR EACH ROW
+EXECUTE PROCEDURE pgtrigger_update_or_delete_snapshot_delete_63666();
+
+COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_delete_63666 ON "audio_audio" IS '3f15b50d6ff720dceeaf2b1cff5606bf76e31fba';
+;
+--
+-- Create trigger update_or_delete_snapshot_update on model audiopanel
+--
+
+CREATE OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
+    trigger_name NAME
+)
+    RETURNS BOOLEAN AS
+$$
+DECLARE
+    _pgtrigger_ignore TEXT[];
+    _result           BOOLEAN;
+BEGIN
+    BEGIN
+        SELECT INTO _pgtrigger_ignore CURRENT_SETTING('pgtrigger.ignore');
+    EXCEPTION
+        WHEN OTHERS THEN
+    END;
+    IF _pgtrigger_ignore IS NOT NULL THEN
+        SELECT trigger_name = ANY (_pgtrigger_ignore)
+        INTO _result;
+        RETURN _result;
+    ELSE
+        RETURN FALSE;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION pgtrigger_update_or_delete_snapshot_update_4e441()
     RETURNS TRIGGER AS
 $$
 
@@ -137,21 +203,78 @@ BEGIN
         END IF;
     END IF;
     INSERT INTO "audio_audiopanelevent" ("audio_id", "id", "person_id", "pgh_context_id", "pgh_created_at", "pgh_label")
-    VALUES (OLD."audio_id", OLD."id", OLD."person_id", _pgh_attach_context(), NOW(), 'custom_snapshot');
+    VALUES (OLD."audio_id", OLD."id", OLD."person_id", _pgh_attach_context(), NOW(), 'update_or_delete_snapshot');
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS pgtrigger_custom_snapshot_update_2497c ON "audio_audio_panel";
-CREATE TRIGGER pgtrigger_custom_snapshot_update_2497c
+DROP TRIGGER IF EXISTS pgtrigger_update_or_delete_snapshot_update_4e441 ON "audio_audio_panel";
+CREATE TRIGGER pgtrigger_update_or_delete_snapshot_update_4e441
     AFTER UPDATE
     ON "audio_audio_panel"
 
 
     FOR EACH ROW
     WHEN (OLD.* IS DISTINCT FROM NEW.*)
-EXECUTE PROCEDURE pgtrigger_custom_snapshot_update_2497c();
+EXECUTE PROCEDURE pgtrigger_update_or_delete_snapshot_update_4e441();
 
-COMMENT ON TRIGGER pgtrigger_custom_snapshot_update_2497c ON "audio_audio_panel" IS '085b4ec0423661deb14f614162b05e76db4fa3da';
+COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_update_4e441 ON "audio_audio_panel" IS '9cadb65943a3d38e84beba67c55089ef7955f87e';
+;
+--
+-- Create trigger update_or_delete_snapshot_delete on model audiopanel
+--
+
+CREATE OR REPLACE FUNCTION "public"._pgtrigger_should_ignore(
+    trigger_name NAME
+)
+    RETURNS BOOLEAN AS
+$$
+DECLARE
+    _pgtrigger_ignore TEXT[];
+    _result           BOOLEAN;
+BEGIN
+    BEGIN
+        SELECT INTO _pgtrigger_ignore CURRENT_SETTING('pgtrigger.ignore');
+    EXCEPTION
+        WHEN OTHERS THEN
+    END;
+    IF _pgtrigger_ignore IS NOT NULL THEN
+        SELECT trigger_name = ANY (_pgtrigger_ignore)
+        INTO _result;
+        RETURN _result;
+    ELSE
+        RETURN FALSE;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION pgtrigger_update_or_delete_snapshot_delete_f5717()
+    RETURNS TRIGGER AS
+$$
+
+BEGIN
+    IF ("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
+        IF (TG_OP = 'DELETE') THEN
+            RETURN OLD;
+        ELSE
+            RETURN NEW;
+        END IF;
+    END IF;
+    INSERT INTO "audio_audiopanelevent" ("audio_id", "id", "person_id", "pgh_context_id", "pgh_created_at", "pgh_label")
+    VALUES (OLD."audio_id", OLD."id", OLD."person_id", _pgh_attach_context(), NOW(), 'update_or_delete_snapshot');
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS pgtrigger_update_or_delete_snapshot_delete_f5717 ON "audio_audio_panel";
+CREATE TRIGGER pgtrigger_update_or_delete_snapshot_delete_f5717
+    AFTER DELETE
+    ON "audio_audio_panel"
+
+
+    FOR EACH ROW
+EXECUTE PROCEDURE pgtrigger_update_or_delete_snapshot_delete_f5717();
+
+COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_delete_f5717 ON "audio_audio_panel" IS '8281b6cb81fc9e9dcce8dff7fe60a40dc051cd7f';
 ;
 COMMIT;
