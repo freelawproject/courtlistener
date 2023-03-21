@@ -12,9 +12,6 @@ else:
     AWS_SES_REGION_NAME = "us-west-2"
     AWS_SES_REGION_ENDPOINT = "email.us-west-2.amazonaws.com"
 
-# Max email attachment to send in bytes, 350KB
-MAX_ATTACHMENT_SIZE = 350_000
-
 # 1: Every message is BCC'ed
 # 0.5: Half of messages are BCC'ed
 # 0.1: 10% of messages are BCC'ed
@@ -22,6 +19,12 @@ MAX_ATTACHMENT_SIZE = 350_000
 EMAIL_BCC_COPY_RATE = 0.1
 
 BCC_EMAIL_ADDRESS = "bcc@free.law"
+
+# Hours after a bounce notification is considered a new failure event.
+BACKOFF_THRESHOLD = 36
+
+# Hours after a backoff event expired to check if there was a new bounce event.
+DELIVERABILITY_THRESHOLD = 2
 
 SERVER_EMAIL = "CourtListener <noreply@courtlistener.com>"
 DEFAULT_FROM_EMAIL = "CourtListener <noreply@courtlistener.com>"

@@ -1,20 +1,20 @@
 from django.urls import path
 
 from cl.favorites.views import (
-    delete_favorite,
-    save_or_update_favorite,
+    delete_note,
+    save_or_update_note,
     view_tag,
     view_tags,
 )
 
 urlpatterns = [
-    # Favorites pages
+    # Notes pages
     path(
-        "favorite/create-or-update/",
-        save_or_update_favorite,
-        name="save_or_update_favorite",
+        "notes/create-or-update/",
+        save_or_update_note,
+        name="save_or_update_note",
     ),
-    path("favorite/delete/", delete_favorite, name="delete_favorite"),
+    path("notes/delete/", delete_note, name="delete_note"),
     # Tag pages
     path(
         "tags/<str:username>/<slug:tag_name>/",

@@ -1,217 +1,204 @@
 {% extends "base.html" %}
-{% load extras %}
+{% load extras static humanize %}
 
-{% block title %}Bulk Data – CourtListener.com{% endblock %}
+{% block title %}Bulk Legal Data – CourtListener.com{% endblock %}
 {% block description %}
-    Free legal bulk data for federal and state opinions,
-    dockets, oral arguments, and judges from Free Law Project, a
-    501(c)(3) nonprofit. A complete Supreme Court corpus and the most complete
-    and comprehensive database of American judges.
+Free legal bulk data for federal and state opinions,
+dockets, oral arguments, and judges from Free Law Project, a
+501(c)(3) nonprofit. A complete Supreme Court corpus and the most complete
+and comprehensive database of American judges.
 {% endblock %}
 {% block og_description %}
-    Free legal bulk data for federal and state opinions,
-    dockets, oral arguments, and judges from Free Law Project, a
-    501(c)(3) nonprofit. A complete Supreme Court corpus and the most complete
-    and comprehensive database of American judges.
+Free legal bulk data for federal and state opinions,
+dockets, oral arguments, and judges from Free Law Project, a
+501(c)(3) nonprofit. A complete Supreme Court corpus and the most complete
+and comprehensive database of American judges.
 {% endblock %}
 
 {% block sidebar %}{% endblock %}
 
 {% block footer-scripts %}
-    {% include "includes/anchors.html" %}
+  {% include "includes/anchors.html" %}
 {% endblock %}
 
 {% block content %}
-    <div class="col-sm-7">
-        <h1 id="about">Bulk Data</h1>
-        <p>For developers, legal researchers, journalists,  and anybody else that might be interested, we provide bulk files containing many types of our data. Several types of files are available as listed below, but in general the files that are available correspond to the major types of data we have in our database, such as opinions, oral arguments, dockets, and judges. We do not offer bulk PDF downloads because of the size of such files.
-        </p>
-
-
-        <h2 id="bulk-data">Bulk Data Files</h2>
-        <p>Bulk data is handled in one of two ways. For data types where it makes sense, JSON files are made for every object, and they are then placed in compressed tar.gz files by jurisdiction. These are then made available, and an additional file, all.tar, is produced containing all of the compressed jurisdictional files (note that this file is <em>not</em> directly compressed and is not a <code>gz</code> file because it contains only compressed files).
-        </p>
-        <p>For some data types, jurisdictional archives don't make sense. So instead, we produce the JSON files and gather those up into a single all.tar.gz file. For example, we provide bulk data on courts themselves. If we gathered that data by jurisdiction each file would only contain one json file -- the court for that individual jurisdiction.
-        </p>
-        <p>You will also find <code>info.json</code> files tucked into the archives. These describe the last time the bulk data was created and how long it took to generate (in seconds).
-        </p>
-
-        <p>Some examples:</p>
-        <dl>
-            <dt>All opinions from the First Circuit of Appeals (ca1):
-            </dt>
-            <dd>
-                <blockquote>
-                    <code>
-                        <a href="/api/bulk-data/opinions/ca1.tar.gz">{% get_full_host %}/api/bulk-data/<strong>opinions</strong>/<strong>ca1</strong>.tar.gz</a>
-                    </code>
-                </blockquote>
-            </dd>
-            <dt>All audio files (oral arguments) from the Third Circuit of Appeals (ca3):
-            </dt>
-            <dd>
-                <blockquote>
-                    <code>
-                        <a href="/api/bulk-data/audio/ca3.tar.gz">https://www.courtlistener.com/api/bulk-data/<strong>audio</strong>/<strong>ca3</strong>.tar.gz</a>
-                    </code>
-                </blockquote>
-            </dd>
-            <dt>All opinions from all jurisdictions (note this is a .tar file, not a .tar.gz file):</dt>
-            <dd>
-                <blockquote>
-                    <code>
-                        <a href="/api/bulk-data/opinions/all.tar">{% get_full_host %}/api/bulk-data/<strong>opinions</strong>/<strong>all</strong>.tar</a>
-                    </code>
-                </blockquote>
-            </dd>
-            <dt>All dockets from all jurisdictions:</dt>
-            <dd>
-                <blockquote>
-                    <code>
-                        <a href="/api/bulk-data/dockets/all.tar">{% get_full_host %}/api/bulk-data/<strong>dockets</strong>/<strong>all</strong>.tar</a>
-                    </code>
-                </blockquote>
-            </dd>
-            <dt>All court data:</dt>
-            <dd>
-                <blockquote>
-                    <code>
-                        <a href="/api/bulk-data/courts/all.tar.gz">https://www.courtlistener.com/api/bulk-data/<strong>courts</strong>/<strong>all</strong>.tar.gz</a>
-                    </code>
-                </blockquote>
-            </dd>
-        </dl>
-        <p>Note how <code>courts</code> is a tar.gz file and <code>dockets</code> provides a tar file. This is because it does not make sense to break up the court data by jurisdiction.
-        </p>
-        <p>You can see all the types of data available at <a href="/api/bulk-data/">the root of the bulk data</a>.
-        <p>These files are always generated using the latest version of the <a href="{% url "rest_docs" %}">REST API</a> and follow the schemas described there. The files inside the tar archives have names corresponding to the ID of each item, and are formatted as JSON. If you wish to see a sample file, we advise selecting a small or secretive jurisdiction (such as the FISA court) and using that to get an idea of what the bulk files contain.
-        </p>
-        <p>A list of all current jurisdictions is on the right and we regularly add new jurisdictions as our content expands (at this point these tend to be terminated or otherwise obscure jurisdictions). To monitor for new jurisdictions, you may want to look at the <a href="{% url "rest_docs" %}#jurisdiction-endpoint">Jurisdiction endpoint</a> of the REST API.
-        </p>
-
-
-
-        <h2 id="judge-data">Bulk Judicial Database Files</h2>
-        <p>The bulk data for the judicial database is generated in the same manner as the other content above, using the latest version of the REST API. You can find detailed explanations in <a href="{% url "rest_docs" %}#judge-endpoint">the documentation for the REST API</a>.
-        </p>
-        <p>In general, the bulk data that is generated for the judicial database is as follows:</p>
+<div class="col-xs-12">
+<div class="row">
+  <div class="hidden-xs hidden-sm col-md-3">
+    <div id="toc">
+      <h3>Table of Contents</h3>
+      <ul>
+        <li><a href="#about">Overview</a></li>
+        <li><a href="#browsing">Browsing the Files</a></li>
+        <li><a href="#formats">Data Definitions</a></li>
+        <li><a href="#schemas">Schema Diagrams</a></li>
         <ul>
-            {% include "includes/judge-endpoints.html" %}
+          <li><a href="#opinions-db">Opinions Data</a></li>
+          <li><a href="#disclosures">Disclosures Data</a></li>
+          <li><a href="#people-db">Judge Data</a></li>
+          <li><a href="#audio-db">Oral Argument Data</a></li>
         </ul>
-        <p>This bulk data is a work in progress and we expect it to grow and change.</p>
+        <li><a href="#odds-and-ends">Odds and Ends</a></li>
+        <ul>
+          <li><a href="#schedule">Data Generation Schedule</a></li>
+          <li><a href="#contributing">Contributions</a></li>
+          <li><a href="#old">Old Formats</a></li>
+          <li><a herf="#copyright">Copyright</a></li>
+        </ul>
+      </ul>
+    </div>
+  </div>
+
+  <div class="col-xs-12 col-md-8 col-lg-6">
+    <h1 id="about">Bulk Legal Data</h1>
+    <p>For developers, legal researchers, journalists, and the public, we provide bulk files containing many types of data. In general the files that are available correspond to the major types of data we have in our database, such as opinions, oral arguments, dockets, and judges.
+    </p>
+    <p><a href="{% url "contact" %}">Get in touch</a> if you're interested in types of data not provided here.
+    </p>
+    <p>If you have questions about the data, <a href="https://flp.discourse.group/">please use our forum</a> and we'll get back to you as soon as possible.
+    </p>
 
 
-        <h2 id="citation-data">Citation Bulk Data File</h2>
-        <p>
-            This is a CSV file that contains all of the citation relationships between opinions in our database. This file has millions of lines, one per citation between opinions.
+    <h2 id="browsing">Browsing the Data Files</h2>
+    <p>As they are generated, files are streamed to an AWS S3 bucket. Dates are added to the filenames indicating when their generation began (in the UTC timezone).
+    </p>
+    <p>
+      <a href="https://com-courtlistener-storage.s3-us-west-2.amazonaws.com/list.html?prefix=bulk-data/" class="btn btn-primary btn-lg">Browse Bulk Data</a>
+    </p>
+
+
+    <h2 id="formats">Data Format and Field Definitions</h2>
+    <p>Files are generated using the PostgreSQL <a href="https://www.postgresql.org/docs/current/sql-copy.html"><code>COPY TO</code></a> command. This generates CSV files that correspond with the tables in our database. Files are provided using the CSV output format, in the UTF-8 encoding, with a header row on the top. If you are using PostgreSQL, the easiest way to import these files is to use the <code>COPY FROM</code> command. Details about the CSVs we generate can be found in the <a href="https://www.postgresql.org/docs/current/sql-copy.html">COPY documentation</a> or by reading <a href="https://github.com/freelawproject/courtlistener/blob/main/scripts/make_bulk_data.sh">the code we use to generate these files</a>.
+    </p>
+    <p>The SQL commands to generate our database schema (including tables, columns, indexes, and constraints) are dumped whenever we generate the bulk data files. You can import the schema file into your own database with something like:
+    </p>
+    <blockquote>
+      <code>psql [various connection parameters] < schema.sql</code>
+    </blockquote>
+    <p>Field definitions can be found in one of two ways. First, you can <a href="https://github.com/freelawproject/courtlistener">browse the CourtListener code base</a>, where all the fields and tables are defined in <code>models.py</code> files. Second, if you send an <code>HTTP OPTIONS</code> request to our
+      <a href="{% url "rest_docs" %}">REST API</a>, it will give you field definitions (though the API does not always correspond to the CSV files on a 1-to-1 basis).
+    </p>
+    <h3>Schema Diagrams</h3>
+    <p>Click for more detail.</p>
+  </div>
+</div>
+
+<div class="row" id="schemas">
+  <div class="hidden-xs hidden-sm col-md-1"></div>
+  <div class="col-xs-7 col-md-6">
+    <a href="{% static "png/people-model-v3.13.png" %}"
+       target="_blank"
+       title="Click to see details.">
+      <img src="{% static "png/people-model-v3.13-small.png" %}"
+           width="640"
+           height="306"
+           class="img-responsive img-rounded">
+    </a>
+  </div>
+  <div class="col-xs-5 col-md-4">
+    <a href="{% static "png/search-model-v3.13.png" %}"
+       target="_blank"
+       title="Click to see details.">
+      <img src="{% static "png/search-model-v3.13-small.png" %}"
+           width="640"
+           height="754"
+           class="img-responsive img-rounded">
+    </a>
+  </div>
+  <div class="hidden-xs hidden-sm col-md-1"></div>
+</div>
+
+<div class="row">
+  <div class="hidden-xs hidden-sm col-md-3"></div>
+  <div class="col-xs-12 col-md-8 col-lg-6">
+    <h2 id="bulk-data">Bulk Data Files</h2>
+    <h3 id="opinions-db">Opinions Data</h3>
+    <p>The following bulk data files are available for our opinions database. Use
+      <a href="https://com-courtlistener-storage.s3-us-west-2.amazonaws.com/list.html?prefix=bulk-data/">the browsable interface</a> to get their most recent links:</p>
+    <ul>
+      <li>
+        <p><strong>Courts</strong> &mdash; This is a dump of court table and contains metadata about the courts we have in our system. Because nearly every data type <em>happens</em> in a court, you'll probably need this table to import any other data type below. We suggest importing it first.
         </p>
-        <p>
-            This file can be obtained in a similar manner to the core data
-            types, by downloading the file that's available at:
+      </li>
+      <li>
+        <p><strong>Dockets</strong> &mdash; Dockets contain high-level case information like the docket number, case name, etc. This table contains many millions of rows and should be imported before the opinions data below. A docket can have multiple opinion clusters within it, just like a real life case can have multiple opinions and orders.
         </p>
-        <blockquote>
-            <code>
-                <a href="/api/bulk-data/citations/all.csv.gz">{% get_full_host %}/api/bulk-data/citations/all.csv.gz</a>
-            </code>
-        </blockquote>
-        <p>The format of the file is three columns. The first column is the <code>ID</code> of the citing opinion; the second column is the <code>ID</code> of the cited opinion; and the third column is the <code>depth</code> of the citation (i.e., the number of those citing-cited dyads). Note that the <code>ID</code> fields are Opinion IDs, not OpinionCluster IDs, though in many cases these are equivalent. This was simplified when v3 of the API was released.
+      </li>
+      <li>
+        <p><strong>Opinion Clusters and Opinions</strong> &mdash; Clusters serve the purpose of grouping dissenting and concurring opinions together. Each cluster tends to have a lot of metadata about the opinion(s) that it groups together. Opinions hold the text of the opinion as well as a few other bits of metadata. Because of the text, the opinions bulk data file is our largest.
         </p>
-
-
-        <h2 id="citegeist">The CiteGeist Bulk Data File</h2>
-        <p>
-            On the 15th of each month, we re-generate the <a href="https://free.law/2013/11/12/citegeist/">CiteGeist scores</a> for the entire collection. Since a single new citation can have a ripple effect across the entire citation network, we store these values in a flat file rather than in our database. This saves us from having to update millions of records every month.
+      </li>
+      <li>
+        <p><strong>Citations Map</strong> &mdash; This is a narrow table that indicates which opinion cited which and how deeply.
         </p>
-        <p>Historically, this file was easily available via a URL, but with our increasingly distributed architecture, that's now prohibitively difficult to maintain. If you are interested in obtaining this file for your research, please let us know and we can usually get you a copy manually.
+      </li>
+      <li>
+        <p><strong>Parentheticals</strong> &mdash; Parentheticals are short summaries of opinions written by the Court. <a href="https://free.law/2022/03/17/summarizing-important-cases">Learn more about them from our blog</a>.
         </p>
-        <p>When inspecting this file, you will find two columns of data. The
-            first column corresponds to the ID numbers of the items in our
-            opinion database, and the second value corresponds to the CiteGeist
-            score for those items.
+      </li>
+      <li>
+        <p><strong>Integrated DB</strong> — We regularly import the <a href="https://www.fjc.gov/research/idb">FJC Integrated Database</a> into our database, merging it with the data we have.
         </p>
+      </li>
+    </ul>
+
+    <h3 id="disclosures">Financial Disclosure Data</h3>
+    <p>We have built a database of {{ disclosures|intcomma }} financial disclosure documents containing {{ investments|intcomma }} investments. To learn more about this data, please read the <a href="{% url "rest_docs" %}">REST API documentation</a> or the <a href="{% url "coverage_fds" %}">disclosures coverage page</a>.
+    </p>
+
+    <h3 id="people-db">Judge Data</h3>
+    <p>Our judge database is described in detail in our <a href="{% url "rest_docs" %}">REST API documentation</a>. To learn more about that data, we suggest you read that documentation. Before you can import this data, you will need to import the court data.
+    </p>
+
+    <h3 id="audio-db">Oral Argument Data</h3>
+    <p>Our database of oral arguments is the largest in the world, but has a very simple structure consisting of only a single table that we export. That said, it relies on our court, judge, and docket data, so before you can import the oral argument data, you will likely want to import those other sources.
+    </p>
 
 
-        <h2>Generation Times</h2>
-        <p>As can be seen on the public <a href="https://www.google.com/calendar/embed?src=michaeljaylissner.com_fvcq09gchprghkghqa69be5hl0@group.calendar.google.com&ctz=America/Los_Angeles">CourtListener maintenance calendar</a>, bulk data files are regenerated on the last day of every month beginning at 3AM PST. Generation can take many hours, but in general is expected to conclude before the 1st of each month. On the last day of the month, we do not guarantee that you will get either the new or old archives, as archives are updated in place as their generation completes. You can verify the generation time using the <code>info.json</code> files.
-        </p>
+    <h2 id="odds-and-ends">Odds and Ends</h2>
+    <h3 id="schedule">Generation Schedule</h3>
+    <p>As can be seen on the public <a href="https://www.google.com/calendar/embed?src=michaeljaylissner.com_fvcq09gchprghkghqa69be5hl0@group.calendar.google.com&ctz=America/Los_Angeles">CourtListener maintenance calendar</a>, bulk data files are regenerated on the last day of every month beginning at 3AM PST. Generation can take many hours, but in general is expected to conclude before the 1st of each month. Check the date in the filename to be sure you have the most recent data.
+    </p>
+
+    <h3 id="contributing">Adding Features and Fixing Bugs</h3>
+    <p>Like all Free Law Project initiatives, CourtListener is an open source project. If you are a developer and you notice bugs or missing features, we enthusiastically welcome your contributions <a href="https://github.com/freelawproject/courtlistener">on Github</a>.
+    </p>
+
+    <h3 id="old">Obsoleted Bulk Data Formats</h3>
+    <p>This is the third version of our bulk data system. Previous versions were available by jurisdiction, by day, month, or year, and in JSON format corresponding to our REST API. We also previously provided our CiteGeist data file. Each of these features has been removed in an effort to simply the feature. For more information, see <a href="https://github.com/freelawproject/courtlistener/issues/285">here (removing day/month/year files)</a> and <a href="https://github.com/freelawproject/courtlistener/issues/1983">here (removing the JSON format and switching to PostgreSQL dumps)</a>.
+    </p>
+
+    <h3 id="copyright"><span>Copyright</span></h3>
+    <p>Our bulk data files are free of known copyright restrictions.<br/>
+      <a rel="license"
+         href="http://creativecommons.org/publicdomain/mark/1.0/">
+        <img src="https://i.creativecommons.org/p/mark/1.0/88x31.png"
+             alt="Public Domain Mark" height="31"
+             width="88"/>
+      </a>
+    </p>
 
 
-        <h2>Please Support High-Quality, Open Legal Data</h2>
-        <p>It is squarely in the mission of <a href="https://free.law">Free Law Project</a>, the federally-recognized 501(c)(3) non-profit supporting CourtListener, to provide these bulk data files. We provide these files in the hope that they will spur legal innovation and research.
-        </p>
-        <p>If you find that these files are valuable to you or your organization, we hope you will consider how much value they provide, and whether a contribution to Free Law Project is possible. We have provided these files for many years, and we need your contributions to continue curating and enhancing this data.
-        </p>
-        <p><a href="{% url "donate" %}?referrer=bulk-data" class="btn btn-lg btn-danger">Donate Now</a>
-        </p>
-
-
-
-        <h2>Adding Features and Fixing Bugs</h2>
-        <p>Like all Free Law Project initiatives, CourtListener is an open source project. If you are a developer and you notice bugs or missing features, we enthusiastically welcome your contributions <a href="https://github.com/freelawproject/courtlistener">on Github</a>.
-        </p>
-        <p>Unfortunately, there are always more bugs than time.</p>
-
-
-
-        <h2>Obsoleted Bulk Data APIs</h2>
-        <p>In the past, bulk data files were available by day, month, or year
-            for every jurisdiction, and a single file was available containing
-            all data. Without community objection, these APIs <a href="https://github.com/freelawproject/courtlistener/issues/285">were sunsetted</a>
-            in the fall of 2014.
-        </p>
+    <div class="well v-offset-above-3">
+      <h2 class="top text-center">Please Support Open Legal Data</h2>
+      <p>These bulk data files are sponsored by <a href="https://free.law">Free Law Project</a> and users like you. We provide these files in furtherance of our mission to make the legal sector more innovative and equitable.
+      </p>
+      <p>We have provided these files for over a decade, and we need your contributions to continue curating and enhancing this service.
+      </p>
+      <p>Will you support us today with a donation?</p>
+      <div class="row">
+        <div class="hidden-xs col-sm-1 col-md-2 col-lg-3"></div>
+        <div class="col-xs-12 col-sm-10 col-md-8 col-lg-6">
+          <p class="text-center">
+            <a href="{% url "donate" %}?referrer={{ request.path }}" class="btn btn-lg btn-block btn-danger"><i class="fa fa-heart-o"></i> Donate Now</a>
+          </p>
+        </div>
+      </div>
     </div>
 
 
+  </div>
+</div>
+</div>
 
-    <div class="col-sm-5">
-        <div class="sidebar-section">
-            <h3><span>Available Jurisdictions</span></h3>
-            <p>We currently have <strong>{{ court_count }}</strong> courts that can be accessed with our APIs. Details about the jurisdictions that are available can be found <a href="{% url "court_index" %}">here</a>.
-            </p>
-
-            <p>Below is a cheat sheet listing the abbreviations for all available jurisdictions.
-            </p>
-
-            <div id="scrollable-jurisdictions">
-                <table class="table settings-table">
-                    <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th title="Gathered from Blue Book, Cornell.edu and ALWD">
-                            Abbreviation
-                        </th>
-                        <th title="The number of cases in this court on CourtListener">
-                            Count
-                        </th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {% for court in courts %}
-                        <tr>
-                            <td>{{ court.full_name }}</td>
-                            <td>
-                                <a href="/?q=&court_{{ court.pk }}=on&order_by=score+desc">
-                                    {{ court.pk }}
-                                </a>
-                            </td>
-                            <td>{{ court.count }}</td>
-                        </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        <div class="sidebar-section">
-            <h3 id="copyright"><span>Copyright</span></h3>
-
-            <p>Our bulk data files are free of known copyright restrictions.<br/>
-                <a rel="license"
-                   href="http://creativecommons.org/publicdomain/mark/1.0/">
-                    <img src="https://i.creativecommons.org/p/mark/1.0/88x31.png"
-                         alt="Public Domain Mark" height="31"
-                         width="88"/>
-                </a>
-            </p>
-        </div>
-    </div>
 {% endblock %}

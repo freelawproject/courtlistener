@@ -12,13 +12,13 @@ MICROSERVICE_URLS = {
         "timeout": 5,
     },
     # Extractor Endpoints
-    "pdf-to-text": {
-        "url": f"{DOCTOR_HOST}/extract/pdf/text/",
-        "timeout": 60 * 5,
-    },
     "document-extract": {
         "url": f"{DOCTOR_HOST}/extract/doc/text/",
         "timeout": 60 * 15,
+    },
+    "document-extract-ocr": {
+        "url": f"{DOCTOR_HOST}/extract/doc/text/",
+        "timeout": 60 * 90,
     },
     # Utils Endpoints
     "page-count": {
@@ -33,12 +33,12 @@ MICROSERVICE_URLS = {
         "url": f"{DOCTOR_HOST}/utils/mime-type/",
         "timeout": 60,
     },
-    "buffer-mime": {
-        "url": f"{DOCTOR_HOST}/utils/file/mime/",
-        "timeout": 60,
-    },
     "buffer-extension": {
         "url": f"{DOCTOR_HOST}/utils/file/extension/",
+        "timeout": 5,
+    },
+    "document-number": {
+        "url": f"{DOCTOR_HOST}/utils/document-number/pdf/",
         "timeout": 60,
     },
     # Converter Endpoints

@@ -1,0 +1,316 @@
+<html><head><link rel="shortcut icon"  href="/favicon.ico"/><title>Eastern District of New York - LIVE Database 1.7 (Revision 1.7.1)</title>
+<script type="text/javascript">var default_base_path = "/"; </script><script type="text/javascript">if (top!=self) {top.location.replace(location.href);}</script><link rel="stylesheet" type="text/css" href="/css/default.css"><script type="text/javascript" src="/lib/core.js"></script></head><body><style type="text/css">body { overflow:auto;}</style><SCRIPT LANGUAGE="JavaScript">
+		var IsForm = false;
+		var FirstField;
+		function SetFocus() {
+			if(IsForm) {
+				if(FirstField) {
+					var ind = FirstField.indexOf('document.',0);
+					if(ind == 0)
+					{
+						eval(FirstField);
+					}
+					else
+					{
+						var Code = "document.forms[0]."+FirstField+".focus();";
+						eval(Code);
+					}
+				} else {
+					var Cnt = 0;
+					while(document.forms[0].elements[Cnt] != null) {
+						try {
+							if(document.forms[0].elements[Cnt].type != "hidden" &&
+									!document.forms[0].elements[Cnt].disabled &&
+									!document.forms[0].elements[Cnt].readOnly) {
+								document.forms[0].elements[Cnt].focus();
+								break;
+							}
+						}
+						catch(e) {}
+						Cnt += 1;
+					}
+				}
+			}
+			return(true);
+		}
+		</SCRIPT>
+
+			<p><b style="margin:10px">Document Selection Menu</b></p>
+
+				<p align=center><big>Multiple Documents</big></p>
+				<p>To view the main document and its attachments without incurring a PACER fee,
+				click on the hyperlinks displayed on this menu.  You may incur a PACER fee
+				to view CM/ECF documents from hyperlinks within the documents.</p>
+
+			<p><span style="margin:10px">Select the document you wish to view.</span></p>
+
+                <script>
+		function size_mb_or_kb(size){
+			if(size < 1024){return size + ' B'}
+			if(size < 1024000){return (size/1024).toFixed(1) + ' KB'}
+			return (size/1024000).toFixed(1) + ' MB';
+		}
+
+// Code used by a Document Link:
+                                // Reset checkboxes if page is refreshed.
+                                function SetFocus(){//overwrite existing function
+                                }
+
+// Code used by Docket Sheet
+
+                function select_all_documents(checked){
+			var elements = document.forms[0].elements;
+			for (var i = 0; i < elements.length; i++) {
+				var checkbox = elements[i];
+				if (checkbox.name == 'all_documents') {
+					checkbox.checked = checked;
+					select_all_attachments(checkbox);
+				}
+			}
+                        if(checked == false){
+                                clear_totals();
+                        }
+                }
+
+		function select_all_attachments(all){
+			attachments = all.value.split('_');
+
+			var elements = document.forms[0].elements;
+			for(var i=0; i < elements.length; i++){
+				var checkbox = elements[i];
+				if(checkbox.name.match('document_' + attachments[0] + '_' + attachments[1] + '_')){
+					if (checkbox.type == "checkbox") {
+						if(checkbox.checked != all.checked){
+							checkbox.checked = all.checked;
+							update_sizes(checkbox);
+						}
+					}
+					else {
+						// Handle things when it is a type = "hidden"
+						update_sizes(checkbox, all.checked);
+					}
+				}
+			}
+
+			// If ROA, and checkbox is cleared, then also clear the sort order
+			if("" != ""){
+				if(all.checked == false){
+					document.getElementById('de_'+attachments[1]+'_sort').value = '';
+				}
+			}
+		}
+
+		function update_sizes(checkbox, all_checked_value){
+			var total_size_counter = document.getElementById('total_size_counter');
+			var total_page_counter = document.getElementById('total_page_counter');
+			var total_size_display = document.getElementById('total_size_display');
+			var total_page_display = document.getElementById('total_page_display');
+
+			var total_size = parseInt(total_size_counter.value);
+			var total_page = parseInt(total_page_counter.value);
+
+			var info = checkbox.value.split('-');//dm_dls_id - file_size - page_size
+			var size = parseInt(info[1]);
+			var page = parseInt(info[2]);
+
+			var checked = all_checked_value;
+			if (checkbox.type == "checkbox") {
+				checked = checkbox.checked;
+			}
+			if(checked == true){
+				total_size += size;
+				total_page += page;
+			}else{
+				total_size -= size;
+				total_page -= page;
+			}
+
+			var buttons_disabled = true;
+			var file_too_big = true;
+			if(total_size <= 314572800){
+				file_too_big = false;
+				if(total_size > 0){
+					buttons_disabled = false;
+				}
+			}
+
+			document.getElementById('view_button').disabled = buttons_disabled;
+			document.getElementById('download_button').disabled = buttons_disabled;
+			document.getElementById('file_too_big').style.display = file_too_big ? 'block':'none';
+
+			//alert(total_size + ':' + total_page);
+			total_size_counter.value = total_size;
+			total_page_counter.value = total_page;
+			if(total_size_display.type == 'text'){
+				total_size_display.value = Number((total_size/1024000).toFixed(5));
+				total_page_display.value = total_page + ((total_page == 1) ? ' page':' pages');
+			}else{
+				total_size_display.innerHTML = size_mb_or_kb(total_size);
+				total_page_display.innerHTML = total_page + ((total_page == 1) ? ' page':' pages');
+			}
+		}
+
+		function clear_totals(){
+			document.getElementById('total_size_counter').value = 0;
+			document.getElementById('total_page_counter').value = 0;
+			document.getElementById('total_size_display').value = 0;
+			document.getElementById('total_page_display').value = 0;
+
+			document.getElementById('view_button').disabled = true;
+			document.getElementById('download_button').disabled = true;
+		}
+
+                function select_link_documents(){ // When selected by a link, check all documents.
+                        clear_totals();
+
+			elements = document.forms[0].elements;
+			for(i=0; i < elements.length; i++){
+				checkbox = elements[i];
+				if(checkbox.type == 'checkbox'){
+					checkbox.checked = true;
+					update_sizes(checkbox);
+				}
+			};
+		}
+
+		function submit_form(zip,url){
+			var include=[];//Docket
+			var exclude=[];//Link
+			var elements = document.forms[0].elements;
+
+			// create a hash of "all_documents" values to "checked" status for dealing with hidden inputs
+			var ad_checked = {};
+			for (var i = 0; i < elements.length; i++) {
+				var checkbox = elements[i];
+				if (checkbox.name == "all_documents") {
+					ad_checked[checkbox.value] = checkbox.checked;
+				}
+			}
+
+			for(var i=0; i < elements.length; i++){
+				var checkbox = elements[i];
+				if(checkbox.name.match(/document_/)){
+					var info = checkbox.value.split('-');//dm_dls_id - file_size - page_size
+					if (checkbox.type == "hidden") {
+						var values = checkbox.name.split('_');
+						var ad_key = values[1] + '_' + values[2];
+						if (ad_checked[ad_key]) {
+							include.push(info[0]);
+						}
+						else {
+							exclude.push(info[0]);
+						}
+					}
+					else {
+						if(checkbox.checked == true){
+							include.push(info[0]);
+						}else{
+							exclude.push(info[0]);
+						}
+					}
+                                }
+                        };
+
+                        if(url){//Link
+                                url += '&exclude_attachments=' + exclude.join(',');
+                                document.location.href = url+'&zipit='+zip;// 0 = Show on screen, 1 = Zip PDF, 2 = Download PDF
+                        }else{
+                                document.getElementsByName('zipit')[0].value = zip;
+                                document.getElementsByName('download_documents')[0].value = include.join(',');
+                                document.view_multi_docs.submit();
+                        }
+                }
+
+                </script>
+
+			<form><!-- Required for old style javascript, for older browsers. -->
+			<script>CMECF.util.Event.addListener(window, 'pageshow', select_link_documents);</script>
+			<script>CMECF.MainMenu.alternateHelp="////show_multidocs.htm"</script>
+			<table style="table-layout:fixed;word-wrap:break-word;margin: 20px">
+
+			<tr>
+				<td colspan="2"><b>Document Number:</b></td>
+				<td width="50px"><input type="checkbox" name="document_16_0" onchange="update_sizes(this)" autocomplete="off" value="19137279-205962-4" /></td>
+				<td><a href="https://ecf.nyed.uscourts.gov/doc1/123119137279" onClick="goDLS('/doc1/123119137279','475249','70','','','','79492711','','');return(false);">16</a></td>
+				<td>4 pages</td>
+				<td>201.1 KB</td>
+			</tr>
+			<tr height="50px">
+				<td width="150px" colspan="2"><b>Attachment</b></td>
+				<td width="200px" colspan="2"><b>Description</b></td>
+				<td width="100px"><b>Pages</b></td>
+				<td width="100px"><b>Size</b></td>
+			</tr>
+
+			<tr>
+				<td width="50px"><input type="checkbox" name="document_16_1" onchange="update_sizes(this)" autocomplete="off" value="19137280-175910-3" /></td>
+				<td><a href="https://ecf.nyed.uscourts.gov/doc1/123119137280" onClick="goDLS('/doc1/123119137280','475249','70','','','','79492711','','');return(false);">1</a></td>
+				<td colspan="2">Proposed Order Proposed Case Management Plan (as discussed in the letter)</td>
+				<td>3 pages</td>
+				<td>171.8 KB</td>
+			</tr>
+
+			<tr>
+				<td width="50px"><input type="checkbox" name="document_16_2" onchange="update_sizes(this)" autocomplete="off" value="19137281-193288-3" /></td>
+				<td><a href="https://ecf.nyed.uscourts.gov/doc1/123119137281" onClick="goDLS('/doc1/123119137281','475249','70','','','','79492711','','');return(false);">2</a></td>
+				<td colspan="2">Exhibit Ex 1 - Sample Coordination Order</td>
+				<td>3 pages</td>
+				<td>188.8 KB</td>
+			</tr>
+
+			<tr>
+				<td width="50px"><input type="checkbox" name="document_16_3" onchange="update_sizes(this)" autocomplete="off" value="19137282-48143-2" /></td>
+				<td><a href="https://ecf.nyed.uscourts.gov/doc1/123119137282" onClick="goDLS('/doc1/123119137282','475249','70','','','','79492711','','');return(false);">3</a></td>
+				<td colspan="2">Exhibit Ex 2 - Order in Britvec and Casablanca</td>
+				<td>2 pages</td>
+				<td>47.0 KB</td>
+			</tr>
+
+			<tr>
+				<td width="50px"><input type="checkbox" name="document_16_4" onchange="update_sizes(this)" autocomplete="off" value="19137283-158761-2" /></td>
+				<td><a href="https://ecf.nyed.uscourts.gov/doc1/123119137283" onClick="goDLS('/doc1/123119137283','475249','70','','','','79492711','','');return(false);">4</a></td>
+				<td colspan="2">Exhibit Ex 3 - Order 1 (Dkt 14) in Rodriguez</td>
+				<td>2 pages</td>
+				<td>155.0 KB</td>
+			</tr>
+
+			<tr>
+				<td width="50px"><input type="checkbox" name="document_16_5" onchange="update_sizes(this)" autocomplete="off" value="19137284-118437-2" /></td>
+				<td><a href="https://ecf.nyed.uscourts.gov/doc1/123119137284" onClick="goDLS('/doc1/123119137284','475249','70','','','','79492711','','');return(false);">5</a></td>
+				<td colspan="2">Exhibit Ex 4 - Order 2 (Dkt 17) in Rodriguez</td>
+				<td>2 pages</td>
+				<td>115.7 KB</td>
+			</tr>
+
+			<tr>
+				<td width="50px"><input type="checkbox" name="document_16_6" onchange="update_sizes(this)" autocomplete="off" value="19137285-455957-3" /></td>
+				<td><a href="https://ecf.nyed.uscourts.gov/doc1/123119137285" onClick="goDLS('/doc1/123119137285','475249','70','','','','79492711','','');return(false);">6</a></td>
+				<td colspan="2">Exhibit Ex 5 - Order in Hernandez</td>
+				<td>3 pages</td>
+				<td>445.3 KB</td>
+			</tr>
+
+			<tr>
+				<td width="50px"><input type="checkbox" name="document_16_7" onchange="update_sizes(this)" autocomplete="off" value="19137286-193288-3" /></td>
+				<td><a href="https://ecf.nyed.uscourts.gov/doc1/123119137286" onClick="goDLS('/doc1/123119137286','475249','70','','','','79492711','','');return(false);">7</a></td>
+				<td colspan="2">Exhibit Ex 6 - Order in Sukana</td>
+				<td>3 pages</td>
+				<td>188.8 KB</td>
+			</tr>
+
+			<tr>
+				<td width="50px"><input type="checkbox" name="document_16_8" onchange="update_sizes(this)" autocomplete="off" value="19137287-128211-2" /></td>
+				<td><a href="https://ecf.nyed.uscourts.gov/doc1/123119137287" onClick="goDLS('/doc1/123119137287','475249','70','','','','79492711','','');return(false);">8</a></td>
+				<td colspan="2">Exhibit Ex 7 - Order in Sharma</td>
+				<td>2 pages</td>
+				<td>125.2 KB</td>
+			</tr>
+
+			<tr>
+				<td width="50px"><input type="checkbox" name="document_16_9" onchange="update_sizes(this)" autocomplete="off" value="19137288-81423-1" /></td>
+				<td><a href="https://ecf.nyed.uscourts.gov/doc1/123119137288" onClick="goDLS('/doc1/123119137288','475249','70','','','','79492711','','');return(false);">9</a></td>
+				<td colspan="2">Exhibit Ex 8 - Order in Margolies</td>
+				<td>1 page</td>
+				<td>79.5 KB</td>
+			</tr>
+			  </div></body></html>

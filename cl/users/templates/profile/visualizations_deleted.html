@@ -15,6 +15,9 @@
 {% endblock %}
 
 {% block content %}
+  {# Navigation Tabs #}
+  {% include "includes/visualizations-tabs.html" %}
+
   <div class="col-xs-12">
     {% if results.paginator.count > 0 %}
       <div class="alert alert-warning" role="alert">

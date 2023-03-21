@@ -93,8 +93,7 @@ class RssFeedData(AbstractDateTimeModel):
 
     @property
     def file_contents(self) -> str:
-        with open(self.filepath.path, "rb") as f:
-            return bz2.decompress(f.read()).decode()
+        return bz2.decompress(self.filepath.read()).decode()
 
     def print_file_contents(self) -> None:
         print(self.file_contents)

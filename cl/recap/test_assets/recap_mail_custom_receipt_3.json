@@ -1,0 +1,60 @@
+{
+  "mail": {
+    "timestamp": "2019-08-05T21:30:02.028Z",
+    "source": "ecf_bounces@nyed.uscourts.gov",
+    "message_id": "recap_mail_example_1",
+    "destination": [
+      "nobody@nyed.uscourts.gov"
+    ],
+    "headers_truncated": false,
+    "headers": [
+      {
+        "name": "Return-Path",
+        "value": "<ecf_bounces@nyed.uscourts.gov>"
+      },
+      {
+        "name": "Received",
+        "value": "from icmecf202.gtwy.uscourts.gov (icmecf202.gtwy.uscourts.gov [63.241.40.205]) by inbound-smtp.us-west-2.amazonaws.com with SMTP id 2604nmhp0cbhhn4cb8ht28rfoki9gus0q8qqd601 for testing_1@recap.email; Wed, 27 Apr 2022 18:02:23 +0000 (UTC)"
+      }
+    ],
+    "common_headers": {
+      "return_path": "ecf_bounces@nyed.uscourts.gov",
+      "from": [
+        "ecf_bounces@nyed.uscourts.gov"
+      ],
+      "date": "Mon, 5 Aug 2019 21:29:57 +0000",
+      "to": [
+        "nobody@nyed.uscourts.gov"
+      ],
+      "message_id": "<16799206@nyed.uscourts.gov>",
+      "subject": "This is a test"
+    }
+  },
+  "receipt": {
+    "timestamp": "2019-08-05T21:30:02.028Z",
+    "processing_time_millis": 1205,
+    "recipients": [
+      "testing_2@recap.email"
+    ],
+    "spam_verdict": {
+      "status": "PASS"
+    },
+    "virus_verdict": {
+      "status": "PASS"
+    },
+    "spf_verdict": {
+      "status": "PASS"
+    },
+    "dkim_verdict": {
+      "status": "PASS"
+    },
+    "dmarc_verdict": {
+      "status": "PASS"
+    },
+    "action": {
+      "type": "Lambda",
+      "function_arn": "arn:aws:lambda:us-east-1:123456789012:function:IncomingEmail",
+      "invocation_type": "Event"
+    }
+  }
+}

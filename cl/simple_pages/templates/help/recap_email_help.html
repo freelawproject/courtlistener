@@ -8,10 +8,10 @@
 
 
 {% block content %}
-  <div class="hidden-xs col-sm-2 col-md-3"></div>
-  <div class="col-xs-12 col-sm-8 col-md-6">
+  <div class="hidden-xs col-md-2 col-lg-3"></div>
+  <div class="col-xs-12 col-md-8 col-lg-6">
     <h1>Help with @recap.email</h1>
-    <p class="lead"><strong>@recap.email</strong> is a system we use to gather content from PACER and add it to the <a href="{% url 'advanced_r' %}">RECAP Archive</a>. If you receive notification emails from PACER, it only takes a minute to set up this system and begin contributing content to the public commons.
+    <p class="lead"><strong>@recap.email</strong> is a system that gathers content from PACER and adds it to the <a href="{% url 'advanced_r' %}">RECAP Archive</a>. If you receive notification emails from PACER, it only takes a minute to set up this system and contribute content to the public commons.
     </p>
 
     <h2>How it works</h2>
@@ -21,16 +21,23 @@
         <p>Every party in a case gets notification emails that contain one-time "magic links." These links give free access to new filings in the case.</p>
       </li>
       <li>
-        <p>We give you an email address that you can configure in your PACER account as a secondary recipient for these notifications. Your primary address in PACER is never changed.</p>
-        <p class="alert-warning alert">
-          {% if request.user.is_authenticated %}
-            Your @recap.email email address is <b>{{ request.user.profile.recap_email }}</b>
-          {% else %}
-            Log in and refresh this page to see your personal @recap.email address here.
-          {% endif %}
-        <p>
+        <p>We give you a personalized email address that you can configure in your PACER account as a secondary recipient for these notifications. Your primary address in PACER is never changed, you keep getting the alerts you do now, and our system does not "use up" your one-free look links.</p>
+        {% if request.user.is_authenticated %}
+          <p>Your @recap.email email address is:</p>
+          {% spaceless %}
+            <p class="alert-warning alert"><b>{{ request.user.profile.recap_email }}</b></p>
+          {% endspaceless %}
+        {% else %}
+          <div class="well">
+            <p>Sign in to see your personal @recap.email address here:</p>
+            <p><a href="{% url "sign-in" %}" class="btn btn-primary btn-lg">Sign In</a></p>
+          </div>
+        {% endif %}
       </li>
-      <li>After you add us as a secondary recipient in PACER, we'll get a copy of your notification emails. When we do, we'll add the items to RECAP, and we'll send you a notification so you're up to date.</li>
+      <li>
+        <p>After you add your personal email address as a secondary recipient in PACER, we'll get a copy of your notification emails. When we do, we'll automatically add the items to RECAP.
+        </p>
+      </li>
     </ol>
     <p>That's it!</p>
 
@@ -39,50 +46,85 @@
     <ol>
       <li><p>You can feel good about contributing to the public commons.</p></li>
       <li><p>You can forget about the emails you currently get from PACER. Just route them to a folder in case you need them someday and that's a wrap.</p></li>
-      <li><p>Every time there's a notification in one of your cases, we'll send you an email with the document attached if it's small enough, or linked if it's not.</p></li>
+      <li><p>Every time there's a notification in one of your cases, we'll send you an email with the document linked.</p></li>
       <li><p>All of the notification emails we send you will have a link to the docket in RECAP, where all of the documents you've contributed will be full-text searchable.</p></li>
       <li><p>It almost goes without saying, but when you use @recap.email, you save yourself from ever paying to download a document in your cases. Your PACER bill get smaller.</p></li>
       <li><p>No more one-time links and download hassles. Unlike PACER notifications, our emails can be freely shared. Forward them to colleagues and clients as you see fit.</p></li>
+      <li><p>Our emails are <a href="https://free.law/2022/09/01/building-a-robust-email-system">more likely to make it to your inbox</a>.</p></li>
     </ol>
 
     <h2>Why is this useful to the public?</h2>
     <p>Because of high PACER fees, researchers, journalists, and individuals do not have access to legal information the way they should. This means that researchers cannot study the federal judiciary the way it merits, investigative reports fail to launch or are hamstrung by bad data, and the public struggles to access the real information in the courts.</p>
     <p>When you use @recap.email, these problems get better as new filings in your cases are automatically added to RECAP. This makes those filings available to the public via our website, and allows us to build better datasets for researchers and journalists. </p>
-    <p>Over time, as more people use @recap.email, it makes the case to Congress and the judicial branch that these documents should be public and that given a choice, people believe in the importance of court transparency.</p>
+    <p>Over time, as more people use @recap.email, it makes the case to Congress and the judicial branch that these documents should be public and that, given a choice, people believe in the importance of court transparency.</p>
+
+
+    <h2>How and why is this free? I trust things I pay&nbsp;for.</h2>
+    <p>We're <a href="{% url "donate" %}?referrer=recap-dot-email">happy to accept donations from those using this service</a>, but the reason @recap.email is free is that we believe open legal data is key to a functioning democracy. When you use this system, you contribute to a better country. That's why this service is free.
+    </p>
+    <p>We're able to make this free for individual users by charging organizations for specialized services, like the webhooks described below.
+    </p>
+
+    <h2>What's the best way to simply contribute to the&nbsp;cause?</h2>
+    <p>Well, we always need <a href="{% url "donate" %}">financial support</a> so we can build things like this, but if you just want to contribute your documents to the RECAP Archive, simply add <code>archive@recap.email</code> as a secondary recipient in your CM/ECF account. Once added, we'll process your notification emails in realtime, without linking them to any CourtListener account, sending you any emails, etc.
+    </p>
+    <p>The next time you search for your case on CourtListener, you'll discover it's all there.</p>
 
 
     <h2>How is this useful to my firm? Webhooks.</h2>
     <p>By default, we will send you notification emails when we get an email from PACER on your behalf. For firms we offer something even better. Instead of sending an email to a user, we can send an event to a webhook the firm has configured.</p>
     <p>This allows our servers to tell yours that something new has arrived in one of your firm's cases. From there, the sky's the limit. Using the message we send you, your servers can download the document and put it in your knowledge management system. Your servers can send notifications to the lead attorney for the case or to the appropriate paralegal. </p>
     <p>Whatever workflow you have in mind can be arranged. The event is no longer in some inbox — Instead it's going directly to your server.</p>
-    <p>To get started with webhooks, <a href="{% url 'contact' %}">please get in touch</a>. We'll schedule a meeting to go over the details.</p>
+    <p>To get started with webhooks <a href="{% url 'webhooks_docs' %}">visit the documentation</a> or <a href="{% url 'contact' %}">please get in touch</a>. We'll schedule a meeting to go over the details.</p>
 
 
     <h2>How do I set it up?</h2>
-    <p>Set up takes a few minutes. You just have to add a secondary email address to your PACER account.</p>
-    <p class="alert-warning alert">
-      {% if request.user.is_authenticated %}
-        Your @recap.email email address is <b>{{ request.user.profile.recap_email }}</b>
-      {% else %}
-        Log in and refresh this page to see your personal @recap.email address here.
-      {% endif %}
-    <p>
-    <p>To add a secondary email address to your PACER account, you can follow the steps in the <a
-        href="https://www.dcd.uscourts.gov/sites/dcd/files/2016_Utilities_Menu.pdf#page=4" rel="nofollow">ECF User's
+    <p>Set up takes a few minutes, but is a one-time thing. You have to add a secondary email address to your PACER account <b>in each jurisdiction</b> where you are admitted.</p>
+    {% if request.user.is_authenticated %}
+      <p>The @recap.email address for your account is:</p>
+      {% spaceless %}
+        <p class="alert-warning alert"><b>{{ request.user.profile.recap_email }}</b></p>
+      {% endspaceless %}
+    {% else %}
+      <div class="well">
+        <p>Sign in to see your personal @recap.email address here:</p>
+        <p><a href="{% url "sign-in" %}" class="btn btn-primary btn-lg">Sign In</a></p>
+      </div>
+    {% endif %}
+    <p>To add a secondary email address to your PACER account, you can follow the steps in <a
+        href="https://www.dcd.uscourts.gov/sites/dcd/files/2016_Utilities_Menu.pdf#page=4" rel="nofollow">DCC's ECF User
         Manual</a>, but the gist is:</p>
     <ol>
-      <li><p>Log into PACER's user management portal here:</p><p><a href="https://pacer.psc.uscourts.gov/pscof/login.xhtml" rel="nofollow">https://pacer.psc.uscourts.gov/pscof/login.xhtml</a></p></li>
-      <li><p>Select <b>Maintain Your Email</b> and then <b>Add New Email Address.</b></p></li>
-      <li><p>Enter
+      <li><p>Log into PACER.</p></li>
+      <li>
+        <p>Go to the <strong>Utilities</strong> menu in the upper panel. This is usually located at a link like:</p>
+        <p>https://ecf.{YOUR COURT HERE}.uscourts.gov/cgi-bin/DisplayMenu.pl?Utilities</p>
+      </li>
+      <li><p>Select <strong>Maintain Your E-mail</strong>.</p></li>
+      <li><p>Select <strong>Add a New E-mail Address</strong>.</p></li>
+      <li>
+        <p>Enter
           {% if request.user.is_authenticated %}
             <b>{{ request.user.profile.recap_email }} </b>
           {% else %}
             your @recap.email address
           {% endif %}
-          as a secondary email address, and make sure that it's set to receive HTML notifications for all your cases.
-          </p>
-        </li>
-        <li>After you add us as a secondary recipient in PACER, we'll get a copy of your notification emails. When we do, we'll add the items to RECAP and we'll send you a notification so you know we did.</li>
+          as a secondary email address
+        </p>
+      </li>
+      <li>
+        <p>Complete the section on the right as follows (these are usually the defaults):</p>
+        <ul>
+          <li><strong>Yes</strong> &mdash; This e-mail should receive notices</li>
+          <li><strong>Yes</strong> &mdash; This email should receive notices for all cases</li>
+          <li><strong>No</strong> &mdash; Do not verify free look links</li>
+          <li>Notices should be sent <strong>Per filing</strong></li>
+          <li>Notices should be sent as <strong>HTML</strong></li>
+          <li><strong>No</strong> &mdash; This e-mail should <strong>not</strong> receive general announcement notices</li>
+        </ul>
+      </li>
+      <li><p>On the left, click <strong>Submit all Changes</strong>.</p></li>
+      <li>After you add us as a secondary recipient in PACER, we'll get a copy of your notification emails. When we do, we'll add the items to RECAP and we'll send you a notification so you know we did.</li>
     </ol>
     <p>Done!</p>
 
@@ -92,10 +134,12 @@
 
 
     <h2>What about sealed content?</h2>
-    <p>We take sealed content very seriously and have designed the system to never add sealed content to RECAP. Instead, when we encounter sealed content, we will send you a notification of that fact and include the one-time “magic link” in our email for you to click yourself.</p>
+    <p>We take sealed cases and documents very seriously and have designed the system to never touch sealed content. This is easy because sealed content is only available via "magic links" after a user logs in <em>and</em> the PACER/ECF system has authorized that user. We do not log in at all when accessing "magic links" and we do not have your login credentials, so we couldn't download sealed documents from your cases even if we tried.
+    </p>
+    <p>We are able to detect if a document is sealed when we try to use its "magic link." When that happens, we send you a notification of that fact and that you will need to get the document yourself by logging into PACER/ECF.</p>
 
-    <h2>What about accidents?</h2>
-    <p>Sometimes content becomes sealed after it has been published on PACER. It happens more than it should. Sometimes filers don't redact things properly. If anything like this happens, we work quickly to make it right. Usually that just means taking the item out of our systems as quickly as possible and marking the entry as sealed.</p>
+    <h2>What about mistakes?</h2>
+    <p>Sometimes filers don't redact things properly. Sometimes content becomes sealed after it has been published on PACER. It happens more than it should. If anything like this happens, we work quickly to make it right. Usually that just means taking the item out of our systems as quickly as possible and marking the entry as sealed.</p>
 
     <h2>More questions?</h2>
     <p>Please get in touch if you have more questions. We know this is an ambitious and complicated product and we welcome your feedback and concerns. Please feel free to reach out and let us know what you think.</p>

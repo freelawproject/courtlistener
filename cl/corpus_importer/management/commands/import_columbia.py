@@ -216,7 +216,6 @@ def do_many(
         logger.debug(folder)
 
         for path in file_generator(folder, random_order, limit):
-
             if skipfile:
                 if startfile is not None:
                     checkfile = path.split("/")[-1]

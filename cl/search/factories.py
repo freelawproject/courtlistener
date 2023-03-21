@@ -11,16 +11,19 @@ from factory.django import DjangoModelFactory, FileField
 from factory.fuzzy import FuzzyChoice, FuzzyText
 from juriscraper.lib.string_utils import CaseNameTweaker
 
+from cl.lib.factories import RelatedFactoryVariableList
 from cl.people_db.factories import PersonFactory
 from cl.search.models import (
-    DOCUMENT_STATUSES,
+    PRECEDENTIAL_STATUS,
     SOURCES,
+    Citation,
     Court,
     Docket,
     DocketEntry,
     Opinion,
     OpinionCluster,
     Parenthetical,
+    RECAPDocument,
 )
 from cl.tests.providers import LegalProvider
 
@@ -32,6 +35,7 @@ cnt = CaseNameTweaker()
 class CourtFactory(DjangoModelFactory):
     class Meta:
         model = Court
+        django_get_or_create = ("id",)
 
     id = FuzzyText(length=4, chars=string.ascii_lowercase, suffix="d")
     position = Faker("pyfloat", positive=True, right_digits=4, left_digits=3)
@@ -63,17 +67,31 @@ class OpinionFactory(DjangoModelFactory):
         model = Opinion
 
     author = SubFactory(PersonFactory)
-    author_str = LazyAttribute(lambda self: self.author.name_full)
+    author_str = LazyAttribute(
+        lambda self: self.author.name_full if self.author else ""
+    )
     type = FuzzyChoice(Opinion.OPINION_TYPES, getter=lambda c: c[0])
     sha1 = Faker("sha1")
     plain_text = Faker("text", max_nb_chars=2000)
 
 
 class OpinionWithChildrenFactory(OpinionFactory):
-
     parentheticals = RelatedFactory(
         ParentheticalFactory,
         factory_related_name="described_opinion",
+    )
+
+
+class CitationWithParentsFactory(DjangoModelFactory):
+    class Meta:
+        model = Citation
+
+    volume = Faker("random_int", min=1, max=100)
+    reporter = "U.S."
+    page = Faker("random_int", min=1, max=100)
+    type = 1
+    cluster = SubFactory(
+        "cl.search.factories.OpinionClusterFactoryWithChildrenAndParents",
     )
 
 
@@ -95,7 +113,9 @@ class OpinionClusterFactory(DjangoModelFactory):
     date_filed = Faker("date")
     slug = Faker("slug")
     source = FuzzyChoice(SOURCES, getter=lambda c: c[0])
-    precedential_status = FuzzyChoice(DOCUMENT_STATUSES, getter=lambda c: c[0])
+    precedential_status = FuzzyChoice(
+        PRECEDENTIAL_STATUS.NAMES, getter=lambda c: c[0]
+    )
 
 
 class OpinionClusterFactoryWithChildren(OpinionClusterFactory):
@@ -134,6 +154,16 @@ class DocketParentMixin(DjangoModelFactory):
     )
 
 
+class OpinionClusterFactoryWithChildrenAndParents(
+    OpinionClusterFactory, DocketParentMixin
+):
+    sub_opinions = RelatedFactory(
+        OpinionWithChildrenFactory,
+        factory_related_name="cluster",
+    )
+    precedential_status = ("Published", "Precedential")  # Always precedential
+
+
 class OpinionClusterWithParentsFactory(
     OpinionClusterFactory,
     DocketParentMixin,
@@ -157,6 +187,15 @@ class DocketEntryWithParentsFactory(
     """Make a DocketEntry with Docket parents"""
 
     pass
+
+
+class RECAPDocumentFactory(DjangoModelFactory):
+    class Meta:
+        model = RECAPDocument
+
+    description = Faker("text", max_nb_chars=750)
+    document_type = RECAPDocument.PACER_DOCUMENT
+    pacer_doc_id = Faker("pyint", min_value=100_000, max_value=400_000)
 
 
 class DocketFactory(DjangoModelFactory):
@@ -187,3 +226,16 @@ class DocketWithChildrenFactory(DocketFactory):
         OpinionClusterFactoryWithChildren,
         factory_related_name="docket",
     )
+
+
+class OpinionClusterFactoryMultipleOpinions(
+    OpinionClusterFactory, DocketParentMixin
+):
+    """Make an OpinionCluster with Docket parent and multiple opinions"""
+
+    sub_opinions = RelatedFactoryVariableList(
+        factory=OpinionWithChildrenFactory,
+        factory_related_name="cluster",
+        size=3,  # by default create 3 opinions
+    )
+    precedential_status = ("Published", "Precedential")

@@ -8,14 +8,24 @@
 
 
 {% block content %}
-  <div class="hidden-xs col-sm-2 col-md-3"></div>
-  <div class="col-xs-12 col-sm-8 col-md-6">
+  <div class="hidden-xs hidden-sm col-md-3">
+    <div id="toc">
+      <h3>Table of Contents</h3>
+      <ul>
+        <li><a href="#general-qs">General Questions</a></li>
+        <li><a href="#donation-qs">Donation Questions</a></li>
+        <li><a href="#recurring-qs">Recurring Donations</a></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="col-xs-12 col-md-8 col-lg-6">
     <h1>Help with Donations to Free Law&nbsp;Project</h1>
-    <p class="lead">CourtListener is a publicly supported 501(c)(3) non-profit based out of Emeryville, CA. Most of the donations we receive are used to pay for our staff and computer expenses.
+    <p class="lead">CourtListener is a publicly supported 501(c)(3) non-profit based out of Oakland, CA. Most of the donations we receive are used to pay for our staff and computer expenses.
     </p>
     <p class="lead">Below we have a number of FAQs that you may have about your donation.</p>
 
-    <h2>General Questions</h2>
+    <h2 id="general-qs">General Questions</h2>
     <h3>Where does the money go and why does it matter?</h3>
     <p>Free Law Project is funded by a blend of user donations, client work, and grants. Almost all of the money that Free Law Project receives goes towards funding either our staff or our infrastructure (servers, hard drives, etc.). Less than 1% of our income goes towards HR, accounting, or other administrative expenses.
     </p>
@@ -27,7 +37,7 @@
     </p>
     <p>RECAP was created at <a href="https://citp.princeton.edu" rel="nofollow">Princeton's Center for Information Technology Policy</a> around the same time. In 2014, Free Law Project <a href="https://free.law/2014/05/19/our-recap-partnership-with-princeton-universitys-citp/">partnered with CITP</a> to continue supporting and maintaining RECAP.
     </p>
-    <p>Free Law Project was <a href="https://free.law/2013/09/24/non-profit-free-law-project-formed-to-create-an-open-legal-ecosystem/">founded in 2013</a>.
+    <p>The Free Law Project organization was <a href="https://free.law/2013/09/24/non-profit-free-law-project-formed-to-create-an-open-legal-ecosystem/">founded in 2013</a>.
     </p>
 
     <h3>What is Free Law Project's tax ID number?</h3>
@@ -35,37 +45,54 @@
 
 
     <hr>
-    <h2>Questions about Donations</h2>
+    <h2 id="donation-qs">Questions about Donations</h2>
     <h3>Do you accept matching donations from employers?</h3>
     <p>Yes! Free Law Project is available in most employer matching tools. If your employer has a giving program, please use it so we can maximize your contribution. If your employer is unable to give to us, let us know and we can usually get things fixed in whatever system they use.</p>
-    <p>If you want to champion our work, we also have <a href="https://free.law/become-a-sponsor/">a corporate sponsors program</a> that some organizations prefer.</p>
+    <p>If you want to champion our work inside your company, we also have <a href="https://free.law/become-a-sponsor/">a corporate sponsors program</a> that some organizations prefer.</p>
 
     <h3>Do you accept checks?</h3>
     <p>Yes, we do. Please <a href="{% url "contact" %}">send us an email</a> if you're interested and we'll follow up from there. Unfortunately, due to the nature of our work, we no longer publish our address online.
     </p>
 
     <h3>Can I donate from an international address?</h3>
-    <p>Usually you can, yes. <a href="{% url "donate" %}">Send us an email</a> with how much you'd like to donate and we can usually provide you a link that'll work for you.</p>
+    <p>International donors can <a href="https://buy.stripe.com/6oE01CgaLbqD06Y28a" rel="nofollow">use this link to make a one-time donation</a> or <a href="https://buy.stripe.com/14kaGg3nZ2U78Du6op" rel="nofollow">this one to create a monthly donation</a>. These links are for international donors <strong>only</strong>. To donate more than five dollars, simply increase the "Qty" of five-dollar donations you wish to make.
+    </p>
+
+    <h3>Can I donate stocks?</h3>
+    <p>Yes.</p>
+    <p>In fact, a gift of appreciated stock generally offers a twofold tax savings. First, you avoid paying any capital gains tax on the increase in the value of the stock. Second, you receive a charitable income tax deduction for the fair market value of the stock on the date it is transferred. Generally, you must own the stock for a "long-term" period (more than 12 months) to qualify for these tax advantages. Gifts of appreciated stock are generally fully deductible — up to a maximum of 30% of your adjusted gross income.</p>
+    <p>Please check with your accountant or tax advisor regarding your particular tax status.</p>
+
+    <p>To facilitate the transfer of securities, please use the following information:</p>
+
+    <ul>
+      <li><strong>Brokerage Firm:</strong> National Financial Services
+      <li><strong>Account Name:</strong> Free Law Project
+      <li><strong>Account Number:</strong> 0BP-803-269
+      <li><strong>DTC#:</strong> 0226
+      <li><strong>Tax ID:</strong> {{ EIN_SECRET }}
+    </ul>
+    <p>Once the transaction is complete or if you need assistance, please email donate@free.law so we can verify the transaction, thank you for your support, and issue a tax receipt for your gift. You may find it convenient to email a copy of the letter of authorization from your broker to this address.
+    </p>
 
     <h3>Do you accept BitCoin or other Cryptocurrencies?</h3>
-    <p>No. We used to but the environmental impact of cryptocurrency cannot be ignored. Sorry. You'll have to use normal dollars with us.</p>
+    <p>No. We used to but the environmental impact of cryptocurrency cannot be ignored. Sorry. If you believe in our work we hope you'll use normal dollars to support us.</p>
 
     <div id="other-ways">
       <h3>Are there other ways to help?</h3>
       <p>There are a few yes:</p>
       <ul>
-        <li><p>You can <a href="https://smile.amazon.com/ch/46-3342480">shop using Amazon Smile</a> and give us a percentage of every purchase you make.</p></li>
         <li><p><a href="https://www.paypal.com/us/fundraiser/charity/1686269">PayPal Giving Fund</a> will cover your credit card fees when you donate via their website.</p></li>
         <li><p>You can <a href="https://help.nextdoor.com/s/article/About-Sell-for-Good">donate to Free Law Project when buying and selling on Nextdoor</a> through their "Sell for Good" initiative.</p></li>
         <li><p>You can <a href="https://github.com/sponsors/freelawproject">sponsor Free Law Project via your Github account</a>.</p></li>
         <li><p>You can <a href="https://charity.ebay.com/">donate while buying or selling on Ebay</a>.</p></li>
-        <li><p>Oragnizations can join <a href="https://free.law/become-a-sponsor/">our corporate sponsors program</a>.</p></li>
+        <li><p>Organizations can join <a href="https://free.law/become-a-sponsor/">our corporate sponsors program</a>.</p></li>
       </ul>
       <p>And of course, we are always <a href="{% url "contribute" %}">looking for volunteers</a>.</p>
     </div>
 
     <hr>
-    <h2>Recurring Donations</h2>
+    <h2 id="recurring-qs">Recurring Donations</h2>
     <h3>When are recurring donations charged?</h3>
     <p>Recurring donations are charged monthly on the day that you set up your original monthly contribution. If that day is on the 29th, 30th, or 31st of the month, we will charge you on the 28th of each month instead.
     </p>

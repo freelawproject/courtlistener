@@ -1,0 +1,38 @@
+{% extends "profile/webhooks_base.html" %}
+{% load static %}
+{% load waffle_tags %}
+
+{% block title %} Webhooks &ndash; CourtListener.com{% endblock %}
+
+{% block webhooks-content %}
+  <div class="table-responsive">
+    <table class="table settings-table"
+      hx-ext="loading-states"
+      data-loading-class="hidden"
+      >
+        <thead>
+          <tr class="active">
+            <th>Event&nbsp;type</th>
+            <th>Status</th>
+            <th>URL</th>
+            <th>Failure count</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tr id="webhook_list_loader" class="hidden">
+          <td class="text-center" colspan="4">
+            <i class="fa fa-spinner fa-spin"></i> Loading
+          </td>
+        </tr>
+        <tbody
+          id="webhook_table_body"
+          hx-trigger="load, webhooksListChanged from:body"
+          hx-get="{% url 'webhooks-list' format="html" %}"
+          data-loading-target="#add-webhook"
+          data-loading-class="hidden"
+          hx-target="this"
+          >
+        </tbody>
+      </table>
+    </div>
+{% endblock %}

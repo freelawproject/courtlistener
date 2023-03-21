@@ -1,0 +1,12 @@
+<div class="col-xs-12 v-offset-above-2 v-offset-below-2">
+  <ul class="nav nav-pills">
+    <li class="{% if page == "visualizations_active" %} active {% endif %} medium">
+      <a href="{% url "view_visualizations" %}">
+        <i class="fa fa-line-chart"></i>&nbsp;Active</a>
+    </li>
+    <li class="{% if page == "visualizations_trash" %} active {% endif %} medium">
+      <a href="{% url "view_deleted_visualizations" %}">
+        <i class="fa fa-trash-o"></i>&nbsp;Trash</a>
+    </li>
+  </ul>
+</div>

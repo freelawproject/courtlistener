@@ -1,0 +1,20 @@
+<div class="col-xs-12 v-offset-above-2 v-offset-below-2">
+  <ul class="nav nav-pills centered-tabs">
+    <li class="{% if page == "profile_settings" %} active {% endif %} medium">
+      <a href="{% url "view_settings" %}">
+        <i class="fa fa-user"></i>&nbsp;Profile</a>
+    </li>
+    <li class="{% if page == "profile_recap" %} active {% endif %} medium">
+      <a href="{% url "view_recap_email" %}">
+        <i class="fa fa-envelope"></i>&nbsp;@recap</a>
+    </li>
+    <li class="{% if page == "profile_donations" %} active {% endif %} medium">
+      <a href="{% url "profile_donations" %}">
+        <i class="fa fa-money"></i>&nbsp;Donations</a>
+    </li>
+    <li class="{% if page == "profile_password" %} active {% endif %} medium">
+      <a href="{% url "password_change" %}">
+        <i class="fa fa-lock"></i>&nbsp;Password</a>
+    </li>
+  </ul>
+</div>

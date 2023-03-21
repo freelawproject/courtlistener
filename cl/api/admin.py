@@ -17,7 +17,6 @@ class WebhookAdmin(admin.ModelAdmin):
         "enabled",
         "event_type",
         "version",
-        "failure_count",
     )
     readonly_fields = (
         "date_created",
@@ -25,14 +24,25 @@ class WebhookAdmin(admin.ModelAdmin):
     )
 
 
+class WebhookInline(admin.TabularInline):
+    model = Webhook
+
+
 @admin.register(WebhookEvent)
 class WebhookEventAdmin(admin.ModelAdmin):
+    raw_id_fields = ("webhook",)
     list_display = (
         "__str__",
         "webhook",
+        "date_created",
+        "next_retry_date",
+        "event_status",
         "status_code",
     )
-    list_filter = ("status_code",)
+    list_filter = (
+        "debug",
+        "status_code",
+    )
     readonly_fields = (
         "date_created",
         "date_modified",

@@ -20,7 +20,10 @@ class UPLOAD_TYPE:
     CLAIMS_REGISTER = 9
     DOCUMENT_ZIP = 10
     SES_EMAIL = 11
-
+    CASE_QUERY_PAGE = 12
+    APPELLATE_CASE_QUERY_PAGE = 13
+    CASE_QUERY_RESULT_PAGE = 14
+    APPELLATE_CASE_QUERY_RESULT_PAGE = 15
     NAMES = (
         (DOCKET, "HTML Docket"),
         (ATTACHMENT_PAGE, "HTML attachment page"),
@@ -33,6 +36,10 @@ class UPLOAD_TYPE:
         (CLAIMS_REGISTER, "Claims register page"),
         (DOCUMENT_ZIP, "Zip archive of RECAP Documents"),
         (SES_EMAIL, "Email in the SES storage format"),
+        (CASE_QUERY_PAGE, "Case query page"),
+        (APPELLATE_CASE_QUERY_PAGE, "Appellate Case query page"),
+        (CASE_QUERY_RESULT_PAGE, "Case query result page"),
+        (APPELLATE_CASE_QUERY_RESULT_PAGE, "Appellate Case query result page"),
     )
 
 

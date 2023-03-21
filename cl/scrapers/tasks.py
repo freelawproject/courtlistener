@@ -75,7 +75,7 @@ def update_document_from_text(opinion: Opinion) -> None:
 @app.task(
     bind=True,
     autoretry_for=(requests.ConnectionError, requests.ReadTimeout),
-    max_retries=3,
+    max_retries=5,
     retry_backoff=10,
 )
 def extract_doc_content(
@@ -91,6 +91,27 @@ def extract_doc_content(
 
     This implementation uses local paths.
 
+    After reviewing some related errors on Sentry we realized that some
+    opinions that didn't need OCR were being extracted using OCR.
+
+    Doctor has a method to decide if a document should be extracted using OCR
+    that works by checking if the document contains images. The problem with
+    that is if a PDF that its content is mostly text contains an image (like a
+    stamp or a signature) it'll be fully converted to images to then be
+    extracted using OCR. That's not good in large documents due to the
+    unnecessary use of resources.
+
+    That's why it's better to first try to extract the content without OCR,
+    then if the extraction doesn't return any content try to extract it using
+    OCR.
+    That means that we'll only use OCR for those PDF documents that are fully
+    composed of images.
+
+    Note that this approach won't work well for those documents with mixed
+    content (text pages + images pages) in these cases we'll only extract the
+    text content. Fortunately seems that documents like those are not too
+    common.
+
     :param self: The Celery task
     :param pk: The opinion primary key to work on
     :param ocr_available: Whether the PDF converting function should use OCR
@@ -98,11 +119,13 @@ def extract_doc_content(
     parsing code. This can be useful do spread these tasks out when doing a
     larger scrape.
     """
+
     opinion = Opinion.objects.get(pk=pk)
+
+    # Try to extract opinion content without using OCR.
     response = microservice(
         service="document-extract",
         item=opinion,
-        params={"ocr_available": ocr_available},
     )
     if not response.ok:
         logging.warning(
@@ -112,6 +135,21 @@ def extract_doc_content(
 
     content = response.json()["content"]
     extracted_by_ocr = response.json()["extracted_by_ocr"]
+    # For PDF documents, if there's no content after the extraction without OCR
+    # Let's try to extract using OCR.
+    if (
+        ocr_available
+        and needs_ocr(content)
+        and ".pdf" in str(opinion.local_path)
+    ):
+        response = microservice(
+            service="document-extract-ocr",
+            item=opinion,
+            params={"ocr_available": ocr_available},
+        )
+        if response.ok:
+            content = response.json()["content"]
+            extracted_by_ocr = True
 
     data = response.json()
     extension = opinion.local_path.name.split(".")[-1]
@@ -171,7 +209,49 @@ def extract_recap_pdf(
     ocr_available: bool = True,
     check_if_needed: bool = True,
 ) -> List[int]:
-    """Extract the contents from a RECAP PDF if necessary."""
+    """Celery task wrapper for extract_recap_pdf_base
+    Extract the contents from a RECAP PDF if necessary.
+
+    In order to avoid the issue described here:
+    https://github.com/freelawproject/courtlistener/issues/2103#issuecomment-1206700403
+
+    If a Celery task is called as a synchronous function within another parent
+    task when it fails the parent task will be retried and every retry logged
+    to sentry.
+
+    To avoid logging every retry to sentry a new base method was created:
+    extract_recap_pdf_base that method should be used when a synchronous call
+    is needed within a parent task.
+
+    And this task wrapper should be used elsewhere for asynchronous calls
+    (delay, async).
+
+    :param pks: The RECAPDocument pk or list of pks to work on.
+    :param ocr_available: Whether it's needed to perform OCR extraction.
+    :param check_if_needed: Whether it's needed to check if the RECAPDocument
+    needs extraction.
+
+    :return: A list of processed RECAPDocument
+    """
+
+    return extract_recap_pdf_base(pks, ocr_available, check_if_needed)
+
+
+def extract_recap_pdf_base(
+    pks: Union[int, List[int]],
+    ocr_available: bool = True,
+    check_if_needed: bool = True,
+) -> List[int]:
+    """Extract the contents from a RECAP PDF if necessary.
+
+    :param pks: The RECAPDocument pk or list of pks to work on.
+    :param ocr_available: Whether it's needed to perform OCR extraction.
+    :param check_if_needed: Whether it's needed to check if the RECAPDocument
+    needs extraction.
+
+    :return: A list of processed RECAPDocument
+    """
+
     if not is_iter(pks):
         pks = [pks]
 
@@ -189,19 +269,19 @@ def extract_recap_pdf(
             item=rd,
         )
         if not response.ok:
-            print("Error from microservice")
             continue
 
         content = response.json()["content"]
         extracted_by_ocr = response.json()["extracted_by_ocr"]
-        if ocr_available and needs_ocr(content):
+        ocr_needed = needs_ocr(content)
+        if ocr_available and ocr_needed:
             response = microservice(
-                service="pdf-to-text",
+                service="document-extract-ocr",
                 item=rd,
                 params={"ocr_available": ocr_available},
             )
             if response.ok:
-                content = response.content
+                content = response.json()["content"]
                 extracted_by_ocr = True
 
         has_content = bool(content)
@@ -209,7 +289,7 @@ def extract_recap_pdf(
             case True, True:
                 rd.ocr_status = RECAPDocument.OCR_COMPLETE
             case True, False:
-                if not ocr_available:
+                if not ocr_needed:
                     rd.ocr_status = RECAPDocument.OCR_UNNECESSARY
             case False, True:
                 rd.ocr_status = RECAPDocument.OCR_FAILED

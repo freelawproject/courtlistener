@@ -18,7 +18,7 @@ RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
 
 # poetry
 # https://python-poetry.org/docs/configuration/#using-environment-variables
-ENV POETRY_VERSION=1.1.13 \
+ENV POETRY_VERSION=1.3.2 \
     # make poetry install to this location
     POETRY_HOME="/opt/poetry" \
     # Don't build a virtualenv to save space
@@ -61,7 +61,7 @@ ADD https://raw.githubusercontent.com/freelawproject/courtlistener/main/poetry.l
 ADD https://raw.githubusercontent.com/freelawproject/courtlistener/main/pyproject.toml /opt/pyproject.toml
 
 # install runtime deps - uses $POETRY_VIRTUALENVS_IN_PROJECT internally
-RUN poetry install --no-root
+RUN poetry install --no-root --without dev
 
 ADD https://github.com/freelawproject/courtlistener/archive/main.tar.gz /opt/courtlistener.tar.gz
 WORKDIR /opt
@@ -112,7 +112,7 @@ CMD python /opt/courtlistener/manage.py migrate && \
 FROM python-base as web-prod
 
 CMD gunicorn cl_wsgi:application \
-    --chdir /opt/courtlistener/docker/nginx/wsgi-configs/ \
+    --chdir /opt/courtlistener/docker/django/wsgi-configs/ \
     --user www-data \
     --group www-data \
     # Set high number of workers. Docs recommend 2-4× core count`
@@ -131,3 +131,8 @@ FROM python-base as rss-scraper
 USER www-data
 CMD /opt/courtlistener/manage.py scrape_rss
 
+
+FROM python-base as retry-webhooks
+
+USER www-data
+CMD /opt/courtlistener/manage.py cl_retry_webhooks

@@ -1,0 +1,234 @@
+Return-Path: <matt+caf_=warrenlex=recap.email@warrenlex.com>
+Received: from mail-lf1-f52.google.com (mail-lf1-f52.google.com [209.85.167.52])
+ by inbound-smtp.us-west-2.amazonaws.com with SMTP id 97mckj4ndtpol1pnh6p4dj806b9p0l0n918c7v81
+ for warrenlex@recap.email;
+ Wed, 02 Mar 2022 16:48:18 +0000 (UTC)
+X-SES-Spam-Verdict: PASS
+X-SES-Virus-Verdict: PASS
+Received-SPF: pass (spfCheck: domain of warrenlex.com designates 209.85.167.52 as permitted sender) client-ip=209.85.167.52; envelope-from=matt+caf_=warrenlex=recap.email@warrenlex.com; helo=mail-lf1-f52.google.com;
+Authentication-Results: amazonses.com;
+ spf=pass (spfCheck: domain of warrenlex.com designates 209.85.167.52 as permitted sender) client-ip=209.85.167.52; envelope-from=matt+caf_=warrenlex=recap.email@warrenlex.com; helo=mail-lf1-f52.google.com;
+ dmarc=fail header.from=txwd.uscourts.gov;
+X-SES-RECEIPT: AEFBQUFBQUFBQUFGcnhBVlZuVStqeGFvM09LTlRPZ1RKRDZnbVk1SDZ3cVROZGU0K0pTcTBRS2FJUjhtclZXMWVsOTRrd3d1NWx4ZzQ0Ukt6U0dIcW42R21GbGpGaXJISXJSaGZtS3FKVm9vNzJmdWtaV2JCSVlrMkhKZ3lsaEpVMy9xVVlMbkthMXpyMU1CdHdtVXVOd2cyYkg3LzlXVlRxYUVjS3UzRnRoTXNYczJKRXRPcituOW9vTmlYL3pIMGNncWJzRURuQndld2xuNnJuanpHV011ZXU0TkN2OG1zbTZETFYxRVR6ckdLQ2dxOFZCMjdzT1ptV0FOSEo4L0hXaHIwdnF2REg4Q2RtT1Rma0VtcHJMOFEyVVFCQlZMd1BLb2Q2VlBNWUd5ai9pb0FKZlk3WHB1U1RNUmh4cE9RUVhUTHNWTUVEYTdIb1JCQmhWeEt5Zkc4bEZEellyTVk=
+X-SES-DKIM-SIGNATURE: a=rsa-sha256; q=dns/txt; b=SBUdw00nRQKrOPWzte0xFVIPDeej4D6HVvb8cZTNVSytUqlArDYQABs72Q9Yh94n0BGCTOqcKLh5bb7NX8B/7EvxGE5hBWSt4CvJj5HZbjKMGxheqeB/u/XOzzScoDWRQEll5X4VT4aLMrZtjdCLVxbEThsVziX3135Vc+YE5SY=; c=relaxed/simple; s=7v7vs6w47njt4pimodk5mmttbegzsi6n; d=amazonses.com; t=1646239699; v=1; bh=wE3kQUGsTERU6xQeJaA8NfquuV/P7c7I4kY8pJV7H70=; h=From:To:Cc:Bcc:Subject:Date:Message-ID:MIME-Version:Content-Type:X-SES-RECEIPT;
+Received: by mail-lf1-f52.google.com with SMTP id b11so3810655lfb.12
+        for <warrenlex@recap.email>; Wed, 02 Mar 2022 08:48:18 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=1e100.net; s=20210112;
+        h=x-original-authentication-results:x-gm-message-state:delivered-to
+         :date:mime-version:from:to:message-id:subject;
+        bh=tylkwj7yzxrNt8mP/NE+fOMUJcPz2ugVdbIxuzxzLPY=;
+        b=y6T6XGStS/r96tcPbXZM9AWYdHLmuER+p6qWcy9JF++Dj3dZyhdfVGCCz40WiOnrCb
+         qgV5qvBEY8hnZ4Di4MKNCZjiIqrItwe+o+l7nzXIOChRJuz8u7WH+td86CqsE0p+HIQS
+         YNso4GVfmYakzxqg1aTQ3TFcyqwGKot3uTAcQNuMKwGnjkgyv5GkJ6CdTQJ0ldyO1/+G
+         HZrqdgZGPAM8Qr8jO8xOqBUZaqMwUwKzFKwfEZs8FWwtlGEPKjkNz3xhwk+E93wqJLRh
+         89ZY/pN/8SxyGXMY+xGK8dNgItOVcxG2EqDXWttokANhsgQzeW/LMT1nyZN7wRY2sMX6
+         oo7w==
+X-Original-Authentication-Results: mx.google.com;       spf=pass (google.com: domain of txw_usdc_notice@txwd.uscourts.gov designates 199.107.16.200 as permitted sender) smtp.mailfrom=TXW_USDC_Notice@txwd.uscourts.gov
+X-Gm-Message-State: AOAM5318/2ADA9LUIUltr0Yx/VM5zY3zrPFPKc2Yjyhj3YziCJYUNddP
+	qDxt6J1uyKDbcf4cK8EhWbr09EZZIufPF3lFn6Knw8U5+9tOqvirtiJr
+X-Received: by 2002:a19:e05b:0:b0:443:9ff9:7b4e with SMTP id g27-20020a19e05b000000b004439ff97b4emr18984649lfj.345.1646239696486;
+        Wed, 02 Mar 2022 08:48:16 -0800 (PST)
+X-Forwarded-To: caribou@matters.warrenlex.com, warrenlex@recap.email
+X-Forwarded-For: matt@warrenlex.com caribou@matters.warrenlex.com, warrenlex@recap.email
+Delivered-To: matt@warrenlex.com
+Received: by 2002:a05:651c:204c:0:0:0:0 with SMTP id t12csp155735ljo;
+        Wed, 2 Mar 2022 08:48:14 -0800 (PST)
+X-Google-Smtp-Source: ABdhPJx7KJI305gDgw2Oy2SBY2unIy6ze2zq3IKYh9+oTsu3dVpIFypcI3Qvx/xijnJWiOTrGXF1
+X-Received: by 2002:ac8:5a12:0:b0:2de:894:69ec with SMTP id n18-20020ac85a12000000b002de089469ecmr24649491qta.503.1646239694748;
+        Wed, 02 Mar 2022 08:48:14 -0800 (PST)
+ARC-Seal: i=1; a=rsa-sha256; t=1646239694; cv=none;
+        d=google.com; s=arc-20160816;
+        b=rk6WCImpTusgaGCH1gruJ2a5q5Lg1q3/t4fkiQQOn+R8YgHMnSB9jpVubK/HAIfrSK
+         T1SHY/YX+oFlQoj1ba48tgNG2m5XY7RrZRiu61T0elYwug3Rw5bwa3vKRHxc2B3G0qnD
+         V5aj2C6ZFZvlzJCXK1mLgfto8FrHzS1pBq0CwB16iwrBiVg/0h2esZFICwO7ieUkHrST
+         Z24ifvdNckDVkJWY5YGXHKTUzfRm4RQbNUT2B6DugPL7XZwPRF7tINDkGARTG1n8J9gW
+         MyByKwthkW1z9VsvIlCuPdslO/qNI/1sREhN658Ansl1o57uefhRqh1Efa93aYll9mRX
+         MGyg==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20160816;
+        h=subject:message-id:to:from:mime-version:date;
+        bh=tylkwj7yzxrNt8mP/NE+fOMUJcPz2ugVdbIxuzxzLPY=;
+        b=ZxmTrUaG0girU82vChBACh+5VbcxyQ7dFoYszVH1xivfm8ZB+4vDK0hO3fWFg7WYqP
+         t/XWpeorcX0KpbJSL/zFTGTFBwynsWC+uatQJZ/O5aIZMbPP6DJeG4RoNZ4j254mlJqy
+         v3OI1BmtxUNs+d7OlrbogF6wG0yfp6NpgnVfh6K2tHpwYgly88UK6zzrMiIBdqzBmzRC
+         YfgaosIK3ALuTARWBiva+2gsKGiYiyfGjv2GodNR1u99TcLfDt71qftatdvMWLFMpc0z
+         nbujtLan/BNSRYeqb2Rdbnn7QyYsMxGI6thhc04Sq4vPMrZQzygdi/GHrlncpXJJW2Ic
+         gcbw==
+ARC-Authentication-Results: i=1; mx.google.com;
+       spf=pass (google.com: domain of txw_usdc_notice@txwd.uscourts.gov designates 199.107.16.200 as permitted sender) smtp.mailfrom=TXW_USDC_Notice@txwd.uscourts.gov
+Return-Path: <TXW_USDC_Notice@txwd.uscourts.gov>
+Received: from icmecf101.gtwy.uscourts.gov (icmecf101.gtwy.uscourts.gov. [199.107.16.200])
+        by mx.google.com with ESMTP id c137-20020a379a8f000000b00648ddd14494si5330121qke.248.2022.03.02.08.48.14
+        for <matt@warrenlex.com>;
+        Wed, 02 Mar 2022 08:48:14 -0800 (PST)
+Received-SPF: pass (google.com: domain of txw_usdc_notice@txwd.uscourts.gov designates 199.107.16.200 as permitted sender) client-ip=199.107.16.200;
+Authentication-Results: mx.google.com;
+       spf=pass (google.com: domain of txw_usdc_notice@txwd.uscourts.gov designates 199.107.16.200 as permitted sender) smtp.mailfrom=TXW_USDC_Notice@txwd.uscourts.gov
+X-SBRS: None
+X-REMOTE-IP: 156.119.56.160
+Received: from txwddb.txwd.gtwy.dcn ([156.119.56.160])
+  by icmecf101.gtwy.uscourts.gov with ESMTP; 02 Mar 2022 11:48:13 -0500
+Received: from txwddb.txwd.gtwy.dcn (localhost.localdomain [127.0.0.1])
+	by txwddb.txwd.gtwy.dcn (8.14.4/8.14.4) with ESMTP id 222GlR5o067597;
+	Wed, 2 Mar 2022 10:47:28 -0600
+Received: (from ecf_web@localhost)
+	by txwddb.txwd.gtwy.dcn (8.14.4/8.14.4/Submit) id 222Gkxg7066660;
+	Wed, 2 Mar 2022 10:46:59 -0600
+Date: Wed, 2 Mar 2022 10:46:59 -0600
+X-Authentication-Warning: txwddb.txwd.gtwy.dcn: ecf_web set sender to TXW_USDC_Notice@txwd.uscourts.gov using -f
+MIME-Version:1.0
+From:TXW_USDC_Notice@txwd.uscourts.gov
+To:cmecf_notices@txwd.uscourts.gov
+Message-Id:<26312598@txwd.uscourts.gov>
+Subject:Activity in Case 6:20-cv-00580-ADA WSOU Investments LLC v. Google LLC Redacted Copy
+Content-Type: text/html
+
+<p><strong><font color="#FF0000">This is an automatic e-mail message generated by the CM/ECF system.
+Please DO NOT RESPOND to this e-mail because the mail box is unattended.
+</font><br>***NOTE TO PUBLIC ACCESS USERS*** Judicial Conference of the United States policy permits attorneys of record and parties in a case (including pro se litigants) to receive one free electronic copy of all documents filed electronically, if receipt is required by law or directed by the filer. PACER access fees apply to all other users.  To avoid later charges, download a copy of each document during this first viewing. However, if the referenced document is a transcript, the free copy and 30 page limit do not apply.</strong></p>
+
+
+
+<p align=center><strong>U.S. District Court [LIVE]</strong></p>
+<p align=center><strong>Western District of Texas</strong></p>
+<font size="3" face="arial,helvetica"><b>Notice of Electronic Filing</b></font>
+
+<BR>
+
+<div><BR>
+The following transaction was entered  by Love, Gregory  on 3/2/2022 at 10:46
+AM CST and filed on 3/2/2022 <BR>
+
+
+
+
+<table border=0 cellspacing=0>
+<tr><td><strong>Case Name:</strong>
+</td><td>WSOU Investments LLC v. Google
+LLC</td></tr>
+<tr><td><strong>Case Number:</strong></td><td><A
+HREF=https://ecf.txwd.uscourts.gov/cgi-bin/DktRpt.pl?1099906>6:20-cv-00580-ADA</A></td></tr>
+
+<tr><td><strong>Filer:</strong></td><td>WSOU
+Investments LLC</td></tr>
+
+<tr><td><strong>Document Number:</strong></td>
+<td>
+<a href="https://ecf.txwd.uscourts.gov/doc1/181127791894?caseid=1099906&de_seq_num=275&magic_num=9283121"
+>97</a>
+</td></tr>
+<tr><td><strong></strong></td><td></td></tr>
+</table>
+<p>
+<strong>Docket Text:</strong>
+<BR>
+<FONT  FACE="arial,helvetica" COLOR="#0000cc" SIZE=3><b>
+Redacted Copy <i>Plaintiff's Motion
+to Extend Pretrial Deadlines</i>   of [83]  Sealed Document,    by WSOU Investments
+LLC. (Love, Gregory)
+</b></Font>
+</p>
+
+
+
+
+
+<BR>
+<B>
+6:20-cv-00580-ADA Notice has been electronically mailed to:
+</B>
+<BR>
+
+<BR>
+Alexandra            Fellowes                                           &nbsp
+&nbsp alexandra.fellowes@foliolaw.com, paralegals@foliolaw.com <BR>
+<BR>
+E.                   Leon Carter
+    &nbsp &nbsp lcarter@carterarnett.com, knewsome@carterarnett.com <BR>
+
+<BR>
+Francesca            Miki Shima Germinario
+          &nbsp &nbsp francesca@warrenlex.com <BR>
+<BR>
+Gregory              Phillip Love
+       &nbsp &nbsp greg@swclaw.com, gail@swclaw.com <BR>
+<BR>
+Jennifer             A. Kash
+  &nbsp &nbsp jen@warrenlex.com <BR>
+<BR>
+Joseph               M. Abraham
+  &nbsp &nbsp joseph.abraham@foliolaw.com, 8715384420@filings.docketbird.com,
+paralegals@foliolaw.com <BR>
+<BR>
+Linda                R. Stahl
+  &nbsp &nbsp testing_1@recap.email, chopkins@carterarnett.com <BR>
+<BR>
+Mark                 D. Siegmund
+  &nbsp &nbsp mark@swclaw.com, jenn@swclaw.com, mark@waltfairpllc.com, melissa@swclaw.com
+<BR>
+<BR>
+Matthew              Warren                                             &nbsp
+&nbsp matt@warrenlex.com <BR>
+<BR>
+Michael              C. Pomeroy
+  &nbsp &nbsp mpomeroy@carterarnett.com, mpomeroy23@utexas.edu <BR>
+<BR>
+Michael              E. Jones
+  &nbsp &nbsp mikejones@potterminton.com, amandatekell@potterminton.com,
+CMECF@potterminton.com <BR>
+<BR>
+Patrick              C. Clutter
+  &nbsp &nbsp patrickclutter@potterminton.com, jovallery@potterminton.com
+<BR>
+<BR>
+Scott                W. Breedlove
+  &nbsp &nbsp sbreedlove@carterarnett.com, knewsome@carterarnett.com <BR>
+
+<BR>
+Seth                 A. Lindner
+  &nbsp &nbsp slindner@carterarnett.com, jhaynie@carterarnett.com <BR>
+<BR>
+Steven               T. Skelley
+  &nbsp &nbsp steve.skelley@foliolaw.com, paralegals@foliolaw.com <BR>
+<BR>
+Tharan               Gregory Lanier
+       &nbsp &nbsp tglanier@jonesday.com, jdaniels@jonesday.com, mmisitigh@jonesday.com
+<BR>
+<BR>
+Theresa              M. Dawson
+  &nbsp &nbsp tdawson@carterarnett.com, knewsome@carterarnett.com <BR>
+<BR>
+Timothy              Franklin Dewberry
+        &nbsp &nbsp Timothy.dewberry@foliolaw.com, paralegals@foliolaw.com
+<BR>
+
+<BR>
+
+<B>
+6:20-cv-00580-ADA Notice has been delivered by other means to:
+</B>
+<BR>
+
+
+
+
+
+
+<div>
+<p>
+The following document(s) are associated with this transaction:</p>
+<table>
+<STRONG>Document description:</STRONG>Main Document <BR>
+<STRONG>Original filename:</STRONG>n/a<BR>
+<STRONG>Electronic document Stamp:</STRONG><BR>
+<TAB>[STAMP dcecfStamp_ID=1080075687 [Date=3/2/2022] [FileNumber=26312597-0<BR>
+
+<TAB>] [ba72d37148e4c6662193e153a7a74e76f2c1e47ac187ecc1f4600fea56c045c7e1b<BR>
+
+<TAB>873d1b44cd1d818ac8c406eb586e2b254fd9394c6ed9d46b23cf88e2fa825]]<BR>
+
+
+
+</table>
+</div>
+

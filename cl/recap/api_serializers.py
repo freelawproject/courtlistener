@@ -91,6 +91,8 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
         if attrs["upload_type"] in [
             UPLOAD_TYPE.DOCKET,
             UPLOAD_TYPE.DOCKET_HISTORY_REPORT,
+            UPLOAD_TYPE.CASE_QUERY_PAGE,
+            UPLOAD_TYPE.CASE_QUERY_RESULT_PAGE,
         ]:
             # These are district court dockets. Is the court valid?
             district_court_ids = (
@@ -118,7 +120,12 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
                     "should have claims registry pages." % attrs["court"]
                 )
 
-        if attrs["upload_type"] == UPLOAD_TYPE.APPELLATE_DOCKET:
+        if attrs["upload_type"] in [
+            UPLOAD_TYPE.APPELLATE_ATTACHMENT_PAGE,
+            UPLOAD_TYPE.APPELLATE_DOCKET,
+            UPLOAD_TYPE.APPELLATE_CASE_QUERY_PAGE,
+            UPLOAD_TYPE.APPELLATE_CASE_QUERY_RESULT_PAGE,
+        ]:
             # Appellate court dockets. Is the court valid?
             appellate_court_ids = (
                 Court.federal_courts.appellate_pacer_courts().values_list(
@@ -141,12 +148,22 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
                     "document_number fields completed."
                 )
 
-        if attrs["upload_type"] != UPLOAD_TYPE.PDF:
-            # Everything but PDFs require the case ID.
+        if attrs["upload_type"] not in [
+            UPLOAD_TYPE.PDF,
+            UPLOAD_TYPE.APPELLATE_CASE_QUERY_RESULT_PAGE,
+            UPLOAD_TYPE.CASE_QUERY_RESULT_PAGE,
+        ]:
+            # Everything but PDFs and case query result pages require the case
+            # ID.
             if not attrs.get("pacer_case_id"):
                 raise ValidationError(
                     "PACER case ID is required for for all non-document "
                     "uploads."
+                )
+
+            if "-" in attrs.get("pacer_case_id"):
+                raise ValidationError(
+                    "PACER case ID can not contains dashes -"
                 )
 
         return attrs
@@ -270,6 +287,10 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
                 "Cannot use 'pacer_case_id' parameter "
                 "without 'court' parameter."
             )
+
+        if attrs.get("pacer_case_id") and "-" in attrs.get("pacer_case_id"):
+            raise ValidationError("PACER case ID can not contains dashes -")
+
         if attrs.get("docket_number") and not attrs.get("court"):
             # If a docket_number is included, is a court also?
             raise ValidationError(

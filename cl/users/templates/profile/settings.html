@@ -5,6 +5,9 @@
 {% block nav-account %}active{% endblock %}
 
 {% block content %}
+  {# Navigation Tabs #}
+  {% include "includes/account-tabs.html" %}
+
     <div class="col-xs-12">
         {% if user_form.errors or profile_form.errors %}
             <div class="alert alert-danger">

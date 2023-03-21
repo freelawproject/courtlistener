@@ -4,6 +4,7 @@ from django.contrib import admin
 from cl.recap.models import (
     FjcIntegratedDatabase,
     PacerFetchQueue,
+    PacerHtmlFiles,
     ProcessingQueue,
 )
 
@@ -53,6 +54,19 @@ class PacerFetchQueueAdmin(CursorPaginatorAdmin):
         "user",
         "docket",
         "recap_document",
+    )
+
+
+@admin.register(PacerHtmlFiles)
+class PacerHtmlFilesAdmin(CursorPaginatorAdmin):
+    list_display = (
+        "__str__",
+        "upload_type",
+        "date_created",
+    )
+    readonly_fields = (
+        "date_created",
+        "date_modified",
     )
 
 

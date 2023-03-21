@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.contrib import sitemaps
 from django.db.models import QuerySet
@@ -12,7 +12,22 @@ class AudioSitemap(sitemaps.Sitemap):
     limit = 50_000
 
     def items(self) -> QuerySet:
-        return Audio.objects.order_by("pk")
+        return Audio.objects.filter(blocked=False).order_by("pk")
+
+    def lastmod(self, obj: Audio) -> datetime:
+        return obj.date_modified
+
+
+class BlockedAudioSitemap(sitemaps.Sitemap):
+    changefreq = "daily"
+    limit = 50_000
+    priority = 0.6
+
+    def items(self) -> QuerySet:
+        return Audio.objects.filter(
+            blocked=True,
+            date_blocked__gt=datetime.today() - timedelta(days=30),
+        ).order_by("pk")
 
     def lastmod(self, obj: Audio) -> datetime:
         return obj.date_modified

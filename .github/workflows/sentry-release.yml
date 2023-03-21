@@ -11,11 +11,11 @@ jobs:
     steps:
       - uses: actions/checkout@master
       - name: Create a Sentry.io release
-        uses: tclindner/sentry-releases-action@v1.2.0
+        uses: getsentry/action-release@v1.2.1
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: freelawproject
           SENTRY_PROJECT: courtlistener
         with:
-          tagName: ${{ github.sha }}
+          version: ${{ github.sha }}
           environment: prod

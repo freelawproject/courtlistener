@@ -12,7 +12,6 @@ With your support, we've made a lot of progress over the past year:
 
  - We've added {{ new_doc_count|intcomma }} opinions to our collection.
  - We now have {{ court_count|intcomma }} jurisdictions that can be queried or analyzed in our bulk data files.
- - We've served our bulk data files {{ bulk_data_count|intcomma }} times.
  - We've sent {{ alerts_sent_count|intcomma }} email alerts.
  - We've added a bunch of new features too numerous to mention.
 

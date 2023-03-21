@@ -1,106 +1,59 @@
 {% extends "profile/nav.html" %}
 {% load waffle_tags %}
 
-{% block title %}{% flag "user-webhooks" %}Developer Tools{% else %}API{% endflag %} &ndash; CourtListener.com{% endblock %}
+{% block title %} {{ page_title }} &ndash; CourtListener.com{% endblock %}
 
 {% block nav-api %}active{% endblock %}
 
 {% block content %}
+  {# Navigation Tabs #}
+  {% include "includes/developer-tabs.html" %}
+
   <div class="hidden-xs col-sm-1 col-md-3"></div>
   <div class="col-xs-12 col-sm-10 col-md-6 text-center">
-    <h1>{% flag "user-webhooks" %}Developer Tools{% else %}CourtListener API{% endflag %}</h1>
-    <h3 class="caps gray">REST APIs{% flag "user-webhooks" %}, Webhooks,{% endflag %} and Bulk Data for Developers</h3>
-    <p>The CourtListener API is a powerful, first-of-its-kind tool that programmers can use to access the contents of the CourtListener database. By allowing programmers and researchers to access this data, we hope to fulfill our mission of stimulating legal innovation.
-    </p>
-    <p class="v-offset-above-3"><a href="{% url "api_index" %}" class="btn btn-primary btn-lg">Read the API Documentation</a></p>
 
-    <h3 class="v-offset-above-3">Your API Token</h3>
-    <p>To get started, you need an API token. Keep this private. Yours is:</p>
-    <h4><code>{{ user.auth_token }}</code></h4>
-
-    <h3 class="v-offset-above-3" id="usage">Your Recent Usage</h3>
-    {% with counts=user.profile.recent_api_usage %}
-      {% if not counts %}
-        <p>No usage yet.</p>
-      {% else %}
-        <p>Showing usage counts for past 14 days (days without usage omitted)</p>
-        <table class="table settings-table">
-          <thead>
-          <tr>
-            <th>Date</th>
-            <th>Count</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for date, count in counts.items %}
-              <tr>
-                <td><p class="bottom text-left">
-                  {% if not forloop.last %}
-                    <code>{{ date }}</code>
-                  {% else %}
-                    <strong>{{ date|capfirst }}</strong>
-                  {% endif %}
-                </p></td>
-                <td><p class="bottom text-left">{{ count }}</p></td>
+    {% if page == "api_info" %}
+      <h1>Developer Tools</h1>
+      <h3 class="caps gray">REST APIs and Bulk Data for Developers</h3>
+      <p>The CourtListener API is a powerful, first-of-its-kind tool that programmers can use to access the contents of the CourtListener database. By allowing programmers and researchers to access this data, we hope to fulfill our mission of stimulating legal innovation.
+      </p>
+      <p class="v-offset-above-2"><a href="{% url "api_index" %}" class="btn btn-primary btn-lg">Read the API Documentation</a></p>
+    {% elif page == "api_token" %}
+      <h3 class="v-offset-above-2">Your API Token</h3>
+      <p>To get started, you need an API token. Keep this private. Yours is:</p>
+      <h4><code>{{ user.auth_token }}</code></h4>
+    {% elif page == "api_usage" %}
+      <h3 class="v-offset-above-2" id="usage">Your API Recent Usage</h3>
+      {% with counts=user.profile.recent_api_usage %}
+        {% if not counts %}
+          <p>No usage yet.</p>
+        {% else %}
+          <p>Showing usage counts for past 14 days (days without usage omitted)</p>
+          <table class="table settings-table">
+            <thead>
+            <tr>
+              <th>Date</th>
+              <th>Count</th>
               </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      {% endif %}
-    {% endwith %}
-
-    {% flag "user-webhooks" %}
-    <h3 class="v-offset-above-3">Your Webhooks</h3>
-    <p>Webhooks let you send a signal to your server whenever certain events happen on our website. To create a webhook, use the form below.</p>
-    <p class="v-offset-below-2"><a href="{% url "api_index" %}"#webhooks class="btn btn-default btn-lg">Read the Webhook Documentation</a></p>
-
-    <div class="row text-right">
-      <div class="col-xs-12">
-        <form action="" method="post">{% csrf_token %}
-          <div class="form-group">
-            <div class="row">
-              <label class="col-xs-4">Webhook Event Type</label>
-              <div class="col-xs-8">
-                {{ webhook_form.event_type }}
-                {% if webhook_form.event_type.errors %}
-                  <p class="help-block">
-                    {% for error in webhook_form.event_type.errors %}
-                      {{ error|escape }}
-                    {% endfor %}
-                  </p>
-                {% endif %}
-              </div>
-            </div>
-          </div>
-          <div class="form-group">
-            <div class="row">
-              <label class="col-xs-4">URL</label>
-              <div class="col-xs-8">
-                {{ webhook_form.url }}
-                {% if webhook_form.url.errors %}
-                  <p class="help-block">
-                    {% for error in webhook_form.url.errors %}
-                      {{ error|escape }}
-                    {% endfor %}
-                  </p>
-                {% endif %}
-              </div>
-            </div>
-          </div>
-          <div class="form-group">
-            <div class="row">
-              <label class="col-xs-4">&nbsp;</label>
-              <div class="col-xs-8">
-                <button class="btn btn-primary btn-block" type="submit">
-                  Create Webhook
-                </button>
-              </div>
-            </div>
-          </div>
-        </form>
-      </div>
-    </div>
-    {% endflag %}
+            </thead>
+            <tbody>
+              {% for date, count in counts.items %}
+                <tr>
+                  <td><p class="bottom text-left">
+                    {% if not forloop.last %}
+                      <code>{{ date }}</code>
+                    {% else %}
+                      <strong>{{ date|capfirst }}</strong>
+                    {% endif %}
+                  </p></td>
+                  <td><p class="bottom text-left">{{ count }}</p></td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% endif %}
+      {% endwith %}
+    {% endif %}
   </div>
   <div class="hidden-xs col-sm-1 col-md-3"></div>
 {% endblock %}

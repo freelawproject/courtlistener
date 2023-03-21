@@ -3,6 +3,7 @@ import random
 from faker import Faker
 from faker.providers import BaseProvider
 from juriscraper.lib.string_utils import titlecase
+from reporters_db import REPORTERS
 
 from cl.custom_filters.templatetags.text_filters import oxford_join
 
@@ -80,3 +81,31 @@ class LegalProvider(BaseProvider):
         plaintiff = self._make_random_party(full)
         defendant = self._make_random_party(full)
         return titlecase(f"{plaintiff} v. {defendant}")
+
+    def citation(self) -> str:
+        """Make or fetch a citation e.g. 345 Mass. 76
+
+        Grab a random reporter if it contains a typical full_cite pattern
+        Exclude reporters that rely on regex patterns.
+
+        :return Citation as a string
+        """
+
+        # Filter to only vol-reporter-page reporters
+        reporters = [
+            edition
+            for edition in REPORTERS.keys()
+            if "regexes"
+            not in REPORTERS[edition][0]["editions"][edition].keys()
+        ]
+        reporter = random.choice(reporters)
+        volume = random.randint(1, 999)
+        page = random.randint(1, 999)
+        return f"{volume} {reporter} {page}"
+
+    def random_id_string(self) -> str:
+        """Generate a random integer and convert to string.
+
+        :return: Random integer as string.
+        """
+        return str(random.randint(100_000, 400_000))

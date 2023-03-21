@@ -177,6 +177,33 @@ $(document).ready(function () {
     }
   });
 
+  ///////////////////////////
+  // TOC Collapse Controls //
+  ///////////////////////////
+
+  // when element moves from hidden to shown
+  $('.collapse').on('shown.bs.collapse', function () {
+    // the element's id is the parent element's href target
+    $targetId = $(this).attr('id')
+
+    // "collapse in" check ensures only direct parent affected
+    // the directly related parent element is edited
+    if($(this).attr("class") === "collapse in") {
+      $(`[href="#${$targetId}"]`).html("[–]")
+    }
+  })
+
+  // when element moves from shown to hidden
+  $('.collapse').on('hidden.bs.collapse', function () {
+    // the element's id is the parent element's href target
+    $targetId = $(this).attr('id')
+
+    // "collapse" check ensures only direct parent affected
+    if($(this).attr("class") === "collapse") {
+      $(`[href="#${$targetId}"]`).html("[+]")
+    }
+  })
+
   ///////////////
   // Show More //
   ///////////////
@@ -256,6 +283,24 @@ $(document).ready(function () {
       document.cookie = "recap_install_plea" + "=" + 'true' + expires + "; path=/";
     }
   });
+
+  // Append the base docket query to the user input and submit the search.
+  function submit_search_query(selector_id) {
+    window.location = $(selector_id).attr('href') + ' ' + $('#de-filter-search').val();
+    return false;
+  }
+  // Make the docket entries search box work on click.
+  $('#search-button-de-filter').on('click', function (e) {
+    e.preventDefault();
+    submit_search_query('#search-button-de-filter');
+  });
+  // Make the docket entries search box work on "Enter".
+  $('#de-filter-search').on('keypress', function (e) {
+    if (e.keyCode == 13) {
+      submit_search_query('#search-button-de-filter');
+    }
+  });
+
 });
 
 
@@ -280,3 +325,21 @@ function debounce(func, wait, immediate) {
     if (callNow) func.apply(context, args);
   };
 };
+
+/*
+  Method to copy the content from a textarea to the clipboard.
+*/
+function copy_text(selector_id) {
+  let text_area = document.getElementById(selector_id).closest('textarea');
+  text_area.select();
+  navigator.clipboard.writeText(text_area.value);
+}
+
+/*
+  Disable the signup form submit button on submit to avoid repeated submissions.
+*/
+const form = document.getElementById('register-form');
+let button = document.getElementById('register-button');
+form.addEventListener('submit', function () {
+  button.disabled = true;
+});

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
-{% load text_filters %}
-{% load partition_util %}
+{% load extras partition_util text_filters %}
+
+{% block canonical %}{% get_canonical_element %}{% endblock %}
 
 
 {% block sidebar %}{% endblock %}
@@ -29,7 +30,7 @@
       <p>Sorry about this. Please try again or try looking up a different reporter abbreviation.
       </p>
       <p class="v-offset-above-2">
-        <a href="{% url "citation_redirector" %}"
+        <a href="{% url "citation_homepage" %}"
            class="btn btn-primary btn-lg">Look Up Another Citation</a></p>
     </div>
   {% elif no_volumes or no_cases %}
@@ -40,7 +41,7 @@
       </p>
       <p>Sorry about this.</p>
       <p class="v-offset-above-2">
-        <a href="{% url "citation_redirector" %}"
+        <a href="{% url "citation_homepage" %}"
            class="btn btn-primary btn-lg">Look Up Another Citation</a></p>
     </div>
   {% elif volumes %}
@@ -89,7 +90,10 @@
     {% for case in cases %}
       <article class="{% cycle "odd" "even" %}">
       <h3 class="bottom serif">
-        <a href="{{ case.get_absolute_url }}" class="visitable">{{ case|best_case_name|safe|v_wrapper }}</a>
+        <a href="{{ case.get_absolute_url }}"
+           class="visitable"
+           {% if case.blocked %}rel="nofollow"{% endif %}
+        >{{ case|best_case_name|safe|v_wrapper }}</a>
       </h3>
       <div class="bottom">
         <div class="inline-block">
@@ -104,7 +108,7 @@
         {% if case.docket.docket_number %}
           <div class="inline-block">
             <span class="meta-data-header">Docket Number:</span>
-            <span class="meta-data-value">{{ case.docket.docket_number }}</span>
+            <span class="meta-data-value select-all">{{ case.docket.docket_number }}</span>
           </div>
         {% endif %}
       </div>

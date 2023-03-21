@@ -1,8 +1,17 @@
 /* --------------------------------------------------------------------------
 Sets up all the overrides or additional CSS that the site uses.
 ---------------------------------------------------------------------------*/
-::-moz-selection {background: #AE0B0B; color: #fff; text-shadow: none;}
-::selection {background: #AE0B0B; color: #fff; text-shadow: none;}
+::-moz-selection {
+  background: #AE0B0B;
+  color: #fff;
+  text-shadow: none;
+}
+
+::selection {
+  background: #AE0B0B;
+  color: #fff;
+  text-shadow: none;
+}
 
 .navbar-brand {
   padding: 16px 15px 16px 30px;
@@ -17,6 +26,7 @@ header {
   margin-bottom: 0;
   border-bottom: 1px solid #e7e7e7;
 }
+
 .navbar-toggle {
   margin-bottom: 0;
 }
@@ -36,16 +46,20 @@ header {
   border-bottom: 3px solid transparent;
   color: #555555;
 }
+
 .subnav {
   min-height: 0;
   border-top: 0;
 }
+
 .subnav .navbar-nav {
   margin: 0;
 }
+
 .subnav .navbar-nav > li {
   float: left;
 }
+
 #navbar-r a:after {
   content: "PACER";
   display: block;
@@ -78,7 +92,7 @@ header {
   color: #AE0B0B;
 }
 
-.navbar-default .navbar-nav > li > a.donate:hover{
+.navbar-default .navbar-nav > li > a.donate:hover {
   color: #d90c0c;
 }
 
@@ -97,6 +111,7 @@ header {
 #search-results {
   margin-top: 23px;
 }
+
 #search-results article {
   padding-top: 10px;
 }
@@ -105,6 +120,7 @@ header {
 .table-hover > tbody > tr:target {
   background-color: #f5f5f5;
 }
+
 /* Standard target color. */
 *:target {
   background-color: lightyellow;
@@ -146,6 +162,7 @@ a.button:active {
   /* border:1px solid #6299c5; */
   color: #fff;
 }
+
 .shadow {
   box-shadow: 2px 2px 5px #000000;
 }
@@ -156,81 +173,128 @@ a.button:active {
   margin-top: 4em;
 }
 
+.filter-box #main-query-box {
+  margin-bottom: 0;
+  margin-top: 0;
+  padding-bottom: 1rem;
+}
+.filter-box #main-query-box .input-group {
+    vertical-align: middle;
+    display: flex;
+}
 
 @media (max-width: 767px) {
   #homepage #main-query-box {
     margin-bottom: 2em;
   }
+
   #main-query-box #id_q {
     width: 250px;
   }
+
   #main-query-box .input-group {
     display: inline-table;
     vertical-align: middle;
   }
+
   #main-query-box .input-group-btn {
     width: auto;
   }
+
   #main-query-box .form-group {
     display: inline-block;
     margin-bottom: 0;
     vertical-align: middle;
   }
+
   .headshot { /* shrink photos on about page for phone size*/
     height: 135px;
     width: 135px;
   }
+
   #court-picker-tabs {
     padding-top: 15px;
   }
+
   #donate-image {
     text-align: start;
   }
+
   .dl-horizontal dd {
     margin-left: 15px;
   }
-  .broken-email-banner{
+
+  .broken-email-banner {
     padding-right: 0px;
   }
-  .broken-email-banner .navbar-text{
+
+  .broken-email-banner .navbar-text {
     float: left;
   }
 }
+
 @media (min-width: 768px) {
   #main-query-box #id_q {
     width: 400px;
   }
+
+  .filter-box #main-query-box .input-group-btn {
+    width: auto;
+  }
+
   #above-main-query {
     margin-top: 6em;
   }
+
   #advanced-search {
     margin-bottom: 6em;
   }
+
   #advanced-search p:not(:first-child) {
     margin-top: 1.5em;
   }
+
   #court-picker-tabs {
     text-align: right;
   }
+
   .dl-horizontal dt {
     white-space: normal;
     width: 100px;
   }
+
   .dl-horizontal dd {
     margin-left: 120px;
   }
+
+  .filter-box #de-filter-search{
+  font-size: 12px;
+  }
+
+  #de-filter-search::placeholder{
+    font-size: 12px;
+  }
+
 }
+
 @media (min-width: 992px) {
   #main-query-box #id_q {
     width: 600px;
   }
+
+  .filter-box #main-query-box {
+  padding-bottom: 0;
+  }
+
   .lg-v-offset-below-3 {
     padding-bottom: 40px;
   }
+
   .col-md-offset-half {
     margin-left: 4.166666666%;
   }
 }
+
 @media (min-width: 1200px) {
   #main-query-box #id_q {
     width: 800px;
@@ -250,9 +314,11 @@ a.button:active {
 .x-large {
   font-size: 25px;
 }
+
 .large {
   font-size: 21px;
 }
+
 .medium {
   font-size: 15px;
 }
@@ -262,6 +328,7 @@ a.button:active {
   font-size: 20px;
   border-radius: 9px;
 }
+
 .btn-close {
   padding-left: 3px;
   padding-right: 3px;
@@ -323,6 +390,7 @@ a.button:active {
 .inline {
   display: inline;
 }
+
 .inline-block {
   display: inline-block;
 }
@@ -353,6 +421,7 @@ a.black-link:focus {
 .gray, .grey {
   color: gray;
 }
+
 .gold {
   color: gold;
 }
@@ -360,9 +429,11 @@ a.black-link:focus {
 .red {
   color: #8a1f11;
 }
+
 .green {
   color: green;
 }
+
 .white-background {
   background-color: white;
 }
@@ -378,6 +449,7 @@ a.black-link:focus {
 .left {
   float: left;
 }
+
 .center {
   text-align: center;
 }
@@ -422,20 +494,61 @@ mark {
 }
 
 /* For adding vertical whitespace */
-.v-offset-above-1 {margin-top: 10px;}
-.v-offset-above-2 {margin-top: 20px;}
-.v-offset-above-3 {margin-top: 40px;}
-.v-offset-above-4 {margin-top: 60px;}
-.v-offset-above-5 {margin-top: 80px;}
-.v-offset-above-6 {margin-top: 100px;}
-.v-offset-above-7 {margin-top: 150px;}
-.v-offset-below-1 {margin-bottom: 10px;}
-.v-offset-below-2 {margin-bottom: 20px;}
-.v-offset-below-3 {margin-bottom: 40px;}
-.v-offset-below-4 {margin-bottom: 60px;}
-.v-offset-below-5 {margin-bottom: 80px;}
-.v-offset-below-6 {margin-bottom: 100px;}
-.v-offset-below-7 {margin-bottom: 150px;}
+.v-offset-above-1 {
+  margin-top: 10px;
+}
+
+.v-offset-above-2 {
+  margin-top: 20px;
+}
+
+.v-offset-above-3 {
+  margin-top: 40px;
+}
+
+.v-offset-above-4 {
+  margin-top: 60px;
+}
+
+.v-offset-above-5 {
+  margin-top: 80px;
+}
+
+.v-offset-above-6 {
+  margin-top: 100px;
+}
+
+.v-offset-above-7 {
+  margin-top: 150px;
+}
+
+.v-offset-below-1 {
+  margin-bottom: 10px;
+}
+
+.v-offset-below-2 {
+  margin-bottom: 20px;
+}
+
+.v-offset-below-3 {
+  margin-bottom: 40px;
+}
+
+.v-offset-below-4 {
+  margin-bottom: 60px;
+}
+
+.v-offset-below-5 {
+  margin-bottom: 80px;
+}
+
+.v-offset-below-6 {
+  margin-bottom: 100px;
+}
+
+.v-offset-below-7 {
+  margin-bottom: 150px;
+}
 
 .radio-list ul {
   /* Django creates radio items as a list, but they need to be wrapped in a
@@ -444,15 +557,27 @@ mark {
   padding-left: 0;
 }
 
-.serif{ font-family: "Warnock Pro","Palatino","Book Antiqua",Georgia,serif; }
-.serif-text{
+.serif {
+  font-family: "Warnock Pro", "Palatino", "Book Antiqua", Georgia, serif;
+}
+
+.serif-text {
   font-family: Georgia, "Times New Roman", Times, serif;
   font-size: 15px;
   letter-spacing: 0.2px;
 }
-.meta-data-header{ font-weight: bold; }
-.meta-data-value{ margin-right: 2em; }
 
+.meta-data-header {
+  font-weight: bold;
+}
+
+.meta-data-value {
+  margin-right: 2em;
+}
+
+.select-all {
+  user-select: all;
+}
 
 /* layout */
 body {
@@ -466,7 +591,7 @@ body {
   border-right: 1px solid #c2c2c2;
 }
 
-#id_q {
+#id_q, #de-filter-search{
   border-color: #a6a6a6 #a6a6a6 #a6a6a6 #a6a6a6;
   border-style: solid none solid solid;
   border-width: 1px 0px 1px 1px;
@@ -527,7 +652,7 @@ div.shown ul {
 #all-summaries hr,
 #cited-by hr,
 #visualizations hr,
-#recommendations hr{
+#recommendations hr {
   margin-bottom: 2px;
 }
 
@@ -554,6 +679,7 @@ div.shown ul {
   padding: 3px 0 2px 0;
   border-bottom: 1pt solid #DDD;
 }
+
 #docket-list > ul > li {
   /* Use > b/c we don't want rule applying to drop downs */
   list-style-type: none;
@@ -565,14 +691,19 @@ div.shown ul {
   padding-inline-start: 15px;
   border-bottom: 1pt solid #DDD;
 }
+
 #summaries li {
   padding-bottom: 5px;
 }
-.bullet-tail:after{
+
+.bullet-tail:after {
   content: " \2022";
   padding: 0.5em;
 }
-.bullet-tail:last-child:after { content: none; }
+
+.bullet-tail:last-child:after {
+  content: none;
+}
 
 .group-summaries {
   padding: 0 1em 0 1em !important;
@@ -585,6 +716,7 @@ div.shown ul {
 .toggle-group-summaries {
   padding: 0;
 }
+
 .toggle-group-summaries:focus {
   outline: none;
 }
@@ -658,6 +790,7 @@ input.court-checkbox, input.status-checkbox {
 #id_q:focus {
   outline-style: none;
 }
+
 #new-search-chooser {
   float: right;
 }
@@ -665,14 +798,17 @@ input.court-checkbox, input.status-checkbox {
 .nojs #sidebar-search-form {
   display: none;
 }
+
 #pagination-left {
   float: left;
   width: 200px;
 }
+
 #pagination-center {
   margin: auto;
   text-align: center;
 }
+
 #pagination-right {
   float: right;
   width: 200px;
@@ -683,17 +819,21 @@ input.court-checkbox, input.status-checkbox {
 #id_entry_gte, #id_entry_lte {
   width: 60px;
 }
+
 #id_filed_after, #id_filed_before {
   width: 120px;
 }
+
 #docket-entry-table .row {
   padding-top: 8px;
   border-bottom: 1px solid #dddddd;
 }
+
 #docket-entry-table .recap-documents.row {
   padding-top: 0px;
   border-bottom: none;
 }
+
 .representation {
   margin-top: 8.5px;
 }
@@ -740,12 +880,15 @@ a:focus, a:hover {
 a {
   color: #009;
 }
+
 a:visited.visitable {
   color: #9d11b3;
 }
+
 a.gray:hover, a.gray:focus, a.grey:hover, a.grey:focus {
   color: gray;
 }
+
 #share-links a:hover {
   text-decoration: none;
 }
@@ -756,29 +899,35 @@ a.gray:hover, a.gray:focus, a.grey:hover, a.grey:focus {
   position: absolute;
   color: #999999;
 }
+
 #resource-org-text p.indent {
   position: relative;
   margin-left: 2em;
   margin-top: 1.5em;
 }
+
 #resource-org-text div.footnotes {
   border-top: 1px dotted black;
   padding-top: 1em;
 }
+
 #resource-org-text div.footnote > p {
   margin-left: 2em;
 }
+
 #resource-org-text div.prelims {
   background: none repeat scroll 0 0 #eeeeee;
   border: 1px solid #dddddd;
   padding-top: 1.5em;
 }
+
 #resource-org-text div.prelims p {
   position: relative;
   margin-left: 2em;
   margin-right: 2em;
   margin-top: 0;
 }
+
 #resource-org-text p.parties {
   text-align: center;
   font-size: 1.25em;
@@ -790,12 +939,14 @@ a.gray:hover, a.gray:focus, a.grey:hover, a.grey:focus {
   color: #000099;
   position: absolute;
 }
+
 #resource-org-text p a.footnote {
   /* make footnotes superscript */
   vertical-align: text-top;
   font-size: 70%;
   color: #000099;
 }
+
 /* End Resource.org display CSS */
 
 
@@ -806,13 +957,20 @@ a.gray:hover, a.gray:focus, a.grey:hover, a.grey:focus {
   padding-bottom: 0.75em;
   font-weight: bold;
 }
+
 #lawbox-text h2 {
   font-size: 1.25em;
   font-weight: bold;
 }
-span.star-pagination {
-  color: #999999;
+#lawbox p {
+  line-height: 2em;
+  font-size: 16px;
 }
+
+span.star-pagination {
+  color: #555555;
+}
+
 span.star-pagination::after {
   display: inline;
   position: relative;
@@ -827,6 +985,7 @@ span.star-pagination::after {
 blockquote span.star-pagination::after {
   left: -2.5em;
 }
+
 /* End lawbox display CSS */
 
 
@@ -846,7 +1005,7 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
   cursor: default;
 }
 
-/* Save favorites and modal box configs */
+/* Save notes and modal box configs */
 .modal {
   box-shadow: 2px 2px 5px #000000;
   border: 1px solid #dddddd;
@@ -860,9 +1019,11 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
   width: 95%;
   max-width: 950px;
 }
+
 #modal-court-picker p.inline {
   margin-left: 10px;
 }
+
 #modal-court-picker a.close {
   font-size: 2em;
   position: relative;
@@ -890,30 +1051,36 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
   float: none;
   display: inline-block;
 }
+
 .nav-tabs a {
   text-transform: uppercase;
 }
-#modal-save-favorite .modal-dialog {
+
+#modal-save-note .modal-dialog {
   width: 430px;
 }
-#modal-save-favorite textarea, #modal-save-favorite input {
+
+#modal-save-note textarea, #modal-save-note input {
   width: 404px !important;
 }
-#save-favorite-text-area {
+
+#save-note-text-area {
   height: auto;
 }
 
-#modal-save-favorite .save-favorite-button {
+#modal-save-note .save-note-button {
   margin-right: 0;
 }
 
-#favorites-bottom-section {
+#notes-bottom-section {
   margin-top: 5.5em;
 }
-#save-favorite-delete {
+
+#save-note-delete {
   margin-bottom: 0.3em;
 }
-#favorites-buttons {
+
+#notes-buttons {
   position: absolute;
   right: 1em;
   bottom: 0.3em;
@@ -923,28 +1090,29 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 .settings-table {
   border-collapse: collapse;
 }
+
 .settings-table th {
   border-width: 0 0 1px 0;
   border-style: solid;
   border-color: gray;
 }
+
 .settings-table tr {
   border-width: 0 0 1px 0;
   border-style: dotted;
   border-color: gray;
 }
+
 .settings-table tr:last-child {
   border-width: 0;
 }
+
 .settings-table tbody tr:hover {
   background-color: #f0f0f0;
 }
+
 #copy-input {
   width: 118px;
-}
-#favorites-star {
-  font-size: 1.5em;
-  margin-right: 0.5em;
 }
 
 .help-block {
@@ -955,13 +1123,16 @@ button[disabled]:active, button[disabled]:hover, button[disabled] {
 body.embed {
   background-color: white;
 }
+
 body.embed div.container {
   border: 0 none;
   margin: 0;
 }
+
 body.embed div#title-block {
   margin-bottom: 0;
 }
+
 body.embed .plottable .axis text {
   font-size: 10px;
 }
@@ -992,20 +1163,25 @@ body.embed .caseHoverText {
 .plottable-colors-1 {
   background-color: orangered;
 }
+
 #table {
   overflow-y: auto;
   max-height: 450px;
 }
+
 #viz-page .tooltip-inner {
   text-align: left;
 }
+
 #viz-homepage #background-chart {
   position: absolute;
 }
+
 #viz-homepage #background-chart svg {
   filter: url(#blur);
   filter: blur(1px);
 }
+
 #viz-homepage .white-out {
   background-color: rgba(255, 255, 255, 0.65);
   z-index: 1;
@@ -1022,6 +1198,7 @@ body.embed .caseHoverText {
 .twitter-typeahead .tt-hint {
   margin-bottom: 0;
 }
+
 .tt-menu {
   max-height: 150px;
   overflow-y: auto;
@@ -1035,20 +1212,25 @@ body.embed .caseHoverText {
   box-shadow: 0 6px 12px rgba(0, 0, 0, 0.175);
   background-clip: padding-box;
 }
+
 .tt-suggestion {
   display: block;
   padding: 3px 20px;
 }
+
 .tt-suggestion:hover {
   color: #fff;
   background-color: #AE0B0B;
 }
+
 .tt-suggestion.tt-is-under-cursor a {
   color: #fff;
 }
+
 .tt-suggestion p {
   margin: 0;
 }
+
 .twitter-typeahead, .tt-hint, .tt-input, .tt-menu {
   width: 100%;
 }
@@ -1069,6 +1251,7 @@ body.embed .caseHoverText {
   background-color: #e5ecf9;
   line-height: 1.2em;
 }
+
 .tag:after {
   content: "\25CF";
   position: absolute;
@@ -1098,7 +1281,7 @@ img:not([width]):not([height]) {
 }
 
 .courtsummary {
-  padding:20px;
+  padding: 20px;
 }
 
 .courtcasedocbody > hr {
@@ -1120,6 +1303,7 @@ emphasis {
 .caseopinions > div > bodytext > p {
   text-indent: 10px;
 }
+
 /* END Tax specific css tweak*/
 
 /*Improve contrast on alert boxes*/
@@ -1131,7 +1315,116 @@ emphasis {
 .alert-dismissible .btn-default {
   border-color: #999999;
 }
-.h-captcha > div{
-  color: #333333!important;
+
+.h-captcha > div {
+  color: #333333 !important;
   font-family: Helvetica;
+}
+
+/* Profile tabs styles */
+.centered-tabs {
+  display: inline-flex;
+  width: 100%;
+  justify-content: center;
+}
+
+.left-tabs {
+  display: inline-flex;
+  width: 100%;
+  justify-content: left;
+}
+
+@media (max-width: 767px) {
+  .centered-tabs {
+    display: block;
+    justify-content: left;
+  }
+}
+
+.recap-email-toggle .toggle {
+  width: 6rem;
+}
+
+.recap-email-toggle label {
+  line-height: 10px;
+}
+
+/* END Profile tabs styles */
+
+/* Webhooks styles */
+.webhooks .panel-body {
+  padding: 0px;
+}
+
+.webhooks .panel-heading {
+  background-color: white;
+}
+
+.empty-webhooks {
+  padding: 1rem;
+}
+
+.justify-content-end {
+  justify-content: flex-end;
+}
+
+.mr-1 {
+  margin-right: 0.25em;
+}
+
+[data-loading] {
+  display: none;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.dummy-area{
+  position:relative;
+}
+
+.copy-text-icon {
+    color: #999;
+    font-size: 1.5em;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    cursor: pointer;
+}
+
+.copy-text-icon:hover{
+  color: #222;
+}
+
+.webhook-detail{
+  padding: 1em;
+}
+.webhook-child {
+    padding-left: 1rem;
+}
+
+.payload p{
+  margin: 0 0 5px;
+}
+.payload hr{
+  margin-top: 5px;
+  margin-bottom: 5px;
+}
+#toc > ul > ul,
+#toc > ul > li > ul {
+  padding-inline-start: 20px;
+}
+/* END Webhooks styles */
+
+
+/* Prevent images inside opinion from overflowing */
+#opinion-content img {
+  max-width: 100%;
+  height: auto;
 }

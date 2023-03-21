@@ -1,0 +1,59 @@
+<div class="row form-group">
+    <label class="col-md-3">Endpoint URL: </label><p class="col-md-9">{{ webhook.url }}</p>
+</div>
+
+<ul class="nav nav-tabs">
+  <li class="active"><a data-toggle="tab" href="#json">As JSON</a></li>
+  <li><a data-toggle="tab" href="#curl">As cURL</a></li>
+</ul>
+
+<div class="tab-content">
+  <div id="json" class="tab-pane fade in active">
+    <div class="row form-group">
+      <div class="col-xs-12">
+        <div class="dummy-area v-offset-above-2">
+          <div class="copy-text-icon" onclick="copy_text('dummy_data')"><i class="fa fa-copy"></i></div>
+          <textarea readonly class="form-control" id="dummy_data" rows="6">{{ dummy_content }}</textarea>
+        </div>
+      </div>
+    </div>
+  {% if  webhook.event_type in event_types %}
+    <div class="row form-group">
+      <div class="col-xs-12" hx-ext="loading-states" data-loading-states>
+        <button id="webhook-send-test" class="btn btn-primary"
+                hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                hx-post="{% url "webhooks-test-webhook" pk=webhook.id format='json' %}"
+                hx-target="#webhook-test-sent"
+                data-loading-target="#webhook-send-test"
+                data-loading-disable
+                >
+              Send Webhook Test Event
+              <i data-loading class="fa fa-spinner fa-spin"></i>
+              <i id="webhook-test-sent" class="hidden fa fa-check-square-o"></i>
+        </button>
+        <a href="{% url "view_webhook_logs" "test-logs" %}" id="view-in-logs-button" type="button" class="btn btn-success">View Test Logs</a>
+      </div>
+    </div>
+  {% endif %}
+  </div>
+  <div id="curl" class="tab-pane fade">
+    <div class="row form-group">
+      <div class="col-xs-12">
+        <div class="dummy-area v-offset-above-2">
+          <div class="copy-text-icon" onclick="copy_text('dummy_curl')"><i class="fa fa-copy"></i></div>
+          <textarea readonly class="form-control v-offset-below-1" id="dummy_curl" rows="6">{{ dummy_curl }}</textarea>
+          <label for="dummy_curl">Use this command locally to replicate this event from our servers.</label>
+        </div>
+        {% if webhook.event_type in event_types %}
+          <button id="webhook-curl" class="btn btn-primary" onclick="copy_text('dummy_curl')">Copy Command</button>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-footer">
+  <p>
+    <button type="button" class="btn btn-secondary" data-dismiss="modal" data-loading-disable>Close</button>
+  </p>
+</div>

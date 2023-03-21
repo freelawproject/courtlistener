@@ -1,9 +1,13 @@
 from django.core.management.base import CommandParser
 
+from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
+from cl.api.factories import WebhookEventWithParentsFactory
+from cl.audio.factories import AudioWithParentsFactory
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.people_db.factories import PersonFactory, PersonWithChildrenFactory
 from cl.recap.factories import FjcIntegratedDatabaseFactory
 from cl.search.factories import (
+    CitationWithParentsFactory,
     CourtFactory,
     DocketEntryWithParentsFactory,
     DocketFactory,
@@ -12,7 +16,7 @@ from cl.search.factories import (
     OpinionWithParentsFactory,
     ParentheticalWithParentsFactory,
 )
-from cl.users.factories import SuperUserFactory, UserFactory
+from cl.users.factories import UserFactory
 
 FACTORIES = {
     # Search app
@@ -28,7 +32,15 @@ FACTORIES = {
     201: PersonWithChildrenFactory,
     # Users
     300: UserFactory,
-    301: SuperUserFactory,
+    # Citations
+    400: CitationWithParentsFactory,
+    # Alerts
+    500: DocketAlertWithParentsFactory,
+    501: AlertFactory,
+    # Audio
+    600: AudioWithParentsFactory,
+    # API
+    700: WebhookEventWithParentsFactory,
 }
 factories_str = "\n".join([f"{k}: {v}" for k, v in FACTORIES.items()])
 
@@ -44,7 +56,7 @@ class Command(VerboseCommand):
             help=f"How many items to create",
         )
         parser.add_argument(
-            "--object-types",
+            "--make-objects",
             type=int,
             nargs="+",
             required=False,
@@ -52,30 +64,51 @@ class Command(VerboseCommand):
             f"(multiple numbers allowed, separated by spaces): "
             f"\n{factories_str}",
         )
+        parser.add_argument(
+            "--list-objects",
+            action="store_true",
+            required=False,
+            help="Print the list of possible objects",
+        )
 
     def handle(self, *args, **options) -> None:
         super(Command, self).handle(*args, **options)
+
+        if options["list_objects"]:
+            for number, obj in FACTORIES.items():
+                print(f"{number}:\t{obj}")
+            exit(0)
+
         count = options["count"]
         logger.info(
             f"Creating dummy data. Making at least {count} "
             f"objects of each type."
         )
-        if options["object_types"] is None:
+        if options["make_objects"] is None:
             # Just make a bit of everything. Start with a docket and build all
             # the children below it.
-            logger.info(
-                f"Making {count} dockets and all their dependent objects"
-            )
-            DocketWithChildrenFactory.create_batch(count)
-            logger.info(f"Making {count} judges and all their positions")
-            PersonWithChildrenFactory.create_batch(count)
-            logger.info(f"Making {count} users and super users")
-            UserFactory.create_batch(count)
-            SuperUserFactory.create_batch(count)
+            for note, Factory in (
+                (
+                    "dockets and all their dependent objects",
+                    DocketWithChildrenFactory,
+                ),
+                ("judges and all their positions", PersonWithChildrenFactory),
+                ("users and super users", UserFactory),
+                (
+                    "citations and their parent objects",
+                    CitationWithParentsFactory,
+                ),
+                (
+                    "docket alerts and their parent objects",
+                    DocketAlertWithParentsFactory,
+                ),
+            ):
+                logger.info(f"Making {count} {note}")
+                Factory.create_batch(count)
         else:
             # The user requested something specific. Build that thing and all
             # the parents above it.
-            for object_type in options["object_types"]:
+            for object_type in options["make_objects"]:
                 Factory = FACTORIES[object_type]
                 logger.info(
                     f"Making {count} items and their dependant parents using "

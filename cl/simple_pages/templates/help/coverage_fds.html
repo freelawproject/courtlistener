@@ -1,0 +1,221 @@
+{% extends 'base.html' %}
+{% load static humanize %}
+
+{% block title %}Financial Disclosure Coverage – CourtListener.com{% endblock %}
+{% block sidebar %}{% endblock %}
+{% block navbar-fd %}active{% endblock %}
+
+
+{% block content %}
+  <div class="hidden-xs hidden-sm col-md-3">
+    <div id="toc">
+      <h3>Table of Contents</h3>
+      <ul>
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#totals">Yearly Totals</a></li>
+        <li><a href="#enhancements">Our Enhancements</a></li>
+        <li><a href="#gaps">Data Gaps</a></li>
+      </ul>
+    </div>
+  </div>
+
+
+  <div class="col-xs-12 col-md-8 col-lg-6">
+    <h1 id="overview">Data Coverage &mdash; What Financial Disclosures Do We&nbsp;Have?</h1>
+    <p>The <a href="https://www.govinfo.gov/content/pkg/USCODE-2010-title5/pdf/USCODE-2010-title5-app-ethicsing.pdf"> Ethics in Government Act of 1978</a> requires that senior government officials file annual disclosures listing their personal financial interests. In the Judicial Branch, this law applies to certain judicial employees and all judges. Once filed, these disclosures are generally available to the public for six years. After that time has elapsed the statute generally <a href="https://www.law.cornell.edu/uscode/text/5a/compiledact-95-521/title-I/section-105">requires that disclosures be "destroyed."</a>
+    </p>
+    <p>Historically, these disclosures were not collected systematically because it was too difficult to do so. Each disclosure had to be requested individually by fax, and had to be paid for by check. A big change to this policy came in the <a href="https://www.uscourts.gov/sites/default/files/2017-03_0.pdf#page=12">March, 2017 meeting of the Judicial Conference</a>, where they created a new policy that allowed the disclosures to be released on "electronic storage devices…at no cost to the requestor."
+    </p>
+    <p>This was a monumental change in policy, and since that time, <strong>Free Law Project has requested all of the judicial disclosures that are legally available</strong>. The Ethics in Government Act also requires certain judicial personnel to complete financial disclosures. We have requested these as well, but asked that the request be fulfilled as a lower priority than the judicial disclosures.
+    </p>
+    <p>At this time, we have received over <a href="https://twitter.com/FreeLawProject/status/1301921783151341568">a dozen thumb drives from the Financial Disclosures Office</a>.
+    </p>
+
+    <p>
+      <img src="{% static "jpeg/disclosure-thumb-drives.jpeg" %}"
+           width="992"
+           height="309"
+           class="img-responsive img-rounded"
+           alt="Picture of thumb drives"
+      >
+    </p>
+    <p>Additionally, judicial nominees file financial disclosures with the Senate Judiciary Committee during the nomination process. Free Law Project <a href="https://www.github.com/freelawproject/nomination-extractor/">built a machine learning model and tool</a> that could identify financial disclosures and used it to scan hundreds of thousands of pages of Senate records.</p>
+
+    <p><a href="https://www.judicialwatch.org/" rel="nofollow">One other organization</a> has systematically placed disclosures online, and we have gathered their corpus as well, as described below. A news organization called ABPNews also gathered them in the late nineties, but after going out of business in 2000, <a href="https://twitter.com/FreeLawProject/status/1093612415185350656">their records were lost to water damage</a>. If you know of other sources, <a href="{% url "contact" %}">please get in touch</a>.
+    </p>
+    <hr>
+
+    <h2 id="totals">Yearly Totals</h2>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Source</th>
+          <th>Year</th>
+          <th>File Count*</th>
+          <th>File Size (GB)*</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+      <tr>
+          <td>Senate Records</td>
+          <td>1987-2013</td>
+          <td>874</td>
+          <td>394.7 MB</td>
+        <td><a href="https://free.law/2021/12/22/nomination-disclosures/">Extracted from Senate Records</a></td>
+      </tr>
+      <tr>
+        <td>Judicial Watch</td>
+        <td>2003-2010</td>
+        <td>9,157</td>
+        <td>7.6</td>
+        <td>Gathered from their website</td>
+      </tr>
+      <tr>
+        <td>U.S. Courts</td>
+        <td>2011</td>
+        <td>3,515</td>
+        <td>46.8</td>
+        <td>Complete</td>
+      </tr>
+      <tr>
+        <td>U.S. Courts</td>
+        <td>2012</td>
+        <td>2,763</td>
+        <td>49.8</td>
+        <td>Complete</td>
+      </tr>
+      <tr>
+        <td>U.S. Courts</td>
+        <td>2013</td>
+        <td>3,238</td>
+        <td>50.1</td>
+        <td>Complete</td>
+      </tr>
+      <tr>
+        <td>U.S. Courts</td>
+        <td>2014</td>
+        <td>2,951</td>
+        <td>51.1</td>
+        <td>Complete</td>
+      </tr>
+      <tr>
+        <td>U.S. Courts</td>
+        <td>2015</td>
+        <td>2,737</td>
+        <td>52.4</td>
+        <td>Complete</td>
+      </tr>
+      <tr>
+        <td>U.S. Courts</td>
+        <td>2016</td>
+        <td>2,764</td>
+        <td>49.1</td>
+        <td>Complete</td>
+      </tr>
+      <tr>
+        <td>U.S. Courts</td>
+        <td>2017</td>
+        <td>2,467</td>
+        <td>49.5</td>
+        <td>Complete</td>
+      </tr>
+      <tr>
+        <td>U.S. Courts</td>
+        <td>2018</td>
+        <td>2,361</td>
+        <td>50.4</td>
+        <td>Complete</td>
+      </tr>
+      <tr>
+        <td>U.S. Courts</td>
+        <td>2019</td>
+        <td>2246</td>
+        <td>191.6 MB</td>
+        <td>Requested 1/1/2020<br>Received partial set of 2019 disclosures. Disclosures received as PDFs.</td>
+      </tr>
+      <tr>
+        <td>U.S. Courts</td>
+        <td>2020</td>
+        <td>1188</td>
+        <td>153.3 MB</td>
+        <td>Requested 1/1/2021.<br>Only received ~1200 disclosures.</td>
+      </tr>
+      <tr>
+        <td>U.S. Courts</td>
+        <td>2021</td>
+        <td>0</td>
+        <td>-</td>
+        <td>Requested 1/1/2022.<br>None received.</td>
+      </tr>
+      </tbody>
+      <tfoot>
+      <tr>
+        <td><strong>TOTAL</strong></td>
+        <td><strong>34 YEARS</strong></td>
+        <td><strong>35k</strong></td>
+        <td><strong>407GB</strong></td>
+        <td><strong></strong></td>
+      </tr>
+      </tfoot>
+    </table>
+    <p class="small gray">* Differences in these columns are due to disclosures frequently being broken into multiple files.
+    </p>
+
+    <p>If you know of other disclosures not already in our collection, we would <a href="{% url "contact" %}">love to hear from you</a>. We need your help to complete this collection.</p>
+    <hr>
+
+
+    <h2 id="enhancements">Our Enhancements</h2>
+    <p>We have dedicated considerable energy to develop <a href="https://github.com/freelawproject/disclosure-extractor">a parsing system</a> for these disclosures. This system takes the disclosure, whether it’s a single-page TIFF, multi-page TIFF or PDF, scanned document or text, and converts it into machine-readable JSON data. When we first ran this system, it took weeks for our servers to parse the information from the disclosures.
+    </p>
+    <p>Additionally, we developed a <a href="https://github.com/freelawproject/nomination-extractor/">machine learning model</a> that extracted 843 Financial Disclosure from over 250k pages of Senate hearing documents.</p>
+    <p>Once the parsing was completed, we converted all the disclosures into good PDF files and ingested the data into our database, where it is <a href="{%  url "api_index" %}">available via our APIs and website</a>. As of this moment, there are <strong>{{ disclosures|intcomma }}</strong> disclosures documenting:
+    </p>
+
+    <ul>
+      <li><strong>{{ investments|intcomma }}</strong> investments</li>
+      <li><strong>{{ positions|intcomma }}</strong> positions held outside of the judiciary</li>
+      <li><strong>{{ agreements|intcomma }}</strong> legal agreements</li>
+      <li><strong>{{ non_investment_income|intcomma }}</strong> sources of non-investment income</li>
+      <li><strong>{{ spousal_income|intcomma }}</strong> sources of spousal income</li>
+      <li><strong>{{ reimbursements|intcomma }}</strong> reimbursements</li>
+      <li><strong>{{ gifts|intcomma }}</strong> gifts to judges and judicial employees</li>
+      <li><strong>{{ debts|intcomma }}</strong> debts</li>
+    </ul>
+
+    <p>When combined with our detailed database of judges, this creates a one-of-a-kind resource for understanding the conflicts, resources, and entanglements of federal judges. We believe this brings our country closer to finally realizing the goals set out by the 1978 Ethics in Government Act.
+    </p>
+
+
+    <h2 id="gaps">What's Missing</h2>
+    <p>We have worked hard to parse all of the disclosures that we have collected, but there are a few places where we were unable to make meaningful progress:
+    </p>
+    <ol>
+      <li>
+        <p>We have a basic parser for documents from Judicial Watch, but due to their age the disclosures in this collection vary considerably. We were able to parse many of them, but some were too difficult.
+        </p>
+      </li>
+      <li>
+        <p>Some disclosures were scanned incorrectly. <a href="https://storage.courtlistener.com/us/federal/judicial/financial-disclosures/823/michael-james-davis-disclosure.2011.pdf">Here's a representative example</a>.
+        </p>
+      </li>
+      <li>
+        <p>Some disclosures had scanned and embedded spreadsheets, <a href="https://storage.courtlistener.com/us/federal/judicial/financial-disclosures/9641/david-e-jones-disclosure.2014.pdf">like this one</a>. These were too challenging to automate.
+        </p>
+      </li>
+      <li>
+        <p>A few disclosures were hand written. We were unable to parse those.</p>
+      </li>
+      <li>
+        <p>Many disclosures we lack &mdash; particularly older ones &mdash; <a href="https://github.com/freelawproject/courtlistener/issues/1644">are available as part of judicial nomination proceedings</a>. We are looking for a funder to help us add them to the collection.</p>
+      </li>
+    </ol>
+
+    <p>Whenever possible, we work with the Office of Financial Disclosures to remedy badly processed disclosures and get them into our system, but this can be an overwhelming administrative effort for our small organization. As with everything we do, your support helps makes this project possible.
+    </p>
+    <p class="v-offset-above-3"><a href="{% url "donate" %}?referer=fd-coverage-page"
+                                   class="btn btn-danger btn-lg"><i class="fa fa-heart-o"></i>&nbsp;Please Donate to Support Our Work</a>
+    </p>
+  </div>
+{% endblock %}

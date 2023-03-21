@@ -46,7 +46,7 @@ services:
   # Task Server
   cl-celery:
     container_name: cl-celery
-    image: ${CELERY_DOCKER_IMAGE:-freelawproject/courtlistener:latest-celery}
+    image: ${CELERY_DOCKER_IMAGE:-freelawproject/courtlistener:latest-celery-dev}
     depends_on:
       - cl-postgresql
       - cl-redis
@@ -83,7 +83,7 @@ services:
 
   cl-selenium:
     container_name: cl-selenium
-    image: selenium/standalone-chrome-debug
+    image: seleniarm/standalone-chromium
     ports:
       - 4444:4444  # Selenium
       - 5900:5900  # VNC server
@@ -103,5 +103,11 @@ services:
   cl-disclosures:
     image: freelawproject/disclosure-extractor:latest
     container_name: "cl-disclosures"
+    networks:
+      - cl_net_overlay
+
+  cl-webhook-sentry:
+    image: juggernaut/webhook-sentry:latest
+    container_name: "cl-webhook-sentry"
     networks:
       - cl_net_overlay

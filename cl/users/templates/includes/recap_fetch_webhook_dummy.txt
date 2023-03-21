@@ -1,0 +1,29 @@
+{
+   "payload":{
+      "id":1,
+      "court":null,
+      "docket":null,
+      "recap_document":10,
+      "date_created":"2023-01-06T09:06:23.854208-08:00",
+      "date_modified":"2023-01-06T09:06:24.760189-08:00",
+      "date_completed":"2023-01-06T09:06:24.760078-08:00",
+      "status":2,
+      "request_type":2,
+      "message":"Successfully completed fetch and save.",
+      "pacer_case_id":"",
+      "docket_number":"",
+      "de_date_start":null,
+      "de_date_end":null,
+      "de_number_start":null,
+      "de_number_end":null,
+      "show_parties_and_counsel":true,
+      "show_terminated_parties":true,
+      "show_list_of_member_cases":false
+   },
+   "webhook":{
+      "version":1,
+      "event_type":3,
+      "date_created":"2024-01-06T14:21:40.855097-07:00",
+      "deprecation_date":null
+   }
+}

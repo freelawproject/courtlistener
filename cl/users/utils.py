@@ -5,6 +5,9 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from django.db import transaction
 
+from cl.alerts.models import AlertEvent, DocketAlertEvent
+from cl.api.models import WebhookHistoryEvent
+from cl.favorites.models import DocketTagEvent, NoteEvent, UserTagEvent
 from cl.lib.crypto import md5
 from cl.lib.types import EmailType
 from cl.users.models import UserProfile
@@ -61,6 +64,7 @@ def convert_to_stub_account(user: User) -> User:
     """
     user.first_name = "Deleted"
     user.last_name = ""
+    user.is_active = False
     user.username = md5(user.email)
     user.set_unusable_password()
     user.save()
@@ -72,6 +76,7 @@ def convert_to_stub_account(user: User) -> User:
     profile.employer = None
     profile.state = None
     profile.stub_account = True
+    profile.email_confirmed = False
     profile.wants_newsletter = False
     profile.zip_code = None
     profile.save()
@@ -79,6 +84,28 @@ def convert_to_stub_account(user: User) -> User:
     profile.barmembership.all().delete()
 
     return user
+
+
+def delete_user_assets(user: User) -> None:
+    """Delete any associated data from a user account and profile"""
+
+    # Nuke history objects related to the user first.
+    DocketAlertEvent.objects.filter(user_id=user.pk).delete()
+    AlertEvent.objects.filter(user_id=user.pk).delete()
+    NoteEvent.objects.filter(user_id=user.pk).delete()
+    UserTagEvent.objects.filter(user_id=user.pk).delete()
+    user_tags = user.user_tags.all()
+    user_tags_ids = [user_tag.pk for user_tag in user_tags]
+    DocketTagEvent.objects.filter(tag__id__in=user_tags_ids).delete()
+    WebhookHistoryEvent.objects.filter(user_id=user.pk).delete()
+
+    user.alerts.all().delete()
+    user.webhooks.all().delete()
+    user.docket_alerts.all().delete()
+    user.notes.all().delete()
+    user_tags.delete()
+    user.monthly_donations.all().update(enabled=False)
+    user.scotus_maps.all().update(deleted=True)
 
 
 emails: Dict[str, EmailType] = {
@@ -145,7 +172,7 @@ emails: Dict[str, EmailType] = {
         "To join the conversation:\n\n"
         " - Sign up for the Free Law Project newsletter: https://free.law/newsletter/\n"
         " - Follow Free Law project or CourtListener on Twitter: https://twitter.com/freelawproject\n"
-        " - Check our blog for the latest news and updates: https://free.law/\n\n"
+        " - Check our blog for the latest news and updates: https://free.law/blog/\n\n"
         "Thanks for using CourtListener and joining our community,\n\n"
         "The Free Law Project Team\n\n"
         "-------------------\n"

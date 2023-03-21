@@ -17,6 +17,7 @@ from cl.lib.search_utils import (
 )
 from cl.search.forms import SearchForm
 from cl.search.models import Court
+from cl.simple_pages.views import get_coverage_data_fds
 
 logger = logging.getLogger(__name__)
 
@@ -87,18 +88,11 @@ def replication_docs(request: HttpRequest) -> HttpResponse:
 
 def bulk_data_index(request: HttpRequest) -> HttpResponse:
     """Shows an index page for the dumps."""
-    courts = make_court_variable()
-    court_count = len(courts)
-    # Temporary message during shift to AWS is completed.
-    messages.add_message(
-        request,
-        messages.ERROR,
-        f"Bulk data is temporarily unavailable while we transition to new server infrastructure. We apologize for the inconvenience. To learn more, follow the github issue <a href='https://github.com/freelawproject/courtlistener/issues/1983'>here</a>.",
-    )
+    disclosure_coverage = get_coverage_data_fds()
     return render(
         request,
         "bulk-data.html",
-        {"court_count": court_count, "courts": courts, "private": False},
+        disclosure_coverage,
     )
 
 
@@ -212,3 +206,18 @@ def deprecated_api(request, v):
         safe=False,
         status=status.HTTP_410_GONE,
     )
+
+
+def webhooks_getting_started(request):
+    context = {"private": False}
+    return render(request, "webhooks-getting-started.html", context)
+
+
+def webhooks_docs(request, version=None):
+    """Show the correct version of the webhooks docs"""
+
+    context = {"private": False}
+    try:
+        return render(request, f"webhooks-docs-{version}.html", context)
+    except TemplateDoesNotExist:
+        return render(request, "webhooks-docs-vlatest.html", context)

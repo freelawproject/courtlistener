@@ -1,11 +1,19 @@
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse, HttpResponseNotAllowed
-from django.shortcuts import HttpResponseRedirect, get_object_or_404, render
+from django.http import (
+    HttpRequest,
+    HttpResponse,
+    HttpResponseNotAllowed,
+    HttpResponseRedirect,
+)
+from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
 
+from cl.alerts.forms import DocketAlertConfirmForm
 from cl.alerts.models import Alert, DocketAlert
+from cl.alerts.tasks import send_unsubscription_confirmation
 from cl.lib.http import is_ajax
 from cl.lib.ratelimiter import ratelimit_deny_list
 from cl.lib.types import AuthenticatedHttpRequest
@@ -89,6 +97,8 @@ def enable_alert(request, secret_key):
 @login_required
 def toggle_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
     """Use Ajax to create or delete an alert for a user."""
+
+    # This could be removed and replaced using the docket-alert API.
     if request.user.is_anonymous:
         return HttpResponse("Please log in to continue.")
 
@@ -98,14 +108,26 @@ def toggle_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
             msg = "Unable to alter alert. Please provide ID attribute"
             return HttpResponse(msg)
         existing_alert = DocketAlert.objects.filter(
-            user=request.user, docket_id=docket_pk
+            user=request.user,
+            docket_id=docket_pk,
         )
         if existing_alert.exists():
-            existing_alert.delete()
-            msg = "Alert disabled successfully"
+            if existing_alert[0].alert_type == DocketAlert.SUBSCRIPTION:
+                # Use save() to force date_created to be updated
+                da_alert = existing_alert[0]
+                da_alert.alert_type = DocketAlert.UNSUBSCRIPTION
+                da_alert.save()
+                msg = "Alert disabled successfully"
+            else:
+                # Use save() to force date_created to be updated
+                da_alert = existing_alert[0]
+                da_alert.alert_type = DocketAlert.SUBSCRIPTION
+                da_alert.save()
+                msg = "Alerts are now enabled for this docket"
         else:
             DocketAlert.objects.create(docket_id=docket_pk, user=request.user)
             msg = "Alerts are now enabled for this docket"
+
         return HttpResponse(msg)
     else:
         return HttpResponseNotAllowed(
@@ -113,7 +135,6 @@ def toggle_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
         )
 
 
-@login_required
 def new_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
     """Allow users to create docket alerts based on case and court ID"""
     pacer_case_id = request.GET.get("pacer_case_id")
@@ -159,5 +180,111 @@ def new_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
             "has_alert": has_alert,
             "docket": docket,
             "private": True,
+        },
+    )
+
+
+def set_docket_alert_state(
+    docket_alert: DocketAlert, target_state: int
+) -> None:
+    """Flip the alert_type for a docket alert.
+
+    :param docket_alert: The docket alert to flip.
+    :param target_state: The new alert_type to set.
+    """
+    # Only flip the alert_type if it's not already the same
+    if docket_alert.alert_type == target_state:
+        return
+
+    docket_alert.alert_type = target_state
+    docket_alert.save()
+    if target_state == DocketAlert.UNSUBSCRIPTION:
+        # Send Unsubscription confirmation email to the user
+        send_unsubscription_confirmation.delay(docket_alert.pk)
+
+
+@ratelimit_deny_list
+def toggle_docket_alert_confirmation(
+    request: HttpRequest,
+    route_prefix: str,
+    secret_key: str,
+) -> HttpResponse:
+    """Show a confirmation or success page for toggling docket alerts.
+
+    :param request: The HttpRequest from the client
+    :param route_prefix: The route prefix, unsubscribe or subscribe
+    :param secret_key: The secret key for the docket alert
+    :return: The HttpResponse to send to the client
+    """
+    target_state = DocketAlert.UNSUBSCRIPTION
+    if route_prefix == "subscribe":
+        target_state = DocketAlert.SUBSCRIPTION
+    try:
+        docket_alert = DocketAlert.objects.get(secret_key=secret_key)
+    except DocketAlert.DoesNotExist:
+        return render(
+            request,
+            "docket_alert.html",
+            {
+                "docket_alert_not_found": True,
+                "da_subscription_type": DocketAlert.SUBSCRIPTION,
+                "private": True,
+                "target_state": target_state,
+            },
+            status=HTTP_404_NOT_FOUND,
+        )
+    # Handle confirmation form POST requests
+    if request.method == "POST":
+        form = DocketAlertConfirmForm(request.POST)
+        if form.is_valid():
+            set_docket_alert_state(docket_alert, target_state)
+            return render(
+                request,
+                "docket_alert.html",
+                {
+                    "docket_alert": docket_alert,
+                    "private": True,
+                    "target_state": target_state,
+                },
+            )
+        # If the form is invalid, show the form errors.
+        return render(
+            request,
+            "docket_alert_confirmation.html",
+            {
+                "docket_alert": docket_alert,
+                "form": form,
+                "private": True,
+                "target_state": target_state,
+                "h_captcha_site_key": settings.HCAPTCHA_SITEKEY,
+            },
+        )
+
+    if request.user.is_authenticated:
+        # If the user is logged in, flip the docket alert. No confirmation page
+        # required
+        set_docket_alert_state(docket_alert, target_state)
+        return render(
+            request,
+            "docket_alert.html",
+            {
+                "docket_alert": docket_alert,
+                "private": True,
+                "target_state": target_state,
+            },
+        )
+
+    # Unauthenticated users need to confirm their action, render the
+    # confirmation page
+    form = DocketAlertConfirmForm()
+    return render(
+        request,
+        "docket_alert_confirmation.html",
+        {
+            "docket_alert": docket_alert,
+            "form": form,
+            "private": True,
+            "target_state": target_state,
+            "h_captcha_site_key": settings.HCAPTCHA_SITEKEY,
         },
     )

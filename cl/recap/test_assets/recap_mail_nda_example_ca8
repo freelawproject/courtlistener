@@ -1,0 +1,64 @@
+Return-Path: <ca8_ecfnoticing@ca8.uscourts.gov>
+Received: from icmecf101.gtwy.uscourts.gov (icmecf101.gtwy.uscourts.gov [199.107.16.200])
+ by inbound-smtp.us-west-2.amazonaws.com with SMTP id 380mgptnphuf24mbk0s1ci1277c6d5mh9egj4301
+ for archive@recap.email;
+ Mon, 08 Aug 2022 22:21:33 +0000 (UTC)
+X-SES-Spam-Verdict: PASS
+X-SES-Virus-Verdict: PASS
+Received-SPF: pass (spfCheck: domain of ca8.uscourts.gov designates 199.107.16.200 as permitted sender) client-ip=199.107.16.200; envelope-from=ca8_ecfnoticing@ca8.uscourts.gov; helo=icmecf101.gtwy.uscourts.gov;
+Authentication-Results: amazonses.com;
+ spf=pass (spfCheck: domain of ca8.uscourts.gov designates 199.107.16.200 as permitted sender) client-ip=199.107.16.200; envelope-from=ca8_ecfnoticing@ca8.uscourts.gov; helo=icmecf101.gtwy.uscourts.gov;
+ dmarc=none header.from=ca8.uscourts.gov;
+X-SES-RECEIPT: AEFBQUFBQUFBQUFFQWVyd2FaSmJPMnQ0SHR4d3RUZFdSUzN1VVo5S29qTXpRbFJrMExzVjEwQy9DYkhFTW9qbmZpTE5MZUEwSHF1RC90bTAvWjJBSTVEU3BJdDhUUVFNbm9CN0JVbHdTYWphRFE2M1RQa2s0VCszRDVjbkRiajR3WXF1dzl0aUQwSzZBUnJOUkI2QzVaN25vbnh4REpHODZEVW5wM3hWbjFyMUZWaHZEOW0yUlJuU0pJeCthaldhSXk5S1pJci84TGxaczJ3NWdDSSszOFRpbEV5c3BDZmc5R2Rib1VqSkFyYzROY09lTjc2dW4xaTJ2V2pCUnJTQmdLRW4waUZVVzhIVXdvZ1FWVER5bUVxRTU1OGw0cmwrYldIREhCSG1ISTBybzdGa1FKbWNtWnNlUkpjc0ovVHlnMDU5V2xud2ZWam89
+X-SES-DKIM-SIGNATURE: a=rsa-sha256; q=dns/txt; b=FBYIMN/iiSzZwTt56Nd3/DCTq42xmeOBeM49zlqGJ0PWNwUo/PkTGyd8btCEcp1R3hul5H4vA0Jfb5nXv5tlzmKaaNXH7lATnmXrMIMiwDZ+en/l9/vHTehYjjrnU089a1gqb+uQ/HOqT8SWc8iOmdFErGrvdOPW3J1xD0v3HY4=; c=relaxed/simple; s=gdwg2y3kokkkj5a55z2ilkup5wp5hhxx; d=amazonses.com; t=1659997294; v=1; bh=ua31659sYxBYrPtX6NcKCYoLfyn4iImZX2qe3mObIEE=; h=From:To:Cc:Bcc:Subject:Date:Message-ID:MIME-Version:Content-Type:X-SES-RECEIPT;
+X-SBRS: None
+X-REMOTE-IP: 156.119.56.100
+Received: from ca8db.ca8.gtwy.dcn ([156.119.56.100])
+  by icmecf101.gtwy.uscourts.gov with ESMTP; 08 Aug 2022 18:21:32 -0400
+Received: from ca8db.ca8.gtwy.dcn (localhost.localdomain [127.0.0.1])
+	by ca8db.ca8.gtwy.dcn (8.14.4/8.14.4) with ESMTP id 278MKxUr099810
+	for <archive@recap.email>; Mon, 8 Aug 2022 15:20:59 -0700
+Date: Mon, 8 Aug 2022 15:20:59 -0700 (PDT)
+From: ca8_ecfnoticing@ca8.uscourts.gov
+To: archive@recap.email
+Message-ID: <1066811685.6583.1659997259208@ca8db.ca8.gtwy.dcn>
+Subject: 21-16499 Rosemarie Vargas, et al v. Facebook, Inc.
+ "Correspondence/Letter to Court"
+MIME-Version: 1.0
+Content-Type: text/html; charset=UTF-8
+Content-Transfer-Encoding: 7bit
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8"><TITLE>21-16499 Rosemarie Vargas, et al v. Facebook, Inc. "Correspondence/Letter to Court"</TITLE>
+</HEAD>
+<BODY BGCOLOR="#F8F8F8" TEXT="#000000" LINK="#0000ff" VLINK="#551a8b" ALINK="#ff0000">
+<P><STRONG>
+***NOTE TO PUBLIC ACCESS USERS*** Judicial Conference of the United States policy permits attorneys of record and parties in a case (including pro se litigants) to receive one free electronic copy of all documents filed electronically, if receipt is required by law or directed by the filer.  PACER access fees apply to all other users.  To avoid later charges, download a copy of each document during this first viewing.</STRONG><BR>
+<P><CENTER><STRONG>United States Court of Appeals for the Ninth Circuit</STRONG></CENTER>
+<P><STRONG>Notice of Docket Activity</STRONG><BR>
+<BR>
+The following transaction was entered on 08/08/2022 at 3:20:58 PM Pacific Daylight Time and filed on 08/08/2022
+<TABLE BORDER=0 CELLSPACING=3>
+<TR><TD><STRONG>Case Name:</STRONG></TD>
+<TD colspan='2'>Rosemarie Vargas, et al v. Facebook, Inc.<BR>
+</TD></TR>
+<TR><TD><STRONG>Case Number:&nbsp;&nbsp;</STRONG></TD>
+<TD><A HREF="https://ecf.ca8.uscourts.gov/n/beam/servlet/TransportRoom?servlet=DocketReportFilter.jsp&caseId=334146">21-16499</A></TD></TR>
+<TR><TD><STRONG>Document(s):</STRONG></TD>
+<TD><A HREF="https://ecf.ca8.uscourts.gov/docs1/00802251695?uid=337433b9bebbd7c7">Document(s)</A></TD></TR>
+</TABLE><BR>
+<P><STRONG>Docket Text:</STRONG><BR>
+Filed (ECF) Appellants Jenny Lin, Deillo Richards, Kisha Skipper, Jazmine Spencer and Rosemarie Vargas Correspondence: Appellants' Response to Appellee Facebook's July 29, 2022 letter. Date of service: 08/08/2022 [12512322] [21-16499] (Seplow, Michael)<BR>
+<BR>
+<STRONG>Notice will be electronically mailed to:</STRONG><BR><BR>
+Testing User: testing_1@recap.email<BR>
+<BR><BR>
+The following document(s) are associated with this transaction:<BR>
+<STRONG>Document Description: </STRONG>Appellants' Response to Appellee Facebook's July 29, 2022 letter<BR>
+<STRONG>Original Filename: </STRONG>Vargas v. Facebook -- Appellants' Response to Appellee's R 28(j) Letter 08-08-2022_FINAL.pdf<BR>
+<STRONG>Electronic Document Stamp:</STRONG><BR>
+[STAMP acecfStamp_ID=1106763461 [Date=08/08/2022] [FileNumber=12512322-0] [5fdc6cc285a2602a878aeac7a4aa8dc30d6d68fedf29ccbe7da54fd2b21706353fec96731d0e8d2d8495fa0c2e7932c55018ee48d2e6832e8a99c4dc74bae321]]<BR>
+<BR>
+</BODY></HTML>

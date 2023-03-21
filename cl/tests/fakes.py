@@ -19,8 +19,20 @@ class FakeDocketReport:
         return {
             "docket_number": DOCKET_NUMBER,
             "case_name": CASE_NAME,
+            "pacer_case_id": "104490",
+            "court_id": "scotus",
             "date_filed": date(2018, 6, 9),
-            "docket_entries": [],
+            "docket_entries": [
+                {
+                    "date_filed": date(2018, 6, 9),
+                    "description": "Fake Description",
+                    "document_number": "27",
+                    "pacer_case_id": "104490",
+                    "pacer_doc_id": "02705212035",
+                    "pacer_magic_num": "99963705",
+                    "pacer_seq_no": "83",
+                }
+            ],
             "parties": [],
         }
 

@@ -1,0 +1,17 @@
+
+{% load text_filters %}{% load humanize %}
+
+You have been unsubscribed from {{ docket|best_case_name|safe }}
+{% if docket.docket_number %}({{ docket.docket_number }}){% endif %}.
+
+If this action was taken in error or was not completed by you, you can re-subscribe here:
+https://www.courtlistener.com{% url 'toggle_docket_alert_confirmation' "subscribe" docket_alert.secret_key %}
+
+************************
+This alert brought to you by the 501(c)(3) non-profit Free Law Project
+
+ - Blog: https://free.law
+ - Twitter: http://twitter.com/freelawproject
+ - Donate: https://www.courtlistener.com{% url "donate" %}?referrer=pt-email
+
+Please donate to support our work.

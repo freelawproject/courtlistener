@@ -1,10 +1,12 @@
-{% extends "base.html" %}
+{% extends "profile/nav.html" %}
 
 {% block title %}Delete Account – CourtListener.com{% endblock %}
 
+{% block nav-account %}active{% endblock %}
 {% block sidebar %}{% endblock %}
 
 {% block content %}
+  {% include "includes/account-tabs.html" %}
 <div class="col-sm-3">&nbsp;</div>
 <div class="col-sm-6">
   <h1>You Are About to Delete Your Account</h1>
@@ -16,30 +18,45 @@
       will be deleted and resurrecting your account will not be
       possible.
   </p>
-  {% if request.user.alerts.count or request.user.favorites.count or non_deleted_map_count %}
+  {% if request.user.alerts.count or request.user.notes.count or non_deleted_map_count or request.user.user_tags.count or request.user.docket_alerts.subscriptions.count %}
   <p>The following will be deleted:</p>
   <ul>
     {% if request.user.alerts.count > 0 %}
-      <li>All of <a href="{% url "profile_alerts" %}">your alerts</a> ({{ request.user.alerts.count }}).</li>
+      <li>All of <a href="{% url "profile_alerts" %}">your search alerts</a> ({{ request.user.alerts.count }}).</li>
     {% endif %}
-    {% if request.user.favorites.count > 0 %}
-      <li>All of <a href="{% url "profile_favorites" %}">your favorites</a> ({{ request.user.favorites.count }}).</li>
+    {% if request.user.docket_alerts.subscriptions.count %}
+      <li>All of <a href="{% url "profile_docket_alerts" %}">your docket alerts</a> ({{ request.user.docket_alerts.subscriptions.count }}).</li>
+    {% endif %}
+    {% if request.user.user_tags.count > 0 %}
+      <li>All of your <a href="{% url "tag_list" username=user.username %}">tags</a> ({{ request.user.user_tags.count }}).</li>
+    {% endif %}
+    {% if request.user.notes.count > 0 %}
+      <li>All of <a href="{% url "profile_notes" %}">your notes</a> ({{ request.user.notes.count }}).</li>
     {% endif %}
     {% if non_deleted_map_count > 0 %}
       <li>All of your <a href="{% url "view_visualizations" %}">network visualizations</a> ({{ non_deleted_map_count }}).</li>
     {% endif %}
-    {% if request.user.user_tags.count > 0 %}
-      <li>All of your <a href="{% url "tag_list" %}">tags</a> ({{ request.user.user_tags.count }}).</li>
-    {% endif %}
+  {% if request.user.webhooks.count > 0 %}
+      <li>All of your <a href="{% url "view_webhooks" %}">webhooks and webhook events</a> ({{ request.user.webhooks.count }}).</li>
+  {% endif %}
   </ul>
   {% endif %}
 
   <p class="v-offset-below-3">If you have any last minute questions or comments, we hope you'll <a href="{% url "contact" %}" target="_blank">share them with us</a> before you delete your account.
   </p>
 
-  <a href="{% url "view_settings" %}" class="btn btn-success btn-lg">Cancel and Go
-      Back</a>&nbsp;&nbsp;
-  <form action="" method="post" class="float-right">{% csrf_token %}
+  <form action="" method="post">{% csrf_token %}
+    <div class="form-group">
+      {{ delete_form.password.label_tag }}
+      {{ delete_form.password }}
+      {% if delete_form.password.errors %}
+        <p class="help-block">
+          {% for error in delete_form.password.errors %}
+            {{ error|escape }}
+          {% endfor %}
+        </p>
+      {% endif %}
+    </div>
     <button type="submit" class="btn btn-danger btn-lg">Delete My Account Now</button>
   </form>
 </div>

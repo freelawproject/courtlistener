@@ -11,7 +11,9 @@ class DisclosureSitemap(Sitemap):
     priority = 0.5
 
     def items(self) -> QuerySet:
-        return FinancialDisclosure.objects.all().order_by("pk")
+        return FinancialDisclosure.objects.order_by(
+            "person_id", "-year"
+        ).distinct("person_id")
 
     def lastmod(self, obj: FinancialDisclosure) -> datetime:
         return obj.date_modified

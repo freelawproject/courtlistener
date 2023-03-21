@@ -2,7 +2,7 @@
 Report of Old or Expiring Docket Alerts
 ***************************************
 
-This email lists docket alerts on long-stagnant cases that you may want to
+This email lists docket alerts on long-dormant cases that you may want to
 disable or that have been automatically disabled by our systems.
 
 Disabling these alerts will prevent them from counting towards your quota and
@@ -17,7 +17,7 @@ terminated cases haven't had updates for over 180 days. If these alerts were
 disabled in error, you can recreate them by clicking below.
 
 {% include "includes/old_alert_docket_list.txt" with dockets=report_data.disabled_dockets %}
-{% endif %}{% if report_data.one_eighty_ago %}Old Terminated Cases -- To be Disabled Soon
+{% endif %}{% if very_old_dockets %}Old Terminated Cases -- To be Disabled Soon
 -------------------------------------------
 
 The following terminated cases were last updated about *180* days ago.
@@ -27,8 +27,8 @@ The following terminated cases were last updated about *180* days ago.
 Please disable and re-enable these alerts if you are still monitoring these
 cases. Doing so will keep them running another 180 days.
 
-{% include "includes/old_alert_docket_list.txt" with dockets=report_data.one_eighty_ago %}
-{% endif %}{% if report_data.ninety_ago %}Cases Terminated about 90 Days Ago
+{% include "includes/old_alert_docket_list.txt" with dockets=report_data.very_old_dockets %}
+{% endif %}{% if report_data.old_dockets %}Cases Terminated about 90 Days Ago
 ----------------------------------
 
 The following terminated cases were last updated about *90* days ago.
@@ -36,7 +36,7 @@ The following terminated cases were last updated about *90* days ago.
 If you are no longer monitoring these cases, you may want to disable their
 alerts by clicking below.
 
-{% include "includes/old_alert_docket_list.txt" with dockets=report_data.ninety_ago %}
+{% include "includes/old_alert_docket_list.txt" with dockets=report_data.old_dockets %}
 {% endif %}************************
 This message brought to you by the 501(c)(3) non-profit Free Law Project
 

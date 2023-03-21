@@ -1,5 +1,7 @@
 from django.template import Library
 
+from cl.api.models import WEBHOOK_EVENT_STATUS
+
 register = Library()
 
 
@@ -64,3 +66,21 @@ def set_data(field, data):
 def behave(field, names):
     """https://github.com/anutron/behavior support"""
     return set_data(field, f"filters:{names}")
+
+
+@register.filter
+def webhook_status_class(event_status: int) -> str:
+    """Map a Webhook Event Status to a bootstrap class.
+
+    :param event_status: The WebhookEvent status.
+    :return: The corresponding css class.
+    """
+
+    match event_status:
+        case WEBHOOK_EVENT_STATUS.SUCCESSFUL:
+            css_class = "text-success"
+        case WEBHOOK_EVENT_STATUS.FAILED:
+            css_class = "text-danger"
+        case _:
+            css_class = "text-warning"
+    return css_class

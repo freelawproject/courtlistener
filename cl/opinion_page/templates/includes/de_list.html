@@ -19,7 +19,13 @@
             {% endif %}
     >
       <div class="col-xs-1 text-center"><p>{{ de.entry_number|default_if_none:"" }}</p></div>
-      <div class="col-xs-3 col-sm-2"><p>{{ de.date_filed|date:"M j, Y"|default:'<em class="gray">Unknown</em>' }}</p></div>
+      <div class="col-xs-3 col-sm-2"><p>
+        {% if de.datetime_filed %}
+          <span title="{{ de.datetime_filed|timezone:timezone}}">{{ de.datetime_filed|timezone:timezone|date:"M j, Y" }}</span>
+        {% else %}
+          {{ de.date_filed|date:"M j, Y"|default:'<em class="gray">Unknown</em>' }}
+        {% endif %}
+      </p></div>
       <div class="col-xs-8 col-lg-7">
         {% if de.description %}
           <p>{{ de.description|safe }}</p>
@@ -32,14 +38,14 @@
                   <p>
                     {% if rd.document_type == rd.ATTACHMENT %}
                       {% if rd.filepath_local %}
-                        <a href="{{ rd.get_absolute_url }}">Att<span
+                        <a href="{{ rd.get_absolute_url }}" rel="nofollow">Att<span
                                 class="hidden-xs hidden-sm">ach&shy;ment</span>&nbsp;{{ rd.attachment_number }}</a>
                       {% else %}
                         Att<span class="hidden-xs hidden-sm">ach&shy;ment</span>&nbsp;{{ rd.attachment_number }}
                       {% endif %}
                     {% else %}
                       {% if rd.filepath_local %}
-                        <a href="{{ rd.get_absolute_url }}">Main Doc<span class="hidden-xs hidden-sm">&shy;ument</span></a>
+                        <a href="{{ rd.get_absolute_url }}" rel="nofollow">Main Doc<span class="hidden-xs hidden-sm">&shy;ument</span></a>
                       {% else %}
                         Main Doc<span class="hidden-xs hidden-sm">&shy;ument</span>
                       {% endif %}
@@ -62,6 +68,7 @@
                 <div class="btn-group hidden-xs col-sm-4 col-md-3 hidden-print flex">
                   {% if rd.filepath_local %}
                     <a href="{{ rd.filepath_local.url }}"
+                       rel="nofollow"
                        role="button"
                        class="btn btn-primary btn-xs"
                             {% if rd.date_upload %}
@@ -79,7 +86,7 @@
                     </button>
                     <ul class="dropdown-menu">
                       <li>
-                        <a href="{{ rd.filepath_local.url }}">From
+                        <a href="{{ rd.filepath_local.url }}" rel="nofollow">From
                           CourtListener</a>
                       </li>
                       {% if rd.filepath_ia %}
@@ -88,26 +95,22 @@
                              rel="nofollow">From
                             Internet Archive</a>
                         </li>
-                        <li role="separator" class="divider"></li>
                       {% endif %}
-                      {% if rd.pacer_url %}
-                        <li>
-                          {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
-                            <a href="{{ rd.pacer_url }}"
-                            class="open_buy_pacer_modal"
-                            data-toggle="modal" data-target="#modal-buy-pacer"
-                            target="_blank"
-                            rel="nofollow">Buy on
-                            PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}</a>
-                          {% else%}
-                            <a href="{{ rd.pacer_url }}"
-                              target="_blank"
-                              rel="nofollow">Buy on
-                              PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}</a>
-                          {% endif %}
-
-                        </li>
-                      {% endif %}
+                        {% if rd.pacer_url %}
+                          <li role="separator" class="divider"></li>
+                          <li>
+                              <a href="{{ rd.pacer_url }}"
+                                {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+                                  class="open_buy_pacer_modal"
+                                  data-toggle="modal"
+                                  data-target="#modal-buy-pacer"
+                                {% endif %}
+                                target="_blank"
+                                rel="nofollow">
+                                  {% if rd.is_free_on_pacer %}From PACER{% else %}Buy on PACER{% endif %} {% if rd.page_count %}(${{ rd|price }}){% endif %}
+                              </a>
+                          </li>
+                        {% endif %}
                     </ul>
                   {% else %}
                     {# We don't have it #}
@@ -115,19 +118,16 @@
                       <span class="btn btn-primary btn-xs disabled">Sealed on PACER</span>
                     {% else %}
                       {% if rd.pacer_url %}
-                        {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
-                          <a href="{{ rd.pacer_url }}"
-                          class="open_buy_pacer_modal btn btn-default btn-xs"
-                          data-toggle="modal" data-target="#modal-buy-pacer"
-                          target="_blank"
-                          rel="nofollow">Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}</a>
-                        {% else%}
-                          <a href="{{ rd.pacer_url }}"
-                          class="btn btn-default btn-xs"
-                          target="_blank"
-                          rel="nofollow">Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}</a>
-                        {% endif %}
-
+                        <a href="{{ rd.pacer_url }}"
+                          {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+                            class="open_buy_pacer_modal btn btn-default btn-xs"
+                            data-toggle="modal" data-target="#modal-buy-pacer"
+                          {% else%}
+                            class="btn btn-default btn-xs"
+                          {% endif %}
+                            target="_blank"
+                            rel="nofollow">Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}
+                        </a>
                       {% endif %}
                     {% endif %}
                   {% endif %}
@@ -137,6 +137,7 @@
                     <a href="{{ rd.filepath_local.url }}"
                        role="button"
                        class="btn btn-primary btn-xs"
+                       rel="nofollow"
                        title="Download PDF"><i class="fa fa-download"></i>
                     </a>
                   {% else %}
@@ -148,24 +149,18 @@
                             </span>
                     {% else %}
                       {% if rd.pacer_url %}
-
-                        {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
-                          <a href="{{ rd.pacer_url }}"
-                          data-toggle="modal" data-target="#modal-buy-pacer"
-                          target="_blank" class="open_buy_pacer_modal btn btn-default btn-xs"
+                        <a href="{{ rd.pacer_url }}"
+                          {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+                            data-toggle="modal"
+                            data-target="#modal-buy-pacer"
+                            class="open_buy_pacer_modal btn btn-default btn-xs"
+                          {% else%}
+                            class="btn btn-default btn-xs"
+                          {% endif %}
+                          target="_blank"
                           rel="nofollow"
-                          title="Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}"><i class="fa fa-download"></i></a>
-
-                        {% else%}
-
-                          <a href="{{ rd.pacer_url }}"
-                           class="btn btn-default btn-xs"
-                           target="_blank"
-                           rel="nofollow"
-                           title="Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}"><i class="fa fa-download"></i></a>
-
-                        {% endif %}
-
+                          title="Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}"><i class="fa fa-download"></i>
+                        </a>
                       {% endif %}
                     {% endif %}
                   {% endif %}

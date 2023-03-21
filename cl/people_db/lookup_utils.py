@@ -165,6 +165,7 @@ NOT_JUDGE_WORDS = [
     "recuse",
     "recused",
     "reference",
+    "referee",
     "rehearing",
     "report",
     "reported",
@@ -374,7 +375,6 @@ def lookup_judge_by_full_name(
         stripped_middle = name.middle.strip(".,")
         initial = len(stripped_middle) == 1
         if initial:
-
             filter_sets.append(
                 [
                     Q(name_middle__istartswith=stripped_middle)
@@ -444,24 +444,30 @@ def lookup_judge_by_last_name(
     last_name: str,
     court_id: str,
     event_date: Optional[date] = None,
+    require_living_judge: bool = True,
 ) -> Optional[Person]:
     """Look up the judge using their last name, a date and court"""
     hn = HumanName()
     hn.last = last_name
-    return lookup_judge_by_full_name(hn, court_id, event_date)
+    return lookup_judge_by_full_name(
+        hn, court_id, event_date, require_living_judge
+    )
 
 
 def lookup_judges_by_last_name_list(
     last_names: List[str],
     court_id: str,
     event_date: Optional[date] = None,
+    require_living_judge: bool = True,
 ) -> List[Person]:
     """Look up a group of judges by list of last names, a date, and a court"""
     found_people = []
     for last_name in last_names:
         hn = HumanName()
         hn.last = last_name
-        person = lookup_judge_by_full_name(hn, court_id, event_date)
+        person = lookup_judge_by_full_name(
+            hn, court_id, event_date, require_living_judge
+        )
         if person is not None:
             found_people.append(person)
     return found_people
@@ -512,7 +518,7 @@ def sort_judge_list(judges: QuerySet, search_terms: Set[str]) -> QuerySet:
 
     # Create list of Judge IDs that have the highest match count
     judge_pks = []
-    for (k, v) in judge_dict.items():
+    for k, v in judge_dict.items():
         if v == highest_match:
             judge_pks.append(k)
 

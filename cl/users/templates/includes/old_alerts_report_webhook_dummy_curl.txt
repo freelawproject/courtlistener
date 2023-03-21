@@ -1,0 +1,34 @@
+curl --request POST \
+  --url '{{ endpoint_url }}' \
+  --header 'Content-Type: application/json' \
+  --header 'Idempotency-Key: 59f1be59-e428-427a-a346-9cacded5c1d4' \
+  --data '{
+   "payload":{
+      "old_alerts":[
+         {
+            "id":3,
+            "date_created":"2022-11-23T18:53:36.903277-08:00",
+            "date_last_hit":"2022-11-24T18:53:36.903277-08:00",
+            "secret_key":"dhT7V9rmnBNIOV6rTMmMH0x6EvxeA0nYXfpN3Ks5",
+            "alert_type":1,
+            "docket":3
+         }
+      ],
+      "disabled_alerts":[
+         {
+            "id":1,
+            "date_created":"2022-05-23T18:53:36.903277-08:00",
+            "date_last_hit":"2022-05-25T18:53:36.903277-08:00",
+            "secret_key":"ihT7V9rmnBNIOV6rTMmMH0x6EvxeA0nYXfpN3Ks1",
+            "alert_type":0,
+            "docket":1
+         }
+      ]
+   },
+   "webhook":{
+      "version":1,
+      "event_type":4,
+      "date_created":"2022-12-28T14:21:40.855097-07:00",
+      "deprecation_date":null
+   }
+}'

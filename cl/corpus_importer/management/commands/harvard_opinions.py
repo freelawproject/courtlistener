@@ -19,6 +19,7 @@ from django.db import transaction
 from django.db.models import QuerySet
 from django.db.utils import IntegrityError, OperationalError
 from eyecite.find import get_citations
+from eyecite.models import FullCaseCitation
 from juriscraper.lib.diff_tools import normalize_phrase
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize, titlecase
 
@@ -29,6 +30,7 @@ from cl.lib.string_diff import get_cosine_similarity
 from cl.lib.string_utils import trunc
 from cl.lib.utils import human_sort
 from cl.people_db.lookup_utils import extract_judge_last_name
+from cl.scrapers.utils import update_or_create_docket
 from cl.search.models import Citation, Court, Docket, Opinion, OpinionCluster
 from cl.search.tasks import add_items_to_solr
 
@@ -220,6 +222,7 @@ class OptionsType(TypedDict):
     court_id: Optional[str]
     location: Optional[str]
     make_searchable: bool
+    bankruptcy: bool
 
 
 def get_fix_list() -> List[str]:
@@ -249,6 +252,25 @@ def merge_fixes(data: Dict[str, Any], identifier: str) -> Dict[str, Any]:
     return data
 
 
+def read_json(file_path: str, ia_download_url: str) -> Optional[Any]:
+    """Read JSON file and throw a warning if exceptions occur
+
+    :param file_path: Filepath to JSON
+    :param ia_download_url: URL of file
+    :return: JSON object if avaialble
+    """
+    try:
+        with open(file_path) as f:
+            data = json.load(f)
+    except ValueError:
+        logger.warning(f"Empty json: missing case at: {ia_download_url}")
+        return None
+    except Exception as e:
+        logger.warning(f"Unknown error {e} for: {ia_download_url}")
+        return None
+    return data
+
+
 def parse_harvard_opinions(options: OptionsType) -> None:
     """Parse Harvard Opinions
 
@@ -272,6 +294,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
     page = options["page"]
     court_id = options["court_id"]
     make_searchable = options["make_searchable"]
+    is_bankruptcy = options["bankruptcy"]
 
     if not reporter and volumes:
         logger.error("You provided volume(s) but no reporter. Exiting.")
@@ -294,14 +317,8 @@ def parse_harvard_opinions(options: OptionsType) -> None:
             )
             continue
 
-        try:
-            with open(file_path) as f:
-                data = json.load(f)
-        except ValueError:
-            logger.warning(f"Empty json: missing case at: {ia_download_url}")
-            continue
-        except Exception as e:
-            logger.warning(f"Unknown error {e} for: {ia_download_url}")
+        data = read_json(file_path, ia_download_url)
+        if not data:
             continue
 
         identifier = "/".join(file_path.rsplit("/", 2)[1:])
@@ -312,6 +329,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
         # Cleanup whitespace on citations
         clean_cite = re.sub(r"\s+", " ", data["citations"][0]["cite"])
         cites = get_citations(clean_cite)
+        cites = [cite for cite in cites if isinstance(cite, FullCaseCitation)]
         if not cites:
             logger.warning(f"No citation found for {clean_cite}")
             continue
@@ -328,7 +346,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
             # This is used to alleviate certain circumstances.
             found_court = find_court(
                 data["court"]["name"],
-                bankruptcy=False,
+                bankruptcy=is_bankruptcy,
                 location=options["location"],
             )
             if len(found_court) != 1:
@@ -357,6 +375,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
             # See: https://cite.case.law/pdf/1305086/Vinson%20v.%20Cox,%2099%20Fla.%201373%20(1930).pdf
             logger.warning(f"No opinion in Harvard XML at {file_path}")
             continue
+
         previously_imported_case = find_previously_imported_cases(
             data,
             court_id,
@@ -368,6 +387,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
         if previously_imported_case:
             # Simply add citations to our matched case for now. Later, we'll
             # upgrade this to do a full merge.
+
             with transaction.atomic():
                 add_citations(
                     data["citations"], cluster_id=previously_imported_case.id
@@ -375,10 +395,12 @@ def parse_harvard_opinions(options: OptionsType) -> None:
                 logger.info(
                     f"Adding citations for case at https://www.courtlistener.com/opinion/{previously_imported_case.id}/{previously_imported_case.slug}"
                 )
+                # Add the filepath to the harvard file for the associated opinion
+                previously_imported_case.filepath_json_harvard = file_path
+                previously_imported_case.save()
             continue
 
         logger.info(f"Adding case {case_name_full}")
-        # This case appears new to CL - lets add it.
         add_new_case(
             data,
             case_body,
@@ -458,13 +480,13 @@ def add_new_case(
         logger.info(
             f"Adding docket for {case_name}: {citation.corrected_citation()}"
         )
-        docket = Docket(
-            case_name=case_name,
-            case_name_short=case_name_short,
+        docket = update_or_create_docket(
+            case_name,
+            case_name_short,
+            court_id,
+            docket_string,
+            Docket.HARVARD,
             case_name_full=case_name_full,
-            docket_number=docket_string,
-            court_id=court_id,
-            source=Docket.HARVARD,
             ia_needs_upload=False,
         )
         try:
@@ -535,7 +557,11 @@ def add_citations(cites: List[CitationType], cluster_id: int) -> None:
         # Cleanup citations with extra spaces
         clean_cite = re.sub(r"\s+", " ", cite["cite"])
         citation = get_citations(clean_cite)
-        if not citation:
+        if (
+            not citation
+            or not isinstance(citation[0], FullCaseCitation)
+            or not citation[0].groups.get("volume", False)
+        ):
             logger.warning(f"Citation parsing failed for {clean_cite}")
             continue
 
@@ -884,7 +910,11 @@ def find_previously_imported_cases(
     # Match against known citations.
     for cite in data["citations"]:
         found_cite = get_citations(cite["cite"])
-        if found_cite:
+        if (
+            found_cite
+            and isinstance(found_cite[0], FullCaseCitation)
+            and found_cite[0].groups.get("volume", False)
+        ):
             possible_cases = OpinionCluster.objects.filter(
                 citations__reporter=found_cite[0].corrected_reporter(),
                 citations__volume=found_cite[0].groups["volume"],
@@ -967,15 +997,40 @@ def winnow_case_name(case_name: str) -> Set:
         "rel",
     }
 
-    # Remove all non alphanumeric characters
+    # strings where order matters
+    false_positive_strings = ["united states"]
+
+    false_positive_strings_regex = re.compile(
+        "|".join(map(re.escape, false_positive_strings))
+    )
+
+    # Fix case name to be cleaner
     case_name = harmonize(case_name)
+
+    # Join abbreviations/acronyms. e.g. "D.L.M. v. T.J.S." -> "DLM v. TJS"
+    case_name = re.sub(
+        r"\b[a-zA-Z][a-zA-Z\.]*[A-Za-z]\b\.?",
+        lambda m: m.group().replace(".", ""),
+        case_name,
+    )
+
+    # Remove all non-alphanumeric characters
     case_title = re.sub(r"[^a-z0-9 ]", " ", case_name.lower())
 
-    # Remove one letter words, initials etc.
+    # Remove strings that can cause an unnecessary overlap
+    case_title = false_positive_strings_regex.sub("", case_title)
+
+    # Remove one-letter words, initials etc.
     case_title = re.sub(r"\b[^ ]\b", "", case_title)
+
+    if not case_title:
+        # Log case name if the process reduce it to blank
+        logger.warning(f"Case name: {case_name} reduced to blank.")
+
+    # Convert case name to set of words
     cleaned_set = set(case_title.split())
 
-    # Lastly remove our ever growing set of false positive words
+    # Lastly remove our ever-growing set of false positive words
     # This is different from bad words, but may have some overlap.
     return cleaned_set - (cleaned_set & false_positive_set)
 
@@ -1009,8 +1064,8 @@ def compare_documents(harvard_characters: str, cl_characters: str) -> int:
         subset = make_subset_range(cl_characters, matched_substring)
         found_overlaps.append(subset)
 
-    # If we checked our subsets as we parsed- we wouldnt need to do this
-    # filtering here. This is a good candiate for refactoring.
+    # If we checked our subsets as we parsed- we wouldn't need to do this
+    # filtering here. This is a good candidate for refactoring.
     filtered_subset = list(filter_subsets(found_overlaps))
     for overlap in filtered_subset:
         count += len(overlap)
@@ -1128,6 +1183,12 @@ class Command(VerboseCommand):
             action="store_true",
             help="Add items to solr as we create opinions. "
             "Items are not searchable unless flag is raised.",
+        )
+        parser.add_argument(
+            "--bankruptcy",
+            action="store_true",
+            help="Tells function to use bankruptcy courts for bankruptcy "
+            "cases.",
         )
         parser.add_argument(
             "--no-debug",

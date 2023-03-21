@@ -1,886 +1,765 @@
 {% extends "base.html" %}
-{% load humanize %}
-{% load static %}
+{% load extras humanize static %}
+
 
 {% block head %}
-	{% if DEBUG %}
-		<link rel="stylesheet" href="{% static "css/bootstrap-datepicker3.css" %}"/>
-	{% else %}
-		<link rel="stylesheet" href="{% static "css/bootstrap-datepicker3.min.css" %}"/>
-	{% endif %}
+  {% if DEBUG %}
+    <link rel="stylesheet" href="{% static "css/bootstrap-datepicker3.css" %}"/>
+  {% else %}
+    <link rel="stylesheet" href="{% static "css/bootstrap-datepicker3.min.css" %}"/>
+  {% endif %}
 {% endblock %}
 
+{% block canonical %}{% get_canonical_element %}{% endblock %}
+
 {% block title %}
-	{% if search_form.type.value == SEARCH_TYPES.OPINION %}
-		Advanced Legal Opinion Search – CourtListener.com
-	{% elif search_form.type.value == SEARCH_TYPES.RECAP %}
-		Advanced RECAP Archive Search for PACER – CourtListener.com
-	{% elif search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}
-		Advanced Oral Argument Search – CourtListener.com
-	{% elif search_form.type.value == SEARCH_TYPES.PEOPLE %}
-		Advanced Judge Search – CourtListener.com
-	{% endif %}
+    {% if search_form.type.value == SEARCH_TYPES.OPINION %}
+        Advanced Legal Opinion Search – CourtListener.com
+    {% elif search_form.type.value == SEARCH_TYPES.RECAP %}
+        Advanced RECAP Archive Search for PACER – CourtListener.com
+    {% elif search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}
+        Advanced Oral Argument Search – CourtListener.com
+    {% elif search_form.type.value == SEARCH_TYPES.PEOPLE %}
+        Advanced Judge Search – CourtListener.com
+    {% endif %}
 {% endblock %}
 
 {% block og_title %}
-	{% if search_form.type.value == SEARCH_TYPES.OPINION %}
-		Advanced Legal Opinion Search – CourtListener.com
-	{% elif search_form.type.value == SEARCH_TYPES.RECAP %}
-		Advanced RECAP Archive Search for PACER – CourtListener.com
-	{% elif search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}
-		Advanced Oral Argument Search – CourtListener.com
-	{% elif search_form.type.value == SEARCH_TYPES.PEOPLE %}
-		Advanced Judge Search – CourtListener.com
-	{% endif %}
+  {% if search_form.type.value == SEARCH_TYPES.OPINION %}
+    Advanced Legal Opinion Search – CourtListener.com
+  {% elif search_form.type.value == SEARCH_TYPES.RECAP %}
+    Advanced RECAP Archive Search for PACER – CourtListener.com
+  {% elif search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}
+    Advanced Oral Argument Search – CourtListener.com
+  {% elif search_form.type.value == SEARCH_TYPES.PEOPLE %}
+    Advanced Judge Search – CourtListener.com
+  {% endif %}
 {% endblock %}
 
 {% block footer-scripts %}
-	{% include "includes/date_picker.html" %}
-	<script type="text/javascript">
-        $(document).ready(function () {
-            $('#start-scroll').on("click", function () {
-                $('html, body').animate({
-                    scrollTop: $(".learn-more").offset().top
-                }, 500);
-            });
-        });
-	</script>
+  {% include "includes/date_picker.html" %}
+  <script type="text/javascript">
+    $(document).ready(function () {
+      $('#start-scroll').on("click", function () {
+        $('html, body').animate({
+          scrollTop: $(".learn-more").offset().top
+        }, 500);
+      });
+    });
+  </script>
 {% endblock %}
 
 {% block sidebar %}{% endblock %}
 
 {% block navbar-o %}
-	{% if search_form.type.value == SEARCH_TYPES.OPINION %}active{% else %}
-		{{ block.super }}{% endif %}
+    {% if search_form.type.value == SEARCH_TYPES.OPINION %}active{% else %}{{ block.super }}{% endif %}
 {% endblock %}
 {% block navbar-r %}
-	{% if search_form.type.value == SEARCH_TYPES.RECAP %}active{% else %}
-		{{ block.super }}{% endif %}
+    {% if search_form.type.value == SEARCH_TYPES.RECAP %}active{% else %}{{ block.super }}{% endif %}
 {% endblock %}
 {% block navbar-oa %}
-	{% if search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}active{% else %}
-		{{ block.super }}{% endif %}
+    {% if search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}active{% else %}{{ block.super }}{% endif %}
 {% endblock %}
 {% block navbar-p %}
-	{% if search_form.type.value == SEARCH_TYPES.PEOPLE %}active{% else %}
-		{{ block.super }}{% endif %}
+    {% if search_form.type.value == SEARCH_TYPES.PEOPLE %}active{% else %}{{ block.super }}{% endif %}
 {% endblock %}
 
 
 
 {% block content %}
-	<div id="advanced-page" class="col-xs-12">
-		<div id="above-main-query">
-			{% if search_form.type.value == SEARCH_TYPES.OPINION %}
-				<h1 class="text-center">Advanced Opinion Search</h1>
-				<p class="text-center gray large">Search millions of opinions across
-					hundreds of jurisdictions. Updated constantly.
-				</p>
-			{% elif search_form.type.value == SEARCH_TYPES.RECAP %}
-				<h1 class="text-center">Advanced RECAP Search</h1>
-				<p class="text-center gray large">Search our database of
-					millions of PACER documents and dockets.
-				</p>
-				{% if not request.COOKIES.recap_install_plea %}
-					<p class="text-center gray large recap_install_plea">Install the
-						free <a href="https://free.law/recap/">RECAP extensions for
-							Firefox, Chrome and Safari</a> to contribute to this
-						archive.</p>
-				{% endif %}
-			{% elif search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}
-				<h1 class="text-center">Advanced Oral Argument Search</h1>
-				<p class="text-center gray large">Search the biggest collection of oral
-					argument audio on the Internet. Updated constantly.
-				</p>
-			{% elif search_form.type.value == SEARCH_TYPES.PEOPLE %}
-				<h1 class="text-center">Advanced Judge Search</h1>
-				<p class="text-center gray large">Search our database of thousands of
-					State and Federal judges.
-				</p>
-			{% endif %}
-			<p class="text-center"><a class="btn btn-default" id="start-scroll">Learn
-				More</a></p>
-		</div>
+    <div id="advanced-page" class="col-xs-12">
+        <div id="above-main-query">
+            {% if search_form.type.value == SEARCH_TYPES.OPINION %}
+                <h1 class="text-center">Advanced Opinion Search</h1>
+                <p class="text-center gray large">Search millions of opinions across hundreds of jurisdictions. Updated constantly.
+                </p>
+            {% elif search_form.type.value == SEARCH_TYPES.RECAP %}
+                <h1 class="text-center">Advanced RECAP Search</h1>
+                <p class="text-center gray large">Search our database of
+                    millions of PACER documents and dockets.
+                </p>
+               {% if not request.COOKIES.recap_install_plea %}
+                 <p class="text-center gray large recap_install_plea">Install the free <a href="https://free.law/recap/">RECAP extensions for Firefox, Chrome and Safari</a> to contribute to this archive.</p>
+               {% endif %}
+            {% elif search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}
+                <h1 class="text-center">Advanced Oral Argument Search</h1>
+                <p class="text-center gray large">Search the biggest collection of oral argument audio on the Internet. Updated constantly.
+                </p>
+            {% elif search_form.type.value == SEARCH_TYPES.PEOPLE %}
+                <h1 class="text-center">Advanced Judge Search</h1>
+                <p class="text-center gray large">Search our database of thousands of State and Federal judges.
+                </p>
+            {% endif %}
+            <p class="text-center"><a class="btn btn-default" id="start-scroll">Learn More</a></p>
+        </div>
 
-		<div id="main-query-box">
-			<form action="/" method="get" id="search-form" class="form-inline"
-				  role="form">
-				{% include "includes/result_type_chooser.html" %}
-				<div id="search-container" class="text-center">
-					<label class="sr-only" for="id_q">Search</label>
-					<div class="input-group">
-						<input class="form-control input-lg"
-							   value="{{ search_form.q.value|default:'' }}"
-							   name="q"
-							   id="id_q"
-							   autocomplete="off"
-							   type="text">
-						<span class="input-group-btn">
+        <div id="main-query-box">
+            <form action="/" method="get" id="search-form" class="form-inline"
+                  role="form">
+                {% include "includes/result_type_chooser.html" %}
+                <div id="search-container" class="text-center">
+                    <label class="sr-only" for="id_q">Search</label>
+                    <div class="input-group">
+                        <input class="form-control input-lg"
+                               value="{{ search_form.q.value|default:'' }}"
+                               name="q"
+                               id="id_q"
+                               autocomplete="off"
+                               type="text">
+                        <span class="input-group-btn">
                         <button type="submit"
-								class="btn btn-primary btn-lg"
-								name="search"
-								id="search-button"><i class="fa fa-search"></i>&nbsp;Search
+                                class="btn btn-primary btn-lg"
+                                name="search"
+                                id="search-button"><i class="fa fa-search"></i>&nbsp;Search
                         </button>
                     </span>
-					</div>
-				</div>
-			</form>
-		</div>
-		{% if search_form.type.value == SEARCH_TYPES.OPINION %}
-			<div class="row">
-				{#  Modal is at bottom of results, so it loads last. #}
-				<div id="extra-sidebar-fields" class="col-sm-9">
-					<div class="row">
-						<div class="col-sm-8">
-							<div class="row">
-								<div class="col-sm-6">
-									<a href="#"
-									   class="btn btn-default btn-lg v-offset-above-1"
-									   type="button" data-toggle="modal"
-									   data-target="#court-picker">
-										<span class="hidden-sm">Select </span>Jurisdictions
-										<span id="jurisdiction-count"
-											  class="badge">{{ court_count_human|default:""}}</span>
-									</a>
-								</div>
-								<div class="col-sm-6">
-									{% include "includes/order_by_dropdown.html" %}
-								</div>
-							</div>
-							<div class="row">
-								<div class="col-sm-6">
-									<div class="form-group">
-										{{ search_form.case_name.label_tag }}
-										{{ search_form.case_name }}
-									</div>
-								</div>
-								<div class="col-sm-6">
-									<div class="form-group">
-										{{ search_form.judge.label_tag }}
-										{{ search_form.judge }}
-									</div>
-								</div>
-							</div>
-						</div>
-						<div class="col-sm-4">
-							<label>Precedential Status</label>
-							{% for facet_field in facet_fields %}
-								{% if forloop.counter == 4 %}
-									<a id="show-all-statuses"
-									   class="cursor">Show All Statuses&hellip;</a>
-								{% endif %}
-								<div class="sidebar-checkbox status-item{% if forloop.counter >= 4 %} hidden{% endif %}">
-									<input
-											id="id_{{ facet_field.html_name }}"
-											type="checkbox"
-											name="{{ facet_field.html_name }}"
-											class="external-input status-checkbox left"
-											{% if facet_field.value %}checked="checked"{% endif %}>
-									<label
-											for="id_{{ facet_field.html_name }}"
-											class="pointer {% if facet_field.count == 0 %}gray{% endif %}">
-										<div>{{ facet_field.label }}&nbsp;
-											{% if facet_field.count != None %}<span
-													class="gray small">(
-												{{ facet_field.count|intcomma }}
-												){% endif %}</span>
-										</div>
-									</label>
-								</div>
-							{% endfor %}
-						</div>
-					</div>
-					<div class="row">
-						<div class="col-sm-4">
-							<div class="form-group">
-								{{ search_form.filed_after.label_tag }}
-								{{ search_form.filed_after }}
-							</div>
-						</div>
-						<div class="col-sm-4">
-							<div class="form-group">
-								{{ search_form.filed_before.label_tag }}
-								{{ search_form.filed_before }}
-							</div>
-						</div>
-						<div class="col-sm-4">
-							<div class="row">
-								<div class="col-xs-6">
-									<div class="form-group">
-										{{ search_form.cited_gt.label_tag }}
-										{{ search_form.cited_gt }}
-									</div>
-								</div>
-								<div class="col-xs-6">
-									<div class="form-group">
-										{{ search_form.cited_lt.label_tag }}
-										{{ search_form.cited_lt }}
-									</div>
-								</div>
-							</div>
-						</div>
-					</div>
-					<div class="row">
-						<div class="col-sm-4">
-							<div class="form-group">
-								{{ search_form.citation.label_tag }}
-								{{ search_form.citation }}
-								<p><a href="{% url "citation_redirector" %}">Look
-									up a specific citation</a>
-								</p>
-							</div>
-						</div>
-						<div class="col-sm-4">
-							<div class="form-group">
-								{{ search_form.neutral_cite.label_tag }}
-								{{ search_form.neutral_cite }}
-							</div>
-						</div>
-						<div class="col-sm-4">
-							<div class="form-group">
-								{{ search_form.docket_number.label_tag }}
-								{{ search_form.docket_number }}
-							</div>
-						</div>
-					</div>
-					<div class="row">
-						<div class="col-xs-12">
-							<button type="submit"
-									class="btn btn-primary btn-lg float-right"
-									name="search"
-									id="search-button-secondary"><i
-									class="fa fa-search"></i>&nbsp;Search
-							</button>
-						</div>
-					</div>
-				</div>
-				<div class="col-sm-3">
-					{% include "includes/operators_quick_list.html" %}
-					<a class="text-right" href="{% url 'advanced_search' %}">More
-						details&hellip;</a>
-				</div>
-			</div>
+                    </div>
+                </div>
+            </form>
+        </div>
+        {% if search_form.type.value == SEARCH_TYPES.OPINION %}
+        <div class="row">
+            {#  Modal is at bottom of results, so it loads last. #}
+            <div id="extra-sidebar-fields" class="col-sm-9">
+                <div class="row">
+                    <div class="col-sm-8">
+                        <div class="row">
+                            <div class="col-sm-6">
+                                <a href="#" class="btn btn-default btn-lg v-offset-above-1"
+                                   type="button" data-toggle="modal"
+                                   data-target="#court-picker">
+                                    <span class="hidden-sm">Select </span>Jurisdictions
+                                    <span id="jurisdiction-count"
+                                          class="badge">{{ court_count_human|default:""}}</span>
+                                </a>
+                            </div>
+                            <div class="col-sm-6">
+                                {% include "includes/order_by_dropdown.html" %}
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-sm-6">
+                                <div class="form-group">
+                                    {{ search_form.case_name.label_tag }}
+                                    {{ search_form.case_name }}
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="form-group">
+                                    {{ search_form.judge.label_tag }}
+                                    {{ search_form.judge }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <label>Precedential Status</label>
+                        {% for facet_field in facet_fields %}
+                            {% if forloop.counter == 4 %}
+                                <a id="show-all-statuses"
+                                   class="cursor">Show All Statuses&hellip;</a>
+                            {% endif %}
+                            <div class="sidebar-checkbox status-item{% if forloop.counter >= 4 %} hidden{% endif %}">
+                                <input
+                                        id="id_{{ facet_field.html_name }}"
+                                        type="checkbox"
+                                        name="{{ facet_field.html_name }}"
+                                        class="external-input status-checkbox left"
+                                        {% if facet_field.value %}checked="checked"{% endif %}>
+                                <label
+                                        for="id_{{ facet_field.html_name }}"
+                                        class="pointer {% if facet_field.count == 0 %}gray{% endif %}">
+                                    <div>{{ facet_field.label }}&nbsp;{% if facet_field.count != None %}<span
+                                            class="gray small">({{ facet_field.count|intcomma }}){% endif %}</span>
+                                    </div>
+                                </label>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            {{ search_form.filed_after.label_tag }}
+                            {{ search_form.filed_after }}
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            {{ search_form.filed_before.label_tag }}
+                            {{ search_form.filed_before }}
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="row">
+                            <div class="col-xs-6">
+                                <div class="form-group">
+                                    {{ search_form.cited_gt.label_tag }}
+                                    {{ search_form.cited_gt }}
+                                </div>
+                            </div>
+                            <div class="col-xs-6">
+                                <div class="form-group">
+                                    {{ search_form.cited_lt.label_tag }}
+                                    {{ search_form.cited_lt }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            {{ search_form.citation.label_tag }}
+                            {{ search_form.citation }}
+                            <p><a href="{% url "citation_homepage" %}">Look
+                                up a specific citation</a>
+                            </p>
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            {{ search_form.neutral_cite.label_tag }}
+                            {{ search_form.neutral_cite }}
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            {{ search_form.docket_number.label_tag }}
+                            {{ search_form.docket_number }}
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-xs-12">
+                        <button type="submit"
+                                class="btn btn-primary btn-lg float-right"
+                                name="search"
+                                id="search-button-secondary"><i
+                                class="fa fa-search"></i>&nbsp;Search
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-3">
+                {% include "includes/operators_quick_list.html" %}
+                <a class="text-right" href="{% url 'advanced_search' %}">More
+                    details&hellip;</a>
+            </div>
+        </div>
 
-		{% elif search_form.type.value == SEARCH_TYPES.RECAP %}
-			<div class="row">
-				{# Modal is at bottom of results, so it loads last #}
-				<div id="extra-sidebar-fields" class="col-sm-9">
-					<div class="row">
-						<div class="col-sm-3">
-							<a href="#" class="btn btn-default btn-lg v-offset-above-1"
-							   type="button" data-toggle="modal"
-							   data-target="#court-picker">
-								<span class="hidden-sm">Select </span>Jurisdictions
-								<span id="jurisdiction-count"
-									  class="badge">{{ court_count_human|default:"" }}</span>
-							</a>
-						</div>
-						<div class="col-sm-4">
-							{% include "includes/order_by_dropdown.html" %}
-						</div>
-						<div class="col-sm-5">
-							<div class="form-group">
-								{{ search_form.docket_number.label_tag }}
-								{{ search_form.docket_number }}
-							</div>
-						</div>
-					</div>
-					<div class="row">
-						<div class="col-sm-6">
-							<div class="form-group">
-								{{ search_form.description.label_tag }}
-								{{ search_form.description }}
-							</div>
-						</div>
-						<div class="col-sm-6">
-							<div class="form-group">
-								{{ search_form.case_name.label_tag }}
-								{{ search_form.case_name }}
-							</div>
-						</div>
-					</div>
-					<div class="row">
-						<div class="col-sm-3">
-							<div class="form-group">
-								{{ search_form.filed_after.label_tag }}
-								{{ search_form.filed_after }}
-							</div>
-						</div>
-						<div class="col-sm-3">
-							<div class="form-group">
-								{{ search_form.filed_before.label_tag }}
-								{{ search_form.filed_before }}
-							</div>
-						</div>
-						<div class="col-sm-3">
-							<div class="form-group">
-								{{ search_form.document_number.label_tag }}
-								{{ search_form.document_number }}
-							</div>
-						</div>
-						<div class="col-sm-3">
-							<div class="form-group">
-								{{ search_form.attachment_number.label_tag }}
-								{{ search_form.attachment_number }}
-							</div>
-						</div>
-					</div>
-					<div class="row">
-						<div class="col-sm-4">
-							<div class="form-group">
-								{{ search_form.assigned_to.label_tag }}
-								{{ search_form.assigned_to }}
-							</div>
-						</div>
-						<div class="col-sm-4">
-							<div class="form-group">
-								{{ search_form.referred_to.label_tag }}
-								{{ search_form.referred_to }}
-							</div>
-						</div>
-						<div class="col-sm-4">
-							<div class="form-group">
-								{{ search_form.nature_of_suit.label_tag }}
-								{{ search_form.nature_of_suit }}
-							</div>
-						</div>
-					</div>
-					<div class="row">
-						<div class="col-sm-4">
-							<div class="form-group">
-								{{ search_form.party_name.label_tag }}
-								{{ search_form.party_name }}
-							</div>
-						</div>
-						<div class="col-sm-4">
-							<div class="form-group">
-								{{ search_form.atty_name.label_tag }}
-								{{ search_form.atty_name }}
-							</div>
-						</div>
-						<div class="col-sm-4">
-							<div class="form-group">
-								<div class="sidebar-checkbox">
-									{{ search_form.available_only }}
-									{{ search_form.available_only.label_tag }}
-								</div>
-							</div>
-						</div>
-					</div>
-					<div class="row">
-						<div class="col-xs-12">
-							<button type="submit"
-									class="btn btn-primary btn-lg float-right"
-									name="search"
-									id="search-button-secondary"><i
-									class="fa fa-search"></i>&nbsp;Search
-							</button>
-						</div>
-					</div>
-				</div>
-				<div class="col-sm-3">
-					{% include "includes/operators_quick_list.html" %}
-					<a class="text-right" href="{% url 'advanced_search' %}">More
-						details&hellip;</a>
-				</div>
-			</div>
+        {% elif search_form.type.value == SEARCH_TYPES.RECAP %}
+        <div class="row">
+            {# Modal is at bottom of results, so it loads last #}
+            <div id="extra-sidebar-fields" class="col-sm-9">
+                <div class="row">
+                    <div class="col-sm-3">
+                        <a href="#" class="btn btn-default btn-lg v-offset-above-1"
+                           type="button" data-toggle="modal"
+                           data-target="#court-picker">
+                            <span class="hidden-sm">Select </span>Jurisdictions
+                            <span id="jurisdiction-count"
+                                  class="badge">{{ court_count_human|default:"" }}</span>
+                        </a>
+                    </div>
+                    <div class="col-sm-4">
+                        {% include "includes/order_by_dropdown.html" %}
+                    </div>
+                    <div class="col-sm-5">
+                        <div class="form-group">
+                            {{ search_form.docket_number.label_tag }}
+                            {{ search_form.docket_number }}
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-6">
+                        <div class="form-group">
+                            {{ search_form.description.label_tag }}
+                            {{ search_form.description }}
+                        </div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="form-group">
+                            {{ search_form.case_name.label_tag }}
+                            {{ search_form.case_name }}
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-3">
+                        <div class="form-group">
+                            {{ search_form.filed_after.label_tag }}
+                            {{ search_form.filed_after }}
+                        </div>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="form-group">
+                            {{ search_form.filed_before.label_tag }}
+                            {{ search_form.filed_before }}
+                        </div>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="form-group">
+                            {{ search_form.document_number.label_tag }}
+                            {{ search_form.document_number }}
+                        </div>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="form-group">
+                            {{ search_form.attachment_number.label_tag }}
+                            {{ search_form.attachment_number }}
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            {{ search_form.assigned_to.label_tag }}
+                            {{ search_form.assigned_to }}
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            {{ search_form.referred_to.label_tag }}
+                            {{ search_form.referred_to }}
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            {{ search_form.nature_of_suit.label_tag }}
+                            {{ search_form.nature_of_suit }}
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-4">
+                         <div class="form-group">
+                             {{ search_form.party_name.label_tag }}
+                             {{ search_form.party_name }}
+                         </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            {{ search_form.atty_name.label_tag }}
+                            {{ search_form.atty_name }}
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            <div class="sidebar-checkbox">
+                                {{ search_form.available_only }}
+                                {{ search_form.available_only.label_tag }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-xs-12">
+                        <button type="submit"
+                                class="btn btn-primary btn-lg float-right"
+                                name="search"
+                                id="search-button-secondary"><i
+                                class="fa fa-search"></i>&nbsp;Search
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-3">
+                {% include "includes/operators_quick_list.html" %}
+                <a class="text-right" href="{% url 'advanced_search' %}">More
+                    details&hellip;</a>
+            </div>
+        </div>
 
 
-		{% elif search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}
-			<div class="row">
-				{#  Modal is at bottom of results, so it loads last. #}
-				<div id="extra-sidebar-fields" class="col-sm-9">
-					<div class="row">
-						<div class="col-sm-3">
-							<a href="#" class="btn btn-default btn-lg v-offset-above-1"
-							   type="button" data-toggle="modal"
-							   data-target="#court-picker">
-								<span class="hidden-sm">Select </span>Jurisdictions
-								<span id="jurisdiction-count"
-									  class="badge">{{ court_count_human|default:"" }}</span>
-							</a>
-						</div>
-						<div class="col-sm-4">
-							{% include "includes/order_by_dropdown.html" %}
-						</div>
-						<div class="col-sm-5">
-							<div class="form-group">
-								{{ search_form.case_name.label_tag }}
-								{{ search_form.case_name }}
-							</div>
-						</div>
-					</div>
-					<div class="row">
-						<div class="col-sm-4">
-							<div class="form-group">
-								{{ search_form.judge.label_tag }}
-								{{ search_form.judge }}
-							</div>
-						</div>
-						<div class="col-sm-4">
-							<div class="form-group">
-								{{ search_form.argued_after.label_tag }}
-								{{ search_form.argued_after }}
-							</div>
-						</div>
-						<div class="col-sm-4">
-							<div class="form-group">
-								{{ search_form.argued_before.label_tag }}
-								{{ search_form.argued_before }}
-							</div>
-						</div>
-					</div>
-					<div class="row">
-						<div class="col-sm-4">
-							<div class="form-group">
-								{{ search_form.docket_number.label_tag }}
-								{{ search_form.docket_number }}
-							</div>
-						</div>
-					</div>
-					<div class="row">
-						<div class="col-xs-12">
-							<button type="submit"
-									class="btn btn-primary btn-lg float-right"
-									name="search"
-									id="search-button-secondary"><i
-									class="fa fa-search"></i>&nbsp;Search
-							</button>
-						</div>
-					</div>
-				</div>
+        {% elif search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}
+        <div class="row">
+            {#  Modal is at bottom of results, so it loads last. #}
+            <div id="extra-sidebar-fields" class="col-sm-9">
+                <div class="row">
+                    <div class="col-sm-3">
+                        <a href="#" class="btn btn-default btn-lg v-offset-above-1"
+                           type="button" data-toggle="modal"
+                           data-target="#court-picker">
+                            <span class="hidden-sm">Select </span>Jurisdictions
+                            <span id="jurisdiction-count"
+                                  class="badge">{{ court_count_human|default:"" }}</span>
+                        </a>
+                    </div>
+                    <div class="col-sm-4">
+                        {% include "includes/order_by_dropdown.html" %}
+                    </div>
+                    <div class="col-sm-5">
+                        <div class="form-group">
+                            {{ search_form.case_name.label_tag }}
+                            {{ search_form.case_name }}
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            {{ search_form.judge.label_tag }}
+                            {{ search_form.judge }}
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            {{ search_form.argued_after.label_tag }}
+                            {{ search_form.argued_after }}
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            {{ search_form.argued_before.label_tag }}
+                            {{ search_form.argued_before }}
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            {{ search_form.docket_number.label_tag }}
+                            {{ search_form.docket_number }}
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-xs-12">
+                        <button type="submit"
+                                class="btn btn-primary btn-lg float-right"
+                                name="search"
+                                id="search-button-secondary"><i
+                                class="fa fa-search"></i>&nbsp;Search
+                        </button>
+                    </div>
+                </div>
+            </div>
 
-				<div class="col-sm-3">
-					{% include "includes/operators_quick_list.html" %}
-					<a class="text-right" href="{% url 'advanced_search' %}">More
-						details&hellip;</a>
-				</div>
-			</div>
-
-
-		{% elif search_form.type.value == SEARCH_TYPES.PEOPLE %}
-			<div class="row">
-				{#  Modal is at bottom of results, so it loads last. #}
-				<div id="extra-sidebar-fields" class="col-sm-12">
-					<div class="row">
-						<div class="col-sm-3">
-							<a href="#" class="btn btn-default btn-lg v-offset-above-1"
-							   type="button" data-toggle="modal"
-							   data-target="#court-picker">
-								<span class="hidden-sm">Select </span>Jurisdictions
-								<span id="jurisdiction-count"
-									  class="badge">{{ court_count_human|default:"" }}</span>
-							</a>
-						</div>
-						<div class="col-sm-3">
-							{% include "includes/order_by_dropdown.html" %}
-						</div>
-						<div class="col-sm-6">
-							<div class="form-group">
-								{{ search_form.name.label_tag }}
-								{{ search_form.name }}
-							</div>
-						</div>
-					</div>
-					<div class="row">
-						<div class="col-sm-3">
-							<div class="form-group">
-								{{ search_form.dob_city.label_tag }}
-								{{ search_form.dob_city }}
-							</div>
-						</div>
-						<div class="col-sm-3">
-							<div class="form-group">
-								{{ search_form.dob_state.label_tag }}
-								{{ search_form.dob_state }}
-							</div>
-						</div>
-						<div class="col-sm-3">
-							<div class="form-group">
-								{{ search_form.born_after.label_tag }}
-								{{ search_form.born_after }}
-							</div>
-						</div>
-						<div class="col-sm-3">
-							<div class="form-group">
-								{{ search_form.born_before.label_tag }}
-								{{ search_form.born_before }}
-							</div>
-						</div>
-					</div>
-					<div class="row">
-						<div class="col-sm-3">
-							<div class="form-group">
-								{{ search_form.school.label_tag }}
-								{{ search_form.school }}
-							</div>
-						</div>
-						<div class="col-sm-3">
-							<div class="form-group">
-								{{ search_form.appointer.label_tag }}
-								{{ search_form.appointer }}
-							</div>
-						</div>
-						<div class="col-sm-3">
-							<div class="form-group">
-								{{ search_form.selection_method.label_tag }}
-								{{ search_form.selection_method }}
-							</div>
-						</div>
-						<div class="col-sm-3">
-							<div class="form-group">
-								{{ search_form.political_affiliation.label_tag }}
-								{{ search_form.political_affiliation }}
-							</div>
-						</div>
-					</div>
-				</div>
-			</div>
-			<div class="row">
-				<div class="col-xs-12">
-					<button type="submit"
-							class="btn btn-primary btn-lg float-right"
-							name="search"
-							id="search-button-secondary"><i class="fa fa-search"></i>&nbsp;Search
-					</button>
-				</div>
-			</div>
-		{% endif %}
+            <div class="col-sm-3">
+                {% include "includes/operators_quick_list.html" %}
+                <a class="text-right" href="{% url 'advanced_search' %}">More
+                    details&hellip;</a>
+            </div>
+        </div>
 
 
-		{% if search_form.type.value == SEARCH_TYPES.OPINION %}
-			<div class="row learn-more" id="about-opinions">
-				<div class="col-xs-12">
-					<h2>About the CourtListener Corpus of Opinions</h2>
-				</div>
-				<div class="col-md-4">
-					<h3>Background</h3>
-					<p>The opinions in CourtListener have been collected since 2009 by
-						<a href="https://free.law">Free Law Project</a>, a non-profit
-						devoted to high-quality legal data. We have collected these
-						opinions so that lawyers, researchers, journalists, corporate
-						organizations, and the public can have easy access to them.
-					</p>
-					<p>We have gathered and curated these opinions from a variety of
-						sources, including court websites, information donations, <a
-								href="https://public.resource.org">Public.Resource.org</a>,
-						and the <a href="http://scdb.wustl.edu/">Supreme Court
-							Database</a>.
-					</p>
-					<p>This work has been possible thanks to <a
-							href="https://free.law/thanks/">financial and volunteer
-						support</a> from a growing list of people and organizations. If
-						this work is valuable to you, your research, or your
-						organization, please donate so our work can continue and thrive.
-					</p>
-					<p>
-						<a href="{% url "donate" %}?referrer=opinion-adv-search"
-						   class="btn btn-danger">Donate Now</a>
-					</p>
-				</div>
-				<div class="col-md-4">
-					<h3>Coverage</h3>
-					<p>Our collection of opinions combines the best data from many
-						sources. On our <a href="{% url "coverage" %}">coverage page</a>,
-						you can see court-by-court graphs of what we have and can see
-						which courts we get data from on an ongoing basis.
-					</p>
-					<p>We are particularly proud of our Supreme Court data, which we
-						consider to be the best collection available. We have made
-						thousands of corrections to the other publicly available data
-						sets, and have enhanced it with data from the <a
-								href="https://free.law/2011/05/25/updated-scotus-dates/">Library
-							of Congress</a> and the <a
-								href="https://free.law/2014/12/21/scdb/">Supreme Court
-							Database</a>.
-					</p>
-					<p>
-						<a class="btn btn-primary"
-						   href="https://free.law/projects/supreme-court-data/">Learn
-							About Our Supreme Court Data</a>
-					</p>
-
-					<h3>CiteGeist Relevancy Engine</h3>
-					<p>The CourtListener search engine has been optimized over the years
-						to provide the most relevant and important cases at the top of
-						the results. The system we use for this is named CiteGeist, and
-						it works by analyzing your query and combining that with
-						information about the citations between cases.
-					</p>
-					<p>
-						<a href="https://free.law/2013/11/12/citegeist/"
-						   class="btn btn-primary">Read About CiteGeist</a>
-					</p>
-				</div>
-				<div class="col-md-4">
-					<h3>Alerts</h3>
-					<p>For the courts where we get content on an <a
-							href="{% url "coverage" %}#scraped-jurisdictions">ongoing
-						basis</a>, you can set up alerts for any search query. This way,
-						you get an email whenever there is a new opinion matching your
-						query.
-					</p>
-					<p>Some popular queries are your company name or that of your
-						competitor, a legal area that you follow, or even <a
-								href="https://free.law/2016/01/30/citation-searching/">a
-							citation alert</a> that emails when a certain case is cited.
-						We also offer <a href="{% url "feeds_info" %}">custom RSS
-							feeds</a> for any search query.
-					</p>
-					<p>To get started, do a search, then save it as an alert from the
-						sidebar of your list of results.
-					</p>
-
-
-					<h3>Even More Advanced Searching</h3>
-					<p>You can do even more advanced searches by using fielded searches
-						and query operators.
-					</p>
-					<p>
-						<a class="btn btn-primary"
-						   href="{% url 'advanced_search' %}">Learn More</a>
-					</p>
-				</div>
-			</div>
-
-		{% elif search_form.type.value == SEARCH_TYPES.RECAP %}
-			<div class="row learn-more" id="about-recap">
-				<div class="col-xs-12">
-					<h2>About CourtListener's RECAP Archive</h2>
-				</div>
-				<div class="col-md-4">
-					<h3>Background</h3>
-					<p>The RECAP Archive is a searchable collection of millions of PACER
-						documents and dockets that were gathered using our <a
-								href="https://free.law/recap/">RECAP Extensions for
-							Firefox, Chrome and Safari</a>. PACER is the government-run
-						system where nearly every legal document is filed from federal
-						cases. The archive also includes <a
-								href="https://free.law/2017/08/15/we-have-all-free-pacer/">every
-							free PACER opinion</a>. This unique archive was created to
-						partially address what we see as the <a
-								href="https://free.law/2015/03/20/what-is-the-pacer-problem/">PACER
-							Problem</a>.
-					</p>
-					<p>Using this archive, you can finally search and download millions
-						of PACER documents, including those that were originally scanned
-						PDFs, <a
-								href="https://free.law/2016/09/26/extracting-text-millions-of-pacer-documents/">which
-							we laboriously convert to text</a>.
-					</p>
-					<p>This work was made possible thanks to a partnership with <a
-							href="https://citp.princeton.edu/">The Center for
-						Information Technology Policy at Princeton</a>, the generous
-						data contributions of thousands of RECAP users, and a ton of <a
-								href="https://free.law/thanks/">volunteer support</a>.
-					</p>
-					<p>If you find this work valuable, or if it saves you money on your
-						PACER bill, please donate.
-					</p>
-					<p>
-						<a href="{% url "donate" %}?referrer=recap-adv-search"
-						   class="btn btn-danger">Donate Now</a>
-					</p>
-				</div>
-				<div class="col-md-4">
-					<h3>Learn More About PACER</h3>
-					<p>We've written many articles about PACER:</p>
-					<ul>
-						<li>
-							<a href="https://free.law/2015/03/20/what-is-the-pacer-problem/">What
-								is the PACER Problem?</a></li>
-						<li>
-							<a href="https://free.law/2016/11/14/pacer-revenue/">How
-								Much Money Does PACER Make?</a>
-						</li>
-						<li>
-							<a href="https://free.law/2015/03/24/what-should-be-done-about-the-pacer-problem/">What
-								Should be Done About the PACER Problem?</a></li>
-						<li>
-							<a href="https://free.law/2016/11/03/what-is-a-pacer-page/">What
-								is a Page of PACER Content?</a></li>
-						<li>
-							<a href="https://free.law/2016/10/10/pacer-costs-a-billion-dollars/">The
-								Cost of PACER Data? Around One Billion Dollars.</a>
-						</li>
-						<li>
-							<a href="https://free.law/2015/03/23/why-should-congress-care-about-pacer/">Why
-								Should Congress Care about PACER?</a></li>
-						<li>
-							<a href="https://free.law/2014/08/26/using-pacer-vid/">Using
-								PACER &mdash; What Could Possibly Go Wrong?</a></li>
-						<li>
-							<a href="https://free.law/2010/08/17/assessing-pacers-access-barriers/">Assessing
-								PACER's Access Barriers</a></li>
-					</ul>
-					<p>You can read more of our <a
-							href="https://free.law/tag/pacer/">PACER</a> and <a
-							href="https://free.law/tag/recap/">RECAP</a>
-						articles on the Free Law Project Blog.</p>
-				</div>
-				<div class="col-md-4">
-					<h3>Get Involved &mdash; Install the Extensions</h3>
-					<p>This archive of data was created by users of the RECAP
-						Extensions. Learn more and install them at the RECAP
-						homepage.
-					</p>
-					<p>
-						<a href="https://free.law/recap/"
-						   class="btn btn-success">Install the Extensions</a>
-					</p>
+        {% elif search_form.type.value == SEARCH_TYPES.PEOPLE %}
+        <div class="row">
+            {#  Modal is at bottom of results, so it loads last. #}
+            <div id="extra-sidebar-fields" class="col-sm-12">
+                <div class="row">
+                    <div class="col-sm-3">
+                        <a href="#" class="btn btn-default btn-lg v-offset-above-1"
+                           type="button" data-toggle="modal"
+                           data-target="#court-picker">
+                            <span class="hidden-sm">Select </span>Jurisdictions
+                            <span id="jurisdiction-count"
+                                  class="badge">{{ court_count_human|default:"" }}</span>
+                        </a>
+                    </div>
+                    <div class="col-sm-3">
+                        {% include "includes/order_by_dropdown.html" %}
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="form-group">
+                            {{ search_form.name.label_tag }}
+                            {{ search_form.name }}
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-3">
+                        <div class="form-group">
+                            {{ search_form.dob_city.label_tag }}
+                            {{ search_form.dob_city }}
+                        </div>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="form-group">
+                            {{ search_form.dob_state.label_tag }}
+                            {{ search_form.dob_state }}
+                        </div>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="form-group">
+                            {{ search_form.born_after.label_tag }}
+                            {{ search_form.born_after }}
+                        </div>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="form-group">
+                            {{ search_form.born_before.label_tag }}
+                            {{ search_form.born_before }}
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-3">
+                        <div class="form-group">
+                            {{ search_form.school.label_tag }}
+                            {{ search_form.school }}
+                        </div>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="form-group">
+                            {{ search_form.appointer.label_tag }}
+                            {{ search_form.appointer }}
+                        </div>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="form-group">
+                            {{ search_form.selection_method.label_tag }}
+                            {{ search_form.selection_method }}
+                        </div>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="form-group">
+                            {{ search_form.political_affiliation.label_tag }}
+                            {{ search_form.political_affiliation }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-xs-12">
+                <button type="submit"
+                        class="btn btn-primary btn-lg float-right"
+                        name="search"
+                        id="search-button-secondary"><i class="fa fa-search"></i>&nbsp;Search
+                </button>
+            </div>
+        </div>
+        {% endif %}
 
 
-					<h3>Research Service and API</h3>
-					<p>Free Law Project, the non-profit behind RECAP, is proud to host a
-						research service and API for PACER content. If you are an
-						organization that needs PACER content or a researcher looking
-						for bulk data, please get in touch.
-					</p>
-					<p>
-						<a href="{% url "contact" %}" class="btn btn-primary">Contact
-							Us</a>
-					</p>
-				</div>
-			</div>
+        {%  if search_form.type.value == SEARCH_TYPES.OPINION %}
+        <div class="row learn-more" id="about-opinions">
+            <div class="col-xs-12">
+                <h2>About the CourtListener Corpus of Opinions</h2>
+            </div>
+            <div class="col-md-4">
+                <h3>Background</h3>
+                <p>The opinions in CourtListener have been collected since 2009 by <a href="https://free.law">Free Law Project</a>, a non-profit devoted to high-quality legal data. We have collected these opinions so that lawyers, researchers, journalists, corporate organizations, and the public can have easy access to them.
+                </p>
+                <p>We have gathered and curated these opinions from a variety of sources, including court websites, information donations, <a href="https://public.resource.org">Public.Resource.org</a>, and the <a href="http://scdb.wustl.edu/">Supreme Court Database</a>.
+                </p>
+                <p>This work has been possible thanks to <a href="https://free.law/thanks/">financial and volunteer support</a> from a growing list of people and organizations. If this work is valuable to you, your research, or your organization, please donate so our work can continue and thrive.
+                </p>
+                <p>
+                    <a href="{% url "donate" %}?referrer=opinion-adv-search"
+                       class="btn btn-danger">Donate Now</a>
+                </p>
+            </div>
+            <div class="col-md-4">
+                <h3>Coverage</h3>
+                <p>Our collection of opinions combines the best data from many sources. On our <a href="{% url "coverage" %}">coverage page</a>, you can see court-by-court graphs of what we have and can see which courts we get data from on an ongoing basis.
+                </p>
+                <p>We are particularly proud of our Supreme Court data, which we consider to be the best collection available. We have made thousands of corrections to the other publicly available data sets, and have enhanced it with data from the <a href="https://free.law/2011/05/25/updated-scotus-dates/">Library of Congress</a> and the <a href="https://free.law/2014/12/21/scdb/">Supreme Court Database</a>.
+                </p>
+                <p>
+                    <a class="btn btn-primary" href="https://free.law/projects/supreme-court-data/">Learn About Our Supreme Court Data</a>
+                </p>
+
+                <h3>CiteGeist Relevancy Engine</h3>
+                <p>The CourtListener search engine has been optimized over the years to provide the most relevant and important cases at the top of the results. The system we use for this is named CiteGeist, and it works by analyzing your query and combining that with information about the citations between cases.
+                </p>
+                <p>
+                    <a href="https://free.law/2013/11/12/citegeist/"
+                       class="btn btn-primary">Read About CiteGeist</a>
+                </p>
+            </div>
+            <div class="col-md-4">
+                <h3>Alerts</h3>
+                <p>For the courts where we get content on an <a href="{% url "coverage" %}#scraped-jurisdictions">ongoing basis</a>, you can set up alerts for any search query. This way, you get an email whenever there is a new opinion matching your query.
+                </p>
+                <p>Some popular queries are your company name or that of your competitor, a legal area that you follow, or even <a href="https://free.law/2016/01/30/citation-searching/">a citation alert</a> that emails when a certain case is cited. We also offer <a href="{% url "feeds_info" %}">custom RSS feeds</a> for any search query.
+                </p>
+                <p>To get started, do a search, then save it as an alert from the sidebar of your list of results.
+                </p>
 
 
-		{% elif search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}
-			<div class="row learn-more" id="about-oral-arguments">
-				<div class="col-xs-12">
-					<h2>About the CourtListener Oral Argument Archive</h2>
-				</div>
-				<div class="col-md-4">
-					<h3>Background</h3>
-					<p>The oral argument audio in CourtListener has been collected from
-						court websites by <a href="https://free.law">Free Law
-							Project</a>, a non-profit devoted to high-quality legal
-						data. We began collecting these oral arguments after hearing
-						that many courts were simply deleting them, claiming that they
-						were too expensive to keep.
-					</p>
-					<p>These audio files are an important part of the historical record,
-						and we are delighted to collect them for students, historians,
-						researchers, journalists, attorneys, and the public.
-					</p>
-					<p>This work has been possible thanks to a grant from Columbia
-						University Library, and a ton of <a
-								href="https://free.law/thanks/">volunteer support</a>.
-						If you find this work valuable, please donate so that it may
-						continue and thrive.
-					</p>
-					<p>
-						<a href="{% url "donate" %}?referrer=oral-arg-adv-search"
-						   class="btn btn-danger">Donate Now</a>
-					</p>
-				</div>
-				<div class="col-sm-4">
-					<h3>Coverage</h3>
-					<p>We collect oral argument audio from the Supreme Court and all of
-						the Federal Circuit courts that provide it. On the state side,
-						we are slowly adding support for additional courts, and we are
-						looking for support to add more. You can see all of the courts
-						that we support on an ongoing basis <a
-								href="{% url "coverage" %}#scraped-jurisdictions">on our
-							coverage page</a>.
-					</p>
-					<p>Our collection of SCOTUS recordings goes back to 2013. Before
-						that, we recommend <a href="https://www.oyez.org"
-											  target="_blank">the wonderful Oyez
-							Project</a>, which goes back to 1955.
-					</p>
+                <h3>Even More Advanced Searching</h3>
+                <p>You can do even more advanced searches by using fielded searches and query operators.
+                </p>
+                <p>
+                    <a class="btn btn-primary"
+                       href="{% url 'advanced_search' %}">Learn More</a>
+                </p>
+            </div>
+        </div>
 
-					<h3>Podcasts&nbsp;<i class="fa fa-podcast gray"></i></h3>
-					<p>For every jurisdiction <a
-							href="{% url "coverage" %}#scraped-jurisdictions">that
-						we support</a>, we provide Podcasts automatically, so you
-						can listen to the latest arguments from that court. It's
-						also possible to create a Podcast from any search that you
-						make, allowing you to make custom Podcasts with only the
-						information you want to hear.
-					</p>
-					<p>
-						<a href="{% url "podcasts" %}" class="btn btn-primary">Learn
-							More</a>
-					</p>
-				</div>
-				<div class="col-sm-4">
-					<h3>Enhancements</h3>
-					<p>We enhance every audio file that we download so that if you
-						download it from CourtListener it'll have great audio quality,
-						metadata, and album art.
-					</p>
-					<p>You can download our enhanced audio files from the sidebar of any
-						oral argument webpage. If you want the original file, it's there
-						too.
-					</p>
-				</div>
-			</div>
+        {% elif search_form.type.value == SEARCH_TYPES.RECAP %}
+        <div class="row learn-more" id="about-recap">
+            <div class="col-xs-12">
+                <h2>About CourtListener's RECAP Archive</h2>
+            </div>
+            <div class="col-md-4">
+                <h3>Background</h3>
+                <p>The RECAP Archive is a searchable collection of millions of PACER documents and dockets that were gathered using our <a href="https://free.law/recap/">RECAP Extensions for Firefox, Chrome and Safari</a>. PACER is the government-run system where nearly every legal document is filed from federal cases. The archive also includes <a href="https://free.law/2017/08/15/we-have-all-free-pacer/">every free PACER opinion</a>. This unique archive was created to partially address what we see as the <a href="https://free.law/2015/03/20/what-is-the-pacer-problem/">PACER Problem</a>.
+                </p>
+                <p>Using this archive, you can finally search and download millions of PACER documents, including those that were originally scanned PDFs, <a href="https://free.law/2016/09/26/extracting-text-millions-of-pacer-documents/">which we laboriously convert to text</a>.
+                </p>
+                <p>This work was made possible thanks to a partnership with <a href="https://citp.princeton.edu/">The Center for Information Technology Policy at Princeton</a>, the generous data contributions of thousands of RECAP users, and a ton of <a href="https://free.law/thanks/">volunteer support</a>.
+                </p>
+                <p>If you find this work valuable, or if it saves you money on your PACER bill, please donate.
+                </p>
+                <p>
+                    <a href="{% url "donate" %}?referrer=recap-adv-search"
+                       class="btn btn-danger">Donate Now</a>
+                </p>
+            </div>
+            <div class="col-md-4">
+                <h3>Learn More About PACER</h3>
+                <p>We've written many articles about PACER:</p>
+                <ul>
+                    <li>
+                        <a href="https://free.law/2015/03/20/what-is-the-pacer-problem/">What
+                            is the PACER Problem?</a></li>
+                    <li>
+                        <a href="https://free.law/2016/11/14/pacer-revenue/">How Much Money Does PACER Make?</a>
+                    </li>
+                    <li>
+                        <a href="https://free.law/2015/03/24/what-should-be-done-about-the-pacer-problem/">What
+                            Should be Done About the PACER Problem?</a></li>
+                    <li>
+                        <a href="https://free.law/2016/11/03/what-is-a-pacer-page/">What
+                            is a Page of PACER Content?</a></li>
+                    <li>
+                        <a href="https://free.law/2016/10/10/pacer-costs-a-billion-dollars/">The
+                            Cost of PACER Data? Around One Billion Dollars.</a>
+                    </li>
+                    <li>
+                        <a href="https://free.law/2015/03/23/why-should-congress-care-about-pacer/">Why
+                            Should Congress Care about PACER?</a></li>
+                    <li>
+                        <a href="https://free.law/2014/08/26/using-pacer-vid/">Using
+                            PACER &mdash; What Could Possibly Go Wrong?</a></li>
+                    <li>
+                        <a href="https://free.law/2010/08/17/assessing-pacers-access-barriers/">Assessing
+                            PACER's Access Barriers</a></li>
+                </ul>
+                <p>You can read more of our <a
+                        href="https://free.law/tag/pacer/">PACER</a> and <a
+                        href="https://free.law/tag/recap/">RECAP</a>
+                    articles on the Free Law Project Blog.</p>
+            </div>
+            <div class="col-md-4">
+                <h3>Get Involved &mdash; Install the Extensions</h3>
+                <p>This archive of data was created by users of the RECAP
+                    Extensions. Learn more and install them at the RECAP
+                    homepage.
+                </p>
+                <p>
+                    <a href="https://free.law/recap/"
+                       class="btn btn-success">Install the Extensions</a>
+                </p>
 
-		{% elif search_form.type.value == SEARCH_TYPES.PEOPLE %}
-			<div class="row v-offset-above-2 learn-more" id="about-judges">
-				<div class="col-xs-12">
-					<h2>About the CourtListener Judicial Database</h2>
-				</div>
-				<div class="col-md-4">
-					<h3>Background</h3>
-					<p>The CourtListener Judicial database <a
-							href="https://free.law/2016/04/19/judge_database/">was
-						formed</a> as partnership with researcher Elliott Ash at
-						Princeton University and with support from the National Science
-						Foundation and Knight Foundation.
-					</p>
-					<p>The database has information about thousands of judges from
-						federal and state courts, including their biographical and
-						educational background, judicial and non-judicial positions
-						held, political affiliations, American Bar Association ratings,
-						<a href="https://free.law/2016/07/27/judge-campaign-finance-data">campaign
-							finance data</a>, and <a
-								href="https://free.law/2016/06/29/judge-authorship">opinions
-							authored</a>.
-					</p>
-					<p>
-						<a href="https://free.law/projects/judge-db/"
-						   class="btn btn-primary">Learn More</a>
-					</p>
-				</div>
-				<div class="col-md-4">
-					<h3>Studying the Data</h3>
-					<p>Like all of our data, the judicial database is available <a
-							href="{% url "bulk_data_index" %}">in bulk</a> and <a
-							href="{% url "api_index" %}">via our APIs</a>. This means
-						that interested researchers, start-ups, journalists, and the
-						public can download the data or integrate it into their systems.
-					</p>
-					<p>We enthusiastically welcome reuse of and contribution to the
-						data.
-					</p>
-					<p>
-						<a href="{% url "api_index" %}"
-						   class="btn btn-primary">Learn More</a>
-					</p>
-				</div>
-				<div class="col-md-4">
-					<h3>Support this Work</h3>
-					<p>CourtListener is an initiative of <a href="https://free.law">Free
-						Law Project</a>, a 501(c)(3) non-profit organization. Projects
-						like this database take time to create and maintain. If you are
-						using it in your research or in your work, we ask that you
-						consider a line item to support our efforts.
-					</p>
-					<p>To learn more about how this works, <a
-							href="{% url "contact" %}">get in touch</a>.
-					</p>
-					<p>
-						<a href="{% url "donate" %}?referrer=judge-adv-search"
-						   class="btn btn-danger">Donate Now</a>
-					</p>
-				</div>
-			</div>
 
-		{% endif %}
+                <h3>Research Service and API</h3>
+                <p>Free Law Project, the non-profit behind RECAP, is proud to host a research service and API for PACER content. If you are an organization that needs PACER content or a researcher looking for bulk data, please get in touch.
+                </p>
+                <p>
+                    <a href="{% url "contact" %}" class="btn btn-primary">Contact Us</a>
+                </p>
+            </div>
+        </div>
 
-		{% include "includes/jurisdiction_picker_modal.html" %}
 
-	</div>
+        {% elif search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}
+        <div class="row learn-more" id="about-oral-arguments">
+            <div class="col-xs-12">
+                <h2>About the CourtListener Oral Argument Archive</h2>
+            </div>
+            <div class="col-md-4">
+                <h3>Background</h3>
+                <p>The oral argument audio in CourtListener has been collected from court websites by <a href="https://free.law">Free Law Project</a>, a non-profit devoted to high-quality legal data. We began collecting these oral arguments after hearing that many courts were simply deleting them, claiming that they were too expensive to keep.
+                </p>
+                <p>These audio files are an important part of the historical record, and we are delighted to collect them for students, historians, researchers, journalists, attorneys, and the public.
+                </p>
+                <p>This work has been possible thanks to a grant from Columbia University Library, and a ton of <a href="https://free.law/thanks/">volunteer support</a>. If you find this work valuable, please donate so that it may continue and thrive.
+                </p>
+                <p>
+                    <a href="{% url "donate" %}?referrer=oral-arg-adv-search"
+                       class="btn btn-danger">Donate Now</a>
+                </p>
+            </div>
+            <div class="col-sm-4">
+                <h3>Coverage</h3>
+                <p>We collect oral argument audio from the Supreme Court and all of the Federal Circuit courts that provide it. On the state side, we are slowly adding support for additional courts, and we are looking for support to add more. You can see all of the courts that we support on an ongoing basis <a href="{% url "coverage" %}#scraped-jurisdictions">on our coverage page</a>.
+                </p>
+                <p>Our collection of SCOTUS recordings goes back to 2013. Before that, we recommend <a href="https://www.oyez.org" target="_blank">the wonderful Oyez Project</a>, which goes back to 1955.
+                </p>
+
+                <h3>Podcasts&nbsp;<i class="fa fa-podcast gray"></i></h3>
+                <p>For every jurisdiction <a
+                        href="{% url "coverage" %}#scraped-jurisdictions">that
+                    we support</a>, we provide Podcasts automatically, so you
+                    can listen to the latest arguments from that court. It's
+                    also possible to create a Podcast from any search that you
+                    make, allowing you to make custom Podcasts with only the
+                    information you want to hear.
+                </p>
+                <p>
+                    <a href="{% url "podcasts" %}" class="btn btn-primary">Learn
+                        More</a>
+                </p>
+            </div>
+            <div class="col-sm-4">
+                <h3>Enhancements</h3>
+                <p>We enhance every audio file that we download so that if you download it from CourtListener it'll have great audio quality, metadata, and album art.
+                </p>
+                <p>You can download our enhanced audio files from the sidebar of any oral argument webpage. If you want the original file, it's there too.
+                </p>
+            </div>
+        </div>
+
+        {% elif search_form.type.value == SEARCH_TYPES.PEOPLE %}
+        <div class="row v-offset-above-2 learn-more" id="about-judges">
+            <div class="col-xs-12">
+                <h2>About the CourtListener Judicial Database</h2>
+            </div>
+            <div class="col-md-4">
+                <h3>Background</h3>
+                <p>The CourtListener Judicial database <a href="https://free.law/2016/04/19/judge_database/">was formed</a> as partnership with researcher Elliott Ash at Princeton University and with support from the National Science Foundation and Knight Foundation.
+                </p>
+                <p>The database has information about thousands of judges from federal and state courts, including their biographical and educational background, judicial and non-judicial positions held, political affiliations, American Bar Association ratings, <a href="https://free.law/2016/07/27/judge-campaign-finance-data">campaign finance data</a>, and <a href="https://free.law/2016/06/29/judge-authorship">opinions authored</a>.
+                </p>
+                <p>
+                    <a href="https://free.law/projects/judge-db/"
+                       class="btn btn-primary">Learn More</a>
+                </p>
+            </div>
+            <div class="col-md-4">
+                <h3>Studying the Data</h3>
+                <p>Like all of our data, the judicial database is available <a href="{% url "bulk_data_index" %}">in bulk</a> and <a href="{% url "api_index" %}">via our APIs</a>. This means that interested researchers, start-ups, journalists, and the public can download the data or integrate it into their systems.
+                </p>
+                <p>We enthusiastically welcome reuse of and contribution to the data.
+                </p>
+                <p>
+                    <a href="{% url "api_index" %}"
+                       class="btn btn-primary">Learn More</a>
+                </p>
+            </div>
+            <div class="col-md-4">
+                <h3>Support this Work</h3>
+                <p>CourtListener is an initiative of <a href="https://free.law">Free Law Project</a>, a 501(c)(3) non-profit organization. Projects like this database take time to create and maintain. If you are using it in your research or in your work, we ask that you consider a line item to support our efforts.
+                </p>
+                <p>To learn more about how this works, <a href="{% url "contact" %}">get in touch</a>.
+                </p>
+                <p>
+                    <a href="{% url "donate" %}?referrer=judge-adv-search"
+                       class="btn btn-danger">Donate Now</a>
+                </p>
+            </div>
+        </div>
+
+        {% endif %}
+
+        {% include "includes/jurisdiction_picker_modal.html" %}
+
+    </div>
 
 {% endblock content %}

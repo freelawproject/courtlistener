@@ -1,204 +1,72 @@
-import glob
-import logging
-import os
-import shutil
-import tarfile
-from os.path import join
-from pathlib import Path
-from typing import Any, Dict
+import json
 
-from django.db.models import QuerySet
-from django.test import RequestFactory
 from rest_framework.renderers import JSONRenderer
-from rest_framework.versioning import URLPathVersioning
 
-from cl.api.utils import BulkJsonHistory, HyperlinkedModelSerializerWithId
+from cl.api.models import Webhook, WebhookEvent, WebhookEventType
+from cl.api.utils import generate_webhook_key_content
+from cl.api.webhooks import send_webhook_event
 from cl.celery_init import app
-from cl.lib.timer import print_timing
-from cl.lib.utils import deepgetattr
+from cl.corpus_importer.api_serializers import DocketEntrySerializer
+from cl.search.models import DocketEntry
 
 
-@app.task
-@print_timing
-def make_bulk_data_and_swap_it_in(
-    courts: QuerySet,
-    bulk_dir: str,
-    kwargs: Dict[str, str],
+@app.task()
+def send_test_webhook_event(
+    webhook_pk: int,
+    content_str: str,
 ) -> None:
-    """We can't wrap the handle() function, but we can wrap this one."""
-    # Create a directory where we'll put temporary files
-    tmp_bulk_dir = join(bulk_dir, "tmp")
+    """POSTS the test webhook event.
 
-    print(f" - Creating bulk {kwargs['obj_type_str']} files...")
-    num_written = write_json_to_disk(bulk_dir=tmp_bulk_dir, **kwargs)
-
-    if num_written > 0:
-        print(
-            f"   - Tarring and compressing all {kwargs['obj_type_str']} files..."
-        )
-        targz_json_files(
-            courts, tmp_bulk_dir, kwargs["obj_type_str"], kwargs["court_attr"]
-        )
-
-        print(f"   - Swapping in the new {kwargs['obj_type_str']} archives...")
-        swap_archives(kwargs["obj_type_str"], bulk_dir, tmp_bulk_dir)
-
-
-def swap_archives(
-    obj_type_str: str,
-    bulk_dir: str,
-    tmp_bulk_dir: str,
-) -> None:
-    """Swap out new archives, clobbering the old, if present"""
-    tmp_gz_dir = join(tmp_bulk_dir, obj_type_str)
-    final_gz_dir = join(bulk_dir, obj_type_str)
-    Path(final_gz_dir).mkdir(parents=True, exist_ok=True)
-    for f in glob.glob(join(tmp_gz_dir, "*.tar*")):
-        shutil.move(f, join(final_gz_dir, os.path.basename(f)))
-
-    # Move the info files too.
-    try:
-        shutil.copy2(
-            join(tmp_gz_dir, "info.json"), join(final_gz_dir, "info.json")
-        )
-    except IOError as e:
-        if e.errno == 2:
-            # No such file/directory
-            pass
-        else:
-            raise
-
-
-def targz_json_files(
-    courts: QuerySet,
-    bulk_dir: str,
-    obj_type_str: str,
-    court_attr: str,
-) -> None:
-    """Create gz-compressed archives using the JSON on disk."""
-
-    root_path = join(bulk_dir, obj_type_str)
-    if court_attr is not None:
-        for court in courts:
-            tar_path = join(root_path, f"{court.pk}.tar.gz")
-            tar = tarfile.open(tar_path, "w:gz", compresslevel=3)
-            for name in glob.glob(join(root_path, court.pk, "*.json")):
-                tar.add(name, arcname=os.path.basename(name))
-            tar.close()
-    else:
-        # Non-jurisdictional-centric object type (like an ABA Rating)
-        tar_path = join(root_path, "all.tar.gz")
-        tar = tarfile.open(tar_path, "w:gz", compresslevel=3)
-        for name in glob.glob(join(root_path, "*.json")):
-            tar.add(name, arcname=os.path.basename(name))
-        tar.close()
-
-    if court_attr is not None:
-        # Make the all.tar file by tarring up the other files.
-        # Non-court-centric objects already did this.
-        tar = tarfile.open(join(root_path, "all.tar"), "w")
-        for court in courts:
-            targz = join(root_path, f"{court.pk}.tar.gz")
-            tar.add(targz, arcname=os.path.basename(targz))
-        tar.close()
-
-
-def write_json_to_disk(
-    obj_type_str: str,
-    obj_class: Any,
-    court_attr: str,
-    serializer: HyperlinkedModelSerializerWithId,
-    bulk_dir: str,
-) -> int:
-    """Write all items to disk as json files inside directories named by
-    jurisdiction.
-
-    The main trick is that we identify if we are creating a bulk archive
-    from scratch. If so, we iterate over everything. If not, we only
-    iterate over items that have been modified since the last good date.
-
-    We deal with two kinds of bulk data. The first is jurisdiction-centric, in
-    which we want to make bulk data for that particular jurisdiction, such as
-    opinions or PACER data, or whatever. The second is non-jurisdiction-
-    specific, like people or schools. For jurisdiction-specific data, we make
-    jurisdiction directories to put the data into. Otherwise, we do not.
-
-    :param obj_type_str: A string to use for the directory name of a type of
-    data. For example, for clusters, it's 'clusters'.
-    :param obj_class: The actual class to make a bulk data for.
-    :param court_attr: A string that can be used to find the court attribute
-    on an object. For example, on clusters, this is currently docket.court_id.
-    :param serializer: A DRF serializer to use to generate the data.
-    :param bulk_dir: A directory to place the serialized JSON data into.
-
-    :returns int: The number of items generated
+    :param webhook_pk: The webhook primary key.
+    :param content_str: The str content to POST.
+    :return: None
     """
-    # Are there already bulk files?
-    history = BulkJsonHistory(obj_type_str, bulk_dir)
-    last_good_date = history.get_last_good_date()
-    history.add_current_attempt_and_save()
 
-    if last_good_date is not None:
-        print(
-            "   - Incremental data found. Assuming it's good and using it..."
+    webhook = Webhook.objects.get(pk=webhook_pk)
+    json_obj = json.loads(content_str)
+    webhook_event = WebhookEvent.objects.create(
+        webhook=webhook, content=json_obj, debug=True
+    )
+    send_webhook_event(webhook_event, content_str.encode("utf-8"))
+
+
+@app.task()
+def send_docket_alert_webhook_events(
+    des_pks: list[int],
+    webhook_recipients_pks: list[int],
+) -> None:
+    """POSTS the DocketAlert to the recipients webhook(s)
+
+    :param des_pks: The list of docket entries primary keys.
+    :param webhook_recipients_pks: A list of User pks to send the webhook to.
+    :return: None
+    """
+
+    webhooks = Webhook.objects.filter(
+        event_type=WebhookEventType.DOCKET_ALERT,
+        user_id__in=webhook_recipients_pks,
+        enabled=True,
+    )
+    docket_entries = DocketEntry.objects.filter(pk__in=des_pks)
+    serialized_docket_entries = []
+    for de in docket_entries:
+        serialized_docket_entries.append(DocketEntrySerializer(de).data)
+
+    for webhook in webhooks:
+        post_content = {
+            "webhook": generate_webhook_key_content(webhook),
+            "payload": {
+                "results": serialized_docket_entries,
+            },
+        }
+        renderer = JSONRenderer()
+        json_bytes = renderer.render(
+            post_content,
+            accepted_media_type="application/json;",
         )
-        qs = obj_class.objects.filter(date_modified__gte=last_good_date)
-    else:
-        print("   - Incremental data not found. Working from scratch...")
-        qs = obj_class.objects.all()
 
-    if qs.count() == 0:
-        print(
-            f"   - No {obj_type_str}-type items in the DB or none that have changed. All done here."
+        webhook_event = WebhookEvent.objects.create(
+            webhook=webhook,
+            content=post_content,
         )
-        history.mark_success_and_save()
-        return 0
-
-    item_list = qs.iterator()
-
-    i = 0
-    renderer = JSONRenderer()
-    r = RequestFactory().request()
-    r.META["SERVER_NAME"] = "www.courtlistener.com"  # Else, it's testserver
-    r.META["SERVER_PORT"] = "443"  # Else, it's 80
-    r.META["wsgi.url_scheme"] = "https"  # Else, it's http.
-    r.version = "v3"
-    r.versioning_scheme = URLPathVersioning()
-    context = dict(request=r)
-    for i, item in enumerate(item_list):
-        if i % 1000 == 0:
-            print(f"Completed {i} items so far.")
-        json_str = renderer.render(
-            serializer(item, context=context).data,
-            accepted_media_type="application/json; indent=2",
-        )
-
-        if court_attr is not None:
-            loc = join(
-                bulk_dir,
-                obj_type_str,
-                deepgetattr(item, court_attr),
-                f"{item.pk}.json",
-            )
-        else:
-            # A non-jurisdiction-centric object.
-            loc = join(bulk_dir, obj_type_str, f"{item.pk}.json")
-
-        try:
-            with open(loc, "wb") as f:
-                f.write(json_str)
-        except FileNotFoundError:
-            directory_path = Path(loc).parents[0]
-            logging.warning(
-                f"Bulk data directory not found, adding it now: {directory_path}"
-            )
-            # If we have new courts or object types since last generation,
-            # make the needed directories
-            Path(directory_path).mkdir(parents=True, exist_ok=True)
-            with open(loc, "wb") as f:
-                f.write(json_str)
-
-    print(f"   - {i} {obj_type_str} json files created.")
-
-    history.mark_success_and_save()
-    return i
+        send_webhook_event(webhook_event, json_bytes)

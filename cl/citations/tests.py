@@ -1,5 +1,6 @@
 import itertools
 from dataclasses import dataclass
+from datetime import date, timedelta
 from typing import List, Tuple
 from unittest.mock import Mock
 
@@ -14,6 +15,7 @@ from eyecite.test_factories import (
     nonopinion_citation,
     supra_citation,
 )
+from factory import RelatedFactory
 from lxml import etree
 
 from cl.citations.annotate_citations import (
@@ -45,7 +47,15 @@ from cl.citations.tasks import (
     find_citations_and_parentheticals_for_opinion_by_pks,
 )
 from cl.lib.test_helpers import IndexedSolrTestCase
+from cl.search.factories import (
+    CitationWithParentsFactory,
+    CourtFactory,
+    DocketFactory,
+    OpinionClusterFactoryWithChildrenAndParents,
+    OpinionWithChildrenFactory,
+)
 from cl.search.models import (
+    Citation,
     Opinion,
     OpinionCluster,
     OpinionsCited,
@@ -55,16 +65,7 @@ from cl.search.models import (
 from cl.tests.cases import SimpleTestCase
 
 
-def remove_citations_from_imported_fixtures():
-    """Delete all the connections between items that are in the fixtures by
-    default, and reset counts to zero.
-    """
-    OpinionsCited.objects.all().delete()
-    Parenthetical.objects.all().delete()
-    OpinionCluster.objects.all().update(citation_count=0)
-
-
-class CiteTest(SimpleTestCase):
+class CitationTextTest(SimpleTestCase):
     def test_make_html_from_plain_text(self) -> None:
         """Can we convert the plain text of an opinion into HTML?"""
         # fmt: off
@@ -305,28 +306,103 @@ class CiteTest(SimpleTestCase):
                 )
 
 
-class MatchingTest(IndexedSolrTestCase):
-    fixtures = [
-        "judge_judy.json",
-        "test_objects_search.json",
-        "opinions_matching_citations.json",
-    ]
+class CitationObjectTest(IndexedSolrTestCase):
+    fixtures: List = []
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        # Courts
+        court_scotus = CourtFactory(id="scotus")
+        court_ca1 = CourtFactory(id="ca1")
+
+        # Citation 1
+        cls.citation1 = CitationWithParentsFactory.create(
+            volume="1",
+            reporter="U.S.",
+            page="1",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=court_scotus),
+                case_name="Foo v. Bar",
+                date_filed=date(
+                    2000, 1, 1
+                ),  # Year must equal text in citation4
+            ),
+        )
+
+        # Citation 2
+        cls.citation2 = CitationWithParentsFactory.create(
+            volume="2",
+            reporter="F.3d",
+            page="2",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=court_ca1),
+                case_name="Qwerty v. Uiop",
+                date_filed=date(2000, 1, 1),  # F.3d must be after 1993
+            ),
+        )
+        cls.citation2a = CitationWithParentsFactory.create(  # Extra citation for same OpinionCluster as above
+            volume="9",
+            reporter="F",
+            page="1",
+            cluster=OpinionCluster.objects.get(pk=cls.citation2.cluster_id),
+        )
+
+        # Citation 3
+        cls.citation3 = CitationWithParentsFactory.create(
+            volume="1",
+            reporter="U.S.",
+            page="50",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=court_scotus),
+                case_name="Lorem v. Ipsum",
+            ),
+        )
+
+        # Citation 4
+        cls.citation4 = CitationWithParentsFactory.create(
+            volume="1",
+            reporter="U.S.",
+            page="999",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=court_scotus),
+                case_name="Abcdef v. Ipsum",
+                sub_opinions=RelatedFactory(
+                    OpinionWithChildrenFactory,
+                    factory_related_name="cluster",
+                    plain_text="Blah blah Foo v. Bar, 1 U.S. 1, 4, 2 S.Ct. 2, 5 (2000) (holding something happened that was at least five words)",
+                ),
+            ),
+        )
+
+        # Citation 5
+        cls.citation5 = CitationWithParentsFactory.create(
+            volume="123",
+            reporter="U.S.",
+            page="123",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=court_scotus),
+                case_name="Bush v. Gore",
+                date_filed=date.today(),  # Must be later than any cited opinion
+                sub_opinions=RelatedFactory(
+                    OpinionWithChildrenFactory,
+                    factory_related_name="cluster",
+                    plain_text="Blah blah Foo v. Bar 1 U.S. 1, 77 blah blah. Asdf asdf Qwerty v. Uiop 2 F.3d 2, 555. Also check out Foo, 1 U.S. at 99 (holding that crime is illegal). Then let's cite Qwerty, supra, at 666 (noting that CourtListener is a great tool and everyone should use it). See also Foo, supra, at 101 as well. Another full citation is Lorem v. Ipsum 1 U. S. 50. Quoting Qwerty, “something something”, 2 F.3d 2, at 59. This case is similar to Fake, supra, and Qwerty supra, as well. This should resolve to the foregoing. Ibid. This should also convert appropriately, see Id., at 57. This should fail to resolve because the reporter and citation is ambiguous, 1 U. S., at 51. However, this should succeed, Lorem, 1 U.S., at 52.",
+                ),
+            ),
+        )
+        super().setUpTestData()
 
     def test_citation_resolution(self) -> None:
         """Tests whether different types of citations (i.e., full, short form,
         supra, id) resolve correctly to opinion matches.
         """
-        # Opinion fixture info:
-        # pk=7 is mocked with name 'Foo v. Bar' and citation '1 U.S. 1'
-        # pk=8 is mocked with name 'Qwerty v. Uiop' and citation '2 F.3d 2'
-        # pk=9 is mocked with name 'Lorem v. Ipsum' and citation '1 U.S. 50'
-        # pk=11 is mocked with name 'Abcdef v. Ipsum' and citation '1 U.S. 999'
-        opinion7 = Opinion.objects.get(pk=7)
-        opinion8 = Opinion.objects.get(pk=8)
-        opinion9 = Opinion.objects.get(pk=9)
-        opinion11 = Opinion.objects.get(pk=11)
+        opinion1 = Opinion.objects.get(cluster__pk=self.citation1.cluster_id)
+        opinion2 = Opinion.objects.get(cluster__pk=self.citation2.cluster_id)
+        opinion3 = Opinion.objects.get(cluster__pk=self.citation3.cluster_id)
+        opinion4 = Opinion.objects.get(cluster__pk=self.citation4.cluster_id)
+        opinion5 = Opinion.objects.get(cluster__pk=self.citation5.cluster_id)
 
-        full7 = case_citation(
+        full1 = case_citation(
             volume="1",
             reporter="U.S.",
             page="1",
@@ -334,7 +410,7 @@ class MatchingTest(IndexedSolrTestCase):
             reporter_found="U.S.",
             metadata={"court": "scotus"},
         )
-        full8 = case_citation(
+        full2 = case_citation(
             volume="2",
             reporter="F.3d",
             page="2",
@@ -342,7 +418,7 @@ class MatchingTest(IndexedSolrTestCase):
             reporter_found="F.3d",
             metadata={"court": "ca1"},
         )
-        full9 = case_citation(
+        full3 = case_citation(
             volume="1",
             reporter="U.S.",
             page="50",
@@ -350,7 +426,7 @@ class MatchingTest(IndexedSolrTestCase):
             reporter_found="U.S.",
             metadata={"court": "scotus"},
         )
-        full11 = case_citation(
+        full4 = case_citation(
             volume="1",
             reporter="U.S.",
             page="999",
@@ -367,7 +443,7 @@ class MatchingTest(IndexedSolrTestCase):
             metadata={"court": "scotus"},
         )
 
-        supra7 = supra_citation(
+        supra1 = supra_citation(
             index=1,
             metadata={
                 "antecedent_guess": "Bar",
@@ -375,7 +451,7 @@ class MatchingTest(IndexedSolrTestCase):
                 "volume": "1",
             },
         )
-        supra9_or_11 = supra_citation(
+        supra3_or_4 = supra_citation(
             index=1,
             metadata={
                 "antecedent_guess": "Ipsum",
@@ -384,7 +460,7 @@ class MatchingTest(IndexedSolrTestCase):
             },
         )
 
-        short7 = case_citation(
+        short1 = case_citation(
             reporter="U.S.",
             page="99",
             volume="1",
@@ -392,7 +468,7 @@ class MatchingTest(IndexedSolrTestCase):
             short=True,
             metadata={"antecedent_guess": "Bar,"},
         )
-        short7_or_9_tiebreaker = case_citation(
+        short1_or_3_tiebreaker = case_citation(
             reporter="U.S.",
             page="99",
             volume="1",
@@ -400,7 +476,7 @@ class MatchingTest(IndexedSolrTestCase):
             short=True,
             metadata={"antecedent_guess": "Bar"},
         )
-        short7_or_9_bad_antecedent = case_citation(
+        short1_or_3_bad_antecedent = case_citation(
             reporter="U.S.",
             page="99",
             volume="1",
@@ -408,7 +484,7 @@ class MatchingTest(IndexedSolrTestCase):
             short=True,
             metadata={"antecedent_guess": "somethingwrong"},
         )
-        short9_or_11_common_antecedent = case_citation(
+        short3_or_4_common_antecedent = case_citation(
             reporter="U.S.",
             page="99",
             volume="1",
@@ -436,80 +512,80 @@ class MatchingTest(IndexedSolrTestCase):
 
         test_pairs = [
             # Simple test for matching a single, full citation
-            ([full7], {opinion7: [full7]}),
+            ([full1], {opinion1: [full1]}),
             # Test matching multiple full citations to different documents
-            ([full7, full8], {opinion7: [full7], opinion8: [full8]}),
+            ([full1, full2], {opinion1: [full1], opinion2: [full2]}),
             # Test matching an unmatchacble full citation
             ([full_na], {NO_MATCH_RESOURCE: [full_na]}),
             # Test resolving a supra citation
-            ([full7, supra7], {opinion7: [full7, supra7]}),
+            ([full1, supra1], {opinion1: [full1, supra1]}),
             # Test resolving a supra citation when its antecedent guess matches
             # two possible candidates. We expect the supra citation to not
             # be matched.
             (
-                [full9, full11, supra9_or_11],
-                {opinion9: [full9], opinion11: [full11]},
+                [full3, full4, supra3_or_4],
+                {opinion3: [full3], opinion4: [full4]},
             ),
             # Test resolving a supra citation when the previous citation
             # match failed.
             # We expect the supra citation to not be matched.
-            ([full_na, supra7], {NO_MATCH_RESOURCE: [full_na]}),
+            ([full_na, supra1], {NO_MATCH_RESOURCE: [full_na]}),
             # Test resolving a short form citation with a meaningful antecedent
-            ([full7, short7], {opinion7: [full7, short7]}),
+            ([full1, short1], {opinion1: [full1, short1]}),
             # Test resolving a short form citation when its reporter and
             # volume match two possible candidates. We expect its antecedent
             # guess to provide the correct tiebreaker.
             (
-                [full7, full9, short7_or_9_tiebreaker],
-                {opinion7: [full7, short7_or_9_tiebreaker], opinion9: [full9]},
+                [full1, full3, short1_or_3_tiebreaker],
+                {opinion1: [full1, short1_or_3_tiebreaker], opinion3: [full3]},
             ),
             # Test resolving a short form citation when its reporter and
             # volume match two possible candidates, and when it lacks a
             # meaningful antecedent.
             # We expect the short form citation to not be matched.
             (
-                [full7, full9, short7_or_9_bad_antecedent],
-                {opinion7: [full7], opinion9: [full9]},
+                [full1, full3, short1_or_3_bad_antecedent],
+                {opinion1: [full1], opinion3: [full3]},
             ),
             # Test resolving a short form citation when its reporter and
             # volume match two possible candidates, and when its antecedent
             # guess also matches multiple possibilities.
             # We expect the short form citation to not be matched.
             (
-                [full9, full11, short9_or_11_common_antecedent],
-                {opinion9: [full9], opinion11: [full11]},
+                [full3, full4, short3_or_4_common_antecedent],
+                {opinion3: [full3], opinion4: [full4]},
             ),
             # Test resolving a short form citation when its reporter and
             # volume are erroneous.
             # We expect the short form citation to not be matched.
-            ([full7, short_na], {opinion7: [full7]}),
+            ([full1, short_na], {opinion1: [full1]}),
             # Test resolving a short form citation when the previous citation
             # match failed.
             # We expect the short form citation to not be matched.
-            ([full_na, short7], {NO_MATCH_RESOURCE: [full_na]}),
+            ([full_na, short1], {NO_MATCH_RESOURCE: [full_na]}),
             # Test resolving an Id. citation
-            ([full7, id], {opinion7: [full7, id]}),
+            ([full1, id], {opinion1: [full1, id]}),
             # Test resolving an Id. citation when the previous citation match
             # failed because there is no clear antecedent. We expect the Id.
             # citation to also not be matched.
             (
-                [full7, short_na, id],
-                {opinion7: [full7]},
+                [full1, short_na, id],
+                {opinion1: [full1]},
             ),
             # Test resolving an Id. citation when the previous citation match
             # failed because a normal full citation lookup returned nothing.
             # We expect the Id. citation to be matched to the
             # NO_MATCH_RESOURCE placeholder object.
             (
-                [full7, full_na, id],
-                {opinion7: [full7], NO_MATCH_RESOURCE: [full_na, id]},
+                [full1, full_na, id],
+                {opinion1: [full1], NO_MATCH_RESOURCE: [full_na, id]},
             ),
             # Test resolving an Id. citation when the previous citation is to a
             # non-opinion document. Since we can't match those documents (yet),
             # we expect the Id. citation to also not be matched.
             (
-                [full7, non, id],
-                {opinion7: [full7]},
+                [full1, non, id],
+                {opinion1: [full1]},
             ),
             # Test resolving an Id. citation when it is the first citation
             # found. Since there is nothing before it, we expect no matches to
@@ -530,8 +606,9 @@ class MatchingTest(IndexedSolrTestCase):
                 citations=citations,
                 expected_resolutions=expected_resolutions,
             ):
-                # The citing opinion does not matter for this test
-                citing_opinion = Opinion.objects.get(pk=1)
+                # The citing opinion must contain the name of the cited case
+                # if a reverse_match() call is required
+                citing_opinion = opinion5
 
                 citation_resolutions = do_resolve_citations(
                     citations, citing_opinion
@@ -545,34 +622,24 @@ class MatchingTest(IndexedSolrTestCase):
 
     def test_citation_matching_issue621(self) -> None:
         """Make sure that a citation like 1 Wheat 9 doesn't match 9 Wheat 1"""
-        # The fixture contains a reference to 9 F. 1, so we expect no results.
+        # citation2a is 9 F. 1, so we expect no results.
         citation_str = "1 F. 9 (1795)"
         citation = get_citations(citation_str)[0]
         results = resolve_fullcase_citation(citation)
         self.assertEqual(NO_MATCH_RESOURCE, results)
 
-
-class UpdateTest(IndexedSolrTestCase):
-    """Tests whether the update task performs correctly, i.e., whether it
-    creates new OpinionsCited objects and whether it updates the citation
-    counters.
-    """
-
-    fixtures = [
-        "judge_judy.json",
-        "test_objects_search.json",
-        "opinions_matching_citations.json",
-    ]
-
     def test_citation_increment(self) -> None:
         """Make sure that found citations update the increment on the cited
         opinion's citation count"""
-        remove_citations_from_imported_fixtures()
+        opinion1 = Opinion.objects.get(cluster__pk=self.citation1.cluster_id)
+        opinion5 = Opinion.objects.get(cluster__pk=self.citation5.cluster_id)
 
-        # Updates d1's citation count in a Celery task
-        find_citations_and_parentheticals_for_opinion_by_pks.delay([3])
+        # Updates cited opinion's citation count in a Celery task
+        find_citations_and_parentheticals_for_opinion_by_pks.delay(
+            [opinion5.pk]
+        )
 
-        cited = Opinion.objects.get(pk=2)
+        cited = Opinion.objects.get(pk=opinion1.pk)
         expected_count = 1
         self.assertEqual(
             cited.cluster.citation_count,
@@ -586,24 +653,29 @@ class UpdateTest(IndexedSolrTestCase):
         """Make sure that found citations are stored in the database as
         OpinionsCited objects with the appropriate references and depth.
         """
-        # Opinion fixture info:
-        # pk=10 is our mock citing opinion, containing a number of references
+        # Here, opinion5 is our mock citing opinion, containing a number of references
         # to other mocked opinions, mixed about. It's hard to exhaustively
         # test all combinations, but this test case is made to be deliberately
         # complex, in an effort to "trick" the algorithm. Cited opinions:
-        # pk=7: 1 FullCaseCitation, 1 ShortCaseCitation, 1 SupraCitation (depth=3)
+        # opinion1: 1 FullCaseCitation, 1 ShortCaseCitation, 1 SupraCitation (depth=3)
         # (case name Foo)
-        # pk=8: 1 FullCaseCitation, 2 IdCitation (one Id. and one Ibid.),
+        # opinion2: 1 FullCaseCitation, 2 IdCitation (one Id. and one Ibid.),
         #   1 ShortCaseCitation, 2 SupraCitation (depth=6) (case name Qwerty)
-        # pk=9: 1 FullCaseCitation, 1 ShortCaseCitation (depth=2) (case name Lorem)
-        remove_citations_from_imported_fixtures()
-        citing = Opinion.objects.get(pk=10)
-        find_citations_and_parentheticals_for_opinion_by_pks.delay([10])
+        # opinion3: 1 FullCaseCitation, 1 ShortCaseCitation (depth=2) (case name Lorem)
+        opinion1 = Opinion.objects.get(cluster__pk=self.citation1.cluster_id)
+        opinion2 = Opinion.objects.get(cluster__pk=self.citation2.cluster_id)
+        opinion3 = Opinion.objects.get(cluster__pk=self.citation3.cluster_id)
+        opinion5 = Opinion.objects.get(cluster__pk=self.citation5.cluster_id)
+
+        citing = opinion5
+        find_citations_and_parentheticals_for_opinion_by_pks.delay(
+            [opinion5.pk]
+        )
 
         citation_test_pairs = [
-            (Opinion.objects.get(pk=7), 3),
-            (Opinion.objects.get(pk=8), 6),
-            (Opinion.objects.get(pk=9), 2),
+            (opinion1, 3),
+            (opinion2, 6),
+            (opinion3, 2),
         ]
 
         for cited, depth in citation_test_pairs:
@@ -620,9 +692,9 @@ class UpdateTest(IndexedSolrTestCase):
                 )
 
         description_test_pairs = [
-            (Opinion.objects.get(pk=7), 1),
-            (Opinion.objects.get(pk=8), 1),
-            (Opinion.objects.get(pk=9), 0),
+            (opinion1, 1),
+            (opinion2, 1),
+            (opinion3, 0),
         ]
         for described, num_parentheticals in description_test_pairs:
             with self.subTest(
@@ -647,10 +719,9 @@ class UpdateTest(IndexedSolrTestCase):
                     )
 
     def test_no_duplicate_parentheticals_from_parallel_cites(self) -> None:
-        remove_citations_from_imported_fixtures()
-        citing = Opinion.objects.get(pk=11)
-        cited = Opinion.objects.get(pk=7)
-        find_citations_and_parentheticals_for_opinion_by_pks.delay([11])
+        citing = Opinion.objects.get(cluster__pk=self.citation4.cluster_id)
+        cited = Opinion.objects.get(cluster__pk=self.citation1.cluster_id)
+        find_citations_and_parentheticals_for_opinion_by_pks.delay([citing.pk])
         self.assertEqual(
             Parenthetical.objects.filter(
                 describing_opinion=citing, described_opinion=cited
@@ -700,10 +771,57 @@ class CitationFeedTest(IndexedSolrTestCase):
 class CitationCommandTest(IndexedSolrTestCase):
     """Test a variety of the ways that cl_find_citations can be called."""
 
+    fixtures: List = []
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        # Court
+        court_scotus = CourtFactory(id="scotus")
+
+        # Citation 1 - cited opinion
+        cls.citation1 = CitationWithParentsFactory.create(
+            volume="1",
+            reporter="Yeates",
+            page="1",
+        )
+
+        # Citation 2 - citing opinion
+        cls.citation2 = CitationWithParentsFactory.create(
+            volume="56",
+            reporter="F.2d",
+            page="9",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=court_scotus),
+                case_name="Foo v. Bar",
+                date_filed=date.today(),  # Must be later than any cited opinion
+                sub_opinions=RelatedFactory(
+                    OpinionWithChildrenFactory,
+                    factory_related_name="cluster",
+                    plain_text="Blah blah 1 Yeates 1",
+                ),
+            ),
+        )
+
+        # Citation 3
+        cls.citation3 = CitationWithParentsFactory.create(
+            volume="56",
+            reporter="F.2d",
+            page="11",
+        )
+
+        # Opinions IDs
+        cls.opinion_id2 = Opinion.objects.get(
+            cluster__pk=cls.citation2.cluster_id
+        ).pk
+        cls.opinion_id3 = Opinion.objects.get(
+            cluster__pk=cls.citation3.cluster_id
+        ).pk
+
+        super().setUpTestData()
+
     def call_command_and_test_it(self, args):
-        remove_citations_from_imported_fixtures()
         call_command("cl_find_citations", *args)
-        cited = Opinion.objects.get(pk=2)
+        cited = Opinion.objects.get(cluster__pk=self.citation1.cluster_id)
         expected_count = 1
         self.assertEqual(
             cited.cluster.citation_count,
@@ -716,7 +834,7 @@ class CitationCommandTest(IndexedSolrTestCase):
     def test_index_by_doc_id(self) -> None:
         args = [
             "--doc-id",
-            "3",
+            f"{self.opinion_id2}",
             "--index",
             "concurrently",
         ]
@@ -725,8 +843,8 @@ class CitationCommandTest(IndexedSolrTestCase):
     def test_index_by_doc_ids(self) -> None:
         args = [
             "--doc-id",
-            "3",
-            "2",
+            f"{self.opinion_id3}",
+            f"{self.opinion_id2}",
             "--index",
             "concurrently",
         ]
@@ -735,7 +853,7 @@ class CitationCommandTest(IndexedSolrTestCase):
     def test_index_by_start_only(self) -> None:
         args = [
             "--start-id",
-            "0",
+            f"{min(self.opinion_id2, self.opinion_id3)}",
             "--index",
             "concurrently",
         ]
@@ -744,9 +862,9 @@ class CitationCommandTest(IndexedSolrTestCase):
     def test_index_by_start_and_end(self) -> None:
         args = [
             "--start-id",
-            "0",
+            f"{min(self.opinion_id2, self.opinion_id3)}",
             "--end-id",
-            "5",
+            f"{max(self.opinion_id2, self.opinion_id3)}",
             "--index",
             "concurrently",
         ]
@@ -755,7 +873,7 @@ class CitationCommandTest(IndexedSolrTestCase):
     def test_filed_after(self) -> None:
         args = [
             "--filed-after",
-            "2015-06-09",
+            f"{OpinionCluster.objects.get(pk=self.citation2.cluster_id).date_filed - timedelta(days=1)}",
             "--index",
             "concurrently",
         ]
@@ -1072,7 +1190,7 @@ class DescriptionScoreTest(SimpleTestCase):
         ]
         num_correct = 0
         failed_cases = []
-        for (desc_a, desc_b, correct_idx) in test_cases:
+        for desc_a, desc_b, correct_idx in test_cases:
             score_a, score_b = (
                 parenthetical_score(
                     desc[0], OpinionCluster(citation_count=desc[1])

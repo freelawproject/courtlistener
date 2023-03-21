@@ -2,28 +2,35 @@
 {% load static %}
 {% load text_filters %}
 
-{% block title %}Alerts – CourtListener.com{% endblock %}
+{% block title %} {{ page_title }} – CourtListener.com{% endblock %}
 
 {% block nav-alerts %}active{% endblock %}
 {% block footer-scripts %}
-  <script type="text/javascript"
-          src="{% static "js/jquery.bootstrap-growl.min.js" %}"></script>
+  {% if DEBUG %}
+    <script src="{% static "js/jquery.bootstrap-growl.js" %}"></script>
+  {% else %}
+    <script src="{% static "js/jquery.bootstrap-growl.min.js" %}"></script>
+  {% endif %}
   <script defer type="text/javascript"
           src="{% static "js/toggle_settings.js" %}"></script>
 {% endblock %}
 
 
 {% block content %}
+  {# Navigation Tabs #}
+  {% include "includes/alerts-tabs.html" %}
+
 {% if not search_alerts and not docket_alerts %}
   {# No alerts yet. Tell the user about them. #}
   <div class="hidden-xs col-sm-1 col-md-3"></div>
   <div class="col-xs-12 col-sm-10 col-md-6 text-center">
-    <h1>CourtListener Alerts</h1>
-    <h3 class="caps gray">You have not made any alerts</h3>
+    <h1>CourtListener {% if page == "docket_alerts" %} RECAP Docket {% else %} Search {% endif %} Alerts</h1>
+    <h3 class="caps gray">You have not made any {% if page == "docket_alerts" %} RECAP Docket {% else %} Search {% endif %} alerts</h3>
     <p>CourtListener provides two types of alerts, Search Alerts that let you follow cases and topics of interest to you, and RECAP Docket Alerts, which let you follow PACER dockets of interest.
     </p>
     <p>
       <a href="{% url "alert_help" %}" class="btn btn-lg btn-primary">Learn More</a>
+    </p>
   </div>
   <div class="hidden-xs col-sm-1 col-md-3"></div>
 {% else %}
@@ -59,7 +66,7 @@
               </td>
               <td>
                 <p class="bottom">
-                  <a href="/?{{ alert.query }}">{{ alert.name }}</a>
+                  <a href="/?{{ alert.query }}" rel="nofollow">{{ alert.name }}</a>
                 </p>
               </td>
               <td>{{ alert.get_rate_display }}</td>
@@ -87,6 +94,7 @@
                   </p>
                 {% else %}
                   <a href="/?{{ alert.query }}&edit_alert={{ alert.pk }}"
+                     rel="nofollow"
                      class="btn btn-primary btn-xs">
                     <i class="fa fa-pencil"></i>&nbsp;Edit</a>
                 {% endif %}
@@ -100,30 +108,19 @@
         </table>
       </div>
     </div>
-    {% if not docket_alerts %}
-      <div class="col-xs-12">
-        <hr class="v-offset-above-3">
-        <h3 class="gray caps">You have not made any RECAP Docket Alerts <a
-          href="{% url "alert_help" %}"
-          class="btn btn-default btn-lg">Learn More About RECAP Alerts</a></h3>
-      </div>
-    {% endif %}
-  {% endif %}
-
-  {% if search_alerts and docket_alerts %}
-    <div class="col-xs-12">
-      <hr class="v-offset-above-3 v-offset-below-3">
-    </div>
   {% endif %}
 
   {% if docket_alerts %}
     <div class="col-xs-12">
       <h2>RECAP Docket Alerts for PACER Cases</h2>
       {% if user.profile.unlimited_docket_alerts %}
-        <h3 class="gray caps">Your account has unlimited docket alerts</h3>
+        <h3 class="gray caps">🎉 Your account has unlimited docket alerts</h3>
+      {% elif user.profile.email_grants_unlimited_docket_alerts %}
+        <h3 class="gray caps">🎉 Your email address provides you unlimited docket alerts</h3>
+     {% elif user.profile.is_monthly_donor %}
+        <h3 class="gray caps">🎉 Being a monthly donor provides you unlimited docket alerts</h3>
       {% endif %}
-    </div>
-    <div class="col-xs-12">
+
       <div class="table-responsive">
         <table class="table settings-table">
           <thead>
@@ -173,13 +170,6 @@
         href="{% url "alert_help" %}"
         class="btn btn-default">Learn More About RECAP Alerts</a></p>
     </div>
-    {% if not search_alerts %}
-      <div class="col-xs-12">
-        <h3 class="gray caps">You have not made any Search Alerts
-          <a href="{% url "alert_help" %}"
-             class="btn btn-default btn-lg">Learn More About Search Alerts</a></h3>
-      </div>
-    {% endif %}
   {% endif %}
 {% endif %}
 {% endblock %}

@@ -1,0 +1,11 @@
+Hello Admins!
+
+The following webhook was {{ action }} in Courtlistener:
+
+Username: {{ webhook.user.username }}
+https://www.courtlistener.com{% url 'admin:auth_user_change' webhook.user.pk %}
+
+Webhook Admin: https://www.courtlistener.com{% url 'admin:api_webhook_change' webhook.pk %}
+
+Webhook Endpoint: {{ webhook.url }}
+

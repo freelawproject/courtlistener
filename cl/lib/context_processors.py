@@ -142,9 +142,12 @@ def inject_email_ban_status(
             email_address=email, flag_type=FLAG_TYPES.BACKOFF
         )
         if backoff_event.exists():
-            msg = TRANSIENT.get(
-                backoff_event[0].notification_subtype,
-                TRANSIENT[EMAIL_NOTIFICATIONS.GENERAL],
-            )
-            return {"EMAIL_BAN_PERMANENT": False, "EMAIL_BAN_REASON": msg}
+            # Only show the failed transient email banner if the backoff event
+            # is active
+            if backoff_event[0].under_waiting_period:
+                msg = TRANSIENT.get(
+                    backoff_event[0].notification_subtype,
+                    TRANSIENT[EMAIL_NOTIFICATIONS.GENERAL],
+                )
+                return {"EMAIL_BAN_PERMANENT": False, "EMAIL_BAN_REASON": msg}
     return {}

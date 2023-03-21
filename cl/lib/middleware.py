@@ -1,12 +1,15 @@
+from http import HTTPStatus
+from typing import Callable
+
 from django.conf import settings
 from django.core.exceptions import MiddlewareNotUsed
+from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
+from django.template.response import TemplateResponse
 from django.utils.cache import add_never_cache_headers
-from django.utils.deprecation import MiddlewareMixin
-from rest_framework.status import HTTP_503_SERVICE_UNAVAILABLE
 
 
-class MaintenanceModeMiddleware(MiddlewareMixin):
+class MaintenanceModeMiddleware:
     """Provides maintenance mode if requested in settings.
 
     This cribs heavily from:
@@ -29,25 +32,61 @@ class MaintenanceModeMiddleware(MiddlewareMixin):
     party code.
     """
 
-    def __init__(self, *args, **kwargs):
-        super(MaintenanceModeMiddleware, self).__init__(*args, **kwargs)
+    def __init__(self, get_response: Callable):
         if not settings.MAINTENANCE_MODE_ENABLED:
             raise MiddlewareNotUsed
+        self.get_response = get_response
 
-    def process_request(self, request):
+    def __call__(self, request: HttpRequest) -> HttpResponse:
+        response = self.get_response(request)
         if hasattr(request, "user"):
             if settings.MAINTENANCE_MODE_ALLOW_STAFF and request.user.is_staff:
-                return None
-
-        for ip_address_re in settings.MAINTENANCE_MODE_ALLOWED_IPS:
-            if ip_address_re.match(request.META["REMOTE_ADDR"]):
-                return None
+                return response
 
         r = render(
             request,
             "maintenance.html",
             {"private": True},
-            status=HTTP_503_SERVICE_UNAVAILABLE,
+            status=HTTPStatus.SERVICE_UNAVAILABLE,
         )
         add_never_cache_headers(r)
         return r
+
+
+class RobotsHeaderMiddleware:
+    """Adds x-robots-tag HTTP header to any request that has `private=True`
+
+    There's some evidence and good logic to support the idea that using the
+    x-robots-tag HTTP header uses less of a site's "crawl budget" than
+    using the noindex HTML tag. Logically, this makes sense because crawlers
+    can simply download the headers and stop, instead of downloading and
+    parsing pages.
+
+    Because we have good measures to make sure that the `private` context
+    variable is set on every page, this middleware uses that variable to set
+    the HTTP headers too.
+    """
+
+    def __init__(self, get_response: Callable):
+        self.get_response = get_response
+
+    def __call__(self, request: HttpRequest) -> HttpResponse:
+        response = self.get_response(request)
+        return response
+
+    def process_template_response(
+        self,
+        request: HttpRequest,
+        response: TemplateResponse,
+    ) -> TemplateResponse:
+        if getattr(response, "context_data", None) is None:
+            return response
+
+        private = False
+        if response.context_data:
+            private = response.context_data.get("private", False)
+        if private:
+            response.headers[
+                "X-Robots-Tag"
+            ] = "noindex, noarchive, noimageindex"
+        return response

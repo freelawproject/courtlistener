@@ -2,12 +2,13 @@ import logging
 from urllib.parse import urljoin
 
 import requests
-from botocore import exceptions as botocore_exception
 from celery import Task
 from django.conf import settings
+from django.utils.timezone import now
 
+from cl.api.models import Webhook, WebhookEvent
 from cl.celery_init import app
-from cl.users.models import STATUS_TYPES, FailedEmail
+from cl.lib.email_utils import make_multipart_email
 
 logger = logging.getLogger(__name__)
 
@@ -35,16 +36,16 @@ def update_moosend_subscription(self: Task, email: str, action: str) -> None:
     """
     allowed_actions = ["subscribe", "unsubscribe"]
     assert action in allowed_actions, f"'{action}' is not an allowed action."
-    params = {"apikey": settings.MOOSEND_API_KEY}
+    params = {"apikey": settings.MOOSEND_API_KEY}  # type: ignore
 
     if action == "subscribe":
-        path = f"/v3/subscribers/{settings.MOOSEND_DEFAULT_LIST_ID}/subscribe.json"
+        path = f"/v3/subscribers/{settings.MOOSEND_DEFAULT_LIST_ID}/subscribe.json"  # type: ignore
     else:
-        path = f"/v3/subscribers/{settings.MOOSEND_DEFAULT_LIST_ID}/unsubscribe.json"
+        path = f"/v3/subscribers/{settings.MOOSEND_DEFAULT_LIST_ID}/unsubscribe.json"  # type: ignore
 
     try:
         r = requests.post(
-            url=urljoin(settings.MOOSEND_API_URL, path),
+            url=urljoin(settings.MOOSEND_API_URL, path),  # type: ignore
             params=params,
             json={
                 "Email": email,
@@ -74,27 +75,108 @@ def update_moosend_subscription(self: Task, email: str, action: str) -> None:
         )
 
 
-@app.task(bind=True, max_retries=3, interval_start=5 * 60)
-def send_failed_email(
-    self: Task,
-    failed_pk: int,
-) -> int:
-    """Task to retry failed email messages"""
+@app.task(ignore_result=True)
+def notify_new_or_updated_webhook(
+    webhook_pk: int,
+    created: bool,
+) -> None:
+    """Send a notification to the admins if a webhook was created or updated.
 
-    failed_email = FailedEmail.objects.get(pk=failed_pk)
-    if failed_email.status != STATUS_TYPES.SUCCESSFUL:
-        # Only execute this task if it has not been previously processed.
-        failed_email.status = STATUS_TYPES.IN_PROGRESS
-        failed_email.save()
-        # Compose email from stored message.
-        email = failed_email.stored_email.convert_to_email_multipart()
-        try:
-            email.send()
-        except (
-            botocore_exception.HTTPClientError,
-            botocore_exception.ConnectionError,
-        ) as exc:
-            # In case of error when sending e.g: SES downtime, retry the task.
-            raise self.retry(exc=exc)
-        failed_email.status = STATUS_TYPES.SUCCESSFUL
-        failed_email.save()
+    :param webhook_pk: The webhook PK that was created or updated.
+    :param created: Whether the webhook was just created or not.
+    :return: None
+    """
+
+    webhook = Webhook.objects.get(pk=webhook_pk)
+
+    action = "created" if created else "updated"
+    subject = f"A webhook was {action}"
+    txt_template = "emails/new_or_updated_webhook.txt"
+    html_template = "emails/new_or_updated_webhook.html"
+    context = {"webhook": webhook, "action": action}
+    msg = make_multipart_email(
+        subject,
+        html_template,
+        txt_template,
+        context,
+        [a[1] for a in settings.MANAGERS],
+    )
+    msg.send()
+
+
+@app.task(ignore_result=True)
+def notify_failing_webhook(
+    webhook_event_pk: int,
+    failure_counter: int,
+    webhook_enabled: bool,
+) -> None:
+    """Send a notification to the webhook user when a webhook event fails, or
+    it has been disabled.
+
+    :param webhook_event_pk: The related webhook event PK.
+    :param failure_counter: The current webhook event failure counter.
+    :param webhook_enabled: Whether the webhook has been disabled.
+    :return: None
+    """
+
+    webhook_event = WebhookEvent.objects.get(pk=webhook_event_pk)
+    webhook = webhook_event.webhook
+    first_name = webhook.user.first_name
+    subject = f"[Action Needed]: Your {webhook.get_event_type_display()} webhook is failing."
+    if not webhook_enabled:
+        subject = f"[Action Needed]: Your {webhook.get_event_type_display()} webhook is now disabled."
+    txt_template = "emails/failing_webhook.txt"
+    html_template = "emails/failing_webhook.html"
+    context = {
+        "webhook": webhook,
+        "webhook_event_pk": webhook_event_pk,
+        "failure_counter": failure_counter,
+        "first_name": first_name,
+        "disabled": not webhook_enabled,
+    }
+    msg = make_multipart_email(
+        subject, html_template, txt_template, context, [webhook.user.email]
+    )
+    msg.send()
+
+
+def get_days_disabled(webhook: Webhook) -> str:
+    """Compute and return a string saying the number of days the webhook has
+    been disabled.
+
+    :param: The related Webhook object.
+    :return: A string with the number of days the webhook has been disabled.
+    """
+
+    date_disabled = webhook.date_modified
+    today = now()
+    days = (today - date_disabled).days
+    str_day = "day"
+    if days > 1:
+        str_day = "days"
+    return f"{days} {str_day}"
+
+
+@app.task(ignore_result=True)
+def send_webhook_still_disabled_email(webhook_pk: int) -> None:
+    """Send an email to the webhook owner when a webhook endpoint is
+    still disabled after 1, 2, and 3 days.
+
+    :param webhook_pk: The related webhook PK.
+    :return: None
+    """
+
+    webhook = Webhook.objects.get(pk=webhook_pk)
+    first_name = webhook.user.first_name
+    days_disabled = get_days_disabled(webhook)
+    subject = f"[Action Needed]: Your {webhook.get_event_type_display()} webhook has been disabled for {days_disabled}."
+    txt_template = "emails/webhook_still_disabled.txt"
+    html_template = "emails/webhook_still_disabled.html"
+    context = {
+        "webhook": webhook,
+        "first_name": first_name,
+    }
+    msg = make_multipart_email(
+        subject, html_template, txt_template, context, [webhook.user.email]
+    )
+    msg.send()

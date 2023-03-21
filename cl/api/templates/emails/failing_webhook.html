@@ -1,0 +1,61 @@
+{% load humanize %}
+
+<!DOCTYPE html>
+<html style="font-size: 100.01%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
+             font-style: inherit; margin: 0; padding: 0;">
+<head>
+    <meta charset="utf-8">
+    <style type="text/css">
+        a:visited { text-decoration: none !important; }
+        a:hover { text-decoration: none !important; }
+        a:focus { text-decoration: none !important; }
+    </style>
+</head>
+<body style="font-size: 100%; font-weight: inherit; line-height: 1.5;
+             font-family: 'Helvetica Neue', Arial, Helvetica, sans-serif; color: #222; border: 0;
+             vertical-align: baseline; font-style: inherit; background: #fff; margin: 0; padding: 0;">
+<hr style="background: #ddd; color: #ddd; clear: both; float: none; width: 60%; height: .1em; margin: 0 0 1.45em;
+           border: none;">
+<p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
+          font-style: inherit; margin: 0 0 1.5em; padding: 0;">
+  {% if first_name %}
+    Hello {{ first_name }},
+  {% else %}
+    Hello,
+  {% endif %}
+</p>
+{% if disabled %}
+  <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
+        font-style: inherit; margin: 0 0 1.5em; padding: 0;">After eight failed attempts over the last two days, one of your webhooks has been disabled and will no longer receive events.</p>
+{% else %}
+  <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
+        font-style: inherit; margin: 0 0 1.5em; padding: 0;">We couldn't deliver events to one of your webhooks. If this problem persists for approximately 48 hours, this webhook will be disabled until it is fixed on your server.</p>
+{% endif %}
+<p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
+          font-style: inherit; margin: 0 0 1.5em; padding: 0;">Please find more details below:</p>
+<ul>
+  <li>Webhook Type: {{ webhook.get_event_type_display }}</li>
+  <li>Webhook Endpoint: {{ webhook.url }}</li>
+  <li>Webhook Event Failure Count: {{ failure_counter }}</li>
+  <li><a href="https://www.courtlistener.com{% url 'view_webhook_logs_detail' webhook_event_pk %}">Webhook Event Details</a></li>
+</ul>
+
+<p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
+          font-style: inherit; margin: 0 0 1.5em; padding: 0;">
+  {% if disabled %}
+    To re-enable this webhook, review your logs in the webhook settings to see the responses we are getting from your server. Once your server is fixed, you can re-enable the webhook in your <a href="https://www.courtlistener.com{% url 'view_webhooks' %}">settings</a>.
+  {% else %}
+    We'll continue trying to deliver events to this webhook up to eight times before disabling further events.
+  {% endif %}
+</p>
+
+<p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
+          font-style: inherit; margin: 0; padding: 0;">Thank you for looking into this.</p>
+<p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
+          font-style: inherit; margin: 0; padding: 0;">If you need further assistance, please contact <a href="https://www.courtlistener.com{% url 'contact' %}">support</a>.</p>
+<p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
+          font-style: inherit; margin: 0; padding: 0;">Sincerely,</p>
+<p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
+          font-style: inherit; margin: 0; padding: 0;">The FLP Bots</p>
+</body>
+</html>

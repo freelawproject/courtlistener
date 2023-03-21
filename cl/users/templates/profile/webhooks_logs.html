@@ -1,0 +1,41 @@
+{% extends "profile/webhooks_base.html" %}
+{% load static %}
+{% load waffle_tags %}
+{% load humanize %}
+{% block title %} {{ page_title }} &ndash; CourtListener.com{% endblock %}
+
+{% block webhooks-content %}
+  <div class="table-responsive">
+    <table class="table"
+      hx-ext="loading-states"
+      data-loading-class="hidden"
+      >
+        <thead>
+        <tr class="active">
+          <th>Event Type</th>
+          <th>Event Status</th>
+          <th>Status code</th>
+          <th>Event Date</th>
+          {% if sub_page == "logs" %}
+            <th>Next attempt</th>
+          {% endif %}
+          <th></th>
+        </tr>
+        </thead>
+        <tr id="webhook_list_loader" class="hidden">
+          <td class="text-center" colspan="4">
+            <i class="fa fa-spinner fa-spin"></i> Loading
+          </td>
+        </tr>
+        <tbody
+          id="webhook_table_body"
+          hx-trigger="load, webhookLogsListChanged from:body"
+          hx-get="{% url 'webhook_events-list' format="html" %}?debug={{debug}}"
+          data-loading-target="#add-webhook"
+          data-loading-class="hidden"
+          hx-target="this"
+          >
+        </tbody>
+      </table>
+    </div>
+{% endblock %}

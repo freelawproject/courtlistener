@@ -1,0 +1,21 @@
+{% load waffle_tags %}
+<div class="col-xs-12 v-offset-above-2 v-offset-below-2">
+  <ul class="nav nav-pills centered-tabs">
+    <li class="{% if page == "api_info" %} active {% endif %} medium">
+      <a href="{% url "view_api" %}">
+        <i class="fa fa-book"></i>&nbsp;API Documentation</a>
+    </li>
+    <li class="{% if page == "api_token" %} active {% endif %} medium">
+      <a href="{% url "view_api_token" %}">
+        <i class="fa fa-key"></i>&nbsp;Your API Token</a>
+    </li>
+    <li class="{% if page == "api_usage" %} active {% endif %} medium">
+      <a href="{% url "view_api_usage" %}">
+        <i class="fa fa-pie-chart"></i>&nbsp;API Usage</a>
+    </li>
+    <li class="{% if page == "api_webhooks" %} active {% endif %} medium">
+      <a href="{% url "view_webhooks" %}">
+        <i class="fa fa-plug"></i>&nbsp;Webhooks</a>
+    </li>
+  </ul>
+</div>

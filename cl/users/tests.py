@@ -1,11 +1,13 @@
 import json
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest import mock
 
+import time_machine
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
+from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
 from django.core.mail import EmailMessage, EmailMultiAlternatives, send_mail
@@ -15,19 +17,55 @@ from django.urls import reverse
 from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
 from django_ses import signals
-from rest_framework.status import HTTP_200_OK
+from rest_framework.status import (
+    HTTP_200_OK,
+    HTTP_201_CREATED,
+    HTTP_204_NO_CONTENT,
+    HTTP_404_NOT_FOUND,
+    HTTP_500_INTERNAL_SERVER_ERROR,
+)
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
+from cl.alerts.factories import DocketAlertFactory
+from cl.alerts.models import DocketAlert, DocketAlertEvent
+from cl.api.factories import WebhookEventFactory, WebhookFactory
+from cl.api.models import (
+    Webhook,
+    WebhookEvent,
+    WebhookEventType,
+    WebhookHistoryEvent,
+)
+from cl.favorites.factories import UserTagFactory
+from cl.favorites.models import (
+    DocketTag,
+    DocketTagEvent,
+    UserTag,
+    UserTagEvent,
+)
+from cl.lib.test_helpers import SimpleUserDataMixin
+from cl.search.factories import DocketFactory
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
-from cl.tests.cases import LiveServerTestCase, TestCase
+from cl.tests.cases import APITestCase, LiveServerTestCase, TestCase
+from cl.tests.utils import MockResponse as MockPostResponse
+from cl.tests.utils import make_client
 from cl.users.email_handlers import (
     add_bcc_random,
     get_email_body,
     normalize_addresses,
 )
-from cl.users.factories import EmailSentFactory, UserFactory
+from cl.users.factories import (
+    EmailSentFactory,
+    UserFactory,
+    UserProfileWithParentsFactory,
+)
 from cl.users.management.commands.cl_delete_old_emails import delete_old_emails
+from cl.users.management.commands.cl_retry_failed_email import (
+    handle_failing_emails,
+)
+from cl.users.management.commands.cl_welcome_new_users import (
+    get_welcome_recipients,
+)
 from cl.users.models import (
     EMAIL_NOTIFICATIONS,
     FLAG_TYPES,
@@ -41,8 +79,6 @@ from cl.users.tasks import update_moosend_subscription
 
 
 class UserTest(LiveServerTestCase):
-    fixtures = ["authtest_data.json"]
-
     def test_simple_auth_urls_GET(self) -> None:
         """Can we at least GET all the basic auth URLs?"""
         reverse_names = [
@@ -133,12 +169,15 @@ class UserTest(LiveServerTestCase):
                         % next_param,
                     )
 
+
+class UserDataTest(LiveServerTestCase):
     def test_signing_in(self) -> None:
         """Can we create a user on the backend then sign them in"""
-        params = {
-            "username": "pandora",
-            "password": "password",
-        }
+        params = {"username": "pandora", "password": "password"}
+        UserProfileWithParentsFactory.create(
+            user__username=params["username"],
+            user__password=make_password(params["password"]),
+        )
         r = self.client.post(reverse("sign-in"), params, follow=True)
         self.assertRedirects(r, "/")
 
@@ -147,16 +186,9 @@ class UserTest(LiveServerTestCase):
         with a single account.
         """
         # Update the expiration since the fixture has one some time ago.
-        u = UserProfile.objects.get(pk=1002)
-        u.key_expires = now() + timedelta(days=2)
-        u.save()
+        up = UserProfileWithParentsFactory.create(email_confirmed=False)
 
-        r = self.client.get(
-            reverse(
-                "email_confirm",
-                args=["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
-            )
-        )
+        r = self.client.get(reverse("email_confirm", args=[up.activation_key]))
         self.assertEqual(
             200,
             r.status_code,
@@ -174,16 +206,14 @@ class UserTest(LiveServerTestCase):
     ) -> None:
         """Test the trickier case when an email is associated with many accounts"""
         # Update the accounts to have keys that are not expired.
-        (
-            UserProfile.objects.filter(pk__in=[1003, 1004, 1005]).update(
-                key_expires=now() + timedelta(days=2)
-            )
+        ups = UserProfileWithParentsFactory.create_batch(
+            3,
+            activation_key="a" * 40,  # Note length has to be correct
+            email_confirmed=False,
         )
+
         r = self.client.get(
-            reverse(
-                "email_confirm",
-                args=["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab"],
-            )
+            reverse("email_confirm", args=[ups[0].activation_key])
         )
         self.assertIn(
             "has been confirmed",
@@ -196,14 +226,31 @@ class UserTest(LiveServerTestCase):
             msg="Did not get 200 code when activating account. "
             "Instead got %s" % r.status_code,
         )
-        ups = UserProfile.objects.filter(pk__in=(3, 4, 5))
+        ups = UserProfile.objects.filter(pk__in=[up.pk for up in ups])
         for up in ups:
             self.assertTrue(up.email_confirmed)
 
+    def test_get_welcome_email_recipients(self) -> None:
+        """This test verifies that we can get the welcome email recipients
+        properly, users that signed up in the last 24 hours.
+        """
 
-class ProfileTest(TestCase):
-    fixtures = ["authtest_data.json"]
+        # Create a new user.
+        UserProfileWithParentsFactory.create(email_confirmed=False)
+        time_now = datetime.now()
+        # Get last 24 hours signed-up users.
+        recipients = get_welcome_recipients(time_now)
+        # The newly created user should be returned.
+        self.assertEqual(len(recipients), 1)
 
+        # Simulate getting recipients for tomorrow.
+        tomorrow = time_now + timedelta(days=1)
+        recipients = get_welcome_recipients(tomorrow)
+        # No recipients should be returned.
+        self.assertEqual(len(recipients), 0)
+
+
+class ProfileTest(SimpleUserDataMixin, TestCase):
     def test_api_page_with_data(self) -> None:
         """Can we access the API stats page after the API has been used?"""
         # Get the page anonymously to populate the stats with anon data
@@ -224,33 +271,126 @@ class ProfileTest(TestCase):
         self.assertTrue(
             self.client.login(username="pandora", password="password")
         )
-        response = self.client.post(reverse("delete_account"), follow=True)
+        response = self.client.post(
+            reverse("delete_account"),
+            {"password": "password"},
+            follow=True,
+        )
         self.assertRedirects(
             response,
             reverse("delete_profile_done"),
         )
 
-    def test_generate_recap_email_with_non_email_username(self) -> None:
-        user_profile = UserProfile.objects.get(
-            recap_email="pandora@recap.email"
+    def test_generate_recap_dot_email_addresses(self) -> None:
+        # Test simple username
+        u = User.objects.get(username="pandora")
+        self.assertEqual(u.profile.recap_email, "pandora@recap.email")
+
+        # Test with email address username
+        up = UserProfileWithParentsFactory(user__username="pandora@gmail.com")
+        self.assertEqual(up.recap_email, "pandora.gmail.com@recap.email")
+
+        # Test username lowercasing
+        up = UserProfileWithParentsFactory(user__username="Test.User")
+        self.assertEqual(up.recap_email, "test.user@recap.email")
+
+    def test_nuke_user_history_objects_assets_deleting_account(self) -> None:
+        """Are user related history objects properly removed when deleting the
+        user account?
+        """
+
+        user_1 = UserProfileWithParentsFactory()
+        user_2 = UserProfileWithParentsFactory()
+        docket = DocketFactory()
+        docket_2 = DocketFactory()
+        docket_alert = DocketAlertFactory(docket=docket, user=user_1.user)
+        docket_alert_2 = DocketAlertFactory(docket=docket_2, user=user_1.user)
+        DocketAlertFactory(docket=docket_2, user=user_2.user)
+
+        # Confirm docket alert objects are created.
+        docket_alerts = DocketAlert.objects.all()
+        self.assertEqual(docket_alerts.count(), 3)
+
+        # Confirm docket alert history objects are created.
+        docket_alert_events = DocketAlertEvent.objects.all()
+        self.assertEqual(docket_alert_events.count(), 3)
+
+        # Trigger a change for docket alert objects.
+        docket_alert.alert_type = DocketAlert.UNSUBSCRIPTION
+        docket_alert.save()
+        docket_alert_2.alert_type = DocketAlert.UNSUBSCRIPTION
+        docket_alert.save()
+
+        # More docket alert history objects should be created.
+        self.assertEqual(docket_alert_events.count(), 5)
+
+        # Delete user account.
+        self.assertTrue(
+            self.client.login(
+                username=user_1.user.username, password="password"
+            )
         )
-        self.assertEqual(user_profile.user.pk, 1001)
-
-    def test_generate_recap_email_with_email_username(self) -> None:
-        user_profile = UserProfile.objects.get(
-            recap_email="pandora.gmail.com@recap.email"
+        self.client.post(
+            reverse("delete_account"),
+            {"password": "password"},
+            follow=True,
         )
-        self.assertEqual(user_profile.user.pk, 1006)
 
-    def test_generate_recap_email_username_lowercase(self) -> None:
-        user_profile = UserProfile.objects.get(
-            recap_email="test.user@recap.email"
+        # Confirm that only history events objects related to the user deleted
+        # are removed from the events table.
+        self.assertEqual(docket_alerts.count(), 1)
+        self.assertEqual(docket_alert_events.count(), 1)
+
+    def test_nuke_user_tag_and_docket_tag_history_objects(self) -> None:
+        """Are user_tag and docket_tag history objects properly removed when
+        deleting the user account?  This is different from the previous test
+        since docket_tag is no directly related to the user.
+        """
+
+        docket_1 = DocketFactory()
+        user_1 = UserProfileWithParentsFactory()
+        user_2 = UserProfileWithParentsFactory()
+
+        tag_1_user_1 = UserTagFactory(user=user_1.user, name="tag_1_user_1")
+        tag_1_user_1.dockets.add(docket_1.pk)
+        tag_1_user_2 = UserTagFactory(user=user_2.user, name="tag_1_user_2")
+        tag_1_user_2.dockets.add(docket_1.pk)
+
+        # Confirm user tags and docket tags are created.
+        user_tags = UserTag.objects.all()
+        docket_tags = DocketTag.objects.all()
+        self.assertEqual(user_tags.count(), 2)
+        self.assertEqual(docket_tags.count(), 2)
+
+        # Confirm user tags and docket tags history objects are created.
+        user_tag_events = UserTagEvent.objects.all()
+        docket_tag_events = DocketTagEvent.objects.all()
+        self.assertEqual(user_tag_events.count(), 2)
+        self.assertEqual(docket_tag_events.count(), 2)
+
+        # Delete user account.
+        self.assertTrue(
+            self.client.login(
+                username=user_1.user.username, password="password"
+            )
         )
-        self.assertEqual(user_profile.user.pk, 1007)
+        self.client.post(
+            reverse("delete_account"),
+            {"password": "password"},
+            follow=True,
+        )
+
+        # Confirm that only history events objects related to the user deleted
+        # are removed from the events table.
+        self.assertEqual(user_tags.count(), 1)
+        self.assertEqual(docket_tags.count(), 1)
+        self.assertEqual(user_tag_events.count(), 1)
+        self.assertEqual(docket_tag_events.count(), 1)
+        self.assertEqual(user_tag_events[0].name, "tag_1_user_2")
+        self.assertEqual(docket_tag_events[0].tag_id, tag_1_user_2.pk)
 
 
-class DisposableEmailTest(TestCase):
-    fixtures = ["authtest_data.json"]
+class DisposableEmailTest(SimpleUserDataMixin, TestCase):
     """
     Tests for issue #724 to block people with bad disposable email addresses.
 
@@ -300,7 +440,12 @@ class DisposableEmailTest(TestCase):
 
 
 class LiveUserTest(BaseSeleniumTest):
-    fixtures = ["authtest_data.json"]
+    def setUp(self) -> None:
+        self.up = UserProfileWithParentsFactory.create(
+            user__username="pandora",
+            user__password=make_password("password"),
+            user__email="pandora@courtlistener.com",
+        )
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_reset_password_using_the_HTML(self) -> None:
@@ -326,14 +471,15 @@ class LiveUserTest(BaseSeleniumTest):
     def test_set_password_using_the_HTML(self) -> None:
         """Can we reset our password after generating a confirmation link?"""
         # Generate a token and use it to visit a generated reset URL
-        up = UserProfile.objects.get(pk=1001)
-        token = default_token_generator.make_token(up.user)
+        token = default_token_generator.make_token(self.up.user)
         url = "{host}{path}".format(
             host=self.live_server_url,
             path=reverse(
                 "confirm_password",
                 kwargs={
-                    "uidb64": urlsafe_base64_encode(str(up.user.pk).encode()),
+                    "uidb64": urlsafe_base64_encode(
+                        str(self.up.user.pk).encode()
+                    ),
                     "token": token,
                 },
             ),
@@ -358,7 +504,7 @@ class LiveUserTest(BaseSeleniumTest):
 
 class SNSWebhookTest(TestCase):
     @classmethod
-    def setUpTestData(cls):
+    def setUpTestData(cls) -> None:
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
         with (
             open(
@@ -374,18 +520,18 @@ class SNSWebhookTest(TestCase):
                 test_dir / "hard_bounce.json", encoding="utf-8"
             ) as hard_bounce,
             open(test_dir / "complaint.json", encoding="utf-8") as complaint,
-            open(test_dir / "delivery.json", encoding="utf-8") as delivery,
             open(
                 test_dir / "suppressed_bounce.json", encoding="utf-8"
             ) as suppressed_bounce,
+            open(test_dir / "no_bounce.json", encoding="utf-8") as no_bounce,
         ):
             cls.soft_bounce_asset = json.load(general_soft_bounce)
             cls.soft_bounce_msg_large_asset = json.load(msg_large_bounce)
             cls.soft_bounce_cnt_rejected_asset = json.load(cnt_rejected_bounce)
             cls.hard_bounce_asset = json.load(hard_bounce)
             cls.complaint_asset = json.load(complaint)
-            cls.delivery_asset = json.load(delivery)
             cls.suppressed_asset = json.load(suppressed_bounce)
+            cls.no_failed_bounce_asset = json.load(no_bounce)
 
     def send_signal(self, test_asset, event_name, signal) -> None:
         """Function to dispatch signal that mocks a SNS notification event
@@ -421,9 +567,9 @@ class SNSWebhookTest(TestCase):
         mock_hard_bounce.assert_called()
 
     @mock.patch("cl.users.signals.handle_soft_bounce")
-    def test_soft_bounce_signal(self, mock_soft_bounce) -> None:
+    def test_soft_bounce_signal_failed(self, mock_soft_bounce) -> None:
         """This test checks if handle_soft_bounce function is called
-        when a soft bounce event is received
+        when a failed soft bounce event is received
         """
         # Trigger a soft bounce event
         self.send_signal(
@@ -431,6 +577,18 @@ class SNSWebhookTest(TestCase):
         )
         # Check if handle_soft_bounce is called
         mock_soft_bounce.assert_called()
+
+    @mock.patch("cl.users.signals.handle_soft_bounce")
+    def test_soft_bounce_signal_not_failed(self, mock_soft_bounce) -> None:
+        """This test checks if handle_soft_bounce function is not called
+        when a not failed soft bounce event is received
+        """
+        # Trigger a soft bounce event for a no failed action
+        self.send_signal(
+            self.no_failed_bounce_asset, "bounce", signals.bounce_received
+        )
+        # Check if handle_soft_bounce is not called
+        mock_soft_bounce.assert_not_called()
 
     @mock.patch("cl.users.signals.handle_complaint")
     def test_complaint_signal(self, mock_complaint) -> None:
@@ -443,19 +601,6 @@ class SNSWebhookTest(TestCase):
         )
         # Check if handle_complaint is called
         mock_complaint.assert_called()
-
-    @mock.patch("cl.users.signals.handle_delivery")
-    def test_delivery_signal(self, mock_delivery) -> None:
-        """This test checks if handle_delivery function is called
-        when a delivery event is received
-        """
-        # Trigger a delivery event
-        self.send_signal(
-            self.delivery_asset, "delivery", signals.delivery_received
-        )
-
-        # Check if handle_delivery is called
-        mock_delivery.assert_called()
 
     @mock.patch("cl.users.email_handlers.logging")
     def test_handle_soft_bounce_unexpected(self, mock_logging) -> None:
@@ -647,7 +792,7 @@ class SNSWebhookTest(TestCase):
             email_address="bounce@simulator.amazonses.com",
             flag_type=FLAG_TYPES.BACKOFF,
         )
-        # Store parameter after backoff event update
+        # Store parameter before backoff event is update
         retry_counter_before = email_backoff_event[0].retry_counter
         # Trigger second backoff notification event
         self.send_signal(
@@ -657,7 +802,8 @@ class SNSWebhookTest(TestCase):
             email_address="bounce@simulator.amazonses.com",
             flag_type=FLAG_TYPES.BACKOFF,
         )
-        # Store parametes after second backoff event update
+
+        # Store parameters after second backoff event update
         retry_counter_after = email_backoff_event_after[0].retry_counter
         next_retry_date_after = email_backoff_event_after[0].next_retry_date
 
@@ -670,6 +816,57 @@ class SNSWebhookTest(TestCase):
 
         # Check retry counter is updated
         self.assertNotEqual(retry_counter_before, retry_counter_after)
+        # Check expected waiting period equals to computed waiting period
+        self.assertEqual(expected_waiting_period, actual_waiting_period)
+
+    def test_restart_backoff_event_after_threshold_bounce(self) -> None:
+        """This test checks if we properly delete or update a backoff event
+        when a new bounce notification comes in. If the bounce event comes in
+        before BACKOFF_THRESHOLD hours since the last retry, the backoff event
+        is updated. Otherwise, the backoff event is restarted.
+        """
+
+        # Trigger first backoff notification event
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
+
+        email_backoff_event = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            flag_type=FLAG_TYPES.BACKOFF,
+        )
+
+        # Update next_retry_date to simulate the last retry was
+        # backoff_threshold hours ago, update retry_counter to 4
+        backoff_threshold = settings.BACKOFF_THRESHOLD + 1
+        email_backoff_event.update(
+            next_retry_date=now() - timedelta(hours=backoff_threshold),
+            retry_counter=4,
+        )
+
+        # Trigger second backoff notification event
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
+        email_backoff_event_after = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            flag_type=FLAG_TYPES.BACKOFF,
+        )
+
+        # Store parameters after second backoff event update
+        retry_counter_after = email_backoff_event_after[0].retry_counter
+        next_retry_date_after = email_backoff_event_after[0].next_retry_date
+
+        # Backoff event is restarted
+        # 2 Hours expected for the next backoff retry
+        expected_waiting_period = 2
+
+        # Obtain waiting period in hours after backoff notification
+        waiting_period = next_retry_date_after - now()
+        actual_waiting_period = round(waiting_period.total_seconds() / 3600)
+
+        # Check retry counter is updated
+        self.assertEqual(retry_counter_after, 0)
         # Check expected waiting period equals to computed waiting period
         self.assertEqual(expected_waiting_period, actual_waiting_period)
 
@@ -796,11 +993,12 @@ class SNSWebhookTest(TestCase):
             email_ban[0].notification_subtype, EMAIL_NOTIFICATIONS.COMPLAINT
         )
 
-    @mock.patch("cl.users.email_handlers.schedule_failed_email")
-    def test_handle_delivery(self, mock_schedule) -> None:
-        """This test checks if a delivery notification is received
-        and exists a previous backoff event it's deleted and
-        schedule_failed_email function is called
+    @mock.patch(
+        "cl.users.management.commands.cl_retry_failed_email.schedule_failed_email"
+    )
+    def test_check_recipient_deliverability(self, mock_schedule) -> None:
+        """This test checks if schedule_failed_email function is called
+        if recipient's deliverability is proven.
         """
         # Trigger soft bounce event to create backoff event
         self.send_signal(
@@ -814,22 +1012,87 @@ class SNSWebhookTest(TestCase):
         # Check if backoff event was created
         self.assertEqual(email_backoff_exists, True)
 
-        # Trigger a delivery event
-        self.send_signal(
-            self.delivery_asset, "delivery", signals.delivery_received
-        )
+        # Fake time, DELIVERABILITY_THRESHOLD hours after backoff event expires
+        first_retry_future_time = 2 + settings.DELIVERABILITY_THRESHOLD
+        fake_now_1 = now() + timedelta(hours=first_retry_future_time)
+        with time_machine.travel(fake_now_1, tick=False):
+            # Check recipient's deliverability 3 hours in the future
+            # One hour after backoff event expires
+            handle_failing_emails()
 
+        # Check if schedule_failed_email is called
+        mock_schedule.assert_called()
+        # Backoff event checked field is set to True
+        self.assertEqual(email_backoff_event[0].checked, fake_now_1)
+
+        # Trigger a new soft bounce event to update the backoff event
+        with time_machine.travel(fake_now_1, tick=False):
+            self.send_signal(
+                self.soft_bounce_asset, "bounce", signals.bounce_received
+            )
+
+        # Backoff event is updated, checked set to False.
+        self.assertEqual(email_backoff_event[0].checked, None)
+        self.assertEqual(email_backoff_event.count(), 1)
+        self.assertEqual(email_backoff_event[0].retry_counter, 1)
+
+        # Fake time DELIVERABILITY_THRESHOLD hours after backoff event expires
+        second_retry_future_time = 4 + settings.DELIVERABILITY_THRESHOLD
+        fake_now_2 = fake_now_1 + timedelta(hours=second_retry_future_time)
+        with time_machine.travel(fake_now_2, tick=False):
+            # Check recipient's deliverability
+            handle_failing_emails()
+
+        # Check if schedule_failed_email is called and backoff marked checked
+        self.assertEqual(mock_schedule.call_count, 2)
+        self.assertEqual(email_backoff_event[0].checked, fake_now_2)
+
+    @mock.patch(
+        "cl.users.management.commands.cl_retry_failed_email.schedule_failed_email"
+    )
+    def test_check_recipient_deliverability_fails(self, mock_schedule) -> None:
+        """This test checks if the backoff event it's not deleted and
+        schedule_failed_email function is not called if recipient's
+        deliverability is not proven.
+        """
+        # Trigger soft bounce event to create backoff event
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
         email_backoff_event = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
             flag_type=FLAG_TYPES.BACKOFF,
         )
         email_backoff_exists = email_backoff_event.exists()
+        # Check if backoff event was created
+        self.assertEqual(email_backoff_exists, True)
 
-        # Check if backoff event was deleted
-        self.assertEqual(email_backoff_exists, False)
+        # Fake time DELIVERABILITY_THRESHOLD hours after backoff event expires
+        first_retry_future_time = 2 + settings.DELIVERABILITY_THRESHOLD
+        fake_now_1 = now() + timedelta(hours=first_retry_future_time)
+        with time_machine.travel(fake_now_1, tick=False):
+            # Trigger soft bounce event to update the backoff event
+            self.send_signal(
+                self.soft_bounce_asset, "bounce", signals.bounce_received
+            )
+        self.assertEqual(email_backoff_event[0].checked, None)
 
-        # Check if schedule_failed_email is called
-        mock_schedule.assert_called()
+        # Fake time one hour before backoff event expires.
+        second_retry_future_time = 3 + settings.DELIVERABILITY_THRESHOLD
+        fake_now_2 = fake_now_1 + timedelta(hours=second_retry_future_time)
+        with time_machine.travel(fake_now_2, tick=False):
+            # Check recipient's deliverability, deliverability shouldn't be
+            # proven.
+            handle_failing_emails()
+
+        email_backoff_exists = email_backoff_event.exists()
+        # Check if backoff event was not deleted
+        self.assertEqual(email_backoff_exists, True)
+
+        # Check if schedule_failed_email is not called
+        mock_schedule.assert_not_called()
+        # Backoff event checked continue as False
+        self.assertEqual(email_backoff_event[0].checked, None)
 
     def test_update_ban_object(self) -> None:
         """This test checks if an email ban object is updated when receiving
@@ -1229,11 +1492,7 @@ class CustomBackendEmailTest(TestCase):
         stored_email = EmailSent.objects.all()
         self.assertEqual(stored_email.count(), 0)
 
-    @mock.patch(
-        "cl.users.email_handlers.send_failed_email",
-        side_effect=lambda x: None,
-    )
-    def test_sending_email_within_back_off(self, mock_send_email) -> None:
+    def test_sending_email_within_back_off(self) -> None:
         """This test checks if an email address is under a backoff waiting
         period and we try to send it an email, the message is stored but
         not sent.
@@ -1554,13 +1813,7 @@ class CustomBackendEmailTest(TestCase):
         stored_email = EmailSent.objects.all()
         self.assertEqual(stored_email.count(), 0)
 
-    @mock.patch(
-        "cl.users.email_handlers.send_failed_email",
-        side_effect=lambda x: None,
-    )
-    def test_sending_multiple_recipients_within_backoff(
-        self, mock_send_email
-    ) -> None:
+    def test_sending_multiple_recipients_within_backoff(self) -> None:
         """When sending an email to multiple recipients, if we detect an email
         address that is under a backoff waiting period we should eliminate
         that address from the recipient list to avoid sending to it
@@ -1600,13 +1853,7 @@ class CustomBackendEmailTest(TestCase):
         stored_email = EmailSent.objects.all()
         self.assertEqual(stored_email.count(), 1)
 
-    @mock.patch(
-        "cl.users.email_handlers.send_failed_email",
-        side_effect=lambda x: None,
-    )
-    def test_sending_multiple_recipients_all_within_backoff(
-        self, mock_send_email
-    ) -> None:
+    def test_sending_multiple_recipients_all_within_backoff(self) -> None:
         """When sending an email to multiple recipients, if we detect that all
         email addresses are under a backoff waiting period we don't send the
         message, we should store the message.
@@ -1858,11 +2105,9 @@ class RetryFailedEmailTest(TestCase):
             open(
                 test_dir / "soft_bounce_msg_id.json", encoding="utf-8"
             ) as soft_bounce_with_id,
-            open(test_dir / "delivery.json", encoding="utf-8") as delivery,
         ):
             cls.soft_bounce_asset = json.load(soft_bounce)
             cls.soft_bounce_with_id_asset = json.load(soft_bounce_with_id)
-            cls.delivery_asset = json.load(delivery)
 
     def send_signal(self, test_asset, event_name, signal) -> None:
         """Function to dispatch signal that mocks a SNS notification event
@@ -1993,11 +2238,7 @@ class RetryFailedEmailTest(TestCase):
         self.assertEqual(message_sent.from_email, "testing@courtlistener.com")
         self.assertEqual(message_sent.to, ["anon_address@courtlistener.com"])
 
-    @mock.patch(
-        "cl.users.email_handlers.send_failed_email",
-        side_effect=lambda x: None,
-    )
-    def test_enqueue_email_backoff_event(self, mock_send_email) -> None:
+    def test_enqueue_email_backoff_event(self) -> None:
         """This test checks if an email is properly enqueued when the
         recipient's email address is under a backoff event waiting period and
         we send more messages to the user.
@@ -2065,15 +2306,83 @@ class RetryFailedEmailTest(TestCase):
         self.assertEqual(failed_email[0].status, STATUS_TYPES.WAITING)
         self.assertEqual(failed_email[0].stored_email.pk, stored_email[1].pk)
 
-    @mock.patch(
-        "cl.users.email_handlers.send_failed_email",
-        side_effect=lambda x: None,
-    )
-    def test_enqueue_email_soft_bounce(self, mock_send_email) -> None:
+    def test_enqueue_email_soft_bounce(self) -> None:
         """This test checks if we can queue a message properly after receiving
         a soft bounce notification.
         """
 
+        # Send a message
+        email = EmailMessage(
+            "This is the subject",
+            "Body goes here",
+            "testing@courtlistener.com",
+            ["bounce@simulator.amazonses.com"],
+        )
+        email.send()
+
+        email_2 = EmailMessage(
+            "This is the subject 2",
+            "Body goes here 2",
+            "testing@courtlistener.com",
+            ["bounce@simulator.amazonses.com"],
+        )
+        email_2.send()
+
+        # Emails are sent
+        self.assertEqual(len(mail.outbox), 2)
+        # Retrieve the stored messages and update its message_id for testing
+        stored_emails = list(EmailSent.objects.all())
+        stored_emails[0].message_id = "5e9b3e8e-93c8-497f-abd4-00f6ddd566f0"
+        stored_emails[0].save()
+
+        stored_emails[1].message_id = "6e9b3e8f-93c8-497f-abd4-00f6ddd566f1"
+        stored_emails[1].save()
+
+        self.assertEqual(
+            stored_emails[0].to, ["bounce@simulator.amazonses.com"]
+        )
+        self.assertEqual(
+            str(stored_emails[0].message_id),
+            "5e9b3e8e-93c8-497f-abd4-00f6ddd566f0",
+        )
+        self.assertEqual(
+            str(stored_emails[1].message_id),
+            "6e9b3e8f-93c8-497f-abd4-00f6ddd566f1",
+        )
+
+        # Create a backoff event for bounce@simulator.amazonses.com and
+        # Message ID: 5e9b3e8e-93c8-497f-abd4-00f6ddd566f0
+        self.send_signal(
+            self.soft_bounce_with_id_asset, "bounce", signals.bounce_received
+        )
+
+        # Check the soft bounce message related is queued
+        failed_email = FailedEmail.objects.all()
+        self.assertEqual(failed_email.count(), 1)
+
+        self.assertEqual(failed_email[0].status, STATUS_TYPES.ENQUEUED)
+        self.assertEqual(failed_email[0].stored_email.pk, stored_emails[0].pk)
+
+        # Send another bounce notification for the same recipient
+        # the related message has to be created as a WAITING status since we
+        # have already an ENQUEUED message.
+        # Message ID: 6e9b3e8f-93c8-497f-abd4-00f6ddd566f1
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
+
+        # Check the message is queued
+        failed_email = FailedEmail.objects.all()
+        self.assertEqual(failed_email.count(), 2)
+
+        failed_email = FailedEmail.objects.filter(status=STATUS_TYPES.WAITING)
+        self.assertEqual(failed_email[0].status, STATUS_TYPES.WAITING)
+        self.assertEqual(failed_email[0].stored_email.pk, stored_emails[1].pk)
+
+    def test_enqueue_email_soft_bounce_duplicates(self) -> None:
+        """This test checks if we receive a bounce event for the same message
+        two or more times, we avoid duplicating FailedEmail objects.
+        """
         # Send a message
         email = EmailMessage(
             "This is the subject",
@@ -2109,28 +2418,21 @@ class RetryFailedEmailTest(TestCase):
         self.assertEqual(failed_email[0].status, STATUS_TYPES.ENQUEUED)
         self.assertEqual(failed_email[0].stored_email.pk, stored_email.pk)
 
-        # Send another bounce notification for the same recipient
-        # the related message has to be created as a WAITING status since we
-        # have already an ENQUEUED message.
+        # Send another bounce notification for the same recipient and same
+        # message_id, the FailedEmail object shouldn't be duplicated
         self.send_signal(
             self.soft_bounce_with_id_asset, "bounce", signals.bounce_received
         )
 
-        # Check the message is queued
+        # If the message with the same ID has already been queued, avoid
+        # creating one more FailedEmail object.
         failed_email = FailedEmail.objects.all()
-        self.assertEqual(failed_email.count(), 2)
+        self.assertEqual(failed_email.count(), 1)
 
-        failed_email = FailedEmail.objects.filter(status=STATUS_TYPES.WAITING)
-        self.assertEqual(failed_email[0].status, STATUS_TYPES.WAITING)
-        self.assertEqual(failed_email[0].stored_email.pk, stored_email.pk)
-
-    @mock.patch(
-        "cl.users.email_handlers.send_failed_email",
-        side_effect=lambda x: None,
-    )
-    def test_enqueue_email_after_delivery(self, mock_send_email) -> None:
-        """This test checks if after a delivery notification, WAITING failed
-        messages are properly scheduled to retry them.
+    def test_enqueue_email_after_check_deliverability(self) -> None:
+        """This test checks if after a successful deliverability recipient's
+        check WAITING failed messages are properly scheduled to be retried. And
+        we can send it.
         """
 
         # Create a backoff event for bounce@simulator.amazonses.com
@@ -2144,7 +2446,6 @@ class RetryFailedEmailTest(TestCase):
             "testing@courtlistener.com",
             ["bounce@simulator.amazonses.com"],
         )
-
         email_1.send()
 
         email_2 = EmailMessage(
@@ -2153,7 +2454,6 @@ class RetryFailedEmailTest(TestCase):
             "testing@courtlistener.com",
             ["bounce@simulator.amazonses.com"],
         )
-
         email_2.send()
 
         email_3 = EmailMessage(
@@ -2162,7 +2462,6 @@ class RetryFailedEmailTest(TestCase):
             "testing@courtlistener.com",
             ["bounce@simulator.amazonses.com"],
         )
-
         email_3.send()
 
         # Messages are not sent
@@ -2176,126 +2475,66 @@ class RetryFailedEmailTest(TestCase):
         )
 
         # Messages are queued, one in ENQUEUED status and two in WAITING.
-        failed_email = FailedEmail.objects.filter(status=STATUS_TYPES.ENQUEUED)
-        self.assertEqual(failed_email.count(), 1)
-        self.assertEqual(failed_email[0].status, STATUS_TYPES.ENQUEUED)
-        self.assertEqual(failed_email[0].stored_email.pk, stored_email[0].pk)
-        failed_email = FailedEmail.objects.filter(status=STATUS_TYPES.WAITING)
-        self.assertEqual(failed_email.count(), 2)
-
-        # Trigger a delivery event
-        self.send_signal(
-            self.delivery_asset, "delivery", signals.delivery_received
+        failed_email_enqueued = FailedEmail.objects.filter(
+            status=STATUS_TYPES.ENQUEUED
         )
-
-        # After the delivery notification the failed messages under WAITING status
-        # were scheduled, now under ENQUEUED_DELIVERY status
-        failed_email = FailedEmail.objects.filter(status=STATUS_TYPES.ENQUEUED)
-        self.assertEqual(failed_email.count(), 1)
-
-        failed_email = FailedEmail.objects.filter(
-            status=STATUS_TYPES.ENQUEUED_DELIVERY
+        self.assertEqual(failed_email_enqueued.count(), 1)
+        self.assertEqual(
+            failed_email_enqueued[0].status, STATUS_TYPES.ENQUEUED
         )
-        self.assertEqual(failed_email.count(), 2)
-
-    @mock.patch(
-        "cl.users.email_handlers.send_failed_email",
-        side_effect=lambda x: None,
-    )
-    def test_delete_failed_task_objects(self, mock_send_email) -> None:
-        """This test checks if delete_failed_tasks_objects function works
-        properly. We shouldn't eliminate objects whose next_retry_date is ahead
-        but the ones that are behind (those whose tasks have failed)
-        """
-
-        # Send a message and update its message_id
-        email = EmailMessage(
-            "This is the subject",
-            "Body goes here",
-            "testing@courtlistener.com",
-            ["bounce@simulator.amazonses.com"],
+        self.assertEqual(
+            failed_email_enqueued[0].stored_email.pk, stored_email[0].pk
         )
-        email.send()
-        # Retrieve stored email and update message_id for testing
-        stored_email = EmailSent.objects.all()[0]
-        stored_email.message_id = "5e9b3e8e-93c8-497f-abd4-00f6ddd566f0"
-        stored_email.save()
-
-        # Create a backoff event for bounce@simulator.amazonses.com and
-        # Message ID: 5e9b3e8e-93c8-497f-abd4-00f6ddd566f0
-        self.send_signal(
-            self.soft_bounce_with_id_asset, "bounce", signals.bounce_received
+        failed_email_waiting = FailedEmail.objects.filter(
+            status=STATUS_TYPES.WAITING
         )
+        self.assertEqual(failed_email_waiting.count(), 2)
 
-        # Here we should have an ENQUEUE FailedEmail object.
-        failed_email = FailedEmail.objects.all()
-        self.assertEqual(failed_email.count(), 1)
-        self.assertEqual(failed_email[0].status, STATUS_TYPES.ENQUEUED)
+        # Fake time 30 minutes after ENQUEUED FailedEmail was created
+        fake_now_1 = now() + timedelta(minutes=30)
+        with time_machine.travel(fake_now_1, tick=False):
+            # Check recipient's deliverability and send failed emails
+            handle_failing_emails()
 
-        # Update next_retry_date to expire waiting time, simulating is going to
-        # expire soon.
-        EmailFlag.objects.filter(
-            email_address="bounce@simulator.amazonses.com",
-            flag_type=FLAG_TYPES.BACKOFF,
-        ).update(next_retry_date=now() + timedelta(minutes=1))
+        # After the deliverability check/send failed email, no new FailedEmail
+        # is enqueued for delivery or sent since it's not time for it.
+        self.assertEqual(failed_email_enqueued.count(), 1)
+        self.assertEqual(failed_email_waiting.count(), 2)
+        self.assertEqual(len(mail.outbox), 0)
 
-        # The recipient is under a backoff event waiting period, so if we try
-        # to send two more messages they are going to fail and create two
-        # WAITING FailedEmail objects.
-        email_1 = EmailMessage(
-            "This is the subject",
-            "Body goes here",
-            "testing@courtlistener.com",
-            ["bounce@simulator.amazonses.com"],
+        # Fake time, 1 hour before meeting the DELIVERABILITY_THRESHOLD time
+        first_retry_future_time = 1 + settings.DELIVERABILITY_THRESHOLD
+        fake_now_2 = now() + timedelta(hours=first_retry_future_time)
+        with time_machine.travel(fake_now_2, tick=False):
+            # Check recipient's deliverability and send failed emails
+            handle_failing_emails()
+
+        # After the deliverability check/send failed email, no new FailedEmail
+        # are enqueued for delivery since it's not time for it. Only the
+        # ENQUEUED FailedEmai is sent and marked as SUCCESSFUL.
+        failed_email_successful = FailedEmail.objects.filter(
+            status=STATUS_TYPES.SUCCESSFUL
         )
+        # 1 FailedEmail now in SUCCESSFUL status
+        self.assertEqual(failed_email_successful.count(), 1)
+        # 1 FailedEmail is sent.
+        self.assertEqual(len(mail.outbox), 1)
+        # 2 FailedEmails continue in WAITING status
+        self.assertEqual(failed_email_waiting.count(), 2)
 
-        email_1.send()
+        # Fake time, meeting the DELIVERABILITY_THRESHOLD time
+        first_retry_future_time = 2 + settings.DELIVERABILITY_THRESHOLD
+        fake_now_3 = now() + timedelta(hours=first_retry_future_time)
+        with time_machine.travel(fake_now_3, tick=False):
+            # Check recipient's deliverability and send failed emails
+            handle_failing_emails()
 
-        email_2 = EmailMessage(
-            "This is the subject 2",
-            "Body goes here 2",
-            "testing@courtlistener.com",
-            ["bounce@simulator.amazonses.com"],
-        )
+        # After the deliverability check/send failed email, WAITING FailedEmail
+        # are ENQUEUED_DELIVERY, sent them and marked as SUCCESSFUL.
+        self.assertEqual(failed_email_successful.count(), 3)
+        self.assertEqual(len(mail.outbox), 3)
 
-        email_2.send()
-        failed_email = FailedEmail.objects.filter(status=STATUS_TYPES.WAITING)
-        self.assertEqual(failed_email.count(), 2)
-
-        # Trigger two delivery notifications to confirm that ENQUEUED_DELIVERY
-        # failed messages are not deleted.
-        self.send_signal(
-            self.delivery_asset, "delivery", signals.delivery_received
-        )
-        self.send_signal(
-            self.delivery_asset, "delivery", signals.delivery_received
-        )
-        # We should have 3 FailedEmail objects now.
-        failed_email = FailedEmail.objects.filter(status=STATUS_TYPES.ENQUEUED)
-        self.assertEqual(failed_email.count(), 1)
-        failed_email = FailedEmail.objects.filter(
-            status=STATUS_TYPES.ENQUEUED_DELIVERY
-        )
-        self.assertEqual(failed_email.count(), 2)
-
-        # Now simulate that the celery tasks of previous FailedEmail objects
-        # failed, set that they failed 35 minutes ago.
-        FailedEmail.objects.all().update(
-            next_retry_date=now() - timedelta(minutes=35)
-        )
-        # Trigger a new delivery notification
-        self.send_signal(
-            self.delivery_asset, "delivery", signals.delivery_received
-        )
-        # Failed objects are eliminated.
-        failed_email = FailedEmail.objects.all()
-        self.assertEqual(failed_email.count(), 0)
-
-    @mock.patch(
-        "cl.users.email_handlers.send_failed_email",
-        side_effect=lambda x: None,
-    )
-    def test_retry_datetime(self, mock_send_email) -> None:
+    def test_retry_datetime(self) -> None:
         """This test checks that retry times are properly computed."""
 
         # Send a message
@@ -2361,36 +2600,37 @@ class RetryFailedEmailTest(TestCase):
 
         failed_email = FailedEmail.objects.filter(status=STATUS_TYPES.WAITING)
         self.assertEqual(failed_email.count(), 3)
-        now_time = now()
-        # Trigger a delivery notification.
-        self.send_signal(
-            self.delivery_asset, "delivery", signals.delivery_received
-        )
+
+        # Fake time DELIVERABILITY_THRESHOLD hours after backoff event expires
+        first_retry_future_time = 2 + settings.DELIVERABILITY_THRESHOLD
+        fake_now_1 = now() + timedelta(hours=first_retry_future_time)
+        with time_machine.travel(fake_now_1, tick=False):
+            # Check recipient's deliverability and send failed emails
+            handle_failing_emails()
+            fake_now_time = now()
 
         # WAITING FailedEmail objects were scheduled with
-        # ENQUEUED_DELIVERY status
+        # ENQUEUED_DELIVERY status and then sent, now in SUCCESSFUL status
         failed_email = FailedEmail.objects.filter(
-            status=STATUS_TYPES.ENQUEUED_DELIVERY
+            status=STATUS_TYPES.SUCCESSFUL
         ).order_by("next_retry_date")
-        self.assertEqual(failed_email.count(), 3)
+        self.assertEqual(failed_email.count(), 4)
 
-        # Failed messages after a delivery notification should be scheduled to
-        # send one message per minute, one after the other.
-        expected_datetime_1 = now_time + timedelta(milliseconds=60_000)
-        expected_datetime_2 = now_time + timedelta(milliseconds=120_000)
-        expected_datetime_3 = now_time + timedelta(milliseconds=180_000)
+        # Failed messages after a successful deliverability recipient's check
+        # should be granted to be sent from now()
+        expected_datetime = fake_now_time
 
-        self.assertEqual(
-            failed_email[0].next_retry_date.strftime("%Y-%m-%d %H:%M:%S"),
-            expected_datetime_1.strftime("%Y-%m-%d %H:%M:%S"),
-        )
         self.assertEqual(
             failed_email[1].next_retry_date.strftime("%Y-%m-%d %H:%M:%S"),
-            expected_datetime_2.strftime("%Y-%m-%d %H:%M:%S"),
+            expected_datetime.strftime("%Y-%m-%d %H:%M:%S"),
         )
         self.assertEqual(
             failed_email[2].next_retry_date.strftime("%Y-%m-%d %H:%M:%S"),
-            expected_datetime_3.strftime("%Y-%m-%d %H:%M:%S"),
+            expected_datetime.strftime("%Y-%m-%d %H:%M:%S"),
+        )
+        self.assertEqual(
+            failed_email[3].next_retry_date.strftime("%Y-%m-%d %H:%M:%S"),
+            expected_datetime.strftime("%Y-%m-%d %H:%M:%S"),
         )
 
 
@@ -2403,7 +2643,6 @@ class EmailBrokenTest(TestCase):
                 test_dir / "hard_bounce.json", encoding="utf-8"
             ) as hard_bounce,
             open(test_dir / "complaint.json", encoding="utf-8") as complaint,
-            open(test_dir / "delivery.json", encoding="utf-8") as delivery,
             open(
                 test_dir / "mail_box_full_soft_bounce.json", encoding="utf-8"
             ) as mail_box_full_soft_bounce,
@@ -2416,7 +2655,6 @@ class EmailBrokenTest(TestCase):
         ):
             cls.hard_bounce_asset = json.load(hard_bounce)
             cls.complaint_asset = json.load(complaint)
-            cls.delivery_asset = json.load(delivery)
             cls.no_email_hard_bounce_asset = json.load(no_email_hard_bounce)
             cls.mail_box_full_soft_bounce_asset = json.load(
                 mail_box_full_soft_bounce
@@ -2623,8 +2861,8 @@ class EmailBrokenTest(TestCase):
         # The broken email banner is gone
         self.assertEqual(r.context.get("EMAIL_BAN_REASON"), None)
 
-    def test_broken_email_banner_delivery(self) -> None:
-        """This test checks if a delivery notification properly deactivate a
+    def test_broken_email_banner_backoff_expired(self) -> None:
+        """This test checks if once a backoff event expires it deactivates the
         Transient broken email banner.
         """
 
@@ -2633,7 +2871,7 @@ class EmailBrokenTest(TestCase):
         user.email = "bounce@simulator.amazonses.com"
         user.password = make_password("password")
         user.save()
-        login = self.client.login(username=user.username, password="password")
+        self.client.login(username=user.username, password="password")
         r = self.client.get(path)
         self.assertEqual(r.context.get("EMAIL_BAN_REASON"), None)
 
@@ -2655,12 +2893,9 @@ class EmailBrokenTest(TestCase):
         self.assertEqual(r.context.get("EMAIL_BAN_PERMANENT"), False)
         self.assertNotEqual(r.context.get("EMAIL_BAN_REASON"), None)
 
-        # Trigger a delivery event
-        self.send_signal(
-            self.delivery_asset, "delivery", signals.delivery_received
-        )
-        # Delivery event eliminates the backoff event
-        self.assertEqual(backoff_event.count(), 0)
+        # Update next_retry_date two hours behind to simulate backoff event is
+        # expired
+        backoff_event.update(next_retry_date=now() - timedelta(hours=2))
 
         r = self.client.get(path)
         # The broken email banner is gone
@@ -2745,3 +2980,257 @@ class MoosendTest(TestCase):
                 action,
                 self.email,
             )
+
+
+class WebhooksHTMXTests(APITestCase):
+    """Check that API CRUD operations are working well for search webhooks."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user_1 = UserFactory()
+        cls.user_2 = UserFactory()
+
+    def setUp(self) -> None:
+        self.webhook_path = reverse("webhooks-list")
+        self.client = make_client(self.user_1.pk)
+        self.client_2 = make_client(self.user_2.pk)
+
+    def tearDown(cls):
+        Webhook.objects.all().delete()
+
+    def make_a_webhook(
+        self,
+        client,
+        url="https://example.com",
+        event_type=WebhookEventType.DOCKET_ALERT,
+        enabled=True,
+    ):
+        data = {
+            "url": url,
+            "event_type": event_type,
+            "enabled": enabled,
+        }
+        return client.post(self.webhook_path, data)
+
+    def test_make_an_webhook(self) -> None:
+        """Can we make a webhook?"""
+
+        # Make a webhook
+        webhooks = Webhook.objects.all()
+        response = self.make_a_webhook(self.client)
+        self.assertEqual(webhooks.count(), 1)
+        self.assertEqual(response.status_code, HTTP_201_CREATED)
+
+        # New or updated webhook notification for admins should go out
+        self.assertEqual(len(mail.outbox), 1)
+        message_sent = mail.outbox[0]
+        self.assertIn("A webhook was created", message_sent.subject)
+
+    def test_make_an_http_webhook_fails(self) -> None:
+        """Can we avoid creating an HTTP webhook endpoint?"""
+
+        # Make a webhook
+        webhooks = Webhook.objects.all()
+        response = self.make_a_webhook(self.client, url="http://example.com")
+        # No webhook should be created since we don't allow HTTP endpoints.
+        self.assertEqual(webhooks.count(), 0)
+        self.assertEqual(response.status_code, HTTP_200_OK)
+
+    def test_list_users_webhooks(self) -> None:
+        """Can we list user's own webhooks?"""
+
+        # Make a webhook for user_1
+        self.make_a_webhook(self.client)
+
+        webhook_path_list = reverse(
+            "webhooks-list",
+            kwargs={"format": "html"},
+        )
+        # Get the webhooks for user_1
+        response = self.client.get(webhook_path_list)
+        self.assertEqual(response.status_code, HTTP_200_OK)
+
+    def test_delete_webhook(self) -> None:
+        """Can we delete a webhook?
+        Avoid users from deleting other users' webhooks.
+        """
+
+        # Make two webhooks for user_1
+        self.make_a_webhook(
+            self.client, event_type=WebhookEventType.DOCKET_ALERT
+        )
+        self.make_a_webhook(
+            self.client, event_type=WebhookEventType.SEARCH_ALERT
+        )
+
+        webhooks = Webhook.objects.all()
+        self.assertEqual(webhooks.count(), 2)
+
+        webhook_1_path_detail = reverse(
+            "webhooks-detail",
+            kwargs={"pk": webhooks[0].pk, "format": "json"},
+        )
+
+        # Delete the webhook for user_1
+        response = self.client.delete(webhook_1_path_detail)
+        self.assertEqual(response.status_code, HTTP_204_NO_CONTENT)
+        self.assertEqual(webhooks.count(), 1)
+
+        webhook_2_path_detail = reverse(
+            "webhooks-detail",
+            kwargs={"pk": webhooks[0].pk, "format": "json"},
+        )
+
+        # user_2 tries to delete a user_1 webhook, it should fail
+        response = self.client_2.delete(webhook_2_path_detail)
+        self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
+        self.assertEqual(webhooks.count(), 1)
+
+    def test_webhook_detail(self) -> None:
+        """Can we get the details of a webhook?
+        Avoid users from getting other users' webhooks.
+        """
+
+        # Make one webhook for user_1
+        self.make_a_webhook(self.client)
+        webhooks = Webhook.objects.all()
+        self.assertEqual(webhooks.count(), 1)
+        webhook_1_path_detail = reverse(
+            "webhooks-detail",
+            kwargs={"pk": webhooks[0].pk, "format": "html"},
+        )
+
+        # Get the webhook detail for user_1
+        response = self.client.get(webhook_1_path_detail)
+        self.assertEqual(response.status_code, HTTP_200_OK)
+
+        # user_2 tries to get user_1 webhook, it should fail
+        response = self.client_2.get(webhook_1_path_detail)
+        self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
+
+    def test_webhook_update(self) -> None:
+        """Can we update a webhook?"""
+
+        # Make one webhook for user_1
+        self.make_a_webhook(self.client)
+        webhooks = Webhook.objects.all()
+        self.assertEqual(webhooks.count(), 1)
+
+        # New or updated webhook notification for admins should go out
+        self.assertEqual(len(mail.outbox), 1)
+        message_sent = mail.outbox[0]
+        self.assertIn("A webhook was created", message_sent.subject)
+
+        webhook_1_path_detail = reverse(
+            "webhooks-detail",
+            kwargs={"pk": webhooks[0].pk, "format": "json"},
+        )
+
+        # Update the webhook
+        data_updated = {
+            "url": "https://example.com/updated",
+            "event_type": webhooks[0].event_type,
+            "enabled": webhooks[0].enabled,
+        }
+        response = self.client.put(webhook_1_path_detail, data_updated)
+
+        # Check that the webhook was updated
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(webhooks[0].url, "https://example.com/updated")
+
+        # New or updated webhook notification for admins should go out
+        self.assertEqual(len(mail.outbox), 2)
+        message_sent = mail.outbox[1]
+        self.assertIn("A webhook was updated", message_sent.subject)
+
+    def test_send_webhook_test(self) -> None:
+        """Can we send a test webhook event?"""
+
+        # Make one webhook for user_1
+        self.make_a_webhook(self.client)
+        webhooks = Webhook.objects.all()
+        self.assertEqual(webhooks.count(), 1)
+
+        webhook_1_path_test = reverse(
+            "webhooks-test-webhook",
+            kwargs={"pk": webhooks[0].pk, "format": "json"},
+        )
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockPostResponse(
+                200, mock_raw=True
+            ),
+        ):
+            response = self.client.post(webhook_1_path_test, {})
+        # Compare the test webhook event data.
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        webhook_event = WebhookEvent.objects.all().order_by("date_created")
+        self.assertEqual(webhook_event[0].status_code, HTTP_200_OK)
+        self.assertEqual(webhook_event[0].debug, True)
+        self.assertEqual(
+            webhook_event[0].content["payload"]["results"][0]["id"], 2208776613
+        )
+
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockPostResponse(
+                500, mock_raw=True
+            ),
+        ):
+            response = self.client.post(webhook_1_path_test, {})
+        # Compare the test webhook event data.
+        self.assertEqual(len(webhook_event), 2)
+        self.assertEqual(
+            webhook_event[1].status_code, HTTP_500_INTERNAL_SERVER_ERROR
+        )
+        self.assertEqual(webhook_event[1].debug, True)
+        self.assertEqual(
+            webhook_event[1].content["payload"]["results"][0]["id"], 2208776613
+        )
+        # Webhook failure count shouldn't be increased by a webhook test event
+        self.assertEqual(webhook_event[1].webhook.failure_count, 0)
+
+    def test_list_webhook_events(self) -> None:
+        """Can we list the user's webhook events?"""
+
+        da_webhook = WebhookFactory(
+            user=self.user_2,
+            event_type=WebhookEventType.DOCKET_ALERT,
+            url="https://example.com/",
+            enabled=True,
+        )
+        WebhookEventFactory(
+            webhook=da_webhook,
+        )
+
+        webhook_event_path_list = reverse(
+            "webhook_events-list",
+            kwargs={"format": "html"},
+        )
+
+        webhooks = Webhook.objects.all()
+        self.assertEqual(webhooks.count(), 1)
+
+        # Get the webhooks for user_1
+        response = self.client.get(webhook_event_path_list)
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        # There shouldn't be results for user_1
+        self.assertEqual(response.content, b"\n\n")
+
+        sa_webhook = WebhookFactory(
+            user=self.user_1,
+            event_type=WebhookEventType.SEARCH_ALERT,
+            url="https://example.com/",
+            enabled=True,
+        )
+        WebhookEventFactory(
+            webhook=sa_webhook,
+        )
+
+        self.assertEqual(webhooks.count(), 2)
+
+        # Get the webhooks for user_1
+        response = self.client.get(webhook_event_path_list)
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        # There should be results for user_1
+        self.assertNotEqual(response.content, b"\n\n")

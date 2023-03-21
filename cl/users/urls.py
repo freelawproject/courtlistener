@@ -1,13 +1,24 @@
-from django.conf import settings
 from django.contrib.auth import views as auth_views
-from django.urls import path, re_path
+from django.urls import include, path, re_path
 from django.views.generic import RedirectView
 from django_ses.views import SESEventWebhookView
+from rest_framework.routers import DefaultRouter
 
 from cl.lib.AuthenticationBackend import ConfirmedEmailAuthenticationForm
 from cl.lib.ratelimiter import ratelimiter_unsafe_10_per_m
+from cl.users import api_views as user_views
 from cl.users import views
 from cl.users.forms import CustomPasswordResetForm, CustomSetPasswordForm
+
+router = DefaultRouter()
+
+# Webhooks
+router.register(r"webhooks", user_views.WebhooksViewSet, basename="webhooks")
+router.register(
+    r"webhook-events",
+    user_views.WebhookEventViewSet,
+    basename="webhook_events",
+)
 
 urlpatterns = [
     # Sign in/out and password pages
@@ -81,8 +92,18 @@ urlpatterns = [
     # Profile pages
     path("profile/settings/", views.view_settings, name="view_settings"),
     path("profile/", RedirectView.as_view(pattern_name="view_settings")),
-    path("profile/favorites/", views.view_favorites, name="profile_favorites"),
-    path("profile/alerts/", views.view_alerts, name="profile_alerts"),
+    path("profile/notes/", views.view_notes, name="profile_notes"),
+    # Redirect old favorites to notes (2023-01-20)
+    path(
+        "profile/favorites/",
+        RedirectView.as_view(pattern_name="profile_notes", permanent=True),
+    ),
+    path("profile/alerts/", views.view_search_alerts, name="profile_alerts"),
+    path(
+        "profile/docket-alerts/",
+        views.view_docket_alerts,
+        name="profile_docket_alerts",
+    ),
     path(
         "profile/visualizations/",
         views.view_visualizations,
@@ -94,10 +115,33 @@ urlpatterns = [
         name="view_deleted_visualizations",
     ),
     path("profile/api/", views.view_api, name="view_api"),
+    path("profile/api-token/", views.view_api_token, name="view_api_token"),
+    path("profile/api-usage/", views.view_api_usage, name="view_api_usage"),
+    path("profile/webhooks/", views.view_webhooks, name="view_webhooks"),
+    re_path(
+        "profile/webhooks/(logs|test-logs)/",
+        views.view_webhook_logs,
+        name="view_webhook_logs",
+    ),
+    path(
+        "profile/webhooks/event/<int:pk>/",
+        views.view_webhook_logs_detail,
+        name="view_webhook_logs_detail",
+    ),
+    path(
+        "profile/auto_subscribe/toggle/",
+        views.toggle_recap_email_auto_subscription,
+        name="toggle_recap_email_auto_subscription",
+    ),
     path(
         "profile/password/change/",
         views.password_change,
         name="password_change",
+    ),
+    path(
+        "profile/recap-dot-email/",
+        views.view_recap_email,
+        name="view_recap_email",
     ),
     path("profile/delete/", views.delete_account, name="delete_account"),
     path(
@@ -143,4 +187,5 @@ urlpatterns = [
         SESEventWebhookView.as_view(),
         name="handle_ses_webhook",
     ),
+    re_path(r"^api/htmx/", include(router.urls)),
 ]

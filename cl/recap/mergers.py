@@ -2,7 +2,7 @@
 import logging
 import re
 from copy import deepcopy
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from django.core.exceptions import ValidationError
@@ -11,12 +11,12 @@ from django.db import IntegrityError, OperationalError, transaction
 from django.db.models import Prefetch, Q, QuerySet
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
-from juriscraper.pacer import AttachmentPage
+from juriscraper.pacer import AppellateAttachmentPage, AttachmentPage
 
 from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.lib.decorators import retry
 from cl.lib.filesizes import convert_size_to_bytes
-from cl.lib.model_helpers import make_docket_number_core
+from cl.lib.model_helpers import clean_docket_number, make_docket_number_core
 from cl.lib.pacer import (
     get_blocked_status,
     map_cl_to_pacer_id,
@@ -25,6 +25,7 @@ from cl.lib.pacer import (
     normalize_attorney_role,
 )
 from cl.lib.privacy_tools import anonymize
+from cl.lib.timezone_helpers import localize_date_and_time
 from cl.lib.utils import previous_and_next, remove_duplicate_dicts
 from cl.people_db.lookup_utils import lookup_judge_by_full_name_and_set_attr
 from cl.people_db.models import (
@@ -61,9 +62,27 @@ logger = logging.getLogger(__name__)
 cnt = CaseNameTweaker()
 
 
+def confirm_docket_number_core_lookup_match(
+    docket: Docket,
+    docket_number: str,
+) -> Docket | None:
+    """Confirm if the docket_number_core lookup match returns the right docket
+    by confirming the docket_number also matches.
+
+    :param docket: The docket matched by the lookup
+    :param docket_number: The incoming docket_number to lookup.
+    :return: The docket object if both dockets matched or otherwise None.
+    """
+    existing_docket_number = clean_docket_number(docket.docket_number)
+    incoming_docket_number = clean_docket_number(docket_number)
+    if existing_docket_number != incoming_docket_number:
+        return None
+    return docket
+
+
 def find_docket_object(
     court_id: str,
-    pacer_case_id: str,
+    pacer_case_id: str | None,
     docket_number: str,
     using: str = "default",
 ) -> Docket:
@@ -80,26 +99,38 @@ def find_docket_object(
     # pacer_case_id is required for Docket and Docket History uploads.
     d = None
     docket_number_core = make_docket_number_core(docket_number)
-    lookups = [
-        {
-            "pacer_case_id": pacer_case_id,
-            "docket_number_core": docket_number_core,
-        },
-        {"pacer_case_id": pacer_case_id},
-    ]
+    lookups = []
+    if pacer_case_id:
+        # Appellate RSS feeds don't contain a pacer_case_id, avoid lookups by
+        # blank pacer_case_id values.
+        lookups = [
+            {
+                "pacer_case_id": pacer_case_id,
+                "docket_number_core": docket_number_core,
+            },
+            {"pacer_case_id": pacer_case_id},
+        ]
     if docket_number_core:
         # Sometimes we don't know how to make core docket numbers. If that's
         # the case, we will have a blank value for the field. We must not do
         # lookups by blank values. See: freelawproject/courtlistener#1531
-        lookups.append(
-            {"pacer_case_id": None, "docket_number_core": docket_number_core},
+        lookups.extend(
+            [
+                {
+                    "pacer_case_id": None,
+                    "docket_number_core": docket_number_core,
+                },
+                {"docket_number_core": docket_number_core},
+            ]
         )
     else:
         # Finally, as a last resort, we can try the docket number. It might not
-        # match b/c of punctuation or whatever, but we can try.
-        lookups.append(
-            {"pacer_case_id": None, "docket_number": docket_number},
-        )
+        # match b/c of punctuation or whatever, but we can try. Avoid lookups
+        # by blank docket_number values.
+        if docket_number:
+            lookups.append(
+                {"pacer_case_id": None, "docket_number": docket_number},
+            )
 
     for kwargs in lookups:
         ds = Docket.objects.filter(court_id=court_id, **kwargs).using(using)
@@ -108,12 +139,21 @@ def find_docket_object(
             continue  # Try a looser lookup.
         if count == 1:
             d = ds[0]
-            break  # Nailed it!
+            if kwargs.get("pacer_case_id") is None and kwargs.get(
+                "docket_number_core"
+            ):
+                d = confirm_docket_number_core_lookup_match(d, docket_number)
+            if d:
+                break  # Nailed it!
         elif count > 1:
             # Choose the oldest one and live with it.
             d = ds.earliest("date_created")
-            break
-
+            if kwargs.get("pacer_case_id") is None and kwargs.get(
+                "docket_number_core"
+            ):
+                d = confirm_docket_number_core_lookup_match(d, docket_number)
+            if d:
+                break
     if d is None:
         # Couldn't find a docket. Return a new one.
         return Docket(
@@ -392,7 +432,7 @@ def get_order_of_docket(docket_entries):
     for _, de, nxt in previous_and_next(docket_entries):
         try:
             current_num = int(de["document_number"])
-            nxt_num = int(de["document_number"])
+            nxt_num = int(nxt["document_number"])
         except (TypeError, ValueError):
             # One or the other can't be cast to an int. Continue until we have
             # two consecutive ints we can compare.
@@ -409,26 +449,24 @@ def get_order_of_docket(docket_entries):
     return order
 
 
-def make_recap_sequence_number(de):
+def make_recap_sequence_number(
+    date_filed: date, recap_sequence_index: int
+) -> str:
     """Make a sequence number using a date and index.
 
-    :param de: A docket entry provided as either a Juriscraper dict or
-    DocketEntry object. Regardless of which is provided, there must be a
-    key/attribute named recap_sequence_index, which will be used to populate
-    the returned sequence number.
-    :return a str to use as the recap_sequence_number
+    :param date_filed: The entry date_filed used to make the sequence number.
+    :param recap_sequence_index: This index will be used to populate the
+    returned sequence number.
+    :return: A str to use as the recap_sequence_number
     """
     template = "%s.%03d"
-    if type(de) == dict:
-        return template % (
-            de["date_filed"].isoformat(),
-            de["recap_sequence_index"],
-        )
-    elif isinstance(de, DocketEntry):
-        return template % (de.date_filed.isoformat(), de.recap_sequence_index)
+    return template % (
+        date_filed.isoformat(),
+        recap_sequence_index,
+    )
 
 
-def calculate_recap_sequence_numbers(docket_entries):
+def calculate_recap_sequence_numbers(docket_entries: list, court_id: str):
     """Figure out the RECAP sequence number values for docket entries
     returned by a parser.
 
@@ -450,6 +488,8 @@ def calculate_recap_sequence_numbers(docket_entries):
 
     :param docket_entries: A list of docket entry dicts from juriscraper or
     another parser containing information about docket entries for a docket
+    :param court_id: The court id to which docket entries belong, used for
+    timezone conversion.
     :return None, but sets the recap_sequence_number for all items.
     """
     # Determine the sort order of the docket entries and normalize it
@@ -459,17 +499,29 @@ def calculate_recap_sequence_numbers(docket_entries):
 
     # Assign sequence numbers
     for prev, de, _ in previous_and_next(docket_entries):
-        if prev is not None and de["date_filed"] == prev["date_filed"]:
+        current_date_filed, current_time_filed = localize_date_and_time(
+            court_id, de["date_filed"]
+        )
+        prev_date_filed = None
+        if prev is not None:
+            prev_date_filed, prev_time_filed = localize_date_and_time(
+                court_id, prev["date_filed"]
+            )
+        if prev is not None and current_date_filed == prev_date_filed:
             # Previous item has same date. Increment the sequence number.
             de["recap_sequence_index"] = prev["recap_sequence_index"] + 1
-            de["recap_sequence_number"] = make_recap_sequence_number(de)
+            de["recap_sequence_number"] = make_recap_sequence_number(
+                current_date_filed, de["recap_sequence_index"]
+            )
             continue
         else:
             # prev is None --> First item on the list; OR
             # current is different than previous --> Changed date.
             # Take same action: Reset the index & assign it.
             de["recap_sequence_index"] = 1
-            de["recap_sequence_number"] = make_recap_sequence_number(de)
+            de["recap_sequence_number"] = make_recap_sequence_number(
+                current_date_filed, de["recap_sequence_index"]
+            )
             continue
 
     # Cleanup
@@ -531,18 +583,28 @@ def get_or_make_docket_entry(d, docket_entry):
      - None is returned when things fail.
     """
     if docket_entry["document_number"]:
-        try:
-            de, de_created = DocketEntry.objects.get_or_create(
-                docket=d, entry_number=docket_entry["document_number"]
-            )
-        except DocketEntry.MultipleObjectsReturned:
-            logger.error(
-                "Multiple docket entries found for document "
-                "entry number '%s' while processing '%s'",
-                docket_entry["document_number"],
-                d,
-            )
-            return None
+        with transaction.atomic():
+            # In order to create a lock, we need to retrieve the docket using
+            # select_for_update
+            docket = Docket.objects.select_for_update().get(pk=d.pk)
+            try:
+                de = DocketEntry.objects.get(
+                    docket=docket, entry_number=docket_entry["document_number"]
+                )
+                de_created = False
+            except DocketEntry.DoesNotExist:
+                de = DocketEntry.objects.create(
+                    docket=docket, entry_number=docket_entry["document_number"]
+                )
+                de_created = True
+            except DocketEntry.MultipleObjectsReturned:
+                logger.error(
+                    "Multiple docket entries found for document "
+                    "entry number '%s' while processing '%s'",
+                    docket_entry["document_number"],
+                    d,
+                )
+                return None
     else:
         # Unnumbered entry. The only thing we can be sure we have is a
         # date. Try to find it by date and description (short or long)
@@ -584,22 +646,28 @@ def get_or_make_docket_entry(d, docket_entry):
     return de, de_created
 
 
-def add_docket_entries(d, docket_entries, tags=None):
+def add_docket_entries(
+    d, docket_entries, tags=None, do_not_update_existing=False
+):
     """Update or create the docket entries and documents.
 
     :param d: The docket object to add things to and use for lookups.
     :param docket_entries: A list of dicts containing docket entry data.
     :param tags: A list of tag objects to apply to the recap documents and
     docket entries created or updated in this function.
-    :returns tuple of a list of RECAPDocument objects created and whether the
+    :param do_not_update_existing: Whether docket entries should only be created and avoid
+    updating an existing one.
+    :returns tuple of a list of created or existing
+    DocketEntry objects,  a list of RECAPDocument objects created, whether
     any docket entry was created.
     """
     # Remove items without a date filed value.
     docket_entries = [de for de in docket_entries if de.get("date_filed")]
 
     rds_created = []
+    des_returned = []
     content_updated = False
-    calculate_recap_sequence_numbers(docket_entries)
+    calculate_recap_sequence_numbers(docket_entries, d.court_id)
     known_filing_dates = [d.date_last_filing]
     for docket_entry in docket_entries:
         response = get_or_make_docket_entry(d, docket_entry)
@@ -609,19 +677,24 @@ def add_docket_entries(d, docket_entries, tags=None):
             de, de_created = response[0], response[1]
 
         de.description = docket_entry["description"] or de.description
-        date_filed = docket_entry["date_filed"]
-        if isinstance(date_filed, datetime):
-            # For now we do dumb date conversion. This simply returns a date
-            # object with the same year, month, and day, ignoring time and
-            # timezones. Once the DB is upgraded to support timezones, we can
-            # do better.
-            date_filed = date_filed.date()
-
-        de.date_filed = date_filed or de.date_filed
+        date_filed, time_filed = localize_date_and_time(
+            de.docket.court.pk, docket_entry["date_filed"]
+        )
+        if not time_filed:
+            # If not time data is available, compare if date_filed changed if
+            # so restart time_filed to None, otherwise keep the current time.
+            if de.date_filed != docket_entry["date_filed"]:
+                de.time_filed = None
+        else:
+            de.time_filed = time_filed
+        de.date_filed = date_filed
         de.pacer_sequence_number = (
             docket_entry.get("pacer_seq_no") or de.pacer_sequence_number
         )
         de.recap_sequence_number = docket_entry["recap_sequence_number"]
+        des_returned.append(de)
+        if do_not_update_existing and not de_created:
+            return des_returned, rds_created, content_updated
         de.save()
         if tags:
             for tag in tags:
@@ -652,6 +725,29 @@ def add_docket_entries(d, docket_entries, tags=None):
         else:
             params["document_type"] = RECAPDocument.PACER_DOCUMENT
 
+        appellate_court_ids = (
+            Court.federal_courts.appellate_pacer_courts().values_list(
+                "pk", flat=True
+            )
+        )
+
+        # Unlike district and bankr. dockets, where you always have a main
+        # RD and can optionally have attachments to the main RD, Appellate
+        # docket entries can either they *only* have a main RD (with no
+        # attachments) or they *only* have attachments (with no main doc).
+        # Unfortunately, when we ingest a docket, we don't know if the entries
+        # have attachments, so we begin by assuming they don't and create
+        # main RDs for each entry. Later, if/when we get attachment pages for
+        # particular entries, we convert the main documents into attachment
+        # RDs. The check here ensures that if that happens for a particular
+        # entry, we avoid creating the main RD a second+ time when we get the
+        # docket sheet a second+ time.
+        if de_created is False and d.court.pk in appellate_court_ids:
+            appellate_rd_att_exists = de.recap_documents.filter(
+                document_type=RECAPDocument.ATTACHMENT
+            ).exists()
+            if appellate_rd_att_exists:
+                params["document_type"] = RECAPDocument.ATTACHMENT
         try:
             rd = RECAPDocument.objects.get(**params)
         except RECAPDocument.DoesNotExist:
@@ -691,7 +787,7 @@ def add_docket_entries(d, docket_entries, tags=None):
             date_last_filing=max(known_filing_dates)
         )
 
-    return rds_created, content_updated
+    return des_returned, rds_created, content_updated
 
 
 def check_json_for_terminated_entities(parties) -> bool:
@@ -863,12 +959,16 @@ def disassociate_extraneous_entities(
         terminated_parties = set()
 
     # Disassociate extraneous parties from the docket.
-    PartyType.objects.filter(docket=d,).exclude(
+    PartyType.objects.filter(
+        docket=d,
+    ).exclude(
         party_id__in=parties_to_preserve,
     ).delete()
 
     # Disassociate extraneous attorneys from the docket and parties.
-    Role.objects.filter(docket=d,).exclude(
+    Role.objects.filter(
+        docket=d,
+    ).exclude(
         # Don't delete attorney roles for attorneys we're preserving.
         attorney_id__in=attorneys_to_preserve,
     ).exclude(
@@ -1147,6 +1247,21 @@ def get_data_from_att_report(text: str, court_id: str) -> Dict[str, str]:
     return att_data
 
 
+def get_data_from_appellate_att_report(
+    text: str, court_id: str
+) -> Dict[str, str]:
+    """Get attachments data from Juriscraper AppellateAttachmentPage
+
+    :param text: The attachment page text to parse.
+    :param court_id: The CourtListener court_id we're working with
+    :return: The appellate attachment page data
+    """
+    att_page = AppellateAttachmentPage(map_cl_to_pacer_id(court_id))
+    att_page._parse_text(text)
+    att_data = att_page.data
+    return att_data
+
+
 def add_tags_to_objs(tag_names: List[str], objs: Any) -> QuerySet:
     """Add tags by name to objects
 
@@ -1203,7 +1318,7 @@ def merge_pacer_docket_into_cl_docket(
         ContentFile(report.response.text.encode()),
     )
 
-    rds_created, content_updated = add_docket_entries(
+    des_returned, rds_created, content_updated = add_docket_entries(
         d, docket_data["docket_entries"], tags=tags
     )
     add_parties_and_attorneys(d, docket_data["parties"])
@@ -1217,7 +1332,7 @@ def merge_attachment_page_data(
     court: Court,
     pacer_case_id: int,
     pacer_doc_id: int,
-    document_number: int,
+    document_number: int | None,
     text: str,
     attachment_dicts: List[Dict[str, Union[int, str]]],
     debug: bool = False,
@@ -1260,7 +1375,8 @@ def merge_attachment_page_data(
     # the docket entry.
     de = main_rd.docket_entry
     if document_number is None:
-        # Bankruptcy attachment page. Use the document number from the Main doc
+        # Bankruptcy or Appellate attachment page. Use the document number from
+        # the Main doc
         document_number = main_rd.document_number
 
     if debug:
@@ -1278,6 +1394,11 @@ def merge_attachment_page_data(
     # Create/update the attachment items.
     rds_created = []
     rds_affected = []
+    appellate_court_ids = (
+        Court.federal_courts.appellate_pacer_courts().values_list(
+            "pk", flat=True
+        )
+    )
     for attachment in attachment_dicts:
         sanity_checks = [
             attachment["attachment_number"],
@@ -1290,12 +1411,24 @@ def merge_attachment_page_data(
         if not all(sanity_checks):
             continue
 
-        rd, created = RECAPDocument.objects.update_or_create(
-            docket_entry=de,
-            document_number=document_number,
-            attachment_number=attachment["attachment_number"],
-            document_type=RECAPDocument.ATTACHMENT,
-        )
+        # Appellate entries with attachments don't have a main RD, transform it
+        # to an attachment.
+        if (
+            court.pk in appellate_court_ids
+            and attachment["pacer_doc_id"] == main_rd.pacer_doc_id
+        ):
+            main_rd.document_type = RECAPDocument.ATTACHMENT
+            main_rd.attachment_number = attachment["attachment_number"]
+            rd = main_rd
+            created = False
+        else:
+            rd, created = RECAPDocument.objects.update_or_create(
+                docket_entry=de,
+                document_number=document_number,
+                attachment_number=attachment["attachment_number"],
+                document_type=RECAPDocument.ATTACHMENT,
+            )
+
         if created:
             rds_created.append(rd)
         rds_affected.append(rd)
@@ -1308,7 +1441,7 @@ def merge_attachment_page_data(
         # we got the real value by measuring.
         if rd.page_count is None:
             rd.page_count = attachment["page_count"]
-        if rd.file_size is None and attachment["file_size_str"]:
+        if rd.file_size is None and attachment.get("file_size_str", None):
             try:
                 rd.file_size = convert_size_to_bytes(
                     attachment["file_size_str"]

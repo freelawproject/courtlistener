@@ -13,7 +13,7 @@ session_key = "session:pacer:cookies:user.%s"
 def log_into_pacer(
     username: str,
     password: str,
-    client_code: str = None,
+    client_code: str | None = None,
 ) -> RequestsCookieJar:
     """Log into PACER and return the cookie jar
 
@@ -35,7 +35,8 @@ def get_or_cache_pacer_cookies(
     user_pk: Union[str, int],
     username: str,
     password: str,
-    client_code: str = None,
+    client_code: str | None = None,
+    refresh: bool = False,
 ) -> RequestsCookieJar:
     """Get PACER cookies for a user or create and cache fresh ones
 
@@ -52,21 +53,28 @@ def get_or_cache_pacer_cookies(
     :param username: The PACER username of the user
     :param password: The PACER password of the user
     :param client_code: The PACER client code of the user
+    :param refresh: If True, refresh the cookies even if they're already cached
     :return: Cookies for the PACER user
     """
     r = make_redis_interface("CACHE", decode_responses=False)
     cookies = get_pacer_cookie_from_cache(user_pk, r=r)
-    if cookies:
+    ttl_seconds = r.ttl(session_key % user_pk)
+    if cookies and ttl_seconds >= 300 and not refresh:
+        # cookies were found in cache and ttl >= 5 minutes, return them
         return cookies
 
-    # Unable to find cookies in cache. Login and cache new values.
+    # Unable to find cookies in cache, are about to expire or refresh needed
+    # Login and cache new values.
     cookies = log_into_pacer(username, password, client_code)
     cookie_expiration = 60 * 60
     r.set(session_key % user_pk, pickle.dumps(cookies), ex=cookie_expiration)
     return cookies
 
 
-def get_pacer_cookie_from_cache(user_pk: Union[str, int], r: Redis = None):
+def get_pacer_cookie_from_cache(
+    user_pk: Union[str, int],
+    r: Redis | None = None,
+):
     """Get the cookie for a user from the cache.
 
     :param user_pk: The ID of the user, can be a string or an ID

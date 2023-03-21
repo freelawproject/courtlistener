@@ -1,4 +1,5 @@
 from datetime import timedelta
+from typing import TypedDict
 
 from django.core.mail import send_mail
 from django.urls import reverse
@@ -15,14 +16,22 @@ from cl.lib.command_utils import VerboseCommand
 from cl.lib.types import EmailType
 
 
+class ResultDict(TypedDict):
+    amount: int
+    users: list[str]
+
+
 class Command(VerboseCommand):
     help = "Charges people that have monthly subscriptions."
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options) -> None:
         super(Command, self).handle(*args, **options)
 
         m_donations = MonthlyDonation.objects.filter(
             enabled=True,
+            # Donation objects get left behind when users are deleted. Don't
+            # charge those donations anymore.
+            donor__isnull=False,
             monthly_donation_day=now().date().day,
             # This is a safety to account for timezones. We want to be very
             # careful that we don't double-bill people right when they sign up,
@@ -31,7 +40,7 @@ class Command(VerboseCommand):
             date_created__lt=now() - timedelta(days=15),
         ).order_by("-date_created")
 
-        results = {"amount": 0, "users": []}
+        results: ResultDict = {"amount": 0, "users": []}
         for m_donation in m_donations:
             try:
                 response = process_stripe_payment(

@@ -120,7 +120,7 @@ class CeleryThrottle(object):
                 break
 
 
-def throttle_task(rate: str, key: str = None) -> Callable:
+def throttle_task(rate: str, key: str | None = None) -> Callable:
     """A decorator for throttling tasks to a given rate.
 
     :param rate: The maximum rate that you want your task to run. Takes the
@@ -194,7 +194,7 @@ def set_for_next_window(
 def get_task_wait(
     task: Task,
     rate: str = "1/s",
-    key: str = None,
+    key: str | None = None,
 ) -> float:
     """Keep a global throttle for tasks
 

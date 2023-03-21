@@ -27,7 +27,10 @@
       <a href="{{ result.absolute_url }}?{{ request.META.QUERY_STRING }}"
          class="visitable">
       {{ result.solr_highlights.caseName.0|safe }}
-      ({% if result.court_id != 'scotus' %}{{ result.solr_highlights.court_citation_string.0|nbsp|safe }}&nbsp;{% endif %}{% if type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION %}{{ result.dateFiled|date:"Y" }}{% else %}{{ result.dateArgued|date:"Y" }}{% endif %})
+      {% url "court_homepage" pk="me" as maine_url %}
+      {% if request.path != maine_url %}
+          ({% if result.court_id != 'scotus' %}{{ result.solr_highlights.court_citation_string.0|nbsp|safe }}&nbsp;{% endif %}{% if type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION %}{{ result.dateFiled|date:"Y" }}{% else %}{{ result.dateArgued|date:"Y" }}{% endif %})
+      {% endif %}
       </a>
     {% endif %}
   </h3>
@@ -43,7 +46,7 @@
     {% if doc0.solr_highlights.docketNumber.0 %}
       <div class="inline-block">
         <span class="meta-data-header">Docket Number:</span>
-        <span class="meta-data-value">{{ doc0.solr_highlights.docketNumber.0|safe }}</span>
+        <span class="meta-data-value select-all">{{ doc0.solr_highlights.docketNumber.0|safe }}</span>
       </div>
     {% endif %}
     <div class="inline-block">
@@ -300,7 +303,7 @@
       {% if result.solr_highlights.docketNumber.0 %}
         <div class="inline-block">
           <span class="meta-data-header">Docket Number:</span>
-          <span class="meta-data-value">{{ result.solr_highlights.docketNumber.0|safe }}</span>
+          <span class="meta-data-value select-all">{{ result.solr_highlights.docketNumber.0|safe }}</span>
         </div>
       {% endif %}
     {% endif %}
@@ -344,9 +347,9 @@
     {% if result.citeCount > 0 %}
       <div class="bottom" class="inline-block">
         <span class="meta-data-value">
-          <a href="/?q=cites%3A({{ result.sibling_ids|join:" OR " }})">
-              Cited by {{ result.citeCount|intcomma }} opinion{{ result.citeCount|pluralize }}
-          </a>
+          <a href="/?q=cites%3A({{ result.sibling_ids|join:" OR " }})"
+             rel="nofollow"
+          >Cited by {{ result.citeCount|intcomma }} opinion{{ result.citeCount|pluralize }}</a>
         </span>
       </div>
     {% endif %}

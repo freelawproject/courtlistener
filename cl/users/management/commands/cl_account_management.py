@@ -57,31 +57,32 @@ class Command(VerboseCommand):
             print("* NO EMAILS SENT OR ACCOUNTS DELETED *")
             print("**************************************")
 
-    def delete_old_accounts(self):
-        """Find accounts older than roughly two months that have not been
-        confirmed, and delete them. Should be run once a month, or so.
+    def delete_old_accounts(self) -> None:
+        """Delete old, unused accounts
+
+        Delete accounts older than 60 days that lack a confirmed email
+        address and never logged in.
+
+        :return None
         """
         two_months_ago = now() - datetime.timedelta(60)
         unconfirmed_ups = UserProfile.objects.filter(
             email_confirmed=False,
             user__date_joined__lte=two_months_ago,
+            user__last_login=None,
             stub_account=False,
         )
 
         for up in unconfirmed_ups:
+            if self.options["simulate"]:
+                return
+
+            up.user.delete()
+            up.delete()
             if self.options["verbose"]:
                 print(f"User {up.user.username} deleted")
-            if not self.options["simulate"]:
-                # Gather their foreign keys, delete those
-                up.user.alerts.all().delete()
-                up.user.donations.all().delete()
-                up.user.favorites.all().delete()
 
-                # delete the user then the profile.
-                up.user.delete()
-                up.delete()
-
-    def notify_unconfirmed_accounts(self):
+    def notify_unconfirmed_accounts(self) -> None:
         """This function will notify people who have not confirmed their
         accounts that they must do so for fear of deletion.
 

@@ -8,6 +8,7 @@ from cl.alerts.views import (
     enable_alert,
     new_docket_alert,
     toggle_docket_alert,
+    toggle_docket_alert_confirmation,
 )
 
 urlpatterns = [
@@ -32,4 +33,9 @@ urlpatterns = [
         name="toggle_docket_alert",
     ),
     path("alert/docket/new/", new_docket_alert, name="new_docket_alert"),
+    re_path(
+        "alert/docket/(unsubscribe|subscribe)/([a-zA-Z0-9]{40})/",
+        toggle_docket_alert_confirmation,
+        name="toggle_docket_alert_confirmation",
+    ),
 ]

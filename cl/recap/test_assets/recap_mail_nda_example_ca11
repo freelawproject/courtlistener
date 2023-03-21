@@ -1,0 +1,69 @@
+Return-Path: <ecf_help@ca11.uscourts.gov>
+Received: from icmecf102.gtwy.uscourts.gov (icmecf102.gtwy.uscourts.gov [199.107.16.202])
+ by inbound-smtp.us-west-2.amazonaws.com with SMTP id k67cf403ai0nbvi83n5fl302buv00vtt4keotc01
+ for archive@recap.email;
+ Tue, 30 Aug 2022 18:35:32 +0000 (UTC)
+X-SES-Spam-Verdict: PASS
+X-SES-Virus-Verdict: PASS
+Received-SPF: pass (spfCheck: domain of ca11.uscourts.gov designates 199.107.16.202 as permitted sender) client-ip=199.107.16.202; envelope-from=ecf_help@ca11.uscourts.gov; helo=icmecf102.gtwy.uscourts.gov;
+Authentication-Results: amazonses.com;
+ spf=pass (spfCheck: domain of ca11.uscourts.gov designates 199.107.16.202 as permitted sender) client-ip=199.107.16.202; envelope-from=ecf_help@ca11.uscourts.gov; helo=icmecf102.gtwy.uscourts.gov;
+ dmarc=none header.from=ca11.uscourts.gov;
+X-SES-RECEIPT: AEFBQUFBQUFBQUFIRXU5Z3JsOThvWU9rbVRRMG9hcEt5NGIzYzhVTFQyZnNlNHFPNy85cEJUQm4xb3dzQ3hpcW9KUWFuVkdHa0tvN29jaE5UcWtyTHpmNXdBVHV2dzhZT3kzTHVRZVN2OVdmSEJTUElBQUdGd2U5M3ZUM084OVdINkprZWxVZ3dKWENpZndtcFBCWTFPL2FJSmh1V3hVVjdxVHJ5b1lnNnNBTWRKemo4dytjNnZaemhSSTVWd2N1bVd4RUNsQUdISHY1ZkpMNFAzT3JWVnpSUDNMRWlNUC82TXlyVUZDTjB0RVIxemtGaEpwTm1POWJJRUlidTFVMGR0TE5NdmFSOUVPQUlmdmZMWmhHWjc0OVVpU0p3N2hER1NGQUJSTVhCTVVwZFFPT3FjeS9KU0E9PQ==
+X-SES-DKIM-SIGNATURE: a=rsa-sha256; q=dns/txt; b=fSUgbDM+v32nKGz/cvywX4ymmqfP2cbixYqUCiTVHey9Fz7/ChUIObrSdHj/TwGJCYttBpDF5cKTzYlvp1ZDtZ5CrFZxMa+HzGrawIORpRI24GHrJQ6zqt9bcl+EzAPnyAqNFX+ViSewPobi2g4lF/+he3r6mQZ7aBTDp5erKlg=; c=relaxed/simple; s=gdwg2y3kokkkj5a55z2ilkup5wp5hhxx; d=amazonses.com; t=1661884533; v=1; bh=HG+MJ6+BVjGtZczqDxDjmOrNyUkjGTwng234vZOyM78=; h=From:To:Cc:Bcc:Subject:Date:Message-ID:MIME-Version:Content-Type:X-SES-RECEIPT;
+X-SBRS: None
+X-REMOTE-IP: 156.119.190.227
+Received: from ca11db.ca11.gtwy.dcn ([156.119.190.227])
+  by icmecf102.gtwy.uscourts.gov with ESMTP; 30 Aug 2022 14:35:31 -0400
+Received: from ca11db.ca11.gtwy.dcn (localhost.localdomain [127.0.0.1])
+	by ca11db.ca11.gtwy.dcn (8.14.7/8.14.7) with ESMTP id 27UIZGog023372
+	for <archive@recap.email>; Tue, 30 Aug 2022 14:35:16 -0400
+Date: Tue, 30 Aug 2022 14:35:16 -0400 (EDT)
+From: ecf_help@ca11.uscourts.gov
+To: archive@recap.email
+Message-ID: <1685635426.2552.1661884516380@ca11db.ca11.gtwy.dcn>
+Subject: 22-11299-JJ Marjorie Taylor Greene v. Secretary of State for the
+ State of Georgia, et al "Motion filed Take Judicial Notice"
+ (1:22-cv-01294-AT)
+MIME-Version: 1.0
+Content-Type: text/html; charset=UTF-8
+Content-Transfer-Encoding: 7bit
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8"><TITLE>22-11299-JJ Marjorie Taylor Greene v. Secretary of State for the State of Georgia, et al "Motion filed Take Judicial Notice" (1:22-cv-01294-AT)</TITLE>
+</HEAD>
+<BODY BGCOLOR="#FFFFCC" TEXT="#000000" LINK="#0000ff" VLINK="#551a8b" ALINK="#ff0000">
+<P><STRONG>
+***NOTE TO PUBLIC ACCESS USERS*** Judicial Conference of the United States policy permits attorneys of record and parties in a case (including pro se litigants) to receive one free electronic copy of all documents filed electronically, if receipt is required by law or directed by the filer.  PACER access fees apply to all other users.  To avoid later charges, download a copy of each document during this first viewing.</STRONG><BR>
+<P><CENTER><STRONG>United States Court of Appeals for the Eleventh Circuit</STRONG></CENTER>
+<P><STRONG>Notice of Docket Activity</STRONG><BR>
+<BR>
+The following transaction was filed on 08/30/2022
+<TABLE BORDER=0 CELLSPACING=3>
+<TR><TD><STRONG>Case Name:</STRONG></TD>
+<TD colspan='2'>Marjorie Taylor Greene v. Secretary of State for the State of Georgia, et al<BR>
+</TD></TR>
+<TR><TD><STRONG>Case Number:&nbsp;&nbsp;</STRONG></TD>
+<TD><A HREF="https://ecf.ca11.uscourts.gov/n/beam/servlet/TransportRoom?servlet=DocketReportFilter.jsp&caseId=78099">22-11299</A></TD></TR>
+<TR><TD><STRONG>Document(s):</STRONG></TD>
+<TD><A HREF="https://ecf.ca11.uscourts.gov/docs1/011012443447?uid=79ffc2e6f98148c1">Document(s)</A></TD></TR>
+</TABLE><BR>
+<P><STRONG>Docket Text:</STRONG><BR>
+<i>MOTION to take judicial notice filed by Marjorie Taylor Greene. Opposition to Motion is Unknown. [9750043-1]</i> [22-11299] (ECF: James Bopp)<BR>
+<BR>
+<STRONG>Notice will be electronically mailed to:</STRONG><BR><BR>
+Testing User<BR>
+<BR><BR><STRONG>Notice sent via US Mail to:</STRONG><BR><BR>
+<P>Testing User<BR>
+Testing Address <BR>ATLANTA, GA 3232323
+<BR>
+<BR>
+The following document(s) are associated with this transaction:<BR>
+<STRONG>Document Description: </STRONG>Motion to Take Judicial Notice of State Appellees' Motion to Dismiss<BR>
+<STRONG>Original Filename: </STRONG>Greene Federal Mot to Take Notice State Appellees MTD FINAL.pdf<BR>
+<STRONG>Electronic Document Stamp:</STRONG><BR>
+[STAMP acecfStamp_ID=1160056652 [Date=08/30/2022] [FileNumber=9750043-0] [7002c15d547948419ed603fc1e5d2adc51e78a8ba38da66cecb646f628264f246342d5df8d323095078f247ea2a4506711547d72575c70659000a6704436532c]]<BR>
+<BR>
+</BODY></HTML>

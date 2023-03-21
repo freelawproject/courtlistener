@@ -1,10 +1,10 @@
 from django.contrib import admin
 
-from cl.favorites.models import DocketTag, Favorite, UserTag
+from cl.favorites.models import DocketTag, Note, UserTag
 
 
-class FavoriteInline(admin.TabularInline):
-    model = Favorite
+class NoteInline(admin.TabularInline):
+    model = Note
     extra = 1
     raw_id_fields = (
         "user",
@@ -15,8 +15,8 @@ class FavoriteInline(admin.TabularInline):
     )
 
 
-@admin.register(Favorite)
-class FavoriteAdmin(admin.ModelAdmin):
+@admin.register(Note)
+class NoteAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "user",

@@ -11,7 +11,7 @@
     </style>
   </head>
   <body style="font-weight: inherit; line-height: 1.5; font-family: 'Helvetica Neue', Arial, Helvetica, sans-serif; color: #222; border: 0; vertical-align: baseline; font-style: inherit; background: #fff; margin: 0; padding: 0;">
-    <p style="font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 1.5em; padding: 0;">This email lists docket alerts on long-stagnant cases that you may want to disable or that have been automatically disabled by our systems.</p>
+    <p style="font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 1.5em; padding: 0;">This email lists docket alerts on long-dormant cases that you may want to disable or that have been automatically disabled by our systems.</p>
     <p style="font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 1.5em; padding: 0;">Disabling these alerts will prevent them from counting towards your quota and will help ease the load on our servers.</p>
 
     {% if report_data.disabled_dockets %}
@@ -23,7 +23,7 @@
       {% include "includes/old_alert_docket_list.html" with dockets=report_data.disabled_dockets %}
     {% endif %}
 
-    {% if report_data.one_eighty_ago %}
+    {% if report_data.very_old_dockets %}
       <hr style="background: #ddd; color: #ddd; clear: both; float: none; width: 60%; height: .1em; margin: 0 0 1.45em; border: none;">
       <h2 style="font-size: 1.5em; font-weight: normal; font-family: inherit; color: #111; border: 0; vertical-align: baseline; font-style: inherit; margin: 0; padding: 0;">Old Terminated Cases &mdash; To be Disabled Soon</h2>
       <p style="font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 1.5em; padding: 0;">
@@ -34,10 +34,10 @@
       </p>
       <p style="font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 1.5em; padding: 0;">Please disable and re-enable these alerts if you are still monitoring these cases. Doing so will keep them running for another 180 days.
       </p>
-      {% include "includes/old_alert_docket_list.html" with dockets=report_data.one_eighty_ago %}
+      {% include "includes/old_alert_docket_list.html" with dockets=report_data.very_old_dockets %}
     {% endif %}
 
-    {% if report_data.ninety_ago %}
+    {% if report_data.old_dockets %}
       <hr style="background: #ddd; color: #ddd; clear: both; float: none; width: 60%; height: .1em; margin: 0 0 1.45em; border: none;">
       <h2 style="font-size: 1.5em; font-weight: normal; font-family: inherit; color: #111; border: 0; vertical-align: baseline; font-style: inherit; margin: 0; padding: 0;">Cases Terminated about 90 Days Ago</h2>
       <p style="font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 1.5em; padding: 0;">
@@ -45,7 +45,7 @@
       </p>
       <p style="font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 1.5em; padding: 0;">If you are no longer monitoring these cases, you may want to disable their alerts by clicking below.</p>
 
-      {% include "includes/old_alert_docket_list.html" with dockets=report_data.ninety_ago %}
+      {% include "includes/old_alert_docket_list.html" with dockets=report_data.old_dockets %}
     {% endif %}
 
 

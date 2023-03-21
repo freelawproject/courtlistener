@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% load honeypot %}
+{% load extras %}
 
+{% block canonical %}{% get_canonical_element %}{% endblock %}
 {% block title %}Register an Account – CourtListener.com{% endblock %}
 
 {% block footer-scripts %}{% endblock %}
@@ -21,7 +23,7 @@
           <div class="col-xs-12">
             <h2>Register a New Account</h2>
 
-            <form action="" method="post">
+            <form action="" method="post" id="register-form">
               {% csrf_token %}
               {% render_honeypot_field "skip_me_if_alive" %}
               <div class="form-group">
@@ -103,7 +105,8 @@
                 </label>
               </div>
               <div class="v-offset-above-2">
-                <button type="submit"
+                <button id="register-button"
+                        type="submit"
                         class="btn btn-primary btn-lg float-right"
                         name="register">Register
                 </button>

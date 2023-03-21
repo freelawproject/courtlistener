@@ -5,12 +5,24 @@
     <li><a href="#support">Support</a></li>
     <li><a href="#data-modeling">Data Modeling</a></li>
     <li>
-      <a href="#overview">Overview of Endpoints</a>
-      <ul>
+      <div>
+        <a href="#overview">Overview of Endpoints</a>
+        <a class="collapse-header" data-toggle="collapse" href="#collapseEndpointsOverview" role="button"
+          aria-expanded="false" aria-controls="collapseEndpointsOverview">
+          [+]
+        </a>
+      </div>
+      <ul class="collapse" id="collapseEndpointsOverview">
         <li><a href="#permissions">Permissions</a></li>
         <li>
-          <a href="#authentication">Authentication</a>
-          <ul>
+          <div>
+            <a href="#authentication">Authentication</a>
+            <a class="collapse-header" data-toggle="collapse" href="#collapseAuth" role="button" aria-expanded="false"
+              aria-controls="collapseAuth">
+              [+]
+            </a>
+          </div>
+          <ul class="collapse" id="collapseAuth">
             <li><a href="#basic-auth">HTTP Basic Authentication</a></li>
             <li><a href="#session-auth">Django Session Authentication</a></li>
             <li><a href="#token-auth">Token Authentication</a></li>
@@ -25,8 +37,14 @@
         <li><a href="#performance-tips">Performance Tips</a></li>
         <li><a href="#downloading-files">Downloading Files</a></li>
         <li>
-          <a href="#field-details">Field Details</a>
-          <ul>
+          <div>
+            <a href="#field-details">Field Details</a>
+            <a class="collapse-header" data-toggle="collapse" href="#collapseFieldDetails" role="button"
+              aria-expanded="false" aria-controls="collapseFieldDetails">
+              [+]
+            </a>
+          </div>
+          <ul class="collapse" id="collapseFieldDetails">
             <li><a href="#date-formats">Date Formats</a></li>
             <li><a href="#case-names">Case Names</a></li>
             <li><a href="#absolute-url">The <code>absolute_url</code> Field</a></li>
@@ -36,8 +54,14 @@
       </ul>
     </li>
     <li>
-      <a href="#endpoints">Endpoints</a>
-      <ul>
+      <div>
+        <a href="#endpoints">Endpoints</a>
+        <a class="collapse-header" data-toggle="collapse" href="#collapseEndpoints" role="button" aria-expanded="false"
+          aria-controls="collapseEndpoints">
+          [+]
+        </a>
+      </div>
+      <ul class="collapse" id="collapseEndpoints">
         <li><a href="#docket-endpoint">{% url "docket-list" version="v3" %}</a></li>
         <li><a href="#og-court-info-endpoint">{% url 'originatingcourtinformation-list' version="v3" %}</a></li>
         <li><a href="#idb-data-endpoint">{% url 'fjcintegrateddatabase-list' version="v3" %}</a></li>
@@ -53,8 +77,14 @@
         <li><a href="#jurisdiction-endpoint">{% url "court-list" version="v3" %}</a></li>
         <li><a href="#search-endpoint">{% url "search-list" version="v3" %}</a></li>
         <li>
-          <a href="#judge-endpoint">Judge Endpoints</a>
-          <ul>
+          <div>
+            <a href="#judge-endpoint">Judge Endpoints</a>
+            <a class="collapse-header" data-toggle="collapse" href="#collapseJudgeEndpoints" role="button"
+              aria-expanded="false" aria-controls="collapseJudgeEndpoints">
+              [+]
+            </a>
+          </div>
+          <ul class="collapse" id="collapseJudgeEndpoints">
             <li><a href="#judge-endpoint-notes">Endpoint-Level Notes</a></li>
             <li><a href="#judge-field-notes">Field-Level Notes</a></li>
           </ul>
@@ -63,12 +93,24 @@
           <a href="#financialdisclosure-endpoint">Financial Disclosure Endpoints</a>
         </li>
         <li>
-          <a href="#recap-endpoint">RECAP Endpoints</a>
-          <ul>
+          <div>
+            <a href="#recap-endpoint">RECAP Endpoints</a>
+            <a class="collapse-header" data-toggle="collapse" href="#collapseRecapEndpoints" role="button"
+              aria-expanded="false" aria-controls="collapseRecapEndpoints">
+              [+]
+            </a>
+          </div>
+          <ul class="collapse" id="collapseRecapEndpoints">
             <li><a href="#processing-queue-endpoint">{% url "processingqueue-list" version="v3" %}</a></li>
             <li><a href="#recap-query">{% url "fast-recapdocument-list" version="v3" %}</a></li>
             <li><a href="#pacer-fetch">{% url "pacerfetchqueue-list" version="v3" %}</a></li>
           </ul>
+        </li>
+        <li>
+          <a href="#alerts-endpoint">{% url "alert-list" version="v3" %}</a>
+        </li>
+        <li>
+          <a href="#docket-alerts-endpoint">{% url "docket-alert-list" version="v3" %}</a>
         </li>
         <li>
           <a href="#visualization-endpoint">{% url "scotusmap-list" version="v3" %}

@@ -4,14 +4,14 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Dict
 
-from django.contrib.auth.models import User
+import pghistory
+from django.conf import settings
+from django.contrib.auth.models import Group, Permission, User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import FieldError
 from django.core.mail import EmailMessage, EmailMultiAlternatives
 from django.db import models
 from django.db.models import Q, Sum, UniqueConstraint
-from django.db.models.signals import post_save
-from django.dispatch import receiver
 from django.utils.timezone import now
 from localflavor.us.models import USStateField
 
@@ -40,6 +40,9 @@ class BarMembership(models.Model):
         ordering = ["barMembership"]
 
 
+@pghistory.track(
+    pghistory.Snapshot(),
+)
 class UserProfile(models.Model):
     user = models.OneToOneField(
         User,
@@ -128,6 +131,13 @@ class UserProfile(models.Model):
         help_text="Generated recap email address for the user.",
         blank=True,
     )
+    auto_subscribe = models.BooleanField(
+        help_text="If enabled, for every new case that comes in from the "
+        "user's recap.email address, a new docket subscription for the case "
+        "will be created; if disabled we'll ask users if they want to "
+        "subscribe to the case.",
+        default=True,
+    )
 
     @property
     def total_donated_last_year(self) -> Decimal:
@@ -159,6 +169,43 @@ class UserProfile(models.Model):
         return bool(self.user.monthly_donations.filter(enabled=True).count())
 
     @property
+    def email_grants_unlimited_docket_alerts(self) -> bool:
+        """Does the user's email grant them unlimited docket alerts?
+
+        :return: True if their email is on the list; else False.
+        """
+        # Don't check if the email is confirmed. They can't log in if so.
+        domain = self.user.email.split("@")[1]
+        if domain in settings.UNLIMITED_DOCKET_ALERT_EMAIL_DOMAINS:
+            return True
+        return False
+
+    @property
+    def can_make_another_alert(self) -> bool:
+        """Can the user make another alert?
+
+        The answer is yes, if any of the following is true:
+         - They get unlimited ones
+         - They are a monthly donor
+         - They are under the threshold
+         - Their email domain is unlimited
+
+        return: True if they can make another alert; else False.
+        """
+        if any(
+            [
+                # Place performant checks first
+                self.unlimited_docket_alerts,
+                self.email_grants_unlimited_docket_alerts,
+                self.is_monthly_donor,
+                self.user.docket_alerts.subscriptions().count()
+                < settings.MAX_FREE_DOCKET_ALERTS,
+            ]
+        ):
+            return True
+        return False
+
+    @property
     def recent_api_usage(self) -> Dict[str, int]:
         """Get stats about API usage for the user for the past 14 days
 
@@ -177,6 +224,17 @@ class UserProfile(models.Model):
     class Meta:
         verbose_name = "user profile"
         verbose_name_plural = "user profiles"
+
+
+@pghistory.track(
+    pghistory.Snapshot(),
+    obj_field=None,
+)
+class UserProfileBarMembership(UserProfile.barmembership.through):
+    """A model class to track user profile barmembership m2m relation"""
+
+    class Meta:
+        proxy = True
 
 
 class EMAIL_NOTIFICATIONS(object):
@@ -249,10 +307,17 @@ class EmailFlag(AbstractDateTimeModel):
         blank=True,
         null=True,
     )
+    checked = models.DateTimeField(
+        help_text="The datetime the recipient's deliverability was checked"
+        " since the last bounce event.",
+        blank=True,
+        null=True,
+    )
 
     class Meta:
         indexes = [
             models.Index(fields=["email_address"]),
+            models.Index(fields=["flag_type", "checked"]),
         ]
         # Creates a unique constraint to allow only one BAN and Backoff Event
         # object for each email_address
@@ -343,6 +408,8 @@ class EmailSent(AbstractDateTimeModel):
         indexes = [
             models.Index(fields=["message_id"]),
         ]
+        verbose_name = "Sent Email"
+        verbose_name_plural = "Emails Sent"
 
     def convert_to_email_multipart(
         self,
@@ -455,8 +522,64 @@ def generate_recap_email(user_profile: UserProfile, append: int = None) -> str:
     return recap_email
 
 
-@receiver(post_save, sender=UserProfile)
-def assign_recap_email(sender, instance=None, created=False, **kwargs) -> None:
-    if created:
-        instance.recap_email = generate_recap_email(instance)
-        instance.save()
+@pghistory.track(
+    pghistory.Snapshot(),
+)
+class UserProxy(User):
+    """A proxy model class to track auth user model"""
+
+    class Meta:
+        proxy = True
+
+
+@pghistory.track(
+    pghistory.Snapshot(),
+)
+class GroupProxy(Group):
+    """A proxy model class to track auth group model"""
+
+    class Meta:
+        proxy = True
+
+
+@pghistory.track(
+    pghistory.Snapshot(),
+)
+class PermissionProxy(Permission):
+    """A proxy model class to track auth permission model"""
+
+    class Meta:
+        proxy = True
+
+
+@pghistory.track(
+    pghistory.Snapshot(),
+    obj_field=None,
+)
+class GroupPermissions(Group.permissions.through):
+    """A proxy model class to track group permissions m2m relation"""
+
+    class Meta:
+        proxy = True
+
+
+@pghistory.track(
+    pghistory.Snapshot(),
+    obj_field=None,
+)
+class UserGroups(User.groups.through):
+    """A proxy model class to track user groups m2m relation"""
+
+    class Meta:
+        proxy = True
+
+
+@pghistory.track(
+    pghistory.Snapshot(),
+    obj_field=None,
+)
+class UserPermissions(User.user_permissions.through):
+    """A proxy model class to track user permissions m2m relation"""
+
+    class Meta:
+        proxy = True

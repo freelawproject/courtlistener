@@ -1,10 +1,11 @@
 import logging
 from datetime import datetime
-from typing import Any
+from typing import Any, MutableMapping
 
 from django import forms
 from django.core.exceptions import ValidationError
 from django.core.validators import FileExtensionValidator
+from django.db.models import Case, IntegerField, Q, Value, When
 from django.utils.encoding import force_bytes
 from django.utils.html import format_html
 
@@ -96,22 +97,21 @@ class DocketEntryFilterForm(forms.Form):
     )
 
 
-class TennWorkersForm(forms.Form):
+class CourtUploadForm(forms.Form):
+    initial: MutableMapping[str, Any]
 
     court_str = forms.CharField(required=True, widget=forms.HiddenInput())
-
     case_title = forms.CharField(
-        label="Case Title",
+        label="Caption",
         required=True,
         widget=forms.TextInput(
             attrs={
                 "class": "form-control",
-                "placeholder": "Case Title",
+                "placeholder": "Caption",
                 "autocomplete": "off",
             }
         ),
     )
-
     docket_number = forms.CharField(
         label="Docket Number",
         required=True,
@@ -123,7 +123,6 @@ class TennWorkersForm(forms.Form):
             }
         ),
     )
-
     publication_date = forms.DateField(
         label="Publication Date",
         required=True,
@@ -135,7 +134,28 @@ class TennWorkersForm(forms.Form):
             }
         ),
     )
-
+    date_argued = forms.DateField(
+        label="Argued Date",
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control datepicker",
+                "placeholder": "Argued Date",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    date_reargued = forms.DateField(
+        label="Reargued Date",
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control datepicker",
+                "placeholder": "Reargued Date",
+                "autocomplete": "off",
+            }
+        ),
+    )
     lead_author = forms.ModelChoiceField(
         queryset=Person.objects.none(),
         required=True,
@@ -147,21 +167,30 @@ class TennWorkersForm(forms.Form):
             }
         ),
     )
-
     second_judge = forms.ModelChoiceField(
         queryset=Person.objects.none(),
         required=False,
         label="Second Panelist",
         widget=forms.Select(attrs={"class": "form-control"}),
     )
-
     third_judge = forms.ModelChoiceField(
         queryset=Person.objects.none(),
         required=False,
         label="Third Panelist",
         widget=forms.Select(attrs={"class": "form-control"}),
     )
-
+    panel = forms.ModelMultipleChoiceField(
+        queryset=Person.objects.none(),
+        required=True,
+        label="Panel",
+        widget=forms.SelectMultiple(
+            attrs={
+                "class": "form-control input-lg",
+                "height": "100%",
+                "size": "10",
+            }
+        ),
+    )
     cite_volume = forms.IntegerField(
         label="Cite Year",
         required=True,
@@ -170,12 +199,10 @@ class TennWorkersForm(forms.Form):
             attrs={"class": "form-control"},
         ),
     )
-
     cite_reporter = forms.CharField(
         label="Cite Reporter",
         required=True,
     )
-
     cite_page = forms.IntegerField(
         label="Cite Page",
         required=True,
@@ -186,7 +213,6 @@ class TennWorkersForm(forms.Form):
             }
         ),
     )
-
     pdf_upload = forms.FileField(
         label="Opinion PDF",
         required=True,
@@ -196,30 +222,104 @@ class TennWorkersForm(forms.Form):
 
     def __init__(self, *args, **kwargs) -> None:
         self.pk = kwargs.pop("pk", None)
-        super(TennWorkersForm, self).__init__(*args, **kwargs)
+        super(CourtUploadForm, self).__init__(*args, **kwargs)
         self.initial["court_str"] = self.pk
         self.initial["court"] = Court.objects.get(pk=self.pk)
 
-        q_judges = Person.objects.filter(
-            positions__court_id=self.pk, is_alias_of=None
-        ).order_by("name_first")
-        for field_name in ["lead_author", "second_judge", "third_judge"]:
-            self.fields[field_name].queryset = q_judges
-            self.fields[field_name].label_from_instance = self.person_label
+        if self.pk == "me":
+            # The court requested the order of the panel match the seniority
+            # of the judges, in order or date joined after sorting by pos type
+            # Chief, Associate, Retired Active
+            # Additionally, we only want active justices so remove them if
+            # terminated or retired, without a new role being created as an
+            # retired active justice
+            q_judges = (
+                Person.objects.filter(
+                    (
+                        (
+                            Q(positions__position_type="c-jus")
+                            | Q(positions__position_type="ass-jus")
+                            | Q(positions__position_type="ret-act-jus")
+                        )
+                        & (
+                            Q(positions__date_termination__isnull=True)
+                            & Q(positions__date_retirement__isnull=True)
+                        )
+                    ),
+                    positions__court_id="me",
+                    is_alias_of=None,
+                )
+                .annotate(
+                    custom_order=Case(
+                        When(positions__position_type="c-jus", then=Value(1)),
+                        When(
+                            positions__position_type="ass-jus", then=Value(2)
+                        ),
+                        When(
+                            positions__position_type="ret-act-jus",
+                            then=Value(3),
+                        ),
+                        output_field=IntegerField(),
+                    )
+                )
+                .order_by("custom_order", "positions__date_start")
+            )
+        else:
+            q_judges = Person.objects.filter(
+                positions__court_id=self.pk, is_alias_of=None
+            ).order_by("name_first")
+
+        for field_name in [
+            "lead_author",
+            "second_judge",
+            "third_judge",
+            "panel",
+        ]:
+            self.fields[field_name].queryset = q_judges  # type: ignore[attr-defined]
+            self.fields[field_name].label_from_instance = self.person_label  # type: ignore[attr-defined]
 
         if self.pk == "tennworkcompcl":
             self.fields["cite_reporter"].widget = forms.Select(
                 choices=[("TN WC", "TN WC")],
                 attrs={"class": "form-control"},
             )
-            del self.fields["second_judge"]
-            del self.fields["third_judge"]
-        else:
+            self.drop_fields(
+                [
+                    "date_argued",
+                    "date_reargued",
+                    "panel",
+                    "second_judge",
+                    "third_judge",
+                ]
+            )
+
+        elif self.pk == "me":
+            self.fields["cite_reporter"].widget = forms.Select(
+                choices=[("ME", "ME")],
+                attrs={"class": "form-control"},
+            )
+            self.drop_fields(["lead_author", "second_judge", "third_judge"])
+        elif self.pk == "tennworkcompapp":
             self.fields["cite_reporter"].widget = forms.Select(
                 choices=[("TN WC App.", "TN WC App.")],
                 attrs={"class": "form-control"},
             )
+            self.drop_fields(["date_argued", "date_reargued", "panel"])
+        else:
+            raise BaseException
+
         self.fields["cite_reporter"].widget.attrs["readonly"] = True
+
+    def drop_fields(self, fields: list[str]) -> None:
+        """Remove fields not used in other courts
+
+        When we add more courts we may need to find a better way to handle this.
+
+        :param fields: Fields as a list not used
+        :return: None
+        """
+        for field in fields:
+            del self.fields[field]
 
     @staticmethod
     def person_label(obj) -> str:
@@ -261,7 +361,7 @@ class TennWorkersForm(forms.Form):
                 )
 
     def clean_pdf_upload(self) -> bytes:
-        pdf_data = self.cleaned_data.get("pdf_upload").read()
+        pdf_data = self.cleaned_data["pdf_upload"].read()
         sha1_hash = sha1(force_bytes(pdf_data))
         ops = Opinion.objects.filter(sha1=sha1_hash)
         if len(ops) > 0:
@@ -289,10 +389,17 @@ class TennWorkersForm(forms.Form):
                     ],
                 )
             )
+        elif self.pk == "me":
+            self.cleaned_data["panel"] = self.cleaned_data["panel"]
         else:
             self.cleaned_data["panel"] = [self.cleaned_data["lead_author"]]
 
     def make_item_dict(self) -> None:
+        """Make item dictionary for adding to our DB
+
+        :return: None
+        """
+        lead_author = self.cleaned_data.get("lead_author")
         self.cleaned_data["item"] = {
             "source": Docket.DIRECT_INPUT,
             "cluster_source": "D",
@@ -301,10 +408,10 @@ class TennWorkersForm(forms.Form):
             "precedential_statuses": "Published",
             "docket_numbers": self.cleaned_data["docket_number"],
             "judges": ", ".join(
-                [j.name_full for j in self.cleaned_data.get("panel")]
+                [j.name_full for j in self.cleaned_data["panel"]]
             ),
-            "author_id": self.cleaned_data["lead_author"].id,
-            "author": self.cleaned_data["lead_author"],
+            "author_id": lead_author.id if lead_author else None,
+            "author": lead_author,
             "date_filed_is_approximate": False,
             "blocked_statuses": False,
             "citations": self.cleaned_data["citations"],
@@ -312,7 +419,7 @@ class TennWorkersForm(forms.Form):
         }
 
     def clean(self) -> dict[str, Any]:
-        super(TennWorkersForm, self).clean()
+        super(CourtUploadForm, self).clean()
         self.validate_neutral_citation()
         self.make_panel()
         self.make_item_dict()

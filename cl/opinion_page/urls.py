@@ -3,6 +3,7 @@ from django.urls import path, re_path
 from cl.opinion_page.feeds import DocketFeed
 from cl.opinion_page.views import (
     block_item,
+    citation_homepage,
     citation_redirector,
     cluster_visualizations,
     court_homepage,
@@ -80,6 +81,12 @@ urlpatterns = [
         "docket/<int:docket_id>/<str:doc_num>/<int:att_num>/<blank-slug:slug>/",
         view_recap_document,
         name="view_recap_attachment",
+    ),
+    # Citation look up pages
+    path(
+        "c/",
+        citation_homepage,
+        name="citation_homepage",
     ),
     re_path(
         r"^c/(?:(?P<reporter>.*)/(?P<volume>\d{1,10})/(?P<page>.*)/)?$",

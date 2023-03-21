@@ -1,0 +1,8 @@
+Hello Admins!
+
+The following @recap.email addresses don't belong to any user in Courtlistener:
+{% for email in recap_email_recipients %}
+  - {{ email }}
+{% endfor %}
+
+We could try to identify the user and let him/her know that he/she should fix his/her email address on PACER.

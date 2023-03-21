@@ -3,7 +3,11 @@ import datetime
 from django.template import Context
 from django.test import RequestFactory
 
-from cl.custom_filters.templatetags.extras import get_full_host, granular_date
+from cl.custom_filters.templatetags.extras import (
+    get_canonical_element,
+    get_full_host,
+    granular_date,
+)
 from cl.custom_filters.templatetags.text_filters import (
     naturalduration,
     oxford_join,
@@ -104,7 +108,6 @@ class DummyObject(object):
 
 
 class TestExtras(SimpleTestCase):
-
     factory = RequestFactory()
 
     def test_get_full_host(self) -> None:
@@ -115,6 +118,15 @@ class TestExtras(SimpleTestCase):
         self.assertEqual(
             get_full_host(c, username="billy", password="crystal"),
             "http://billy:crystal@testserver",
+        )
+
+    def test_get_canonical_element(self) -> None:
+        """Do we get a simple canonical element?"""
+
+        c = Context({"request": self.factory.get("/some-path/")})
+        self.assertEqual(
+            get_canonical_element(c),
+            '<link rel="canonical" href="http://testserver/some-path/" />',
         )
 
     def test_granular_dates(self) -> None:

@@ -26,8 +26,6 @@ class EmailBackend(BaseEmailBackend):
     BASE_BACKEND: The base email backend to use to send emails, in our case:
     django_ses.SESBackend, for testing is used:
     django.core.mail.backends.locmem.EmailBackend
-    MAX_ATTACHMENT_SIZE: The maximum file size in bytes that an attachment can
-    have to be sent.
 
     - Verifies if the recipient's email address is not banned before sending
     or storing the message.
@@ -41,7 +39,6 @@ class EmailBackend(BaseEmailBackend):
         self,
         email_messages: Sequence[EmailMessage | EmailMultiAlternatives],
     ) -> int:
-
         if not email_messages:
             return 0
         # Open a connection to the BASE_BACKEND set in settings (e.g: SES).

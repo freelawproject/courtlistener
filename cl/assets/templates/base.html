@@ -80,6 +80,7 @@
   {% endblock %}
   <title>{% block title %}CourtListener.com{% endblock %}</title>
   {% block head %}{% endblock %}
+  {% block canonical %}{% endblock %}
   {% if DEBUG %}
     <link rel="stylesheet" href="{% static "css/bootstrap/3.3.0/bootstrap.css" %} "
           type="text/css">
@@ -100,16 +101,24 @@
     <div class="navbar navbar-default subnav alert-danger alert-dismissible" role="navigation">
       <div class="container-fluid">
         <div class="row">
-          <div class="col-xs-7 col-sm-8 col-md-9 col-lg-10">
-            <p class="navbar-text lead">CourtListener is hosted by <a href="https://free.law" target="_blank" class="navbar-link">Free Law Project</a>, a small and scrappy non-profit. If CourtListener or RECAP has helped you this year,  please support our annual fundraiser with a contribution. A contribution in any amount helps make our work possible.
-            </p>
+          <div class="col-xs-12 col-md-9 col-lg-10">
+            <div class="navbar-text lead">
+              <p>CourtListener is hosted by Free Law Project, a small non-profit that punches way above its weight. We host some of the largest open legal databases on the planet, but we need your support to do our work. Please make a charitable donation today.
+              </p>
+              <p>In 2022, Free Law Project served nearly 200 million documents and sent more than 1.3 million alerts to our users. We <a href="https://twitter.com/FreeLawProject/status/1588664445609267200">added</a> millions of opinions to our database and <a href="https://free.law/2022/03/17/summarizing-important-cases/">summarized</a> over a million opinions. We launched <a href="{% url "recap_email_help" %}">@recap.email</a> and <a href="{% url "webhooks_docs" %}">legal webhooks</a>. In a few days, we will add appellate court support to the RECAP extension.</p>
+              <p>On the policy side, we <a href="https://ross.house.gov/media/press-releases/president-biden-signs-law-ross-bill-enhance-judicial-ethics-and-transparency">helped</a> pass a law to publish judicial financial disclosures to eliminate conflicts of interest. We <a href="https://twitter.com/FreeLawProject/status/1601011543344152577">opposed</a> unconstitutional efforts to censor our website. We are working with others to develop a FOIA-like law for the judiciary.
+              </p>
+              <p>To learn more about our accomplishments and our goals for 2023, please read our annual letter. Once you do, we hope you will support our work with a charitable gift. The more you give, the more we can do.
+              </p>
+              <p>Thank you.</p>
+            </div>
           </div>
-          <div class="col-xs-5 col-sm-4 col-md-3 col-lg-2">
+          <div class="col-xs-12 col-md-3 col-lg-2">
             <div class="row">
               <div class="col-xs-12">
                 <button type="button" class="close"
                         data-cookie-name="no_banner"
-                        data-duration="3"
+                        data-duration="5"
                         aria-label="Close">
                     <span aria-hidden="true"
                           class="x-large">&times;</span></button>
@@ -118,11 +127,11 @@
             <div class="row">
               <div class="col-xs-12">
                 <p class="right">
-                  <a href="{% url "donate" %}?referrer=navbar-banner"
-                     class="btn btn-danger v-offset-above-1"><i class="fa fa-heart-o"></i>&nbsp;Donate Now</a>
-                  <a href="https://free.law/fundraiser/2021/"
+                  <a href="{% url "donate" %}?referrer=navbar-banner#heading"
+                     class="btn btn-danger btn-lg v-offset-above-1"><i class="fa fa-heart-o"></i>&nbsp;Donate Now</a>
+                  <a href="https://free.law/fundraiser/2022/"
                      target="_blank"
-                     class="btn btn-default v-offset-above-1">Annual Report</a>
+                     class="btn btn-default btn-lg v-offset-above-1">Annual Report</a>
                 </p>
               </div>
             </div>
@@ -194,8 +203,8 @@
                   <ul class="dropdown-menu" role="menu">
                     <li><a href="{% url "profile_alerts" %}"
                            tabindex="203"><i class="fa fa-bell-o gray fa-fw"></i>&nbsp;Alerts</a></li>
-                    <li><a href="{% url "profile_favorites" %}"
-                           tabindex="205"><i class="fa fa-star-o gray fa-fw"></i>&nbsp;Favorites</a></li>
+                    <li><a href="{% url "profile_notes" %}"
+                           tabindex="205"><i class="fa fa-bookmark-o gray fa-fw"></i>&nbsp;Notes</a></li>
                     <li><a href="{% url "tag_list" username=user.username %}"
                            tabindex="205"><i class="fa fa-tags gray fa-fw"></i>&nbsp;Tags</a></li>
                     <li class="divider"></li>
@@ -249,7 +258,7 @@
                   <a href="{% url "es_search" "parenthetical" %}" tabindex="101">Parenthetical Search</a>
                 </li>
                 <li>
-                  <a href="{% url "citation_redirector" %}"
+                  <a href="{% url "citation_homepage" %}"
                      tabindex="102">Citation Look Up</a>
                 </li>
                 <li>
@@ -303,7 +312,7 @@
 
   {% block newsletter %}
     {% if user.is_anonymous or user.is_authenticated and not user.profile.wants_newsletter %}
-    <div class="row base-newsletter">
+    <div class="row base-newsletter hidden-print">
       <div class="col-sm-6">
         <p class="bold bottom">Newsletter</p>
         <p>Sign up to receive the Free Law Project newsletter with tips and announcements.</p>
@@ -338,10 +347,7 @@
               <a href="https://free.law/about/">About</a>
             </div>
             <div class="footer-item">
-              <a href="{% url "mapper_homepage" %}">Visual&shy;izations</a>
-            </div>
-            <div class="footer-item">
-              <a href="{% url "faq" %}">FAQ</a>
+              <a href="{% url "help_home" %}">Help</a> &amp; <a href="{% url "faq" %}">FAQ</a>
             </div>
             <div class="footer-item">
               <a href="{% url "donate" %}?referrer=footer-link">Donate</a>
@@ -350,7 +356,7 @@
 
           <div class="col-sm-6 no-gutter">
             <div class="footer-item">
-              <a href="{% url "citation_redirector" %}">Citation Lookup</a>
+              <a href="{% url "citation_homepage" %}">Citation Lookup</a>
             </div>
             <div class="footer-item">
               <a href="{% url "coverage" %}">Coverage</a>
@@ -460,7 +466,7 @@
 <script type="text/javascript">
   {# Default values are to ensure JS parsing even if 500 error thrown #}
   var totalDonatedLastYear = parseFloat({{ user.profile.total_donated_last_year|safe|default:0}}),
-      userAlertCount = {{ user.docket_alerts.count|default:"0" }},
+      userAlertCount = {{ user.docket_alerts.subscriptions.count|default:"0" }},
       priceRtAlerts = parseFloat({{ MIN_DONATION.rt_alerts|default:0 }}),
       maxFreeDocketAlerts = {{ MAX_FREE_DOCKET_ALERTS|default:0 }},
       recapBonusAlerts = {{ DOCKET_ALERT_RECAP_BONUS|default:0 }};

@@ -14,7 +14,7 @@ from cl.search.fields import (
     FloorDateField,
     RandomChoiceField,
 )
-from cl.search.models import DOCUMENT_STATUSES, SEARCH_TYPES, Court
+from cl.search.models import PRECEDENTIAL_STATUS, SEARCH_TYPES, Court
 
 OPINION_ORDER_BY_CHOICES = (
     ("score desc", "Relevance"),
@@ -60,7 +60,7 @@ def _clean_form(get_params, cd, courts):
     for court in courts:
         get_params[f"court_{court.pk}"] = cd[f"court_{court.pk}"]
 
-    for status in DOCUMENT_STATUSES:
+    for status in PRECEDENTIAL_STATUS.NAMES:
         get_params[f"stat_{status[1]}"] = cd[f"stat_{status[1]}"]
 
     # Ensure that we have the cleaned_data and other related attributes set.
@@ -478,7 +478,7 @@ class SearchForm(forms.Form):
                 widget=forms.CheckboxInput(attrs={"checked": "checked"}),
             )
 
-        for status in DOCUMENT_STATUSES:
+        for status in PRECEDENTIAL_STATUS.NAMES:
             attrs = {}
             if status[1] == "Precedential":
                 initial = True

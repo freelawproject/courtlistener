@@ -5,6 +5,7 @@
 {% load text_filters %}
 {% load waffle_tags %}
 
+{% block canonical %}{% get_canonical_element %}{% endblock %}
 {% block title %}{{ title }} – CourtListener.com{% endblock %}
 {% block og_title %}{{ title }} – CourtListener.com{% endblock %}
 {% block description %}{{ title }} – CourtListener.com{% endblock %}
@@ -119,7 +120,7 @@ $(document).ready(function(){
           {% endif %}
         </h2>
         <span class="small gray top">
-          {% if person.fjc_id %},  FJC ID:
+          {% if person.fjc_id %}FJC ID:
             {% filter lower %}
             {% if person.name_middle %}
               {% if person.name_suffix %}
@@ -220,7 +221,7 @@ $(document).ready(function(){
             {% if person.religion %}
             <p>
               <span class="meta-data-header">Religion:</span>
-              <span class="meta-data-value">{{ person.religion }}</span>
+              <span class="meta-data-value">{{ person.get_religion_display }}</span>
             </p>
             {% endif %}
           </div>
@@ -555,20 +556,24 @@ $(document).ready(function(){
     {% endif %}
 
     {% if disclosures %}
-      <h3 class="bottom">
-        <i class="gray fa fa-file-text-o"></i> Financial Disclosures ({{ disclosures|length }})
-      </h3>
-      <p class="gray">Annual financial disclosure records filed by Federal judges, magistrates and clerks of the court.</p>
-      <hr class="top">
-      <div class="row">
-        {% for disclosure in disclosures %}
-          <div class="col-xs-3">
-            <h4 class="text">
-              <a href="{% url 'financial_disclosures_viewer' person.id disclosure.id person.slug %}">{{ disclosure.year }}</a>
-            </h4>
-          </div>
-        {% endfor %}
+    <div class="row v-offset-below-3">
+      <div class="col-xs-12">
+        <h3 id="disclosures">
+          <i class="gray fa fa-file-text-o"></i> Financial Disclosures ({{ disclosures|length }})
+        </h3>
+        <p class="gray">Annual financial disclosure records filed by Federal judges, magistrates and clerks of the court.</p>
+        <hr class="top">
+        <div class="row">
+          {% for disclosure in disclosures %}
+            <div class="col-xs-3">
+              <h4 class="text">
+                <a href="{% url 'financial_disclosures_viewer' person.id disclosure.id person.slug %}">{{ disclosure.year }}</a>
+              </h4>
+            </div>
+          {% endfor %}
+        </div>
       </div>
+    </div>
     {% endif %}
 
     {% if authored_opinions.result.numFound > 0 %}
@@ -621,15 +626,15 @@ $(document).ready(function(){
           {% if o.docketNumber %}
             <div class="inline nowrap">
               <span class="meta-data-header">Docket Number:</span>
-              <span class="meta-data-value">{{ o.docketNumber|safe }}</span>
+              <span class="meta-data-value select-all">{{ o.docketNumber|safe }}</span>
             </div>
           {% endif %}
           {% if o.citeCount > 0 %}
             <div class="bottom" class="inline nowrap">
             <span class="meta-data-value">
-              <a href="/?q=cites%3A({{ o.sibling_ids|join:" OR " }})">
-                Cited {{ o.citeCount|intcomma }} time{{ o.citeCount|pluralize }}
-              </a>
+              <a href="/?q=cites%3A({{ o.sibling_ids|join:" OR " }})"
+                 rel="nofollow"
+              >Cited {{ o.citeCount|intcomma }} time{{ o.citeCount|pluralize }}</a>
             </span>
             </div>
           {% endif %}
@@ -638,7 +643,10 @@ $(document).ready(function(){
         </div>
         {% endfor %}
         <p>
-            <a href="/?type=o&q=author_id%3A{{ person.pk }}+OR+panel_ids%3A{{ person.pk }}&stat_Precedential=on&stat_Non-Precedential=on&stat_Errata=on&stat_Separate%20Opinion=on&stat_In-chambers=on&stat_Relating-to%20orders=on&stat_Unknown%20Status=on" class="btn btn-primary">Search for All Opinions Authored by {{ person.name_last }} in CourtListener</a>
+            <a href="/?type=o&q=author_id%3A{{ person.pk }}+OR+panel_ids%3A{{ person.pk }}&stat_Precedential=on&stat_Non-Precedential=on&stat_Errata=on&stat_Separate%20Opinion=on&stat_In-chambers=on&stat_Relating-to%20orders=on&stat_Unknown%20Status=on"
+               rel="nofollow"
+               class="btn btn-primary"
+            >Search for All Opinions Authored by {{ person.name_last }} in CourtListener</a>
         </p>
       </div>
     </div>
@@ -653,39 +661,44 @@ $(document).ready(function(){
         </h3>
         <hr class="top">
 
-        {% for o in recap_cases_assigned %}
+        {% for result in recap_cases_assigned %}
         <div class="row">
-        <div class="col-xs-12">
+          <div class="col-xs-12">
           <article class="v-offset-below-2">
-          <h4 class="bottom">
-            <a href="{{ o.docket_absolute_url }}">
-              {{ o.doclist.docs.0.caseName|safe|v_wrapper }}
-              ({% if o.doclist.docs.0.court_id != 'scotus' %}{{ o.doclist.docs.0.court_citation_string|nbsp|safe }}&nbsp;{% endif %}{{ o.doclist.docs.0.dateFiled|date:"Y" }})
-            </a>
-          </h4>
-          <div class="inline nowrap">
-            <span class="meta-data-header">Date Filed:</span>
-            <time class="meta-data-value"
-                datetime="{{ o.doclist.docs.0.dateFiled|date:'Y-m-d' }}">
-              {% if o.doclist.docs.0.dateFiled %}
-                {{ o.doclist.docs.0.dateFiled|date:"F jS, Y" }}
-              {% else %}
-                Unknown Date
-              {% endif %}
-            </time>
-          </div>
-          {% if o.doclist.docs.0.docketNumber %}
+          {% with doc0=result.doclist.docs.0 %}
+            <h4 class="bottom">
+              <a href="{{ doc0.docket_absolute_url }}">
+                {{ doc0.caseName|safe|v_wrapper }}
+                ({% if doc0.court_id != 'scotus' %}{{ doc0.court_citation_string|nbsp|safe }}&nbsp;{% endif %}{{ doc0.dateFiled|date:"Y" }})
+              </a>
+            </h4>
             <div class="inline nowrap">
-              <span class="meta-data-header">Docket Number:</span>
-              <span class="meta-data-value">{{ o.doclist.docs.0.docketNumber|safe }}</span>
+              <span class="meta-data-header">Date Filed:</span>
+              <time class="meta-data-value"
+                  datetime="{{ doc0.dateFiled|date:'Y-m-d' }}">
+                {% if doc0.dateFiled %}
+                  {{ doc0.dateFiled|date:"F jS, Y" }}
+                {% else %}
+                  Unknown Date
+                {% endif %}
+              </time>
             </div>
-          {% endif %}
+            {% if doc0.docketNumber %}
+              <div class="inline nowrap">
+                <span class="meta-data-header">Docket Number:</span>
+                <span class="meta-data-value select-all">{{ doc0.docketNumber|safe }}</span>
+              </div>
+            {% endif %}
+          {% endwith %}
           </article>
         </div>
         </div>
         {% endfor %}
         <p>
-            <a href="/?type=r&q=(assigned_to_id:{{person.pk}} OR referred_to_id:{{person.pk}})&order_by=score%20desc" class="btn btn-primary">Search for All Cases Assigned/Referred to {{ person.name_last }} in RECAP</a>
+            <a href="/?type=r&q=(assigned_to_id:{{person.pk}} OR referred_to_id:{{person.pk}})&order_by=score%20desc"
+               rel="nofollow"
+               class="btn btn-primary"
+            >Search for All Cases Assigned/Referred to {{ person.name_last }} in RECAP</a>
         </p>
       </div>
     </div>
@@ -731,7 +744,7 @@ $(document).ready(function(){
           {% if oa.docketNumber %}
             <div class="inline nowrap">
               <span class="meta-data-header">Docket Number:</span>
-              <span class="meta-data-value">{{ oa.docketNumber|safe }}</span>
+              <span class="meta-data-value select-all">{{ oa.docketNumber|safe }}</span>
             </div>
           {% endif %}
           </article>
@@ -740,7 +753,9 @@ $(document).ready(function(){
         {% endfor %}
 
         <p>
-          <a href="/?type=oa&q=panel_ids%3A{{ person.pk }}" class="btn btn-primary">Search for All Oral Arguments Heard by {{ person.name_last }}</a>
+          <a href="/?type=oa&q=panel_ids%3A{{ person.pk }}" class="btn btn-primary"
+             rel="nofollow"
+          >Search for All Oral Arguments Heard by {{ person.name_last }}</a>
         </p>
       </div>
     </div>

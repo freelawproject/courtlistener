@@ -1,9 +1,12 @@
 {% extends "base.html" %}
-{% load text_filters %}
+{% load extras %}
 {% load humanize %}
-{% load tz %}
 {% load static %}
+{% load text_filters %}
+{% load tz %}
 
+
+{% block canonical %}{% get_canonical_element %}{% endblock %}
 {% block sidebar %}{% endblock %}
 {% block content %}{% endblock %}
 
@@ -15,7 +18,7 @@
             src="{% static "js/jquery.NobleCount.min.js" %}"></script>
     <script src="{% static "js/jquery.bootstrap-growl.min.js" %}"></script>
     <script defer type="text/javascript"
-            src="{% static "js/save-favorites.js" %}"></script>
+            src="{% static "js/save-notes.js" %}"></script>
     {% if request.user.is_authenticated %}
       <script defer type="text/javascript"
               src="{% static "js/toggle_settings.js" %}"></script>
@@ -27,7 +30,7 @@
 
     <script type="text/javascript">
       // Set this variable for the docket alerts script to find
-      var userAlertAcount = {{ user.docket_alerts.count|default:"0" }};
+      var userAlertAcount = {{ user.docket_alerts.subscriptions.count|default:"0" }};
     </script>
 
     <script defer type="text/javascript"
@@ -65,29 +68,20 @@
         {% endif %}
       </p>
     {% endif %}
-    <i id="favorites-star"
-       class="{% if favorite_form.instance.docket_id %}gold fa-star{% else %}gray fa-star-o bold{% endif %} pointer fa inline hidden-print"
-       data-toggle="modal"
-       data-target="#modal-save-favorite, #modal-logged-out"
-       title="{% if favorite_form.instance.docket_id %}Edit this favorite{% else %}Save this as a favorite in your profile{% endif %}"></i>
-
     <h1 class="bottom inline" data-type="search.Docket" data-id="{{ docket.pk }}">
       {{ docket|best_case_name|safe|v_wrapper }}
       {% if docket.docket_number %}
-        ({{ docket.docket_number }})
+        (<span class="select-all">{{ docket.docket_number }}</span>)
       {% endif %}
     </h1>
-    {% include "includes/favorites_modal.html" %}
+    {% include "includes/notes_modal.html" %}
     {% include "includes/docket_alerts_modal.html" %}
 
     <h2>{{ docket.court }}</h2>
 
     {% if docket.pacer_docket_url or docket_entries %}
       <div class="v-offset-above-2">
-        {% if docket_entries %}
-          <a href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}"
-             class="btn btn-success"><i class="fa fa-search"></i>&nbsp;Search this Docket</a>
-        {% endif %}
+        {% include "includes/add_note_button.html" with form_instance_id=note_form.instance.docket_id %}
         <div class="btn-group"
              id="react-root"
              data-docket="{{ docket.id }}"
@@ -105,10 +99,11 @@
           </a>
           <ul class="dropdown-menu">
             <li>
-              <a href="{% url "docket_feed" docket.pk %}"><i class="fa fa-rss fa-fw gray"></i> Subscribe with RSS</a>
+              <a href="{% url "docket_feed" docket.pk %}" rel="nofollow"><i class="fa fa-rss fa-fw gray"></i> Subscribe with RSS</a>
             </li>
             <li>
-              <a href="{% url "new_docket_alert" %}?pacer_case_id={{ docket.pacer_case_id }}&court_id={{ docket.court_id }}"><i class="fa fa-share-alt fa-fw gray"></i> Share Alert Link</a>
+              <a href="{% url "new_docket_alert" %}?pacer_case_id={{ docket.pacer_case_id }}&court_id={{ docket.court_id }}"
+                rel="nofollow"><i class="fa fa-share-alt fa-fw gray"></i> Share Alert Link</a>
             </li>
             <li>
               <a href="{% url "alert_help" %}#recap-alerts"><i class="fa fa-question-circle-o fa-fw gray"></i> Learn More</a>
@@ -146,7 +141,9 @@
           {% if docket.assigned_to %}
             <a href="{{ docket.assigned_to.get_absolute_url }}">{{ docket.assigned_to.name_full }}</a>
           {% elif docket.assigned_to_str %}
-            <a href="/?type=r&amp;assigned_to=&quot;{{ docket.assigned_to_str }}&quot;">{{ docket.assigned_to_str }}</a>
+            <a href="/?type=r&amp;assigned_to=&quot;{{ docket.assigned_to_str }}&quot;"
+               rel="nofollow"
+            >{{ docket.assigned_to_str }}</a>
           {% endif %}
         </span>
       </p>
@@ -159,7 +156,9 @@
           {% if docket.referred_to %}
             <a href="{{ docket.referred_to.get_absolute_url }}">{{ docket.referred_to.name_full }}</a>
           {% elif docket.referred_to_str %}
-            <a href="/?type=r&amp;referred_to=&quot;{{ docket.referred_to_str }}&quot;">{{ docket.referred_to_str }}</a>
+            <a href="/?type=r&amp;referred_to=&quot;{{ docket.referred_to_str }}&quot;"
+               rel="nofollow"
+            >{{ docket.referred_to_str }}</a>
           {% endif %}
         </span>
       </p>
@@ -225,7 +224,9 @@
       <p class="bottom">
         <span class="meta-data-header">Cause:</span>
         <span class="meta-data-value">
-          <a href="/?type=r&amp;cause=&quot;{{ docket.cause }}&quot;">{{ docket.cause }}</a>
+          <a href="/?type=r&amp;cause=&quot;{{ docket.cause }}&quot;"
+             rel="nofollow"
+          >{{ docket.cause }}</a>
         </span>
       </p>
     {% endif %}
@@ -234,7 +235,9 @@
         <p class="bottom">
           <span class="meta-data-header">Nature of Suit:</span>
           <span class="meta-data-value">
-            <a href="/?type=r&amp;nature_of_suit=&quot;{{ docket.nature_of_suit }}&quot;">{{ docket.nature_of_suit }}</a>
+            <a href="/?type=r&amp;nature_of_suit=&quot;{{ docket.nature_of_suit }}&quot;"
+               rel="nofollow"
+            >{{ docket.nature_of_suit }}</a>
           </span>
         </p>
     {% endif %}
@@ -243,7 +246,9 @@
       <p class="bottom">
         <span class="meta-data-header">Jury Demand:</span>
         <span class="meta-data-value">
-          <a href="/?type=r&amp;q=juryDemand:&quot;{{ docket.jury_demand }}&quot;">{{ docket.jury_demand }}</a>
+          <a href="/?type=r&amp;q=juryDemand:&quot;{{ docket.jury_demand }}&quot;"
+             rel="nofollow"
+          >{{ docket.jury_demand }}</a>
         </span>
       </p>
     {% endif %}
@@ -337,6 +342,7 @@
               {% if docket.appeal_from %}
                 (<a
                 href="/?type=r&amp;docket_number={{ og_info.docket_number }}&amp;court={{ docket.appeal_from.pk }}"
+                rel="nofollow"
                 data-toggle="tooltip"
                 data-placement="right"
                 title="Search for this docket number in the RECAP Archive.">{{ og_info.docket_number }})</a>
@@ -360,8 +366,9 @@
             {% if og_info.assigned_to %}
               <a href="{{ og_info.assigned_to.get_absolute_url }}">{{ og_info.assigned_to.name_full }}</a>
             {% elif og_info.assigned_to_str %}
-              <a
-                href="/?type=r&amp;assigned_to=&quot;{{ og_info.assigned_to_str }}&quot;">{{ og_info.assigned_to_str }}</a>
+              <a href="/?type=r&amp;assigned_to=&quot;{{ og_info.assigned_to_str }}&quot;"
+                 rel="nofollow"
+              >{{ og_info.assigned_to_str }}</a>
             {% endif %}
           </span>
         </p>
@@ -375,8 +382,9 @@
               <a
                 href="{{ og_info.ordering_judge.get_absolute_url }}">{{ og_info.ordering_judge.name_full }}</a>
             {% elif og_info.assigned_to_str %}
-              <a
-                href="/?type=r&amp;assigned_to=&quot;{{ og_info.ordering_judge_str }}&quot;">{{ og_info.ordering_judge_str }}</a>
+              <a href="/?type=r&amp;assigned_to=&quot;{{ og_info.ordering_judge_str }}&quot;"
+                 rel="nofollow"
+              >{{ og_info.ordering_judge_str }}</a>
             {% endif %}
           </span>
         </p>

@@ -674,9 +674,9 @@
                         <tr>
                             <td>{{ court.full_name }}</td>
                             <td>
-                                <a href="/?q=&court_{{ court.pk }}=on&order_by=score+desc">
-                                    {{ court.pk }}
-                                </a>
+                                <a href="/?q=&court_{{ court.pk }}=on&order_by=score+desc"
+                                   rel="nofollow"
+                                >{{ court.pk }}</a>
                             </td>
                             <td>{{ court.count }}</td>
                         </tr>

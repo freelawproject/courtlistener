@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% load humanize %}
-{% load static %}
+{% load extras humanize static %}
 
+{% block canonical %}{% get_canonical_element %}{% endblock %}
 {% block title %}
     Judicial Financial Disclosure Forms for {{ title }} – CourtListener.com
 {% endblock %}

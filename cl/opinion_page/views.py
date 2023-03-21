@@ -1,22 +1,22 @@
+import datetime
 from collections import OrderedDict, defaultdict
 from itertools import groupby
-from typing import Dict, Optional, Tuple, Union
+from typing import Dict, Tuple, Union
 from urllib.parse import urlencode
 
-import waffle
 from django.contrib import messages
 from django.contrib.auth.models import AnonymousUser, User
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import F, IntegerField, Prefetch
 from django.db.models.functions import Cast
 from django.http import HttpRequest, HttpResponseRedirect
 from django.http.response import Http404, HttpResponse, HttpResponseNotAllowed
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404
 from django.template import loader
 from django.template.defaultfilters import slugify
+from django.template.response import TemplateResponse
 from django.urls import reverse
-from django.utils.safestring import SafeText
 from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -29,13 +29,10 @@ from reporters_db import (
 from rest_framework.status import HTTP_300_MULTIPLE_CHOICES, HTTP_404_NOT_FOUND
 
 from cl.alerts.models import DocketAlert
-from cl.citations.parenthetical_utils import (
-    create_parenthetical_groups,
-    get_or_create_parenthetical_groups,
-)
+from cl.citations.parenthetical_utils import get_or_create_parenthetical_groups
 from cl.custom_filters.templatetags.text_filters import best_case_name
-from cl.favorites.forms import FavoriteForm
-from cl.favorites.models import Favorite
+from cl.favorites.forms import NoteForm
+from cl.favorites.models import Note
 from cl.lib.auth import group_required
 from cl.lib.bot_detector import is_og_bot
 from cl.lib.http import is_ajax
@@ -54,8 +51,8 @@ from cl.lib.utils import alphanumeric_sort
 from cl.lib.view_utils import increment_view_count
 from cl.opinion_page.forms import (
     CitationRedirectorForm,
+    CourtUploadForm,
     DocketEntryFilterForm,
-    TennWorkersForm,
 )
 from cl.people_db.models import AttorneyOrganization, CriminalCount, Role
 from cl.recap.constants import COURT_TIMEZONES
@@ -71,48 +68,70 @@ from cl.search.views import do_search
 
 
 def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
-    if pk not in ["tennworkcompcl", "tennworkcompapp"]:
-        raise Http404("Court pages only implemented for Tennessee so far.")
+    """Individual Court Home Pages"""
+    if pk not in ["tennworkcompcl", "tennworkcompapp", "me"]:
+        raise Http404("Court pages only implemented for select courts.")
 
     render_dict = {
-        # Load the render_dict with good results that can be shown in the
-        # "Latest Cases" sections
-        "results_compcl": do_search(
-            request.GET.copy(),
-            rows=5,
-            override_params={
-                "order_by": "dateFiled desc",
-                "court": "tennworkcompcl",
-            },
-            facet=False,
-        )["results"],
-        "results_compapp": do_search(
-            request.GET.copy(),
-            rows=5,
-            override_params={
-                "order_by": "dateFiled desc",
-                "court": "tennworkcompapp",
-            },
-            facet=False,
-        )["results"],
         "private": False,
+        "pk": pk,
+        "court": Court.objects.get(pk=pk).full_name,
     }
-    return render(request, "court.html", render_dict)
+
+    if "tennworkcomp" in pk:
+        courts = ["tennworkcompcl", "tennworkcompapp"]
+        template = "tn-court.html"
+    else:
+        courts = [pk]
+        template = "court.html"
+
+    for court in courts:
+        if "tennwork" in court:
+            results = f"results_{court}"
+        else:
+            results = "results"
+        render_dict[results] = do_search(
+            request.GET.copy(),
+            override_params={
+                "filed_after": (
+                    datetime.datetime.today() - datetime.timedelta(days=28)
+                ),
+                "order_by": "dateFiled desc",
+                "court": court,
+            },
+            facet=False,
+        )["results"]
+    return TemplateResponse(request, template, render_dict)
 
 
-@group_required("tenn_work_uploaders")
+@group_required(
+    "tenn_work_uploaders",
+    "uploaders_tennworkcompcl",
+    "uploaders_tennworkcompapp",
+    "uploaders_me",
+)
 def court_publish_page(request: HttpRequest, pk: int) -> HttpResponse:
-    """Display upload form and intake Opinions for Tenn. Workers Comp Cl/App
+    """Display upload form and intake Opinions for partner courts
 
     :param request: A GET or POST request for the page
     :param pk: The CL Court ID for each court
     """
+    if pk not in ["tennworkcompcl", "tennworkcompapp", "me"]:
+        raise Http404(
+            "Court pages only implemented for Tennessee Worker Comp Courts and Maine SJC."
+        )
+    # Validate the user has permission
+    if not request.user.is_staff and not request.user.is_superuser:
+        if not request.user.groups.filter(  # type: ignore
+            name__in=[f"uploaders_{pk}"]
+        ).exists():
+            raise PermissionDenied(
+                "You do not have permission to access this page."
+            )
 
-    if pk not in ["tennworkcompcl", "tennworkcompapp"]:
-        raise Http404("Court pages only implemented for Tennessee so far.")
-    form = TennWorkersForm(pk=pk)
+    form = CourtUploadForm(pk=pk)
     if request.method == "POST":
-        form = TennWorkersForm(request.POST, request.FILES, pk=pk)
+        form = CourtUploadForm(request.POST, request.FILES, pk=pk)
         if form.is_valid():
             cluster = form.save()
             goto = reverse("view_case", args=[cluster.pk, cluster.slug])
@@ -126,7 +145,7 @@ def court_publish_page(request: HttpRequest, pk: int) -> HttpResponse:
             messages.info(
                 request, "Error submitting form, please review below."
             )
-    return render(
+    return TemplateResponse(
         request, "publish.html", {"form": form, "private": True, "pk": pk}
     )
 
@@ -196,7 +215,7 @@ def user_has_alert(user: Union[AnonymousUser, User], docket: Docket) -> bool:
     has_alert = False
     if user.is_authenticated:
         has_alert = DocketAlert.objects.filter(
-            docket=docket, user=user
+            docket=docket, user=user, alert_type=DocketAlert.SUBSCRIPTION
         ).exists()
     return has_alert
 
@@ -204,23 +223,23 @@ def user_has_alert(user: Union[AnonymousUser, User], docket: Docket) -> bool:
 def core_docket_data(
     request: HttpRequest,
     pk: int,
-) -> Tuple[Docket, Dict[str, Union[bool, str, Docket, FavoriteForm]]]:
+) -> Tuple[Docket, Dict[str, Union[bool, str, Docket, NoteForm]]]:
     """Gather the core data for a docket, party, or IDB page."""
     docket = get_object_or_404(Docket, pk=pk)
     title = make_docket_title(docket)
 
     try:
-        fave = Favorite.objects.get(docket_id=docket.pk, user=request.user)
+        note = Note.objects.get(docket_id=docket.pk, user=request.user)
     except (ObjectDoesNotExist, TypeError):
-        # Not favorited or anonymous user
-        favorite_form = FavoriteForm(
+        # Not saved in notes or anonymous user
+        note_form = NoteForm(
             initial={
                 "docket_id": docket.pk,
                 "name": trunc(best_case_name(docket), 100, ellipsis="..."),
             }
         )
     else:
-        favorite_form = FavoriteForm(instance=fave)
+        note_form = NoteForm(instance=note)
 
     has_alert = user_has_alert(request.user, docket)
 
@@ -229,7 +248,7 @@ def core_docket_data(
         {
             "docket": docket,
             "title": title,
-            "favorite_form": favorite_form,
+            "note_form": note_form,
             "has_alert": has_alert,
             "timezone": COURT_TIMEZONES.get(docket.court_id, "US/Eastern"),
             "private": docket.blocked,
@@ -276,7 +295,7 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
             "get_string": make_get_string(request),
         }
     )
-    return render(request, "view_docket.html", context)
+    return TemplateResponse(request, "docket.html", context)
 
 
 @ratelimit_deny_list
@@ -332,7 +351,7 @@ def view_parties(
     context.update(
         {"parties": parties, "docket_entries": docket.docket_entries.exists()}
     )
-    return render(request, "docket_parties.html", context)
+    return TemplateResponse(request, "docket_parties.html", context)
 
 
 @ratelimit_deny_list
@@ -370,7 +389,7 @@ def docket_idb_data(
             "pro_se_csv": choices_to_csv(docket.idb_data, "pro_se"),
         }
     )
-    return render(request, "docket_idb_data.html", context)
+    return TemplateResponse(request, "docket_idb_data.html", context)
 
 
 def make_rd_title(rd: RECAPDocument) -> str:
@@ -413,9 +432,9 @@ def make_thumb_if_needed(
 @ratelimit_deny_list
 def view_recap_document(
     request: HttpRequest,
-    docket_id: Optional[int] = None,
-    doc_num: Optional[int] = None,
-    att_num: Optional[int] = None,
+    docket_id: int | None = None,
+    doc_num: int | None = None,
+    att_num: int | None = None,
     slug: str = "",
 ) -> HttpResponse:
     """This view can either load an attachment or a regular document,
@@ -427,32 +446,47 @@ def view_recap_document(
             document_number=doc_num,
             attachment_number=att_num,
         ).order_by("pk")[0]
+
+        # Check if the user has requested automatic redirection to the document
+        rd_download_redirect = request.GET.get("redirect_to_download", False)
+        if rd_download_redirect:
+            # Check if the document is available from CourtListener and
+            # if it is, redirect to the local document
+            # if it isn't, redirect to PACER if pacer_url is available
+            if rd.is_available:
+                return HttpResponseRedirect(rd.filepath_local.url)
+            else:
+                if rd.pacer_url:
+                    return HttpResponseRedirect(rd.pacer_url)
     except IndexError:
         raise Http404("No RECAPDocument matches the given query.")
 
     title = make_rd_title(rd)
     rd = make_thumb_if_needed(request, rd)
     try:
-        fave = Favorite.objects.get(recap_doc_id=rd.pk, user=request.user)
+        note = Note.objects.get(recap_doc_id=rd.pk, user=request.user)
     except (ObjectDoesNotExist, TypeError):
-        # Not favorited or anonymous user
-        favorite_form = FavoriteForm(
+        # Not saved in notes or anonymous user
+        note_form = NoteForm(
             initial={
                 "recap_doc_id": rd.pk,
                 "name": trunc(title, 100, ellipsis="..."),
             }
         )
     else:
-        favorite_form = FavoriteForm(instance=fave)
+        note_form = NoteForm(instance=note)
 
-    return render(
+    return TemplateResponse(
         request,
         "recap_document.html",
         {
             "rd": rd,
             "title": title,
-            "favorite_form": favorite_form,
+            "note_form": note_form,
             "private": True,  # Always True for RECAP docs.
+            "timezone": COURT_TIMEZONES.get(
+                rd.docket_entry.docket.court_id, "US/Eastern"
+            ),
         },
     )
 
@@ -462,12 +496,12 @@ def view_recap_document(
 def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     """Using the cluster ID, return the cluster of opinions.
 
-    We also test if the cluster ID is a favorite for the user, and send data
-    if needed. If it's a favorite, we send the bound form for the favorite so
-    it can populate the form on the page. If it is not a favorite, we send the
+    We also test if the cluster ID has a user note, and send data
+    if needed. If it's a note, we send the bound form for the note so
+    it can populate the form on the page. If it has note a note, we send the
     unbound form.
     """
-    # Look up the court, cluster, title and favorite information
+    # Look up the court, cluster, title and note information
     cluster = get_object_or_404(OpinionCluster, pk=pk)
     title = ", ".join(
         [
@@ -487,17 +521,17 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     get_string = make_get_string(request)
 
     try:
-        fave = Favorite.objects.get(cluster_id=cluster.pk, user=request.user)
+        note = Note.objects.get(cluster_id=cluster.pk, user=request.user)
     except (ObjectDoesNotExist, TypeError):
-        # Not favorited or anonymous user
-        favorite_form = FavoriteForm(
+        # Not note or anonymous user
+        note_form = NoteForm(
             initial={
                 "cluster_id": cluster.pk,
                 "name": trunc(best_case_name(cluster), 100, ellipsis="..."),
             }
         )
     else:
-        favorite_form = FavoriteForm(instance=fave)
+        note_form = NoteForm(instance=note)
 
     citing_clusters, citing_cluster_count = get_citing_clusters_with_cache(
         cluster
@@ -512,14 +546,23 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     parenthetical_groups = get_or_create_parenthetical_groups(
         cluster,
     ).prefetch_related("representative",)[:3]
-    return render(
+
+    # Identify opinions updated/added in partnership with v|lex for 3 years
+    sponsored = False
+    if (
+        cluster.date_created.date() > datetime.datetime(2022, 6, 1).date()
+        and cluster.filepath_json_harvard
+    ):
+        sponsored = True
+
+    return TemplateResponse(
         request,
-        "view_opinion.html",
+        "opinion.html",
         {
             "title": title,
             "cluster": cluster,
             "has_downloads": has_downloads,
-            "favorite_form": favorite_form,
+            "note_form": note_form,
             "get_string": get_string,
             "private": cluster.blocked,
             "citing_clusters": citing_clusters,
@@ -533,6 +576,7 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
             "related_clusters": related_clusters,
             "related_cluster_ids": [item["id"] for item in related_clusters],
             "related_search_params": f"&{urlencode(related_search_params)}",
+            "sponsored": sponsored,
         },
     )
 
@@ -553,9 +597,9 @@ def view_summaries(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
         )
     )
 
-    return render(
+    return TemplateResponse(
         request,
-        "view_opinion_summaries.html",
+        "opinion_summaries.html",
         {
             "title": get_case_title(cluster),
             "cluster": cluster,
@@ -570,9 +614,9 @@ def view_summaries(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
 def view_authorities(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     cluster = get_object_or_404(OpinionCluster, pk=pk)
 
-    return render(
+    return TemplateResponse(
         request,
-        "view_opinion_authorities.html",
+        "opinion_authorities.html",
         {
             "title": get_case_title(cluster),
             "cluster": cluster,
@@ -587,9 +631,9 @@ def cluster_visualizations(
     request: HttpRequest, pk: int, slug: str
 ) -> HttpResponse:
     cluster = get_object_or_404(OpinionCluster, pk=pk)
-    return render(
+    return TemplateResponse(
         request,
-        "view_opinion_visualizations.html",
+        "opinion_visualizations.html",
         {
             "title": get_case_title(cluster),
             "cluster": cluster,
@@ -599,7 +643,7 @@ def cluster_visualizations(
 
 
 def throw_404(request: HttpRequest, context: Dict) -> HttpResponse:
-    return render(
+    return TemplateResponse(
         request,
         "volumes_for_reporter.html",
         context,
@@ -608,7 +652,7 @@ def throw_404(request: HttpRequest, context: Dict) -> HttpResponse:
 
 
 def reporter_or_volume_handler(
-    request: HttpRequest, reporter: str, volume: Optional[str] = None
+    request: HttpRequest, reporter: str, volume: str | None = None
 ) -> HttpResponse:
     """Show all the volumes for a given reporter abbreviation or all the cases
     for a reporter-volume dyad.
@@ -654,7 +698,7 @@ def reporter_or_volume_handler(
                 },
             )
 
-        return render(
+        return TemplateResponse(
             request,
             "volumes_for_reporter.html",
             {
@@ -710,7 +754,7 @@ def reporter_or_volume_handler(
     except EmptyPage:
         cases = paginator.page(paginator.num_pages)
 
-    return render(
+    return TemplateResponse(
         request,
         "volumes_for_reporter.html",
         {
@@ -767,7 +811,7 @@ def citation_handler(
     else:
         cluster_count = clusters.count()
 
-    if cluster_count == 0:
+    if cluster_count == 0 and page.isdigit():
         # Do a second pass for the closest opinion and check if we have
         # a page cite that matches -- if it does give the requested opinion
         possible_match = (
@@ -793,7 +837,7 @@ def citation_handler(
     # Show the correct page....
     if cluster_count == 0:
         # No results for an otherwise valid citation.
-        return render(
+        return TemplateResponse(
             request,
             "citation_redirect_info_page.html",
             {
@@ -826,11 +870,97 @@ def citation_handler(
     return HttpResponse(status=500)
 
 
+def make_citation_url_dict(
+    reporter: str, volume: str | None, page: str | None
+) -> dict[str, str]:
+    """Make a dict of the volume/reporter/page, but only if truthy."""
+    d = {"reporter": reporter}
+    if volume:
+        d["volume"] = volume
+    if page:
+        d["page"] = page
+    return d
+
+
+def attempt_reporter_variation(
+    request: HttpRequest,
+    reporter: str,
+    volume: str | None,
+    page: str | None,
+) -> HttpResponse:
+    """Try to disambiguate an unknown reporter using the variations dict.
+
+    The variations dict looks like this:
+
+        {
+         "A. 2d": ["A.2d"],
+         ...
+         "P.R.": ["Pen. & W.", "P.R.R.", "P."],
+        }
+
+    This means that there can be more than one canonical reporter for a given
+    variation. When that happens, we give up. When there's exactly one, we
+    redirect to the canonical variation. When there's zero, we give up.
+
+    :param request: The HTTP request
+    :param reporter: The reporter string we're trying to look up, e.g., "f-3d"
+    :param volume: The volume requested, if provided
+    :param page: The page requested, if provided
+    """
+    # Make a slugified variations dict
+    slugified_variations = {}
+    for variant, canonicals in VARIATIONS_ONLY.items():
+        slugged_canonicals = []
+        for canonical in canonicals:
+            slugged_canonicals.append(slugify(canonical))
+        slugified_variations[str(slugify(variant))] = slugged_canonicals
+
+    # Look up the user's request in the variations dict
+    possible_canonicals = slugified_variations.get(reporter, [])
+    if len(possible_canonicals) == 0:
+        # Couldn't find it as a variation. Give up.
+        return throw_404(
+            request,
+            {"no_reporters": True, "reporter": reporter, "private": True},
+        )
+
+    elif len(possible_canonicals) == 1:
+        # Unambiguous reporter variation. Great. Redirect to the canonical
+        # reporter
+        return HttpResponseRedirect(
+            reverse(
+                "citation_redirector",
+                kwargs=make_citation_url_dict(
+                    possible_canonicals[0], volume, page
+                ),
+            ),
+        )
+
+    elif len(possible_canonicals) > 1:
+        # The reporter variation is ambiguous b/c it can refer to more than
+        # one reporter. Abort with a 300 status.
+        return HttpResponse(
+            content=loader.render_to_string(
+                "citation_redirect_info_page.html",
+                {
+                    "too_many_reporter_variations": True,
+                    "reporter": reporter,
+                    "possible_canonicals": possible_canonicals,
+                    "private": True,
+                },
+                request=request,
+            ),
+            status=HTTP_300_MULTIPLE_CHOICES,
+        )
+    else:
+        return HttpResponse(status=500)
+
+
 def citation_redirector(
     request: HttpRequest,
-    reporter: Optional[str] = None,
-    volume: Optional[str] = None,
-    page: Optional[str] = None,
+    reporter: str,
+    volume: str | None = None,
+    page: str | None = None,
 ) -> HttpResponse:
     """Take a citation URL and use it to redirect the user to the canonical
     page for that citation.
@@ -838,6 +968,42 @@ def citation_redirector(
     This uses the same infrastructure as the thing that identifies citations in
     the text of opinions.
     """
+    reporter_slug = slugify(reporter)
+
+    if reporter != reporter_slug:
+        # Reporter provided in non-slugified form. Redirect to slugified
+        # version.
+
+        return HttpResponseRedirect(
+            reverse(
+                "citation_redirector",
+                kwargs=make_citation_url_dict(
+                    reporter_slug,
+                    volume,
+                    page,
+                ),
+            ),
+        )
+
+    # Look up the slugified reporter to get its proper version (so-2d -> So. 2d)
+    slugified_editions = {str(slugify(item)): item for item in EDITIONS.keys()}
+    proper_reporter = slugified_editions.get(reporter, None)
+    if not proper_reporter:
+        return attempt_reporter_variation(request, reporter, volume, page)
+
+    # We have a reporter (show volumes in it), a volume (show cases in
+    # it), or a citation (show matching citation(s))
+    if proper_reporter and volume and page:
+        return citation_handler(request, proper_reporter, volume, page)
+    elif proper_reporter and volume and page is None:
+        return reporter_or_volume_handler(request, proper_reporter, volume)
+    elif proper_reporter and volume is None and page is None:
+        return reporter_or_volume_handler(request, proper_reporter)
+    return HttpResponse(status=500)
+
+
+def citation_homepage(request: HttpRequest) -> HttpResponse:
+    """Show the citation homepage"""
     if request.method == "POST":
         form = CitationRedirectorForm(request.POST)
         if form.is_valid():
@@ -848,58 +1014,24 @@ def citation_redirector(
             )
         else:
             # Error in form, somehow.
-            return render(
+            return TemplateResponse(
                 request,
                 "citation_redirect_info_page.html",
                 {"show_homepage": True, "form": form, "private": False},
             )
 
-    if all(_ is None for _ in (reporter, volume, page)):
-        # No parameters. Show the citation lookup homepage.
-        form = CitationRedirectorForm()
-        reporter_dict = make_reporter_dict()
-        return render(
-            request,
-            "citation_redirect_info_page.html",
-            {
-                "show_homepage": True,
-                "reporter_dict": reporter_dict,
-                "form": form,
-                "private": False,
-            },
-        )
-
-    if reporter:
-        reporter_slug = slugify(reporter)
-        if reporter != reporter_slug:
-            # Reporter provided in non-slugified form. Redirect to slugified
-            # version.
-            cd = {"reporter": reporter_slug}
-            if volume:
-                cd["volume"] = volume
-            if page:
-                cd["page"] = page
-            return HttpResponseRedirect(
-                reverse("citation_redirector", kwargs=cd)
-            )
-
-    # Look up the slugified reporter to get its proper version (so-2d -> So. 2d)
-    slug_edition = {slugify(item): item for item in EDITIONS.keys()}
-    proper_reporter = slug_edition.get(SafeText(reporter), None)
-    if not proper_reporter:
-        return throw_404(
-            request,
-            {"no_reporters": True, "reporter": reporter, "private": False},
-        )
-    # We have a reporter (show volumes in it), a volume (show cases in
-    # it), or a citation (show matching citation(s))
-    if proper_reporter and volume and page:
-        return citation_handler(request, proper_reporter, volume, page)
-    elif proper_reporter and volume and page is None:
-        return reporter_or_volume_handler(request, proper_reporter, volume)
-    elif proper_reporter and volume is None and page is None:
-        return reporter_or_volume_handler(request, proper_reporter)
-    return HttpResponse(status=500)
+    form = CitationRedirectorForm()
+    reporter_dict = make_reporter_dict()
+    return TemplateResponse(
+        request,
+        "citation_redirect_info_page.html",
+        {
+            "show_homepage": True,
+            "reporter_dict": reporter_dict,
+            "form": form,
+            "private": False,
+        },
+    )
 
 
 @ensure_csrf_cookie

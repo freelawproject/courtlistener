@@ -1,0 +1,48 @@
+{% load widget_tweaks %}
+{% if results %}
+  {% for webhook in results %}
+    <tr>
+      <td>
+        <p class="bottom ">
+         {{ webhook.webhook.get_event_type_display }}
+        </p>
+      </td>
+      <td>
+        <p class="bottom bold {{ webhook.event_status|webhook_status_class }}">
+          {{ webhook.get_event_status_display }}
+        </p>
+      </td>
+      <td>
+        <p class="bottom bold text-center">
+          {% if webhook.status_code %}
+            {{ webhook.status_code }}
+          {% else %}
+            -
+          {% endif %}
+        </p>
+      </td>
+      <td>{{ webhook.date_created }}</td>
+      {% if not webhook.debug %}
+        <td class="text-center">
+          {% if webhook.next_retry_date %}
+            {{ webhook.next_retry_date }}
+          {% else %}
+            -
+          {% endif %}
+        </td>
+      {% endif %}
+      <td class="right">
+        <div class="flex justify-content-end">
+          <a href="{% url "view_webhook_logs_detail" pk=webhook.id %}" id='btn-test-{{ webhook.id }}' class="btn btn-primary btn-xs">
+            <i class="fa fa-info"></i>&nbsp;Detail
+          </a>
+        </div>
+      </td>
+    </tr>
+  {% endfor %}
+  <tr>
+    <td colspan="100%">
+      {% include "includes/pagination.html" %}
+    </td>
+  </tr>
+{% endif %}

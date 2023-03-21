@@ -32,6 +32,7 @@ class DocketAlertAdmin(admin.ModelAdmin):
         "docket",
         "user",
     )
+    readonly_fields = ("date_created", "date_modified")
 
 
 class DocketAlertInline(admin.TabularInline):

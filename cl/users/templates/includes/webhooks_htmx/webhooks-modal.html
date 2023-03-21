@@ -1,0 +1,22 @@
+{% load humanize %}
+<div id="webhook-modal"
+     class="modal hidden-print text-left"
+     role="dialog"
+     aria-hidden="true"
+     tabindex="-1">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span>
+        </button>
+        <h2 class="modal-title">Add webhook endpoint</h2>
+      </div>
+      <div class="modal-body" id="webhooks-body" hx-target="#webhook-form">
+      </div>
+      <div class="modal-body" id="webhooks-body-testing">
+      </div>
+    </div>
+  </div>
+</div>
+
+

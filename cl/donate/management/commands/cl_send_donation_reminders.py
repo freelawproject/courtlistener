@@ -1,4 +1,5 @@
 from datetime import timedelta
+from decimal import Decimal
 
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives
@@ -22,12 +23,11 @@ class Command(VerboseCommand):
         super(Command, self).__init__(*args, **kwargs)
         self.new_doc_count = 0
         self.court_count = 0
-        self.bulk_data_count = 0
         self.alerts_sent_count = 0
         self.users = []
         self.verbosity = 0
 
-    def gather_stats_and_users(self):
+    def gather_stats_and_users(self) -> None:
         about_a_year_ago = now() - timedelta(days=355)
 
         # Gather some stats to email
@@ -35,9 +35,6 @@ class Command(VerboseCommand):
             date_created__gte=about_a_year_ago
         ).count()
         self.court_count = Court.objects.all().count()
-        self.bulk_data_count = Stat.objects.filter(
-            name__startswith="bulk_data", date_logged__gte=about_a_year_ago
-        ).aggregate(Sum("count"))["count__sum"]
         self.alerts_sent_count = Stat.objects.filter(
             name="alerts.sent", date_logged__gte=about_a_year_ago
         ).aggregate(Sum("count"))["count__sum"]
@@ -49,7 +46,7 @@ class Command(VerboseCommand):
             donations__status=Donation.PROCESSED,
         ).annotate(Sum("donations__amount"))
 
-    def send_reminder_email(self, user, amount):
+    def send_reminder_email(self, user: User, amount: Decimal) -> None:
         """Send an email imploring the person for another donation."""
         email_subject = "Please donate again to Free Law Project"
         email_sender = "CourtListener <mike@courtlistener.com>"
@@ -58,7 +55,6 @@ class Command(VerboseCommand):
         context = {
             "amount": amount,
             "new_doc_count": self.new_doc_count,
-            "bulk_data_count": self.bulk_data_count,
             "alerts_sent_count": self.alerts_sent_count,
             "court_count": self.court_count,
         }
@@ -70,7 +66,7 @@ class Command(VerboseCommand):
         msg.attach_alternative(html, "text/html")
         msg.send(fail_silently=False)
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options) -> None:
         super(Command, self).handle(*args, **options)
         self.verbosity = options.get("verbosity", 1)
         self.gather_stats_and_users()

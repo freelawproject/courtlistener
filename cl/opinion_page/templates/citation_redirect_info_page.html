@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% load text_filters %}
-{% load cache %}
-{% load partition_util %}
+{% load cache extras partition_util text_filters %}
+
+{% block canonical %}{% get_canonical_element %}{% endblock %}
 
 {% block sidebar %}{% endblock %}
 
@@ -16,6 +16,8 @@
             Citation Not Found (404) – CourtListener.com
         {% elif too_many %}
           {{ citation_str }}: Several Citations Found – CourtListener.com
+        {% elif too_many_reporter_variations %}
+          Too many reporter variations – CourtListener.com
         {% endif %}
     {% endif %}
 {% endblock %}
@@ -28,6 +30,8 @@
       Citation Not Found (404) – CourtListener.com
     {% elif too_many %}
       {{ citation_str }}: Several Citations Found – CourtListener.com
+    {% elif too_many_reporter_variations %}
+      Too many reporter variations – CourtListener.com
     {% endif %}
   {% endif %}
 {% endblock %}
@@ -125,18 +129,31 @@
                 <p>In most jurisdictions, citations are unavailable at the time of
                     publication, making this a particularly thorny problem.
                 </p>
+                <p class="v-offset-above-2">
+                  <a href="{% url "citation_homepage" %}"
+                     class="btn btn-primary btn-lg">Look Up Another Citation</a>
+                </p>
             {% elif too_many %}
                 <h1 class="v-offset-below-2">Found More than One Result for "{{ citation_str|nbsp }}"</h1>
                 <ul>
                     {% for cluster in clusters %}
                         <li>
-                            <a href="{{ cluster.get_absolute_url }}">{{ cluster.caption|safe|v_wrapper }}</a>
+                            <a href="{{ cluster.get_absolute_url }}"
+                               {% if cluster.blocked %}rel="nofollow"{% endif %}>{{ cluster.caption|safe|v_wrapper }}</a>
                             <br>
                             {{ cluster.docket.court }} |
                             {{ cluster.date_filed }}
                         </li>
                     {% endfor %}
                 </ul>
+            {% elif too_many_reporter_variations %}
+              <h1 class="v-offset-below-2">Found More Than One Possible Reporter for "{{ reporter|nbsp }}"</h1>
+              <p>This reporter could be a variation of {{ possible_canonicals|oxford_join:"or" }}.</p>
+              <p>Unfortunately, we have no way of knowing which.</p>
+              <p class="v-offset-above-2">
+                <a href="{% url "citation_homepage" %}"
+                   class="btn btn-primary btn-lg">Look Up Another Citation</a>
+              </p>
             {% endif %}
         </div>
         <div class="col-md-3"></div>

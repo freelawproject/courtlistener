@@ -92,6 +92,10 @@ def needs_ocr(content):
     line usually looks something like:
 
     Case 2:06-cv-00376-SRW Document 1-2 Filed 04/25/2006 Page 1 of 1
+    Appeal: 15-1504 Doc: 6 Filed: 05/12/2015 Pg: 1 of 4
+    Appellate Case: 14-3253 Page: 1 Date Filed: 01/14/2015 Entry ID: 4234486
+    USCA Case #16-1062 Document #1600692 Filed: 02/24/2016 Page 1 of 3
+    USCA11 Case: 21-12355 Date Filed: 07/13/202 Page: 1 of 2
 
     This function removes these lines so that if no text remains, we can be sure
     that the PDF needs OCR.
@@ -101,7 +105,7 @@ def needs_ocr(content):
     """
     for line in content.splitlines():
         line = line.strip()
-        if line.startswith("Case"):
+        if line.startswith(("Case", "Appellate", "Appeal", "USCA")):
             continue
         elif line:
             # We found a line with good content. No OCR needed.

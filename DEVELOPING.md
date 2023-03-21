@@ -105,6 +105,8 @@ To set up a development machine, do the following:
 
     If this does not make an object that you want for your work, you should update it so it does. It's a relatively new tool and it's growing as we use it.
 
+    If you need specific data from CourtListener (to debug something, say), you can use `clone_from_cl`, which pulls data from the CourtListener API into your dev database.
+
 1. Finally, create a new superuser login by running this command, and entering the required information:
 
     `docker exec -it cl-django python /opt/courtlistener/manage.py createsuperuser`
@@ -141,7 +143,7 @@ Then run something like `docker restart cl-django` and you should be good, or if
 2. Add your problem here...
 
 
-## Code upgrades
+## Ongoing code upgrades you should do when possible
 
 Python and its ecosystem are always evolving. There are a number of best practices that we do to try to keep up:
 
@@ -204,6 +206,8 @@ for Intellij/PyCharm/et al.
         Fixes: #xyz
 
     We welcome LONG commit messages that could literally double as blog posts. If somebody is looking at the commit in five years, they *want* an essay, not a tweet.
+
+1. PR's that do anything visual (email templates, HTML pages, etc) should include a comment with a screenshot or gif of the visual changes.
 
 1. *KEEP YOUR PR's SMALL*. A good PR should land a specific thing of some sort.
 It doesn't have to be done — it doesn't even have to work! — but it should be
@@ -364,6 +368,8 @@ There are some helper methods provided via `BaseSeleniumTest` as well:
 * `assert_text_not_in_body(text)` - similar to previous, but tests that text is NOT in the body, failing if it's found.
 * `extract_result_count_from_serp()` - if on the search result page, will attempt to find and parse the total results found count into a number and return it.
 
+*Windows/WSL Tip:* If you are running tests on a Windows machine with WSL you probably hit a wall because we don't have a /dev/shm directory and this won't let you run the selenium tests. To fix this: you need to get the full path to /dev/shm or /run/shm from your WSL virtual machine, in my case is: *\\wsl.localhost\Ubuntu-20.04\run\shm* (you can get this path from Windows explorer), the next thing to do is to set the environment variable *CL_SHM_DIR* to that path and then restart your *cl-selenium* container.
+
 ##### Viewing the Remote Selenium Browser
 
 You can watch the remote selenium browser using VNC. To do so, start a VNC client, and then connect to:
@@ -421,18 +427,18 @@ Now, when executing a task you'll be able to monitor it with celery events.
 
 Once an amazing new feature has been added to CL or to an import dependency (ie Juriscraper) one might need to update the docker image.
 
-To do this:
+Use CI/CD to do this automatically (see below), or if you're impatient:
 
-1) Update the version numbers and version logs in `docker/django/version.txt`.
-2) Push to `main`
-3) Build and push new images with `make push --file docker/django/Makefile`
+1) Push to `main`
+
+2) Build and push new images with `make push --file docker/django/Makefile`
 
 
 ### CI/CD
 
 We use Github Actions to run the full test and linting suite on every push. If the tests fail or your code is not formatted properly according to our linters, your code probably won't get merged.
 
-We also automatically build and push new docker images using github actions when merging new code into main (with version bumps).
+When code is merged into `main`, we also automatically build and push new docker images, then deploy that code to our kubernetes cluster. If the code has a database migration, it is not deployed without manual review and a re-run of the deploy step after the migration is applied by hand.
 
 
 [wiki]: https://github.com/freelawproject/courtlistener/wiki/Installing-CourtListener-on-Ubuntu-Linux

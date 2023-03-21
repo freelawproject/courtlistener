@@ -1,0 +1,65 @@
+{% extends "profile/nav.html" %}
+{% load static %}
+
+{% block title %}@recap.email – CourtListener.com{% endblock %}
+
+{% block nav-account %}active{% endblock %}
+{% block footer-scripts %}
+  {% if DEBUG %}
+    <script src="{% static "js/jquery.bootstrap-growl.js" %}"></script>
+    <script src="{% static "js/htmx.js" %}"></script>
+    <link href="{% static "css/bootstrap4-toggle.css" %}" rel="stylesheet">
+  {% else %}
+    <script src="{% static "js/jquery.bootstrap-growl.min.js" %}"></script>
+    <script src="{% static "js/htmx.min.js" %}"></script>
+    <link href="{% static "css/bootstrap4-toggle.min.css" %}" rel="stylesheet">
+  {% endif %}
+  <script defer
+          type="text/javascript" src="{% static "js/toggle_auto_subscribe.js" %}"></script>
+
+{% endblock %}
+
+{% block content %}
+  {# Navigation Tabs #}
+  {% include "includes/account-tabs.html" %}
+
+  <div class="col-sm-3"></div>
+  <div class="col-xs-12 col-sm-6">
+    <h1>@recap.email automated alerts</h1>
+    <p class="lead"><strong>@recap.email</strong> is a system that gathers CM/ECF notifications and adds them to the <a href="{% url 'advanced_r' %}">RECAP Archive</a>. If you receive notifications from PACER, it only takes a minute to set up this system and contribute content to the public commons.
+    </p>
+
+    <h2 class="v-offset-above-3">Your recap.email address</h2>
+    <p>To use the system, simply add this email address as a secondary recipient in your CM/ECF account:</p>
+
+    {% spaceless %}
+    <p class="alert-warning alert">
+      <b>{{ request.user.profile.recap_email }}</b>
+    </p>
+    {%  endspaceless %}
+    <p><a href="{% url "recap_email_help" %}#how-do-i-set-it-up" class="btn btn-lg btn-primary">Explain how</a></p>
+
+    <h2 class="v-offset-above-3">Auto-Subscribe to your cases</h2>
+    <p>With auto-subscribe on, we'll forward your notifications when we get them. To decide about each case manually, set auto-subscribe to off.</p>
+    <p>When auto-subscribe is off, we'll send you the first notification we get for a case, and it'll have a link for you to subscribe by hand.</p>
+
+    <hr>
+    <div class="recap-email-toggle text-center" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+      <label for="auto-subscribe"><b>Auto-subscribe to my recap.email cases: </b></label>
+      <div id="switch-button" class="toggle btn {% if auto_subscribe %}btn-primary {% else %} btn-light off {% endif %}"
+           hx-post="{% url "toggle_recap_email_auto_subscription" %}"
+           hx-swap="none" hx-include="[name=current_toggle_status]"
+           data-toggle="toggle" role="button">
+        <input name="current_toggle_status" type="hidden" value="{{auto_subscribe}}"/>
+        <div class="toggle-group">
+          <label for="auto-subscribe" class="btn btn-primary toggle-on">On</label>
+          <label for="auto-subscribe" class="btn btn-light toggle-off">Off</label>
+          <span class="toggle-handle btn btn-light"></span>
+        </div>
+      </div>
+    </div>
+    <hr>
+    <a href="{% url "recap_email_help" %}" class="btn btn-primary btn-lg">Learn more</a>
+  </div>
+  <div class="col-sm-3"></div>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}
+  {% if docket_alert_not_found is True %}
+    Docket Alert not found – CourtListener.com
+  {% else %}
+    Your Docket Alert is now {% if target_state == docket_alert.SUBSCRIPTION %} Enabled {% else %} Disabled {% endif %} – CourtListener.com
+  {% endif %}
+{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+  <div class="col-sm-2"></div>
+  <div class="col-sm-8">
+    <div class="text-center">
+      {% if docket_alert_not_found is True %}
+        <h1>
+          Sorry, we couldn't find the docket alert you're trying to {% if target_state == da_subscription_type %} subscribe {% else %} unsubscribe {% endif %}
+          {% if target_state == da_subscription_type %} to{% else %} from{% endif %}.
+        </h1>
+         <a href="{% url 'profile_docket_alerts' %}"
+               class="btn btn btn-primary btn-lg v-offset-above-3"><i class="fa fa-bell"
+         data-enable-icon-class="fa-bell"
+         data-disable-icon-class="fa-bell-slash-o"></i> Manage Alerts</a>
+      {% else %}
+        <h1>You Have {% if target_state == docket_alert.SUBSCRIPTION %} Enabled {% else %} Disabled {% endif %} This Docket Alert</h1>
+        <h3>You're now {% if target_state == docket_alert.SUBSCRIPTION %} subscribed {% else %} unsubscribed {% endif %}</h3>
+        <h3 class="gray alt">&mdash; {% if target_state == docket_alert.SUBSCRIPTION %} to {% else %} from {% endif %} &mdash;</h3>
+        {% include "includes/docket_alert_case_name.html" %}
+        <div class="row">
+          <div class="col-xs-6">
+            <a href="{{ docket_alert.docket.get_absolute_url }}"
+               class="btn btn-primary btn-lg btn-block"><i class="fa fa-arrow-circle-o-left"></i> View Docket</a>
+          </div>
+          <div class="col-xs-6">
+            <a href="{% url 'profile_docket_alerts' %}"
+               class="btn btn-success btn-lg btn-block"><i class="fa fa-bell"
+         data-enable-icon-class="fa-bell"
+         data-disable-icon-class="fa-bell-slash-o"></i> Manage Alerts</a>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+    {% include "includes/docket_alert_donation.html" %}
+  </div>
+{% endblock %}

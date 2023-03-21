@@ -11,10 +11,6 @@ This repository is organized in the following way:
  - scripts: logrotate, systemd, etc, and init scripts for our various configurations and daemons.
 
 
-## Architecture
-
-
-
 ## Getting Involved
 
 If you want to get involved send us an email with your contact info or take a look through the [issues list][issues]. There are innumerable things we need help with, but we especially are looking for help with:
@@ -39,7 +35,7 @@ All materials in this repository are copyright Free Law Project under the Affero
 
 ## Contact
 
-To contract Free Law Project, see here:
+To contact Free Law Project, see here:
 
 https://free.law/contact/
 

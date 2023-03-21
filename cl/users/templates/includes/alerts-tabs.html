@@ -1,0 +1,12 @@
+<div class="col-xs-12 v-offset-above-2 v-offset-below-2">
+  <ul class="nav nav-pills">
+    <li class="{% if page == "search_alerts" %} active {% endif %} medium">
+      <a href="{% url "profile_alerts" %}">
+        <i class="fa fa-search"></i> Search Alerts</a>
+    </li>
+    <li class="{% if page == "docket_alerts" %} active {% endif %} medium">
+      <a href="{% url "profile_docket_alerts" %}">
+        <i class="fa fa-file-text-o"></i> Docket Alerts</a>
+    </li>
+  </ul>
+</div>

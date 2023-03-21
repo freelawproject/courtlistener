@@ -11,6 +11,8 @@ from django.template import loader
 from django.utils.timezone import now
 
 from cl.alerts.models import Alert, RealTimeQueue
+from cl.api.models import WebhookEventType
+from cl.api.webhooks import send_search_alert_webhook
 from cl.lib import search_utils
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.scorched_utils import ExtraSolrInterface
@@ -112,7 +114,7 @@ class Command(VerboseCommand):
             self.remove_stale_rt_items()
             self.valid_ids = self.get_new_ids()
 
-        self.send_emails(options["rate"])
+        self.send_emails_and_webhooks(options["rate"])
         if options["rate"] == Alert.REAL_TIME:
             self.clean_rt_queue()
 
@@ -147,7 +149,11 @@ class Command(VerboseCommand):
                 # Bail out. No results will be found if no valid_ids.
                 return query_type, results
 
-            main_params = search_utils.build_main_query(cd, facet=False)
+            main_params = search_utils.build_main_query(
+                cd,
+                highlight="text",  # Required to show all field as in Search API
+                facet=False,
+            )
             main_params.update(
                 {
                     "rows": "20",
@@ -179,9 +185,9 @@ class Command(VerboseCommand):
         logger.info(f"There were {len(results)} results.")
         return qd, results
 
-    def send_emails(self, rate):
-        """Send out an email to every user whose alert has a new hit for a
-        rate.
+    def send_emails_and_webhooks(self, rate):
+        """Send out an email and webhook events to every user whose alert has a
+        new hit for a rate.
         """
         users = User.objects.filter(alerts__rate=rate).distinct()
 
@@ -216,12 +222,21 @@ class Command(VerboseCommand):
                 # paired with a list of document dicts, of the form:
                 # [[alert1, [{hit1}, {hit2}, {hit3}]], [alert2, ...]]
                 if len(results) > 0:
-                    hits.append(
-                        [alert, qd.get("type", SEARCH_TYPES.OPINION), results]
-                    )
+                    search_type = qd.get("type", SEARCH_TYPES.OPINION)
+                    hits.append([alert, search_type, results])
                     alert.query_run = qd.urlencode()
                     alert.date_last_hit = now()
                     alert.save()
+
+                    # Send webhook event if the user has a SEARCH_ALERT
+                    # endpoint enabled.
+                    user_webhooks = user.webhooks.filter(
+                        event_type=WebhookEventType.SEARCH_ALERT, enabled=True
+                    )
+                    for user_webhook in user_webhooks:
+                        send_search_alert_webhook(
+                            self.sis[search_type], results, user_webhook, alert
+                        )
 
             if len(hits) > 0:
                 alerts_sent_count += 1

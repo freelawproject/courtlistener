@@ -3,7 +3,8 @@ Unit tests for Visualizations
 """
 from typing import Any, Callable, Dict
 
-from django.contrib.auth.models import User
+from django.contrib.auth.hashers import make_password
+from django.contrib.auth.models import Permission, User
 from django.core.handlers.wsgi import WSGIRequest
 from django.test import RequestFactory
 from django.urls import reverse
@@ -19,8 +20,12 @@ from rest_framework.status import (
 from cl.search.models import OpinionCluster
 from cl.tests.cases import APITestCase, TestCase
 from cl.tests.utils import make_client
-from cl.users.models import UserProfile
+from cl.users.factories import (
+    UserProfileWithParentsFactory,
+    UserWithChildProfileFactory,
+)
 from cl.visualizations import views
+from cl.visualizations.factories import VisualizationFactory
 from cl.visualizations.forms import VizForm
 from cl.visualizations.models import JSONVersion, SCOTUSMap
 from cl.visualizations.network_utils import reverse_endpoints_if_needed
@@ -63,27 +68,23 @@ class TestVizUtils(TestCase):
 class TestVizModels(TestCase):
     """Tests for Visualization models"""
 
-    fixtures = ["scotus_map_data.json", "visualizations.json"]
-
-    def setUp(self) -> None:
-        self.user = User.objects.create_user("Joe", "joe@cl.com", "password")
-        self.start = OpinionCluster.objects.get(case_name="Marsh v. Chambers")
-        self.end = OpinionCluster.objects.get(
-            case_name="Town of Greece v. Galloway"
-        )
+    fixtures = ["scotus_map_data.json"]
 
     def test_SCOTUSMap_builds_nx_digraph(self) -> None:
         """Tests build_nx_digraph method to see how it works"""
-        viz = SCOTUSMap(
-            user=self.user,
-            cluster_start=self.start,
-            cluster_end=self.end,
+        start = OpinionCluster.objects.get(case_name="Marsh v. Chambers")
+        end = OpinionCluster.objects.get(
+            case_name="Town of Greece v. Galloway"
+        )
+        viz = VisualizationFactory.create(
+            cluster_start=start,
+            cluster_end=end,
             title="Test SCOTUSMap",
             notes="Test Notes",
         )
 
         build_kwargs = {
-            "parent_authority": self.end,
+            "parent_authority": end,
             "visited_nodes": {},
             "good_nodes": {},
             "max_hops": 3,
@@ -96,15 +97,13 @@ class TestVizModels(TestCase):
         """
         Make sure we delete JSONVersion instances when deleted SCOTUSMaps
         """
-        viz = SCOTUSMap.objects.get(pk=1)
-        json_version = JSONVersion.objects.get(map=viz.pk)
-        self.assertIsNotNone(json_version)
-        json_pk = json_version.pk
-
+        viz = VisualizationFactory.create(
+            title="Test SCOTUSMap",
+            notes="Test Notes",
+        )
+        self.assertGreater(viz.json_versions.all().count(), 0)
         viz.delete()
-
-        with self.assertRaises(JSONVersion.DoesNotExist):
-            JSONVersion.objects.get(pk=json_pk)
+        self.assertEqual(viz.json_versions.all().count(), 0)
 
 
 class TestViews(TestCase):
@@ -112,27 +111,37 @@ class TestViews(TestCase):
 
     view = "new_visualization"
 
-    fixtures = ["scotus_map_data.json", "visualizations.json"]
+    fixtures = ["scotus_map_data.json"]
 
-    def setUp(self) -> None:
-        self.start = OpinionCluster.objects.get(
-            case_name="Town of Greece v. Galloway"
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.regular_user = UserWithChildProfileFactory.create(
+            first_name="Userio",
+            username="regular_user",
+            password=make_password("password"),
+            profile__email_confirmed=True,
         )
-        self.end = OpinionCluster.objects.get(case_name="Marsh v. Chambers")
-        self.user = User.objects.create_user("user", "user@cl.com", "password")
-        self.user.save()
-        self.user_profile = UserProfile.objects.create(
-            user=self.user, email_confirmed=True
+        cls.viz = VisualizationFactory.create(
+            user=cls.regular_user,
+            notes="FREE KESHA",
+            published=True,
+            deleted=False,
         )
 
-    def tearDown(self) -> None:
-        SCOTUSMap.objects.all().delete()
-        JSONVersion.objects.all().delete()
+        cls.admin_user = UserWithChildProfileFactory.create(
+            username="admin",
+            password=make_password("password"),
+        )
+        cls.admin_user.is_superuser = True
+        cls.admin_user.is_staff = True
+        cls.admin_user.save()
 
     def test_new_visualization_view_provides_form(self) -> None:
         """Test a GET to the Visualization view provides a VizForm"""
         self.assertTrue(
-            self.client.login(username="user", password="password")
+            self.client.login(
+                username=self.regular_user.username, password="password"
+            )
         )
         response = self.client.get(reverse(self.view))
         self.assertEqual(response.status_code, 200)
@@ -140,10 +149,10 @@ class TestViews(TestCase):
 
     def test_new_visualization_view_creates_map_on_post(self) -> None:
         """Test a valid POST creates a new ScotusMap object"""
-        SCOTUSMap.objects.all().delete()
+        count_before = SCOTUSMap.objects.all().count()
 
         self.assertTrue(
-            self.client.login(username="user", password="password")
+            self.client.login(username="regular_user", password="password")
         )
         data = {
             "cluster_start": 2674862,
@@ -154,42 +163,55 @@ class TestViews(TestCase):
         response = self.client.post(reverse(self.view), data=data)
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(1, SCOTUSMap.objects.count())
+        self.assertEqual(count_before + 1, SCOTUSMap.objects.count())
 
         # Should not raise DoesNotExist exception.
-        _ = SCOTUSMap.objects.get(title="Test Map Title")
+        SCOTUSMap.objects.get(title="Test Map Title")
 
     def test_published_visualizations_show_in_gallery(self) -> None:
         """Test that a user can see published visualizations from others"""
         self.assertTrue(
-            self.client.login(username="user", password="password")
+            self.client.login(username="regular_user", password="password")
         )
         response = self.client.get(reverse("viz_gallery"))
         html = response.content.decode()
         html = " ".join(html.split())
-        self.assertIn("Shared by Admin", html)
+        self.assertIn("Shared by Userio", html)
         self.assertIn("FREE KESHA", html)
 
     def test_cannot_view_anothers_private_visualization(self) -> None:
         """Test unpublished visualizations cannot be seen by others"""
-        viz = SCOTUSMap.objects.get(pk=2)
+        viz = VisualizationFactory.create(
+            user=self.regular_user,
+            title="My Private Visualization",
+            published=False,
+            deleted=False,
+        )
+
         self.assertFalse(viz.published, "Test SCOTUSMap should be unpublished")
         url = reverse(
             "view_visualization", kwargs={"pk": viz.pk, "slug": viz.slug}
         )
 
+        # Created by regular user, so *can* see unpublished viz.
+        self.assertTrue(
+            self.client.login(username="regular_user", password="password")
+        )
+        response = self.client.get(url)
+        self.assertEqual(
+            response.status_code,
+            HTTP_200_OK,
+            msg=f"Didn't get {HTTP_200_OK}, got {response.status_code}, with HTML:\n{response.content.decode()}",
+        )
+        self.assertIn("My Private Visualization", response.content.decode())
+
+        # Not created by admin and we don't have special code to allow admins,
+        # so don't show viz.
         self.assertTrue(
             self.client.login(username="admin", password="password")
         )
         response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("My Private Visualization", response.content.decode())
-
-        self.assertTrue(
-            self.client.login(username="user", password="password")
-        )
-        response = self.client.get(url)
-        self.assertNotEqual(response.status_code, 200)
+        self.assertNotEqual(response.status_code, HTTP_200_OK)
         self.assertNotIn("My Private Visualization", response.content.decode())
 
     def test_view_counts_increment_by_one(self) -> None:
@@ -197,12 +219,17 @@ class TestViews(TestCase):
 
         Ensure that the date_modified does not change.
         """
-        viz = SCOTUSMap.objects.get(pk=1)
+        viz = VisualizationFactory.create(
+            user=self.regular_user,
+            published=True,
+            deleted=False,
+            view_count=10,
+        )
         old_view_count = viz.view_count
         old_date_modified = viz.date_modified
 
         self.assertTrue(
-            self.client.login(username="user", password="password")
+            self.client.login(username="regular_user", password="password")
         )
         response = self.client.get(viz.get_absolute_url())
 
@@ -341,16 +368,27 @@ class TestVizAjaxCrud(TestCase):
 class APIVisualizationTestCase(APITestCase):
     """Check that visualizations are created properly through the API."""
 
-    fixtures = [
-        "api_scotus_map_data.json",
-        "user_with_recap_api_access.json",
-        "authtest_data.json",
-    ]
+    fixtures = ["api_scotus_map_data.json"]
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        # Add the permissions to the user.
+        cls.up = UserProfileWithParentsFactory.create(
+            user__username="recap-user",
+            user__password=make_password("password"),
+        )
+        cls.ps = Permission.objects.filter(codename="has_recap_api_access")
+        cls.up.user.user_permissions.add(*cls.ps)
+
+        cls.pandora = UserProfileWithParentsFactory.create(
+            user__username="pandora",
+            user__password=make_password("password"),
+        )
 
     def setUp(self) -> None:
         self.path = reverse("scotusmap-list", kwargs={"version": "v3"})
-        self.client = make_client(6)
-        self.rando_client = make_client(1001)
+        self.client = make_client(self.up.user.pk)
+        self.rando_client = make_client(self.pandora.user.pk)
 
     def tearDown(self) -> None:
         SCOTUSMap.objects.all().delete()
@@ -424,7 +462,11 @@ class APIVisualizationTestCase(APITestCase):
         }
         response = self.client.post(self.path, data, format="json")
         res = response.json()
-        self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.status_code,
+            HTTP_400_BAD_REQUEST,
+            msg=f"Got {response.status_code} instead of {HTTP_400_BAD_REQUEST}. JSON was:\n{res}",
+        )
         self.assertEqual(
             res["cluster_start"][0],
             "Invalid hyperlink - Object does not exist.",

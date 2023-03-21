@@ -1,0 +1,64 @@
+Return-Path: <cmecf@ca2.uscourts.gov>
+Received: from icmecf201.gtwy.uscourts.gov (icmecf201.gtwy.uscourts.gov [63.241.40.204])
+ by inbound-smtp.us-west-2.amazonaws.com with SMTP id 7gb5mip3qpc0o829952dccgr7ne640iqlchr13g1
+ for archive@recap.email;
+ Tue, 30 Aug 2022 16:27:02 +0000 (UTC)
+X-SES-Spam-Verdict: PASS
+X-SES-Virus-Verdict: PASS
+Received-SPF: pass (spfCheck: domain of ca2.uscourts.gov designates 63.241.40.204 as permitted sender) client-ip=63.241.40.204; envelope-from=cmecf@ca2.uscourts.gov; helo=icmecf201.gtwy.uscourts.gov;
+Authentication-Results: amazonses.com;
+ spf=pass (spfCheck: domain of ca2.uscourts.gov designates 63.241.40.204 as permitted sender) client-ip=63.241.40.204; envelope-from=cmecf@ca2.uscourts.gov; helo=icmecf201.gtwy.uscourts.gov;
+ dmarc=none header.from=ca2.uscourts.gov;
+X-SES-RECEIPT: AEFBQUFBQUFBQUFGL2R2QUhrOHVaemhSM2t6QlNQSlgzbUhCV1ZLcnBuMWI2bmtCMGU2UExaMlBYSXdyS09YRXpCeTU2Y2xYcEw4Z01GVFoxNjgvdkhWTkNTQ2JPQms4V1o3QVNvRTJNZTRtUGpjUXVLWDZTb0sxODhBSS90N0s0OUlLakJFc2NuN2Z1VjBLYklXaWRNU3pCT3I1MjNzS0ljZnAwcGlkUXVDYVJmQjFlY1FaSWtzb0t1V1NyZ2xXUnd6QXh5azFvelYyY2Vhdlg0dzd1M0kwcUJZMGZ5SFV6OXNsUDY0aGZEbWpaaGFZTGFwZlFEV1pobDdlcEc4NGdkdFp4SkJnaEkzQTJjNnNOZHBlMkpOSjRvWkZrZFB1eTNWYVRVbXdlQm51ekpkOThBNnFvVVE9PQ==
+X-SES-DKIM-SIGNATURE: a=rsa-sha256; q=dns/txt; b=GFgY6ZPT0jIRlgqvd61UPt15YsHK03bdYRebLZbZiTeFPnzSc4gBK3KggCYoXiTA/sZxhFBioUTsF7TlEt+nAAgbN0ACqBhGm3Qqt4Sa/TvKP2VMmhBp8mzp0YzYCXJJWisss0nuPTK64UAk7jV5V1F31e9nfBxDg+khvV+mQ8w=; c=relaxed/simple; s=gdwg2y3kokkkj5a55z2ilkup5wp5hhxx; d=amazonses.com; t=1661876823; v=1; bh=ACt1NiFjv3Ptv6wBxO+mnDd4yNoyHxgQaNuH6Kfya1I=; h=From:To:Cc:Bcc:Subject:Date:Message-ID:MIME-Version:Content-Type:X-SES-RECEIPT;
+X-SBRS: None
+X-REMOTE-IP: 156.119.190.45
+Received: from ca2db.ca2.gtwy.dcn ([156.119.190.45])
+  by icmecf201.gtwy.uscourts.gov with ESMTP; 30 Aug 2022 12:27:01 -0400
+Received: from ca2db.ca2.gtwy.dcn (localhost.localdomain [127.0.0.1])
+	by ca2db.ca2.gtwy.dcn (8.14.4/8.14.4) with ESMTP id 27UGQokn072674
+	for <archive@recap.email>; Tue, 30 Aug 2022 12:26:51 -0400
+Date: Tue, 30 Aug 2022 12:26:50 -0400 (EDT)
+From: cmecf@ca2.uscourts.gov
+To: archive@recap.email
+Message-ID: <607127413.1551.1661876811004@ca2db.ca2.gtwy.dcn>
+Subject: 22-7 Elisa W. v. The City of New York "FRAP 28(j) Letter RECEIVED"
+MIME-Version: 1.0
+Content-Type: text/html; charset=UTF-8
+Content-Transfer-Encoding: 7bit
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8"><TITLE>22-7 Elisa W. v. The City of New York "FRAP 28(j) Letter RECEIVED"</TITLE>
+</HEAD>
+<BODY BGCOLOR="#FFFFDA" TEXT="#000000" LINK="#0000ff" VLINK="#551a8b" ALINK="#ff0000">
+<P><STRONG>
+***NOTE TO PUBLIC ACCESS USERS*** Judicial Conference of the United States policy permits attorneys of record and parties in a case (including pro se litigants) to receive one free electronic copy of all documents filed electronically, if receipt is required by law or directed by the filer.  PACER access fees apply to all other users.  To avoid later charges, download a copy of each document during this first viewing.</STRONG><BR>
+<P><CENTER><STRONG>Court of Appeals, 2nd Circuit</STRONG></CENTER>
+<P><STRONG>Notice of Docket Activity</STRONG><BR>
+<BR>
+The following transaction was filed on 08/30/2022
+<TABLE BORDER=0 CELLSPACING=3>
+<TR><TD><STRONG>Case Name:</STRONG></TD>
+<TD colspan='2'>Elisa W. v. The City of New York<BR>
+</TD></TR>
+<TR><TD><STRONG>Case Number:&nbsp;&nbsp;</STRONG></TD>
+<TD><A HREF="https://ecf.ca2.uscourts.gov/n/beam/servlet/TransportRoom?servlet=DocketReportFilter.jsp&caseId=56342">22-7</A></TD></TR>
+<TR><TD><STRONG>Document(s):</STRONG></TD>
+<TD><A HREF="https://ecf.ca2.uscourts.gov/docs1/00208991597?uid=17a9689a91098387">Document(s)</A></TD></TR>
+</TABLE><BR>
+<P><STRONG>Docket Text:</STRONG><BR>
+FRAP 28(j) LETTER, dated 08/30/2022, on behalf of Appellee Sheila J. Poole, RECEIVED. Service date 08/30/2022 by CM/ECF.[3373872] [22-7]<BR>
+<BR>
+<STRONG>Notice will be electronically mailed to:</STRONG><BR><BR>
+Mr. Testing User, -: archive@recap.email<BR>
+Quality Control 1<BR>
+<BR>
+The following document(s) are associated with this transaction:<BR>
+<STRONG>Document Description: </STRONG>FRAP 28(j) Letter RECEIVED<BR>
+<STRONG>Original Filename: </STRONG>22-7 - Poole - Response to Pls' 28(j) Letter (Wyatt B.) - FINAL (8.30.2022) PDFA.pdf<BR>
+<STRONG>Electronic Document Stamp:</STRONG><BR>
+[STAMP acecfStamp_ID=1161632333 [Date=08/30/2022] [FileNumber=3373872-0] [5e911b6b50a4552b54141e24c299b6d60a798a86fdd266a47c0878ea6eda9a911162f349f3fe80d652b982353a4fa47c8b40c39f4955247f92b8332957c5c808]]<BR>
+<BR>
+</BODY></HTML>

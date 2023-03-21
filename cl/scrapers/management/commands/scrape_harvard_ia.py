@@ -4,13 +4,16 @@
 import json
 import os
 import re
+import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TypedDict
+from typing import List, Optional, TypedDict
 
 import internetarchive as ia
 import requests
 from django.conf import settings
 from internetarchive import ArchiveSession
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from cl.lib.argparse_types import _argparse_volumes
 from cl.lib.command_utils import VerboseCommand, logger
@@ -82,8 +85,18 @@ def download_file(ia_key: str, file_name) -> None:
 
     logger.info("Capturing: %s", url)
     Path(directory).mkdir(parents=True, exist_ok=True)
-
-    data = requests.get(url, timeout=10).json()
+    # Create session to retry timeouts with backoff events
+    session = requests.Session()
+    session.mount(
+        "https://",
+        HTTPAdapter(
+            max_retries=Retry(
+                total=5,
+                backoff_factor=10,
+            )
+        ),
+    )
+    data = session.get(url, timeout=15).json()
     with open(file_path, "w") as outfile:
         json.dump(data, outfile, indent=2)
 

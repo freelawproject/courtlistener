@@ -1,6 +1,9 @@
 import re
+from datetime import datetime
 from typing import Any, Dict, List, Tuple, TypeVar
 
+import pghistory
+import pytz
 from celery.canvas import chain
 from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
@@ -31,15 +34,26 @@ from cl.lib.storage import IncrementingAWSMediaStorage
 from cl.lib.string_utils import trunc
 from cl.lib.utils import deepgetattr
 
-DOCUMENT_STATUSES = (
-    ("Published", "Precedential"),
-    ("Unpublished", "Non-Precedential"),
-    ("Errata", "Errata"),
-    ("Separate", "Separate Opinion"),
-    ("In-chambers", "In-chambers"),
-    ("Relating-to", "Relating-to orders"),
-    ("Unknown", "Unknown Status"),
-)
+
+class PRECEDENTIAL_STATUS:
+    PUBLISHED = "Published"
+    UNPUBLISHED = "Unpublished"
+    ERRATA = "Errata"
+    SEPARATE = "Separate"
+    IN_CHAMBERS = "In-chambers"
+    RELATING_TO = "Relating-to"
+    UNKNOWN = "Unknown"
+
+    NAMES = (
+        (PUBLISHED, "Precedential"),
+        (UNPUBLISHED, "Non-Precedential"),
+        (ERRATA, "Errata"),
+        (SEPARATE, "Separate Opinion"),
+        (IN_CHAMBERS, "In-chambers"),
+        (RELATING_TO, "Relating-to orders"),
+        (UNKNOWN, "Unknown Status"),
+    )
+
 
 SOURCES = (
     ("C", "court website"),
@@ -66,6 +80,9 @@ SOURCES = (
 )
 
 
+@pghistory.track(
+    pghistory.Snapshot(),
+)
 class OriginatingCourtInformation(AbstractDateTimeModel):
     """Lower court metadata to associate with appellate cases.
 
@@ -168,6 +185,10 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
         verbose_name_plural = "Originating Court Information"
 
 
+@pghistory.track(
+    pghistory.Snapshot(),
+    exclude=["view_count"],
+)
 class Docket(AbstractDateTimeModel):
     """A class to sit above OpinionClusters, Audio files, and Docket Entries,
     and link them together.
@@ -196,7 +217,8 @@ class Docket(AbstractDateTimeModel):
     COLUMBIA_AND_SCRAPER_AND_IDB = 14
     COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB = 15
     HARVARD = 16
-    SCRAPER_AND_HARVARD = 17  # This should be 18; 17 s/b HARVARD_AND_RECAP.
+    HARVARD_AND_RECAP = 17
+    SCRAPER_AND_HARVARD = 18
     DIRECT_INPUT = 32
     ANON_2020 = 64
     ANON_2020_AND_SCRAPER = 66
@@ -223,6 +245,7 @@ class Docket(AbstractDateTimeModel):
             "Columbia, RECAP, Scraper, and IDB",
         ),
         (HARVARD, "Harvard"),
+        (HARVARD_AND_RECAP, "Harvard and RECAP"),
         (SCRAPER_AND_HARVARD, "Scraper and Harvard"),
         (DIRECT_INPUT, "Direct court input"),
         (ANON_2020, "2020 anonymous database"),
@@ -578,6 +601,10 @@ class Docket(AbstractDateTimeModel):
         unique_together = ("docket_number", "pacer_case_id", "court")
         indexes = [
             models.Index(fields=["court_id", "id"]),
+            models.Index(
+                fields=["court_id", "docket_number_core", "pacer_case_id"],
+                name="district_court_docket_lookup_idx",
+            ),
         ]
 
     def __str__(self) -> str:
@@ -592,8 +619,15 @@ class Docket(AbstractDateTimeModel):
             self.docket_number_core = make_docket_number_core(
                 self.docket_number
             )
+
         if self.source in self.RECAP_SOURCES:
             for field in ["pacer_case_id", "docket_number"]:
+                if (
+                    field == "pacer_case_id"
+                    and getattr(self, "court", None)
+                    and self.court.jurisdiction == Court.FEDERAL_APPELLATE
+                ):
+                    continue
                 if not getattr(self, field, None):
                     raise ValidationError(
                         f"'{field}' cannot be Null or empty in RECAP dockets."
@@ -615,6 +649,7 @@ class Docket(AbstractDateTimeModel):
             self.SCRAPER_AND_IDB,
             self.COLUMBIA_AND_IDB,
             self.COLUMBIA_AND_SCRAPER_AND_IDB,
+            self.HARVARD,
         ]:
             # Simply add the RECAP value to the other value.
             self.source = self.source + self.RECAP
@@ -664,25 +699,38 @@ class Docket(AbstractDateTimeModel):
             self.pacer_case_id,
         )
 
+    def pacer_appellate_url_with_caseId(self, path):
+        return (
+            f"https://ecf.{self.pacer_court_id}.uscourts.gov"
+            f"{path}"
+            f"servlet=CaseSummary.jsp&"
+            f"caseId={self.pacer_case_id}&"
+            f"incOrigDkt=Y&"
+            f"incDktEntries=Y"
+        )
+
+    def pacer_appellate_url_with_caseNum(self, path):
+        return (
+            f"https://ecf.{self.pacer_court_id}.uscourts.gov"
+            f"{path}"
+            f"servlet=CaseSummary.jsp&"
+            f"caseNum={self.docket_number}&"
+            f"incOrigDkt=Y&"
+            f"incDktEntries=Y"
+        )
+
     @property
     def pacer_docket_url(self):
-        if not self.pacer_case_id:
-            return None
-
         if self.court.jurisdiction == Court.FEDERAL_APPELLATE:
             if self.court.pk in ["ca5", "ca7", "ca11"]:
                 path = "/cmecf/servlet/TransportRoom?"
             else:
                 path = "/n/beam/servlet/TransportRoom?"
 
-            return (
-                f"https://ecf.{self.pacer_court_id}.uscourts.gov"
-                f"{path}"
-                f"servlet=CaseSummary.jsp&"
-                f"caseId={self.pacer_case_id}&"
-                f"incOrigDkt=Y&"
-                f"incDktEntries=Y"
-            )
+            if not self.pacer_case_id:
+                return self.pacer_appellate_url_with_caseNum(path)
+            else:
+                return self.pacer_appellate_url_with_caseId(path)
         else:
             return self.pacer_district_url("DktRpt.pl")
 
@@ -922,6 +970,31 @@ class Docket(AbstractDateTimeModel):
             )
 
 
+@pghistory.track(
+    pghistory.Snapshot(),
+    obj_field=None,
+)
+class DocketTags(Docket.tags.through):
+    """A model class to track docket tags m2m relation"""
+
+    class Meta:
+        proxy = True
+
+
+@pghistory.track(
+    pghistory.Snapshot(),
+    obj_field=None,
+)
+class DocketPanel(Docket.panel.through):
+    """A model class to track docket panel m2m relation"""
+
+    class Meta:
+        proxy = True
+
+
+@pghistory.track(
+    pghistory.Snapshot(),
+)
 class DocketEntry(AbstractDateTimeModel):
     docket = models.ForeignKey(
         Docket,
@@ -947,7 +1020,18 @@ class DocketEntry(AbstractDateTimeModel):
         blank=True,
     )
     date_filed = models.DateField(
-        help_text="The created date of the Docket Entry.",
+        help_text=(
+            "The created date of the Docket Entry according to the "
+            "court timezone."
+        ),
+        null=True,
+        blank=True,
+    )
+    time_filed = models.TimeField(
+        help_text=(
+            "The created time of the Docket Entry according to the court "
+            "timezone, null if no time data is available."
+        ),
         null=True,
         blank=True,
     )
@@ -1005,6 +1089,30 @@ class DocketEntry(AbstractDateTimeModel):
     def __str__(self) -> str:
         return f"{self.pk} ---> {trunc(self.description, 50, ellipsis='...')}"
 
+    @property
+    def datetime_filed(self) -> datetime | None:
+        if self.time_filed:
+            from cl.recap.constants import COURT_TIMEZONES
+
+            local_timezone = pytz.timezone(
+                COURT_TIMEZONES.get(self.docket.court.id, "US/Eastern")
+            )
+            return local_timezone.localize(
+                datetime.combine(self.date_filed, self.time_filed)
+            )
+        return None
+
+
+@pghistory.track(
+    pghistory.Snapshot(),
+    obj_field=None,
+)
+class DocketEntryTags(DocketEntry.tags.through):
+    """A model class to track docket entry tags m2m relation"""
+
+    class Meta:
+        proxy = True
+
 
 class AbstractPacerDocument(models.Model):
     date_upload = models.DateTimeField(
@@ -1060,6 +1168,9 @@ class AbstractPacerDocument(models.Model):
         abstract = True
 
 
+@pghistory.track(
+    pghistory.Snapshot(),
+)
 class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
     """The model for Docket Documents and Attachments."""
 
@@ -1148,7 +1259,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             )
 
     @property
-    def pacer_url(self):
+    def pacer_url(self) -> str | None:
         """Construct a doc1 URL for any item, if we can. Else, return None."""
         from cl.lib.pacer import map_cl_to_pacer_id
 
@@ -1156,12 +1267,11 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         court_id = map_cl_to_pacer_id(court.pk)
         if self.pacer_doc_id:
             if court.jurisdiction == Court.FEDERAL_APPELLATE:
-                path = "docs1"
+                template = "https://ecf.%s.uscourts.gov/docs1/%s?caseId=%s"
             else:
-                path = "doc1"
-            return "https://ecf.%s.uscourts.gov/%s/%s?caseid=%s" % (
+                template = "https://ecf.%s.uscourts.gov/doc1/%s?caseid=%s"
+            return template % (
                 court_id,
-                path,
                 self.pacer_doc_id,
                 self.docket_entry.docket.pacer_case_id,
             )
@@ -1409,6 +1519,20 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         return normalize_search_dicts(out)
 
 
+@pghistory.track(
+    pghistory.Snapshot(),
+    obj_field=None,
+)
+class RECAPDocumentTags(RECAPDocument.tags.through):
+    """A model class to track recap document tags m2m relation"""
+
+    class Meta:
+        proxy = True
+
+
+@pghistory.track(
+    pghistory.Snapshot(),
+)
 class BankruptcyInformation(AbstractDateTimeModel):
     docket = models.OneToOneField(
         Docket,
@@ -1451,6 +1575,9 @@ class BankruptcyInformation(AbstractDateTimeModel):
         return f"Bankruptcy Info for docket {self.docket_id}"
 
 
+@pghistory.track(
+    pghistory.Snapshot(),
+)
 class Claim(AbstractDateTimeModel):
     docket = models.ForeignKey(
         Docket,
@@ -1565,6 +1692,20 @@ class Claim(AbstractDateTimeModel):
         )
 
 
+@pghistory.track(
+    pghistory.Snapshot(),
+    obj_field=None,
+)
+class ClaimTags(Claim.tags.through):
+    """A model class to track claim tags m2m relation"""
+
+    class Meta:
+        proxy = True
+
+
+@pghistory.track(
+    pghistory.Snapshot(),
+)
 class ClaimHistory(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
     DOCKET_ENTRY = 1
     CLAIM_ENTRY = 2
@@ -1656,7 +1797,7 @@ class FederalCourtsQuerySet(models.QuerySet):
 
     def appellate_pacer_courts(self) -> models.QuerySet:
         return self.filter(
-            Q(jurisdiction__in=[Court.FEDERAL_APPELLATE]) |
+            Q(jurisdiction=Court.FEDERAL_APPELLATE) |
             # Court of Appeals for Veterans Claims uses appellate PACER
             Q(pk__in=["cavc"]),
             end_date__isnull=True,
@@ -1676,7 +1817,16 @@ class FederalCourtsQuerySet(models.QuerySet):
     def appellate_courts(self) -> models.QuerySet:
         return self.filter(jurisdiction=Court.FEDERAL_APPELLATE)
 
+    def tribal_courts(self) -> models.QuerySet:
+        return self.filter(jurisdictions__in=Court.TRIBAL_JURISDICTIONS)
 
+    def territorial_courts(self) -> models.QuerySet:
+        return self.filter(jurisdictions__in=Court.TERRITORY_JURISDICTIONS)
+
+
+@pghistory.track(
+    pghistory.Snapshot(),
+)
 class Court(models.Model):
     """A class to represent some information about each court, can be extended
     as needed."""
@@ -1693,6 +1843,14 @@ class Court(models.Model):
     STATE_TRIAL = "ST"
     STATE_SPECIAL = "SS"
     STATE_ATTORNEY_GENERAL = "SAG"
+    TRIBAL_SUPREME = "TRS"
+    TRIBAL_APPELLATE = "TRA"
+    TRIBAL_TRIAL = "TRT"
+    TRIBAL_SPECIAL = "TRX"
+    TERRITORY_SUPREME = "TS"
+    TERRITORY_APPELLATE = "TA"
+    TERRITORY_TRIAL = "TT"
+    TERRITORY_SPECIAL = "TSP"
     COMMITTEE = "C"
     INTERNATIONAL = "I"
     TESTING_COURT = "T"
@@ -1706,6 +1864,14 @@ class Court(models.Model):
         (STATE_APPELLATE, "State Appellate"),
         (STATE_TRIAL, "State Trial"),
         (STATE_SPECIAL, "State Special"),
+        (TRIBAL_SUPREME, "Tribal Supreme"),
+        (TRIBAL_APPELLATE, "Tribal Appellate"),
+        (TRIBAL_TRIAL, "Tribal Trial"),
+        (TRIBAL_SPECIAL, "Tribal Special"),
+        (TERRITORY_SUPREME, "Territory Supreme"),
+        (TERRITORY_APPELLATE, "Territory Appellate"),
+        (TERRITORY_TRIAL, "Territory Trial"),
+        (TERRITORY_SPECIAL, "Territory Special"),
         (STATE_ATTORNEY_GENERAL, "State Attorney General"),
         (COMMITTEE, "Committee"),
         (INTERNATIONAL, "International"),
@@ -1729,6 +1895,19 @@ class Court(models.Model):
         FEDERAL_BANKRUPTCY,
         FEDERAL_BANKRUPTCY_PANEL,
     ]
+    TRIBAL_JURISDICTIONS = [
+        TRIBAL_SUPREME,
+        TRIBAL_APPELLATE,
+        TRIBAL_TRIAL,
+        TRIBAL_SPECIAL,
+    ]
+    TERRITORY_JURISDICTIONS = [
+        TERRITORY_SUPREME,
+        TERRITORY_APPELLATE,
+        TERRITORY_TRIAL,
+        TERRITORY_SPECIAL,
+    ]
+
     id = models.CharField(
         help_text="a unique ID for each court as used in URLs",
         max_length=15,  # Changes here will require updates in urls.py
@@ -1900,6 +2079,9 @@ class ClusterCitationQuerySet(models.query.QuerySet):
         return clone
 
 
+@pghistory.track(
+    pghistory.Snapshot(),
+)
 class OpinionCluster(AbstractDateTimeModel):
     """A class representing a cluster of court opinions."""
 
@@ -2113,10 +2295,10 @@ class OpinionCluster(AbstractDateTimeModel):
     )
     precedential_status = models.CharField(
         help_text="The precedential status of document, one of: "
-        "%s" % ", ".join([t[0] for t in DOCUMENT_STATUSES]),
+        "%s" % ", ".join([t[0] for t in PRECEDENTIAL_STATUS.NAMES]),
         max_length=50,
         blank=True,
-        choices=DOCUMENT_STATUSES,
+        choices=PRECEDENTIAL_STATUS.NAMES,
         db_index=True,
     )
     date_blocked = models.DateField(
@@ -2411,6 +2593,34 @@ class OpinionCluster(AbstractDateTimeModel):
         return search_list
 
 
+@pghistory.track(
+    pghistory.Snapshot(),
+    obj_field=None,
+)
+class OpinionClusterPanel(OpinionCluster.panel.through):
+    """A model class to track opinion cluster panel m2m relation"""
+
+    class Meta:
+        proxy = True
+
+
+@pghistory.track(
+    pghistory.Snapshot(),
+    obj_field=None,
+)
+class OpinionClusterNonParticipatingJudges(
+    OpinionCluster.non_participating_judges.through
+):
+    """A model class to track opinion cluster non_participating_judges m2m
+    relation"""
+
+    class Meta:
+        proxy = True
+
+
+@pghistory.track(
+    pghistory.Snapshot(),
+)
 class Citation(models.Model):
     """A simple class to hold citations."""
 
@@ -2531,6 +2741,9 @@ def sort_cites(c):
         return 8
 
 
+@pghistory.track(
+    pghistory.Snapshot(),
+)
 class Opinion(AbstractDateTimeModel):
     COMBINED = "010combined"
     UNANIMOUS = "015unamimous"
@@ -2817,6 +3030,17 @@ class Opinion(AbstractDateTimeModel):
         return normalize_search_dicts(out)
 
 
+@pghistory.track(
+    pghistory.Snapshot(),
+    obj_field=None,
+)
+class OpinionJoinedBy(Opinion.joined_by.through):
+    """A model class to track opinion joined_by m2m relation"""
+
+    class Meta:
+        proxy = True
+
+
 class OpinionsCited(models.Model):
     citing_opinion = models.ForeignKey(
         Opinion, related_name="cited_opinions", on_delete=models.CASCADE
@@ -2845,6 +3069,28 @@ class OpinionsCited(models.Model):
     class Meta:
         verbose_name_plural = "Opinions cited"
         unique_together = ("citing_opinion", "cited_opinion")
+
+
+class OpinionsCitedByRECAPDocument(models.Model):
+    citing_document = models.ForeignKey(
+        RECAPDocument, related_name="cited_opinions", on_delete=models.CASCADE
+    )
+    cited_opinion = models.ForeignKey(
+        Opinion, related_name="citing_documents", on_delete=models.CASCADE
+    )
+    depth = models.IntegerField(
+        help_text="The number of times the cited opinion was cited "
+        "in the citing document",
+        default=1,
+    )
+
+    def __str__(self) -> str:
+        return f"{self.citing_document.id} ⤜--cites⟶  {self.cited_opinion.id}"
+
+    class Meta:
+        verbose_name_plural = "Opinions cited by RECAP document"
+        unique_together = ("citing_document", "cited_opinion")
+        indexes = [models.Index(fields=["depth"])]
 
 
 class Parenthetical(models.Model):
@@ -2928,6 +3174,9 @@ class ParentheticalGroup(models.Model):
 TaggableType = TypeVar("TaggableType", Docket, DocketEntry, RECAPDocument)
 
 
+@pghistory.track(
+    pghistory.Snapshot(),
+)
 class Tag(AbstractDateTimeModel):
     name = models.CharField(
         help_text="The name of the tag.",

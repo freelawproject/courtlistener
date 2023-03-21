@@ -3,16 +3,17 @@ from django.db import models
 from requests import Request, Response, Session
 
 from cl.audio.models import Audio
+from cl.lib.search_utils import clean_up_recap_document_file
 from cl.search.models import Opinion, RECAPDocument
 
 
 def microservice(
     service: str,
     method: str = "POST",
-    item: models.Model = None,
-    file: bytes = None,
-    file_type: str = None,
-    filepath: str = None,
+    item: models.Model | None = None,
+    file: bytes | None = None,
+    file_type: str | None = None,
+    filepath: str | None = None,
     data=None,
     params=None,
 ) -> Response:
@@ -50,20 +51,25 @@ def microservice(
     # Sadly these are not uniform
     if item:
         if type(item) == RECAPDocument:
-            req.files = {
-                "file": (item.filepath_local.name, item.filepath_local.read())
-            }
+            try:
+                with item.filepath_local.open(mode="rb") as local_path:
+                    req.files = {
+                        "file": (item.filepath_local.name, local_path.read())
+                    }
+            except FileNotFoundError:
+                # The file is no longer available, clean it up in DB
+                clean_up_recap_document_file(item)
         elif type(item) == Opinion:
-            req.files = {
-                "file": (item.local_path.name, item.local_path.read())
-            }
+            with item.local_path.open(mode="rb") as local_path:
+                req.files = {"file": (item.local_path.name, local_path.read())}
         elif type(item) == Audio:
-            req.files = {
-                "file": (
-                    item.local_path_original_file.name,
-                    item.local_path_original_file.read(),
-                )
-            }
+            with item.local_path_original_file.open(mode="rb") as local_path:
+                req.files = {
+                    "file": (
+                        item.local_path_original_file.name,
+                        local_path.read(),
+                    )
+                }
     # Sometimes we will want to pass in a filename and the file bytes
     # to avoid writing them to disk. Filename can often be generic
     # and is used to identify the file extension for our microservices

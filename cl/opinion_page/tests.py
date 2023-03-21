@@ -1,3 +1,4 @@
+# mypy: disable-error-code=attr-defined
 import datetime
 import os
 import shutil
@@ -5,7 +6,7 @@ from unittest import mock
 from unittest.mock import MagicMock
 
 from django.conf import settings
-from django.contrib.auth.models import Group, User
+from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.test.client import Client
@@ -20,13 +21,18 @@ from rest_framework.status import (
 )
 
 from cl.lib.storage import clobbering_get_name
-from cl.lib.test_helpers import SitemapTest
-from cl.opinion_page.forms import TennWorkersForm
+from cl.lib.test_helpers import SimpleUserDataMixin, SitemapTest
+from cl.opinion_page.forms import CourtUploadForm
 from cl.opinion_page.views import make_docket_title
 from cl.people_db.factories import PersonFactory, PositionFactory
 from cl.people_db.models import Person
-from cl.search.factories import CourtFactory
+from cl.search.factories import (
+    CourtFactory,
+    DocketFactory,
+    OpinionClusterWithParentsFactory,
+)
 from cl.search.models import (
+    PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
     Citation,
     Docket,
@@ -81,11 +87,12 @@ class CitationRedirectorTest(TestCase):
             msg=f"Didn't get a {status} status code. Got {r.status_code} instead.",
         )
 
-    def test_with_and_without_a_citation(self) -> None:
-        """Make sure that the url paths are working properly."""
-        r = self.client.get(reverse("citation_redirector"))
+    def test_citation_homepage(self) -> None:
+        r = self.client.get(reverse("citation_homepage"))
         self.assertStatus(r, HTTP_200_OK)
 
+    def test_with_a_citation(self) -> None:
+        """Make sure that the url paths are working properly."""
         # Are we redirected to the correct place when we use GET or POST?
         r = self.client.get(
             reverse("citation_redirector", kwargs=self.citation), follow=True
@@ -120,6 +127,20 @@ class CitationRedirectorTest(TestCase):
                     "reporter": "bad-reporter",
                     "volume": "1",
                     "page": "1",
+                },
+            ),
+        )
+        self.assertStatus(r, HTTP_404_NOT_FOUND)
+
+    def test_invalid_page_number_1918(self) -> None:
+        """Do we fail gracefully with invalid page numbers?"""
+        r = self.client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={
+                    "reporter": "f2d",
+                    "volume": "1",
+                    "page": "asdf",  # <-- Nasty, nasty hobbits
                 },
             ),
         )
@@ -181,13 +202,71 @@ class CitationRedirectorTest(TestCase):
         )
         self.assertEqual(r.url, "/c/f2d/56/9/")
 
+    def test_reporter_variation_just_reporter(self) -> None:
+        """Do we redirect properly when we get reporter variations?"""
+        r = self.client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={
+                    # Introduce a space (slugified to a dash) into the reporter
+                    "reporter": "f-2d",
+                },
+            )
+        )
+        self.assertEqual(r.status_code, HTTP_302_FOUND)
+        self.assertEqual(r.url, "/c/f2d/")
+
+    def test_reporter_variation_just_reporter_and_volume(self) -> None:
+        """Do we redirect properly when we get reporter variations?"""
+        r = self.client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={
+                    # Introduce a space (slugified to a dash) into the reporter
+                    "reporter": "f-2d",
+                    "volume": "56",
+                },
+            )
+        )
+        self.assertEqual(r.status_code, HTTP_302_FOUND)
+        self.assertEqual(r.url, "/c/f2d/56/")
+
+    def test_reporter_variation_full_citation(self) -> None:
+        """Do we redirect properly when we get reporter variations?"""
+        r = self.client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={
+                    # Introduce a space (slugified to a dash) into the reporter
+                    "reporter": "f-2d",
+                    "volume": "56",
+                    "page": "9",
+                },
+            )
+        )
+        self.assertEqual(r.status_code, HTTP_302_FOUND)
+        self.assertEqual(r.url, "/c/f2d/56/9/")
+
 
 class ViewRecapDocketTest(TestCase):
-    fixtures = ["test_objects_search.json", "judge_judy.json"]
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.docket = DocketFactory(
+            court=cls.court,
+            source=Docket.RECAP,
+        )
+        cls.court_appellate = CourtFactory(id="ca1", jurisdiction="F")
+        cls.docket_appellate = DocketFactory(
+            court=cls.court_appellate,
+            source=Docket.RECAP,
+        )
 
     def test_regular_docket_url(self) -> None:
         """Can we load a regular docket sheet?"""
-        r = self.client.get(reverse("view_docket", args=[1, "case-name"]))
+        r = self.client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
         self.assertEqual(r.status_code, HTTP_200_OK)
 
     def test_recap_docket_url(self) -> None:
@@ -197,15 +276,50 @@ class ViewRecapDocketTest(TestCase):
         r = self.client.get(
             reverse(
                 "redirect_docket_recap",
-                kwargs={"court": "test", "pacer_case_id": "666666"},
+                kwargs={
+                    "court": self.court.pk,
+                    "pacer_case_id": self.docket.pacer_case_id,
+                },
             ),
             follow=True,
         )
         self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
 
+    def test_docket_view_counts_increment_by_one(self) -> None:
+        """Test the view count for a Docket increments on page view"""
+
+        old_view_count = self.docket.view_count
+        r = self.client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.docket.refresh_from_db(fields=["view_count"])
+        self.assertEqual(old_view_count + 1, self.docket.view_count)
+
+    def test_appellate_docket_no_pacer_case_id_increment_view_count(
+        self,
+    ) -> None:
+        """Test the view count for a RECAP Docket without pacer_case_id
+        increments on page view
+        """
+
+        # Set pacer_case_id blank
+        Docket.objects.filter(pk=self.docket_appellate.pk).update(
+            pacer_case_id=None
+        )
+        old_view_count = self.docket_appellate.view_count
+        r = self.client.get(
+            reverse(
+                "view_docket",
+                args=[self.docket_appellate.pk, self.docket_appellate.slug],
+            )
+        )
+        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.docket_appellate.refresh_from_db(fields=["view_count"])
+        self.assertEqual(old_view_count + 1, self.docket_appellate.view_count)
+
 
 class OgRedirectLookupViewTest(TestCase):
-
     fixtures = ["recap_docs.json"]
 
     def setUp(self) -> None:
@@ -232,12 +346,11 @@ class OgRedirectLookupViewTest(TestCase):
         mock.assert_called_once()
 
 
-class NewDocketAlertTest(TestCase):
+class NewDocketAlertTest(SimpleUserDataMixin, TestCase):
     fixtures = [
         "test_objects_search.json",
         "judge_judy.json",
         "test_court.json",
-        "authtest_data.json",
     ]
 
     def setUp(self) -> None:
@@ -270,14 +383,100 @@ class NewDocketAlertTest(TestCase):
 
 
 class OpinionSitemapTest(SitemapTest):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        # Included b/c so new
+        OpinionClusterWithParentsFactory.create(
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            citation_count=0,
+            date_filed=datetime.date.today(),
+        )
+        # Included b/c cited
+        OpinionClusterWithParentsFactory.create(
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            citation_count=1,
+            date_filed=datetime.date.today() - datetime.timedelta(365 * 15),
+        )
+        # Excluded because no cites
+        OpinionClusterWithParentsFactory.create(
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            citation_count=0,
+            date_filed=datetime.date.today() - datetime.timedelta(365 * 15),
+        )
+        # Excluded because blocked
+        OpinionClusterWithParentsFactory.create(
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            citation_count=100,
+            blocked=True,
+        )
+
     def setUp(self) -> None:
         self.sitemap_url = reverse(
             "sitemaps", kwargs={"section": SEARCH_TYPES.OPINION}
         )
-        self.item_qs = OpinionCluster.objects.all()
+        self.expected_item_count = 2
 
     def test_does_the_sitemap_have_content(self) -> None:
-        super(OpinionSitemapTest, self).assert_sitemap_has_content()
+        super().assert_sitemap_has_content()
+
+
+class DocketSitemapTest(SitemapTest):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        # Included b/c so new
+        DocketFactory.create(
+            source=Docket.RECAP,
+            blocked=False,
+            view_count=0,
+            date_filed=datetime.date.today(),
+        )
+        # Included b/c many views
+        DocketFactory.create(
+            source=Docket.RECAP,
+            blocked=False,
+            view_count=50,
+            date_filed=datetime.date.today() - datetime.timedelta(days=60),
+        )
+        # Excluded b/c blocked
+        DocketFactory.create(
+            source=Docket.RECAP,
+            blocked=True,
+        )
+
+    def setUp(self) -> None:
+        self.sitemap_url = reverse(
+            "sitemaps", kwargs={"section": SEARCH_TYPES.RECAP}
+        )
+        self.expected_item_count = 2
+
+    def test_does_the_sitemap_have_content(self) -> None:
+        super().assert_sitemap_has_content()
+
+
+class BlockedSitemapTest(SitemapTest):
+    """Do we create sitemaps of recently blocked opinions?"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        # Included b/c recently blocked
+        OpinionClusterWithParentsFactory.create(
+            blocked=True,
+            date_blocked=datetime.date.today(),
+        )
+        # Excluded b/c blocked too long ago
+        OpinionClusterWithParentsFactory.create(
+            blocked=True,
+            date_blocked=datetime.date.today() - datetime.timedelta(days=60),
+        )
+
+    def setUp(self) -> None:
+        self.sitemap_url = reverse(
+            "sitemaps", kwargs={"section": "blocked-opinions"}
+        )
+        self.expected_item_count = 1
+
+    def test_does_the_sitemap_have_content(self) -> None:
+        super().assert_sitemap_has_content()
 
 
 @override_settings(
@@ -305,8 +504,12 @@ class UploadPublication(TestCase):
             username="learned",
             email="learnedhand@scotus.gov",
         )
-        tenn_group = Group.objects.get(name="tenn_work_uploaders")
-        cls.tenn_user.groups.add(tenn_group)
+        Group.objects.create(name="uploaders_tennworkcompcl")
+        Group.objects.create(name="uploaders_tennworkcompapp")
+        tenn_cl_group = Group.objects.get(name="uploaders_tennworkcompcl")
+        tenn_app_group = Group.objects.get(name="uploaders_tennworkcompapp")
+        cls.tenn_user.groups.add(tenn_cl_group)
+        cls.tenn_user.groups.add(tenn_app_group)
 
         cls.reg_user = UserFactory.create(
             username="test_user",
@@ -378,7 +581,7 @@ class UploadPublication(TestCase):
 
     def test_pdf_upload(self, mock) -> None:
         """Can we upload a PDF and form?"""
-        form = TennWorkersForm(
+        form = CourtUploadForm(
             self.work_comp_data,
             pk="tennworkcompcl",
             files={"pdf_upload": self.pdf},
@@ -417,7 +620,7 @@ class UploadPublication(TestCase):
 
     def test_pdf_validation_failure(self, mock) -> None:
         """Can we fail upload documents that are not PDFs?"""
-        form = TennWorkersForm(
+        form = CourtUploadForm(
             self.work_comp_data,
             pk="tennworkcompcl",
             files={"pdf_upload": self.png},
@@ -436,7 +639,7 @@ class UploadPublication(TestCase):
 
     def test_tn_wc_app_upload(self, mock) -> None:
         """Can we test appellate uploading?"""
-        form = TennWorkersForm(
+        form = CourtUploadForm(
             self.work_comp_app_data,
             pk="tennworkcompapp",
             files={"pdf_upload": self.pdf},
@@ -478,7 +681,7 @@ class UploadPublication(TestCase):
         """Can we validate required testing field case title?"""
         self.work_comp_app_data.pop("case_title")
 
-        form = TennWorkersForm(
+        form = CourtUploadForm(
             self.work_comp_app_data,
             pk="tennworkcompapp",
             files={"pdf_upload": self.pdf},
@@ -497,7 +700,7 @@ class UploadPublication(TestCase):
 
         pre_count = Opinion.objects.all().count()
 
-        form = TennWorkersForm(
+        form = CourtUploadForm(
             self.work_comp_app_data,
             pk="tennworkcompapp",
             files={"pdf_upload": self.pdf},
@@ -519,7 +722,7 @@ class UploadPublication(TestCase):
         # Remove a judge from the data
         self.work_comp_app_data["third_judge"] = None
 
-        form = TennWorkersForm(
+        form = CourtUploadForm(
             self.work_comp_app_data,
             pk="tennworkcompapp",
             files={"pdf_upload": self.pdf},
@@ -554,7 +757,7 @@ class UploadPublication(TestCase):
             sha1="ffe0ec472b16e4e573aa1bbaf2ae358460b5d72c",
         )
 
-        form2 = TennWorkersForm(
+        form2 = CourtUploadForm(
             self.work_comp_data,
             pk="tennworkcompcl",
             files={"pdf_upload": self.pdf},

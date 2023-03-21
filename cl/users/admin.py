@@ -3,8 +3,9 @@ from django.contrib.auth.models import Permission, User
 from rest_framework.authtoken.models import Token
 
 from cl.alerts.admin import AlertInline, DocketAlertInline
+from cl.api.admin import WebhookInline
 from cl.donate.admin import DonationInline, MonthlyDonationInline
-from cl.favorites.admin import FavoriteInline, UserTagInline
+from cl.favorites.admin import NoteInline, UserTagInline
 from cl.lib.admin import AdminTweaksMixin
 from cl.users.models import (
     BarMembership,
@@ -44,7 +45,8 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         MonthlyDonationInline,
         AlertInline,
         DocketAlertInline,
-        FavoriteInline,
+        WebhookInline,
+        NoteInline,
         UserTagInline,
         TokenInline,
     )
@@ -72,6 +74,10 @@ class EmailFlagAdmin(admin.ModelAdmin):
         "notification_subtype",
         "date_created",
     )
+    readonly_fields = (
+        "date_modified",
+        "date_created",
+    )
 
 
 @admin.register(EmailSent)
@@ -81,6 +87,10 @@ class EmailSentAdmin(admin.ModelAdmin):
         "to",
         "id",
         "subject",
+        "date_created",
+    )
+    readonly_fields = (
+        "date_modified",
         "date_created",
     )
     raw_id_fields = ("user",)
@@ -93,6 +103,10 @@ class FailedEmailAdmin(admin.ModelAdmin):
         "recipient",
         "id",
         "status",
+        "date_created",
+    )
+    readonly_fields = (
+        "date_modified",
         "date_created",
     )
     raw_id_fields = ("stored_email",)

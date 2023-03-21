@@ -1,24 +1,46 @@
-{% load text_filters %}{% load humanize %}**************************
+
+{% load text_filters %}{% load humanize %}{% load tz %}
+{% if first_email and not auto_subscribe %}
+Your account on CourtListener just received its first email from PACER related to the case below.
+Your account has auto-subscribe turned off, so this is the only alert you will get for this case.
+Subscribe to this case to get ongoing updates:
+
+https://www.courtlistener.com{% url 'toggle_docket_alert_confirmation' "subscribe" docket_alert_secret_key %}
+{% elif first_email and auto_subscribe %}
+Your account on CourtListener just received its first email from PACER related to the case below.
+You've been subscribed to this case because your account has auto-subscribe turned on.
+{% endif %}
+**************************
 CourtListener Docket Alert
 **************************
 
-{{ new_des.count }} New Entr{{ new_des.count|pluralize:"y,ies" }} in {{ docket|best_case_name|safe }} {% if docket.docket_number %}({{ docket.docket_number }}){% endif %}
+{{ count }} New Entr{{ count|pluralize:"y,ies" }} in {{ docket|best_case_name|safe }} {% if docket.docket_number %}({{ docket.docket_number }}){% endif %}
 {{ docket.court }}
 ~~~
-View Docket: https://www.courtlistener.com{{ docket.get_absolute_url }}?order_by=desc
-Buy Docket on PACER: {{ docket.pacer_url }}
+View Docket: https://www.courtlistener.com{{ docket.get_absolute_url }}?order_by=desc{% if docket.pacer_url %}
+Buy Docket on PACER: {{ docket.pacer_url }}{% endif %}
 
-{% for de in new_des %}{% for rd in de.recap_documents.all %}Document Number: {{ de.entry_number }}
-Date Filed: {{ de.date_filed|date:"M j, Y"|default:'Unknown' }}
+{% if notes or tags %}
+Your Note: {% if notes %}{{ notes }}{% else %} You have not added notes to this case. Learn More: https://www.courtlistener.com{% url 'tag_notes_help' %}{% endif %}
+
+Your Tags: {% if tags %}{% for tag in tags %}{{ tag.name }}{% if not forloop.last %}, {% endif %}{% endfor %}{% else %} No tags yet. Learn More: https://www.courtlistener.com{% url 'tag_notes_help' %}{% endif %}
+{% else %}
+Use notes and tags to organize and share the cases you follow. Learn More: https://www.courtlistener.com{% url 'tag_notes_help' %}
+{% endif %}
+
+{% for de in new_des %}{% for rd in de.recap_documents.all %}Document Number: {{ de.entry_number }}{% if rd.attachment_number  %}-{{ rd.attachment_number }}{% endif %}
+Date Filed: {% if de.datetime_filed %}{{ de.datetime_filed|timezone:timezone|date:"M j, Y" }}{% else %}{{ de.date_filed|date:"M j, Y"|default:'Unknown' }}{% endif %}
 {% if rd.description %}{{ rd.description|safe|wordwrap:80 }}{% else %}{{ de.description|default:"Unknown docket entry description"|safe|wordwrap:80 }}{% endif %}{% if rd.document_number %}{% if rd.filepath_local %}
-Download PDF from RECAP: {{ rd.filepath_local.url }}{% endif %}{% if rd.pacer_url %}
-Buy PDF from PACER: {{ rd.pacer_url }}{% endif %}{% endif %}
+Download PDF from RECAP: {{ rd.filepath_local.url }}{% elif rd.is_sealed %}
+Sealed on PACER{% else %}
+Download PDF from RECAP with PACER fallback: https://www.courtlistener.com{{ rd.get_absolute_url }}?redirect_to_download=True{% endif %}{% endif %}
+
 {% endfor %}{% endfor %}
 
-This alert was sent because you subscribed to this docket with your account on
-CourtListener.com. To disable this alert, view the docket on CourtListener.com
-and click the "disable" button.
-
+{% if not first_email or first_email and auto_subscribe %}
+This alert was sent because you subscribed to this docket with your account on CourtListener.com.
+To disable this alert unsubscribe here: https://www.courtlistener.com{% url 'toggle_docket_alert_confirmation' 'unsubscribe' docket_alert_secret_key %}
+{% endif %}
 ************************
 This alert brought to you by the 501(c)(3) non-profit Free Law Project
 

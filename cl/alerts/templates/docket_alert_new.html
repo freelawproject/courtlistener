@@ -16,7 +16,7 @@
   {% endif %}
   <script type="text/javascript">
     // Set this variable for the docket alerts script to find
-    var userAlertAcount = {{ user.docket_alerts.count|default:"0" }};
+    var userAlertAcount = {{ user.docket_alerts.subscriptions.count|default:"0" }};
   </script>
   <script defer type="text/javascript"
           src="{% static "js/docket_alerts.js" %}"></script>
@@ -59,22 +59,7 @@
         </div>
       </div>
 
-      <div class="clearfix"></div>
-
-      <div class="well v-offset-above-5">
-        <h3 class="top text-center">Support Services Like this One</h3>
-        <p>CourtListener is sponsored by <a href="https://free.law/">Free Law Project</a>, a 501(c)(3) non-profit created to make high quality legal data widely available.  Alerts like these take time and energy to create and maintain, and we are only able to offer this service through your generous support.
-        </p>
-        <p>Will you support us today with a donation?</p>
-        <div class="row">
-          <div class="hidden-xs col-sm-1 col-md-2 col-lg-3"></div>
-          <div class="col-xs-12 col-sm-10 col-md-8 col-lg-6">
-            <p class="text-center">
-              <a href="{% url "donate" %}?referrer={{ request.path }}" class="btn btn-lg btn-block btn-danger"><i class="fa fa-heart-o"></i> Donate Now</a>
-            </p>
-          </div>
-        </div>
-      </div>
+      {% include "includes/docket_alert_donation.html" %}
     {% else %}
       {% if not request.GET.pacer_case_id or not request.GET.court_id %}
         <h1>Invalid Request</h1>

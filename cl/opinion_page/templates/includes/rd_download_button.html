@@ -27,17 +27,13 @@
       {% endif %}
       {% if rd.pacer_url %}
         <li>
-          {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
             <a href="{{ rd.pacer_url }}"
-            data-toggle="modal" data-target="#modal-buy-pacer"
-            class="open_buy_pacer_modal"
-            target="_blank"
-            rel="nofollow">Buy on PACER</a>
-          {% else%}
-            <a href="{{ rd.pacer_url }}"
-            target="_blank"
-            rel="nofollow">Buy on PACER</a>
-          {% endif %}
+              {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+                data-toggle="modal" data-target="#modal-buy-pacer"
+                class="open_buy_pacer_modal"
+             {% endif %}
+              target="_blank"
+              rel="nofollow">Buy on PACER</a>
         </li>
       {% endif %}
     </ul>
@@ -47,18 +43,15 @@
       <span class="btn btn-primary disabled">This Item is Sealed</span>
     {% else %}
       {% if rd.pacer_url %}
-        {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
-              <a href="{{ rd.pacer_url }}"
-              data-toggle="modal" data-target="#modal-buy-pacer"
-              class="open_buy_pacer_modal btn btn-primary"
-              target="_blank"
-              rel="nofollow"><i class="fa fa-external-link"></i> Buy on PACER</a>
-            {% else%}
-              <a href="{{ rd.pacer_url }}"
-              class="btn btn-primary"
-              target="_blank"
-              rel="nofollow"><i class="fa fa-external-link"></i> Buy on PACER</a>
-            {% endif %}
+        <a href="{{ rd.pacer_url }}"
+          {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+            data-toggle="modal" data-target="#modal-buy-pacer"
+            class="open_buy_pacer_modal btn btn-primary"
+          {% else%}
+            class="btn btn-primary"
+          {% endif %}
+          target="_blank"
+          rel="nofollow"><i class="fa fa-external-link"></i> Buy on PACER</a>
       {% endif %}
     {% endif %}
   {% endif %}

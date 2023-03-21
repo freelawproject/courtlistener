@@ -1,0 +1,70 @@
+{% if webhooks %}
+  {% for webhook in webhooks %}
+  <tr>
+    <td>
+      <p class="bottom">
+       {{ webhook.get_event_type_display }}
+      </p>
+    </td>
+    <td>
+      <p class="bottom">
+        {% if webhook.enabled is True %}
+          <span class="text-success">Active</span>
+        {% else %}
+          <span class="text-danger">Disabled</span>
+        {% endif %}
+      </p>
+    </td>
+    <td>{{ webhook.url }}</td>
+    <td>{{ webhook.failure_count }}</td>
+    <td class="right" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+      <div class="flex justify-content-end">
+        <div class="mr-1" data-loading-states >
+            <div class="hidden" data-loading-disable data-loading-target="#btn-remove-{{ webhook.id }}, #btn-test-{{ webhook.id }}"></div>
+            <button id='btn-edit-{{ webhook.id }}' class="btn btn-primary btn-xs"
+                hx-get="{% url "webhooks-detail" pk=webhook.id format='html' %}"
+                hx-target="#webhooks-body"
+                data-loading-disable
+                >
+            <i class="fa fa-pencil"></i>&nbsp;Edit
+            <i data-loading class="fa fa-spinner fa-spin"></i>
+          </button>
+        </div>
+        <div class="mr-1" data-loading-states >
+            <div class="hidden" data-loading-disable data-loading-target="#btn-remove-{{ webhook.id }}, #btn-edit-{{ webhook.id }}"></div>
+            <button id='btn-test-{{ webhook.id }}' class="btn btn-info btn-xs"
+                hx-get="{% url "webhooks-test-webhook" pk=webhook.id format='html' %}"
+                hx-target="#webhooks-body-testing"
+                data-loading-disable
+                >
+            <i class="fa fa-flask"></i>&nbsp;Test
+            <i data-loading class="fa fa-spinner fa-spin"></i>
+            </button>
+        </div>
+        <div data-loading-states>
+          <div class="hidden" data-loading-disable data-loading-target="#btn-edit-{{ webhook.id }}, #btn-test-{{ webhook.id }}"></div>
+          <button id='btn-remove-{{ webhook.id }}' class="btn btn-danger btn-xs"
+                hx-delete="{% url "webhooks-detail" pk=webhook.id format='json' %}"
+                hx-confirm="Are you sure you want to delete this Webhook?"
+                data-loading-disable>
+            <i class="fa fa-trash-o"></i>&nbsp;Delete
+            <i data-loading class="fa fa-spinner fa-spin"></i>
+          </button>
+        </div>
+      </div>
+    </td>
+  </tr>
+{% endfor %}
+{% else %}
+  <td class="text-center empty-webhooks" colspan="5" data-loading-states>
+    <p>Create a new webhook:</p>
+    <button id="add-webhook" class="btn btn-primary btn-xs"
+            hx-get="{% url 'webhooks-render-form' format="html" %}"
+            hx-target="#webhooks-body"
+            data-loading-target="#add-webhook"
+            data-loading-disable>
+      <i class="fa fa-plus"></i>&nbsp;Add webhook
+      <i data-loading class="fa fa-spinner fa-spin"></i>
+    </button>
+  </td>
+{% endif %}

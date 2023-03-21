@@ -150,16 +150,16 @@ def ca_judges(request: AuthenticatedHttpRequest) -> HttpResponse:
     # Get list of judge schools
     judge_schools = qs_education.values_list("school", flat=True)
     # Populate queryset form just with judge schools
-    for form in education_formset.initial_forms:
-        form.fields["school"].queryset = School.objects.filter(
+    for edu_form in education_formset.initial_forms:
+        edu_form.fields["school"].queryset = School.objects.filter(  # type: ignore[attr-defined]
             pk__in=judge_schools
         )
 
     # Get list of judge courts
     judge_courts = qs_positions.values_list("court", flat=True)
     # Populate queryset just with judge courts
-    for form in positions_formset.initial_forms:
-        form.fields["court"].queryset = Court.objects.filter(
+    for pos_form in positions_formset.initial_forms:
+        pos_form.fields["court"].queryset = Court.objects.filter(  # type: ignore[attr-defined]
             pk__in=judge_courts
         )
 

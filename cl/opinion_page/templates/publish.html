@@ -2,16 +2,16 @@
 {% load static %}
 
 {% block title %}
-  Decisions for Tennessee Workers' Compensation Courts – CourtListener.com
+  Decisions for {{ form.initial.court }} – CourtListener.com
 {% endblock %}
 {% block og_title %}
-  Decisions for Tennessee Workers' Compensation Courts – CourtListener.com
+  Decisions for {{ form.initial.court }} – CourtListener.com
 {% endblock %}
 {% block description %}
-  Search and read decisions from the Tennessee Court of Workers' Compensation Claims and Tennessee Workers' Compensation Appeals Board
+  Search and read decisions from the {{ form.initial.court }}
 {% endblock %}
 {% block og_description %}
-  Search and read decisions from the Tennessee Court of Workers' Compensation Claims and Tennessee Workers' Compensation Appeals Board
+  Search and read decisions from the {{ form.initial.court }}
 {% endblock %}
 
 {% block navbar-o %}active{% endblock %}
@@ -37,7 +37,13 @@
     <div class="row">
       <div class="col-xs-1"></div>
       <div class="col-xs-2">
-        <img src="{% static "img/tn-court.jpg" %}" class="img-responsive" width="359" height="359" >
+        {% if form.initial.court.id == "me" %}
+          <img src="https://seals.free.law/v2/128/me.png" class="img-responsive" height=128 width="128" />
+        {% elif form.initial.court.id == "tennworkcompcl" %}
+          <img src="{% static "img/tn-court.jpg" %}" class="img-responsive" width="359" height="359" >
+        {% elif  form.initial.court.id == "tennworkcompapp" %}
+          <img src="{% static "img/tn-court.jpg" %}" class="img-responsive" width="359" height="359" >
+        {% endif %}
 
       </div>
       <div class="col-xs-8">

@@ -1,0 +1,50 @@
+{% extends "profile/webhooks_base.html" %}
+{% load static %}
+{% load waffle_tags %}
+{% load humanize %}
+{% load widget_tweaks %}
+{% block title %} Webhook Event Details &ndash; CourtListener.com{% endblock %}
+
+{% block webhooks-content %}
+  <div class="webhook-detail">
+    <h3 class="v-offset-below-2">Webhook Event Details{% if webhook_event.debug %} (Testing){% endif %}</h3>
+    <div class="row form-group">
+      <label class="col-md-3">Endpoint URL: </label><p class="col-md-9">{{ webhook_event.webhook.url }}</p>
+      <label class="col-md-3">Endpoint status: </label><p class="col-md-9">{% if webhook_event.webhook.enabled %} Enabled {% else %} Disabled {% endif %}</p>
+      <label class="col-md-3">Event type: </label><p class="col-md-9">{{ webhook_event.webhook.get_event_type_display }}</p>
+      <label class="col-md-3">Idempotency-key: </label><p class="col-md-9">{{ webhook_event.event_id }}</p>
+      <label class="col-md-3">Event date: </label><p class="col-md-9">{{ webhook_event.date_created }}</p>
+      <label class="col-md-3">Status code: </label><p class="col-md-9 bold"> {% if webhook_event.status_code %}{{ webhook_event.status_code }} {{ webhook_event.get_status_code_display }} {% else %}-{% endif %}</p>
+      <label class="col-md-3">Event status: </label><p class="col-md-9 bold {{ webhook_event.event_status|webhook_status_class }}">{{ webhook_event.get_event_status_display }}</p>
+      <label class="col-md-3">Failure count: </label><p class="col-md-9">{{ webhook_event.retry_counter }}</p>
+      <label class="col-md-3">Next retry date: </label><p class="col-md-9">{% if not webhook_event.debug %}{% if webhook_event.next_retry_date %}{{ webhook_event.next_retry_date }}{% else %}-{% endif %}{% else %}Test events will not be retried{% endif %}</p>
+    </div>
+    <div class="row form-group">
+      <div class="col-xs-12">
+        <label for="content">Content:</label>
+        <div class="dummy-area">
+          <div class="copy-text-icon" onclick="copy_text('content')"><i class="fa fa-copy"></i></div>
+          <textarea readonly class="form-control" id="content" rows="8">{{ json_content }}</textarea>
+        </div>
+      </div>
+    </div>
+    <div class="row form-group">
+      <div class="col-xs-12">
+        <label for="response">Response:</label>
+        <div class="dummy-area">
+          <div class="copy-text-icon" onclick="copy_text('response')"><i class="fa fa-copy"></i></div>
+          <textarea readonly class="form-control" id="response" rows="8">{{ webhook_event.response }}</textarea>
+        </div>
+      </div>
+    </div>
+    <div class="row form-group">
+        <div class="col-xs-12">
+          <label for="error_message">Error message:</label>
+          <div class="dummy-area">
+            <div class="copy-text-icon" onclick="copy_text('error_message')"><i class="fa fa-copy"></i></div>
+            <textarea readonly class="form-control" id="error_message" rows="4">{{ webhook_event.error_message }}</textarea>
+          </div>
+        </div>
+    </div>
+  </div>
+{% endblock %}

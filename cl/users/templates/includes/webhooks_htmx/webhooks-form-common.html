@@ -1,0 +1,45 @@
+<div class="form-group">
+  <div class="row">
+    <label class="col-xs-12">Endpoint URL</label>
+    <div class="col-xs-12">
+      {{ webhook_form.url }}
+      {% if webhook_form.url.errors %}
+        <p class="help-block">
+          {% for error in webhook_form.url.errors %}
+            {{ error|escape }}
+          {% endfor %}
+        </p>
+      {% endif %}
+      <small class="form-text text-muted">Must begin with HTTPS and should be <a href="{% url "webhooks_docs" %}#security">long and random</a>.</small>
+    </div>
+  </div>
+</div>
+
+<div class="form-group">
+  <div class="row">
+    <label class="col-xs-12">Event Type</label>
+    <div class="col-xs-12">
+      {{ webhook_form.event_type }}
+      {% if webhook_form.event_type.errors %}
+        <p class="help-block">
+          {% for error in webhook_form.event_type.errors %}
+            {{ error|escape }}
+          {% endfor %}
+        </p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="form-group">
+      {{ webhook_form.enabled }}
+      <label class="form-check-label" for="id_enabled">Enabled</label>
+      {% if webhook_form.url.errors %}
+        <p class="help-block">
+          {% for error in webhook_form.enabled.errors %}
+            {{ error|escape }}
+          {% endfor %}
+        </p>
+      {% endif %}
+</div>
+

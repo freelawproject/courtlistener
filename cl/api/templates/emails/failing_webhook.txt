@@ -1,0 +1,33 @@
+{% if first_name %}
+Hello {{ first_name }},
+{% else %}
+Hello,
+{% endif %}
+
+{% if disabled %}
+After eight failed attempts over the last two days, one of your webhooks has been disabled and will no longer receive events.
+{% else %}
+We couldn't deliver events to one of your webhooks. If this problem persists for approximately 48 hours, this webhook will be disabled until it is fixed on your server.
+{% endif %}
+
+Please find more details below:
+Webhook Type: {{ webhook.get_event_type_display }}
+Webhook Endpoint: {{ webhook.url }}
+Webhook Event Failure Count: {{ failure_counter }}
+Webhook Event Details: https://www.courtlistener.com{% url 'view_webhook_logs_detail' webhook_event_pk %}
+
+{% if disabled %}
+To re-enable this webhook, review your logs in the webhook settings to see the responses we are getting from your server. Once your server is fixed, you can re-enable the webhook in your settings:
+https://www.courtlistener.com{% url 'view_webhooks' %}
+{% else %}
+We'll continue trying to deliver events to this webhook up to eight times before disabling further events.
+{% endif %}
+
+Thank you for looking into this.
+
+If you need further assistance, please contact support:
+https://www.courtlistener.com{% url 'contact' %}
+
+Sincerely,
+
+The FLP Bots

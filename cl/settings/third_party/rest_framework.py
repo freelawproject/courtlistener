@@ -24,12 +24,15 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {"anon": "100/day", "user": "5000/hour"},
     "OVERRIDE_THROTTLE_RATES": {
         # Throttling down.
+        # Didn't respond to emails; looks unsavory.
+        "donier": "10/hour",
         # Doing a background check service, we told them we didn't want to work
         # with them.
         "elios": "10/hour",
         # Sent multiple emails, but no response.
         "bchecker": "1/hour",
         # No response
+        "commernet": "1/hour",
         "zealousgalileo": "1/hour",
         "tuhinharit": "1/hour",  # Deep pagination
         "JaneDoe": "1/hour",
@@ -57,6 +60,7 @@ REST_FRAMEWORK = {
         "ellliottt": "15000/hour",
         "flooie": "20000/hour",  # Needed for testing
         "WarrenLex": "10000/hour",  # For big litigation days (wow)
+        "quevon24": "500000/hour",  # Perform tests, clone cases in local env
     },
     # Auth
     "DEFAULT_AUTHENTICATION_CLASSES": (

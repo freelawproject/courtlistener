@@ -1,0 +1,71 @@
+{
+   "payload":{
+      "results":[
+         {
+            "absolute_url":"/opinion/2812209/obergefell-v-hodges/",
+            "attorney":"",
+            "author_id":null,
+            "caseName":"Obergefell v. Hodges",
+            "caseNameShort":"Obergefell",
+            "citation":[
+               "192 L. Ed. 2d 609",
+               "135 S. Ct. 2584",
+               "2015 U.S. LEXIS 4250",
+               "576 U.S. 644"
+            ],
+            "citeCount":432,
+            "cites":[],
+            "cluster_id":2812209,
+            "court":"Supreme Court of the United States",
+            "court_citation_string":"SCOTUS",
+            "court_exact":"scotus",
+            "court_id":"scotus",
+            "dateArgued":null,
+            "dateFiled":"2015-06-26T00:53:00-07:00",
+            "dateReargued":null,
+            "dateReargumentDenied":null,
+            "docketNumber":"14-556",
+            "docket_id":2668808,
+            "download_url":"http://www.supremecourt.gov/opinions/14pdf/14-556_3204.pdf",
+            "id":2812209,
+            "joined_by_ids":null,
+            "judge":"",
+            "lexisCite":"2015 U.S. LEXIS 4250",
+            "local_path":null,
+            "neutralCite":null,
+            "non_participating_judge_ids":null,
+            "pagerank":null,
+            "panel_ids":null,
+            "per_curiam":null,
+            "scdb_id":"2014-070",
+            "sibling_ids":[
+               2812209
+            ],
+            "snippet":" Syllabus\n\n  <mark>OBERGEFELL</mark> ET AL. <mark>v</mark>. <mark>HODGES</mark>, DIRECTOR, OHIO \n\n        DEPARTMENT &hellip; the same court.\n2                       <mark>OBERGEFELL</mark> <mark>v</mark>. <mark>HODGES</mark>\n\n                                  Syllabus&hellip;commitment\nto procreate.\n4                       <mark>OBERGEFELL</mark> <mark>v</mark>. <mark>HODGES</mark>\n\n                                  Syllabus&hellip;\n     JAMES <mark>OBERGEFELL</mark>, ET AL., PETITIONERS\n14–556               <mark>v</mark>.\n       RICHARD <mark>HODGES</mark>, DIRECTOR, OHIO&hellip;specific rights that allow\n2                <mark>OBERGEFELL</mark> <mark>v</mark>. <mark>HODGES</mark>\n\n                     Opinion of the Court",
+            "source":"C",
+            "status":"Precedential",
+            "status_exact":"Precedential",
+            "suitNature":"",
+            "timestamp":"2022-11-14T15:26:19.603000-08:00",
+            "type":"010combined"
+         }
+      ],
+      "alert":{
+         "id":1,
+         "name":"Obergefell v. Hodges",
+         "rate":"dly",
+         "user":1,
+         "query":"?q=Obergefell+v.+Hodges&type=o&order_by=score+desc&stat_Precedential=on&filed_after=06%2F01%2F2015&docket_number=14-556&",
+         "secret_key":"MV8yfOSXQvDQauQOCEg0orkgi4hBC4r9yg5Wk3ue",
+         "date_created":"2022-12-02T15:42:34.921805-08:00",
+         "date_last_hit":"2022-12-02T15:42:35.915737-08:00",
+         "date_modified":"2022-12-02T15:42:35.915880-08:00"
+      }
+   },
+   "webhook":{
+      "version":1,
+      "event_type":2,
+      "date_created":"2022-12-02T23:42:34.894411+00:00",
+      "deprecation_date":"None"
+   }
+}

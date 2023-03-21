@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Help with Tags – CourtListener.com{% endblock %}
+{% block title %}Help with Tags and Notes – CourtListener.com{% endblock %}
 {% block footer-scripts %}
   {% include "includes/anchors.html" %}
 {% endblock %}
@@ -9,29 +9,44 @@
 
 
 {% block content %}
-  <div class="hidden-xs col-sm-1 col-md-2"></div>
-  <div class="col-xs-12 col-sm-10 col-md-8">
-    <h1>Help with Tags on CourtListener</h1>
-    <p>The tagging feature on CourtListener helps you to tag and organize cases that you are working with.
-    </p>
-    <p>Currently you are only able to tag dockets, but we plan to add documents and other types of records in the future.</p>
-    <p>We hope that if you find our tags useful, you will donate to <a href="https://free.law">Free Law Project</a>, the non-profit supporting CourtListener and RECAP, to support the ongoing development and maintenance of this and other features.
-    </p>
+  <div class="hidden-xs hidden-sm col-md-3">
+    <div id="toc">
+      <h3>Table of Contents</h3>
+      <ul>
+        <li>
+          <a href="#tags">Tag Overview</a>
+          <ul>
+            <li><a href="#making-tags">Making Tags</a></li>
+            <li><a href="#editing-tags">Editing or Deleting Tags</a></li>
+          </ul>
+        </li>
+        <li>
+          <a href="#notes">Note Overview</a>
+          <ul>
+            <li><a href="#making-notes">Making Notes</a></li>
+            <li><a href="#editing-notes">Working with Notes</a></li>
+          </ul>
+        </li>
+      </ul>
+    </div>
+  </div>
 
-    <p>Read on to learn more or skip ahead to the section that interests you:</p>
-    <ul>
-        <li><a href="#tags-overview">Tags Overview</a></li>
-        <li><a href="#making-tags">Making Tags</a></li>
-        <li><a href="#editing-tags">Editing or Deleting Tags</a></li>
-    </ul>
-
+  <div class="col-xs-12 col-md-8 col-lg-6">
+    <h1>Help with Tags and Notes on CourtListener</h1>
+    <p>Our tagging and notes features help you to tag, organize, and share cases that you are working with. To learn more about these features, continue reading below.
+    </p>
+    <p>We hope that if you find these tools useful, you will donate to <a href="https://free.law">Free Law Project</a>, the non-profit supporting CourtListener and RECAP, to support the ongoing development and maintenance of these and other features.
+    </p>
     <p><a href="{% url "donate" %}?referrer=alerts-help"
           class="btn btn-danger btn-lg"><i class="fa fa-heart-o"></i> Donate Now</a></p>
 
 
     <hr>
-    <h2 id="tags-overview">Tags Overview</h2>
-    <p>Every tag you create has a page on CourtListener listing items that are labelled with that tag. This allows you to organize and describe our content for your own purposes or to share with others. When you are on one of your tag pages, you can add a description of the tag, and you can make the tag public so that other people can see it too.
+
+    <h2 id="tags">Tags</h2>
+    <p>Every tag you create has a page on CourtListener listing items that are labelled with that tag. This allows you to organize and describe our content for your own purposes or to share your tags with others.
+    </p>
+    <p>When you are on one of your tag pages, you can add a description of the tag using <a href="{% url "markdown_help" %}">markdown</a>, and you can make the tag public so that other people can see it too.
     </p>
     <p>
       If you do not make a tag page public, nobody else will know you have that tag. Once a tag is made public it is immediately visible to others until you make it private again. All of your public tags will be visible to others as a {% if user.is_authenticated %}<a href="{% url "tag_list" username=user.get_username %}">list of tags in your profile</a>{% else %}list of tags in your profile{% endif %}.
@@ -39,8 +54,8 @@
 
 
     <hr>
-    <h2 id="making-tags">Tagging a Docket</h2>
-    <p>Tags can be added to any docket by clicking the <a class="btn btn-success btn-sm">Tags <span class="caret"></span></a> button on a docket. Once clicked, a tagging interface will appear:
+    <h3 id="making-tags">Tagging a Docket</h3>
+    <p>Tags can be added to any docket by clicking the <a class="btn btn-success btn-sm">Tags <span class="caret"></span></a> button on a docket. Once clicked, a tagging tool will appear:
     </p>
     <p>
       <img src="{% static "png/tag-chooser.png" %}"
@@ -53,7 +68,7 @@
 
 
     <hr>
-    <h2 id="editing-tags">Editing or Deleting a Tag</h2>
+    <h3 id="editing-tags">Editing or Deleting a Tag</h3>
     <p>Tags can be edited or deleted. To edit a tag, either find it on {% if user.is_authenticated %}<a href="{% url "tag_list" username=user.get_username %}">your list of tags</a>{% else %}your list of tags{% endif %} or open it via the <i class="fa fa-external-link"></i> icon in the tagging tool.
     </p>
     <p>When editing a tag, you can add a description to it using our editor or you can make it either public or private by toggling the setting in the actions drop down. Public tag pages are immediately visible to others.
@@ -61,6 +76,7 @@
     <p>
       <img src="{% static "png/tag-page.png" %}"
            alt="screenshot of the tag page showing edit features"
+           class="img-responsive center-block"
            height=729
            width=800>
     </p>
@@ -69,9 +85,57 @@
 
 
     <hr>
-    <h2>Coming Soon</h2>
+    <h3>Coming Soon</h3>
     <p>For now, we only allow tagging dockets, but we hope to add more tags to more parts of CourtListener too.
     </p>
     <p>Please stay tuned!</p>
+
+
+    <h2 id="notes">Notes</h2>
+    <p>You can use the Notes feature to save Dockets, RECAP Documents, Opinions, and Oral arguments to the <a href="{% url 'profile_notes' %}">Notes tab</a> in your account. You can add notes to each note item as well.
+    </p>
+    <p>Notes on dockets will be shown in <a href="{% url 'alert_help' %}#recap-alerts">docket alerts</a> that we send you, if you subscribe to a case, but are otherwise always private.
+    </p>
+
+    <h3 id="making-notes">Save a Note</h3>
+    <p>To save a note on an item on CourtListener, log in and click <strong>Add Note</strong> button on a Docket, RECAP Document, Opinion, or Oral Argument.</p>
+    <p><img src="{% static "png/add-note-button.png" %}"
+         alt="screenshot of the star icon to add a note to an item"
+         class="img-responsive img-rounded shadow center-block"
+         height="251"
+         width="554">
+    </p>
+    <p>A modal pops up:</p>
+    <p><img src="{% static "png/make-a-note.png" %}"
+         alt="screenshot of the creating a note modal"
+         class="img-responsive img-rounded shadow center-block"
+         height="296"
+         width="554">
+    </p>
+    <p>Complete the box with following information:</p>
+    <ol>
+      <li><strong>Name:</strong> Required field, by default the item title, you can change it.</li>
+      <li><strong>Notes:</strong> Optional, a private note explaining why the item is important or relevant to you (500 character limit).</li>
+    </ol>
+    <p>Click the save button.</p>
+
+    <h3 id="editing-notes">Viewing, Editing or Deleting a Note</h3>
+    <p>You can view your notes items in the <a href="{% url 'profile_notes' %}">Notes tab</a> within your user profile panel.</p>
+    <p><img src="{% static "png/view-notes.png" %}"
+         alt="screenshot of the notes tab"
+         class="img-responsive img-rounded shadow center-block"
+         height="242"
+         width="554">
+    </p>
+    <p>Here, you can edit or delete a note item by clicking on the "Edit/Delete" button.</p>
+    <p>A modal pops up:</p>
+    <p><img src="{% static "png/edit-delete-notes.png" %}"
+         alt="screenshot of the edit/delete notes modal"
+         class="img-responsive img-rounded shadow center-block"
+         height="242"
+         width="554">
+    </p>
+   <p>You can change the content of the note and save or you can delete it by clicking the "Delete" button in the bottom left corner.</p>
+
   </div>
 {% endblock %}
