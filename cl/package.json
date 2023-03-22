@@ -11,8 +11,8 @@
     "extends": "react-app"
   },
   "scripts": {
-    "build": "cross-env NODE_ENV=production ./node_modules/.bin/webpack --config webpack.config.js",
-    "dev": "cross-env ./node_modules/webpack-dev-server/bin/webpack-dev-server.js --hot",
+    "build": "NODE_ENV=production ./node_modules/.bin/webpack --config webpack.config.js",
+    "dev": "./node_modules/webpack-dev-server/bin/webpack-dev-server.js --hot",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
@@ -35,7 +35,6 @@
     "babel-loader": "^8.1.0",
     "clean-webpack-plugin": "*",
     "compression-webpack-plugin": "^5.0.1",
-    "cross-env": "^7.0.3",
     "downshift": "^6.0.5",
     "eslint": "^7.7.0",
     "eslint-config-prettier": "^6.11.0",

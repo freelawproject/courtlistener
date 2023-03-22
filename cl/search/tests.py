@@ -35,6 +35,7 @@ from cl.lib.search_utils import (
     build_sort_results,
     build_terms_query,
     cleanup_main_query,
+    group_search_results,
 )
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
@@ -42,13 +43,19 @@ from cl.lib.test_helpers import (
     IndexedSolrTestCase,
     SolrTestCase,
 )
-from cl.people_db.models import FEMALE, Person
-from cl.search.documents import ParentheticalDocument
 from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.factories import DocketEntriesDataFactory, DocketEntryDataFactory
 from cl.recap.mergers import add_docket_entries
 from cl.scrapers.factories import PACERFreeDocumentLogFactory
-from cl.search.factories import CourtFactory, DocketFactory
+from cl.search.documents import ParentheticalDocument
+from cl.search.factories import (
+    CourtFactory,
+    DocketFactory,
+    OpinionClusterFactory,
+    OpinionWithParentsFactory,
+    ParentheticalFactory,
+    ParentheticalGroupFactory,
+)
 from cl.search.feeds import JurisdictionFeed
 from cl.search.management.commands.cl_calculate_pagerank import Command
 from cl.search.models import (
@@ -60,8 +67,6 @@ from cl.search.models import (
     DocketEntry,
     Opinion,
     OpinionCluster,
-    Parenthetical,
-    ParentheticalGroup,
     RECAPDocument,
     sort_cites,
 )
@@ -1775,188 +1780,111 @@ class ElasticSearchTest(TestCase):
         # -f rebuilds index without prompt for confirmation
         call_command("search_index", "--rebuild", "-f")
 
-    def setUp(self) -> None:
-        # Dev data from make_dev_data commmand
-        self.c1 = Court.objects.create(
-            id="tsoyd",
-            position=811.2506,
-            short_name="District court of the Medical Worries",
-            full_name="Appeals court for the Eruptanyom",
-            jurisdiction="I",
-        )
+    @classmethod
+    def setUpTestData(cls):
+        cls.c1 = CourtFactory(id="canb", jurisdiction="I")
+        cls.c2 = CourtFactory(id="ca1", jurisdiction="F")
+        cls.c3 = CourtFactory(id="cacd", jurisdiction="FB")
 
-        self.c2 = Court.objects.create(
-            id="djmfd",
-            position=294.3326,
-            short_name="Superior court of the Dirty Dishes",
-            full_name="Superior court for the dragons",
-            jurisdiction="I",
-        )
-
-        self.c3 = Court.objects.create(
-            id="dopad",
-            position=610.7101,
-            short_name="Thirteenth circuit of the Medical Worries",
-            full_name="District court of the Zoo",
-            jurisdiction="FBP",
-        )
-
-        self.docket = Docket.objects.create(
-            case_name="Peck, Williams and Freeman v. Stephens",
-            court_id="tsoyd",
-            source=Docket.DEFAULT,
-            docket_number="1:98-cr-35856",
-            docket_number_core="9835856",
-            pacer_case_id="272262",
-        )
-        self.docket2 = Docket.objects.create(
-            case_name="Riley v. Brewer-Hall",
-            court_id="djmfd",
-            source=Docket.DEFAULT,
-            docket_number="6:56-cv-46383",
-            docket_number_core="5646383",
-            pacer_case_id="190961",
-        )
-
-        self.docket3 = Docket.objects.create(
-            case_name="Smith v. Herrera",
-            court_id="dopad",
-            source=Docket.DEFAULT,
-            docket_number="7:46-bk-35707",
-            docket_number_core="4635707",
-            pacer_case_id="132140",
-        )
-
-        self.oc = OpinionCluster.objects.create(
-            case_name="Peck, Williams and Freeman v. Stephens",
-            case_name_short="Stephens",
-            docket=self.docket,
-            date_filed=date(1978, 3, 10),
-            source="H",
-            precedential_status="Published",
-        )
-
-        self.oc2 = OpinionCluster.objects.create(
-            case_name="Riley v. Brewer-Hall",
-            case_name_short="Riley",
-            docket=self.docket2,
-            date_filed=date(1976, 8, 30),
-            source="H",
-            precedential_status="Published",
-        )
-
-        self.oc3 = OpinionCluster.objects.create(
-            case_name="Smith v. Herrera",
-            case_name_short="Herrera",
-            docket=self.docket3,
-            date_filed=date(1981, 7, 11),
-            source="LC",
-            precedential_status="Published",
-        )
-
-        self.person = Person.objects.create(
-            name_first="Sharon Navarro", name_last="Carpenter", gender=FEMALE
-        )
-
-        self.person2 = Person.objects.create(
-            name_first="Heidi Wheeler", name_last="Zimmerman", gender=FEMALE
-        )
-
-        self.person3 = Person.objects.create(
-            name_first="Emma Cabrera", name_last="Schmidt", gender=FEMALE
-        )
-
-        self.o = Opinion.objects.create(
-            cluster=self.oc,
-            author=self.person,
+        cls.o = OpinionWithParentsFactory(
+            cluster=OpinionClusterFactory(
+                case_name="Peck, Williams and Freeman v. Stephens",
+                case_name_short="Stephens",
+                docket=DocketFactory(
+                    court=cls.c1,
+                    docket_number="1:98-cr-35856",
+                ),
+                date_filed=date(1978, 3, 10),
+                source="H",
+                precedential_status="Published",
+            ),
             type="Plurality Opinion",
-            sha1="6872c55064015d816e51a653241f38d35e78a02a",
-            plain_text="Compare recently always material authority. Drug water "
-            "population letter. Property probably soon add product. Mind "
-            "happy although interesting pretty pattern represent. "
-            "Administration either short special artist. Skin yet member "
-            "fish describe which recognize. Assume rock everything phone "
-            "similar wear. Example speak free sort.",
-            per_curiam=False,
             extracted_by_ocr=True,
         )
 
-        self.o2 = Opinion.objects.create(
-            cluster=self.oc2,
-            author=self.person2,
+        cls.o2 = OpinionWithParentsFactory(
+            cluster=OpinionClusterFactory(
+                case_name="Riley v. Brewer-Hall",
+                case_name_short="Riley",
+                docket=DocketFactory(
+                    court=cls.c2,
+                ),
+                date_filed=date(1976, 8, 30),
+                source="H",
+                precedential_status="Published",
+            ),
             type="Concurrence Opinion",
-            sha1="c65b4add5c2e7147503ebeb783c5fba55705e376",
-            plain_text="Trip modern talk experience fight final low. Director say "
-            "green support bag international kind easy. Now name to."
-            "Morning summer finish money school hundred. Sense heavy then "
-            "early however. Poor charge energy before particularly. Safe "
-            "agent vote base capital old something attack. Soldier "
-            "beautiful thank billion believe realize. Plant support here "
-            "operation stop fly. Middle through onto under up visit time. "
-            "Class experience identify significant.",
-            per_curiam=True,
-            extracted_by_ocr=True,
+            extracted_by_ocr=False,
         )
 
-        self.o3 = Opinion.objects.create(
-            cluster=self.oc3,
-            author=self.person3,
+        cls.o3 = OpinionWithParentsFactory(
+            cluster=OpinionClusterFactory(
+                case_name="Smith v. Herrera",
+                case_name_short="Herrera",
+                docket=DocketFactory(
+                    court=cls.c3,
+                ),
+                date_filed=date(1981, 7, 11),
+                source="LC",
+                precedential_status="Published",
+            ),
             type="In Part Opinion",
-            sha1="a729cdae5a1d25890927d249d18edb917dcf7b95",
-            plain_text="Help place late theory recognize peace official. Debate until "
-            "under street whole term. Beyond family because possible cover "
-            "most. Those realize lose treatment. Often data pretty heart. "
-            "Different goal he whose traditional like. Key throughout "
-            "subject start race cell carry operation. Campaign imagine "
-            "first agent head weight including. ",
-            per_curiam=False,
             extracted_by_ocr=True,
         )
 
-        self.p = Parenthetical.objects.create(
-            describing_opinion=self.o,
-            described_opinion=self.o,
+        cls.p = ParentheticalFactory(
+            describing_opinion=cls.o,
+            described_opinion=cls.o,
             group=None,
             text="At responsibility learn point year rate.",
             score=0.3236,
         )
 
-        self.p2 = Parenthetical.objects.create(
-            describing_opinion=self.o2,
-            described_opinion=self.o2,
+        cls.p2 = ParentheticalFactory(
+            describing_opinion=cls.o2,
+            described_opinion=cls.o2,
             group=None,
-            text="Together friend conference end different such.",
-            score=0.318,
+            text="Necessary Together friend conference end different such.",
+            score=0.4218,
         )
 
-        self.p3 = Parenthetical.objects.create(
-            describing_opinion=self.o3,
-            described_opinion=self.o3,
+        cls.p3 = ParentheticalFactory(
+            describing_opinion=cls.o3,
+            described_opinion=cls.o3,
             group=None,
-            text="Necessary drug realize matter provide.",
+            text="Necessary drug realize matter provide different.",
             score=0.1578,
         )
 
-        self.pg = ParentheticalGroup.objects.create(
-            opinion=self.o, representative=self.p, score=0.3236, size=1
+        cls.p4 = ParentheticalFactory(
+            describing_opinion=cls.o3,
+            described_opinion=cls.o3,
+            group=None,
+            text="Necessary realize matter to provide further.",
+            score=0.1478,
         )
 
-        self.pg2 = ParentheticalGroup.objects.create(
-            opinion=self.o2, representative=self.p2, score=0.318, size=1
+        cls.pg = ParentheticalGroupFactory(
+            opinion=cls.o, representative=cls.p, score=0.3236, size=1
         )
-
-        self.pg3 = ParentheticalGroup.objects.create(
-            opinion=self.o3, representative=self.p3, score=0.1578, size=1
+        cls.pg2 = ParentheticalGroupFactory(
+            opinion=cls.o2, representative=cls.p2, score=0.318, size=1
+        )
+        cls.pg3 = ParentheticalGroupFactory(
+            opinion=cls.o3, representative=cls.p3, score=0.1578, size=1
         )
 
         # Set parenthetical group
-        self.p.group = self.pg
-        self.p.save()
-        self.p2.group = self.pg2
-        self.p2.save()
-        self.p3.group = self.pg3
-        self.p3.save()
+        cls.p.group = cls.pg
+        cls.p.save()
+        cls.p2.group = cls.pg2
+        cls.p2.save()
+        cls.p3.group = cls.pg3
+        cls.p3.save()
+        cls.p4.group = cls.pg3
+        cls.p4.save()
 
+    def setUp(self) -> None:
         self.rebuild_index()
 
     # Notes:
@@ -1965,19 +1893,20 @@ class ElasticSearchTest(TestCase):
     # value. The provided text is analyzed before matching.
 
     def test_filter_search(self) -> None:
-        """Test filtering and search the same time"""
+        """Test filtering and search at the same time"""
+
         filters = []
-
-        filters.append(Q("match", plain_text="experience"))
-        filters.append(Q("match", describing_opinion_extracted_by_ocr=True))
-        filters.append(Q("match", describing_opinion_per_curiam=True))
-
+        filters.append(Q("match", text="different"))
         s1 = ParentheticalDocument.search().filter(
             reduce(operator.iand, filters)
         )
-        print(s1.to_dict())
-        print(s1.count())
-        self.assertEqual(s1.count(), 0)
+        self.assertEqual(s1.count(), 2)
+
+        filters.append(Q("match", described_opinion_extracted_by_ocr=False))
+        s2 = ParentheticalDocument.search().filter(
+            reduce(operator.iand, filters)
+        )
+        self.assertEqual(s2.count(), 1)
 
     def test_filter_daterange(self) -> None:
         """Test filter by date range"""
@@ -1988,7 +1917,7 @@ class ElasticSearchTest(TestCase):
         filters.append(
             Q(
                 "range",
-                describing_opinion_cluster_docket_date_filed={
+                describing_opinion_cluster_date_filed={
                     "gte": date_gte,
                     "lte": date_lte,
                 },
@@ -1997,7 +1926,7 @@ class ElasticSearchTest(TestCase):
         filters.append(
             Q(
                 "range",
-                described_opinion_cluster_docket_date_filed={
+                described_opinion_cluster_date_filed={
                     "gte": date_gte,
                     "lte": date_lte,
                 },
@@ -2007,10 +1936,11 @@ class ElasticSearchTest(TestCase):
         s1 = ParentheticalDocument.search().filter(
             reduce(operator.iand, filters)
         )
+
         self.assertEqual(s1.count(), 2)
 
     def test_filter_search_2(self) -> None:
-        """Test filtering date range and search the same time"""
+        """Test filtering date range and search at the same time"""
         filters = []
         date_gte = "1976-08-30T00:00:00Z"
         date_lte = "1978-03-10T23:59:59Z"
@@ -2019,7 +1949,7 @@ class ElasticSearchTest(TestCase):
         filters.append(
             Q(
                 "range",
-                describing_opinion_cluster_docket_date_filed={
+                describing_opinion_cluster_date_filed={
                     "gte": date_gte,
                     "lte": date_lte,
                 },
@@ -2028,7 +1958,7 @@ class ElasticSearchTest(TestCase):
         filters.append(
             Q(
                 "range",
-                described_opinion_cluster_docket_date_filed={
+                described_opinion_cluster_date_filed={
                     "gte": date_gte,
                     "lte": date_lte,
                 },
@@ -2042,7 +1972,7 @@ class ElasticSearchTest(TestCase):
 
     def test_ordering(self) -> None:
         """Test filter and then ordering by descending
-        describing_opinion_cluster_docket_date_filed"""
+        describing_opinion_cluster_date_filed"""
         filters = []
         date_gte = "1976-08-30T00:00:00Z"
         date_lte = "1978-03-10T23:59:59Z"
@@ -2050,7 +1980,7 @@ class ElasticSearchTest(TestCase):
         filters.append(
             Q(
                 "range",
-                describing_opinion_cluster_docket_date_filed={
+                describing_opinion_cluster_date_filed={
                     "gte": date_gte,
                     "lte": date_lte,
                 },
@@ -2060,11 +1990,18 @@ class ElasticSearchTest(TestCase):
         s = (
             ParentheticalDocument.search()
             .filter(reduce(operator.iand, filters))
-            .sort("-describing_opinion_cluster_docket_date_filed")
+            .sort("-describing_opinion_cluster_date_filed")
         )
+        s1 = s.sort("-describing_opinion_cluster_date_filed")
+        self.assertEqual(s1.count(), 2)
         self.assertEqual(
-            s.execute()[0].describing_opinion_cluster_docket_date_filed,
+            s1.execute()[0].describing_opinion_cluster_date_filed,
             datetime.datetime(1978, 3, 10, 0, 0),
+        )
+        s2 = s.sort("describing_opinion_cluster_date_filed")
+        self.assertEqual(
+            s2.execute()[0].describing_opinion_cluster_date_filed,
+            datetime.datetime(1976, 8, 30, 0, 0),
         )
 
     def test_build_daterange_query(self) -> None:
@@ -2074,7 +2011,7 @@ class ElasticSearchTest(TestCase):
         date_lte = datetime.datetime(1978, 3, 10, 0, 0).date()
 
         q1 = build_daterange_query(
-            "described_opinion_cluster_docket_date_filed", date_lte, date_gte
+            "described_opinion_cluster_date_filed", date_lte, date_gte
         )
         filters.extend(q1)
 
@@ -2097,7 +2034,8 @@ class ElasticSearchTest(TestCase):
         """Test build es terms query"""
         filters = []
         q = build_terms_query(
-            "described_opinion_cluster_docket_court_id", ["tsoyd", "djmfd"]
+            "described_opinion_cluster_docket_court_id",
+            [self.c1.pk, self.c2.pk],
         )
         filters.extend(q)
         s = ParentheticalDocument.search().filter(
@@ -2128,7 +2066,7 @@ class ElasticSearchTest(TestCase):
         if not filters:
             # Return all results
             s = ParentheticalDocument.search().query("match_all")
-            self.assertEqual(s.count(), 3)
+            self.assertEqual(s.count(), 4)
 
     def test_docker_number_filter(self) -> None:
         """Test filter by docker_number"""
@@ -2146,14 +2084,54 @@ class ElasticSearchTest(TestCase):
     def test_build_sort(self) -> None:
         """Test we can build sort dict and sort ES query"""
         cd = {"order_by": "dateFiled desc"}
-
         ordering = build_sort_results(cd)
-
         s = ParentheticalDocument.search().query("match_all").sort(ordering)
+        self.assertEqual(s.count(), 4)
         self.assertEqual(
-            s.execute()[0].described_opinion_cluster_docket_date_filed,
+            s.execute()[0].described_opinion_cluster_date_filed,
             datetime.datetime(1981, 7, 11, 0, 0),
         )
+
+        cd = {"order_by": "dateFiled asc"}
+        ordering = build_sort_results(cd)
+        s = ParentheticalDocument.search().query("match_all").sort(ordering)
+        self.assertEqual(
+            s.execute()[0].described_opinion_cluster_date_filed,
+            datetime.datetime(1976, 8, 30, 0, 0),
+        )
+
+        cd = {"order_by": "score desc"}
+        ordering = build_sort_results(cd)
+        s = ParentheticalDocument.search().query("match_all").sort(ordering)
+        self.assertEqual(
+            s.execute()[0].described_opinion_cluster_date_filed,
+            datetime.datetime(1976, 8, 30, 0, 0),
+        )
+
+    def test_group_results(self) -> None:
+        """Test retrieve results grouped by group_id"""
+
+        filters = []
+        q1 = build_fulltext_query("text", "Necessary")
+        filters.extend(q1)
+        s = ParentheticalDocument.search().filter(
+            reduce(operator.iand, filters)
+        )
+        # Group results.
+        group_search_results(s, "group_id", "score", 5)
+        hits = s.execute()
+        groups = hits.aggregations.groups.buckets
+
+        # Compare groups and hits content.
+        self.assertEqual(len(groups), 2)
+        self.assertEqual(len(groups[0].grouped_by_group_id.hits.hits), 2)
+        self.assertEqual(len(groups[1].grouped_by_group_id.hits.hits), 1)
+
+        group_1_hits = groups[0].grouped_by_group_id.hits
+        self.assertEqual(group_1_hits.hits[0]._source.score, 0.1578)
+        self.assertEqual(group_1_hits.hits[1]._source.score, 0.1478)
+
+
 class DocketEntriesTimezone(TestCase):
     """Test docket entries with time, store date and time in the local court
     timezone and make datetime_filed aware to the local court timezone.

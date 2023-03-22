@@ -13,8 +13,8 @@ from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Count, Sum
-from django.shortcuts import HttpResponseRedirect, get_object_or_404, render
 from django.http import Http404, HttpRequest, HttpResponse
+from django.shortcuts import HttpResponseRedirect, get_object_or_404, render
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.timezone import make_aware, utc
@@ -39,6 +39,7 @@ from cl.lib.search_utils import (
     get_mlt_query,
     get_query_citation,
     get_solr_interface,
+    group_search_results,
     make_get_string,
     make_stats_variable,
     merge_form_with_courts,
@@ -607,6 +608,7 @@ def do_es_search(get_params, search_type):
                 hits_query = document_type.search().filter(
                     reduce(operator.iand, filters)
                 )
+
             else:
                 hits_query = document_type.search().query("match_all")
         else:
@@ -616,9 +618,13 @@ def do_es_search(get_params, search_type):
         try:
             # Order by relevance default
             hits_query = hits_query.sort(build_sort_results(cd))
+            # Create groups aggregation.
+            group_search_results(hits_query, "group_id", "score", 5)
             hits = hits_query.execute()
+            query_time = hits.took
+            groups = hits.aggregations.groups.buckets
             paged_results = do_es_pagination(
-                get_params, hits, rows_per_page=10
+                get_params, groups, rows_per_page=10
             )
         except (TransportError, ConnectionError, RequestError) as e:
             error = True
@@ -645,6 +651,7 @@ def do_es_search(get_params, search_type):
 
     return {
         "results": paged_results,
+        "query_time": query_time,
         "search_form": search_form,
         "search_summary_str": search_summary_str,
         "search_summary_dict": search_summary_dict,
@@ -663,7 +670,6 @@ def do_es_pagination(get_params, hits, rows_per_page=10):
     :return: paginated results
     """
 
-    # print("hits type", type(hits))
     try:
         page = int(get_params.get("page", 1))
     except ValueError:

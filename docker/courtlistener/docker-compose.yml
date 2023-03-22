@@ -71,6 +71,7 @@ services:
       - cl-selenium
       - cl-doctor
       - cl-disclosures
+      - cl-es
     ports:
       - "8000:8000"
     volumes:
@@ -109,5 +110,21 @@ services:
   cl-webhook-sentry:
     image: juggernaut/webhook-sentry:latest
     container_name: "cl-webhook-sentry"
+    networks:
+      - cl_net_overlay
+
+  cl-es:
+    container_name: cl-es
+    image: elasticsearch:7.8.1
+    environment:
+      - discovery.type=single-node
+      - cluster.name=courtlistener-cluster
+      - xpack.security.enabled=false
+      - "http.cors.allow-origin=*"
+      - "http.cors.enabled=true"
+      - "http.cors.allow-headers=X-Requested-With,X-Auth-Token,Content-Type,Content-Length,Authorization"
+      - "http.cors.allow-credentials=true"
+    ports:
+      - "9200:9200"
     networks:
       - cl_net_overlay

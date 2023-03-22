@@ -1,12 +1,7 @@
 from django_elasticsearch_dsl import Document, fields
 from django_elasticsearch_dsl.registries import registry
 
-from cl.search.models import (
-    Opinion,
-    OpinionCluster,
-    Parenthetical,
-    ParentheticalGroup,
-)
+from cl.search.models import Parenthetical
 
 
 @registry.register_document
@@ -21,14 +16,17 @@ class ParentheticalDocument(Document):
     describing_opinion_autor_id = fields.IntegerField(
         attr="describing_opinion.author_id"
     )
+    describing_opinion_extracted_by_ocr = fields.BooleanField(
+        attr="describing_opinion.extracted_by_ocr"
+    )
     describing_opinion_cluster_id = fields.IntegerField(
         attr="describing_opinion.cluster_id"
     )
+    describing_opinion_cluster_date_filed = fields.DateField(
+        attr="describing_opinion.cluster.date_filed"
+    )
     describing_opinion_cluster_docket_id = fields.IntegerField(
         attr="describing_opinion.cluster.docket_id"
-    )
-    describing_opinion_cluster_docket_date_filed = fields.DateField(
-        attr="describing_opinion.cluster.date_filed"
     )
     describing_opinion_cluster_docket_court_id = fields.KeywordField(
         attr="describing_opinion.cluster.docket.court.pk"
@@ -45,14 +43,17 @@ class ParentheticalDocument(Document):
     described_opinion_autor_id = fields.IntegerField(
         attr="described_opinion.author_id"
     )
+    described_opinion_extracted_by_ocr = fields.BooleanField(
+        attr="described_opinion.extracted_by_ocr"
+    )
     described_opinion_cluster_id = fields.IntegerField(
         attr="described_opinion.cluster_id"
     )
+    described_opinion_cluster_date_filed = fields.DateField(
+        attr="described_opinion.cluster.date_filed"
+    )
     described_opinion_cluster_docket_id = fields.IntegerField(
         attr="described_opinion.cluster.docket_id"
-    )
-    described_opinion_cluster_docket_date_filed = fields.DateField(
-        attr="described_opinion.cluster.date_filed"
     )
     described_opinion_cluster_docket_court_id = fields.KeywordField(
         attr="described_opinion.cluster.docket.court.pk"

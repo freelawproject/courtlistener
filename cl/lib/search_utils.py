@@ -1,13 +1,14 @@
 import re
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
 from urllib.parse import parse_qs, urlencode
 
 from django.conf import settings
 from django.core.cache import cache, caches
 from django.http import HttpRequest, QueryDict
-from django_elasticsearch_dsl import Document
-from elasticsearch_dsl import Q
+from django_elasticsearch_dsl.search import Search
+from elasticsearch_dsl import A, Q
+from elasticsearch_dsl.query import Range
 from eyecite import get_citations
 from eyecite.models import FullCaseCitation
 from scorched.response import SolrResponse
@@ -220,14 +221,11 @@ def merge_form_with_courts(
     """
     # Are any of the checkboxes checked?
 
-    # print("search_form fieldsx", search_form.fields)
-
     checked_statuses = [
         field.value()
         for field in search_form
         if field.html_name.startswith("court_")
     ]
-    # print("checked_statuses", checked_statuses)
     no_facets_selected = not any(checked_statuses)
     all_facets_selected = all(checked_statuses)
     court_count = str(
@@ -820,7 +818,6 @@ def print_params(params: SearchParam) -> None:
             "Params sent to search are:\n%s"
             % " &\n".join(["  %s = %s" % (k, v) for k, v in params.items()])
         )
-        # print results_si.execute()
 
 
 def cleanup_main_query(query_string: str) -> str:
@@ -1245,48 +1242,12 @@ def get_mlt_query(
     return si.mlt_query(hl_fields).add_extra(**q)
 
 
-def build_range_query(
-    field: str,
-    less: int,
-    greater: int,
-    less_than_equal: bool = True,
-    greater_than_equal: bool = True,
-    relation: Optional[str] = None,
-) -> List:
-    """Given field name and range limits, returns ElasticSearch range query
-    https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html
-    :param field: elasticsearch index fieldname
-    :param less: upper limit
-    :param greater: lower limit
-    :param less_than_equal: True to set less than or equal to
-    :param greater_than_equal: True to set greater than or equal to
-    :param relation: Indicates how the range query matches values for range fields
-    :return: Empty list or list with DSL Range query
-    """
-    params = {}  # type: Dict[str, Any]
-    if any([less, greater]):
-        if less:
-            params["lte" if less_than_equal else "lt"] = less
-        if greater:
-            params["gte" if greater_than_equal else "gt"] = greater
-        if relation is not None:
-            allowed_relations = ["INTERSECTS", "CONTAINS", "WITHIN"]
-            assert (
-                relation in allowed_relations
-            ), f"'{relation}' is not an allowed relation."
-            params["relation"] = relation
-
-    if params:
-        return [Q("range", **{field: params})]
-
-    return []
-
-
 def build_daterange_query(
-    field: str, before: date, after: date, relation: Optional[str] = None
-) -> List:
+    field: str, before: date, after: date, relation: str | None = None
+) -> list[Range]:
     """Given field name and date range limits returns ElasticSearch range query or None
     https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html#ranges-on-dates
+
     :param field: elasticsearch index fieldname
     :param before: datetime upper limit
     :param after: datetime lower limit
@@ -1315,6 +1276,12 @@ def build_daterange_query(
 def build_fulltext_query(field: str, value: str, query: str = "match") -> List:
     """Given the cleaned data from a form, return a Elastic Search string query or []
     https://www.elastic.co/guide/en/elasticsearch/reference/current/full-text-queries.html
+
+    :param field: The name of the field to search in.
+    :param value: The string value to search for.
+    :param query: The type of Elastic Search query to use. Defaults to "match".
+    :return: A list of Elastic Search queries. If the "value" param is
+    empty or None, returns an empty list.
     """
     queries = ["match", "match_phrase", "query_string"]
     assert query in queries, f"'{query}' is not an allowed query."
@@ -1328,9 +1295,10 @@ def build_term_query(field: str, value: str) -> List:
     "term" Returns documents that contain an exact term in a provided field
     NOTE: Use it only whe you want an exact match, avoid using this with text fields
     https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-term-query.html
-    @param field: elasticsearch index fieldname
-    @param value: term to find
-    @return: Empty list or list with DSL Match query
+
+    :param field: elasticsearch index fieldname
+    :param value: term to find
+    :return: Empty list or list with DSL Match query
     """
     if value:
         return [Q("term", **{field: value})]
@@ -1340,97 +1308,108 @@ def build_term_query(field: str, value: str) -> List:
 def build_terms_query(field: str, value: List) -> List:
     """Given field name and list of values, return Elastic Search term query or [].
     "terms" Returns documents that contain one or more exact terms in a provided field.
+
     https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-terms-query.html
-    @param field: elasticsearch index fieldname
-    @param value: term to find
-    @return: Empty list or list with DSL Match query
+    :param field: elasticsearch index fieldname
+    :param value: term to find
+    :return: Empty list or list with DSL Match query
     """
 
     # Remove elements that evaluate to False, like ""
     value = list(filter(None, value))
-
     if value:
         return [Q("terms", **{field: value})]
     return []
 
 
 def build_sort_results(cd: CleanData) -> Dict:
+    """Given cleaned data, find order_by value and return dict to use with
+    ElasticSearch sort
+
+    :param cd: The user input CleanedData
+    :return: The short dict.
     """
-    Given cleaned data, find order_by value and return dict to use with ElasticSearch
-    sort
-    :param cd: CleanedData
-    :return: dict or None
-    """
-    desc_order = ["score desc", "dateFiled desc"]
-    map_desc_order = [
-        ("score desc", "_score"),
-        ("dateFiled desc", "described_opinion_cluster_docket_date_filed"),
-    ]
-    asc_order = ["dateFiled asc"]
-    map_asc_order = [
-        ("dateFiled asc", "described_opinion_cluster_docket_date_filed")
-    ]
+
+    order_by_map = {
+        "score desc": {"score": "desc"},
+        "dateFiled desc": {"described_opinion_cluster_date_filed": "desc"},
+        "dateFiled asc": {"described_opinion_cluster_date_filed": "asc"},
+    }
     order_by = cd.get("order_by")
-    if order_by:
-        if order_by in desc_order:
-            fieldname_map = list(
-                filter(lambda x: x[0] == order_by, map_desc_order)
-            )
-            if fieldname_map:
-                # print("fieldname_map1", fieldname_map)
-                return {fieldname_map[0][1]: "desc"}
-        if order_by in asc_order:
-            fieldname_map = list(
-                filter(lambda x: x[0] == order_by, map_asc_order)
-            )
-            if fieldname_map:
-                # print("fieldname_map", fieldname_map)
-                return {fieldname_map[0][1]: "asc"}
+    if order_by and order_by in order_by_map:
+        return order_by_map[order_by]
+
+    # Default sort by score in descending order
     return {"score": "desc"}
 
 
 def build_es_queries(cd: CleanData) -> List:
+    """Builds elasticsearch queries based on the CleanData object.
+
+    :param cd: An object containing cleaned user data.
+    :return: The list of Elasticsearch queries built.
+    """
+
     queries_list = []
 
     # Only use described_opinion fields to do search
-
     # Build daterange query
-    q1 = build_daterange_query(
-        "described_opinion_cluster_docket_date_filed",
-        cd.get("filed_before", ""),
-        cd.get("filed_after", ""),
+    queries_list.extend(
+        build_daterange_query(
+            "described_opinion_cluster_date_filed",
+            cd.get("filed_before", ""),
+            cd.get("filed_after", ""),
+        )
     )
-    queries_list.extend(q1)
-    # q2 = build_daterange_query("describing_opinion_cluster_docket_date_filed",
-    #                            cd.get("filed_before", ""), cd.get("filed_after", ""))
-    # queries_list.extend(q2)
 
     # Build court terms filter
-    q3 = build_terms_query(
-        "described_opinion_cluster_docket_court_id",
-        cd.get("court", "").split(" "),
+    queries_list.extend(
+        build_terms_query(
+            "described_opinion_cluster_docket_court_id",
+            cd.get("court", "").split(),
+        )
     )
-    queries_list.extend(q3)
 
     # Build fulltext query
-    q4 = build_fulltext_query("text", cd.get("q", ""))
-    queries_list.extend(q4)
+    queries_list.extend(build_fulltext_query("text", cd.get("q", "")))
 
-    # Build other text queries
-    # q5 = build_term_query("describing_opinion_cluster_docket_number",
-    #                       cd.get("docket_number", ""))
-    # queries_list.extend(q5)
-    q6 = build_term_query(
-        "described_opinion_cluster_docket_number", cd.get("docket_number", "")
+    # Build docket number term query
+    queries_list.extend(
+        build_term_query(
+            "described_opinion_cluster_docket_number",
+            cd.get("docket_number", ""),
+        )
     )
-    queries_list.extend(q6)
 
-    q7 = build_term_query("described_opinion_id", cd.get("opinion_id", ""))
-    queries_list.extend(q7)
-
-    # print("queries_list", queries_list)
+    # Build opinion id term query
+    queries_list.extend(
+        build_term_query("described_opinion_id", cd.get("opinion_id", ""))
+    )
 
     return queries_list
+
+
+def group_search_results(
+    search: Search, group_by: str, order_by: str, size: int
+) -> None:
+    """Group search results by a specified field and return top hits for each
+    group.
+
+    :param search: The elasticsearch Search object representing the query.
+    :param group_by: The field name to group the results by.
+    :param order_by: The field name to use for sorting the top hits.
+    :param  size: The number of top hits to return for each group.
+    :return: None, results are returned as part of the Elasticsearch search object.
+    """
+
+    aggregation = A("terms", field=group_by)
+    sub_aggregation = A(
+        "top_hits", size=size, sort={order_by: {"order": "desc"}}
+    )
+    aggregation.bucket("grouped_by_group_id", sub_aggregation)
+    search.aggs.bucket("groups", aggregation)
+
+
 def clean_up_recap_document_file(item: RECAPDocument) -> None:
     """Clean up the RecapDocument file-related fields after detecting the file
     doesn't exist in the storage.

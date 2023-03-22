@@ -3,14 +3,33 @@
 {% load mathfilters %}
 {% load humanize %}
 
-{% for result in results.object_list %}
-	<article>
-		<h3 class="bottom serif">
-			{{ result.text|safe }}
-		</h3>
-		<a href="{{ result.describing_opinion_url }}?{{ request.META.QUERY_STRING }}"><i
-				class="fa fa-search visitable">&nbsp;View describing opinion</i></a>
-		<a href="{{ result.described_opinion_url }}?{{ request.META.QUERY_STRING }}"><i
-				class="fa fa-search visitable">&nbsp;View described opinion</i></a>
-	</article>
-{% endfor %}
+<div id="all-summaries">
+  {% for result in results.object_list %}
+   <article>
+     <ul>
+        {% for parenthetical in result.grouped_by_group_id.hits.hits %}
+          {% with source=parenthetical|get_attrdict:"_source" %}
+            {% if forloop.first %}
+              <li>
+            {% else %}
+              <li class="group-summaries">
+            {% endif %}
+                <h3 class="bottom serif">
+                  {{ source.text|safe }}
+                </h3>
+                <span class="bullet-tail">{{ source.describing_opinion_cluster_date_filed }}</span>
+                <span class="bullet-tail"><a href="{{ source.describing_opinion_url }}?{{ request.META.QUERY_STRING }}"><i
+                    class="fa fa-search visitable">&nbsp;View describing opinion</i></a>
+                </span>
+                <span class="bullet-tail">{{ source.described_opinion_cluster_date_filed }}</span>
+                <span class="bullet-tail"><a href="{{ source.described_opinion_url }}?{{ request.META.QUERY_STRING }}"><i
+                    class="fa fa-search visitable">&nbsp;View described opinion</i></a></span>
+              </li>
+          {% endwith %}
+        {% endfor %}
+     </ul>
+    </article>
+
+  {% endfor %}
+
+</div>

@@ -120,3 +120,13 @@ def get(mapping, key):
 @register.simple_tag
 def random_int(a: int, b: int) -> int:
     return random.randint(a, b)
+
+
+@register.filter
+def get_attrdict(mapping, key):
+    """Emulates the dictionary get for AttrDict objects. Useful when keys
+    have spaces or other punctuation."""
+    try:
+        return mapping[key]
+    except KeyError:
+        return ""

@@ -23,6 +23,7 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     Parenthetical,
+    ParentheticalGroup,
     RECAPDocument,
 )
 from cl.tests.providers import LegalProvider
@@ -53,6 +54,14 @@ class ParentheticalFactory(DjangoModelFactory):
     describing_opinion = SelfAttribute("described_opinion")
     text = Faker("sentence")
     score = Faker("pyfloat", min_value=0, max_value=1, right_digits=4)
+
+
+class ParentheticalGroupFactory(DjangoModelFactory):
+    class Meta:
+        model = ParentheticalGroup
+
+    score = Faker("pyfloat", min_value=0, max_value=1, right_digits=4)
+    size = Faker("random_int", min=1, max=100)
 
 
 class ParentheticalWithParentsFactory(ParentheticalFactory):

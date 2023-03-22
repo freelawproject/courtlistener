@@ -164,11 +164,11 @@
 					<h2 id="result-count" class="bottom">
 						{% if search_type == "parenthetical" %}
 							{{ results.paginator.count|intcomma }}
-							Parenthetical{{ results.paginator.count|pluralize }}
+							Parenthetical{{ results.paginator.count|pluralize }} Group{{ results.paginator.count|pluralize }}
 						{% endif %}
 
 					</h2>
-					<span class="small gray top">{{ results.paginator.execution_time|intcomma }}ms</span>
+					<span class="small gray top">{{ query_time|intcomma }}ms</span>
 				</div>
 			</div>
 			{% include "elasticsearch/search_result.html" %}
