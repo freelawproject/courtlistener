@@ -43,17 +43,7 @@ def _clean_form(get_params, cd, courts):
     # fine to leave it here until there's a reason to remove it. It could be
     # helpful if somebody finds a way not to use the datepickers (js off, say)
     for date_field in SearchForm().get_date_field_names():
-        for time in ("before", "after"):
-            field = f"{date_field}_{time}"
-            if get_params.get(field) and cd.get(field) is not None:
-                # Don't use strftime. It'll fail before 1900
-                before = cd[field]
-                get_params[field] = "%02d/%02d/%s" % (
-                    before.month,
-                    before.day,
-                    before.year,
-                )
-
+        clean_up_date_formats(cd, date_field, get_params)
     get_params["order_by"] = cd["order_by"]
     get_params["type"] = cd["type"]
 
@@ -763,9 +753,7 @@ class ParentheticalSearchForm(forms.Form):
 
         # Clear options to avoid duplicates
         self.ORDER_BY_OPTIONS.clear()
-
         courts = Court.objects.filter(in_use=True)
-
         for court in courts:
             self.fields[f"court_{court.pk}"] = forms.BooleanField(
                 label=court.short_name,
@@ -811,8 +799,7 @@ class ParentheticalSearchForm(forms.Form):
                 cleaned_data[f"court_{court_id}"] = True
 
         # 3. Make sure that the user has selected at least one facet for each
-        #    taxonomy. Note that this logic must be paralleled in
-        #    search_utils.make_facet_variable
+        #    taxonomy.
         court_bools = [
             v for k, v in cleaned_data.items() if k.startswith("court_")
         ]
@@ -822,19 +809,7 @@ class ParentheticalSearchForm(forms.Form):
                 if key.startswith("court_"):
                     cleaned_data[key] = True
 
-        stat_bools = [
-            v for k, v in cleaned_data.items() if k.startswith("stat_")
-        ]
-        if not any(stat_bools):
-            # Set everything to False...
-            for key in cleaned_data.keys():
-                if key.startswith("stat_"):
-                    cleaned_data[key] = False
-            # ...except precedential
-            cleaned_data["stat_Precedential"] = True
-
         cleaned_data["_court_count"] = len(court_bools)
-        cleaned_data["_stat_count"] = len(stat_bools)
 
         # 4. Strip any whitespace, otherwise it crashes Solr.
         for k, v in cleaned_data.items():
@@ -858,14 +833,11 @@ class ParentheticalSearchForm(forms.Form):
         if all courts are being queried.
         :returns A dictionary of the data
         """
-        # The search type is usually provided by cleaned data, but can be
-        # missing when the form is invalid (and lacks it). If so, just give up.
 
         display_dict = OrderedDict({"Courts": court_count_human})
         for field_name, field in self.fields.items():
             if not hasattr(field, "as_str_types"):
                 continue
-            # if search_type in field.as_str_types:
             value = self.cleaned_data.get(field_name)
             if value:
                 if isinstance(field, ChoiceField):
@@ -894,19 +866,9 @@ def _clean_es_form(get_params, cd, courts, search_type, formclass):
     # fine to leave it here until there's a reason to remove it. It could be
     # helpful if somebody finds a way not to use the datepickers (js off, say)
     for date_field in ParentheticalSearchForm().get_date_field_names():
-        for time in ("before", "after"):
-            field = f"{date_field}_{time}"
-            if get_params.get(field) and cd.get(field) is not None:
-                # Don't use strftime. It'll fail before 1900
-                before = cd[field]
-                get_params[field] = "%02d/%02d/%s" % (
-                    before.month,
-                    before.day,
-                    before.year,
-                )
+        clean_up_date_formats(cd, date_field, get_params)
 
     get_params["order_by"] = cd["order_by"]
-
     for court in courts:
         get_params[f"court_{court.pk}"] = cd[f"court_{court.pk}"]
 
@@ -915,30 +877,24 @@ def _clean_es_form(get_params, cd, courts, search_type, formclass):
     return form
 
 
-def prep_cd(get_params, cd, courts):
-    """Returns cleaned up values as a Form object."""
-    # Send the user the cleaned up query
-    get_params["q"] = cd["q"]
+def clean_up_date_formats(
+    cd: dict[str, any], date_field: str, get_params: dict[str, any]
+) -> None:
+    """Clean up date formats in a given params dictionary.
 
-    # Clean up the date formats. This is probably no longer needed since we do
-    # date cleanup on the client side via our datepickers, but it's probably
-    # fine to leave it here until there's a reason to remove it. It could be
-    # helpful if somebody finds a way not to use the datepickers (js off, say)
-    for date_field in ParentheticalSearchForm().get_date_field_names():
-        for time in ("before", "after"):
-            field = f"{date_field}_{time}"
-            if get_params.get(field) and cd.get(field) is not None:
-                # Don't use strftime. It'll fail before 1900
-                before = cd[field]
-                get_params[field] = "%02d/%02d/%s" % (
-                    before.month,
-                    before.day,
-                    before.year,
-                )
+    :param cd: The cleaned data dict.
+    :param date_field: The name of the date field to be cleaned up.
+    :param get_params: The query request params.
+    :return: None
+    """
 
-    get_params["order_by"] = cd["order_by"]
-
-    for court in courts:
-        get_params[f"court_{court.pk}"] = cd[f"court_{court.pk}"]
-
-    return get_params
+    for time in ("before", "after"):
+        field = f"{date_field}_{time}"
+        if get_params.get(field) and cd.get(field) is not None:
+            # Don't use strftime. It'll fail before 1900
+            before = cd[field]
+            get_params[field] = "%02d/%02d/%s" % (
+                before.month,
+                before.day,
+                before.year,
+            )

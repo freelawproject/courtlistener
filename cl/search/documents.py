@@ -1,10 +1,17 @@
-from django_elasticsearch_dsl import Document, fields
-from django_elasticsearch_dsl.registries import registry
+from django.conf import settings
+from django_elasticsearch_dsl import Document, Index, fields
 
 from cl.search.models import Parenthetical
 
+# Define parenthetical elasticsearch index
+parenthetical_index = Index("parenthetical")
+parenthetical_index.settings(
+    number_of_shards=settings.ELASTICSEARCH_NUMBER_OF_SHARDS,
+    number_of_replicas=settings.ELASTICSEARCH_NUMBER_OF_REPLICAS,
+)
 
-@registry.register_document
+
+@parenthetical_index.document
 class ParentheticalDocument(Document):
     describing_opinion_url = fields.KeywordField(
         attr="describing_opinion.get_absolute_url"
@@ -63,11 +70,6 @@ class ParentheticalDocument(Document):
     )
 
     group_id = fields.IntegerField(attr="group_id")
-
-    class Index:
-        # Name of Elasticsearch index
-        name = "parenthetical"
-        settings = {"number_of_shards": 1, "number_of_replicas": 0}
 
     class Django:
         model = Parenthetical
