@@ -18,11 +18,11 @@
                   {{ source.text|safe }}
                 </h3>
                 <span class="bullet-tail">{{ source.describing_opinion_cluster_date_filed }}</span>
-                <span class="bullet-tail"><a href="{{ source.describing_opinion_url }}?{{ request.META.QUERY_STRING }}"><i
+                <span class="bullet-tail"><a href="{% url 'view_case' source.describing_opinion_cluster_id source.describing_opinion_cluster_slug %}?{{ request.META.QUERY_STRING }}"><i
                     class="fa fa-search visitable">&nbsp;View describing opinion</i></a>
                 </span>
                 <span class="bullet-tail">{{ source.described_opinion_cluster_date_filed }}</span>
-                <span class="bullet-tail"><a href="{{ source.described_opinion_url }}?{{ request.META.QUERY_STRING }}"><i
+                <span class="bullet-tail"><a href="{% url 'view_case' source.described_opinion_cluster_id source.described_opinion_cluster_slug %}?{{ request.META.QUERY_STRING }}"><i
                     class="fa fa-search visitable">&nbsp;View described opinion</i></a></span>
               </li>
           {% endwith %}

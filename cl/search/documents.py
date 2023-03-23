@@ -13,9 +13,6 @@ parenthetical_index.settings(
 
 @parenthetical_index.document
 class ParentheticalDocument(Document):
-    describing_opinion_url = fields.KeywordField(
-        attr="describing_opinion.get_absolute_url"
-    )
     describing_opinion_id = fields.IntegerField(attr="describing_opinion_id")
     describing_opinion_type = fields.KeywordField(
         attr="describing_opinion.type"
@@ -28,6 +25,9 @@ class ParentheticalDocument(Document):
     )
     describing_opinion_cluster_id = fields.IntegerField(
         attr="describing_opinion.cluster_id"
+    )
+    describing_opinion_cluster_slug = fields.KeywordField(
+        attr="describing_opinion.cluster.slug"
     )
     describing_opinion_cluster_date_filed = fields.DateField(
         attr="describing_opinion.cluster.date_filed"
@@ -42,9 +42,6 @@ class ParentheticalDocument(Document):
         attr="describing_opinion.cluster.docket.docket_number"
     )
 
-    described_opinion_url = fields.KeywordField(
-        attr="described_opinion.get_absolute_url"
-    )
     described_opinion_id = fields.IntegerField(attr="described_opinion_id")
     described_opinion_type = fields.KeywordField(attr="described_opinion.type")
     described_opinion_autor_id = fields.IntegerField(
@@ -55,6 +52,9 @@ class ParentheticalDocument(Document):
     )
     described_opinion_cluster_id = fields.IntegerField(
         attr="described_opinion.cluster_id"
+    )
+    described_opinion_cluster_slug = fields.KeywordField(
+        attr="described_opinion.cluster.slug"
     )
     described_opinion_cluster_date_filed = fields.DateField(
         attr="described_opinion.cluster.date_filed"
