@@ -254,9 +254,11 @@
                 <li>
                   <a href="{% url "advanced_o" %}" tabindex="101">Opinions Search</a>
                 </li>
-				        <li>
-                  <a href="{% url "es_search" "parenthetical" %}" tabindex="101">Parentheticals Search</a>
-                </li>
+                {% flag "parenthetical-search" %}
+                  <li>
+                    <a href="{% url "es_search" "parenthetical" %}" tabindex="101">Parentheticals Search</a>
+                  </li>
+                {% endflag %}
                 <li>
                   <a href="{% url "citation_homepage" %}"
                      tabindex="102">Citation Look Up</a>

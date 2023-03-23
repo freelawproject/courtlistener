@@ -28,15 +28,16 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
 
-from cl.lib.search_utils import (
+from cl.lib.search_utils import cleanup_main_query
+from cl.lib.elasticsearch_utils import (
     build_daterange_query,
     build_es_queries,
     build_fulltext_query,
     build_sort_results,
     build_terms_query,
-    cleanup_main_query,
     group_search_results,
 )
+
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
     EmptySolrTestCase,
@@ -1796,7 +1797,7 @@ class ElasticSearchTest(TestCase):
                 ),
                 date_filed=date(1978, 3, 10),
                 source="H",
-                precedential_status="Published",
+                precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
             ),
             type="Plurality Opinion",
             extracted_by_ocr=True,
@@ -1811,7 +1812,7 @@ class ElasticSearchTest(TestCase):
                 ),
                 date_filed=date(1976, 8, 30),
                 source="H",
-                precedential_status="Published",
+                precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
             ),
             type="Concurrence Opinion",
             extracted_by_ocr=False,
@@ -1826,7 +1827,7 @@ class ElasticSearchTest(TestCase):
                 ),
                 date_filed=date(1981, 7, 11),
                 source="LC",
-                precedential_status="Published",
+                precedential_status=PRECEDENTIAL_STATUS.SEPARATE,
             ),
             type="In Part Opinion",
             extracted_by_ocr=True,
@@ -2043,6 +2044,34 @@ class ElasticSearchTest(TestCase):
         )
         self.assertEqual(s.count(), 2)
 
+
+    def test_precedential_status_query(self) -> None:
+        """Test build es terms query"""
+        filters = []
+        q = build_terms_query(
+            "described_opinion_cluster_precedential_status",
+            [PRECEDENTIAL_STATUS.SEPARATE, PRECEDENTIAL_STATUS.PUBLISHED],
+        )
+        filters.extend(q)
+        s = ParentheticalDocument.search().filter(
+            reduce(operator.iand, filters)
+        )
+        self.assertEqual(s.count(), 3)
+
+    def test_cd_query_stat(self) -> None:
+        """Test build es query with cleaned data"""
+        cd = {
+            "stat_Precedential":True,
+            "stat_Separate Opinion": True,
+            "stat_Non-Precedential": False,
+        }
+
+        filters = build_es_queries(cd)
+        s = ParentheticalDocument.search().filter(
+            reduce(operator.iand, filters)
+        )
+        self.assertEqual(s.count(), 3)
+
     def test_cd_query(self) -> None:
         """Test build es query with cleaned data"""
         cd = {
@@ -2080,6 +2109,7 @@ class ElasticSearchTest(TestCase):
             reduce(operator.iand, filters)
         )
         self.assertEqual(s.count(), 1)
+
 
     def test_build_sort(self) -> None:
         """Test we can build sort dict and sort ES query"""

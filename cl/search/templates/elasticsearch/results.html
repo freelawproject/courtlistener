@@ -52,52 +52,6 @@
 
 {% block footer-scripts %}
 	{% include "includes/date_picker.html" %}
-	{% if alert_form.errors or request.GET.show_alert_modal %}
-		<script type="text/javascript">
-            $(window).on('load', function () {
-                $("#modal-save-alert").modal('show');
-            });
-		</script>
-	{% endif %}
-	<script type="text/javascript">
-        $("#modal-save-alert").on('show.bs.modal', function (e) {
-            const modalBody = $('.modal-body.logged-in');
-            if (modalBody.length === 0) {
-                // Not logged in; abort. Don't do alert estimation ajax
-                return
-            }
-            const estimate = $(this).find('#alert-estimate');
-            const icon = estimate.find('i');
-            const msg = estimate.find('span');
-            const numDaysToEstimate = 100;
-            $.ajax({
-                url: "{% url "alert_frequency" version=3 day_count=100 %}" + window.location.search,
-                success: function (data) {
-                    // Check if this is impractically large. If so, block it
-                    const hitsPerDay = Math.floor(data.count / numDaysToEstimate);
-                    if (hitsPerDay > {{ MAX_ALERT_RESULTS_PER_DAY }}) {
-                        // Wipe the screen; show message to the user
-                        modalBody.empty();
-                        modalBody.append(
-                            $('<p/>').text("This query averages about " + hitsPerDay + " results per day. This is more than our system can support and may create a lot of messages in your inbox."),
-                            $('<p/>').text("Please narrow your query to have fewer results per day.")
-                        );
-                        modalBody.removeClass("hidden");
-                    } else {
-                        // Show the form; Update icon and text
-                        modalBody.removeClass("hidden");
-                        icon.removeClass('fa-spinner fa-pulse fa-warning').addClass('fa-clock-o');
-                        msg.text(" " + data.count + " hits in the last 100 days")
-                    }
-                },
-                error: function () {
-                    modalBody.removeClass("hidden");
-                    icon.removeClass("fa-spinner fa-pulse fa-clock-o").addClass("fa-warning");
-                    msg.text(" Unable to get estimate for this alert");
-                }
-            })
-        })
-	</script>
 {% endblock %}
 
 {% block navbar-o %}

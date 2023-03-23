@@ -68,6 +68,10 @@ class ParentheticalDocument(Document):
     described_opinion_cluster_docket_number = fields.KeywordField(
         attr="described_opinion.cluster.docket.docket_number"
     )
+    described_opinion_cluster_precedential_status = fields.KeywordField(
+        attr="described_opinion.cluster.precedential_status"
+    )
+
 
     group_id = fields.IntegerField(attr="group_id")
 

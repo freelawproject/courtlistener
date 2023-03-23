@@ -3,33 +3,37 @@
 {% load mathfilters %}
 {% load humanize %}
 
-<div id="all-summaries">
-  {% for result in results.object_list %}
-   <article>
-     <ul>
-        {% for parenthetical in result.grouped_by_group_id.hits.hits %}
-          {% with source=parenthetical|get_attrdict:"_source" %}
-            {% if forloop.first %}
-              <li>
-            {% else %}
-              <li class="group-summaries">
-            {% endif %}
-                <h3 class="bottom serif">
-                  {{ source.text|safe }}
-                </h3>
-                <span class="bullet-tail">{{ source.describing_opinion_cluster_date_filed }}</span>
-                <span class="bullet-tail"><a href="{% url 'view_case' source.describing_opinion_cluster_id source.describing_opinion_cluster_slug %}?{{ request.META.QUERY_STRING }}"><i
-                    class="fa fa-search visitable">&nbsp;View describing opinion</i></a>
-                </span>
-                <span class="bullet-tail">{{ source.described_opinion_cluster_date_filed }}</span>
-                <span class="bullet-tail"><a href="{% url 'view_case' source.described_opinion_cluster_id source.described_opinion_cluster_slug %}?{{ request.META.QUERY_STRING }}"><i
-                    class="fa fa-search visitable">&nbsp;View described opinion</i></a></span>
-              </li>
-          {% endwith %}
-        {% endfor %}
-     </ul>
-    </article>
-
+{% for result in results.object_list %}
+ <article>
+  {% for parenthetical in result.grouped_by_group_id.hits.hits %}
+    {% with source=parenthetical|get_attrdict:"_source" %}
+      {% if forloop.first %}
+        <div>
+          <h3 class="bottom serif">
+      {% else %}
+        <div class="col-md-offset-half">
+          <h4>
+      {% endif %}
+            <a href="{% url 'view_case' source.described_opinion_cluster_id source.described_opinion_cluster_slug %}?{{ request.META.QUERY_STRING }}" class="visitable">
+              {{ source.text|safe }}
+            </a>
+      {% if forloop.first %}
+        </h3>
+      {% else %}
+        </h4>
+      {% endif %}
+          <div class="inline-block">
+            <span class="meta-data-header">Date Filed:</span>
+            <time class="meta-data-value" datetime="{{ source.described_opinion_cluster_date_filed }}">{{ source.described_opinion_cluster_date_filed }}</time>
+          </div>
+          <span class="bullet-tail"><a href="{% url 'view_case' source.describing_opinion_cluster_id source.describing_opinion_cluster_slug %}?{{ request.META.QUERY_STRING }}"><i
+              class="fa fa-search visitable">&nbsp;View describing opinion</i></a>
+          </span>
+        </div>
+    {% endwith %}
   {% endfor %}
 
-</div>
+  </article>
+
+{% endfor %}
+

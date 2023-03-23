@@ -22,7 +22,7 @@
 			</div>
 
 			<div class="form-group">
-				{% include "fields/form_group_field.html" with field=search_form.order_by %}
+				{% include "includes/order_by_dropdown.html" %}
 			</div>
 
 			<div class="row">
@@ -38,7 +38,26 @@
 			</div>
 
 			<div class="form-group">
-				{% include "fields/form_group_field.html" with field=search_form.opinion_id %}
+          <label>Precedential Status</label>
+          {% for facet_field in facet_fields %}
+              {% if forloop.counter == 4 %}
+                  <a id="show-all-statuses"
+                     class="cursor">Show All Statuses&hellip;</a>
+              {% endif %}
+              <div class="sidebar-checkbox status-item{% if forloop.counter >= 4 %} hidden{% endif %}">
+                  <input
+                          id="id_{{ facet_field.html_name }}"
+                          type="checkbox"
+                          name="{{ facet_field.html_name }}"
+                          class="external-input status-checkbox left"
+                          {% if facet_field.value %}checked="checked"{% endif %}>
+                  <label
+                        for="id_{{ facet_field.html_name }}"
+                        class="pointer">
+                    <div>{{ facet_field.label }}&nbsp </div>
+                </label>
+              </div>
+          {% endfor %}
 			</div>
 
 			<div class="form-group text-right">
