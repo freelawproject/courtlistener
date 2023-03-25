@@ -6,22 +6,29 @@ import linecache
 import re
 import sys
 import threading
+from collections import defaultdict
 from datetime import datetime
 from queue import Queue
-from typing import Any, Mapping, TypedDict
+from typing import Any, DefaultDict, Mapping, TypedDict
 from urllib.parse import unquote
 
 from django.db import DataError, IntegrityError, transaction
+from django.db.models import Q
+from django.utils.text import slugify
 from django.utils.timezone import make_aware, utc
 from juriscraper.pacer import PacerRssFeed
 
+from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.model_helpers import make_docket_number_core
 from cl.lib.pacer import map_pacer_to_cl_id
 from cl.lib.redis_utils import make_redis_interface
 from cl.lib.storage import S3PrivateUUIDStorage
+from cl.lib.string_utils import trunc
+from cl.lib.timezone_helpers import localize_date_and_time
 from cl.recap.mergers import (
     add_bankruptcy_data_to_docket,
-    add_docket_entries,
+    calculate_recap_sequence_numbers,
     find_docket_object,
     update_docket_metadata,
 )
@@ -31,10 +38,193 @@ from cl.recap_rss.tasks import (
     hash_item,
     is_cached,
 )
-from cl.search.models import Court
+from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
 from cl.search.tasks import add_items_to_solr
 
 FILES_BUFFER_THRESHOLD = 3
+
+
+def check_for_early_termination(
+    court_id: str, docket: dict[str, Any]
+) -> str | None:
+    """Check for early termination, skip the rest of the file in case a cached
+    item is reached or skip a single item if it doesn't contain required data.
+    Cache the current item.
+
+    :param court_id: The court the docket entries belong to.
+    :param docket: A dict containing the item data.
+    :return: A "break" string indicating if the rest of the file should be
+    omitted, "continue" if only the current item should be omitted or None.
+    """
+    item_hash = hash_item(docket)
+    if is_cached(item_hash):
+        logger.info(
+            f"Hit a cached item, finishing adding bulk entries for {court_id} feed. "
+        )
+        return "break"
+
+    cache_hash(item_hash)
+    if (
+        not docket["pacer_case_id"]
+        and not docket["docket_number"]
+        or not len(docket["docket_entries"])
+    ):
+        return "continue"
+    return None
+
+
+def add_new_docket_from_rss(
+    court_id: str,
+    d: Docket,
+    docket: dict[str, Any],
+    unique_dockets: dict[str, Any],
+    dockets_to_create: list[Docket],
+) -> None:
+    """Set metadata and extra values to the Docket object and append it to
+    the list of dockets to be added in bulk.
+
+    :param court_id: The court the docket entries belong to.
+    :param d: The Docket object to modify and add.
+    :param docket: The dict containing the item data.
+    :param unique_dockets: The dict to keep track of unique dockets to add.
+    :param dockets_to_create: The list of dockets to add in bulk.
+    :return: None
+    """
+
+    date_filed, time_filed = localize_date_and_time(
+        court_id, docket["docket_entries"][0]["date_filed"]
+    )
+    update_docket_metadata(d, docket)
+    d.pacer_case_id = docket["pacer_case_id"]
+    d.slug = slugify(trunc(best_case_name(d), 75))
+    d.date_last_filing = date_filed
+    if d.docket_number:
+        d.docket_number_core = make_docket_number_core(d.docket_number)
+
+    docket_in_list = unique_dockets.get(docket["docket_number"], None)
+    if not docket_in_list:
+        unique_dockets[docket["docket_number"]] = docket
+        dockets_to_create.append(d)
+
+
+def do_bulk_additions(
+    court_id: str,
+    unique_dockets: dict[str, Any],
+    dockets_to_create: list[Docket],
+    des_to_add_no_existing_docket: DefaultDict[str, list[dict[str, Any]]],
+    des_to_add_existing_docket: list[tuple[int, dict[str, Any]]],
+) -> tuple[list[int], int]:
+    """Create dockets, docket entries and recap documents in bulk.
+
+    :param court_id: The court the docket entries belong to.
+    :param unique_dockets: The dict to keep track of unique dockets to add.
+    :param dockets_to_create: The list of dockets to add in bulk.
+    :param des_to_add_no_existing_docket: A DefaultDict containing entries to
+    add which its parent docket didn't exist, docket_number: [entries]
+    :param des_to_add_existing_docket: A list of tuples containing entries to
+    add which its parent docket exists, (docket.pk, docket_entry)
+    :return: A tuple containing a list of created recap documents pks, the
+    number of dockets created.
+    """
+
+    with transaction.atomic():
+        # Create dockets in bulk.
+        d_bulk_created = Docket.objects.bulk_create(dockets_to_create)
+
+        # Add bankruptcy data to dockets.
+        for d in d_bulk_created:
+            docket_data = unique_dockets.get(d.docket_number)
+            if docket_data:
+                add_bankruptcy_data_to_docket(d, docket_data)
+
+        # Find and assign the created docket pk to the list of docket entries
+        # to add.
+        for d_created in d_bulk_created:
+            docket_number = d_created.docket_number
+            des_to_create = des_to_add_no_existing_docket[docket_number]
+            for de_entry in des_to_create:
+                des_to_add_existing_docket.append((d_created.pk, de_entry))
+
+        # Create docket entries in bulk.
+        docket_entries_to_add_bulk = get_docket_entries_to_add(
+            court_id, des_to_add_existing_docket
+        )
+        des_bulk_created = DocketEntry.objects.bulk_create(
+            docket_entries_to_add_bulk
+        )
+
+        # Create RECAP documents in bulk.
+        rds_to_create_bulk = get_rds_to_add(
+            des_bulk_created, des_to_add_existing_docket
+        )
+        rd_bulk_created = RECAPDocument.objects.bulk_create(rds_to_create_bulk)
+
+    return [rd.pk for rd in rd_bulk_created], len(d_bulk_created)
+
+
+def get_docket_entries_to_add(
+    court_id: str, des_to_add_existing_docket: list[tuple[int, dict[str, Any]]]
+) -> list[DocketEntry]:
+    """Make and return a list of the DocketEntry objects to save in bulk.
+
+    :param court_id: The court the docket entries belong to.
+    :param des_to_add_existing_docket: A list of tuples containing the docket
+    pk the entry belongs to, the docket entry dict.
+    :return: A list of DocketEntry objects.
+    """
+
+    docket_entries_to_add_bulk = []
+    for de_add in des_to_add_existing_docket:
+        d_pk = de_add[0]
+        docket_entry = de_add[1]
+        calculate_recap_sequence_numbers([docket_entry], court_id)
+        date_filed, time_filed = localize_date_and_time(
+            court_id, docket_entry["date_filed"]
+        )
+        de_to_add = DocketEntry(
+            docket_id=d_pk,
+            entry_number=docket_entry["document_number"],
+            description=docket_entry["description"],
+            pacer_sequence_number=docket_entry["pacer_seq_no"],
+            recap_sequence_number=docket_entry["recap_sequence_number"],
+            time_filed=time_filed,
+            date_filed=date_filed,
+        )
+        docket_entries_to_add_bulk.append(de_to_add)
+    return docket_entries_to_add_bulk
+
+
+def get_rds_to_add(
+    des_bulk_created: list[DocketEntry],
+    des_to_add_existing_docket: list[tuple[int, dict[str, Any]]],
+) -> list[RECAPDocument]:
+    """Make and return a list of the RECAPDocument objects to save in bulk.
+
+    :param des_bulk_created: The list of DocketEntry objects saved in a
+    previous step.
+    :param des_to_add_existing_docket: A list of tuples containing the docket
+    pk the entry belongs to, the docket entry dict.
+    :return: A list of RECAPDocument objects.
+    """
+
+    rds_to_create_bulk = []
+    for d_entry, bulk_created in zip(
+        des_to_add_existing_docket, des_bulk_created
+    ):
+        de_pk = bulk_created.pk
+        docket_entry = d_entry[1]
+        document_number = docket_entry["document_number"] or ""
+        rd = RECAPDocument(
+            docket_entry_id=de_pk,
+            document_number=document_number,
+            description=docket_entry["short_description"],
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            pacer_doc_id=docket_entry["pacer_doc_id"],
+            is_available=False,
+        )
+        rds_to_create_bulk.append(rd)
+
+    return rds_to_create_bulk
 
 
 def merge_rss_data(
@@ -51,6 +241,7 @@ def merge_rss_data(
     """
 
     court_id = map_pacer_to_cl_id(court_id)
+    court = Court.objects.get(pk=court_id)
     dockets_created = 0
     all_rds_created: list[int] = []
     district_court_ids = (
@@ -68,51 +259,80 @@ def merge_rss_data(
         # Avoid parsing/adding feeds after we start scraping RSS Feeds for
         # district and bankruptcy courts.
         return all_rds_created, dockets_created
+
+    dockets_to_create: list[Docket] = []
+    unique_dockets: dict[str, Any] = {}
+    des_to_add_existing_docket: list[tuple[int, dict[str, Any]]] = []
+    des_to_add_no_existing_docket: DefaultDict[
+        str, list[dict[str, Any]]
+    ] = defaultdict(list)
     for docket in feed_data:
-        item_hash = hash_item(docket)
-        if is_cached(item_hash):
-            logger.info(
-                f"Hit a cached item, finished adding {court_id} feed. "
-                f"Added {len(all_rds_created)} RDs."
-            )
-            return all_rds_created, dockets_created
-
-        if (
-            not docket["pacer_case_id"]
-            and not docket["docket_number"]
-            or not len(docket["docket_entries"])
-        ):
+        skip_or_break = check_for_early_termination(court_id, docket)
+        if skip_or_break == "continue":
             continue
+        elif skip_or_break == "break":
+            break
 
-        with transaction.atomic():
-            cached_ok = cache_hash(item_hash)
-            if not cached_ok:
-                # The item is already in the cache, ergo it's getting processed
-                # in another thread/process and we had a race condition.
-                continue
-
-            d = find_docket_object(
-                court_id,
-                docket["pacer_case_id"],
-                docket["docket_number"],
-            )
-            document_number = docket["docket_entries"][0]["document_number"]
-            if (
-                document_number
-                and d.docket_entries.filter(
-                    entry_number=document_number
-                ).exists()
-            ):
+        d = find_docket_object(
+            court_id,
+            docket["pacer_case_id"],
+            docket["docket_number"],
+        )
+        docket_entry = docket["docket_entries"][0]
+        document_number = docket["docket_entries"][0]["document_number"]
+        if (
+            document_number
+            and d.docket_entries.filter(entry_number=document_number).exists()
+        ):
+            # It's an existing docket entry; let's not add it.
+            continue
+        else:
+            # Try finding the docket entry by short_description.
+            short_description = docket_entry["short_description"]
+            query = Q()
+            if short_description:
+                query |= Q(
+                    recap_documents__description=docket_entry[
+                        "short_description"
+                    ]
+                )
+            if d.docket_entries.filter(
+                query,
+                date_filed=docket_entry["date_filed"],
+                entry_number=docket_entry["document_number"],
+            ).exists():
                 # It's an existing docket entry; let's not add it.
                 continue
-            if not d.pk:
-                update_docket_metadata(d, docket)
-                dockets_created += 1
 
-            if not d.pacer_case_id:
-                d.pacer_case_id = docket["pacer_case_id"]
+        d.add_recap_source()
+        if not d.pk:
+            # Set metadata for the new docket and append the docket and entry
+            # to the list to add in bulk.
+            if (
+                not docket["pacer_case_id"]
+                and court.jurisdiction != Court.FEDERAL_APPELLATE
+            ):
+                # Avoid adding the docket if it belongs to a district/bankr
+                # court and doesn't have a pacer_case_id
+                continue
+
+            add_new_docket_from_rss(
+                court_id,
+                d,
+                docket,
+                unique_dockets,
+                dockets_to_create,
+            )
+            # Append docket entries to add in bulk.
+            des_to_add_no_existing_docket[docket["docket_number"]].append(
+                docket_entry
+            )
+        else:
+            # Existing docket, update source, add bankr data and append the
+            # docket entry to add in bulk.
+            des_to_add_existing_docket.append((d.pk, docket_entry))
             try:
-                d.save()
+                d.save(update_fields=["source"])
                 add_bankruptcy_data_to_docket(d, docket)
             except (DataError, IntegrityError) as exc:
                 # Trouble. Log and move on
@@ -120,22 +340,14 @@ def merge_rss_data(
                     f"Got DataError or IntegrityError while saving docket."
                 )
 
-            des_returned, rds_created, content_updated = add_docket_entries(
-                d,
-                docket["docket_entries"],
-                do_not_update_existing=True,
-            )
-            if content_updated:
-                # Only add recap source if a docket entry was created.
-                d.add_recap_source()
-                try:
-                    d.save()
-                except IntegrityError as exc:
-                    # Trouble. Log and move on
-                    logger.warn(f"Got IntegrityError while saving docket.")
-
-        all_rds_created.extend([rd.pk for rd in rds_created])
-
+    rds_created_pks, dockets_created = do_bulk_additions(
+        court_id,
+        unique_dockets,
+        dockets_to_create,
+        des_to_add_no_existing_docket,
+        des_to_add_existing_docket,
+    )
+    all_rds_created.extend(rds_created_pks)
     logger.info(
         f"Finished adding {court_id} feed. Added {len(all_rds_created)} RDs."
     )
@@ -381,6 +593,7 @@ def iterate_and_import_files(
         rds_for_solr, dockets_created = merge_rss_data(
             feed_data, court_id, build_date
         )
+
         add_items_to_solr.delay(rds_for_solr, "search.RECAPDocument")
 
         total_dockets_created += dockets_created

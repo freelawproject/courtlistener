@@ -125,10 +125,12 @@ def find_docket_object(
         )
     else:
         # Finally, as a last resort, we can try the docket number. It might not
-        # match b/c of punctuation or whatever, but we can try.
-        lookups.append(
-            {"pacer_case_id": None, "docket_number": docket_number},
-        )
+        # match b/c of punctuation or whatever, but we can try. Avoid lookups
+        # by blank docket_number values.
+        if docket_number:
+            lookups.append(
+                {"pacer_case_id": None, "docket_number": docket_number},
+            )
 
     for kwargs in lookups:
         ds = Docket.objects.filter(court_id=court_id, **kwargs).using(using)

@@ -92,7 +92,8 @@ jobs:
           cl/users/management/commands/cl_account_management.py \
           cl/users/management/commands/cl_delete_old_emails.py \
           cl/users/management/commands/cl_retry_failed_email.py \
-          cl/users/tasks.py
+          cl/users/tasks.py \
+          cl/recap/management/commands/remove_appellate_entries_with_long_numbers.py
 
 
 
