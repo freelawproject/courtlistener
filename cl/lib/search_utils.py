@@ -6,9 +6,6 @@ from urllib.parse import parse_qs, urlencode
 from django.conf import settings
 from django.core.cache import cache, caches
 from django.http import HttpRequest, QueryDict
-from django_elasticsearch_dsl.search import Search
-from elasticsearch_dsl import A, Q
-from elasticsearch_dsl.query import Range
 from eyecite import get_citations
 from eyecite.models import FullCaseCitation
 from scorched.response import SolrResponse

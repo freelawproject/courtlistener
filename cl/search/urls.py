@@ -15,11 +15,10 @@ urlpatterns = [
     path("audio/", advanced, name="advanced_oa"),
     path("person/", advanced, name="advanced_p"),
     path("recap/", advanced, name="advanced_r"),
+    path("parenthetical/", es_search, name="advanced_pa"),
     path("financial-disclosures/", advanced, name="advanced_fd"),
     # Elastic search pages
     # TODO optional param
-    path("search/", es_search, name="es_search"),
-    path("search/<str:search_type>/", es_search, name="es_search"),
     path("results/", es_search_results, name="es_results"),
     path("results/<str:search_type>/", es_search_results, name="es_results"),
     # Feeds & Podcasts

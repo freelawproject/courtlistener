@@ -72,7 +72,6 @@ class ParentheticalDocument(Document):
         attr="described_opinion.cluster.precedential_status"
     )
 
-
     group_id = fields.IntegerField(attr="group_id")
 
     class Django:

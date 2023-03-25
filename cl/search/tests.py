@@ -28,7 +28,6 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
 
-from cl.lib.search_utils import cleanup_main_query
 from cl.lib.elasticsearch_utils import (
     build_daterange_query,
     build_es_queries,
@@ -37,7 +36,7 @@ from cl.lib.elasticsearch_utils import (
     build_terms_query,
     group_search_results,
 )
-
+from cl.lib.search_utils import cleanup_main_query
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
     EmptySolrTestCase,
@@ -2044,7 +2043,6 @@ class ElasticSearchTest(TestCase):
         )
         self.assertEqual(s.count(), 2)
 
-
     def test_precedential_status_query(self) -> None:
         """Test build es terms query"""
         filters = []
@@ -2061,7 +2059,7 @@ class ElasticSearchTest(TestCase):
     def test_cd_query_stat(self) -> None:
         """Test build es query with cleaned data"""
         cd = {
-            "stat_Precedential":True,
+            "stat_Precedential": True,
             "stat_Separate Opinion": True,
             "stat_Non-Precedential": False,
         }
@@ -2109,7 +2107,6 @@ class ElasticSearchTest(TestCase):
             reduce(operator.iand, filters)
         )
         self.assertEqual(s.count(), 1)
-
 
     def test_build_sort(self) -> None:
         """Test we can build sort dict and sort ES query"""

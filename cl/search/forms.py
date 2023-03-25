@@ -34,7 +34,6 @@ OPINION_ORDER_BY_CHOICES = (
 
 
 class BaseSearchForm(forms.Form):
-
     type = forms.ChoiceField(
         choices=SEARCH_TYPES.NAMES,
         required=False,
@@ -83,9 +82,11 @@ class BaseSearchForm(forms.Form):
                 initial=initial,
                 widget=forms.CheckboxInput(attrs=attrs),
             )
-            new_field.as_str_types = [SEARCH_TYPES.OPINION, SEARCH_TYPES.PARENTHETICAL]
+            new_field.as_str_types = [
+                SEARCH_TYPES.OPINION,
+                SEARCH_TYPES.PARENTHETICAL,
+            ]
             self.fields[f"stat_{status[1]}"] = new_field
-
 
     # This is a particularly nasty area of the code due to several factors:
     #  1. Django doesn't have a good method of setting default values for
@@ -271,8 +272,7 @@ class BaseSearchForm(forms.Form):
     def as_text(self, court_count_human):
         """Create a human-readable string representation of the search form"""
         crumbs = []
-        for label, value in self.as_display_dict(
-            court_count_human).items():
+        for label, value in self.as_display_dict(court_count_human).items():
             crumbs.append(f"{label}: {value}")
         return " › ".join(crumbs)
 
@@ -656,7 +656,6 @@ class SearchForm(BaseSearchForm):
 
 
 class ParentheticalSearchForm(BaseSearchForm):
-
     q = forms.CharField(required=False, label="Query")
 
     order_by = forms.ChoiceField(
@@ -705,9 +704,7 @@ class ParentheticalSearchForm(BaseSearchForm):
             }
         ),
     )
-    docket_number.as_str_types = [
-        SEARCH_TYPES.PARENTHETICAL
-    ]
+    docket_number.as_str_types = [SEARCH_TYPES.PARENTHETICAL]
 
 
 def clean_up_date_formats(

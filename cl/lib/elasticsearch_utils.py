@@ -1,12 +1,13 @@
 from datetime import date
 from typing import Dict, List
+
 from django_elasticsearch_dsl.search import Search
 from elasticsearch_dsl import A, Q
 from elasticsearch_dsl.query import Range
 
 from cl.lib.types import CleanData
-from cl.search.models import PRECEDENTIAL_STATUS
 from cl.search.forms import ParentheticalSearchForm
+from cl.search.models import PRECEDENTIAL_STATUS
 
 
 def build_daterange_query(
@@ -137,7 +138,7 @@ def build_es_queries(cd: CleanData) -> List:
     )
 
     # Build precedential status terms filter
-    stat_list=get_precedential_status_values(cd)
+    stat_list = get_precedential_status_values(cd)
     queries_list.extend(
         build_terms_query(
             "described_opinion_cluster_precedential_status",
@@ -185,8 +186,8 @@ def group_search_results(
     search.aggs.bucket("groups", aggregation)
 
 
-def get_precedential_status_values(cd: CleanData)->list[str]:
-    """ Convert precedential_status from clean data to a list of values for
+def get_precedential_status_values(cd: CleanData) -> list[str]:
+    """Convert precedential_status from clean data to a list of values for
     use in an elastic search query.
     e.g: stat_Precedential=on, stat_Errata=on
     to: ["Published", "Errata"]
@@ -194,9 +195,10 @@ def get_precedential_status_values(cd: CleanData)->list[str]:
     :param cd: The form CleanData
     :return: A list of precedential_status to query.
     """
-    status_list=[]
-    status_names_to_values = {name: value for value, name in
-                              PRECEDENTIAL_STATUS.NAMES}
+    status_list = []
+    status_names_to_values = {
+        name: value for value, name in PRECEDENTIAL_STATUS.NAMES
+    }
     for stat_v in dict(PRECEDENTIAL_STATUS.NAMES).values():
         if cd.get(f"stat_{stat_v}"):
             status_value = status_names_to_values.get(stat_v, "")
@@ -206,10 +208,10 @@ def get_precedential_status_values(cd: CleanData)->list[str]:
 
 
 def make_stats_es_facets(search_form: ParentheticalSearchForm):
-    """ Create facets for precedential_status.
+    """Create facets for precedential_status.
 
-        :param search_form: The ParentheticalSearchForm
-        :return: A list of faceted fields.
+    :param search_form: The ParentheticalSearchForm
+    :return: A list of faceted fields.
     """
     # TODO retrieve facets from ES.
     facet_fields = []

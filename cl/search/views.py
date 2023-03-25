@@ -4,7 +4,6 @@ import traceback
 from datetime import date, datetime, timedelta
 from functools import reduce
 from urllib.parse import quote
-from waffle.decorators import waffle_flag
 
 from cache_memoize import cache_memoize
 from django.conf import settings
@@ -23,12 +22,19 @@ from django.views.decorators.cache import never_cache
 from elasticsearch.exceptions import RequestError, TransportError
 from requests import RequestException
 from scorched.exc import SolrError
+from waffle.decorators import waffle_flag
 
 from cl.alerts.forms import CreateAlertForm
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.bot_detector import is_bot
+from cl.lib.elasticsearch_utils import (
+    build_es_queries,
+    build_sort_results,
+    group_search_results,
+    make_stats_es_facets,
+)
 from cl.lib.paginators import ESPaginator
 from cl.lib.ratelimiter import ratelimit_deny_list
 from cl.lib.redis_utils import make_redis_interface
@@ -43,14 +49,9 @@ from cl.lib.search_utils import (
     merge_form_with_courts,
     regroup_snippets,
 )
-from cl.lib.elasticsearch_utils import build_es_queries, build_sort_results, group_search_results, make_stats_es_facets
 from cl.search.constants import RELATED_PATTERN
 from cl.search.documents import ParentheticalDocument
-from cl.search.forms import (
-    ParentheticalSearchForm,
-    SearchForm,
-    _clean_form,
-)
+from cl.search.forms import ParentheticalSearchForm, SearchForm, _clean_form
 from cl.search.models import SEARCH_TYPES, Court, Opinion, OpinionCluster
 from cl.stats.models import Stat
 from cl.stats.utils import tally_stat
@@ -196,7 +197,9 @@ def do_search(
                 traceback.print_exc()
 
         # A couple special variables for particular search types
-        search_form = _clean_form(get_params, cd, courts, search_form.__class__)
+        search_form = _clean_form(
+            get_params, cd, courts, search_form.__class__
+        )
         if cd["type"] in [
             SEARCH_TYPES.OPINION,
             SEARCH_TYPES.RECAP,
@@ -322,6 +325,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
     All of these paths have tests.
     """
     # Create a search string that does not contain the page numbers
+
     get_string = make_get_string(request)
     get_string_sans_alert = make_get_string(
         request, ["page", "edit_alert", "show_alert_modal"]
@@ -511,34 +515,29 @@ def advanced(request: HttpRequest) -> HttpResponse:
         return render(request, "advanced.html", render_dict)
 
 
-@waffle_flag('parenthetical-search')
-def es_search(request: HttpRequest, search_type: str = None) -> HttpResponse:
+@waffle_flag("parenthetical-search")
+def es_search(request: HttpRequest) -> HttpResponse:
     """Display elasticsearch search page based on type passed as url param
     :param request: HttpRequest object
-    :param search_type: search type name
     :return: HttpResponse
     """
     render_dict = {"private": False}
     template = None
 
-    if not search_type:
-        return HttpResponseRedirect(reverse("show_results"))
-
-    if search_type in ["parenthetical"]:
+    if request.path == reverse("advanced_pa"):
         courts = Court.objects.filter(in_use=True)
-        render_dict.update({"search_type": search_type})
-        if search_type == "parenthetical":
-            obj_type = SEARCH_TYPES.PARENTHETICAL
+        render_dict.update({"search_type": "parenthetical"})
+        obj_type = SEARCH_TYPES.PARENTHETICAL
 
-            search_form = ParentheticalSearchForm({"type": obj_type})
-            if search_form.is_valid():
-                search_form = _clean_form(
-                    request.GET.copy(),
-                    search_form.cleaned_data,
-                    courts,
-                    search_form.__class__,
-                )
-            template = "parenthetical.html"
+        search_form = ParentheticalSearchForm({"type": obj_type})
+        if search_form.is_valid():
+            search_form = _clean_form(
+                request.GET.copy(),
+                search_form.cleaned_data,
+                courts,
+                search_form.__class__,
+            )
+        template = "parenthetical.html"
 
         courts, court_count_human, court_count = merge_form_with_courts(
             courts, search_form
@@ -552,12 +551,11 @@ def es_search(request: HttpRequest, search_type: str = None) -> HttpResponse:
                 "court_count": court_count,
             }
         )
-    else:
-        raise Http404(f"Search type: {search_type} not valid")
 
     return render(request, template, render_dict)
 
-@waffle_flag('parenthetical-search')
+
+@waffle_flag("parenthetical-search")
 def es_search_results(
     request: HttpRequest, search_type: str = None
 ) -> HttpResponse:
@@ -607,9 +605,7 @@ def do_es_search(get_params, search_type):
         if search_type == "parenthetical":
             obj_type = SEARCH_TYPES.PARENTHETICAL
             get_params["type"] = obj_type
-            search_form = ParentheticalSearchForm(
-                get_params
-            )
+            search_form = ParentheticalSearchForm(get_params)
             document_type = ParentheticalDocument
 
     hits_query = None
@@ -618,7 +614,7 @@ def do_es_search(get_params, search_type):
         if search_form.is_valid():
             cd = search_form.cleaned_data
             # Create necessary filters to execute ES query
-            #print("CD data: ", cd)
+            # print("CD data: ", cd)
             filters = build_es_queries(cd)
             print("Filters: ", filters)
             if filters:
