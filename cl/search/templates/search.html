@@ -99,7 +99,7 @@
 {% endblock %}
 
 {% block navbar-o %}
-    {% if search_form.type.value == SEARCH_TYPES.OPINION %}active{% else %}{{ block.super }}{% endif %}
+    {% if search_form.type.value == SEARCH_TYPES.OPINION or search_form.type.value == SEARCH_TYPES.PARENTHETICAL %}active{% else %}{{ block.super }}{% endif %}
 {% endblock %}
 {% block navbar-r %}
     {% if search_form.type.value == SEARCH_TYPES.RECAP or search_form.type.value == SEARCH_TYPES.DOCKETS %}active{% else %}{{ block.super }}{% endif %}
@@ -269,7 +269,11 @@
                     <span class="small gray top">{{ results.object_list.QTime|intcomma }}ms</span>
                 </div>
             </div>
-            {% include "includes/search_result.html" %}
+            {% if type == SEARCH_TYPES.PARENTHETICAL %}
+              {% include "includes/pa_search_result.html" %}
+            {% else %}
+              {% include "includes/search_result.html" %}
+            {% endif %}
         {% else %}
             {% include "includes/no_results.html" %}
         {% endif %}

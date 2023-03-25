@@ -73,6 +73,10 @@
                 <h1 class="text-center">Advanced Opinion Search</h1>
                 <p class="text-center gray large">Search millions of opinions across hundreds of jurisdictions. Updated constantly.
                 </p>
+            {% elif search_form.type.value == SEARCH_TYPES.PARENTHETICAL %}
+                <h1 class="text-center">Advanced Opinion Parenthetical Search</h1>
+                <p class="text-center gray large">Search millions of opinions across hundreds of jurisdictions. Updated constantly.
+                </p>
             {% elif search_form.type.value == SEARCH_TYPES.RECAP %}
                 <h1 class="text-center">Advanced RECAP Search</h1>
                 <p class="text-center gray large">Search our database of
@@ -153,28 +157,7 @@
                         </div>
                     </div>
                     <div class="col-sm-4">
-                        <label>Precedential Status</label>
-                        {% for facet_field in facet_fields %}
-                            {% if forloop.counter == 4 %}
-                                <a id="show-all-statuses"
-                                   class="cursor">Show All Statuses&hellip;</a>
-                            {% endif %}
-                            <div class="sidebar-checkbox status-item{% if forloop.counter >= 4 %} hidden{% endif %}">
-                                <input
-                                        id="id_{{ facet_field.html_name }}"
-                                        type="checkbox"
-                                        name="{{ facet_field.html_name }}"
-                                        class="external-input status-checkbox left"
-                                        {% if facet_field.value %}checked="checked"{% endif %}>
-                                <label
-                                        for="id_{{ facet_field.html_name }}"
-                                        class="pointer {% if facet_field.count == 0 %}gray{% endif %}">
-                                    <div>{{ facet_field.label }}&nbsp;{% if facet_field.count != None %}<span
-                                            class="gray small">({{ facet_field.count|intcomma }}){% endif %}</span>
-                                    </div>
-                                </label>
-                            </div>
-                        {% endfor %}
+                      {% include "includes/precedential_status_collapsed.html" %}
                     </div>
                 </div>
                 <div class="row">
@@ -247,7 +230,70 @@
                     details&hellip;</a>
             </div>
         </div>
-
+        {% elif search_form.type.value == SEARCH_TYPES.PARENTHETICAL %}
+          <div class="row">
+            {#  Modal is at bottom of results, so it loads last. #}
+            <div id="extra-sidebar-fields" class="col-sm-9">
+                <div class="row">
+                    <div class="col-sm-8">
+                        <div class="row">
+                            <div class="col-sm-6">
+                                <a href="#" class="btn btn-default btn-lg v-offset-above-1"
+                                   type="button" data-toggle="modal"
+                                   data-target="#court-picker">
+                                    <span class="hidden-sm">Select </span>Jurisdictions
+                                    <span id="jurisdiction-count"
+                                          class="badge">{{ court_count_human|default:""}}</span>
+                                </a>
+                            </div>
+                            <div class="col-sm-6">
+                                {% include "includes/order_by_dropdown.html" %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                      {% include "includes/precedential_status_collapsed.html" %}
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            {{ search_form.filed_after.label_tag }}
+                            {{ search_form.filed_after }}
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            {{ search_form.filed_before.label_tag }}
+                            {{ search_form.filed_before }}
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            {{ search_form.docket_number.label_tag }}
+                            {{ search_form.docket_number }}
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-xs-12">
+                        <button type="submit"
+                                class="btn btn-primary btn-lg float-right"
+                                name="search"
+                                id="search-button-secondary"><i
+                                class="fa fa-search"></i>&nbsp;Search
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-3">
+                {% include "includes/operators_quick_list.html" %}
+                <a class="text-right" href="{% url 'advanced_search' %}">More
+                    details&hellip;</a>
+            </div>
+        </div>
         {% elif search_form.type.value == SEARCH_TYPES.RECAP %}
         <div class="row">
             {# Modal is at bottom of results, so it loads last #}

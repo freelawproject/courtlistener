@@ -26,6 +26,8 @@
           {{ search_form.judge.label_tag }}
           {{ search_form.judge }}
         </div>
+      {% endif %}
+      {% if type == SEARCH_TYPES.OPINION or type == SEARCH_TYPES.PARENTHETICAL %}
         <div class="v-offset-below-2">
           <label>Precedential Status</label>
           {% for facet_field in facet_fields %}
@@ -46,6 +48,8 @@
             </div>
           {% endfor %}
         </div>
+      {% endif %}
+      {% if type == SEARCH_TYPES.OPINION or type == SEARCH_TYPES.PARENTHETICAL %}
         <div class="row">
           <div class="col-md-6">
             <div class="form-group{% if search_form.filed_after.errors %} has-error{% endif %}">
@@ -60,6 +64,8 @@
             </div>
           </div>
         </div>
+      {% endif %}
+      {% if type == SEARCH_TYPES.OPINION %}
         <div class="form-group">
           {{ search_form.citation.label_tag }}
           {{ search_form.citation }}
@@ -69,10 +75,14 @@
           {{ search_form.neutral_cite.label_tag }}
           {{ search_form.neutral_cite }}
         </div>
+      {% endif %}
+      {% if type == SEARCH_TYPES.OPINION or type == SEARCH_TYPES.PARENTHETICAL %}
         <div class="form-group">
           {{ search_form.docket_number.label_tag }}
           {{ search_form.docket_number }}
         </div>
+      {% endif %}
+      {% if type == SEARCH_TYPES.OPINION %}
         <div class="row">
           <div class="col-xs-6">
             <div class="form-group{% if search_form.cited_gt.errors %} has-error{% endif %}">

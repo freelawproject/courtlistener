@@ -13,7 +13,7 @@ from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Count, Sum
-from django.http import Http404, HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse
 from django.shortcuts import HttpResponseRedirect, get_object_or_404, render
 from django.template.response import TemplateResponse
 from django.urls import reverse
@@ -459,12 +459,17 @@ def show_results(request: HttpRequest) -> HttpResponse:
                     user=request.user,
                 )
 
-            render_dict.update(do_search(request.GET.copy()))
-            # Set the value to the query as a convenience
-            alert_form.fields["name"].widget.attrs["value"] = render_dict[
-                "search_summary_str"
-            ]
-            render_dict.update({"alert_form": alert_form})
+                if request.GET.get("type") == SEARCH_TYPES.PARENTHETICAL:
+                    search_results = do_es_search(request.GET.copy())
+                    render_dict.update(search_results)
+
+                else:
+                    render_dict.update(do_search(request.GET.copy()))
+                    # Set the value to the query as a convenience
+                    alert_form.fields["name"].widget.attrs[
+                        "value"
+                    ] = render_dict["search_summary_str"]
+                    render_dict.update({"alert_form": alert_form})
             return TemplateResponse(request, "search.html", render_dict)
 
 
@@ -528,7 +533,6 @@ def es_search(request: HttpRequest) -> HttpResponse:
         courts = Court.objects.filter(in_use=True)
         render_dict.update({"search_type": "parenthetical"})
         obj_type = SEARCH_TYPES.PARENTHETICAL
-
         search_form = ParentheticalSearchForm({"type": obj_type})
         if search_form.is_valid():
             search_form = _clean_form(
@@ -537,7 +541,7 @@ def es_search(request: HttpRequest) -> HttpResponse:
                 courts,
                 search_form.__class__,
             )
-        template = "parenthetical.html"
+        template = "advanced.html"
 
         courts, court_count_human, court_count = merge_form_with_courts(
             courts, search_form
@@ -555,43 +559,13 @@ def es_search(request: HttpRequest) -> HttpResponse:
     return render(request, template, render_dict)
 
 
-@waffle_flag("parenthetical-search")
-def es_search_results(
-    request: HttpRequest, search_type: str = None
-) -> HttpResponse:
-    """Display elasticsearch search results
-    :param request: HttpRequest object
-    :param search_type: indicates search type by name
-    :return: HttpResponse
-    """
-    render_dict = {"private": False}
-    if not search_type:
-        return HttpResponseRedirect(reverse("show_results"))
-
-    get_string = make_get_string(request)
-    render_dict.update({"get_string": get_string})
-
-    if search_type in ["parenthetical"]:
-        render_dict.update({"search_type": search_type})
-        search_results = do_es_search(request.GET.copy(), search_type)
-        render_dict.update(search_results)
-
-        print("Check form type pa: ", render_dict["search_form"]["type"])
-
-    else:
-        raise Http404(f"Search type: {search_type} not valid")
-
-    return render(request, "elasticsearch/results.html", render_dict)
-
-
-def do_es_search(get_params, search_type):
+def do_es_search(get_params):
     """Run Elasticsearch searching and filtering and prepare data to display
     :param get_params: The request.GET params sent by user.
     :param search_type: indicates search type by name
     :return: dict
     """
 
-    print("Search type pare: ", search_type)
     search_form = None
     document_type = None
     paged_results = None
@@ -600,13 +574,8 @@ def do_es_search(get_params, search_type):
     error = False
     courts = Court.objects.filter(in_use=True)
 
-    if search_type in ["parenthetical"]:
-        courts = Court.objects.filter(in_use=True)
-        if search_type == "parenthetical":
-            obj_type = SEARCH_TYPES.PARENTHETICAL
-            get_params["type"] = obj_type
-            search_form = ParentheticalSearchForm(get_params)
-            document_type = ParentheticalDocument
+    search_form = ParentheticalSearchForm(get_params)
+    document_type = ParentheticalDocument
 
     hits_query = None
 
@@ -614,9 +583,7 @@ def do_es_search(get_params, search_type):
         if search_form.is_valid():
             cd = search_form.cleaned_data
             # Create necessary filters to execute ES query
-            # print("CD data: ", cd)
             filters = build_es_queries(cd)
-            print("Filters: ", filters)
             if filters:
                 hits_query = document_type.search().filter(
                     reduce(operator.iand, filters)
