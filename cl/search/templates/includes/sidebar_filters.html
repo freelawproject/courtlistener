@@ -26,8 +26,6 @@
           {{ search_form.judge.label_tag }}
           {{ search_form.judge }}
         </div>
-      {% endif %}
-      {% if type == SEARCH_TYPES.OPINION or type == SEARCH_TYPES.PARENTHETICAL %}
         <div class="v-offset-below-2">
           <label>Precedential Status</label>
           {% for facet_field in facet_fields %}

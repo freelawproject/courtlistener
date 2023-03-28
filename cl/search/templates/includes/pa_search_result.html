@@ -4,36 +4,54 @@
 {% load humanize %}
 
 {% for result in results.object_list %}
- <article>
-  {% for parenthetical in result.grouped_by_group_id.hits.hits %}
-    {% with source=parenthetical|get_attrdict:"_source" %}
-      {% if forloop.first %}
-        <div>
-          <h3 class="bottom serif">
-      {% else %}
+  {% with opinion=result.grouped_by_opinion_cluster_id.hits.hits.0|get_attrdict:"_source" %}
+
+  <article>
+    <h3 class="bottom serif">
+      <a href="{% url 'view_case' opinion.opinion_cluster_id opinion.opinion_cluster_slug %}?{{ request.META.QUERY_STRING }}" class="visitable">
+        {{ opinion.opinion_cluster_case_name|safe }}
+      </a>
+    </h3>
+    <div class="bottom">
+      <div class="inline-block">
+        <span class="meta-data-header">Docket Number:</span>
+        <span class="meta-data-value select-all">{{ opinion.opinion_cluster_docket_number|safe }}</span>
+      </div>
+      <div class="inline-block">
+        <span class="meta-data-header">Date Filed:</span>
+        <time class="meta-data-value" datetime="{{ opinion.opinion_cluster_date_filed }}">
+          {% if opinion.opinion_cluster_date_filed %}
+            {{ opinion.opinion_cluster_date_filed }}
+          {% else %}
+            Unknown Date
+          {% endif %}
+        </time>
+      </div>
+
+      {% for parenthetical_group in result.grouped_by_opinion_cluster_id.hits.hits %}
         <div class="col-md-offset-half">
+        {% with pa_group=parenthetical_group|get_attrdict:"_source" %}
           <h4>
-      {% endif %}
-            <a href="{% url 'view_case' source.described_opinion_cluster_id source.described_opinion_cluster_slug %}?{{ request.META.QUERY_STRING }}" class="visitable">
-              {{ source.text|safe }}
+            <a href="{% url 'view_case' pa_group.opinion_cluster_id pa_group.opinion_cluster_slug %}?{{ request.META.QUERY_STRING }}" class="visitable">
+              {{ pa_group.representative_text|safe }}
             </a>
-      {% if forloop.first %}
-        </h3>
-      {% else %}
-        </h4>
-      {% endif %}
-          <div class="inline-block">
-            <span class="meta-data-header">Date Filed:</span>
-            <time class="meta-data-value" datetime="{{ source.described_opinion_cluster_date_filed }}">{{ source.described_opinion_cluster_date_filed }}</time>
-          </div>
-          <span class="bullet-tail"><a href="{% url 'view_case' source.describing_opinion_cluster_id source.describing_opinion_cluster_slug %}?{{ request.META.QUERY_STRING }}"><i
-              class="fa fa-search visitable">&nbsp;View describing opinion</i></a>
-          </span>
+          </h4>
+        {% endwith %}
         </div>
-    {% endwith %}
-  {% endfor %}
+      {% endfor %}
+      <div class="col-md-offset-half">
+        {% with limit=results_details.2 %}
+        {% with remaining=result.doc_count|sub:limit %}
+        {% if remaining > 0 %}
+        <a href="{% url "show_results" %}?type={{ type }}&amp;q={% if request.GET.q %}({{ request.GET.q }}) AND {% endif %}docket_id:{{ opinion.docket_id }}" class="btn-default btn">View {{ remaining }} Additional Result{{ remaining|pluralize }} for
+            this Case</a>
+        {% endif %}
+        {% endwith %}
+        {% endwith %}
+      </div>
 
+    </div>
   </article>
-
+  {% endwith %}
 {% endfor %}
 

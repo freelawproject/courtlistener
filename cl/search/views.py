@@ -1,8 +1,7 @@
 import logging
-import operator
+import re
 import traceback
 from datetime import date, datetime, timedelta
-from functools import reduce
 from urllib.parse import quote
 
 from cache_memoize import cache_memoize
@@ -30,10 +29,10 @@ from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.bot_detector import is_bot
 from cl.lib.elasticsearch_utils import (
-    build_es_queries,
+    build_es_main_query,
     build_sort_results,
     group_search_results,
-    make_stats_es_facets,
+    set_results_highlights,
 )
 from cl.lib.paginators import ESPaginator
 from cl.lib.ratelimiter import ratelimit_deny_list
@@ -50,7 +49,7 @@ from cl.lib.search_utils import (
     regroup_snippets,
 )
 from cl.search.constants import RELATED_PATTERN
-from cl.search.documents import ParentheticalDocument
+from cl.search.documents import ParentheticalGroupDocument
 from cl.search.forms import ParentheticalSearchForm, SearchForm, _clean_form
 from cl.search.models import SEARCH_TYPES, Court, Opinion, OpinionCluster
 from cl.stats.models import Stat
@@ -549,7 +548,6 @@ def es_search(request: HttpRequest) -> HttpResponse:
         render_dict.update(
             {
                 "search_form": search_form,
-                "facet_fields": make_stats_es_facets(search_form),
                 "courts": courts,
                 "court_count_human": court_count_human,
                 "court_count": court_count,
@@ -566,41 +564,42 @@ def do_es_search(get_params):
     :return: dict
     """
 
-    search_form = None
-    document_type = None
     paged_results = None
-    hits = []
     cd = {}
     error = False
     courts = Court.objects.filter(in_use=True)
+    query_time = total_pa_groups = 0
 
     search_form = ParentheticalSearchForm(get_params)
-    document_type = ParentheticalDocument
-
-    hits_query = None
+    document_type = ParentheticalGroupDocument
+    search_query = None
+    top_hits_limit = 5
 
     if search_form:
         if search_form.is_valid():
             cd = search_form.cleaned_data
             # Create necessary filters to execute ES query
-            filters = build_es_queries(cd)
-            if filters:
-                hits_query = document_type.search().filter(
-                    reduce(operator.iand, filters)
-                )
-
-            else:
-                hits_query = document_type.search().query("match_all")
+            search_query = document_type.search()
+            search_query = build_es_main_query(search_query, cd)
         else:
             error = True
 
-    if hits_query:
+    if search_query:
         try:
-            # Order by relevance default
-            hits_query = hits_query.sort(build_sort_results(cd))
+            total_pa_groups = search_query.count()
+            # If docket_query set the top_hits_limit to 100
+            # Top hits limit in elasticsearch is 100
+            docket_query = re.search(r"docket_id:\d+", cd["q"])
+            top_hits_limit = top_hits_limit if not docket_query else 100
+
             # Create groups aggregation.
-            group_search_results(hits_query, "group_id", "score", 5)
-            hits = hits_query.execute()
+            group_search_results(
+                search_query,
+                "opinion_cluster_id",
+                build_sort_results(cd),
+                top_hits_limit,
+            )
+            hits = search_query.execute()
             query_time = hits.took
             groups = hits.aggregations.groups.buckets
             paged_results = do_es_pagination(
@@ -621,16 +620,15 @@ def do_es_search(get_params):
         courts,
         search_form.__class__,
     )
-
     courts, court_count_human, court_count = merge_form_with_courts(
         courts, search_form
     )
     search_summary_str = search_form.as_text(court_count_human)
     search_summary_dict = search_form.as_display_dict(court_count_human)
+    results_details = [query_time, total_pa_groups, top_hits_limit]
     return {
         "results": paged_results,
-        "query_time": query_time,
-        "facet_fields": make_stats_es_facets(search_form),
+        "results_details": results_details,
         "search_form": search_form,
         "search_summary_str": search_summary_str,
         "search_summary_dict": search_summary_dict,
@@ -641,7 +639,7 @@ def do_es_search(get_params):
     }
 
 
-def do_es_pagination(get_params, hits, rows_per_page=10):
+def do_es_pagination(get_params, hits, rows_per_page=5):
     """Paginate elasticsearch results
     :param get_params: url get params
     :param hits: elasticsearch results
@@ -664,5 +662,8 @@ def do_es_pagination(get_params, hits, rows_per_page=10):
         results = paginator.page(1)
     except EmptyPage:
         results = paginator.page(paginator.num_pages)
+
+    # Set highlights in results.
+    set_results_highlights(results)
 
     return results

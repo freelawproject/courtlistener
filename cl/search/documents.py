@@ -1,82 +1,42 @@
 from django.conf import settings
 from django_elasticsearch_dsl import Document, Index, fields
 
-from cl.search.models import Parenthetical
+from cl.search.models import ParentheticalGroup
 
 # Define parenthetical elasticsearch index
-parenthetical_index = Index("parenthetical")
-parenthetical_index.settings(
+parenthetical_group_index = Index("parenthetical_group")
+parenthetical_group_index.settings(
     number_of_shards=settings.ELASTICSEARCH_NUMBER_OF_SHARDS,
     number_of_replicas=settings.ELASTICSEARCH_NUMBER_OF_REPLICAS,
 )
 
 
-@parenthetical_index.document
-class ParentheticalDocument(Document):
-    describing_opinion_id = fields.IntegerField(attr="describing_opinion_id")
-    describing_opinion_type = fields.KeywordField(
-        attr="describing_opinion.type"
+@parenthetical_group_index.document
+class ParentheticalGroupDocument(Document):
+    opinion_extracted_by_ocr = fields.BooleanField(
+        attr="opinion.extracted_by_ocr"
     )
-    describing_opinion_autor_id = fields.IntegerField(
-        attr="describing_opinion.author_id"
+    opinion_cluster_case_name = fields.TextField(
+        attr="opinion.cluster.case_name"
     )
-    describing_opinion_extracted_by_ocr = fields.BooleanField(
-        attr="describing_opinion.extracted_by_ocr"
+    opinion_cluster_id = fields.IntegerField(attr="opinion.cluster_id")
+    opinion_cluster_date_filed = fields.DateField(
+        attr="opinion.cluster.date_filed"
     )
-    describing_opinion_cluster_id = fields.IntegerField(
-        attr="describing_opinion.cluster_id"
+    docket_id = fields.IntegerField(attr="opinion.cluster.docket_id")
+    opinion_cluster_docket_court_id = fields.KeywordField(
+        attr="opinion.cluster.docket.court.pk"
     )
-    describing_opinion_cluster_slug = fields.KeywordField(
-        attr="describing_opinion.cluster.slug"
+    opinion_cluster_docket_number = fields.KeywordField(
+        attr="opinion.cluster.docket.docket_number"
     )
-    describing_opinion_cluster_date_filed = fields.DateField(
-        attr="describing_opinion.cluster.date_filed"
-    )
-    describing_opinion_cluster_docket_id = fields.IntegerField(
-        attr="describing_opinion.cluster.docket_id"
-    )
-    describing_opinion_cluster_docket_court_id = fields.KeywordField(
-        attr="describing_opinion.cluster.docket.court.pk"
-    )
-    describing_opinion_cluster_docket_number = fields.KeywordField(
-        attr="describing_opinion.cluster.docket.docket_number"
-    )
+    opinion_cluster_slug = fields.KeywordField(attr="opinion.cluster.slug")
 
-    described_opinion_id = fields.IntegerField(attr="described_opinion_id")
-    described_opinion_type = fields.KeywordField(attr="described_opinion.type")
-    described_opinion_autor_id = fields.IntegerField(
-        attr="described_opinion.author_id"
+    representative_text = fields.TextField(
+        attr="representative.text",
     )
-    described_opinion_extracted_by_ocr = fields.BooleanField(
-        attr="described_opinion.extracted_by_ocr"
-    )
-    described_opinion_cluster_id = fields.IntegerField(
-        attr="described_opinion.cluster_id"
-    )
-    described_opinion_cluster_slug = fields.KeywordField(
-        attr="described_opinion.cluster.slug"
-    )
-    described_opinion_cluster_date_filed = fields.DateField(
-        attr="described_opinion.cluster.date_filed"
-    )
-    described_opinion_cluster_docket_id = fields.IntegerField(
-        attr="described_opinion.cluster.docket_id"
-    )
-    described_opinion_cluster_docket_court_id = fields.KeywordField(
-        attr="described_opinion.cluster.docket.court.pk"
-    )
-    described_opinion_cluster_docket_number = fields.KeywordField(
-        attr="described_opinion.cluster.docket.docket_number"
-    )
-    described_opinion_cluster_precedential_status = fields.KeywordField(
-        attr="described_opinion.cluster.precedential_status"
-    )
-
-    group_id = fields.IntegerField(attr="group_id")
+    representative_score = fields.KeywordField(attr="representative.score")
 
     class Django:
-        model = Parenthetical
-        fields = [
-            "text",
-            "score",
-        ]
+        model = ParentheticalGroup
+        fields = ["score"]

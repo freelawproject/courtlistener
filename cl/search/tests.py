@@ -30,7 +30,8 @@ from timeout_decorator import timeout_decorator
 
 from cl.lib.elasticsearch_utils import (
     build_daterange_query,
-    build_es_queries,
+    build_es_filters,
+    build_es_main_query,
     build_fulltext_query,
     build_sort_results,
     build_terms_query,
@@ -47,7 +48,7 @@ from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.factories import DocketEntriesDataFactory, DocketEntryDataFactory
 from cl.recap.mergers import add_docket_entries
 from cl.scrapers.factories import PACERFreeDocumentLogFactory
-from cl.search.documents import ParentheticalDocument
+from cl.search.documents import ParentheticalGroupDocument
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
@@ -1873,6 +1874,9 @@ class ElasticSearchTest(TestCase):
         cls.pg3 = ParentheticalGroupFactory(
             opinion=cls.o3, representative=cls.p3, score=0.1578, size=1
         )
+        cls.pg4 = ParentheticalGroupFactory(
+            opinion=cls.o3, representative=cls.p4, score=0.1678, size=1
+        )
 
         # Set parenthetical group
         cls.p.group = cls.pg
@@ -1881,7 +1885,7 @@ class ElasticSearchTest(TestCase):
         cls.p2.save()
         cls.p3.group = cls.pg3
         cls.p3.save()
-        cls.p4.group = cls.pg3
+        cls.p4.group = cls.pg4
         cls.p4.save()
 
     def setUp(self) -> None:
@@ -1896,14 +1900,14 @@ class ElasticSearchTest(TestCase):
         """Test filtering and search at the same time"""
 
         filters = []
-        filters.append(Q("match", text="different"))
-        s1 = ParentheticalDocument.search().filter(
+        filters.append(Q("match", representative_text="different"))
+        s1 = ParentheticalGroupDocument.search().filter(
             reduce(operator.iand, filters)
         )
         self.assertEqual(s1.count(), 2)
 
-        filters.append(Q("match", described_opinion_extracted_by_ocr=False))
-        s2 = ParentheticalDocument.search().filter(
+        filters.append(Q("match", opinion_extracted_by_ocr=False))
+        s2 = ParentheticalGroupDocument.search().filter(
             reduce(operator.iand, filters)
         )
         self.assertEqual(s2.count(), 1)
@@ -1917,23 +1921,14 @@ class ElasticSearchTest(TestCase):
         filters.append(
             Q(
                 "range",
-                describing_opinion_cluster_date_filed={
-                    "gte": date_gte,
-                    "lte": date_lte,
-                },
-            )
-        )
-        filters.append(
-            Q(
-                "range",
-                described_opinion_cluster_date_filed={
+                opinion_cluster_date_filed={
                     "gte": date_gte,
                     "lte": date_lte,
                 },
             )
         )
 
-        s1 = ParentheticalDocument.search().filter(
+        s1 = ParentheticalGroupDocument.search().filter(
             reduce(operator.iand, filters)
         )
 
@@ -1945,34 +1940,25 @@ class ElasticSearchTest(TestCase):
         date_gte = "1976-08-30T00:00:00Z"
         date_lte = "1978-03-10T23:59:59Z"
 
-        filters.append(Q("match", text="friend"))
+        filters.append(Q("match", representative_text="different"))
         filters.append(
             Q(
                 "range",
-                describing_opinion_cluster_date_filed={
-                    "gte": date_gte,
-                    "lte": date_lte,
-                },
-            )
-        )
-        filters.append(
-            Q(
-                "range",
-                described_opinion_cluster_date_filed={
+                opinion_cluster_date_filed={
                     "gte": date_gte,
                     "lte": date_lte,
                 },
             )
         )
 
-        s = ParentheticalDocument.search().filter(
+        s = ParentheticalGroupDocument.search().filter(
             reduce(operator.iand, filters)
         )
         self.assertEqual(s.count(), 1)
 
     def test_ordering(self) -> None:
         """Test filter and then ordering by descending
-        describing_opinion_cluster_date_filed"""
+        opinion_cluster_date_filed"""
         filters = []
         date_gte = "1976-08-30T00:00:00Z"
         date_lte = "1978-03-10T23:59:59Z"
@@ -1980,7 +1966,7 @@ class ElasticSearchTest(TestCase):
         filters.append(
             Q(
                 "range",
-                describing_opinion_cluster_date_filed={
+                opinion_cluster_date_filed={
                     "gte": date_gte,
                     "lte": date_lte,
                 },
@@ -1988,19 +1974,19 @@ class ElasticSearchTest(TestCase):
         )
 
         s = (
-            ParentheticalDocument.search()
+            ParentheticalGroupDocument.search()
             .filter(reduce(operator.iand, filters))
-            .sort("-describing_opinion_cluster_date_filed")
+            .sort("-opinion_cluster_date_filed")
         )
-        s1 = s.sort("-describing_opinion_cluster_date_filed")
+        s1 = s.sort("-opinion_cluster_date_filed")
         self.assertEqual(s1.count(), 2)
         self.assertEqual(
-            s1.execute()[0].describing_opinion_cluster_date_filed,
+            s1.execute()[0].opinion_cluster_date_filed,
             datetime.datetime(1978, 3, 10, 0, 0),
         )
-        s2 = s.sort("describing_opinion_cluster_date_filed")
+        s2 = s.sort("opinion_cluster_date_filed")
         self.assertEqual(
-            s2.execute()[0].describing_opinion_cluster_date_filed,
+            s2.execute()[0].opinion_cluster_date_filed,
             datetime.datetime(1976, 8, 30, 0, 0),
         )
 
@@ -2011,88 +1997,56 @@ class ElasticSearchTest(TestCase):
         date_lte = datetime.datetime(1978, 3, 10, 0, 0).date()
 
         q1 = build_daterange_query(
-            "described_opinion_cluster_date_filed", date_lte, date_gte
+            "opinion_cluster_date_filed", date_lte, date_gte
         )
         filters.extend(q1)
 
-        s = ParentheticalDocument.search().filter(
+        s = ParentheticalGroupDocument.search().filter(
             reduce(operator.iand, filters)
         )
         self.assertEqual(s.count(), 2)
 
     def test_build_fulltext_query(self) -> None:
         """Test build es fulltext query"""
-        filters = []
-        q1 = build_fulltext_query("text", "responsibility")
-        filters.extend(q1)
-        s = ParentheticalDocument.search().filter(
-            reduce(operator.iand, filters)
-        )
+
+        q1 = build_fulltext_query("representative_text", "responsibility")
+        s = ParentheticalGroupDocument.search().filter(q1)
         self.assertEqual(s.count(), 1)
 
     def test_build_terms_query(self) -> None:
         """Test build es terms query"""
         filters = []
         q = build_terms_query(
-            "described_opinion_cluster_docket_court_id",
+            "opinion_cluster_docket_court_id",
             [self.c1.pk, self.c2.pk],
         )
         filters.extend(q)
-        s = ParentheticalDocument.search().filter(
+        s = ParentheticalGroupDocument.search().filter(
             reduce(operator.iand, filters)
         )
         self.assertEqual(s.count(), 2)
 
-    def test_precedential_status_query(self) -> None:
-        """Test build es terms query"""
-        filters = []
-        q = build_terms_query(
-            "described_opinion_cluster_precedential_status",
-            [PRECEDENTIAL_STATUS.SEPARATE, PRECEDENTIAL_STATUS.PUBLISHED],
-        )
-        filters.extend(q)
-        s = ParentheticalDocument.search().filter(
-            reduce(operator.iand, filters)
-        )
-        self.assertEqual(s.count(), 3)
-
-    def test_cd_query_stat(self) -> None:
-        """Test build es query with cleaned data"""
-        cd = {
-            "stat_Precedential": True,
-            "stat_Separate Opinion": True,
-            "stat_Non-Precedential": False,
-        }
-
-        filters = build_es_queries(cd)
-        s = ParentheticalDocument.search().filter(
-            reduce(operator.iand, filters)
-        )
-        self.assertEqual(s.count(), 3)
-
     def test_cd_query(self) -> None:
         """Test build es query with cleaned data"""
+
         cd = {
             "filed_after": datetime.datetime(1976, 8, 30, 0, 0).date(),
             "filed_before": datetime.datetime(1978, 3, 10, 0, 0).date(),
             "q": "responsibility",
         }
-
-        filters = build_es_queries(cd)
-        s = ParentheticalDocument.search().filter(
-            reduce(operator.iand, filters)
-        )
+        search_query = ParentheticalGroupDocument.search()
+        s = build_es_main_query(search_query, cd)
         self.assertEqual(s.count(), 1)
 
     def test_cd_query_2(self) -> None:
         """Test build es query with cleaned data"""
         cd = {"filed_after": "", "filed_before": "", "q": ""}
 
-        filters = build_es_queries(cd)
+        filters = build_es_filters(cd)
 
         if not filters:
             # Return all results
-            s = ParentheticalDocument.search().query("match_all")
+            s = ParentheticalGroupDocument.search().query("match_all")
             self.assertEqual(s.count(), 4)
 
     def test_docker_number_filter(self) -> None:
@@ -2100,10 +2054,10 @@ class ElasticSearchTest(TestCase):
         filters = []
 
         filters.append(
-            Q("term", described_opinion_cluster_docket_number="1:98-cr-35856")
+            Q("term", opinion_cluster_docket_number="1:98-cr-35856")
         )
 
-        s = ParentheticalDocument.search().filter(
+        s = ParentheticalGroupDocument.search().filter(
             reduce(operator.iand, filters)
         )
         self.assertEqual(s.count(), 1)
@@ -2112,51 +2066,65 @@ class ElasticSearchTest(TestCase):
         """Test we can build sort dict and sort ES query"""
         cd = {"order_by": "dateFiled desc"}
         ordering = build_sort_results(cd)
-        s = ParentheticalDocument.search().query("match_all").sort(ordering)
+        s = (
+            ParentheticalGroupDocument.search()
+            .query("match_all")
+            .sort(ordering)
+        )
         self.assertEqual(s.count(), 4)
         self.assertEqual(
-            s.execute()[0].described_opinion_cluster_date_filed,
+            s.execute()[0].opinion_cluster_date_filed,
             datetime.datetime(1981, 7, 11, 0, 0),
         )
 
         cd = {"order_by": "dateFiled asc"}
         ordering = build_sort_results(cd)
-        s = ParentheticalDocument.search().query("match_all").sort(ordering)
+        s = (
+            ParentheticalGroupDocument.search()
+            .query("match_all")
+            .sort(ordering)
+        )
         self.assertEqual(
-            s.execute()[0].described_opinion_cluster_date_filed,
+            s.execute()[0].opinion_cluster_date_filed,
             datetime.datetime(1976, 8, 30, 0, 0),
         )
 
         cd = {"order_by": "score desc"}
         ordering = build_sort_results(cd)
-        s = ParentheticalDocument.search().query("match_all").sort(ordering)
+        s = (
+            ParentheticalGroupDocument.search()
+            .query("match_all")
+            .sort(ordering)
+        )
         self.assertEqual(
-            s.execute()[0].described_opinion_cluster_date_filed,
-            datetime.datetime(1976, 8, 30, 0, 0),
+            s.execute()[0].opinion_cluster_date_filed,
+            datetime.datetime(1978, 3, 10, 0, 0),
         )
 
     def test_group_results(self) -> None:
         """Test retrieve results grouped by group_id"""
 
-        filters = []
-        q1 = build_fulltext_query("text", "Necessary")
-        filters.extend(q1)
-        s = ParentheticalDocument.search().filter(
-            reduce(operator.iand, filters)
-        )
+        q1 = build_fulltext_query("representative_text", "Necessary")
+        s = ParentheticalGroupDocument.search().query(q1)
         # Group results.
-        group_search_results(s, "group_id", "score", 5)
+        group_search_results(
+            s, "opinion_cluster_id", {"score": {"order": "desc"}}, 5
+        )
         hits = s.execute()
         groups = hits.aggregations.groups.buckets
 
         # Compare groups and hits content.
         self.assertEqual(len(groups), 2)
-        self.assertEqual(len(groups[0].grouped_by_group_id.hits.hits), 2)
-        self.assertEqual(len(groups[1].grouped_by_group_id.hits.hits), 1)
+        self.assertEqual(
+            len(groups[0].grouped_by_opinion_cluster_id.hits.hits), 2
+        )
+        self.assertEqual(
+            len(groups[1].grouped_by_opinion_cluster_id.hits.hits), 1
+        )
 
-        group_1_hits = groups[0].grouped_by_group_id.hits
-        self.assertEqual(group_1_hits.hits[0]._source.score, 0.1578)
-        self.assertEqual(group_1_hits.hits[1]._source.score, 0.1478)
+        group_1_hits = groups[0].grouped_by_opinion_cluster_id.hits.hits
+        self.assertEqual(group_1_hits[0]._source.score, 0.1578)
+        self.assertEqual(group_1_hits[1]._source.score, 0.1678)
 
 
 class DocketEntriesTimezone(TestCase):

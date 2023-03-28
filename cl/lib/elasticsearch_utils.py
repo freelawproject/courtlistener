@@ -1,13 +1,14 @@
+import operator
 from datetime import date
+from functools import reduce
 from typing import Dict, List
 
+from django.core.paginator import Page
 from django_elasticsearch_dsl.search import Search
 from elasticsearch_dsl import A, Q
-from elasticsearch_dsl.query import Range
+from elasticsearch_dsl.query import QueryString, Range
 
 from cl.lib.types import CleanData
-from cl.search.forms import ParentheticalSearchForm
-from cl.search.models import PRECEDENTIAL_STATUS
 
 
 def build_daterange_query(
@@ -41,21 +42,18 @@ def build_daterange_query(
     return []
 
 
-def build_fulltext_query(field: str, value: str, query: str = "match") -> List:
+def build_fulltext_query(field: str, value: str) -> QueryString | None:
     """Given the cleaned data from a form, return a Elastic Search string query or []
     https://www.elastic.co/guide/en/elasticsearch/reference/current/full-text-queries.html
 
     :param field: The name of the field to search in.
     :param value: The string value to search for.
-    :param query: The type of Elastic Search query to use. Defaults to "match".
-    :return: A list of Elastic Search queries. If the "value" param is
-    empty or None, returns an empty list.
+    :return: A Elasticsearch QueryString or None if the "value" param is empty.
     """
-    queries = ["match", "match_phrase", "query_string"]
-    assert query in queries, f"'{query}' is not an allowed query."
+
     if value:
-        return [Q(query, **{field: value})]
-    return []
+        return Q("query_string", query=value, fields=[field])
+    return None
 
 
 def build_term_query(field: str, value: str) -> List:
@@ -99,20 +97,20 @@ def build_sort_results(cd: CleanData) -> Dict:
     """
 
     order_by_map = {
-        "score desc": {"score": "desc"},
-        "dateFiled desc": {"described_opinion_cluster_date_filed": "desc"},
-        "dateFiled asc": {"described_opinion_cluster_date_filed": "asc"},
+        "score desc": {"score": {"order": "desc"}},
+        "dateFiled desc": {"opinion_cluster_date_filed": {"order": "desc"}},
+        "dateFiled asc": {"opinion_cluster_date_filed": {"order": "asc"}},
     }
     order_by = cd.get("order_by")
     if order_by and order_by in order_by_map:
         return order_by_map[order_by]
 
     # Default sort by score in descending order
-    return {"score": "desc"}
+    return {"score": {"order": "desc"}}
 
 
-def build_es_queries(cd: CleanData) -> List:
-    """Builds elasticsearch queries based on the CleanData object.
+def build_es_filters(cd: CleanData) -> List:
+    """Builds elasticsearch filters based on the CleanData object.
 
     :param cd: An object containing cleaned user data.
     :return: The list of Elasticsearch queries built.
@@ -123,7 +121,7 @@ def build_es_queries(cd: CleanData) -> List:
     # Build daterange query
     queries_list.extend(
         build_daterange_query(
-            "described_opinion_cluster_date_filed",
+            "opinion_cluster_date_filed",
             cd.get("filed_before", ""),
             cd.get("filed_after", ""),
         )
@@ -132,41 +130,73 @@ def build_es_queries(cd: CleanData) -> List:
     # Build court terms filter
     queries_list.extend(
         build_terms_query(
-            "described_opinion_cluster_docket_court_id",
+            "opinion_cluster_docket_court_id",
             cd.get("court", "").split(),
         )
     )
 
-    # Build precedential status terms filter
-    stat_list = get_precedential_status_values(cd)
-    queries_list.extend(
-        build_terms_query(
-            "described_opinion_cluster_precedential_status",
-            stat_list,
-        )
-    )
-
-    # Build fulltext query
-    queries_list.extend(build_fulltext_query("text", cd.get("q", "")))
-
     # Build docket number term query
     queries_list.extend(
         build_term_query(
-            "described_opinion_cluster_docket_number",
+            "opinion_cluster_docket_number",
             cd.get("docket_number", ""),
         )
-    )
-
-    # Build opinion id term query
-    queries_list.extend(
-        build_term_query("described_opinion_id", cd.get("opinion_id", ""))
     )
 
     return queries_list
 
 
+def build_es_main_query(search_query: Search, cd: CleanData) -> Search:
+    """Builds and returns an elasticsearch query based on the given cleaned
+     data.
+    :param search_query: The Elasticsearch search query object.
+    :param cd: The cleaned data object containing the query and filters.
+
+    :return: The Elasticsearch search query object after applying filters and
+    string query.
+    """
+
+    filters = build_es_filters(cd)
+    string_query = build_fulltext_query("representative_text", cd.get("q", ""))
+    if filters or string_query:
+        # Apply filters first if there is at least one set.
+        if filters:
+            search_query = search_query.filter(reduce(operator.iand, filters))
+        # Apply string query after if is set, required to properly
+        # compute elasticsearch scores.
+        if string_query:
+            search_query = search_query.query(string_query)
+    else:
+        search_query = search_query.query("match_all")
+
+    return search_query
+
+
+def set_results_highlights(results: Page) -> None:
+    """Sets the highlights for each search result in a Page object by updating
+    related fields in _source dict.
+
+    :param results: The Page object containing search results.
+    :return: None, the function updates the results in place.
+    """
+
+    for result in results.object_list:
+        top_hits = result.grouped_by_opinion_cluster_id.hits.hits
+        for hit in top_hits:
+            if hasattr(hit, "highlight"):
+                highlighted_fields = [
+                    k for k in dir(hit.highlight) if not k.startswith("_")
+                ]
+                for highlighted_field in highlighted_fields:
+                    highlight = hit.highlight[highlighted_field][0]
+                    hit["_source"][highlighted_field] = highlight
+
+
 def group_search_results(
-    search: Search, group_by: str, order_by: str, size: int
+    search: Search,
+    group_by: str,
+    order_by: dict[str : dict[str:str]],
+    size: int,
 ) -> None:
     """Group search results by a specified field and return top hits for each
     group.
@@ -178,45 +208,44 @@ def group_search_results(
     :return: None, results are returned as part of the Elasticsearch search object.
     """
 
-    aggregation = A("terms", field=group_by)
+    aggregation = A("terms", field=group_by, size=1_000_000)
     sub_aggregation = A(
-        "top_hits", size=size, sort={order_by: {"order": "desc"}}
+        "top_hits",
+        size=size,
+        sort={"_score": {"order": "desc"}},
+        highlight={
+            "fields": {
+                "representative_text": {},
+                "opinion_cluster_docket_number": {},
+            },
+            "pre_tags": ["<mark>"],
+            "post_tags": ["</mark>"],
+        },
     )
-    aggregation.bucket("grouped_by_group_id", sub_aggregation)
+    aggregation.bucket("grouped_by_opinion_cluster_id", sub_aggregation)
+
+    order_by_field = list(order_by.keys())[0]
+    if order_by_field != "score":
+        # If order field is other than score (elasticsearch relevance)
+        # Add a max aggregation to calculate the max value of the provided
+        # field to order, for each bucket.
+        max_value_field = A("max", field=order_by_field)
+        aggregation.bucket("max_value_field", max_value_field)
+
+        # Add a bucket_sort aggregation to sort the result buckets based on
+        # the max_value_field aggregation
+        bucket_sort = A(
+            "bucket_sort", sort=[{"max_value_field": order_by[order_by_field]}]
+        )
+        aggregation.bucket("sorted_buckets", bucket_sort)
+    else:
+        # If order field score (elasticsearch relevance)
+        # Add a max aggregation to calculate the max value of _score
+        max_score = A("max", script="_score")
+        aggregation.bucket("max_score", max_score)
+        bucket_sort_score = A(
+            "bucket_sort", sort=[{"max_score": {"order": "desc"}}]
+        )
+        aggregation.bucket("sorted_buckets", bucket_sort_score)
+
     search.aggs.bucket("groups", aggregation)
-
-
-def get_precedential_status_values(cd: CleanData) -> list[str]:
-    """Convert precedential_status from clean data to a list of values for
-    use in an elastic search query.
-    e.g: stat_Precedential=on, stat_Errata=on
-    to: ["Published", "Errata"]
-
-    :param cd: The form CleanData
-    :return: A list of precedential_status to query.
-    """
-    status_list = []
-    status_names_to_values = {
-        name: value for value, name in PRECEDENTIAL_STATUS.NAMES
-    }
-    for stat_v in dict(PRECEDENTIAL_STATUS.NAMES).values():
-        if cd.get(f"stat_{stat_v}"):
-            status_value = status_names_to_values.get(stat_v, "")
-            status_list.append(status_value)
-
-    return status_list
-
-
-def make_stats_es_facets(search_form: ParentheticalSearchForm):
-    """Create facets for precedential_status.
-
-    :param search_form: The ParentheticalSearchForm
-    :return: A list of faceted fields.
-    """
-    # TODO retrieve facets from ES.
-    facet_fields = []
-    for field in search_form:
-        if not field.html_name.startswith("stat_"):
-            continue
-        facet_fields.append(field)
-    return facet_fields

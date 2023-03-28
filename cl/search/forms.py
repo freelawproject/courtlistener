@@ -82,10 +82,7 @@ class BaseSearchForm(forms.Form):
                 initial=initial,
                 widget=forms.CheckboxInput(attrs=attrs),
             )
-            new_field.as_str_types = [
-                SEARCH_TYPES.OPINION,
-                SEARCH_TYPES.PARENTHETICAL,
-            ]
+            new_field.as_str_types = [SEARCH_TYPES.OPINION]
             self.fields[f"stat_{status[1]}"] = new_field
 
     # This is a particularly nasty area of the code due to several factors:
