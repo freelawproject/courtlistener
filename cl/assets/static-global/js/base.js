@@ -339,6 +339,8 @@ function copy_text(selector_id) {
 */
 const form = document.getElementById('register-form');
 let button = document.getElementById('register-button');
-form.addEventListener('submit', function () {
-  button.disabled = true;
-});
+if (form && button) {
+  form.addEventListener('submit', function () {
+    button.disabled = true;
+  });
+}

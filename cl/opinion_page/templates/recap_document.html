@@ -28,6 +28,15 @@
             src="{% static "js/save-notes.js" %}"></script>
     <script defer type="text/javascript"
             src="{% static "js/buy_pacer_modal.js" %}"></script>
+    {% if redirect_to_pacer_modal %}
+      {% include "includes/redirect_to_pacer_modal.html" %}
+      <script>
+        $(document).ready(function(){
+          $("#modal-redirect-to-pacer").modal();
+        });
+      </script>
+  {% endif %}
+
 {% endblock %}
 
 {% block sidebar %}
