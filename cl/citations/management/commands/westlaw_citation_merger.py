@@ -1,6 +1,7 @@
+import itertools
 import re
-from datetime import datetime
-from typing import List, Optional, Union
+from datetime import date, datetime
+from typing import List, Union
 
 import pandas as pd
 from courts_db import find_court
@@ -12,6 +13,9 @@ from pandas import DataFrame
 from pandas.io.parsers import TextFileReader
 
 from cl.citations.utils import map_reporter_db_cite_type
+from cl.corpus_importer.management.commands.harvard_opinions import (
+    winnow_case_name,
+)
 from cl.lib.command_utils import logger
 from cl.search.models import Citation, OpinionCluster
 
@@ -27,17 +31,37 @@ def load_csv_file(csv_path: str) -> DataFrame | TextFileReader:
     return data
 
 
-def find_indexes(list_to_check: list, item_to_find: Union[str, int]) -> list:
-    """Get index of all occurrences of an element in a list
-    :param list_to_check: list
-    :param item_to_find: element to find
-    return: list with indexes or empty list
+def dict_all_combinations(d: dict):
+    """Generate all possible combinations of a dict
+    :param d: dict
+    :return: list of possible combinations of dict keys and values
     """
-    indexes = []
-    for idx, value in enumerate(list_to_check):
-        if value == item_to_find:
-            indexes.append(idx)
-    return indexes
+    results = []
+    for i in range(1, len(d) + 1):
+        results.extend(list(map(dict, itertools.combinations(d.items(), i))))
+    return results
+
+
+def case_names_overlap(case: OpinionCluster, case_name: str) -> bool:
+    """Case names not overlap
+    Check if the case names have quality overlapping case name words.
+    Excludes 'bad words' and other common words
+    :param case: The case opinion cluster
+    :param case_name: The case name from csv
+    :return: Do the case names share quality overlapping words
+    """
+
+    # We combine as much data as possible for the case name to increase our
+    # chances of getting a match
+    cl_case_name = (
+        f"{case.case_name} {case.case_name_short} {case.case_name_full}"
+    )
+
+    overlap = winnow_case_name(cl_case_name) & winnow_case_name(case_name)
+
+    if overlap:
+        return True
+    return False
 
 
 def add_citation(citation: str, cluster_id: int, debug: bool = False) -> None:
@@ -81,7 +105,7 @@ def add_citation(citation: str, cluster_id: int, debug: bool = False) -> None:
         )
 
 
-def prepare_date(date_str: str) -> Optional[datetime]:
+def prepare_date(date_str: str) -> date | None:
     """Convert dates like 'February 28, 2011' or '2011-02-28' to date object
     :param date_str: date string
     :return: date object or None
@@ -90,7 +114,7 @@ def prepare_date(date_str: str) -> Optional[datetime]:
     for date_format in valid_formats:
         try:
             date_obj = datetime.strptime(date_str, date_format)
-            return date_obj
+            return date_obj.date()
         except ValueError:
             logger.warning(f"Invalid date string: {date_str}")
             continue
@@ -103,12 +127,138 @@ def prepare_citation(citation: str) -> Union[List[FullCaseCitation], List]:
     :return: list of valid cites
     """
     clean_cite = re.sub(r"\s+", " ", citation)
-    cites = get_citations(clean_cite)
-    cites = [cite for cite in cites if isinstance(cite, FullCaseCitation)]
-    return cites
+    citations = get_citations(clean_cite)
+    citations = [
+        cite for cite in citations if isinstance(cite, FullCaseCitation)
+    ]
+    return citations
 
 
-def process_citations(data: DataFrame | TextFileReader, debug: bool) -> None:
+def find_case_with_citation(
+    citation_str: str,
+    court: str | None = None,
+    date_filed: str | None = None,
+    case_name: str | None = None,
+    docket_number: str | None = None,
+) -> OpinionCluster | None:
+    """Search for possible case using citation, court, date filed and case name
+    :param citation_str: Citation str
+    :param court: Court name
+    :param date_filed: The date the case was filed
+    :param case_name: The case name
+    :param docket_number: The docket number
+    :return: OpinionCluster or None
+    """
+    prepared_citation = prepare_citation(citation_str)
+
+    if prepared_citation:
+        citation_search_params = {
+            "citations__volume": prepared_citation[0].groups.get("volume"),
+            "citations__reporter": prepared_citation[0].corrected_reporter(),
+            "citations__page": prepared_citation[0].groups.get("page"),
+        }
+
+        # Filter by citation
+        cluster_results = OpinionCluster.objects.filter(
+            **citation_search_params
+        )
+
+        # Store the count to use it in the following code
+        results_count = cluster_results.count()
+        if results_count == 1:
+            if case_name:
+                names_are_similar = case_names_overlap(
+                    cluster_results.first(), case_name
+                )
+                if names_are_similar:
+                    # Case names are similar, we have a match
+                    return cluster_results.first()
+
+        court_id = None
+        if court:
+            # Remove dot at end, court-db fails to find court with
+            # dot at end, e.g. "Supreme Court of Pennsylvania." fails,
+            # but "Supreme Court of Pennsylvania" doesn't
+            court = court.strip(".")
+
+            # Try without bankruptcy flag
+            found_court = find_court(court, bankruptcy=False)
+
+            if not found_court:
+                # Try with bankruptcy flag
+                found_court = find_court(court, bankruptcy=True)
+
+            if len(found_court) >= 1:
+                court_id = found_court[0]
+
+        filters = {
+            "docket__court__id": court_id,
+            "case_name": case_name,
+            "docket__docket_number": docket_number,
+        }
+
+        if date_filed:
+            # Only add date if we have one
+            prep_date_filed = prepare_date(date_filed)
+            if prep_date_filed:
+                filters["date_filed"] = prep_date_filed.strftime("%Y-%m-%d")
+
+        # Remove any None value
+        filters = {
+            key: value for key, value in filters.items() if value is not None
+        }
+
+        # Generate all possible combinations of filters
+        generated_filters = dict_all_combinations(filters)
+
+        obj = None
+
+        # Apply all possible combination of filters to try to get the case
+        for queryset_filter in generated_filters:
+            # cluster_results is already filtered by citation
+            results = cluster_results.filter(**queryset_filter)
+            filter_results_count = results.count()
+            if filter_results_count == 1:
+                obj = results.first()
+                break
+            else:
+                # Try next filter
+                continue
+
+        if not obj:
+            # We couldn't find a match using filters, if only filtering by
+            # citation gave us a large queryset, lets try to compare each
+            # result with case name to try to find a match
+            if results_count > 1:
+                for cluster in cluster_results:
+                    if case_name:
+                        names_are_similar = case_names_overlap(
+                            cluster, case_name
+                        )
+                        if names_are_similar:
+                            # We found a case with similar name to westlaw data
+                            return cluster
+
+        # Perform extra check to be sure that we have the correct case
+        if obj:
+            if case_name:
+                names_are_similar = case_names_overlap(obj, case_name)
+                if names_are_similar:
+                    # We got a match
+                    return obj
+
+        return None
+
+    else:
+        logger.warning(f'Invalid citation found: "{citation_str}"')
+
+        # No result at all
+        return None
+
+
+def process_westlaw_data(
+    data: DataFrame | TextFileReader, debug: bool
+) -> None:
     """
     Process citations from csv file
     :param data: rows from csv file
@@ -123,209 +273,51 @@ def process_citations(data: DataFrame | TextFileReader, debug: bool) -> None:
         docket_number = row.get("Docket Num")
         date_filed = row.get("Filed Date")
 
-        additional_search_params = {}
+        # Find a match for each citation, westlaw data only have two citations
+        # in the csv files
+        citation_cluster_result = find_case_with_citation(
+            citation, court, date_filed, case_name, docket_number
+        )
+        parallel_citation_cluster_result = find_case_with_citation(
+            parallel_citation, court, date_filed, case_name, docket_number
+        )
 
-        if court:
-            # Add court to search params if exists
-            if court.endswith("."):
-                # Remove dot at end, court-db fails to find court with
-                # dot at end, e.g. "Supreme Court of Pennsylvania." fails,
-                # but "Supreme Court of Pennsylvania" doesn't
-                court = court[:-1]
-
-            # TODO try to get court with and without bankruptcy flag?
-            found_court = find_court(court, bankruptcy=False)
-
-            if len(found_court) >= 1:
-                court_id = found_court[0]
-                additional_search_params["docket__court__id"] = court_id
-
-        # TODO date_filed may break thinks, we could get many results and we
-        #  can have duplicated cases but with different date_filed because
-        #  many reasons, like incorrect data or because approximated date is
-        #  incorrect
-        # if date_filed:
-        #     # Add date filed to search params if exist
-        #     prep_date_filed = prepare_date(date_filed)
-        #     if prep_date_filed:
-        #         additional_search_params[
-        #             "date_filed"
-        #         ] = prep_date_filed.strftime("%Y-%m-%d")
-        #         # We have an exact date
-        #         additional_search_params[
-        #             "date_filed_is_approximate"] = False
-
-        # Check that both citations are valid
-        prepared_citation = prepare_citation(citation)
-        prepared_parallel_citation = prepare_citation(parallel_citation)
-
-        if prepared_citation and prepared_parallel_citation:
-            # Citation and parallel citation are valid, prepare filter
-            # params for citation and parallel citation
-            citation_search_params = {
-                "citations__volume": prepared_citation[0].groups.get("volume"),
-                "citations__reporter": prepared_citation[
-                    0
-                ].corrected_reporter(),
-                "citations__page": prepared_citation[0].groups.get("page"),
-            }
-            parallel_citation_search_params = {
-                "citations__volume": prepared_parallel_citation[0].groups.get(
-                    "volume"
-                ),
-                "citations__reporter": prepared_parallel_citation[
-                    0
-                ].corrected_reporter(),
-                "citations__page": prepared_parallel_citation[0].groups.get(
-                    "page"
-                ),
-            }
-
-            # Add additional params to dict filters
-            citation_search_params.update(additional_search_params)
-            parallel_citation_search_params.update(additional_search_params)
-
-            # We filter by citation and parallel citation params
-            citation_cluster_results = OpinionCluster.objects.filter(
-                **citation_search_params
+        if citation_cluster_result and not parallel_citation_cluster_result:
+            # Add citation to cluster
+            add_citation(
+                parallel_citation,
+                citation_cluster_result.pk,
+                debug,
             )
-
-            parallel_citation_cluster_results = OpinionCluster.objects.filter(
-                **parallel_citation_search_params
+        elif not citation_cluster_result and parallel_citation_cluster_result:
+            # Add citation to cluster
+            add_citation(
+                citation,
+                parallel_citation_cluster_result.pk,
+                debug,
             )
-
-            # Store the count to use it in the following code
-            results_count = citation_cluster_results.count()
-
-            parallel_results_count = parallel_citation_cluster_results.count()
-
-            # Store names and the ids of the clusters obtained from
-            # citation and parallel citation
-            results_names = citation_cluster_results.values_list(
-                "case_name", flat=True
-            )
-
-            results_ids = citation_cluster_results.values_list("pk", flat=True)
-
-            parallel_results_names = (
-                parallel_citation_cluster_results.values_list(
-                    "case_name", flat=True
-                )
-            )
-
-            parallel_results_ids = (
-                parallel_citation_cluster_results.values_list("pk", flat=True)
-            )
-
-            if results_count == 1 and parallel_results_count == 0:
-                # Add parallel citation to cluster
-                add_citation(
-                    parallel_citation,
-                    citation_cluster_results.first().pk,
-                    debug,
-                )
-            elif results_count == 0 and parallel_results_count == 1:
-                # Add citation to cluster with parallel citation.
-                # Note: there may be the case that we can have duplicate
-                # cases, but one has date_filed_is_approximate and the
-                # other not, we will add the citation to the case with
-                # date_filed_is_approximate is false, e.g. cluster id:
-                # 7414160 and 5350679
-                add_citation(
-                    citation,
-                    parallel_citation_cluster_results.first().pk,
-                    debug,
-                )
-            elif results_count == 1 and parallel_results_count == 1:
-                # The case could be duplicated, compare the ids of each
-                # result
-                if (
-                    citation_cluster_results.first().pk
-                    != parallel_citation_cluster_results.first().pk
-                ):
-                    logger.warning(
-                        f'Possible duplicated cases for citations: "{citation}" with clusters: {citation_cluster_results.first().pk} and {parallel_citation_cluster_results.first().pk}'
-                    )
-                else:
-                    logger.warning(
-                        f'Cluster {citation_cluster_results.first().pk} already have both citations "{citation}" and "{parallel_citation}"'
-                    )
-            elif results_count > 1 and parallel_results_count == 0:
-                # We got more than one result using the citation, we can
-                # try to find the case name using csv data and try to
-                # match it with the correct case
-
-                # Check if case name from csv is exactly the same in
-                # case_names list and get index, this is just a workaround
-                # to use as much of westlaw data as possible, we could try
-                # to implement something more complex
-                indexes_found = find_indexes(list(results_names), case_name)
-                if len(indexes_found) == 1:
-                    # Add parallel citation to cluster obtained from list
-                    case_id = results_ids[indexes_found[0]]
-                    add_citation(parallel_citation, case_id, debug)
-                elif len(indexes_found) > 1:
-                    logger.warning(
-                        f'Multiple results for case: "{case_name}" and citation: "{citation}"'
-                    )
-
-            elif results_count == 0 and parallel_results_count > 1:
-                # We got more than one result using parallel citation,
-                # we can try to find the case name using csv data and
-                # try to match it with the correct case
-
-                # Check if the csv case name is exactly the same in
-                # the case_names list and get the index
-                indexes_found = find_indexes(
-                    list(parallel_results_names), case_name
-                )
-                if len(indexes_found) == 1:
-                    case_id = parallel_results_ids[indexes_found[0]]
-                    # Add citation to parallel citation cluster
-                    add_citation(citation, case_id, debug)
-                elif len(indexes_found) > 1:
-                    # Many case names have the same names, it's hard
-                    # to figure out where citation belongs to
-                    logger.warning(
-                        f'Multiple results for case: "{case_name}" and '
-                        f'parallel citation: "{parallel_citation}"'
-                    )
-
-            elif results_count == 0 and parallel_results_count == 0:
-                # No match for both citations
+        elif citation_cluster_result and parallel_citation_cluster_result:
+            # The case could be duplicated, compare the id of each result
+            if (
+                citation_cluster_result.pk
+                != parallel_citation_cluster_result.pk
+            ):
                 logger.warning(
-                    f'No results for case: "{case_name}" with '
-                    f'citation: "{citation}" and parallel citation: '
-                    f'"{parallel_citation}"'
+                    f'Possible duplicated cases for citations: "{citation}" '
+                    f"with cluster: {citation_cluster_result.pk} and "
+                    f"{parallel_citation_cluster_result.pk} "
                 )
-            elif results_count == 1 and parallel_results_count > 1:
-                if results_ids[0] in list(parallel_results_ids):
-                    # Case is in two list, therefore it has both citations
-                    logger.warning(
-                        f'Cluster {results_ids[0]} already have both citations "{citation}" and "{parallel_citation}"'
-                    )
-            elif results_count > 1 and parallel_results_count == 1:
-                # Case is in two list, therefore it has both citations
-                if parallel_results_ids[0] in list(results_ids):
-                    logger.warning(
-                        f'Cluster {parallel_results_ids[0]} already have both citations "{citation}" and "{parallel_citation}"'
-                    )
             else:
-                pass
-
-        elif prepared_citation and not prepared_parallel_citation:
-            logger.warning(
-                f'Case: "{case_name}", invalid citation found: "{parallel_citation}"'
-            )
-
-        elif not prepared_citation and prepared_parallel_citation:
-            logger.warning(
-                f'Case: "{case_name}", invalid citation found: "{citation}"'
-            )
-
+                logger.info(
+                    f"Cluster {citation_cluster_result.pk} already have both "
+                    f'citations "{citation}" and "{parallel_citation}" '
+                )
         else:
-            logger.warning(
-                f'Case: "{case_name}", invalid citations found: "{citation}" and "{parallel_citation}"'
+            # No results
+            logger.info(
+                f'No results for case: "{case_name}" with '
+                f'citation: "{citation}" or parallel citation: '
+                f'"{parallel_citation}"'
             )
 
 
@@ -351,4 +343,4 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         data = load_csv_file(options["csv"])
         if not data.empty:
-            process_citations(data, options["debug"])
+            process_westlaw_data(data, options["debug"])
