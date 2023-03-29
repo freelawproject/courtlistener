@@ -5,6 +5,7 @@ from unittest import mock
 
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Permission
+from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
 from django.db import connection
 from django.http import HttpRequest, JsonResponse
 from django.test import Client, RequestFactory
@@ -16,7 +17,7 @@ from rest_framework.status import HTTP_200_OK, HTTP_403_FORBIDDEN
 from rest_framework.test import APIRequestFactory
 
 from cl.api.factories import WebhookEventFactory, WebhookFactory
-from cl.api.models import WEBHOOK_EVENT_STATUS, WebhookEventType
+from cl.api.models import WEBHOOK_EVENT_STATUS, WebhookEvent, WebhookEventType
 from cl.api.pagination import ShallowOnlyPageNumberPagination
 from cl.api.views import coverage_data
 from cl.api.webhooks import send_webhook_event
@@ -27,6 +28,7 @@ from cl.recap.factories import ProcessingQueueFactory
 from cl.search.models import Opinion
 from cl.stats.models import Event
 from cl.tests.cases import SimpleTestCase, TestCase, TransactionTestCase
+from cl.tests.utils import MockResponse
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 from cl.users.models import UserProfile
 
@@ -1055,3 +1057,193 @@ class WebhooksProxySecurityTest(TestCase):
             webhook_event_3.status_code,
             HTTP_403_FORBIDDEN,
         )
+
+
+class WebhooksMilestoneEventsTest(TestCase):
+    """Test Webhook milestone events tracking"""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user_profile_1 = UserProfileWithParentsFactory()
+        cls.user_profile_2 = UserProfileWithParentsFactory()
+        cls.webhook_user_1 = WebhookFactory(
+            user=cls.user_profile_1.user,
+            event_type=WebhookEventType.DOCKET_ALERT,
+            url="https://example.com/",
+            enabled=True,
+        )
+        cls.webhook_user_2 = WebhookFactory(
+            user=cls.user_profile_2.user,
+            event_type=WebhookEventType.RECAP_FETCH,
+            url="https://example.com/",
+            enabled=True,
+        )
+
+    def setUp(self) -> None:
+        self.r = make_redis_interface("STATS")
+        self.flush_stats()
+
+    def tearDown(self) -> None:
+        self.flush_stats()
+
+    def flush_stats(self) -> None:
+        # Flush existing stats
+        keys = self.r.keys("webhook:*")
+        if keys:
+            self.r.delete(*keys)
+
+    @mock.patch(
+        "cl.api.utils.get_webhook_logging_prefix",
+        return_value="webhook:test_1",
+    )
+    def test_webhook_milestone_events_creation(self, mock_prefix):
+        """Are webhook events properly tracked and milestone events created?"""
+
+        webhook_event_1 = WebhookEventFactory(
+            webhook=self.webhook_user_1,
+            content="{'message': 'ok_1'}",
+            event_status=WEBHOOK_EVENT_STATUS.IN_PROGRESS,
+        )
+        # Send one webhook event for user_1.
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            send_webhook_event(webhook_event_1)
+
+        webhook_events = WebhookEvent.objects.all()
+        self.assertEqual(webhook_events.count(), 1)
+        self.assertEqual(
+            webhook_events[0].event_status, WEBHOOK_EVENT_STATUS.SUCCESSFUL
+        )
+
+        total_events = Event.objects.filter(user=None).order_by("date_created")
+        user_1_events = Event.objects.filter(
+            user=self.webhook_user_1.user
+        ).order_by("date_created")
+
+        # Confirm one webhook global event and a webhook user event are created
+        self.assertEqual(total_events.count(), 1)
+        self.assertEqual(user_1_events.count(), 1)
+        global_description = (
+            f"User '{self.webhook_user_1.user.username}' "
+            f"has placed their {intcomma(ordinal(1))} webhook event."
+        )
+        self.assertEqual(user_1_events[0].description, global_description)
+        user_description = "Webhooks have logged 1 total successful events."
+        self.assertEqual(total_events[0].description, user_description)
+
+        # Send 4 more new webhook events for user_1:
+        for i in range(4):
+            webhook_event = WebhookEventFactory(
+                webhook=self.webhook_user_1,
+                content="{'message': 'ok_1'}",
+                event_status=WEBHOOK_EVENT_STATUS.IN_PROGRESS,
+            )
+            with mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ):
+                send_webhook_event(webhook_event)
+
+        self.assertEqual(webhook_events.count(), 5)
+
+        # Confirm new global and user webhook events are created.
+        self.assertEqual(total_events.count(), 2)
+        self.assertEqual(user_1_events.count(), 2)
+        # Confirm the new events counter were properly increased.
+        user_description = (
+            f"User '{self.webhook_user_1.user.username}' "
+            f"has placed their {intcomma(ordinal(5))} webhook event."
+        )
+        self.assertEqual(user_1_events[1].description, user_description)
+        global_description = "Webhooks have logged 5 total successful events."
+        self.assertEqual(total_events[1].description, global_description)
+
+        # Send 5 new webhook events for user_2
+        for i in range(5):
+            webhook_event_2 = WebhookEventFactory(
+                webhook=self.webhook_user_2,
+                content="{'message': 'ok_2'}",
+                event_status=WEBHOOK_EVENT_STATUS.IN_PROGRESS,
+            )
+            with mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ):
+                send_webhook_event(webhook_event_2)
+
+        user_2_events = Event.objects.filter(
+            user=self.webhook_user_2.user
+        ).order_by("date_created")
+
+        # Confirm 5 webhook milestone event for user_2
+        user_description = (
+            f"User '{self.webhook_user_2.user.username}' "
+            f"has placed their {intcomma(ordinal(5))} webhook event."
+        )
+        self.assertEqual(user_2_events[1].description, user_description)
+
+        # Confirm 10 global webhook milestone event
+        global_description = "Webhooks have logged 10 total successful events."
+        self.assertEqual(total_events[2].description, global_description)
+
+    @mock.patch(
+        "cl.api.utils.get_webhook_logging_prefix",
+        return_value="webhook:test_2",
+    )
+    def test_avoid_logging_not_successful_webhook_events(self, mock_prefix):
+        """Can we avoid logging debug and failing webhook events?"""
+
+        webhook_event_1 = WebhookEventFactory(
+            webhook=self.webhook_user_1,
+            content="{'message': 'ok_1'}",
+            event_status=WEBHOOK_EVENT_STATUS.IN_PROGRESS,
+        )
+        # Send a webhook event that fails to be delivered.
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                500, mock_raw=True
+            ),
+        ):
+            send_webhook_event(webhook_event_1)
+
+        webhook_events = WebhookEvent.objects.all()
+        webhook_event_1.refresh_from_db()
+        self.assertEqual(
+            webhook_event_1.event_status, WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY
+        )
+        self.assertEqual(webhook_events.count(), 1)
+        # Confirm no milestone event should be created.
+        milestone_events = Event.objects.all()
+        self.assertEqual(milestone_events.count(), 0)
+
+        webhook_event_2 = WebhookEventFactory(
+            webhook=self.webhook_user_1,
+            content="{'message': 'ok_1'}",
+            event_status=WEBHOOK_EVENT_STATUS.IN_PROGRESS,
+            debug=True,
+        )
+        # Send a debug webhook event.
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            send_webhook_event(webhook_event_2)
+
+        webhook_event_2.refresh_from_db()
+        self.assertEqual(
+            webhook_event_2.event_status, WEBHOOK_EVENT_STATUS.SUCCESSFUL
+        )
+        self.assertEqual(webhook_events.count(), 2)
+        # Confirm no milestone event should be created.
+        self.assertEqual(milestone_events.count(), 0)
