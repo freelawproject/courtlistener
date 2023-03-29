@@ -99,117 +99,7 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
     """
     opinions: List[Opinion] = Opinion.objects.filter(pk__in=opinion_pks)
     for opinion in opinions:
-        # Memoize parsed versions of the opinion's text
-        get_and_clean_opinion_text(opinion)
-
-        # Extract the citations from the opinion's text
-        citations: List[CitationBase] = get_citations(opinion.cleaned_text)
-
-        # If no citations are found, continue
-        if not citations:
-            continue
-        # Resolve all those different citation objects to Opinion objects,
-        # using a variety of heuristics.
-        try:
-            citation_resolutions: Dict[
-                MatchedResourceType, List[SupportedCitationType]
-            ] = do_resolve_citations(citations, opinion)
-        except ResponseNotReady as e:
-            # Threading problem in httplib, which is used in the Solr query.
-            raise self.retry(exc=e, countdown=2)
-
-        # Generate the citing opinion's new HTML with inline citation links
-        opinion.html_with_citations = create_cited_html(
-            opinion, citation_resolutions
-        )
-
-        # Delete the unmatched citations
-        citation_resolutions.pop(NO_MATCH_RESOURCE, None)
-
-        # Increase the citation count for the cluster of each matched opinion
-        # if that cluster has not already been cited by this opinion. First,
-        # calculate a list of the IDs of every opinion whose cluster will need
-        # updating.
-        all_cited_opinions = opinion.opinions_cited.all().values_list(
-            "pk", flat=True
-        )
-        opinion_ids_to_update = set()
-        for _opinion in citation_resolutions.keys():
-            if _opinion.pk not in all_cited_opinions:
-                opinion_ids_to_update.add(_opinion.pk)
-
-        clusters_to_update_par_groups_for = set()
-        parentheticals: List[Parenthetical] = []
-        for _opinion, _citations in citation_resolutions.items():
-            # Currently, eyecite has a bug where parallel citations are
-            # detected individually. We avoid creating duplicate parentheticals
-            # because of that by keeping track of what we've seen so far.
-            parenthetical_texts = set()
-            for _cit in _citations:
-                # If the citation has a descriptive parenthetical, clean
-                # it up and store it as a Parenthetical
-                if (
-                    (par_text := _cit.metadata.parenthetical)
-                    and par_text not in parenthetical_texts
-                    and is_parenthetical_descriptive(par_text)
-                ):
-                    clusters_to_update_par_groups_for.add(_opinion.cluster_id)
-                    parenthetical_texts.add(par_text)
-                    clean = clean_parenthetical_text(par_text)
-                    parentheticals.append(
-                        Parenthetical(
-                            describing_opinion_id=opinion.pk,
-                            described_opinion_id=_opinion.pk,
-                            text=clean,
-                            score=parenthetical_score(clean, opinion.cluster),
-                        )
-                    )
-
-        # Finally, commit these changes to the database in a single
-        # transcation block. Trigger a single Solr update as well, if
-        # required.
-        with transaction.atomic():
-            opinion_clusters_to_update = OpinionCluster.objects.filter(
-                sub_opinions__pk__in=opinion_ids_to_update
-            )
-            opinion_clusters_to_update.update(
-                citation_count=F("citation_count") + 1
-            )
-            if index:
-                add_items_to_solr.delay(
-                    opinion_clusters_to_update.values_list("pk", flat=True),
-                    "search.OpinionCluster",
-                )
-
-            # Nuke existing citations and parentheticals
-            OpinionsCited.objects.filter(citing_opinion_id=opinion.pk).delete()
-            Parenthetical.objects.filter(
-                describing_opinion_id=opinion.pk
-            ).delete()
-
-            # Create the new ones.
-            OpinionsCited.objects.bulk_create(
-                [
-                    OpinionsCited(
-                        citing_opinion_id=opinion.pk,
-                        cited_opinion_id=_opinion.pk,
-                        depth=len(_citations),
-                    )
-                    for _opinion, _citations in citation_resolutions.items()
-                ]
-            )
-
-            Parenthetical.objects.bulk_create(parentheticals)
-
-            # Update parenthetical groups for clusters that we have added
-            # parentheticals for from this opinion
-            for cluster_id in clusters_to_update_par_groups_for:
-                create_parenthetical_groups(
-                    OpinionCluster.objects.get(pk=cluster_id)
-                )
-
-            # Save all the changes to the citing opinion (send to solr later)
-            opinion.save(index=False)
+        store_opinion_citations_and_update_parentheticals(opinion, index)
 
     # If a Solr update was requested, do a single one at the end with all the
     # pks of the passed opinions
@@ -217,7 +107,9 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
         add_items_to_solr.delay(opinion_pks, "search.Opinion")
 
 
-def store_opinion_citations_and_update_parentheticals(opinion: Opinion):
+def store_opinion_citations_and_update_parentheticals(
+    opinion: Opinion, index: bool
+):
     get_and_clean_opinion_text(opinion)
     citations: List[CitationBase] = get_citations(opinion.cleaned_text)
 
@@ -281,3 +173,43 @@ def store_opinion_citations_and_update_parentheticals(opinion: Opinion):
                         score=parenthetical_score(clean, opinion.cluster),
                     )
                 )
+
+    with transaction.atomic():
+        opinion_clusters_to_update = OpinionCluster.objects.filter(
+            sub_opinions__pk__in=opinion_ids_to_update
+        )
+        opinion_clusters_to_update.update(
+            citation_count=F("citation_count") + 1
+        )
+
+        if index:
+            add_items_to_solr.delay(
+                opinion_clusters_to_update.values_list("pk", flat=True),
+                "search.OpinionCluster",
+            )
+        # Nuke existing citations and parentheticals
+        OpinionsCited.objects.filter(citing_opinion_id=opinion.pk).delete()
+        Parenthetical.objects.filter(describing_opinion_id=opinion.pk).delete()
+
+        # Create the new ones.
+        OpinionsCited.objects.bulk_create(
+            [
+                OpinionsCited(
+                    citing_opinion_id=opinion.pk,
+                    cited_opinion_id=_opinion.pk,
+                    depth=len(_citations),
+                )
+                for _opinion, _citations in citation_resolutions.items()
+            ]
+        )
+        Parenthetical.objects.bulk_create(parentheticals)
+
+        # Update parenthetical groups for clusters that we have added
+        # parentheticals for from this opinion
+        for cluster_id in clusters_to_update_par_groups_for:
+            create_parenthetical_groups(
+                OpinionCluster.objects.get(pk=cluster_id)
+            )
+
+            # Save all the changes to the citing opinion (send to solr later)
+        opinion.save(index=False)
