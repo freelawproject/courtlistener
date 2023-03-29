@@ -84,6 +84,9 @@ def find_citations_and_parantheticals_for_recap_documents(
         pk__in=doc_ids
     )
 
+    for d in documents:
+        store_recap_citations_and_update_parentheticals(d, index)
+
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
 def find_citations_and_parentheticals_for_opinion_by_pks(
@@ -213,3 +216,9 @@ def store_opinion_citations_and_update_parentheticals(
 
             # Save all the changes to the citing opinion (send to solr later)
         opinion.save(index=False)
+
+
+def store_recap_citations_and_update_parentheticals(
+    document: RECAPDocument, index: bool
+):
+    pass
