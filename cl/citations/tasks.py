@@ -26,9 +26,9 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     OpinionsCited,
+    OpinionsCitedByRECAPDocument,
     Parenthetical,
     RECAPDocument,
-    OpinionsCitedByRECAPDocument,
 )
 from cl.search.tasks import add_items_to_solr
 
