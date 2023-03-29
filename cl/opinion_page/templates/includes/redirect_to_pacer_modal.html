@@ -10,13 +10,13 @@
         <button type="button" class="close" data-dismiss="modal"
                 aria-label="Close"><span aria-hidden="true">&times;</span>
         </button>
-        <h2 class="modal-title">This document is unavailable</h2>
+        <h2 class="modal-title">Sorry, this document isn't in the RECAP Archive yet</h2>
       </div>
       <div class="modal-body">
        {% if not request.COOKIES.recap_install_plea %}
-         <p>To purchase this document and add it here, please install the RECAP extension and download it from PACER.</p>
+         <p>To purchase this document and add it to the archive, please install the RECAP extension and download it from PACER.</p>
        {% else %}
-         <p>To purchase this document, please download it from PACER.</p>
+         <p>To purchase this document and add it to the archive, please download it from PACER.</p>
          <p></p>
        {% endif %}
       </div>
@@ -34,3 +34,4 @@
       </div>
     </div>
   </div>
+</div>
