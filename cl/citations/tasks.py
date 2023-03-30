@@ -124,13 +124,19 @@ def store_opinion_citations_and_update_parentheticals(
     :param index: Whether to add the item to Solr
     :return: None
     """
+
+    # Memoize parsed versions of the opinion's text
     get_and_clean_opinion_text(opinion)
+
+    # Extract the citations from the opinion's text
     citations: List[CitationBase] = get_citations(opinion.cleaned_text)
 
     # If no citations are found, then there is nothing else to do for now.
     if not citations:
         return
 
+    # Resolve all those different citation objects to Opinion objects,
+    # using a variety of heuristics.
     citation_resolutions: Dict[
         MatchedResourceType, List[SupportedCitationType]
     ] = do_resolve_citations(citations, opinion)
@@ -142,6 +148,11 @@ def store_opinion_citations_and_update_parentheticals(
 
     # Delete the unmatched citations
     citation_resolutions.pop(NO_MATCH_RESOURCE, None)
+
+    # Increase the citation count for the cluster of each matched opinion
+    # if that cluster has not already been cited by this opinion. First,
+    # calculate a list of the IDs of every opinion whose cluster will need
+    # updating.
 
     currently_cited_opinions = opinion.opinions_cited.all().values_list(
         "pk", flat=True
@@ -159,6 +170,9 @@ def store_opinion_citations_and_update_parentheticals(
     parentheticals: List[Parenthetical] = []
 
     for _opinion, _citations in citation_resolutions.items():
+        # Currently, eyecite has a bug where parallel citations are
+        # detected individually. We avoid creating duplicate parentheticals
+        # because of that by keeping track of what we've seen so far.
         parenthetical_texts = set()
 
         for c in _citations:
@@ -179,6 +193,9 @@ def store_opinion_citations_and_update_parentheticals(
                     )
                 )
 
+    # Finally, commit these changes to the database in a single
+    # transcation block. Trigger a single Solr update as well, if
+    # required.
     with transaction.atomic():
         opinion_clusters_to_update = OpinionCluster.objects.filter(
             sub_opinions__pk__in=opinion_ids_to_update
@@ -216,7 +233,7 @@ def store_opinion_citations_and_update_parentheticals(
                 OpinionCluster.objects.get(pk=cluster_id)
             )
 
-            # Save all the changes to the citing opinion (send to solr later)
+        # Save all the changes to the citing opinion (send to solr later)
         opinion.save(index=False)
 
 
