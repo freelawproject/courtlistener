@@ -13,6 +13,7 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.utils.timezone import make_aware, utc
 from factory import RelatedFactory
+from juriscraper.lib.string_utils import harmonize
 
 from cl.corpus_importer.court_regexes import match_court_string
 from cl.corpus_importer.factories import (
@@ -50,6 +51,7 @@ from cl.corpus_importer.tasks import generate_ia_json
 from cl.corpus_importer.utils import get_start_of_quarter
 from cl.lib.pacer import process_docket_data
 from cl.lib.redis_utils import make_redis_interface
+from cl.lib.timezone_helpers import localize_date_and_time
 from cl.people_db.factories import PersonWithChildrenFactory, PositionFactory
 from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
@@ -65,6 +67,7 @@ from cl.search.factories import (
     RECAPDocumentFactory,
 )
 from cl.search.models import (
+    BankruptcyInformation,
     Citation,
     Court,
     Docket,
@@ -674,6 +677,34 @@ Appeals, No. 19667-4-III, October 31, 2002. Denied September 30, 2003."
         # Test some docket attributes
         docket = cite.cluster.docket
         self.assertEqual(docket.docket_number, case_law["docket_number"])
+
+    def test_existing_docket_lookup(self):
+        """Can we update an existing docket instead of creating a new one?"""
+
+        case_law = CaseLawFactory()
+        DocketFactory(
+            docket_number=case_law["docket_number"],
+            court_id="harvard",
+            source=Docket.HARVARD,
+            pacer_case_id=None,
+            idb_data=None,
+        )
+
+        self.read_json_func.return_value = case_law
+        self.assertSuccessfulParse(1)
+
+        cite = self._get_cite(case_law)
+
+        dockets = Docket.objects.all()
+        self.assertEqual(dockets.count(), 1)
+
+        # Test some docket attributes
+        docket = cite.cluster.docket
+        self.assertEqual(docket.docket_number, case_law["docket_number"])
+        self.assertEqual(
+            docket.case_name, harmonize(case_law["name_abbreviation"])
+        )
+        self.assertEqual(docket.ia_needs_upload, False)
 
     def test_new_bankruptcy_case(self):
         """Can we add a bankruptcy court?"""
@@ -1944,8 +1975,7 @@ class TrollerBKTests(TestCase):
         self.assertEqual(d_created, 1)
         self.assertEqual(cached_items.count(), 3)
         mock_logger.info.assert_called_with(
-            f"Hit a cached item, finished adding {self.court_appellate.pk} feed. "
-            f"Added {len(rds_created)} RDs."
+            f"Finished adding {self.court_appellate.pk} feed. Added {len(rds_created)} RDs."
         )
 
     @patch(
@@ -2019,6 +2049,249 @@ class TrollerBKTests(TestCase):
         files_queue.task_done()
 
         self.assertEqual(files_queue.qsize(), 0)
+
+    def test_add_objects_in_bulk(self):
+        """Can we properly add related RSS feed objects in bulk?"""
+
+        a_rss_data_0 = RssDocketDataFactory(
+            court_id=self.court_appellate.pk,
+            docket_number="15-3247",
+            pacer_case_id=None,
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    document_number=1,
+                    date_filed=make_aware(
+                        datetime(year=2018, month=1, day=5), utc
+                    ),
+                ),
+            ],
+        )
+
+        a_rss_data_1 = RssDocketDataFactory(
+            court_id=self.court_appellate.pk,
+            docket_number="15-3245",
+            pacer_case_id=None,
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    document_number=1,
+                    date_filed=make_aware(
+                        datetime(year=2018, month=1, day=5), utc
+                    ),
+                )
+            ],
+        )
+        a_rss_data_2 = RssDocketDataFactory(
+            court_id=self.court_appellate.pk,
+            docket_number="15-3247",
+            pacer_case_id=None,
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    document_number=2,
+                    date_filed=make_aware(
+                        datetime(year=2018, month=1, day=5), utc
+                    ),
+                )
+            ],
+        )
+
+        a_rss_data_3 = RssDocketDataFactory(
+            court_id=self.court_appellate.pk,
+            docket_number="12-2532",
+            pacer_case_id=None,
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    document_number=5,
+                    date_filed=make_aware(
+                        datetime(year=2018, month=1, day=5), utc
+                    ),
+                )
+            ],
+        )
+
+        list_rss_data = [
+            a_rss_data_0,
+            a_rss_data_1,
+            a_rss_data_2,
+            a_rss_data_3,
+        ]
+        cached_items = RssItemCache.objects.all()
+        self.assertEqual(cached_items.count(), 0)
+
+        build_date = a_rss_data_0["docket_entries"][0]["date_filed"]
+        rds_created, d_created = merge_rss_data(
+            list_rss_data, self.court_appellate.pk, build_date
+        )
+
+        date_filed, time_filed = localize_date_and_time(
+            self.court_appellate.pk, build_date
+        )
+
+        # Only two dockets created: 15-3247 and 15-3245, 12-2532 already exists
+        self.assertEqual(d_created, 2)
+        self.assertEqual(len(rds_created), 4)
+
+        # Compare docket entries and rds created for each docket.
+        des_to_compare = [("15-3245", 1), ("15-3247", 2), ("12-2532", 1)]
+        for d_number, de_count in des_to_compare:
+            docket = Docket.objects.get(docket_number=d_number)
+            self.assertEqual(len(docket.docket_entries.all()), de_count)
+
+            # For every docket entry there is one recap document created.
+            docket_entries = docket.docket_entries.all()
+            for de in docket_entries:
+                self.assertEqual(len(de.recap_documents.all()), 1)
+                self.assertEqual(de.time_filed, time_filed)
+                self.assertEqual(de.date_filed, date_filed)
+                self.assertNotEqual(de.recap_sequence_number, "")
+
+            # docket_number_core generated for every docket
+            self.assertNotEqual(docket.docket_number_core, "")
+            # Slug is generated for every docket
+            self.assertNotEqual(docket.slug, "")
+
+            # Verify RECAP source is added to existing and new dockets.
+            if d_number == "12-2532":
+                self.assertEqual(docket.source, Docket.HARVARD_AND_RECAP)
+            else:
+                self.assertEqual(docket.source, Docket.RECAP)
+                # Confirm date_last_filing is added to each new docket.
+                self.assertEqual(docket.date_last_filing, date_filed)
+
+        # BankruptcyInformation is added only on new dockets.
+        bankr_objs_created = BankruptcyInformation.objects.all()
+        self.assertEqual(len(bankr_objs_created), 3)
+
+        # Compare bankruptcy data is linked correctly to the parent docket.
+        bankr_d_1 = BankruptcyInformation.objects.get(
+            docket__docket_number=a_rss_data_0["docket_number"]
+        )
+        self.assertEqual(bankr_d_1.chapter, str(a_rss_data_0["chapter"]))
+        self.assertEqual(
+            bankr_d_1.trustee_str, str(a_rss_data_0["trustee_str"])
+        )
+
+        bankr_d_2 = BankruptcyInformation.objects.get(
+            docket__docket_number=a_rss_data_1["docket_number"]
+        )
+        self.assertEqual(bankr_d_2.chapter, str(a_rss_data_1["chapter"]))
+        self.assertEqual(
+            bankr_d_2.trustee_str, str(a_rss_data_1["trustee_str"])
+        )
+
+        bankr_d_3 = BankruptcyInformation.objects.get(
+            docket__docket_number=a_rss_data_3["docket_number"]
+        )
+        self.assertEqual(bankr_d_3.chapter, str(a_rss_data_3["chapter"]))
+        self.assertEqual(
+            bankr_d_3.trustee_str, str(a_rss_data_3["trustee_str"])
+        )
+
+    def test_avoid_adding_district_dockets_no_pacer_case_id_in_bulk(self):
+        """Can we avoid adding district/bankr dockets that don't have a
+        pacer_case_id?"""
+
+        a_rss_data_0 = RssDocketDataFactory(
+            court_id=self.court_neb.pk,
+            docket_number="15-3247",
+            pacer_case_id=None,
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    document_number=1,
+                    date_filed=make_aware(
+                        datetime(year=2018, month=1, day=5), utc
+                    ),
+                ),
+            ],
+        )
+
+        a_rss_data_1 = RssDocketDataFactory(
+            court_id=self.court_neb.pk,
+            docket_number="15-3245",
+            pacer_case_id="12345",
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    document_number=1,
+                    date_filed=make_aware(
+                        datetime(year=2018, month=1, day=5), utc
+                    ),
+                )
+            ],
+        )
+
+        list_rss_data = [
+            a_rss_data_0,
+            a_rss_data_1,
+        ]
+
+        build_date = a_rss_data_0["docket_entries"][0]["date_filed"]
+        rds_created, d_created = merge_rss_data(
+            list_rss_data, self.court_neb.pk, build_date
+        )
+
+        # Only one docket created: 15-3245, since 15-3247 don't have pacer_case_id
+        self.assertEqual(d_created, 1)
+        self.assertEqual(len(rds_created), 1)
+
+        # Compare docket entries and rds created for each docket.
+        des_to_compare = [("15-3245", 1)]
+        for d_number, de_count in des_to_compare:
+            docket = Docket.objects.get(docket_number=d_number)
+            self.assertEqual(len(docket.docket_entries.all()), de_count)
+            # For every docket entry there is one recap document created.
+            docket_entries = docket.docket_entries.all()
+            for de in docket_entries:
+                self.assertEqual(len(de.recap_documents.all()), 1)
+                self.assertNotEqual(de.recap_sequence_number, "")
+
+            # docket_number_core generated for every docket
+            self.assertNotEqual(docket.docket_number_core, "")
+            # Slug is generated for every docket
+            self.assertNotEqual(docket.slug, "")
+            self.assertEqual(docket.source, Docket.RECAP)
+
+        # BankruptcyInformation is added only on new dockets.
+        bankr_objs_created = BankruptcyInformation.objects.all()
+        self.assertEqual(len(bankr_objs_created), 1)
+
+    def test_avoid_adding_existing_entries_by_description(self):
+        """Can we avoid adding district/bankr dockets that don't have a
+        pacer_case_id?"""
+
+        de = DocketEntryWithParentsFactory(
+            docket__court=self.court,
+            docket__case_name="Young Entry v. Dragon",
+            docket__docket_number="3:87-CV-01409",
+            docket__source=Docket.HARVARD,
+            docket__pacer_case_id="90385",
+            entry_number=None,
+            date_filed=make_aware(datetime(year=2018, month=1, day=5), utc),
+        )
+        RECAPDocumentFactory(docket_entry=de, description="Opinion Issued")
+        a_rss_data_0 = RssDocketDataFactory(
+            court_id=self.court,
+            docket_number="3:87-CV-01409",
+            pacer_case_id="90385",
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    document_number=None,
+                    short_description="Opinion Issued",
+                    date_filed=make_aware(
+                        datetime(year=2018, month=1, day=5), utc
+                    ),
+                ),
+            ],
+        )
+        list_rss_data = [
+            a_rss_data_0,
+        ]
+        build_date = a_rss_data_0["docket_entries"][0]["date_filed"]
+        rds_created, d_created = merge_rss_data(
+            list_rss_data, self.court.pk, build_date
+        )
+
+        # No docket entry should be created
+        self.assertEqual(d_created, 0)
+        self.assertEqual(len(rds_created), 0)
 
 
 @patch(
