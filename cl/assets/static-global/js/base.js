@@ -299,6 +299,11 @@ $(document).ready(function () {
       submit_search_query('#search-button-de-filter');
     }
   });
+  // Open the #open-modal-on-load modal on page load if it exists in a page.
+  const modal_exist = document.getElementById('open-modal-on-load');
+  if (modal_exist) {
+    $('#open-modal-on-load').modal();
+  }
 
 });
 
@@ -339,6 +344,8 @@ function copy_text(selector_id) {
 */
 const form = document.getElementById('register-form');
 let button = document.getElementById('register-button');
-form.addEventListener('submit', function () {
-  button.disabled = true;
-});
+if (form && button) {
+  form.addEventListener('submit', function () {
+    button.disabled = true;
+  });
+}
