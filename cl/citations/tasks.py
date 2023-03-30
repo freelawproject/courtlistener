@@ -116,7 +116,14 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
 
 def store_opinion_citations_and_update_parentheticals(
     opinion: Opinion, index: bool
-):
+) -> None:
+    """
+    Updates counts of citations within court opinions, as well as parenthetical info for cited opinions.
+
+    :param opinion_pks: An iterable of search.Opinion PKs
+    :param index: Whether to add the item to Solr
+    :return: None
+    """
     get_and_clean_opinion_text(opinion)
     citations: List[CitationBase] = get_citations(opinion.cleaned_text)
 
