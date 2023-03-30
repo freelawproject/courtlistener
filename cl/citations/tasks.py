@@ -102,7 +102,11 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
     """
     opinions: List[Opinion] = Opinion.objects.filter(pk__in=opinion_pks)
     for opinion in opinions:
-        store_opinion_citations_and_update_parentheticals(opinion, index)
+        try:
+            store_opinion_citations_and_update_parentheticals(opinion, index)
+        except ResponseNotReady as e:
+            # Threading problem in httplib, which is used in the Solr query.
+            raise self.retry(exc=e, countdown=2)
 
     # If a Solr update was requested, do a single one at the end with all the
     # pks of the passed opinions
@@ -120,13 +124,9 @@ def store_opinion_citations_and_update_parentheticals(
     if not citations:
         return
 
-    # try:
     citation_resolutions: Dict[
         MatchedResourceType, List[SupportedCitationType]
     ] = do_resolve_citations(citations, opinion)
-    # except ResponseNotReady as e:
-    #     # Threading problem in httplib, which is used in the Solr query.
-    #     raise self.retry(exc=e, countdown=2)
 
     # Generate the citing opinion's new HTML with inline citation links
     opinion.html_with_citations = create_cited_html(
@@ -139,11 +139,6 @@ def store_opinion_citations_and_update_parentheticals(
     currently_cited_opinions = opinion.opinions_cited.all().values_list(
         "pk", flat=True
     )
-
-    # opinion_ids_to_update = set()
-    # for _opinion in citation_resolutions.keys():
-    #     if _opinion.pk not in currently_cited_opinions:
-    #         opinion_ids_to_update.add(_opinion.pk)
 
     opinion_ids_to_update = set(
         [
