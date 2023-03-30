@@ -67,7 +67,7 @@ from cl.search.models import (
     Parenthetical,
     ParentheticalGroup,
 )
-from cl.tests.cases import SimpleTestCase
+from cl.tests.cases import SimpleTestCase, TestCase
 
 
 class CitationTextTest(SimpleTestCase):
@@ -1545,99 +1545,7 @@ class GroupParentheticalsTest(SimpleTestCase):
                 )
 
 
-class WestlawCitationMergerTest(SimpleTestCase):
-    @classmethod
-    def setUpTestData(cls) -> None:
-        # Courts
-        court_ca5 = CourtFactory(id="ca5")
-        court_scotus = CourtFactory(id="scotus")
-
-        test_data = [
-            {
-                "Title": "Vesuna v. ABB Lummus Crest Inc.",
-                "Court": "United States Court of Appeals, Fifth Circuit.",
-                "Filed Date": "September 09, 1993",
-                "Citation": "5 F.3d 528",
-                "Parallel Cite": "1993 WL 373508",
-                "Docket Num": "",
-            },
-            {
-                "Title": "Torres v. U.S.",
-                "Court": "Supreme Court of the United States",
-                "Filed Date": "November 14, 2011",
-                "Citation": "565 U.S. 1042",
-                "Parallel Cite": "132 S.Ct. 594 (Mem)",
-                "Docket Num": "6",
-            },
-        ]
-
-        cls.df = pd.DataFrame(test_data)
-
-        citation_1 = CitationWithParentsFactory.create(
-            volume="5",
-            reporter="F.3d",
-            page="528",
-            cluster=OpinionClusterWithParentsFactory(
-                docket=DocketFactory(
-                    court=court_ca5, case_name="Jones v. Collins"
-                ),
-                case_name="Jones v. Collins",
-                case_name_short="Jones",
-                date_filed=date(1993, 9, 9),
-                id=653032,
-            ),
-        )
-
-        citation_2 = CitationWithParentsFactory.create(
-            volume="5",
-            reporter="F.3d",
-            page="528",
-            cluster=OpinionClusterWithParentsFactory(
-                docket=DocketFactory(
-                    court=court_ca5,
-                    case_name="Vesuna v. Abb Lummus Crest, Inc.",
-                ),
-                case_name="Vesuna v. Abb Lummus Crest, Inc.",
-                case_name_short="Vesuna",
-                date_filed=date(1993, 9, 9),
-                id=653034,
-            ),
-        )
-
-        citation_3 = CitationWithParentsFactory.create(
-            volume="565",
-            reporter="U.S.",
-            page="1042",
-            cluster=OpinionClusterWithParentsFactory(
-                docket=DocketFactory(
-                    court=court_scotus, case_name="DeRoss v. United States"
-                ),
-                case_name="DeRoss v. United States",
-                case_name_full="John J. DeRoss v. United States",
-                case_name_short="DeRoss",
-                date_filed=date(2011, 11, 14),
-                id=7349501,
-            ),
-        )
-
-        citation_4 = CitationWithParentsFactory.create(
-            volume="132",
-            reporter="S. Ct.",
-            page="594",
-            cluster=OpinionClusterWithParentsFactory(
-                docket=DocketFactory(
-                    court=court_scotus, case_name="DeRoss v. United States"
-                ),
-                case_name="Torres v. United States",
-                case_name_full="Edgar Camacho Torres v. United States",
-                case_name_short="Torres",
-                date_filed=date(2011, 11, 14),
-                id=7349502,
-            ),
-        )
-
-        super().setUpTestData()
-
+class WestlawCitationMergerTest(TestCase):
     def test_add_new_citation_multiple_results_for_citation(self) -> None:
         """Can we select the correct case to add the new citation when we
         have multiple results with one citation?"""
