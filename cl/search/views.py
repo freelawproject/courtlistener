@@ -589,8 +589,8 @@ def do_es_search(get_params):
             total_pa_groups = search_query.count()
             # If docket_query set the top_hits_limit to 100
             # Top hits limit in elasticsearch is 100
-            docket_query = re.search(r"docket_id:\d+", cd["q"])
-            top_hits_limit = top_hits_limit if not docket_query else 100
+            cluster_query = re.search(r"opinion_cluster_id:\d+", cd["q"])
+            top_hits_limit = top_hits_limit if not cluster_query else 100
 
             # Create groups aggregation.
             group_search_results(

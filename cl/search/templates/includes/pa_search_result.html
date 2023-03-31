@@ -43,7 +43,7 @@
         {% with limit=results_details.2 %}
         {% with remaining=result.doc_count|sub:limit %}
         {% if remaining > 0 %}
-        <a href="{% url "show_results" %}?type={{ type }}&amp;q={% if request.GET.q %}({{ request.GET.q }}) AND {% endif %}docket_id:{{ opinion.docket_id }}" class="btn-default btn">View {{ remaining }} Additional Result{{ remaining|pluralize }} for
+        <a href="{% url "show_results" %}?type={{ type }}&amp;q={% if request.GET.q %}({{ request.GET.q }}) AND {% endif %}opinion_cluster_id:{{ opinion.opinion_cluster_id }}" class="btn-default btn">View {{ remaining }} Additional Result{{ remaining|pluralize }} for
             this Case</a>
         {% endif %}
         {% endwith %}
