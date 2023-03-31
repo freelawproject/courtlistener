@@ -116,8 +116,9 @@ def prepare_date(date_str: str) -> date | None:
             date_obj = datetime.strptime(date_str, date_format)
             return date_obj.date()
         except ValueError:
-            logger.warning(f"Invalid date string: {date_str}")
             continue
+
+    logger.warning(f"Invalid date string: {date_str}")
     return None
 
 
