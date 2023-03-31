@@ -3,10 +3,12 @@ import re
 from datetime import date, datetime
 from typing import List, Union
 
+import numpy as np
 import pandas as pd
 from courts_db import find_court
 from django.core.management import BaseCommand
 from django.db import IntegrityError
+from django.db.models.query import QuerySet
 from eyecite import get_citations
 from eyecite.models import FullCaseCitation
 from pandas import DataFrame
@@ -27,6 +29,8 @@ def load_csv_file(csv_path: str) -> DataFrame | TextFileReader:
     """
 
     data = pd.read_csv(csv_path, delimiter=",")
+    # Replace nan in dataframe
+    data = data.replace(np.nan, "", regex=True)
     logger.info(f"Found {len(data.index)} rows in csv file.")
     return data
 
@@ -49,14 +53,15 @@ def prepare_date(date_str: str) -> date | None:
     :param date_str: date string
     :return: date object or None
     """
-    valid_formats = ["%B %d, %Y", "%Y-%m-%d"]
+    valid_formats = ["%Y-%m-%d"]
     for date_format in valid_formats:
         try:
             date_obj = datetime.strptime(date_str, date_format)
             return date_obj.date()
         except ValueError:
-            logger.warning(f"Invalid date string: {date_str}")
             continue
+
+    logger.warning(f"Invalid date string: {date_str}")
     return None
 
 
@@ -90,13 +95,13 @@ def dict_all_combinations(d: dict, dates_filed: list) -> list:
     """
     results = []
     if dates_filed:
-        d_copy = d.copy()
         for date_filed in dates_filed:
-            # Generate filters with all date_filed possibilities
+            d_copy = d.copy()
             d_copy["date_filed"] = date_filed
-            for i in range(1, len(d) + 1):
+            # Generate filters with all date_filed possibilities
+            for i in range(1, len(d_copy) + 1):
                 results.extend(
-                    list(map(dict, itertools.combinations(d.items(), i)))
+                    list(map(dict, itertools.combinations(d_copy.items(), i)))
                 )
     else:
         # We don't have any date_filed, generate filters
@@ -122,27 +127,31 @@ def add_citations(
 
     for citation in citations:
         # Get correct reporter type before trying to add the citation
-        if not citation[0].corrected_reporter():
+        if not citation.corrected_reporter():
             reporter_type = Citation.STATE
         else:
-            cite_type_str = citation[0].all_editions[0].reporter.cite_type
+            cite_type_str = citation.all_editions[0].reporter.cite_type
             reporter_type = map_reporter_db_cite_type(cite_type_str)
 
         try:
             if not debug:
                 Citation.objects.get_or_create(
-                    volume=citation[0].groups["volume"],
-                    reporter=citation[0].corrected_reporter(),
-                    page=citation[0].groups["page"],
+                    volume=citation.groups["volume"],
+                    reporter=citation.corrected_reporter(),
+                    page=citation.groups["page"],
                     type=reporter_type,
                     cluster_id=cluster_id,
                 )
+            # Note: not all added citations are from lexis, lexis data
+            # contains citations from other reporters
             logger.info(
-                f'Citation "{citation}" added to cluster id: {cluster_id}'
+                f'Citation "{citation.corrected_citation_full()}" added to '
+                f"cluster id: {cluster_id}"
             )
         except IntegrityError:
             logger.warning(
-                f"Reporter mismatch for cluster: {cluster_id} on cite: {citation}"
+                f"Reporter mismatch for cluster: {cluster_id} on "
+                f"cite: {citation.corrected_citation_full()}"
             )
 
 
@@ -166,13 +175,76 @@ def extract_valid_citations(citations: str) -> list:
     return valid_citations
 
 
-def find_case_with_citations(
+def get_date_filter(
+    date_filed: str | None = None, date_decided: str | None = None
+) -> list:
+    """Prepare dates to be used as filters
+    :param date_filed: date filed
+    :param date_decided: date decided
+    :return: list with valid dates
+    """
+    # Store all possible date_filed dates
+    dates_filed = []
+
+    if date_filed:
+        # Only add date if we have one
+        prep_date_filed = prepare_date(date_filed)
+        if prep_date_filed:
+            dates_filed.append(prep_date_filed.strftime("%Y-%m-%d"))
+
+    if date_decided:
+        # Lexis dataset contains can contain the date_filed in
+        # date_decided column, I found out this after taking a sample
+        # from dataset and comparing it with courtlistener data
+        prep_date_filed = prepare_date(date_decided)
+        if prep_date_filed:
+            dates_filed.append(prep_date_filed.strftime("%Y-%m-%d"))
+
+    # We remove duplicates if date_filed is the same as date_decided
+    dates_filed = list(set(dates_filed))
+
+    return dates_filed
+
+
+# def find_case_with_other_data(
+#     court: str | None = None,
+#     date_filed: str | None = None,
+#     date_decided: str | None = None,
+#     case_name: str | None = None,
+# ) -> OpinionCluster | None:
+#     # TODO generate filters with minimum 2 values: court and date_filed/date_decided
+#     # TODO use case_name to get a match
+#
+#     if court and (date_filed or date_decided):
+#         filters = {}
+#
+#         # Remove dot at end, court-db fails to find court with
+#         # dot at end, e.g. "Supreme Court of Pennsylvania." fails,
+#         # but "Supreme Court of Pennsylvania" doesn't
+#         court = court.strip(".")
+#
+#         # Try without bankruptcy flag
+#         found_court = find_court(court, bankruptcy=False)
+#
+#         if not found_court:
+#             # Try with bankruptcy flag
+#             found_court = find_court(court, bankruptcy=True)
+#
+#         if len(found_court) >= 1:
+#             filters = {"docket__court__id": found_court[0]}
+#
+#         dates_filed = get_date_filter(date_filed, date_decided)
+#
+#     pass
+
+
+def find_cases_with_citations(
     valid_citations: list,
     court: str | None = None,
     date_filed: str | None = None,
     date_decided: str | None = None,
     case_name: str | None = None,
-) -> OpinionCluster | None:
+) -> "QuerySet[OpinionCluster]":
     """Search for possible case using citation, court, date filed and case name
     :param valid_citations: list with valid citations from csv row
     :param court: Court name
@@ -180,16 +252,20 @@ def find_case_with_citations(
     :param date_decided: The date the case was decided, in cl is also the date
     the case was filed
     :param case_name: The case name
-    :return: OpinionCluster or None
+    :return: OpinionCluster QuerySet
     """
+
+    results_ids = []
     for citation in valid_citations:
+        # print(f"processing citation: {citation.corrected_citation_full()}")
+
         # Lexis data contains many citations, we need to find at least one
         # case with the citation, so we can add the others
 
         citation_search_params = {
-            "citations__volume": citation[0].groups.get("volume"),
-            "citations__reporter": citation[0].corrected_reporter(),
-            "citations__page": citation[0].groups.get("page"),
+            "citations__volume": citation.groups.get("volume"),
+            "citations__reporter": citation.corrected_reporter(),
+            "citations__page": citation.groups.get("page"),
         }
 
         # Filter by citation
@@ -205,103 +281,92 @@ def find_case_with_citations(
                     cluster_results.first(), case_name
                 )
                 if names_are_similar:
-                    # Case names are similar, we have a match
-                    return cluster_results.first()
+                    # Case names are similar, we have a match, store the pk
+                    results_ids.append(cluster_results.first().pk)
 
-        court_id = None
-        if court:
-            # Remove dot at end, court-db fails to find court with
-            # dot at end, e.g. "Supreme Court of Pennsylvania." fails,
-            # but "Supreme Court of Pennsylvania" doesn't
-            court = court.strip(".")
+        if not results_ids:
+            # If we don't get a single match with citation
 
-            # Try without bankruptcy flag
-            found_court = find_court(court, bankruptcy=False)
+            court_id = None
+            if court:
+                # Remove dot at end, court-db fails to find court with
+                # dot at end, e.g. "Supreme Court of Pennsylvania." fails,
+                # but "Supreme Court of Pennsylvania" doesn't
+                court = court.strip(".")
 
-            if not found_court:
-                # Try with bankruptcy flag
-                found_court = find_court(court, bankruptcy=True)
+                # Try without bankruptcy flag
+                found_court = find_court(court, bankruptcy=False)
 
-            if len(found_court) >= 1:
-                court_id = found_court[0]
+                if not found_court:
+                    # Try with bankruptcy flag
+                    found_court = find_court(court, bankruptcy=True)
 
-        filters = {"docket__court__id": court_id, "case_name": case_name}
+                if len(found_court) >= 1:
+                    court_id = found_court[0]
 
-        # Store all possible date_filed dates
-        dates_filed = []
+            filters = {"docket__court__id": court_id, "case_name": case_name}
 
-        if date_filed and not date_decided:
-            # Only add date if we have one
-            prep_date_filed = prepare_date(date_filed)
-            if prep_date_filed:
-                dates_filed.append(prep_date_filed.strftime("%Y-%m-%d"))
+            dates_filed = get_date_filter(date_filed, date_decided)
 
-        if not date_filed and date_decided:
-            # Lexis dataset contains can contain the date_filed in
-            # date_decided column, I found out this after taking a sample
-            # from dataset and comparing it with courtlistener data
-            prep_date_filed = prepare_date(date_decided)
-            if prep_date_filed:
-                dates_filed.append(prep_date_filed.strftime("%Y-%m-%d"))
+            # Remove any None value
+            filters = {
+                key: value
+                for key, value in filters.items()
+                if value is not None
+            }
 
-        if date_filed and date_decided:
-            prep_date_filed = prepare_date(date_filed)
-            prep_date_decided = prepare_date(date_decided)
-            if prep_date_filed:
-                dates_filed.append(prep_date_filed.strftime("%Y-%m-%d"))
-            if prep_date_decided:
-                dates_filed.append(prep_date_decided.strftime("%Y-%m-%d"))
+            # Generate all possible combinations of filters
+            generated_filters = dict_all_combinations(filters, dates_filed)
+            # We start with complex filters and go to most basic filter which
+            # can return multiple results
+            generated_filters = sorted(
+                generated_filters, key=lambda d: len(d.keys()), reverse=True
+            )
 
-        # Remove any None value
-        filters = {
-            key: value for key, value in filters.items() if value is not None
-        }
-
-        # Generate all possible combinations of filters
-        generated_filters = dict_all_combinations(filters, dates_filed)
-
-        obj = None
-
-        # Apply all possible combination of filters to try to get the case
-        for queryset_filter in generated_filters:
-            # cluster_results is already filtered by citation
-            results = cluster_results.filter(**queryset_filter)
-            filter_results_count = results.count()
-            if filter_results_count == 1:
-                obj = results.first()
-                break
-            else:
-                # Try next filter
-                continue
-
-        if not obj:
-            # We couldn't find a match using filters, if only filtering by
-            # citation gave us a large queryset, lets try to compare each
-            # result with case name to try to find a match
-            if results_count > 1:
-                for cluster in cluster_results:
+            # Apply all possible combination of filters to try to get the case
+            for queryset_filter in generated_filters:
+                # cluster_results is already filtered by citation
+                results = cluster_results.filter(**queryset_filter)
+                filter_results_count = results.count()
+                if filter_results_count == 1:
                     if case_name:
                         names_are_similar = case_names_overlap(
-                            cluster, case_name
+                            cluster_results.first(), case_name
                         )
                         if names_are_similar:
-                            # We found a case with similar name to westlaw data
-                            return cluster
+                            # We found a case with similar name to lexis data,
+                            # store pk
+                            results_ids.append(cluster_results.first().pk)
+                else:
+                    # Try next filter
+                    continue
 
-        # Perform extra check to be sure that we have the correct case
-        if obj:
-            if case_name:
-                names_are_similar = case_names_overlap(obj, case_name)
-                if names_are_similar:
-                    # We got a match
-                    return obj
+            if not results_ids:
+                # We couldn't find a match using filters, if only filtering by
+                # citation gave us a large queryset, lets try to compare each
+                # result with case name to try to find a match
+                if results_count > 1:
+                    for cluster in cluster_results:
+                        if case_name:
+                            names_are_similar = case_names_overlap(
+                                cluster, case_name
+                            )
+                            if names_are_similar:
+                                # We found a case with similar name to lexis
+                                # data
+                                results_ids.append(cluster.pk)
 
-        return None
-
-    return None
+    # Return a queryset of all the possible cases matched by filter and case
+    # name overlap, remove duplicated ids to filter
+    return OpinionCluster.objects.filter(pk__in=list(set(results_ids)))
 
 
 def process_lexis_data(data: DataFrame | TextFileReader, debug: bool) -> None:
+    """Process citations from csv file
+    :param data: rows from csv file
+    :param debug: if true don't save changes
+    :return: None
+    """
     for index, row in data.iterrows():
         case_name = row.get("full_name")
         citations = row.get("lexis_ids_normalized")
@@ -314,15 +379,16 @@ def process_lexis_data(data: DataFrame | TextFileReader, debug: bool) -> None:
         valid_citations = extract_valid_citations(citations)
 
         if len(valid_citations) > 1:
-            search_result = find_case_with_citations(
-                valid_citations, court, date_filed, date_decided
+            search_results = find_cases_with_citations(
+                valid_citations, court, date_filed, date_decided, case_name
             )
-            if search_result:
-                add_citations(
-                    valid_citations,
-                    search_result.pk,
-                    debug,
-                )
+            if search_results:
+                for search_result in search_results:
+                    add_citations(
+                        valid_citations,
+                        search_result.pk,
+                        debug,
+                    )
         elif len(valid_citations) == 1:
             # We only got one correct citation, we can't add the other
             # citations because are invalid, or we only have one citation in
@@ -330,12 +396,13 @@ def process_lexis_data(data: DataFrame | TextFileReader, debug: bool) -> None:
             pass
         else:
             logger.info(
-                f'No results for case: "{case_name}" with citations: "{citations}"'
+                f'No results for case: "{case_name}" with '
+                f'citations: "{citations}"'
             )
 
 
 class Command(BaseCommand):
-    help = "Merge citations from westlaw dataset"
+    help = "Merge citations from Westlaw dataset"
 
     def __init__(self, *args, **kwargs):
         super(Command, self).__init__(*args, **kwargs)
