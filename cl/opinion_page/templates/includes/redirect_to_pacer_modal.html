@@ -1,0 +1,37 @@
+{% load humanize %}
+<div id="open-modal-on-load"
+     class="modal hidden-print text-left"
+     role="dialog"
+     aria-hidden="true"
+     tabindex="-1">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal"
+                aria-label="Close"><span aria-hidden="true">&times;</span>
+        </button>
+        <h2 class="modal-title">Sorry, this document isn't in the RECAP Archive yet</h2>
+      </div>
+      <div class="modal-body">
+       {% if not request.COOKIES.recap_install_plea %}
+         <p>To purchase this document and add it to the archive, please install the RECAP extension and download it from PACER.</p>
+       {% else %}
+         <p>To purchase this document and add it to the archive, please download it from PACER.</p>
+         <p></p>
+       {% endif %}
+      </div>
+      <div class="modal-footer">
+        <p>
+          {% if not request.COOKIES.recap_install_plea %}
+            <a href="https://free.law/recap/"
+                       class="btn btn-success btn-sm recap_install_plea">Install RECAP</a>
+          {% endif %}
+          <a class="btn btn-primary btn-sm"
+               href="{{ rd.pacer_url }}"
+               rel="nofollow"
+               target="_blank"><i class="fa fa-dollar"></i>&nbsp;Buy on PACER</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
