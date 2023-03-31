@@ -195,7 +195,7 @@ def set_results_highlights(results: Page) -> None:
 def group_search_results(
     search: Search,
     group_by: str,
-    order_by: dict[str : dict[str:str]],
+    order_by: dict[str, dict[str, str]],
     size: int,
 ) -> None:
     """Group search results by a specified field and return top hits for each
