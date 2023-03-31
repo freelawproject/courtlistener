@@ -3,6 +3,7 @@ import re
 from datetime import date, datetime
 from typing import List, Union
 
+import numpy as np
 import pandas as pd
 from courts_db import find_court
 from django.core.management import BaseCommand
@@ -27,6 +28,8 @@ def load_csv_file(csv_path: str) -> DataFrame | TextFileReader:
     """
 
     data = pd.read_csv(csv_path, delimiter=",")
+    # Replace nan in dataframe
+    data = data.replace(np.nan, "", regex=True)
     logger.info(f"Found {len(data.index)} rows in csv file.")
     return data
 
