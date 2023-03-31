@@ -87,8 +87,7 @@ $(document).ready(function () {
         .val(el.val())
         .appendTo('#search-form');
     });
-    // Get path from action attr instead of hardcoded it
-    document.location = $('#search-form').attr('action') + '?' + $('#search-form').serialize();
+    document.location = '/?' + $('#search-form').serialize();
   }
 
   // Statuses
