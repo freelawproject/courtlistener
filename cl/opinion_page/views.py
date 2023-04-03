@@ -65,7 +65,7 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.search.views import do_search
-
+from cl.users.models import UserProfile
 
 def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
     """Individual Court Home Pages"""
@@ -264,7 +264,8 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     de_list = docket.docket_entries.all().prefetch_related("recap_documents")
     form = DocketEntryFilterForm(request.GET)
     if form.is_valid():
-        desc = request.user.is_authenticated and request.user.profile.sort_desc
+        user: UserProfile.user = request.user
+        desc = user.is_authenticated and user.profile.sort_desc
         cd = form.cleaned_data
         if desc and not cd.get("order_by"):
             cd["order_by"] = DocketEntryFilterForm.DESCENDING
