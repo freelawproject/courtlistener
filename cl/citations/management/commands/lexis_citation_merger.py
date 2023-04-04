@@ -378,6 +378,8 @@ def process_lexis_data(data: DataFrame | TextFileReader, debug: bool) -> None:
             # We only got one correct citation, we can't add the other
             # citations because are invalid, or we only have one citation in
             # lexis dataset
+            # TODO use the other data like court and date_filed to try to find
+            #  the correct case and add the citation?
             pass
         else:
             logger.info(
