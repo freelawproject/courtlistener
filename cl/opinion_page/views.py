@@ -67,6 +67,7 @@ from cl.search.models import (
 from cl.search.views import do_search
 from cl.users.models import UserProfile
 
+
 def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
     """Individual Court Home Pages"""
     if pk not in ["tennworkcompcl", "tennworkcompapp", "me"]:
