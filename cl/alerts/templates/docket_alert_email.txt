@@ -1,5 +1,5 @@
 
-{% load text_filters %}{% load humanize %}
+{% load text_filters %}{% load humanize %}{% load tz %}
 {% if first_email and not auto_subscribe %}
 Your account on CourtListener just received its first email from PACER related to the case below.
 Your account has auto-subscribe turned off, so this is the only alert you will get for this case.
@@ -29,9 +29,10 @@ Use notes and tags to organize and share the cases you follow. Learn More: https
 {% endif %}
 
 {% for de in new_des %}{% for rd in de.recap_documents.all %}Document Number: {{ de.entry_number }}{% if rd.attachment_number  %}-{{ rd.attachment_number }}{% endif %}
-Date Filed: {{ de.date_filed|date:"M j, Y"|default:'Unknown' }}
+Date Filed: {% if de.datetime_filed %}{{ de.datetime_filed|timezone:timezone|date:"M j, Y" }}{% else %}{{ de.date_filed|date:"M j, Y"|default:'Unknown' }}{% endif %}
 {% if rd.description %}{{ rd.description|safe|wordwrap:80 }}{% else %}{{ de.description|default:"Unknown docket entry description"|safe|wordwrap:80 }}{% endif %}{% if rd.document_number %}{% if rd.filepath_local %}
-Download PDF from RECAP: {{ rd.filepath_local.url }}{% else %}
+Download PDF from RECAP: {{ rd.filepath_local.url }}{% elif rd.is_sealed %}
+Sealed on PACER{% else %}
 Download PDF from RECAP with PACER fallback: https://www.courtlistener.com{{ rd.get_absolute_url }}?redirect_to_download=True{% endif %}{% endif %}
 
 {% endfor %}{% endfor %}

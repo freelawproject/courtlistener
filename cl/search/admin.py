@@ -5,6 +5,7 @@ from django.forms import ModelForm
 from django.http import HttpRequest
 
 from cl.alerts.admin import DocketAlertInline
+from cl.lib.cloud_front import invalidate_cloudfront
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.recap.management.commands.delete_document_from_ia import delete_from_ia
 from cl.search.models import (
@@ -152,13 +153,16 @@ class RECAPDocumentAdmin(CursorPaginatorAdmin):
     @admin.action(description="Seal Document")
     def seal_documents(self, request: HttpRequest, queryset: QuerySet) -> None:
         ia_failures = []
+        deleted_filepaths = []
         for rd in queryset:
             # Thumbnail
             if rd.thumbnail:
+                deleted_filepaths.append(rd.thumbnail.name)
                 rd.thumbnail.delete()
 
             # PDF
             if rd.filepath_local:
+                deleted_filepaths.append(rd.filepath_local.name)
                 rd.filepath_local.delete()
 
             # Internet Archive
@@ -185,6 +189,9 @@ class RECAPDocumentAdmin(CursorPaginatorAdmin):
         add_items_to_solr.delay(
             [rd.pk for rd in queryset], "search.RECAPDocument"
         )
+
+        # Do a CloudFront invalidation
+        invalidate_cloudfront([f"/{path}" for path in deleted_filepaths])
 
         if ia_failures:
             self.message_user(

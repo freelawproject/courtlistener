@@ -20,15 +20,17 @@ from cl.scrapers.models import ErrorLog, UrlHash
 from cl.scrapers.tasks import extract_doc_content, process_audio_file
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.scrapers.utils import get_extension
-from cl.search.factories import DocketFactory
-from cl.search.models import Court, Opinion
+from cl.search.factories import CourtFactory, DocketFactory
+from cl.search.models import Court, Docket, Opinion
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import SimpleTestCase, TestCase
 from cl.tests.fixtures import ONE_SECOND_MP3_BYTES, SMALL_WAV_BYTES
 
 
 class ScraperIngestionTest(TestCase):
-    fixtures = ["test_court.json"]
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="test", jurisdiction="F")
 
     def test_extension(self):
         r = microservice(
@@ -39,6 +41,31 @@ class ScraperIngestionTest(TestCase):
 
     def test_ingest_opinions_from_scraper(self) -> None:
         """Can we successfully ingest opinions at a high level?"""
+
+        d_1 = DocketFactory(
+            case_name="Tarrant Regional Water District v. Herrmann old",
+            docket_number="11-889",
+            court=self.court,
+            source=Docket.SCRAPER,
+            pacer_case_id=None,
+        )
+
+        d_2 = DocketFactory(
+            case_name="State of Indiana v. Charles Barker old",
+            docket_number="49S00-0308-DP-392",
+            court=self.court,
+            source=Docket.SCRAPER,
+            pacer_case_id=None,
+        )
+
+        d_3 = DocketFactory(
+            case_name="Intl Fidlty Ins Co v. Ideal Elec Sec Co old",
+            docket_number="96-7169",
+            court=self.court,
+            source=Docket.SCRAPER,
+            pacer_case_id="12345",
+        )
+
         site = test_opinion_scraper.Site()
         site.method = "LOCAL"
         parsed_site = site.parse()
@@ -53,8 +80,34 @@ class ScraperIngestionTest(TestCase):
             f"Should have 6 test opinions, not {count}",
         )
 
+        dockets = Docket.objects.all()
+        self.assertTrue(
+            dockets.count() == 6,
+            f"Should have 6 test dockets, not {dockets.count()}",
+        )
+
+        d_1.refresh_from_db()
+        d_2.refresh_from_db()
+        d_3.refresh_from_db()
+        self.assertEqual(
+            d_1.case_name, "Tarrant Regional Water District v. Herrmann"
+        )
+        self.assertEqual(d_2.case_name, "State of Indiana v. Charles Barker")
+        self.assertEqual(
+            d_3.case_name, "Intl Fidlty Ins Co v. Ideal Elec Sec Co"
+        )
+
     def test_ingest_oral_arguments(self) -> None:
         """Can we successfully ingest oral arguments at a high level?"""
+
+        d_1 = DocketFactory(
+            case_name="Jeremy v. Julian old",
+            docket_number="23-232388",
+            court=self.court,
+            source=Docket.SCRAPER,
+            pacer_case_id=None,
+        )
+
         site = test_oral_arg_scraper.Site()
         site.method = "LOCAL"
         parsed_site = site.parse()
@@ -65,6 +118,14 @@ class ScraperIngestionTest(TestCase):
         # There should now be two items in the database.
         audio_files = Audio.objects.all()
         self.assertEqual(2, audio_files.count())
+
+        dockets = Docket.objects.all()
+        self.assertTrue(
+            dockets.count() == 2,
+            f"Should have 2 dockets, not {dockets.count()}",
+        )
+        d_1.refresh_from_db()
+        self.assertEqual(d_1.case_name, "Jeremy v. Julian")
 
     def test_parsing_xml_opinion_site_to_site_object(self) -> None:
         """Does a basic parse of a site reveal the right number of items?"""
@@ -78,7 +139,6 @@ class ScraperIngestionTest(TestCase):
 
 
 class IngestionTest(TestCase):
-
     fixtures = [
         "test_court.json",
         "judge_judy.json",

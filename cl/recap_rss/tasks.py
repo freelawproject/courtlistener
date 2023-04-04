@@ -9,7 +9,7 @@ from typing import Optional
 
 import requests
 from celery import Task
-from dateutil import parser
+from dateparser import parse
 from django.core.files.base import ContentFile
 from django.core.mail import send_mail
 from django.db import IntegrityError, transaction
@@ -37,7 +37,7 @@ from cl.search.models import Court
 logger = logging.getLogger(__name__)
 
 
-def update_entry_types(court_pk, description):
+def update_entry_types(court_pk: str, description: str) -> None:
     """Check the entry types of a feed. If changed update our record and
     send an email.
 
@@ -94,7 +94,7 @@ def get_last_build_date(b: bytes) -> Optional[datetime]:
     if m is None:
         return None
     last_build_date_b = m.group(2)
-    return parser.parse(last_build_date_b, fuzzy=False)
+    return parse(last_build_date_b.decode())
 
 
 def alert_on_staleness(

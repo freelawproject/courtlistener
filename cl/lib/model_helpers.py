@@ -12,6 +12,45 @@ from cl.lib.recap_utils import get_bucket_name
 from cl.lib.string_utils import normalize_dashes, trunc
 
 
+def clean_docket_number(docket_number: str | None) -> str:
+    """Clean a docket number and returns the actual docket_number if is a
+    valid docket number and if there is only one valid docket number.
+
+    Converts docket numbers like:
+
+    CIVIL ACTION NO. 7:17-CV-00426 -> 7:17-CV-00426
+    4:20-cv-01245 -> 4:20-cv-01245
+    No. 17-1142 -> 17-1142
+    17-1142 -> 17-1142
+    Nos. C 123-80-123-82 -> "" no valid docket number
+    Nos. 212-213 -> "" no valid docket number
+    Nos. 17-11426, 15-11166 -> "" multiple valid docket numbers
+
+    :param docket_number: The docket number to clean.
+    :return: The cleaned docket number or an empty string if no valid docket
+    number is found.
+    """
+    if docket_number is None:
+        return ""
+
+    # Normalize dashes
+    docket_number = normalize_dashes(docket_number)
+    # Normalize to lowercase
+    docket_number = docket_number.lower()
+    # Match all the valid district docket numbers in a string.
+    district_m = re.findall(r"\b(?:\d:)?\d\d-..-\d+", docket_number)
+    if len(district_m) == 1:
+        return district_m[0]
+
+    # Match all the valid bankruptcy and appellate docket numbers at the
+    # beginning of a string, after a blank space or after a comma.
+    bankr_m = re.findall(r"(?<![^ ,])\d\d-\d+", docket_number)
+    if len(bankr_m) == 1:
+        return bankr_m[0]
+
+    return ""
+
+
 def make_docket_number_core(docket_number: Optional[str]) -> str:
     """Make a core docket number from an existing docket number.
 
@@ -36,13 +75,13 @@ def make_docket_number_core(docket_number: Optional[str]) -> str:
     if docket_number is None:
         return ""
 
-    docket_number = normalize_dashes(docket_number)
+    cleaned_docket_number = clean_docket_number(docket_number)
 
-    district_m = re.search(r"(?:\d:)?(\d\d)-..-(\d+)", docket_number)
+    district_m = re.search(r"(?:\d:)?(\d\d)-..-(\d+)", cleaned_docket_number)
     if district_m:
         return f"{district_m.group(1)}{int(district_m.group(2)):05d}"
 
-    bankr_m = re.search(r"(\d\d)-(\d+)", docket_number)
+    bankr_m = re.search(r"(\d\d)-(\d+)", cleaned_docket_number)
     if bankr_m:
         # Pad to six characters because some courts have a LOT of bankruptcies
         return f"{bankr_m.group(1)}{int(bankr_m.group(2)):06d}"

@@ -17,7 +17,7 @@ from cl.search.models import Opinion
 
 
 class Command(VerboseCommand):
-    help = "Parse citations and parenthetical out of documents."
+    help = "Parse citations and parentheticals from court opinions."
 
     def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(

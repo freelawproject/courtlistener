@@ -79,15 +79,15 @@ def help_home(request: HttpRequest) -> HttpResponse:
 
 
 def alert_help(request: HttpRequest) -> HttpResponse:
-    no_feeds = Court.federal_courts.district_pacer_courts().filter(
+    no_feeds = Court.federal_courts.all_pacer_courts().filter(
         pacer_has_rss_feed=False,
     )
     partial_feeds = (
-        Court.federal_courts.district_pacer_courts()
+        Court.federal_courts.all_pacer_courts()
         .filter(pacer_has_rss_feed=True)
         .exclude(pacer_rss_entry_types="all")
     )
-    full_feeds = Court.federal_courts.district_pacer_courts().filter(
+    full_feeds = Court.federal_courts.all_pacer_courts().filter(
         pacer_has_rss_feed=True, pacer_rss_entry_types="all"
     )
     cache_key = "alert-help-stats"
@@ -373,7 +373,7 @@ def contact_thanks(request: HttpRequest) -> HttpResponse:
 
 def advanced_search(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(
-        request, "advanced_search.html", {"private": False}
+        request, "help/advanced_search.html", {"private": False}
     )
 
 

@@ -15,6 +15,7 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.models import Note, UserTag
 from cl.lib.redis_utils import create_redis_semaphore, delete_redis_semaphore
 from cl.lib.string_utils import trunc
+from cl.recap.constants import COURT_TIMEZONES
 from cl.search.models import Docket, DocketEntry
 from cl.stats.utils import tally_stat
 from cl.users.models import UserProfile
@@ -186,10 +187,10 @@ def make_alert_messages(
         "count": de_count,
         "docket": d,
         "docket_alert_secret_key": None,
+        "timezone": COURT_TIMEZONES.get(d.court_id, "US/Eastern"),
     }
     messages = []
     for recipient in da_recipients:
-
         notes, tags = get_docket_notes_and_tags_by_user(
             d.pk, recipient.user_pk
         )

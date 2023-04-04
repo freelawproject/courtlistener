@@ -117,7 +117,6 @@ class IndexedSolrTestCase(SolrTestCase):
 
 
 class SitemapTest(TestCase):
-
     sitemap_url: str
     expected_item_count: int
 

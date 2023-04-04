@@ -469,7 +469,7 @@ def process_free_opinion_result(
             # by a docket or other source, it tends to be better. Prefer an
             # existing rsn if we have it.
             recap_sequence_number = make_recap_sequence_number(
-                {"date_filed": result.date_filed, "recap_sequence_index": 1}
+                result.date_filed, 1
             )
             de.recap_sequence_number = (
                 de.recap_sequence_number or recap_sequence_number
@@ -1005,7 +1005,7 @@ def do_case_query_by_pacer_case_id(
     data: TaskData,
     court_id: str,
     cookies: RequestsCookieJar,
-    tag_names: List[str] = None,
+    tag_names: List[str] | None = None,
 ) -> Optional[TaskData]:
     """Run a case query (iquery.pl) query on a case and save the data
 
@@ -1677,7 +1677,7 @@ def get_document_number_for_appellate(
         if dn_response.ok and dn_response.text:
             document_number = dn_response.text
 
-    if not document_number:
+    if not document_number and pacer_doc_id:
         # If we still don't have the document number fall back on the
         # download confirmation page
         document_number = get_document_number_from_confirmation_page(
@@ -1698,6 +1698,29 @@ def get_document_number_for_appellate(
         document_number = f"{document_number[:3]}0{document_number[4:]}"
 
     return document_number
+
+
+def is_pacer_doc_sealed(court_id: str, pacer_doc_id: str) -> bool:
+    """Check if a pacer doc is sealed, querying the document in PACER.
+    If a receipt is returned the document is not sealed, otherwise is sealed.
+
+    :param court_id: A CourtListener court ID to query the confirmation page.
+    :param pacer_doc_id: The pacer_doc_id to query the confirmation page.
+    :return: True if the document is sealed on PACER, False otherwise.
+    """
+
+    recap_email_user = User.objects.get(username="recap-email")
+    cookies = get_or_cache_pacer_cookies(
+        recap_email_user.pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
+    )
+
+    s = PacerSession(cookies=cookies)
+    receipt_report = DownloadConfirmationPage(court_id, s)
+    receipt_report.query(pacer_doc_id)
+    data = receipt_report.data
+    if data == {}:
+        return True
+    return False
 
 
 def update_rd_metadata(

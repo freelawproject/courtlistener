@@ -18,7 +18,11 @@ from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.management.commands import cl_scrape_opinions
 from cl.scrapers.models import ErrorLog
 from cl.scrapers.tasks import process_audio_file
-from cl.scrapers.utils import get_binary_content, get_extension
+from cl.scrapers.utils import (
+    get_binary_content,
+    get_extension,
+    update_or_create_docket,
+)
 from cl.search.models import SEARCH_TYPES, Court, Docket
 
 cnt = CaseNameTweaker()
@@ -68,15 +72,15 @@ def make_objects(
         item["case_names"]
     )
 
-    docket = Docket(
-        docket_number=item.get("docket_numbers", ""),
-        case_name=item["case_names"],
-        case_name_short=case_name_short,
-        court=court,
+    docket = update_or_create_docket(
+        item["case_names"],
+        case_name_short,
+        court.pk,
+        item.get("docket_numbers", ""),
+        item.get("source") or Docket.SCRAPER,
         blocked=blocked,
         date_blocked=date_blocked,
         date_argued=item["case_dates"],
-        source=item.get("source") or Docket.SCRAPER,
     )
 
     audio_file = Audio(

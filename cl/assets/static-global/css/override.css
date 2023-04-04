@@ -575,6 +575,9 @@ mark {
   margin-right: 2em;
 }
 
+.select-all {
+  user-select: all;
+}
 
 /* layout */
 body {
@@ -959,6 +962,10 @@ a.gray:hover, a.gray:focus, a.grey:hover, a.grey:focus {
   font-size: 1.25em;
   font-weight: bold;
 }
+#lawbox p {
+  line-height: 2em;
+  font-size: 16px;
+}
 
 span.star-pagination {
   color: #555555;
@@ -1313,20 +1320,6 @@ emphasis {
   color: #333333 !important;
   font-family: Helvetica;
 }
-
-/* Buy on Pacerdash custom styles*/
-.btn-pacerdash {
-  padding: 0px 3px;
-  min-width: auto;
-  left: 16px;
-}
-
-.btn-pacerdash > li > a {
-  padding: 2px 5px;
-  font-size: 11px;
-}
-
-/* END  Buy on Pacerdash custom styles */
 
 /* Profile tabs styles */
 .centered-tabs {

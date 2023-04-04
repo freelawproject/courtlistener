@@ -8,7 +8,6 @@ import re
 
 
 def convert_columbia_html(text):
-
     conversions = [
         ("italic", "em"),
         ("block_quote", "blockquote"),
@@ -21,7 +20,7 @@ def convert_columbia_html(text):
         ("table", "pre"),
     ]
 
-    for (pattern, replacement) in conversions:
+    for pattern, replacement in conversions:
         text = re.sub(f"<{pattern}>", f"<{replacement}>", text)
         text = re.sub(f"</{pattern}>", f"</{replacement}>", text)
 

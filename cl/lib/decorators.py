@@ -11,7 +11,7 @@ def retry(
     tries: int = 4,
     delay: float = 3,
     backoff: float = 2,
-    logger: logging.Logger = None,
+    logger: logging.Logger | None = None,
 ) -> Callable:
     """Retry calling the decorated function using an exponential backoff.
 

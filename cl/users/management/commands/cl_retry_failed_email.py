@@ -47,7 +47,7 @@ def handle_failing_emails() -> int:
         flag_type=FLAG_TYPES.BACKOFF,
         checked=None,
         next_retry_date__lte=now()
-        - timedelta(hours=settings.DELIVERABILITY_THRESHOLD),
+        - timedelta(hours=settings.DELIVERABILITY_THRESHOLD),  # type: ignore
     )
     with transaction.atomic():
         for backoff_event in active_backoff_events:

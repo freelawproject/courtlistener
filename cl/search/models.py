@@ -1,7 +1,9 @@
 import re
+from datetime import datetime
 from typing import Any, Dict, List, Tuple, TypeVar
 
 import pghistory
+import pytz
 from celery.canvas import chain
 from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
@@ -599,6 +601,10 @@ class Docket(AbstractDateTimeModel):
         unique_together = ("docket_number", "pacer_case_id", "court")
         indexes = [
             models.Index(fields=["court_id", "id"]),
+            models.Index(
+                fields=["court_id", "docket_number_core", "pacer_case_id"],
+                name="district_court_docket_lookup_idx",
+            ),
         ]
 
     def __str__(self) -> str:
@@ -613,8 +619,15 @@ class Docket(AbstractDateTimeModel):
             self.docket_number_core = make_docket_number_core(
                 self.docket_number
             )
+
         if self.source in self.RECAP_SOURCES:
             for field in ["pacer_case_id", "docket_number"]:
+                if (
+                    field == "pacer_case_id"
+                    and getattr(self, "court", None)
+                    and self.court.jurisdiction == Court.FEDERAL_APPELLATE
+                ):
+                    continue
                 if not getattr(self, field, None):
                     raise ValidationError(
                         f"'{field}' cannot be Null or empty in RECAP dockets."
@@ -686,25 +699,38 @@ class Docket(AbstractDateTimeModel):
             self.pacer_case_id,
         )
 
+    def pacer_appellate_url_with_caseId(self, path):
+        return (
+            f"https://ecf.{self.pacer_court_id}.uscourts.gov"
+            f"{path}"
+            f"servlet=CaseSummary.jsp&"
+            f"caseId={self.pacer_case_id}&"
+            f"incOrigDkt=Y&"
+            f"incDktEntries=Y"
+        )
+
+    def pacer_appellate_url_with_caseNum(self, path):
+        return (
+            f"https://ecf.{self.pacer_court_id}.uscourts.gov"
+            f"{path}"
+            f"servlet=CaseSummary.jsp&"
+            f"caseNum={self.docket_number}&"
+            f"incOrigDkt=Y&"
+            f"incDktEntries=Y"
+        )
+
     @property
     def pacer_docket_url(self):
-        if not self.pacer_case_id:
-            return None
-
         if self.court.jurisdiction == Court.FEDERAL_APPELLATE:
             if self.court.pk in ["ca5", "ca7", "ca11"]:
                 path = "/cmecf/servlet/TransportRoom?"
             else:
                 path = "/n/beam/servlet/TransportRoom?"
 
-            return (
-                f"https://ecf.{self.pacer_court_id}.uscourts.gov"
-                f"{path}"
-                f"servlet=CaseSummary.jsp&"
-                f"caseId={self.pacer_case_id}&"
-                f"incOrigDkt=Y&"
-                f"incDktEntries=Y"
-            )
+            if not self.pacer_case_id:
+                return self.pacer_appellate_url_with_caseNum(path)
+            else:
+                return self.pacer_appellate_url_with_caseId(path)
         else:
             return self.pacer_district_url("DktRpt.pl")
 
@@ -994,7 +1020,18 @@ class DocketEntry(AbstractDateTimeModel):
         blank=True,
     )
     date_filed = models.DateField(
-        help_text="The created date of the Docket Entry.",
+        help_text=(
+            "The created date of the Docket Entry according to the "
+            "court timezone."
+        ),
+        null=True,
+        blank=True,
+    )
+    time_filed = models.TimeField(
+        help_text=(
+            "The created time of the Docket Entry according to the court "
+            "timezone, null if no time data is available."
+        ),
         null=True,
         blank=True,
     )
@@ -1051,6 +1088,19 @@ class DocketEntry(AbstractDateTimeModel):
 
     def __str__(self) -> str:
         return f"{self.pk} ---> {trunc(self.description, 50, ellipsis='...')}"
+
+    @property
+    def datetime_filed(self) -> datetime | None:
+        if self.time_filed:
+            from cl.recap.constants import COURT_TIMEZONES
+
+            local_timezone = pytz.timezone(
+                COURT_TIMEZONES.get(self.docket.court.id, "US/Eastern")
+            )
+            return local_timezone.localize(
+                datetime.combine(self.date_filed, self.time_filed)
+            )
+        return None
 
 
 @pghistory.track(
@@ -1244,21 +1294,6 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
                         magic_number="",  # For future use.
                     )
                 )
-
-    @property
-    def pacerdash_url(self) -> str | None:
-        """Construct the PacerDash URL, if we can.
-
-        :param self: The RECAPDocument object.
-        :return: The PacerDash URL or None if pacer_doc_id is not available.
-        """
-
-        if not self.pacer_doc_id:
-            return None
-        return (
-            "https://www.pacerdash.com/court-listener-checkouts/"
-            f"{self.pacer_doc_id}"
-        )
 
     @property
     def has_valid_pdf(self) -> bool:

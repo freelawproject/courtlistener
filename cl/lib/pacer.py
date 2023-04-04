@@ -30,6 +30,8 @@ from cl.search.models import Court, Docket
 
 logger = logging.getLogger(__name__)
 
+phone_digits_re = re.compile(r"^(?:1-?)?(\d{3})[-.]?(\d{3})[-.]?(\d{4})$")
+
 
 pacer_to_cl_ids = {
     # Maps PACER ids to their CL equivalents
@@ -40,9 +42,7 @@ pacer_to_cl_ids = {
 }
 
 # Reverse dict of pacer_to_cl_ids
-cl_to_pacer_ids = {v: k for k, v in pacer_to_cl_ids.items()}
-
-phone_digits_re = re.compile(r"^(?:1-?)?(\d{3})[-.]?(\d{3})[-.]?(\d{4})$")
+cl_to_pacer_ids = {v: k for k, v in pacer_to_cl_ids.items() if v != "nysb"}
 
 
 def map_pacer_to_cl_id(pacer_id):
@@ -50,10 +50,7 @@ def map_pacer_to_cl_id(pacer_id):
 
 
 def map_cl_to_pacer_id(cl_id):
-    if cl_id == "nysb":
-        return cl_id
-    else:
-        return cl_to_pacer_ids.get(cl_id, cl_id)
+    return cl_to_pacer_ids.get(cl_id, cl_id)
 
 
 def lookup_and_save(new, debug=False):
@@ -208,7 +205,7 @@ def get_blocked_status(docket, count_override=None):
 def process_docket_data(
     d: Docket,
     report_type: int,
-    filepath: str = None,
+    filepath: str | None = None,
 ) -> Optional[int]:
     """Process docket data file.
 

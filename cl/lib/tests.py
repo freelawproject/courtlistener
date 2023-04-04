@@ -10,7 +10,11 @@ from rest_framework.status import HTTP_200_OK, HTTP_503_SERVICE_UNAVAILABLE
 
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.mime_types import lookup_mime_type
-from cl.lib.model_helpers import make_docket_number_core, make_upload_path
+from cl.lib.model_helpers import (
+    clean_docket_number,
+    make_docket_number_core,
+    make_upload_path,
+)
 from cl.lib.pacer import (
     get_blocked_status,
     make_address_lookup_key,
@@ -205,6 +209,15 @@ class TestModelHelpers(TestCase):
         )
         self.assertEqual(make_docket_number_core("2:12-cv-01032"), expected)
         self.assertEqual(make_docket_number_core("12-cv-01032"), expected)
+        self.assertEqual(
+            make_docket_number_core(
+                "CIVIL ACTION NO. 7:17\u2013CV\u201300426"
+            ),
+            "1700426",
+        )
+        self.assertEqual(
+            make_docket_number_core("Case No.1:19-CV-00118-MRB"), "1900118"
+        )
 
         # Do we automatically zero-pad short docket numbers?
         self.assertEqual(make_docket_number_core("12-cv-1032"), expected)
@@ -218,6 +231,70 @@ class TestModelHelpers(TestCase):
         # docket_number fields can be null. If so, the core value should be
         # an empty string.
         self.assertEqual(make_docket_number_core(None), "")
+
+    def test_avoid_generating_docket_number_core(self) -> None:
+        """Can we avoid generating docket_number_core when the docket number
+        format doesn't match a valid format or if a string contains more than
+        one docket number?
+        """
+
+        # Not valid docket number formats for district, bankruptcy or appellate
+        self.assertEqual(make_docket_number_core("Nos. C 123-80-123-82"), "")
+        self.assertEqual(make_docket_number_core("Nos. C 123-80-123"), "")
+        self.assertEqual(
+            make_docket_number_core("Nos. 212-213, Dockets 27264, 27265"), ""
+        )
+
+        # Multiple valid docket numbers
+        self.assertEqual(
+            make_docket_number_core(
+                "Nos. 14-13542, 14-13657, 15-10967, 15-11166"
+            ),
+            "",
+        )
+        self.assertEqual(make_docket_number_core("12-33112, 12-33112"), "")
+        self.assertEqual(
+            make_docket_number_core(
+                "CIVIL ACTION NO. 7:17-CV-00426,  7:17-CV-00426"
+            ),
+            "",
+        )
+
+    def test_clean_docket_number(self) -> None:
+        """Can we clean and return a docket number if it has a valid format?"""
+
+        # Not valid docket number formats for district, bankruptcy or appellate
+        # not docket number returned
+        self.assertEqual(clean_docket_number("Nos. C 123-80-123-82"), "")
+        self.assertEqual(clean_docket_number("Nos. C 123-80-123"), "")
+        self.assertEqual(clean_docket_number("Nos. 212-213"), "")
+
+        # Multiple valid docket numbers, not docket number returned
+        self.assertEqual(
+            clean_docket_number("Nos. 14-13542, 14-13657, 15-10967, 15-11166"),
+            "",
+        )
+        self.assertEqual(clean_docket_number("12-33112, 12-33112"), "")
+
+        # One valid docket number, return the cleaned number
+        self.assertEqual(
+            clean_docket_number("CIVIL ACTION NO. 7:17-CV-00426"),
+            "7:17-cv-00426",
+        )
+        self.assertEqual(
+            clean_docket_number("Case No.1:19-CV-00118-MRB"), "1:19-cv-00118"
+        )
+        self.assertEqual(clean_docket_number("Case 12-33112"), "12-33112")
+        self.assertEqual(clean_docket_number("12-33112"), "12-33112")
+        self.assertEqual(
+            clean_docket_number("12-cv-01032-JKG-MJL"), "12-cv-01032"
+        )
+        self.assertEqual(
+            clean_docket_number("Nos. 212-213, Dockets 27264, 27265"), ""
+        )
+        self.assertEqual(
+            clean_docket_number("Nos. 12-213, Dockets 27264, 27265"), "12-213"
+        )
 
 
 class S3PrivateUUIDStorageTest(TestCase):

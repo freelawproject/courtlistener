@@ -16,7 +16,6 @@ court_misses = Counter()
 court = None
 
 for line in open("judge_assignment_log.txt", "rt"):
-
     if "Judge string" in line:
         judges = line.split(":")[1].strip()
         continue
