@@ -263,16 +263,10 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     increment_view_count(docket, request)
 
     de_list = docket.docket_entries.all().prefetch_related("recap_documents")
-    form = DocketEntryFilterForm(request.GET)
+    form = DocketEntryFilterForm(request.GET, request=request)
     if form.is_valid():
-        user: UserProfile.user = request.user
-        desc = user.is_authenticated and user.profile.docket_default_order_desc
         cd = form.cleaned_data
-        if desc and not cd.get("order_by"):
-            cd["order_by"] = DocketEntryFilterForm.DESCENDING
-            form = DocketEntryFilterForm(cd)
-            form.is_valid()
-            cd = form.cleaned_data
+
         if cd.get("entry_gte"):
             de_list = de_list.filter(entry_number__gte=cd["entry_gte"])
         if cd.get("entry_lte"):
