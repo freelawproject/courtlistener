@@ -266,7 +266,7 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     form = DocketEntryFilterForm(request.GET)
     if form.is_valid():
         user: UserProfile.user = request.user
-        desc = user.is_authenticated and user.profile.sort_desc
+        desc = user.is_authenticated and user.profile.docket_default_order_desc
         cd = form.cleaned_data
         if desc and not cd.get("order_by"):
             cd["order_by"] = DocketEntryFilterForm.DESCENDING

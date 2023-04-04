@@ -52,7 +52,7 @@ class ProfileForm(ModelForm):
             "zip_code",
             "wants_newsletter",
             "is_tester",
-            "sort_desc",
+            "docket_default_order_desc",
             "barmembership",
             "plaintext_preferred",
         )

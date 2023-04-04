@@ -138,7 +138,7 @@ class UserProfile(models.Model):
         "subscribe to the case.",
         default=True,
     )
-    sort_desc = models.BooleanField(
+    docket_default_order_desc = models.BooleanField(
         help_text="Sort dockets in descending order by default",
         default=False,
     )
