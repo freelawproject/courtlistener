@@ -4,6 +4,7 @@ from datetime import date, timedelta
 from typing import List, Tuple
 from unittest.mock import Mock
 
+import pandas as pd
 from django.core.management import call_command
 from django.urls import reverse
 from eyecite import get_citations
@@ -36,6 +37,9 @@ from cl.citations.management.commands.add_parallel_citations import (
     identify_parallel_citations,
     make_edge_list,
 )
+from cl.citations.management.commands.westlaw_citation_merger import (
+    process_westlaw_data,
+)
 from cl.citations.match_citations import (
     NO_MATCH_RESOURCE,
     do_resolve_citations,
@@ -54,6 +58,7 @@ from cl.search.factories import (
     DocketEntryWithParentsFactory,
     DocketFactory,
     OpinionClusterFactoryWithChildrenAndParents,
+    OpinionClusterWithParentsFactory,
     OpinionWithChildrenFactory,
     RECAPDocumentFactory,
 )
@@ -67,7 +72,7 @@ from cl.search.models import (
     ParentheticalGroup,
     RECAPDocument,
 )
-from cl.tests.cases import SimpleTestCase
+from cl.tests.cases import SimpleTestCase, TestCase
 
 
 class CitationTextTest(SimpleTestCase):
@@ -1612,3 +1617,186 @@ class GroupParentheticalsTest(SimpleTestCase):
                     sorted(output),
                     f"Got incorrect result from get_graph_component for inputs (expected {output}): {inputs}",
                 )
+
+
+class WestlawCitationMergerTest(TestCase):
+    def test_add_new_citation_multiple_results_for_citation(self) -> None:
+        """Can we select the correct case to add the new citation when we
+        have multiple results with one citation?"""
+
+        # Sample data from westlaw dataset
+        test_data = [
+            {
+                "Title": "Vesuna v. ABB Lummus Crest Inc.",
+                "Court": "United States Court of Appeals, Fifth Circuit.",
+                "Filed Date": "September 09, 1993",
+                "Citation": "5 F.3d 528",
+                "Parallel Cite": "1993 WL 373508",
+                "Docket Num": "",
+            }
+        ]
+
+        # Convert test data to dataframe
+        df = pd.DataFrame(test_data)
+
+        # Add two opinion clusters with same citation
+        CitationWithParentsFactory.create(
+            volume="5",
+            reporter="F.3d",
+            page="528",
+            cluster=OpinionClusterWithParentsFactory(
+                docket=DocketFactory(
+                    court=CourtFactory(id="ca5"), case_name="Jones v. Collins"
+                ),
+                case_name="Jones v. Collins",
+                case_name_short="Jones",
+                date_filed=date(1993, 9, 9),
+                id=653032,
+            ),
+        )
+
+        # We need to add "1993 WL 373508" to this cluster
+        CitationWithParentsFactory.create(
+            volume="5",
+            reporter="F.3d",
+            page="528",
+            cluster=OpinionClusterWithParentsFactory(
+                docket=DocketFactory(
+                    court=CourtFactory(id="ca5"),
+                    case_name="Vesuna v. Abb Lummus Crest, Inc.",
+                ),
+                case_name="Vesuna v. Abb Lummus Crest, Inc.",
+                case_name_short="Vesuna",
+                date_filed=date(1993, 9, 9),
+                id=653034,
+            ),
+        )
+
+        # Check we have two opinion clusters with same citation
+        self.assertEqual(
+            OpinionCluster.objects.filter(citation="5 F.3d 528").count(), 2
+        )
+
+        # Check that target cluster only have one citation
+        self.assertEqual(
+            OpinionCluster.objects.get(id=653034).citations.all().count(), 1
+        )
+
+        # Call process to add citations using test data
+        process_westlaw_data(df, False)
+
+        # Check that target cluster now have two citations
+        self.assertEqual(
+            OpinionCluster.objects.get(id=653034).citations.all().count(), 2
+        )
+
+        # Check we have original citation
+        self.assertEqual(
+            str(OpinionCluster.objects.get(id=653034).citations.all()[0]),
+            "5 F.3d 528",
+        )
+
+        # Check we have new citation
+        self.assertEqual(
+            str(OpinionCluster.objects.get(id=653034).citations.all()[1]),
+            "1993 WL 373508",
+        )
+
+        # Check that the other cluster still have one citation
+        self.assertEqual(
+            OpinionCluster.objects.get(id=653032).citations.all().count(), 1
+        )
+
+    def test_add_new_citation_results_for_each_citation(self) -> None:
+        """Can we select the correct case to add the new citation when we
+        have results for citation and parallel cite in the test data?"""
+
+        test_data = [
+            {
+                "Title": "Torres v. U.S.",
+                "Court": "Supreme Court of the United States",
+                "Filed Date": "November 14, 2011",
+                "Citation": "565 U.S. 1042",
+                "Parallel Cite": "132 S.Ct. 594 (Mem)",
+                "Docket Num": "6",
+            }
+        ]
+
+        # Convert test data to dataframe
+        df = pd.DataFrame(test_data)
+
+        # Cluster with citation "565 U.S. 1042", court: scotus and filed date:
+        # 2011-22-14
+        CitationWithParentsFactory.create(
+            volume="565",
+            reporter="U.S.",
+            page="1042",
+            cluster=OpinionClusterWithParentsFactory(
+                docket=DocketFactory(
+                    court=CourtFactory(id="scotus"),
+                    case_name="DeRoss v. United States",
+                ),
+                case_name="DeRoss v. United States",
+                case_name_full="John J. DeRoss v. United States",
+                case_name_short="DeRoss",
+                date_filed=date(2011, 11, 14),
+                id=7349501,
+            ),
+        )
+
+        # Cluster with parallel citation "132 S. Ct. 594", court: scotus and
+        # filed date: 2011-22-14, we need to add "565 U.S. 1042" to this
+        # cluster
+        CitationWithParentsFactory.create(
+            volume="132",
+            reporter="S. Ct.",
+            page="594",
+            cluster=OpinionClusterWithParentsFactory(
+                docket=DocketFactory(
+                    court=CourtFactory(id="scotus"),
+                    case_name="Torres v. United States",
+                ),
+                case_name="Torres v. United States",
+                case_name_full="Edgar Camacho Torres v. United States",
+                case_name_short="Torres",
+                date_filed=date(2011, 11, 14),
+                id=7349502,
+            ),
+        )
+
+        # Check we have an opinion cluster with citation
+        self.assertEqual(
+            OpinionCluster.objects.filter(citation="565 U.S. 1042").count(), 1
+        )
+
+        # Check we have an opinion cluster with parallel cite
+        self.assertEqual(
+            OpinionCluster.objects.filter(
+                citation="132 S.Ct. 594 (Mem)"
+            ).count(),
+            1,
+        )
+
+        # Call process to add citations using test data
+        process_westlaw_data(df, False)
+
+        # Check that target cluster now have two citations
+        self.assertEqual(
+            OpinionCluster.objects.get(id=7349502).citations.all().count(), 2
+        )
+
+        # Check we have original citation
+        self.assertEqual(
+            str(OpinionCluster.objects.get(id=7349502).citations.all()[0]),
+            "132 S. Ct. 594",
+        )
+        # Check we have new citation
+        self.assertEqual(
+            str(OpinionCluster.objects.get(id=7349502).citations.all()[1]),
+            "565 U.S. 1042",
+        )
+
+        # Check that the other cluster still have one citation
+        self.assertEqual(
+            OpinionCluster.objects.get(id=7349501).citations.all().count(), 1
+        )
