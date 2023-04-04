@@ -65,6 +65,7 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.search.views import do_search
+from cl.users.models import UserProfile
 
 
 def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
@@ -262,9 +263,10 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     increment_view_count(docket, request)
 
     de_list = docket.docket_entries.all().prefetch_related("recap_documents")
-    form = DocketEntryFilterForm(request.GET)
+    form = DocketEntryFilterForm(request.GET, request=request)
     if form.is_valid():
         cd = form.cleaned_data
+
         if cd.get("entry_gte"):
             de_list = de_list.filter(entry_number__gte=cd["entry_gte"])
         if cd.get("entry_lte"):
