@@ -135,23 +135,30 @@ def add_citations(
 
         try:
             if not debug:
-                Citation.objects.get_or_create(
+                obj, created = Citation.objects.get_or_create(
                     volume=citation.groups["volume"],
                     reporter=citation.corrected_reporter(),
                     page=citation.groups["page"],
                     type=reporter_type,
                     cluster_id=cluster_id,
                 )
-            # Note: not all added citations are from lexis, lexis data
-            # contains citations from other reporters
-            logger.info(
-                f'Citation "{citation.corrected_citation_full()}" added to '
-                f"cluster id: {cluster_id}"
-            )
+            else:
+                # Force to show log message when debug is true, if false log
+                # message will only show if new citation is created
+                created = True
+
+            if created:
+                # Note: not all added citations are from lexis, lexis data
+                # contains citations from other reporters
+                logger.info(
+                    f'Citation "{citation.corrected_citation()}" added to '
+                    f"cluster id: {cluster_id}"
+                )
+
         except IntegrityError:
             logger.warning(
                 f"Reporter mismatch for cluster: {cluster_id} on "
-                f"cite: {citation.corrected_citation_full()}"
+                f"cite: {citation.corrected_citation()}"
             )
 
 
@@ -206,36 +213,29 @@ def get_date_filter(
     return dates_filed
 
 
-# def find_case_with_other_data(
-#     court: str | None = None,
-#     date_filed: str | None = None,
-#     date_decided: str | None = None,
-#     case_name: str | None = None,
-# ) -> OpinionCluster | None:
-#     # TODO generate filters with minimum 2 values: court and date_filed/date_decided
-#     # TODO use case_name to get a match
-#
-#     if court and (date_filed or date_decided):
-#         filters = {}
-#
-#         # Remove dot at end, court-db fails to find court with
-#         # dot at end, e.g. "Supreme Court of Pennsylvania." fails,
-#         # but "Supreme Court of Pennsylvania" doesn't
-#         court = court.strip(".")
-#
-#         # Try without bankruptcy flag
-#         found_court = find_court(court, bankruptcy=False)
-#
-#         if not found_court:
-#             # Try with bankruptcy flag
-#             found_court = find_court(court, bankruptcy=True)
-#
-#         if len(found_court) >= 1:
-#             filters = {"docket__court__id": found_court[0]}
-#
-#         dates_filed = get_date_filter(date_filed, date_decided)
-#
-#     pass
+def get_court_filter(court: str | None = None) -> dict:
+    """Create dict with court filter
+    :param court: court name or none
+    :return: dict
+    """
+    if court:
+        # Remove dot at end, court-db fails to find court with
+        # dot at end, e.g. "Supreme Court of Pennsylvania." fails,
+        # but "Supreme Court of Pennsylvania" doesn't
+        court = court.strip(".")
+
+        # Try without bankruptcy flag
+        found_court = find_court(court, bankruptcy=False)
+
+        if not found_court:
+            # Try with bankruptcy flag
+            found_court = find_court(court, bankruptcy=True)
+
+        if len(found_court) >= 1:
+            court_id = found_court[0]
+            return {"docket__court__id": court_id}
+
+    return {}
 
 
 def find_cases_with_citations(
@@ -257,8 +257,6 @@ def find_cases_with_citations(
 
     results_ids = []
     for citation in valid_citations:
-        # print(f"processing citation: {citation.corrected_citation_full()}")
-
         # Lexis data contains many citations, we need to find at least one
         # case with the citation, so we can add the others
 
@@ -287,24 +285,11 @@ def find_cases_with_citations(
         if not results_ids:
             # If we don't get a single match with citation
 
-            court_id = None
-            if court:
-                # Remove dot at end, court-db fails to find court with
-                # dot at end, e.g. "Supreme Court of Pennsylvania." fails,
-                # but "Supreme Court of Pennsylvania" doesn't
-                court = court.strip(".")
+            # Basic filter
+            filters = {"case_name": case_name}
 
-                # Try without bankruptcy flag
-                found_court = find_court(court, bankruptcy=False)
-
-                if not found_court:
-                    # Try with bankruptcy flag
-                    found_court = find_court(court, bankruptcy=True)
-
-                if len(found_court) >= 1:
-                    court_id = found_court[0]
-
-            filters = {"docket__court__id": court_id, "case_name": case_name}
+            # Add court to filters if we have court in csv
+            filters.update(get_court_filter(court))
 
             dates_filed = get_date_filter(date_filed, date_decided)
 

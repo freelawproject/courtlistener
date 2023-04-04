@@ -4,6 +4,7 @@ from datetime import date, timedelta
 from typing import List, Tuple
 from unittest.mock import Mock
 
+import pandas as pd
 from django.core.management import call_command
 from django.urls import reverse
 from eyecite import get_citations
@@ -37,6 +38,9 @@ from cl.citations.management.commands.cl_add_parallel_citations import (
     identify_parallel_citations,
     make_edge_list,
 )
+from cl.citations.management.commands.lexis_citation_merger import (
+    process_lexis_data,
+)
 from cl.citations.match_citations import (
     NO_MATCH_RESOURCE,
     do_resolve_citations,
@@ -52,6 +56,7 @@ from cl.search.factories import (
     CourtFactory,
     DocketFactory,
     OpinionClusterFactoryWithChildrenAndParents,
+    OpinionClusterWithParentsFactory,
     OpinionWithChildrenFactory,
 )
 from cl.search.models import (
@@ -62,7 +67,7 @@ from cl.search.models import (
     Parenthetical,
     ParentheticalGroup,
 )
-from cl.tests.cases import SimpleTestCase
+from cl.tests.cases import SimpleTestCase, TestCase
 
 
 class CitationTextTest(SimpleTestCase):
@@ -1535,3 +1540,115 @@ class GroupParentheticalsTest(SimpleTestCase):
                     sorted(output),
                     f"Got incorrect result from get_graph_component for inputs (expected {output}): {inputs}",
                 )
+
+
+class LexisCitationMergerTest(TestCase):
+    def test_add_new_citations_multiple_results_for_citation(self) -> None:
+        """Can we select the correct case to add the new citations when we
+        have multiple results with one citation?"""
+
+        # Sample data from lexis dataset
+        test_data = [
+            {
+                "full_name": "Rodney Washington, Petitioner v. Wisconsin.",
+                "lexis_ids_normalized": '{"2014 WL 684312","188 L. Ed. 2d 330","2014 U.S. LEXIS 1156","134 S. Ct. 1313","82 U.S.L.W. 3493"}',
+                "court": "Supreme Court of the United States",
+                "date_filed": "",
+                "date_decided": "2014-02-24",
+            }
+        ]
+
+        # Convert test data to dataframe
+        df = pd.DataFrame(test_data)
+
+        CitationWithParentsFactory.create(
+            volume="188",
+            reporter="L. Ed. 2d",
+            page="330",
+            cluster=OpinionClusterWithParentsFactory(
+                docket=DocketFactory(
+                    court=CourtFactory(id="scotus"), case_name="Harris v. Cain"
+                ),
+                case_name="Harris v. Cain",
+                case_name_full="Larry HARRIS v. Burl CAIN, Warden.",
+                case_name_short="Harris",
+                date_filed=date(2014, 2, 24),
+                id=8415282,
+            ),
+        )
+
+        CitationWithParentsFactory.create(
+            volume="188",
+            reporter="L. Ed. 2d",
+            page="330",
+            cluster=OpinionClusterWithParentsFactory(
+                docket=DocketFactory(
+                    court=CourtFactory(id="scotus"),
+                    case_name="Flores v. Beard",
+                ),
+                case_name="Flores v. Beard",
+                case_name_full="Juan FLORES, Jr. v. Jeffrey BEARD, Secretary, California Department of Corrections and Rehabilitation.",
+                case_name_short="Flores",
+                date_filed=date(2014, 2, 24),
+                id=8415281,
+            ),
+        )
+
+        CitationWithParentsFactory.create(
+            volume="188",
+            reporter="L. Ed. 2d",
+            page="330",
+            cluster=OpinionClusterWithParentsFactory(
+                docket=DocketFactory(
+                    court=CourtFactory(id="scotus"),
+                    case_name="Washington v. Wisconsin",
+                ),
+                case_name="Washington v. Wisconsin",
+                case_name_full="Rodney WASHINGTON v. WISCONSIN.",
+                date_filed=date(2014, 2, 24),
+                id=8415276,
+            ),
+        )
+
+        # Check we have three opinion clusters with same citation
+        self.assertEqual(
+            OpinionCluster.objects.filter(
+                citation="188 L. Ed. 2d 330"
+            ).count(),
+            3,
+        )
+
+        # Check that target cluster only have one citation
+        self.assertEqual(
+            OpinionCluster.objects.get(id=8415276).citations.all().count(), 1
+        )
+
+        # Call process to add citations using test data
+        process_lexis_data(df, False)
+
+        # Check that target cluster now have five citations
+        self.assertEqual(
+            OpinionCluster.objects.get(id=8415276).citations.all().count(), 5
+        )
+
+        # Check we have all citations, citations are in specific order
+        citations = [
+            "188 L. Ed. 2d 330",
+            "2014 WL 684312",
+            "2014 U.S. LEXIS 1156",
+            "134 S. Ct. 1313",
+            "82 U.S.L.W. 3493",
+        ]
+        for i, citation in enumerate(citations):
+            self.assertEqual(
+                str(OpinionCluster.objects.get(id=8415276).citations.all()[i]),
+                citation,
+            )
+
+        # Check that the other clusters still have one citation
+        self.assertEqual(
+            OpinionCluster.objects.get(id=8415281).citations.all().count(), 1
+        )
+        self.assertEqual(
+            OpinionCluster.objects.get(id=8415282).citations.all().count(), 1
+        )
