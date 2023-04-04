@@ -90,7 +90,7 @@ def query_and_parse_claims_activity(
                 )
 
                 # Save report HTML in disk.
-                with open(html_file, "w") as file:
+                with open(html_file, "w", encoding="utf-8") as file:
                     file.write(report.response.text)
 
             else:
@@ -110,7 +110,7 @@ def query_and_parse_claims_activity(
                 with open(html_file, "rb") as file:
                     text = file.read().decode("utf-8")
                 report._parse_text(text)
-                with open(json_file, "w") as file:
+                with open(json_file, "w", encoding="utf-8") as file:
                     json.dump(
                         report.data,
                         file,
@@ -150,7 +150,7 @@ def make_csv_if_required(alias: str, court_id: str, json_file: str):
         f"{alias}",
         f"{court_id}-{alias}.csv",
     )
-    with open(json_file) as f:
+    with open(json_file, encoding="utf-8") as f:
         data = json.load(f)
 
     if not os.path.exists(csv_file) and not data == {} and not data == []:
