@@ -1,19 +1,21 @@
 # !/usr/bin/python
 # -*- coding: utf-8 -*-
 
+import glob
 import json
 import os
 from datetime import date
 
 import pandas as pd
 from django.conf import settings
-from django.contrib.auth.models import User
 from juriscraper.pacer import ClaimsActivity, PacerSession
 
 from cl.lib.argparse_types import valid_date
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import get_or_cache_pacer_cookies
 from cl.search.models import Court
+
+PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
+PACER_PASSWORD = os.environ.get("PACER_PASSWORD", settings.PACER_PASSWORD)
 
 
 def query_and_parse_claims_activity(
@@ -41,18 +43,15 @@ def query_and_parse_claims_activity(
         "firmenich": "Firmenich",
     }
 
-    recap_user = User.objects.get(username="recap")
-    cookies = get_or_cache_pacer_cookies(
-        recap_user.pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
-    )
-    s = PacerSession(cookies=cookies)
+    s = PacerSession(username=PACER_USERNAME, password=PACER_PASSWORD)
+    s.login()
     for court in courts:
         for alias, creditor_name in creditor_names.items():
             logger.info(f"Doing {court} and creditor {alias}")
 
-            # Check if the creditor directory already exists
+            # Check if the reports directory already exists
             html_path = os.path.join(
-                settings.MEDIA_ROOT, "claims_activity", f"{alias}"
+                settings.MEDIA_ROOT, "claims_activity", "reports"
             )
             if not os.path.exists(html_path):
                 # Create the directory if it doesn't exist
@@ -61,7 +60,7 @@ def query_and_parse_claims_activity(
             html_file = os.path.join(
                 settings.MEDIA_ROOT,
                 "claims_activity",
-                f"{alias}",
+                "reports",
                 f"{court}-{alias}.html",
             )
             try:
@@ -102,7 +101,7 @@ def query_and_parse_claims_activity(
             json_file = os.path.join(
                 settings.MEDIA_ROOT,
                 "claims_activity",
-                f"{alias}",
+                "reports",
                 f"{court}-{alias}.json",
             )
             if not os.path.exists(json_file):
@@ -118,7 +117,6 @@ def query_and_parse_claims_activity(
                         indent=2,
                         sort_keys=True,
                     )
-            make_csv_if_required(alias, court, json_file)
 
 
 def serialize_json(obj: date) -> str:
@@ -133,104 +131,114 @@ def serialize_json(obj: date) -> str:
     return ""
 
 
-def make_csv_if_required(alias: str, court_id: str, json_file: str):
-    """Generate a CSV file if it does not already exist, based on the data in
-    the given JSON file.
+def make_csv_file() -> None:
+    """Generate a CSV based on the data of all the JSON files.
 
-    :param alias: The creditor alias.
-    :param court_id: The court id.
-    :param json_file: The path to the JSON file containing the data to be
-    processed.
     :return: None, The function saves a CSV file in disk.
     """
+
+    # Check if the csv directory already exists
+    csv_path = os.path.join(settings.MEDIA_ROOT, "claims_activity", "csv")
+    if not os.path.exists(csv_path):
+        # Create the directory if it doesn't exist
+        os.makedirs(csv_path)
 
     csv_file = os.path.join(
         settings.MEDIA_ROOT,
         "claims_activity",
-        f"{alias}",
-        f"{court_id}-{alias}.csv",
+        "csv",
+        "global_report.csv",
     )
-    with open(json_file, encoding="utf-8") as f:
-        data = json.load(f)
+    files_path = os.path.join(
+        settings.MEDIA_ROOT, "claims_activity", "reports"
+    )
+    logger.info(f"Generating CSV {csv_file}")
+    json_files = glob.glob(f"{files_path}/*json")
+    data_frames = []
+    for file_path in json_files:
+        with open(file_path, encoding="utf-8") as f:
+            data = json.load(f)
 
-    if not os.path.exists(csv_file) and not data == {} and not data == []:
-        logger.info(
-            f"Generating {csv_file}, court: {court_id}, alias: {alias}"
-        )
-        dataframe = pd.DataFrame()
-        for row in data:
-            # Create rows for claims without attachments.
-            if not len(row["claim"]["attachments"]):
-                del row["claim"]["attachments"]
-                row_df = pd.json_normalize(row)
-                empty_att_row = {
-                    "att_claim_doc_seq": "",
-                    "att_claim_id": "",
-                    "att_claim_number": "",
-                    "att_short_description": "",
-                    "att_pacer_case_id": "",
-                }
-                empty_att_row_df = pd.json_normalize(empty_att_row)
-                dataframe = pd.concat(
-                    [dataframe, pd.concat([row_df, empty_att_row_df], axis=1)],
-                    ignore_index=True,
-                )
-                continue
-
-            # Create rows for claims with attachments.
-            for i, att_row in enumerate(row["claim"]["attachments"]):
-                # Rename attachment fields with att_ prefix.
-                att_row_renamed = {f"att_{k}": v for k, v in att_row.items()}
-                pd_att = pd.json_normalize(att_row_renamed)
-                if i == 0:
+        if not data == {} and not data == []:
+            dataframe = pd.DataFrame()
+            for row in data:
+                # Create rows for claims without attachments.
+                if not len(row["claim"]["attachments"]):
                     del row["claim"]["attachments"]
-                pd_row = pd.json_normalize(row)
-                dataframe = pd.concat(
-                    [dataframe, pd.concat([pd_row, pd_att], axis=1)],
-                    ignore_index=True,
-                )
+                    row_df = pd.json_normalize(row)
+                    empty_att_row = {
+                        "att_claim_doc_seq": "",
+                        "att_claim_id": "",
+                        "att_claim_number": "",
+                        "att_short_description": "",
+                        "att_pacer_case_id": "",
+                    }
+                    empty_att_row_df = pd.json_normalize(empty_att_row)
+                    dataframe = pd.concat(
+                        [
+                            dataframe,
+                            pd.concat([row_df, empty_att_row_df], axis=1),
+                        ],
+                        ignore_index=True,
+                    )
+                    continue
 
-        # Set columns with a custom order.
-        column_order = [
-            "court_id",
-            "docket_number",
-            "case_name",
-            "chapter",
-            "office",
-            "assigned_to_str",
-            "trustee_str",
-            "last_date_to_file_claims",
-            "last_date_to_file_govt",
-            "claim.amends_no",
-            "claim.amount_allowed",
-            "claim.amount_claimed",
-            "claim.claim_id",
-            "claim.claim_number",
-            "claim.creditor_id",
-            "claim.creditor_name_address",
-            "claim.date_entered",
-            "claim.date_filed",
-            "claim.description",
-            "claim.entered_by",
-            "claim.filed_by",
-            "claim.pacer_case_id",
-            "claim.priority_claimed",
-            "claim.remarks",
-            "claim.secured_claimed",
-            "claim.status",
-            "att_claim_doc_seq",
-            "att_claim_id",
-            "att_claim_number",
-            "att_short_description",
-            "att_pacer_case_id",
-        ]
-        dataframe.to_csv(csv_file, columns=column_order, index=False)
+                # Create rows for claims with attachments.
+                for i, att_row in enumerate(row["claim"]["attachments"]):
+                    # Rename attachment fields with att_ prefix.
+                    att_row_renamed = {
+                        f"att_{k}": v for k, v in att_row.items()
+                    }
+                    pd_att = pd.json_normalize(att_row_renamed)
+                    if i == 0:
+                        del row["claim"]["attachments"]
+                    pd_row = pd.json_normalize(row)
+                    dataframe = pd.concat(
+                        [dataframe, pd.concat([pd_row, pd_att], axis=1)],
+                        ignore_index=True,
+                    )
 
-    if data == {} or data == []:
-        logger.warning(
-            f"Report for court: {court_id} and alias: {alias} is "
-            f"empty, skipping CSV generation."
-        )
+            data_frames.append(dataframe)
+
+    # Set columns with a custom order.
+    column_order = [
+        "court_id",
+        "docket_number",
+        "case_name",
+        "chapter",
+        "office",
+        "assigned_to_str",
+        "trustee_str",
+        "last_date_to_file_claims",
+        "last_date_to_file_govt",
+        "claim.amends_no",
+        "claim.amount_allowed",
+        "claim.amount_claimed",
+        "claim.claim_id",
+        "claim.claim_number",
+        "claim.creditor_id",
+        "claim.creditor_name_address",
+        "claim.date_entered",
+        "claim.date_filed",
+        "claim.description",
+        "claim.entered_by",
+        "claim.filed_by",
+        "claim.pacer_case_id",
+        "claim.priority_claimed",
+        "claim.remarks",
+        "claim.secured_claimed",
+        "claim.status",
+        "att_claim_doc_seq",
+        "att_claim_id",
+        "att_claim_number",
+        "att_short_description",
+        "att_pacer_case_id",
+    ]
+    if not data_frames:
+        logger.warning("No content to create CSV.")
+        return
+    df_combined = pd.concat(data_frames, ignore_index=True)
+    df_combined.to_csv(csv_file, columns=column_order, index=False)
 
 
 class Command(VerboseCommand):
@@ -263,3 +271,4 @@ class Command(VerboseCommand):
         query_and_parse_claims_activity(
             options["courts"], date_start, date_end
         )
+        make_csv_file()
