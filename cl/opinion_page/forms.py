@@ -96,6 +96,21 @@ class DocketEntryFilterForm(forms.Form):
         widget=forms.Select(),
     )
 
+    def __init__(self, *args, **kwargs):
+        self.request = kwargs.pop("request", None)
+        super(DocketEntryFilterForm, self).__init__(*args, **kwargs)
+
+    def clean_order_by(self):
+        data = self.cleaned_data["order_by"]
+        if data:
+            return data
+        if not self.request.user.is_authenticated:
+            return data
+        user: UserProfile.user = self.request.user
+        if user.profile.docket_default_order_desc:
+            return DocketEntryFilterForm.DESCENDING
+        return data
+
 
 class CourtUploadForm(forms.Form):
     initial: MutableMapping[str, Any]
