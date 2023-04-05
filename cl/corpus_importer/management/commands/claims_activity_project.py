@@ -12,6 +12,7 @@ from juriscraper.pacer import ClaimsActivity, PacerSession
 
 from cl.lib.argparse_types import valid_date
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.pacer import map_cl_to_pacer_id
 from cl.search.models import Court
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
@@ -45,7 +46,8 @@ def query_and_parse_claims_activity(
 
     s = PacerSession(username=PACER_USERNAME, password=PACER_PASSWORD)
     s.login()
-    for court in courts:
+    for court_id in courts:
+        court = map_cl_to_pacer_id(court_id)
         for alias, creditor_name in creditor_names.items():
             logger.info(f"Doing {court} and creditor {alias}")
 
