@@ -999,8 +999,10 @@ files = [
 
 [package.dependencies]
 boto3 = ">=1.0.0"
+cryptography = {version = ">=36.0.2", optional = true, markers = "extra == \"bounce\" or extra == \"events\""}
 django = ">=2.2"
 pytz = ">=2016.10"
+requests = {version = ">=2.27.1", optional = true, markers = "extra == \"bounce\" or extra == \"events\""}
 
 [package.extras]
 bounce = ["cryptography (>=36.0.2)", "requests (>=2.27.1)"]
@@ -4077,4 +4079,4 @@ h11 = ">=0.9.0,<1"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10, <3.11"
-content-hash = "46537c2c2341f822fb9ec4317b75b077636eaa0512a3bac68cf161fa7473954b"
+content-hash = "69f1c1fac95888e046cf8a9b03adbde64e281d3d4cf3232509eeb85c9f1ee322"
