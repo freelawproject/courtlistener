@@ -1116,14 +1116,14 @@ djangorestframework = "*"
 
 [[package]]
 name = "djangorestframework-stubs"
-version = "1.9.1"
+version = "1.10.0"
 description = "PEP-484 stubs for django-rest-framework"
 category = "dev"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "djangorestframework-stubs-1.9.1.tar.gz", hash = "sha256:89f6c2add193cb5ab61b9e47187b33a93cc099376a8df5e4d6c3fc8ecb992d3b"},
-    {file = "djangorestframework_stubs-1.9.1-py3-none-any.whl", hash = "sha256:9475e1374b057ffbdcaaa84a060fe5f01476d8b9014d82a83b4153f57fbcbc1f"},
+    {file = "djangorestframework-stubs-1.10.0.tar.gz", hash = "sha256:69e8a1ea7eb815cbe35155c27eee72522d7c8666d3cbdacb9997ab88c7b4202c"},
+    {file = "djangorestframework_stubs-1.10.0-py3-none-any.whl", hash = "sha256:433edd7f10786914138b300b9be5aba1ebc80c471b5156934664afd7e9df9fd6"},
 ]
 
 [package.dependencies]
@@ -1135,7 +1135,7 @@ types-requests = ">=0.1.12"
 typing-extensions = ">=3.10.0"
 
 [package.extras]
-compatible-mypy = ["mypy (>=1.0,<1.1)"]
+compatible-mypy = ["mypy (>=1.1.1,<1.2)"]
 coreapi = ["coreapi (>=2.0.0)"]
 markdown = ["types-Markdown (>=0.1.5)"]
 
@@ -4068,4 +4068,4 @@ h11 = ">=0.9.0,<1"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10, <3.11"
-content-hash = "c8cef0265a2029da4950a6a320e744a3f300bc7d6381077f234dc4e11568c455"
+content-hash = "51a7ac4e3a41ace8bd7a2bb0e5b8fc81e11ebd0aeb31737a30476b361530abcd"
