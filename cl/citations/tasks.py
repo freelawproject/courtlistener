@@ -26,7 +26,7 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     OpinionsCited,
-    OpinionsCitedByRECAPDocument,
+    # OpinionsCitedByRECAPDocument,
     Parenthetical,
     RECAPDocument,
 )
@@ -80,12 +80,22 @@ def identify_parallel_citations(
 def find_citations_and_parantheticals_for_recap_documents(
     self, doc_ids: List[int], index: bool = True
 ):
+    """Find citations and authored parentheticals for search.RECAPDocument objects.
+
+    :param doc_ids: An iterable of search.RECAPDocument PKs
+    :param index: Whether to add the items to Solr
+    :return: None
+    """
     documents: List[RECAPDocument] = RECAPDocument.objects.filter(
         pk__in=doc_ids
     )
 
     for d in documents:
-        store_recap_citations_and_update_parentheticals(d, index)
+        try:
+            store_recap_citations_and_update_parentheticals(d, index)
+        except ResponseNotReady as e:
+            # Threading problem in httplib, which is used in the Solr query.
+            raise self.retry(exc=e, countdown=2)
 
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
@@ -97,7 +107,7 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
     """Find citations and authored parentheticals for search.Opinion objects.
 
     :param opinion_pks: An iterable of search.Opinion PKs
-    :param index: Whether to add the item to Solr
+    :param index: Whether to add the items to Solr
     :return: None
     """
     opinions: List[Opinion] = Opinion.objects.filter(pk__in=opinion_pks)
@@ -118,9 +128,9 @@ def store_opinion_citations_and_update_parentheticals(
     opinion: Opinion, index: bool
 ) -> None:
     """
-    Updates counts of citations within court opinions, as well as parenthetical info for cited opinions.
+    Updates counts of citations to other opinions within a given court opinion, as well as parenthetical info for the cited opinions.
 
-    :param opinion_pks: An iterable of search.Opinion PKs
+    :param opinion: A search.Opinion object.
     :param index: Whether to add the item to Solr
     :return: None
     """
