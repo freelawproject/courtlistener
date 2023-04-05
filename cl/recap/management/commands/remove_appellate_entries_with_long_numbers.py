@@ -64,6 +64,8 @@ def clean_up_duplicate_appellate_entries(
                 related_rd = de.recap_documents.filter(
                     document_type=RECAPDocument.PACER_DOCUMENT
                 ).first()
+                if not related_rd:
+                    continue
                 if related_rd.pacer_doc_id == "":
                     # If the pacer_doc_id is empty, look for duplicates by date
                     # and description.

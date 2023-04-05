@@ -138,6 +138,10 @@ class UserProfile(models.Model):
         "subscribe to the case.",
         default=True,
     )
+    docket_default_order_desc = models.BooleanField(
+        help_text="Sort dockets in descending order by default",
+        default=False,
+    )
 
     @property
     def total_donated_last_year(self) -> Decimal:
