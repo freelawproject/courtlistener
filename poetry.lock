@@ -930,14 +930,14 @@ files = [
 
 [[package]]
 name = "django-pghistory"
-version = "2.5.1"
+version = "2.6.0"
 description = "History tracking for Django and Postgres"
 category = "main"
 optional = false
 python-versions = ">=3.7.0,<4"
 files = [
-    {file = "django-pghistory-2.5.1.tar.gz", hash = "sha256:8b020391755ce9067a9edcb59fb5237c0ffad1521d335c4fc1c637cf1c852b0d"},
-    {file = "django_pghistory-2.5.1-py3-none-any.whl", hash = "sha256:a602057524dc29b52a1cd961a03b3328dc9ab4eee30e2bb7381943844dd0b6f2"},
+    {file = "django_pghistory-2.6.0-py3-none-any.whl", hash = "sha256:73429f0b7bbbe8751ceb3a44c24cd76df5ba39e38ee7a3d4a99874bfc8daf624"},
+    {file = "django_pghistory-2.6.0.tar.gz", hash = "sha256:07debaed6d48f3722b29dc65ef9b10628c090548037465267ef824ca455251d1"},
 ]
 
 [package.dependencies]
@@ -4068,4 +4068,4 @@ h11 = ">=0.9.0,<1"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10, <3.11"
-content-hash = "c8cef0265a2029da4950a6a320e744a3f300bc7d6381077f234dc4e11568c455"
+content-hash = "80ba640899cc0320e98cebafd613900932b603655c8fc19ff1c516885e7cbc3e"
