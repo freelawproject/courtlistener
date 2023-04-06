@@ -26,7 +26,7 @@ from cl.lib.types import (
     SearchParam,
     SupportedCitationType,
 )
-from cl.search.models import Opinion
+from cl.search.models import Opinion, RECAPDocument
 
 DEBUG = True
 
@@ -279,12 +279,17 @@ def resolve_supra_citation(
 
 
 def do_resolve_citations(
-    citations: List[CitationBase], citing_opinion: Opinion
+    citations: List[CitationBase], citing_document: Opinion | RECAPDocument
 ) -> Dict[MatchedResourceType, List[SupportedCitationType]]:
     # Set the citing opinion on FullCaseCitation objects for later matching
     for c in citations:
         if type(c) is FullCaseCitation:
-            c.citing_opinion = citing_opinion
+            citing_attr = (
+                "citing_opinion"
+                if type(citing_document) == Opinion
+                else "citing_document"
+            )
+            setattr(c, citing_attr, citing_document)
 
     # Call and return eyecite's resolve_citations() function
     return resolve_citations(
