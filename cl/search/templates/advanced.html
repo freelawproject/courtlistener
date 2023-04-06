@@ -75,7 +75,7 @@
                 </p>
             {% elif search_form.type.value == SEARCH_TYPES.PARENTHETICAL %}
                 <h1 class="text-center">Advanced Opinion Parenthetical Search</h1>
-                <p class="text-center gray large">Search millions of opinions across hundreds of jurisdictions. Updated constantly.
+                <p class="text-center gray large">Search over a million opinion summaries written by judges to find on-point decisions.
                 </p>
             {% elif search_form.type.value == SEARCH_TYPES.RECAP %}
                 <h1 class="text-center">Advanced RECAP Search</h1>
@@ -291,16 +291,6 @@
                             {{ search_form.filed_before.label_tag }}
                             {{ search_form.filed_before }}
                         </div>
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-xs-12">
-                        <button type="submit"
-                                class="btn btn-primary btn-lg float-right"
-                                name="search"
-                                id="search-button-secondary"><i
-                                class="fa fa-search"></i>&nbsp;Search
-                        </button>
                     </div>
                 </div>
             </div>

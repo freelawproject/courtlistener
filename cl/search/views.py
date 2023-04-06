@@ -31,7 +31,9 @@ from cl.lib.bot_detector import is_bot
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
     build_sort_results,
+    convert_str_date_fields_to_date_objects,
     group_search_results,
+    merge_courts_from_db,
     set_results_highlights,
 )
 from cl.lib.paginators import ESPaginator
@@ -589,13 +591,13 @@ def do_es_search(get_params):
             total_pa_groups = search_query.count()
             # If docket_query set the top_hits_limit to 100
             # Top hits limit in elasticsearch is 100
-            cluster_query = re.search(r"opinion_cluster_id:\d+", cd["q"])
+            cluster_query = re.search(r"cluster_id:\d+", cd["q"])
             top_hits_limit = top_hits_limit if not cluster_query else 100
 
             # Create groups aggregation.
             group_search_results(
                 search_query,
-                "opinion_cluster_id",
+                "cluster_id",
                 build_sort_results(cd),
                 top_hits_limit,
             )
@@ -665,5 +667,7 @@ def do_es_pagination(get_params, hits, rows_per_page=5):
 
     # Set highlights in results.
     set_results_highlights(results)
+    convert_str_date_fields_to_date_objects(results, "dateFiled")
+    merge_courts_from_db(results)
 
     return results

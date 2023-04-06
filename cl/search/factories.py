@@ -22,6 +22,7 @@ from cl.search.models import (
     DocketEntry,
     Opinion,
     OpinionCluster,
+    OpinionsCited,
     Parenthetical,
     ParentheticalGroup,
     RECAPDocument,
@@ -248,3 +249,17 @@ class OpinionClusterFactoryMultipleOpinions(
         size=3,  # by default create 3 opinions
     )
     precedential_status = ("Published", "Precedential")
+
+
+class OpinionsCitedWithParentsFactory(DjangoModelFactory):
+    """Make a DocketEntry with Docket parents"""
+
+    class Meta:
+        model = OpinionsCited
+
+    citing_opinion = SubFactory(
+        "cl.search.factories.OpinionFactory",
+    )
+    cited_opinion = SubFactory(
+        "cl.search.factories.OpinionFactory",
+    )

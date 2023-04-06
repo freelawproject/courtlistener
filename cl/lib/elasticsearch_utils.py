@@ -9,6 +9,7 @@ from elasticsearch_dsl import A, Q
 from elasticsearch_dsl.query import QueryString, Range
 
 from cl.lib.types import CleanData
+from cl.search.models import Court
 
 
 def build_daterange_query(
@@ -98,8 +99,8 @@ def build_sort_results(cd: CleanData) -> Dict:
 
     order_by_map = {
         "score desc": {"score": {"order": "desc"}},
-        "dateFiled desc": {"opinion_cluster_date_filed": {"order": "desc"}},
-        "dateFiled asc": {"opinion_cluster_date_filed": {"order": "asc"}},
+        "dateFiled desc": {"dateFiled": {"order": "desc"}},
+        "dateFiled asc": {"dateFiled": {"order": "asc"}},
     }
     order_by = cd.get("order_by")
     if order_by and order_by in order_by_map:
@@ -121,7 +122,7 @@ def build_es_filters(cd: CleanData) -> List:
     # Build daterange query
     queries_list.extend(
         build_daterange_query(
-            "opinion_cluster_date_filed",
+            "dateFiled",
             cd.get("filed_before", ""),
             cd.get("filed_after", ""),
         )
@@ -130,7 +131,7 @@ def build_es_filters(cd: CleanData) -> List:
     # Build court terms filter
     queries_list.extend(
         build_terms_query(
-            "opinion_cluster_docket_court_id",
+            "court_id",
             cd.get("court", "").split(),
         )
     )
@@ -138,7 +139,7 @@ def build_es_filters(cd: CleanData) -> List:
     # Build docket number term query
     queries_list.extend(
         build_term_query(
-            "opinion_cluster_docket_number",
+            "docketNumber",
             cd.get("docket_number", ""),
         )
     )
@@ -216,7 +217,7 @@ def group_search_results(
         highlight={
             "fields": {
                 "representative_text": {},
-                "opinion_cluster_docket_number": {},
+                "docketNumber": {},
             },
             "pre_tags": ["<mark>"],
             "post_tags": ["</mark>"],
@@ -249,3 +250,50 @@ def group_search_results(
         aggregation.bucket("sorted_buckets", bucket_sort_score)
 
     search.aggs.bucket("groups", aggregation)
+
+
+def convert_str_date_fields_to_date_objects(
+    results: Page, date_field_name: str
+) -> None:
+    """Converts string date fields in Elasticsearch search results to date
+    objects.
+
+    :param results: A Page object containing the search results to be modified.
+    :param date_field_name: The date field name containing the date strings
+    to be converted.
+    :return: None, the function modifies the search results object in place.
+    """
+
+    for result in results.object_list:
+        top_hits = result.grouped_by_opinion_cluster_id.hits.hits
+        for hit in top_hits:
+            date_str = hit["_source"][date_field_name]
+            date_obj = date.fromisoformat(date_str)
+            hit["_source"][date_field_name] = date_obj
+
+
+def merge_courts_from_db(results: Page) -> None:
+    """Merges court citation strings from the database into search results.
+
+    :param results: A Page object containing the search results to be modified.
+    :return: None, the function modifies the search results object in place.
+    """
+
+    court_ids = [
+        d["grouped_by_opinion_cluster_id"]["hits"]["hits"][0]["_source"][
+            "court_id"
+        ]
+        for d in results
+    ]
+    courts_in_page = Court.objects.filter(pk__in=court_ids).only(
+        "pk", "citation_string"
+    )
+    courts_dict = {}
+    for court in courts_in_page:
+        courts_dict[court.pk] = court.citation_string
+
+    for result in results.object_list:
+        top_hits = result.grouped_by_opinion_cluster_id.hits.hits
+        for hit in top_hits:
+            court_id = hit["_source"]["court_id"]
+            hit["_source"]["citation_string"] = courts_dict.get(court_id)

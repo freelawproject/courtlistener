@@ -245,7 +245,7 @@
                             <span class="gray alt">related to</span> {{ related_cluster.caption|safe|v_wrapper }}
                           {% endif %}
                         {% elif type == SEARCH_TYPES.PARENTHETICAL %}
-                            {{ results_details.1|intcomma }} Parenthetical{{ results_details.1|pluralize }} found in {{ results.paginator.count|intcomma }} Opinion{{ results.paginator.count|pluralize }}
+                            {{ results_details.1|intcomma }} Parenthetical{{ results_details.1|pluralize }} Summarizing {{ results.paginator.count|intcomma }} Opinion{{ results.paginator.count|pluralize }}
                         {% elif type == SEARCH_TYPES.RECAP or type == SEARCH_TYPES.DOCKETS %}
                             {% with matches=results.object_list.groups.docket_id.matches count=results.paginator.count %}
                             {{ count|intcomma }} Case{{ count|pluralize }} <span class="gray">&mdash;</span>

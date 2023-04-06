@@ -50,9 +50,11 @@ from cl.recap.mergers import add_docket_entries
 from cl.scrapers.factories import PACERFreeDocumentLogFactory
 from cl.search.documents import ParentheticalGroupDocument
 from cl.search.factories import (
+    CitationWithParentsFactory,
     CourtFactory,
     DocketFactory,
     OpinionClusterFactory,
+    OpinionsCitedWithParentsFactory,
     OpinionWithParentsFactory,
     ParentheticalFactory,
     ParentheticalGroupFactory,
@@ -1787,22 +1789,39 @@ class ElasticSearchTest(TestCase):
         cls.c2 = CourtFactory(id="ca1", jurisdiction="F")
         cls.c3 = CourtFactory(id="cacd", jurisdiction="FB")
 
-        cls.o = OpinionWithParentsFactory(
-            cluster=OpinionClusterFactory(
-                case_name="Peck, Williams and Freeman v. Stephens",
-                case_name_short="Stephens",
-                docket=DocketFactory(
-                    court=cls.c1,
-                    docket_number="1:98-cr-35856",
-                ),
-                date_filed=date(1978, 3, 10),
-                source="H",
-                precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
+        cls.cluster = OpinionClusterFactory(
+            case_name="Peck, Williams and Freeman v. Stephens",
+            case_name_short="Stephens",
+            judges="Lorem ipsum",
+            scdb_id="1952-121",
+            nature_of_suit="710",
+            docket=DocketFactory(
+                court=cls.c1,
+                docket_number="1:98-cr-35856",
+                date_reargued=date(1986, 1, 30),
+                date_reargument_denied=date(1986, 5, 30),
             ),
+            date_filed=date(1978, 3, 10),
+            source="H",
+            precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
+        )
+        cls.o = OpinionWithParentsFactory(
+            cluster=cls.cluster,
             type="Plurality Opinion",
             extracted_by_ocr=True,
         )
-
+        cls.o.joined_by.add(cls.o.author)
+        cls.cluster.panel.add(cls.o.author)
+        cls.citation = CitationWithParentsFactory(cluster=cls.cluster)
+        cls.citation_lexis = CitationWithParentsFactory(
+            cluster=cls.cluster, type=Citation.LEXIS
+        )
+        cls.citation_neutral = CitationWithParentsFactory(
+            cluster=cls.cluster, type=Citation.NEUTRAL
+        )
+        cls.opinion_cited = OpinionsCitedWithParentsFactory(
+            citing_opinion=cls.o, cited_opinion=cls.o
+        )
         cls.o2 = OpinionWithParentsFactory(
             cluster=OpinionClusterFactory(
                 case_name="Riley v. Brewer-Hall",
@@ -1921,7 +1940,7 @@ class ElasticSearchTest(TestCase):
         filters.append(
             Q(
                 "range",
-                opinion_cluster_date_filed={
+                dateFiled={
                     "gte": date_gte,
                     "lte": date_lte,
                 },
@@ -1944,7 +1963,7 @@ class ElasticSearchTest(TestCase):
         filters.append(
             Q(
                 "range",
-                opinion_cluster_date_filed={
+                dateFiled={
                     "gte": date_gte,
                     "lte": date_lte,
                 },
@@ -1958,7 +1977,7 @@ class ElasticSearchTest(TestCase):
 
     def test_ordering(self) -> None:
         """Test filter and then ordering by descending
-        opinion_cluster_date_filed"""
+        dateFiled"""
         filters = []
         date_gte = "1976-08-30T00:00:00Z"
         date_lte = "1978-03-10T23:59:59Z"
@@ -1966,7 +1985,7 @@ class ElasticSearchTest(TestCase):
         filters.append(
             Q(
                 "range",
-                opinion_cluster_date_filed={
+                dateFiled={
                     "gte": date_gte,
                     "lte": date_lte,
                 },
@@ -1976,17 +1995,17 @@ class ElasticSearchTest(TestCase):
         s = (
             ParentheticalGroupDocument.search()
             .filter(reduce(operator.iand, filters))
-            .sort("-opinion_cluster_date_filed")
+            .sort("-dateFiled")
         )
-        s1 = s.sort("-opinion_cluster_date_filed")
+        s1 = s.sort("-dateFiled")
         self.assertEqual(s1.count(), 2)
         self.assertEqual(
-            s1.execute()[0].opinion_cluster_date_filed,
+            s1.execute()[0].dateFiled,
             datetime.datetime(1978, 3, 10, 0, 0),
         )
-        s2 = s.sort("opinion_cluster_date_filed")
+        s2 = s.sort("dateFiled")
         self.assertEqual(
-            s2.execute()[0].opinion_cluster_date_filed,
+            s2.execute()[0].dateFiled,
             datetime.datetime(1976, 8, 30, 0, 0),
         )
 
@@ -1996,9 +2015,7 @@ class ElasticSearchTest(TestCase):
         date_gte = datetime.datetime(1976, 8, 30, 0, 0).date()
         date_lte = datetime.datetime(1978, 3, 10, 0, 0).date()
 
-        q1 = build_daterange_query(
-            "opinion_cluster_date_filed", date_lte, date_gte
-        )
+        q1 = build_daterange_query("dateFiled", date_lte, date_gte)
         filters.extend(q1)
 
         s = ParentheticalGroupDocument.search().filter(
@@ -2017,7 +2034,7 @@ class ElasticSearchTest(TestCase):
         """Test build es terms query"""
         filters = []
         q = build_terms_query(
-            "opinion_cluster_docket_court_id",
+            "court_id",
             [self.c1.pk, self.c2.pk],
         )
         filters.extend(q)
@@ -2053,9 +2070,7 @@ class ElasticSearchTest(TestCase):
         """Test filter by docker_number"""
         filters = []
 
-        filters.append(
-            Q("term", opinion_cluster_docket_number="1:98-cr-35856")
-        )
+        filters.append(Q("term", docketNumber="1:98-cr-35856"))
 
         s = ParentheticalGroupDocument.search().filter(
             reduce(operator.iand, filters)
@@ -2073,7 +2088,7 @@ class ElasticSearchTest(TestCase):
         )
         self.assertEqual(s.count(), 4)
         self.assertEqual(
-            s.execute()[0].opinion_cluster_date_filed,
+            s.execute()[0].dateFiled,
             datetime.datetime(1981, 7, 11, 0, 0),
         )
 
@@ -2085,7 +2100,7 @@ class ElasticSearchTest(TestCase):
             .sort(ordering)
         )
         self.assertEqual(
-            s.execute()[0].opinion_cluster_date_filed,
+            s.execute()[0].dateFiled,
             datetime.datetime(1976, 8, 30, 0, 0),
         )
 
@@ -2097,7 +2112,7 @@ class ElasticSearchTest(TestCase):
             .sort(ordering)
         )
         self.assertEqual(
-            s.execute()[0].opinion_cluster_date_filed,
+            s.execute()[0].dateFiled,
             datetime.datetime(1978, 3, 10, 0, 0),
         )
 
@@ -2107,9 +2122,7 @@ class ElasticSearchTest(TestCase):
         q1 = build_fulltext_query("representative_text", "Necessary")
         s = ParentheticalGroupDocument.search().query(q1)
         # Group results.
-        group_search_results(
-            s, "opinion_cluster_id", {"score": {"order": "desc"}}, 5
-        )
+        group_search_results(s, "cluster_id", {"score": {"order": "desc"}}, 5)
         hits = s.execute()
         groups = hits.aggregations.groups.buckets
 
@@ -2125,6 +2138,42 @@ class ElasticSearchTest(TestCase):
         group_1_hits = groups[0].grouped_by_opinion_cluster_id.hits.hits
         self.assertEqual(group_1_hits[0]._source.score, 0.1578)
         self.assertEqual(group_1_hits[1]._source.score, 0.1678)
+
+    def test_index_advanced_search_fields(self) -> None:
+        """Test confirm advanced search fields are indexed."""
+
+        filters = []
+        filters.append(Q("term", docketNumber="1:98-cr-35856"))
+        s = ParentheticalGroupDocument.search().filter(
+            reduce(operator.iand, filters)
+        )
+        results = s.execute()
+
+        # Check advanced search fields are indexed and confirm their data types
+        self.assertEqual(len(results), 1)
+        self.assertEqual(type(results[0].author_id), int)
+        self.assertEqual(type(results[0].caseName), str)
+        self.assertEqual(results[0].citeCount, 0)
+        self.assertIsNotNone(results[0].citation)
+        self.assertEqual(type(results[0].citation[0]), str)
+        self.assertEqual(type(results[0].cites[0]), int)
+        self.assertEqual(type(results[0].court_id), str)
+        self.assertEqual(type(results[0].dateArgued), datetime.datetime)
+        self.assertEqual(type(results[0].dateFiled), datetime.datetime)
+        self.assertEqual(type(results[0].dateReargued), datetime.datetime)
+        self.assertEqual(
+            type(results[0].dateReargumentDenied), datetime.datetime
+        )
+        self.assertEqual(type(results[0].docket_id), int)
+        self.assertEqual(type(results[0].docketNumber), str)
+        self.assertEqual(type(results[0].joined_by_ids[0]), int)
+        self.assertEqual(type(results[0].judge), str)
+        self.assertEqual(type(results[0].lexisCite), str)
+        self.assertEqual(type(results[0].neutralCite), str)
+        self.assertEqual(type(results[0].panel_ids[0]), int)
+        self.assertEqual(type(results[0].scdb_id), str)
+        self.assertEqual(type(results[0].status), str)
+        self.assertEqual(type(results[0].suitNature), str)
 
 
 class DocketEntriesTimezone(TestCase):

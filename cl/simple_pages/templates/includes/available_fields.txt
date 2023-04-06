@@ -1,0 +1,346 @@
+[
+   {
+      "field":"id",
+      "description":"The ID of the item in the CourtListener system.",
+      "opinions":true,
+      "parentheticals":true,
+      "recap_archive":true,
+      "oral_arguments":true
+   },
+   {
+      "field":"docket_id",
+      "description":"The ID of the docket that the item is associated with.",
+      "opinions":true,
+      "parentheticals":true,
+      "recap_archive":true,
+      "oral_arguments":true
+   },
+   {
+      "field":"docket_entry_id",
+      "description":"The ID of the docket entry that the item is associated with.",
+      "opinions":false,
+      "parentheticals":false,
+      "recap_archive":true,
+      "oral_arguments":true
+   },
+   {
+      "field":"scdb_id",
+      "description":"The ID of an opinion in the <a href='http://scdb.wustl.edu/'>Supreme Court Database</a>.",
+      "opinions":true,
+      "parentheticals":true,
+      "recap_archive":false,
+      "oral_arguments":false
+   },
+   {
+      "field":"cluster_id",
+      "description":"A single case can have dissents, concurrences and other types of opinions. We call these 'clusters'. This is the ID of the cluster that an opinion is part of. See also: <code>sibling_ids</code>",
+      "opinions":true,
+      "parentheticals":true,
+      "recap_archive":false,
+      "oral_arguments":false
+   },
+   {
+      "field":"sibling_ids",
+      "description":"The ID of other opinions within a cluster.",
+      "opinions":true,
+      "parentheticals":false,
+      "recap_archive":false,
+      "oral_arguments":false
+   },
+   {
+      "field":"court_id",
+      "description":"This is the abbreviated court ID associated with the item. See the <a href='{% url 'court_index' %}'>jurisdictions page</a> for a current list of abbreviations. For judge search, see the court field for an alternate approach.",
+      "opinions":true,
+      "parentheticals":true,
+      "recap_archive":true,
+      "oral_arguments":true
+   },
+   {
+      "field":"party",
+      "description":"The name of the parties in a PACER case. Can have multiple values.",
+      "opinions":false,
+      "parentheticals":false,
+      "recap_archive":true,
+      "oral_arguments":false
+   },
+   {
+      "field":"attorney",
+      "description":"The name of the attorneys in a PACER case. Can have multiple values.",
+      "opinions":false,
+      "parentheticals":false,
+      "recap_archive":true,
+      "oral_arguments":false
+   },
+   {
+      "field":"firm_id",
+      "description":"The ID of a firm in a PACER case. Can have multiple values.",
+      "opinions":false,
+      "parentheticals":false,
+      "recap_archive":true,
+      "oral_arguments":false
+   },
+   {
+      "field":"firm",
+      "description":"The name of a firm in a PACER case. Can have multiple values.",
+      "opinions":false,
+      "parentheticals":false,
+      "recap_archive":true,
+      "oral_arguments":false
+   },
+   {
+      "field":"author_id",
+      "description":"The ID of the judge that authored an opinion.",
+      "opinions":true,
+      "parentheticals":true,
+      "recap_archive":false,
+      "oral_arguments":false
+   },
+   {
+      "field":"panel_ids",
+      "description":"The IDs of the judges on a panel for a case.",
+      "opinions":true,
+      "parentheticals":true,
+      "recap_archive":false,
+      "oral_arguments":true
+   },
+   {
+      "field":"joined_by_ids",
+      "description":"The IDs of the judges joining an author in an opinion.",
+      "opinions":true,
+      "parentheticals":true,
+      "recap_archive":false,
+      "oral_arguments":true
+   },
+   {
+      "field":"assigned_to_id",
+      "description":"The IDs of the judges joining an author in an opinion.",
+      "opinions":false,
+      "parentheticals":false,
+      "recap_archive":true,
+      "oral_arguments":false
+   },
+   {
+      "field":"referred_to_id",
+      "description":"The ID of the judge a case is referred to. See also: <code>referredTo</code>",
+      "opinions":false,
+      "parentheticals":false,
+      "recap_archive":true,
+      "oral_arguments":false
+   },
+   {
+      "field":"assignedTo",
+      "description":"A full-text searchable field containing the judge name a case was assigned to. This can be useful for judges that do not yet have an ID in our database. See also: <code>assigned_to_id</code>",
+      "opinions":false,
+      "parentheticals":false,
+      "recap_archive":true,
+      "oral_arguments":false
+   },
+   {
+      "field":"referredTo",
+      "description":"A full-text searchable field containing the judge name a case was referred to. This can be useful for judges that do not yet have an ID in our database. See also: <code>referred_to_id</code>",
+      "opinions":false,
+      "parentheticals":false,
+      "recap_archive":true,
+      "oral_arguments":false
+   },
+   {
+      "field":"judge",
+      "description":"A full-text searchable field containing the judge name, if known. This can be useful for judges that do not yet have an ID in our database.",
+      "opinions":true,
+      "parentheticals":true,
+      "recap_archive":false,
+      "oral_arguments":true
+   },
+   {
+      "field":"per_curiam",
+      "description":"Whether an opinion was written per curiam.",
+      "opinions":true,
+      "parentheticals":false,
+      "recap_archive":false,
+      "oral_arguments":false
+   },
+   {
+      "field":"dateFiled",
+      "description":"The date that a case or opinion was filed in the court.",
+      "opinions":true,
+      "parentheticals":true,
+      "recap_archive":true,
+      "oral_arguments":false
+   },
+   {
+      "field":"entry_date_filed",
+      "description":"The date of a document entry in the PACER docket.",
+      "opinions":false,
+      "parentheticals":false,
+      "recap_archive":true,
+      "oral_arguments":false
+   },
+   {
+      "field":"dateArgued",
+      "description":"The date that a case was first argued.",
+      "opinions":true,
+      "parentheticals":true,
+      "recap_archive":true,
+      "oral_arguments":false
+   },
+   {
+      "field":"dateReargued",
+      "description":"The date that a case was reargued.",
+      "opinions":true,
+      "parentheticals":true,
+      "recap_archive":false,
+      "oral_arguments":true
+   },
+   {
+      "field":"dateReargumentDenied",
+      "description":"The date a that a motion for reargument was denied.",
+      "opinions":true,
+      "parentheticals":true,
+      "recap_archive":false,
+      "oral_arguments":true
+   },
+   {
+      "field":"dateTerminated",
+      "description":"The date that a case was terminated in PACER.",
+      "opinions":false,
+      "parentheticals":false,
+      "recap_archive":true,
+      "oral_arguments":false
+   },
+   {
+      "field":"caseName",
+      "description":"The name of the case.",
+      "opinions":true,
+      "parentheticals":true,
+      "recap_archive":true,
+      "oral_arguments":true
+   },
+   {
+      "field":"docketNumber",
+      "description":"The docket number for a case.",
+      "opinions":true,
+      "parentheticals":true,
+      "recap_archive":true,
+      "oral_arguments":true
+   },
+   {
+      "field":"citation",
+      "description":"An all-encompassing field containing all of the citations for an opinion.",
+      "opinions":true,
+      "parentheticals":true,
+      "recap_archive":false,
+      "oral_arguments":false
+   },
+   {
+      "field":"neutralCite",
+      "description":"The neutral citation for an opinion, if known.",
+      "opinions":true,
+      "parentheticals":true,
+      "recap_archive":false,
+      "oral_arguments":false
+   },
+   {
+      "field":"lexisCite",
+      "description":"The citation for a case within LexisNexis's database.",
+      "opinions":true,
+      "parentheticals":true,
+      "recap_archive":false,
+      "oral_arguments":false
+   },
+   {
+      "field":"suitNature",
+      "description":"The nature of suit for a case.",
+      "opinions":true,
+      "parentheticals":true,
+      "recap_archive":true,
+      "oral_arguments":false
+   },
+   {
+      "field":"citeCount",
+      "description":"The number of times an opinion has been cited. This field can accept range queries.",
+      "opinions":true,
+      "parentheticals":true,
+      "recap_archive":false,
+      "oral_arguments":false
+   },
+   {
+      "field":"status",
+      "description":"The precedential status of a case. Valid entries for this field are <code>u</code> for Unpublished, <code>p</code> for published, <code>r</code> for relating-to, and <code>i</code> for in chambers opinions.",
+      "opinions":true,
+      "parentheticals":true,
+      "recap_archive":false,
+      "oral_arguments":false
+   },
+   {
+      "field":"cites",
+      "description":"All of the item IDs that cite an opinion.",
+      "opinions":true,
+      "parentheticals":true,
+      "recap_archive":false,
+      "oral_arguments":false
+   },
+   {
+      "field":"document_type",
+      "description":"Whether an item in the RECAP Archive is a document or an attachment. Allowed values are <code><a href='/?q=document_type%3A%22PACER+Document%22&type=r&order_by=score+desc' rel='nofollow'>PACER Document</a></code> or <code><a href='/?q=document_type%3AAttachment&type=r&order_by=score+desc' rel='nofollow'>Attachment</a></code>",
+      "opinions":false,
+      "parentheticals":false,
+      "recap_archive":true,
+      "oral_arguments":false
+   },
+   {
+      "field":"document_number",
+      "description":"The document number of the item on the PACER docket.",
+      "opinions":false,
+      "parentheticals":false,
+      "recap_archive":true,
+      "oral_arguments":false
+   },
+   {
+      "field":"attachment_number",
+      "description":"The attachment number of the item on the PACER docket.",
+      "opinions":false,
+      "parentheticals":false,
+      "recap_archive":true,
+      "oral_arguments":false
+   },
+   {
+      "field":"is_available",
+      "description":"Whether a document is in the RECAP Archive.",
+      "opinions":false,
+      "parentheticals":false,
+      "recap_archive":true,
+      "oral_arguments":false
+   },
+   {
+      "field":"page_count",
+      "description":"The number of pages in a PACER document.",
+      "opinions":false,
+      "parentheticals":false,
+      "recap_archive":true,
+      "oral_arguments":false
+   },
+   {
+      "field":"description",
+      "description":"The description of a PACER document from the docket entry.",
+      "opinions":false,
+      "parentheticals":false,
+      "recap_archive":true,
+      "oral_arguments":false
+   },
+   {
+      "field":"short_description",
+      "description":"The short description of a PACER document from the download document page.",
+      "opinions":false,
+      "parentheticals":false,
+      "recap_archive":true,
+      "oral_arguments":false
+   },
+   {
+      "field":"juryDemand",
+      "description":"The jury demand for a case in PACER.",
+      "opinions":false,
+      "parentheticals":false,
+      "recap_archive":true,
+      "oral_arguments":false
+   }
+]

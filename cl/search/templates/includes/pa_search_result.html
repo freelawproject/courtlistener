@@ -5,23 +5,23 @@
 
 {% for result in results.object_list %}
   {% with opinion=result.grouped_by_opinion_cluster_id.hits.hits.0|get_attrdict:"_source" %}
-
   <article>
     <h3 class="bottom serif">
-      <a href="{% url 'view_case' opinion.opinion_cluster_id opinion.opinion_cluster_slug %}?{{ request.META.QUERY_STRING }}" class="visitable">
-        {{ opinion.opinion_cluster_case_name|safe }}
+      <a href="{% url 'view_case' opinion.cluster_id opinion.opinion_cluster_slug %}?{{ request.META.QUERY_STRING }}" class="visitable">
+        {{ opinion.caseName|safe }}
+        ({% if opinion.opinion_cluster_docket_court_id != 'scotus' %}{{ opinion.citation_string|nbsp|safe }}&nbsp;{% endif %}{{ opinion.dateFiled|date:"Y" }})
       </a>
     </h3>
     <div class="bottom">
       <div class="inline-block">
         <span class="meta-data-header">Docket Number:</span>
-        <span class="meta-data-value select-all">{{ opinion.opinion_cluster_docket_number|safe }}</span>
+        <span class="meta-data-value select-all">{{ opinion.docketNumber|safe }}</span>
       </div>
       <div class="inline-block">
         <span class="meta-data-header">Date Filed:</span>
-        <time class="meta-data-value" datetime="{{ opinion.opinion_cluster_date_filed }}">
-          {% if opinion.opinion_cluster_date_filed %}
-            {{ opinion.opinion_cluster_date_filed }}
+        <time class="meta-data-value" datetime="{{ opinion.dateFiled }}">
+          {% if opinion.dateFiled %}
+            {{ opinion.dateFiled|date:"F jS, Y"  }}
           {% else %}
             Unknown Date
           {% endif %}
@@ -32,7 +32,7 @@
         <div class="col-md-offset-half">
         {% with pa_group=parenthetical_group|get_attrdict:"_source" %}
           <h4>
-            <a href="{% url 'view_case' pa_group.opinion_cluster_id pa_group.opinion_cluster_slug %}?{{ request.META.QUERY_STRING }}" class="visitable">
+            <a href="{% url 'view_case' pa_group.describing_opinion_cluster_id pa_group.describing_opinion_cluster_slug %}?{{ request.META.QUERY_STRING }}" class="visitable">
               {{ pa_group.representative_text|safe }}
             </a>
           </h4>
@@ -43,7 +43,7 @@
         {% with limit=results_details.2 %}
         {% with remaining=result.doc_count|sub:limit %}
         {% if remaining > 0 %}
-        <a href="{% url "show_results" %}?type={{ type }}&amp;q={% if request.GET.q %}({{ request.GET.q }}) AND {% endif %}opinion_cluster_id:{{ opinion.opinion_cluster_id }}" class="btn-default btn">View {{ remaining }} Additional Result{{ remaining|pluralize }} for
+        <a href="{% url "show_results" %}?type={{ type }}&amp;q={% if request.GET.q %}({{ request.GET.q }}) AND {% endif %}cluster_id:{{ opinion.cluster_id }}" class="btn-default btn">View {{ remaining }} Additional Result{{ remaining|pluralize }} for
             this Case</a>
         {% endif %}
         {% endwith %}
