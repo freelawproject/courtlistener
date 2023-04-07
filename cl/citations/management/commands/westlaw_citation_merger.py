@@ -7,9 +7,11 @@ import numpy as np
 import pandas as pd
 from courts_db import find_court
 from django.core.management import BaseCommand
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
+from django.db.models.query import QuerySet
 from eyecite import get_citations
 from eyecite.models import FullCaseCitation
+from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from pandas import DataFrame
 from pandas.io.parsers import TextFileReader
 
@@ -18,7 +20,9 @@ from cl.corpus_importer.management.commands.harvard_opinions import (
     winnow_case_name,
 )
 from cl.lib.command_utils import logger
-from cl.search.models import Citation, OpinionCluster
+from cl.search.models import Citation, Court, Docket, Opinion, OpinionCluster
+
+cnt = CaseNameTweaker()
 
 
 def load_csv_file(csv_path: str) -> DataFrame | TextFileReader:
@@ -30,7 +34,9 @@ def load_csv_file(csv_path: str) -> DataFrame | TextFileReader:
     data = pd.read_csv(csv_path, delimiter=",")
     # Replace nan in dataframe
     data = data.replace(np.nan, "", regex=True)
-    logger.info(f"Found {len(data.index)} rows in csv file.")
+    logger.info(
+        f"(Westlaw) Found {len(data.index)} rows in csv file: {csv_path}"
+    )
     return data
 
 
@@ -67,61 +73,20 @@ def case_names_overlap(case: OpinionCluster, case_name: str) -> bool:
     return False
 
 
-def add_citation(citation: str, cluster_id: int, debug: bool = False) -> None:
-    """Add citation to OpinionCluster
-    :param citation: str citation
-    :param cluster_id: Cluster id of found case
-    :param debug: set false to save changes
-    :return: None
-    """
-
-    # Process the citation string before proceeding
-    citations = prepare_citation(citation)
-
-    if not citations:
-        logger.warning(
-            f"The citation: {citation} you are trying to add to the cluster "
-            f"id: {cluster_id} is invalid."
-        )
-        return
-
-    # Get correct reporter type before trying to add the citation
-    if not citations[0].corrected_reporter():
-        reporter_type = Citation.STATE
-    else:
-        cite_type_str = citations[0].all_editions[0].reporter.cite_type
-        reporter_type = map_reporter_db_cite_type(cite_type_str)
-
-    try:
-        if not debug:
-            Citation.objects.get_or_create(
-                volume=citations[0].groups["volume"],
-                reporter=citations[0].corrected_reporter(),
-                page=citations[0].groups["page"],
-                type=reporter_type,
-                cluster_id=cluster_id,
-            )
-        logger.info(f'Citation "{citation}" added to cluster id: {cluster_id}')
-    except IntegrityError:
-        logger.warning(
-            f"Reporter mismatch for cluster: {cluster_id} on cite: {citation}"
-        )
-
-
-def prepare_date(date_str: str) -> date | None:
+def prepare_date(date_str: str | None = None) -> date | None:
     """Convert dates like 'February 28, 2011' or '2011-02-28' to date object
     :param date_str: date string
     :return: date object or None
     """
-    valid_formats = ["%B %d, %Y", "%Y-%m-%d"]
-    for date_format in valid_formats:
-        try:
-            date_obj = datetime.strptime(date_str, date_format)
-            return date_obj.date()
-        except ValueError:
-            continue
-
-    logger.warning(f"Invalid date string: {date_str}")
+    if date_str:
+        valid_formats = ["%B %d, %Y", "%Y-%m-%d"]
+        for date_format in valid_formats:
+            try:
+                date_obj = datetime.strptime(date_str, date_format)
+                return date_obj.date()
+            except ValueError:
+                continue
+        logger.warning(f"(Westlaw) Invalid date string: {date_str}")
     return None
 
 
@@ -138,28 +103,188 @@ def prepare_citation(citation: str) -> Union[List[FullCaseCitation], List]:
     return citations
 
 
-def find_case_with_citation(
-    citation_str: str,
+def get_court_filter(court: str | None = None) -> dict:
+    """Create dict with court filter
+    :param court: court name or none
+    :return: dict
+    """
+    if court:
+        # Remove dot at end, court-db fails to find court with
+        # dot at end, e.g. "Supreme Court of Pennsylvania." fails,
+        # but "Supreme Court of Pennsylvania" doesn't
+        court = court.strip(".")
+
+        # Try without bankruptcy flag
+        found_court = find_court(court, bankruptcy=False)
+
+        if not found_court:
+            # Try with bankruptcy flag
+            found_court = find_court(court, bankruptcy=True)
+
+        if len(found_court) >= 1:
+            court_id = found_court[0]
+            return {"docket__court__id": court_id}
+
+    return {}
+
+
+def add_stub_case(
+    valid_citations: list,
+    court_str: str,
+    case_name: str,
+    date_filed: str | None = None,
+    debug: bool = False,
+) -> None:
+    """Add stub case
+    :param valid_citations: List of valid citations to add
+    :param court_str: Court name
+    :param case_name: Case name
+    :param date_filed: Date filed optional
+    :param debug: if true don't save changes
+    """
+
+    # Remove dot at end
+    court_name = court_str.strip(".")
+
+    # Try without bankruptcy flag
+    found_court = find_court(court_name, bankruptcy=False)
+
+    if not found_court:
+        # Try with bankruptcy flag
+        found_court = find_court(court_name, bankruptcy=True)
+
+    if len(found_court) >= 1:
+        court = Court.objects.get(pk=found_court[0])
+    else:
+        logger.info(f"(Westlaw) Couldn't find court: {court_name}")
+        return
+
+    # Prepare date
+    prep_date_filed = prepare_date(date_filed)
+
+    if court and prep_date_filed:
+        if not debug:
+            with transaction.atomic():
+                # Prepare case name
+                case_name = harmonize(case_name)
+                case_name_short = cnt.make_case_name_short(case_name)
+
+                docket = Docket.objects.create(
+                    source=0,
+                    court=court,
+                    case_name=case_name,
+                    case_name_short=case_name_short,
+                    case_name_full=case_name,
+                    date_filed=prep_date_filed,
+                )
+
+                cluster = OpinionCluster.objects.create(
+                    case_name=case_name,
+                    case_name_short=case_name_short,
+                    case_name_full=case_name,
+                    docket=docket,
+                    date_filed=prep_date_filed,
+                )
+
+                # By default, add to solr to make it searchable
+                Opinion.objects.create(
+                    cluster=cluster,
+                    type="Lead Opinion",
+                    plain_text="We don't have enough information about this "
+                    "case/citation.",
+                )
+
+                add_citations(valid_citations, cluster.pk, debug)
+
+                logger.info(
+                    f"(Westlaw) Stub case added correctly, "
+                    f"cluster id: {cluster.pk}"
+                )
+        else:
+            logger.info(f"(Westlaw) Stub case added correctly")
+
+
+def extract_valid_citations(citations) -> list:
+    """Extract citations from list of strings
+    :param citations: list with string citations
+    :return: list with valid FullCaseCitation citations
+    """
+    valid_citations = []
+    for citation in citations:
+        validated_citation = prepare_citation(citation)
+        if validated_citation:
+            valid_citations.extend(validated_citation)
+        else:
+            logger.warning(f'(Westlaw) Invalid citation found: "{citation}"')
+    return valid_citations
+
+
+def add_citations(
+    citations: list, cluster_id: int, debug: bool = False
+) -> None:
+    """Add citation to OpinionCluster
+    :param citations: list with valid citations
+    :param cluster_id: Cluster id of found case
+    :param debug: set false to save changes
+    :return: None
+    """
+
+    for citation in citations:
+        # Get correct reporter type before trying to add the citation
+        if not citation.corrected_reporter():
+            reporter_type = Citation.STATE
+        else:
+            cite_type_str = citation.all_editions[0].reporter.cite_type
+            reporter_type = map_reporter_db_cite_type(cite_type_str)
+
+        try:
+            if not debug:
+                obj, created = Citation.objects.get_or_create(
+                    volume=citation.groups["volume"],
+                    reporter=citation.corrected_reporter(),
+                    page=citation.groups["page"],
+                    type=reporter_type,
+                    cluster_id=cluster_id,
+                )
+            else:
+                # Force to show log message when debug is true, if false log
+                # message will only show if new citation is created
+                created = True
+
+            if created:
+                logger.info(
+                    f'(Westlaw) Citation "{citation.corrected_citation()}"'
+                    f" added to cluster id: {cluster_id}"
+                )
+
+        except IntegrityError:
+            logger.warning(
+                f"(Westlaw) Reporter mismatch for cluster: {cluster_id} on "
+                f"cite: {citation.corrected_citation()}"
+            )
+
+
+def find_cases_with_citations(
+    valid_citations: list,
     court: str | None = None,
     date_filed: str | None = None,
     case_name: str | None = None,
     docket_number: str | None = None,
-) -> OpinionCluster | None:
+) -> "QuerySet[OpinionCluster]":
     """Search for possible case using citation, court, date filed and case name
-    :param citation_str: Citation str
+    :param valid_citations: list with valid citations from csv row
     :param court: Court name
     :param date_filed: The date the case was filed
     :param case_name: The case name
     :param docket_number: The docket number
-    :return: OpinionCluster or None
+    :return: OpinionCluster QuerySet
     """
-    prepared_citation = prepare_citation(citation_str)
-
-    if prepared_citation:
+    results_ids = []
+    for citation in valid_citations:
         citation_search_params = {
-            "citations__volume": prepared_citation[0].groups.get("volume"),
-            "citations__reporter": prepared_citation[0].corrected_reporter(),
-            "citations__page": prepared_citation[0].groups.get("page"),
+            "citations__volume": citation.groups.get("volume"),
+            "citations__reporter": citation.corrected_reporter(),
+            "citations__page": citation.groups.get("page"),
         }
 
         # Filter by citation
@@ -175,89 +300,93 @@ def find_case_with_citation(
                     cluster_results.first(), case_name
                 )
                 if names_are_similar:
-                    # Case names are similar, we have a match
-                    return cluster_results.first()
+                    # Case names are similar, we have a match, store the pk
+                    results_ids.append(cluster_results.first().pk)
 
-        court_id = None
-        if court:
-            # Remove dot at end, court-db fails to find court with
-            # dot at end, e.g. "Supreme Court of Pennsylvania." fails,
-            # but "Supreme Court of Pennsylvania" doesn't
-            court = court.strip(".")
+        if not results_ids:
+            # If we don't get a single match with citation
 
-            # Try without bankruptcy flag
-            found_court = find_court(court, bankruptcy=False)
+            # Basic filter
+            filters = {
+                "case_name": case_name,
+                "docket__docket_number": docket_number,
+            }
 
-            if not found_court:
-                # Try with bankruptcy flag
-                found_court = find_court(court, bankruptcy=True)
-
-            if len(found_court) >= 1:
-                court_id = found_court[0]
-
-        filters = {
-            "docket__court__id": court_id,
-            "case_name": case_name,
-            "docket__docket_number": docket_number,
-        }
-
-        if date_filed:
-            # Only add date if we have one
             prep_date_filed = prepare_date(date_filed)
             if prep_date_filed:
                 filters["date_filed"] = prep_date_filed.strftime("%Y-%m-%d")
 
-        # Remove any None value
-        filters = {
-            key: value for key, value in filters.items() if value is not None
-        }
+            # Add court to filters if we have court in csv
+            filters.update(get_court_filter(court))
 
-        # Generate all possible combinations of filters
-        generated_filters = dict_all_combinations(filters)
+            # Remove any None value
+            filters = {
+                key: value
+                for key, value in filters.items()
+                if value is not None
+            }
 
-        obj = None
+            # Generate all possible combinations of filters
+            generated_filters = dict_all_combinations(filters)
 
-        # Apply all possible combination of filters to try to get the case
-        for queryset_filter in generated_filters:
-            # cluster_results is already filtered by citation
-            results = cluster_results.filter(**queryset_filter)
-            filter_results_count = results.count()
-            if filter_results_count == 1:
-                obj = results.first()
-                break
-            else:
-                # Try next filter
-                continue
+            # We start with complex filters and go to most basic filter which
+            # can return multiple results
+            generated_filters = sorted(
+                generated_filters, key=lambda d: len(d.keys()), reverse=True
+            )
 
-        if not obj:
-            # We couldn't find a match using filters, if only filtering by
-            # citation gave us a large queryset, lets try to compare each
-            # result with case name to try to find a match
-            if results_count > 1:
-                for cluster in cluster_results:
+            # Apply all possible combination of filters to try to get the case
+            for queryset_filter in generated_filters:
+                # cluster_results is already filtered by citation
+                if cluster_results:
+                    # When we have results with citation
+                    results = cluster_results.filter(**queryset_filter)
+                else:
+                    # When we don't have any results with citation, use the
+                    # other filters to try to find the case
+                    results = OpinionCluster.objects.filter(**queryset_filter)
+                filter_results_count = results.count()
+                if filter_results_count == 1:
                     if case_name:
                         names_are_similar = case_names_overlap(
-                            cluster, case_name
+                            results.first(), case_name
                         )
                         if names_are_similar:
-                            # We found a case with similar name to westlaw data
-                            return cluster
+                            # We found a case with similar name to westlaw
+                            # data, store pk
+                            results_ids.append(results.first().pk)
+                else:
+                    # Try next filter
+                    continue
 
-        # Perform extra check to be sure that we have the correct case
-        if obj:
-            if case_name:
-                names_are_similar = case_names_overlap(obj, case_name)
-                if names_are_similar:
-                    # We got a match
-                    return obj
+            if not results_ids:
+                # We couldn't find a match using filters, if only filtering by
+                # citation gave us a large queryset, lets try to compare each
+                # result with case name to try to find a match
+                if results_count > 1:
+                    for cluster in cluster_results:
+                        if case_name:
+                            names_are_similar = case_names_overlap(
+                                cluster, case_name
+                            )
+                            if names_are_similar:
+                                # We found a case with similar name to
+                                # westlaw data
+                                results_ids.append(cluster.pk)
 
-        return None
+    # Remove possible duplicated ids
+    results_ids = list(set(results_ids))
 
-    else:
-        logger.warning(f'Invalid citation found: "{citation_str}"')
+    if len(results_ids) > 1:
+        # Possible duplicate cases, we still add citations to cases that
+        # match the search criteria
+        logger.warning(
+            f"(Westlaw) Possible duplicated cases with ids: {','.join(results_ids)}"
+        )
 
-        # No result at all
-        return None
+    # Return a queryset of all the possible cases matched by filter and case
+    # name overlap, remove duplicated ids to filter
+    return OpinionCluster.objects.filter(pk__in=results_ids)
 
 
 def process_westlaw_data(
@@ -277,52 +406,41 @@ def process_westlaw_data(
         docket_number = row.get("Docket Num")
         date_filed = row.get("Filed Date")
 
-        # Find a match for each citation, westlaw data only have two citations
-        # in the csv files
-        citation_cluster_result = find_case_with_citation(
-            citation, court, date_filed, case_name, docket_number
-        )
-        parallel_citation_cluster_result = find_case_with_citation(
-            parallel_citation, court, date_filed, case_name, docket_number
-        )
+        citations = []
+        if citation:
+            citations.append(citation)
+        if parallel_citation:
+            citations.append(parallel_citation)
 
-        if citation_cluster_result and not parallel_citation_cluster_result:
-            # Add citation to cluster
-            add_citation(
-                parallel_citation,
-                citation_cluster_result.pk,
-                debug,
+        valid_citations = extract_valid_citations(citations)
+
+        if valid_citations:
+            search_results = find_cases_with_citations(
+                valid_citations, court, date_filed, case_name, docket_number
             )
-        elif not citation_cluster_result and parallel_citation_cluster_result:
-            # Add citation to cluster
-            add_citation(
-                citation,
-                parallel_citation_cluster_result.pk,
-                debug,
-            )
-        elif citation_cluster_result and parallel_citation_cluster_result:
-            # The case could be duplicated, compare the id of each result
-            if (
-                citation_cluster_result.pk
-                != parallel_citation_cluster_result.pk
-            ):
-                logger.warning(
-                    f'Possible duplicated cases for citations: "{citation}" '
-                    f"with cluster: {citation_cluster_result.pk} and "
-                    f"{parallel_citation_cluster_result.pk} "
+
+            if search_results:
+                for search_result in search_results:
+                    add_citations(valid_citations, search_result.pk, debug)
+            else:
+                # We couldn't get any search result to add the citations
+                if case_name and valid_citations and court and date_filed:
+                    add_stub_case(
+                        valid_citations, court, case_name, date_filed, debug
+                    )
+                else:
+                    # +1 to indicate row considering the header
+                    logger.info(f"(Westlaw) Invalid data in row: {index + 1}")
+
+        else:
+            # Add stub case if possible
+            if case_name and valid_citations and court and date_filed:
+                add_stub_case(
+                    valid_citations, court, case_name, date_filed, debug
                 )
             else:
-                logger.info(
-                    f"Cluster {citation_cluster_result.pk} already have both "
-                    f'citations "{citation}" and "{parallel_citation}" '
-                )
-        else:
-            # No results
-            logger.info(
-                f'No results for case: "{case_name}" with '
-                f'citation: "{citation}" or parallel citation: '
-                f'"{parallel_citation}"'
-            )
+                # +1 to indicate row considering the header
+                logger.info(f"(Westlaw) Invalid data in row: {index + 1}")
 
 
 class Command(BaseCommand):
