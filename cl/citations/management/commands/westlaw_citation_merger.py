@@ -184,6 +184,7 @@ def add_stub_case(
                     case_name_full=case_name,
                     docket=docket,
                     date_filed=prep_date_filed,
+                    precedential_status="Unknown",
                 )
 
                 # By default, add to solr to make it searchable
