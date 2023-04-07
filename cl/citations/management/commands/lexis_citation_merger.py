@@ -433,9 +433,19 @@ def find_cases_with_citations(
                                 # data
                                 results_ids.append(cluster.pk)
 
+    # Remove possible duplicated ids
+    results_ids = list(set(results_ids))
+
+    if len(results_ids) > 1:
+        # Possible duplicate cases, we still add citations to cases that
+        # match the search criteria
+        logger.warning(
+            f"(Westlaw) Possible duplicated cases with ids: {','.join(map(str, results_ids))}"
+        )
+
     # Return a queryset of all the possible cases matched by filter and case
     # name overlap, remove duplicated ids to filter
-    return OpinionCluster.objects.filter(pk__in=list(set(results_ids)))
+    return OpinionCluster.objects.filter(pk__in=results_ids)
 
 
 def process_lexis_data(data: DataFrame | TextFileReader, debug: bool) -> None:
@@ -482,6 +492,9 @@ def process_lexis_data(data: DataFrame | TextFileReader, debug: bool) -> None:
                         date_decided,
                         debug,
                     )
+                else:
+                    # +1 to indicate row considering the header
+                    logger.info(f"(Lexis) Invalid data in row: {index + 1}")
 
         else:
             if (
@@ -499,6 +512,9 @@ def process_lexis_data(data: DataFrame | TextFileReader, debug: bool) -> None:
                     date_decided,
                     debug,
                 )
+            else:
+                # +1 to indicate row considering the header
+                logger.info(f"(Lexis) Invalid data in row: {index + 1}")
 
 
 class Command(BaseCommand):
