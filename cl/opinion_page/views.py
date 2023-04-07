@@ -276,18 +276,19 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
         current_de = quick_entries[4]
         next_de = quick_entries[5]
         n = 5
-        while (n < len(quick_entries)-1
-               and current_de.date_filed
-               and next_de.date_filed
-               and next_de.date_filed == current_de.date_filed
-               ):      
+        while (
+            n < len(quick_entries) - 1
+            and current_de.date_filed
+            and next_de.date_filed
+            and next_de.date_filed == current_de.date_filed
+        ):
             n = n + 1
             current_de = next_de
             current_de = quick_entry[n]
         quick_entries = quick_entries[0:n]
         quick_entries.append(de_list[0])
         quick_entries.reverse()
-    
+
     form = DocketEntryFilterForm(request.GET, request=request)
     if form.is_valid():
         cd = form.cleaned_data
