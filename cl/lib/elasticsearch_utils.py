@@ -1,4 +1,5 @@
 import operator
+import re
 from datetime import date
 from functools import reduce
 from typing import Dict, List
@@ -53,6 +54,20 @@ def build_fulltext_query(field: str, value: str) -> QueryString | None:
     """
 
     if value:
+        # In Elasticsearch, the colon (:) character is used to separate the
+        # field name and the field value in a query.
+        # To avoid parsing errors escape any colon characters in the value
+        # parameter with a backslash.
+        if "docketNumber:" in value:
+            docket_number = re.search("docketNumber:([^ ]+)", value)
+            if docket_number:
+                docket_number = docket_number.group(1)
+                docket_number = docket_number.replace(":", r"\:")
+                value = re.sub(
+                    r"docketNumber:([^ ]+)",
+                    f"docketNumber:{docket_number}",
+                    value,
+                )
         return Q("query_string", query=value, fields=[field])
     return None
 
