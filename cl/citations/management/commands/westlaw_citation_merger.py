@@ -381,7 +381,7 @@ def find_cases_with_citations(
         # Possible duplicate cases, we still add citations to cases that
         # match the search criteria
         logger.warning(
-            f"(Westlaw) Possible duplicated cases with ids: {','.join(results_ids)}"
+            f"(Westlaw) Possible duplicated cases with ids: {','.join(map(str, results_ids))}"
         )
 
     # Return a queryset of all the possible cases matched by filter and case
