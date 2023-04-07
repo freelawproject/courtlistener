@@ -264,24 +264,30 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     sort_order_asc = True
 
     de_list = docket.docket_entries.all().prefetch_related("recap_documents")
-    de_as_list = list(de_list)
-    n = min(len(de_as_list) - 1, 4)
-    if n < 4:
-        quick_entries = de_as_list[-n:]
+    # First DB hit, we should be asking for the last 25 entries
+    # in the reverse ordered list.
+    quick_entries = list(de_list.reverse()[0:24])
+    #
+    # if there are less than 6 entries than we have what we need but in
+    # the wrong order
+    if len(quick_entries) < 6:
+        quick_entries = quick_entries.reverse()
     else:
-        quick_entries = de_as_list[-n:]
-        current = quick_entries[0]
-        n = n - 1
-        while (
-            n > 0
-            and current.date_filed
-            and de_as_list[n].date_filed
-            and de_as_list[n].date_filed == current.date_filed
-        ):
-            current = de_as_list[n]
-            n = n - 1
-            quick_entries.insert(0, current)
-        quick_entries.insert(0,de_as_list[0])
+        current_de = quick_entries[4]
+        next_de = quick_entries[5]
+        n = 5
+        while (n < len(quick_entries)-1
+               and current_de.date_filed
+               and next_de.date_filed
+               and next_de.date_filed == current_de.date_filed
+               ):      
+            n = n + 1
+            current_de = next_de
+            current_de = quick_entry[n]
+        quick_entries = quick_entries[0:n]
+        quick_entries.append(de_list[0])
+        quick_entries.reverse()
+    
     form = DocketEntryFilterForm(request.GET, request=request)
     if form.is_valid():
         cd = form.cleaned_data
