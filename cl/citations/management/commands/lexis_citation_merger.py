@@ -229,6 +229,7 @@ def add_stub_case(
                     date_filed=prep_date_filed
                     if prep_date_filed
                     else prep_date_decided,
+                    precedential_status="Unknown",
                 )
 
                 # By default, add to solr to make it searchable
