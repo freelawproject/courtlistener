@@ -3,7 +3,7 @@
       "field":"id",
       "description":"The ID of the item in the CourtListener system.",
       "opinions":true,
-      "parentheticals":true,
+      "parentheticals":false,
       "recap_archive":true,
       "oral_arguments":true
    },
@@ -21,7 +21,7 @@
       "opinions":false,
       "parentheticals":false,
       "recap_archive":true,
-      "oral_arguments":true
+      "oral_arguments":false
    },
    {
       "field":"scdb_id",
@@ -109,7 +109,7 @@
       "opinions":true,
       "parentheticals":true,
       "recap_archive":false,
-      "oral_arguments":true
+      "oral_arguments":false
    },
    {
       "field":"assigned_to_id",
@@ -181,7 +181,7 @@
       "opinions":true,
       "parentheticals":true,
       "recap_archive":true,
-      "oral_arguments":false
+      "oral_arguments":true
    },
    {
       "field":"dateReargued",
@@ -330,6 +330,14 @@
    {
       "field":"short_description",
       "description":"The short description of a PACER document from the download document page.",
+      "opinions":false,
+      "parentheticals":false,
+      "recap_archive":true,
+      "oral_arguments":false
+   },
+   {
+      "field":"cause",
+      "description":"The cause of action for a case in PACER.",
       "opinions":false,
       "parentheticals":false,
       "recap_archive":true,
