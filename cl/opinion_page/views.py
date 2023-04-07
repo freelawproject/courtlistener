@@ -271,7 +271,7 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     # if there are less than 6 entries than we have what we need but in
     # the wrong order
     if len(quick_entries) < 6:
-        quick_entries = quick_entries.reverse()
+        quick_entries.reverse()
     else:
         current_de = quick_entries[4]
         next_de = quick_entries[5]
@@ -284,7 +284,7 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
         ):
             n = n + 1
             current_de = next_de
-            current_de = quick_entry[n]
+            current_de = quick_entries[n]
         quick_entries = quick_entries[0:n]
         quick_entries.append(de_list[0])
         quick_entries.reverse()
