@@ -59,9 +59,9 @@ def build_fulltext_query(field: str, value: str) -> QueryString | None:
         # To avoid parsing errors escape any colon characters in the value
         # parameter with a backslash.
         if "docketNumber:" in value:
-            docket_number = re.search("docketNumber:([^ ]+)", value)
-            if docket_number:
-                docket_number = docket_number.group(1)
+            docket_number_match = re.search("docketNumber:([^ ]+)", value)
+            if docket_number_match:
+                docket_number = docket_number_match.group(1)
                 docket_number = docket_number.replace(":", r"\:")
                 value = re.sub(
                     r"docketNumber:([^ ]+)",
