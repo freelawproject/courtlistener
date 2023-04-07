@@ -261,6 +261,7 @@ def core_docket_data(
 def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     docket, context = core_docket_data(request, pk)
     increment_view_count(docket, request)
+    sort_order_asc=True
 
     de_list = docket.docket_entries.all().prefetch_related("recap_documents")
     form = DocketEntryFilterForm(request.GET, request=request)
@@ -276,6 +277,7 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
         if cd.get("filed_before"):
             de_list = de_list.filter(date_filed__lte=cd["filed_before"])
         if cd.get("order_by") == DocketEntryFilterForm.DESCENDING:
+            sort_order_asc=False
             de_list = de_list.order_by(
                 "-recap_sequence_number", "-entry_number"
             )
@@ -293,6 +295,7 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
         {
             "parties": docket.parties.exists(),  # Needed to show/hide parties tab.
             "docket_entries": docket_entries,
+            "sort_order_asc": sort_order_asc,
             "form": form,
             "get_string": make_get_string(request),
         }
