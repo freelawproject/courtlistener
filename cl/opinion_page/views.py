@@ -281,7 +281,7 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
             current = de_as_list[n]
             n = n - 1
             quick_entries.insert(0, current)
-        quick_entries.insert(0,de_as_list[0])
+        quick_entries.insert(0, de_as_list[0])
     form = DocketEntryFilterForm(request.GET, request=request)
     if form.is_valid():
         cd = form.cleaned_data
