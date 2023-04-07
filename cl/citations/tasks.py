@@ -26,6 +26,7 @@ from cl.search.models import (  # OpinionsCitedByRECAPDocument,
     Opinion,
     OpinionCluster,
     OpinionsCited,
+    OpinionsCitedByRECAPDocument,
     Parenthetical,
     RECAPDocument,
 )
@@ -77,12 +78,12 @@ def identify_parallel_citations(
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
 def find_citations_and_parantheticals_for_recap_documents(
-    self, doc_ids: List[int], index: bool = True
+    self, doc_ids: List[int]
 ):
     """Find citations and authored parentheticals for search.RECAPDocument objects.
 
     :param doc_ids: An iterable of search.RECAPDocument PKs
-    :param index: Whether to add the items to Solr
+
     :return: None
     """
     documents: List[RECAPDocument] = RECAPDocument.objects.filter(
@@ -91,7 +92,7 @@ def find_citations_and_parantheticals_for_recap_documents(
 
     for d in documents:
         try:
-            store_recap_citations_and_update_parentheticals(d, index)
+            store_recap_citations(d)
         except ResponseNotReady as e:
             # Threading problem in httplib, which is used in the Solr query.
             raise self.retry(exc=e, countdown=2)
@@ -246,14 +247,12 @@ def store_opinion_citations_and_update_parentheticals(
         opinion.save(index=False)
 
 
-def store_recap_citations_and_update_parentheticals(
-    document: RECAPDocument, index: bool
-) -> None:
+def store_recap_citations(document: RECAPDocument) -> None:
     """
-    Updates counts of citations to other opinions within a given court opinion, as well as parenthetical info for the cited opinions.
+    Updates counts of citations to other opinions within a given court opinion.
 
     :param document: A search.RECAPDocument object.
-    :param index: Whether to add the item to Solr
+
     :return: None
     """
     ######
@@ -280,44 +279,22 @@ def store_recap_citations_and_update_parentheticals(
     # Delete the unmatched citations
     citation_resolutions.pop(NO_MATCH_RESOURCE, None)
 
-    currently_cited_opinions = document.cited_opinions.all().values_list(
-        "pk", flat=True
-    )
-
-    opinion_ids_to_update = set(
-        [
-            o.pk
-            for o in citation_resolutions.keys()
-            if o.pk not in currently_cited_opinions
-        ]
-    )
-
-    clusters_to_update_par_groups_for = set()
-    parentheticals: List[Parenthetical] = []
-
-    for opinion_object, _citations in citation_resolutions.items():
-        # Currently, eyecite has a bug where parallel citations are
-        # detected individually. We avoid creating duplicate parentheticals
-        # because of that by keeping track of what we've seen so far.
-        parenthetical_texts = set()
-
-        for c in _citations:
-            if (
-                (par_text := c.metadata.parenthetical)
-                and par_text not in parenthetical_texts
-                and is_parenthetical_descriptive(par_text)
-            ):
-                parenthetical_texts.add(par_text)
-                clean = clean_parenthetical_text(par_text)
-                parentheticals.append(
-                    Parenthetical(
-                        describing_opinion_id=opinion.pk,
-                        described_opinion_id=_opinion.pk,
-                        text=clean,
-                        score=parenthetical_score(clean, opinion.cluster),
-                    )
-                )
+    # put parenthetical storage code here if such a feature is requested or desired; base off of the same functionality in `store_opinion_citations_and_update_parentheticals`
+    # https://github.com/freelawproject/courtlistener/issues/607#issuecomment-1500336779
 
     with transaction.atomic():
-        # OpinionsCit
-        pass
+        # delete existing citation entries
+        OpinionsCitedByRECAPDocument.objects.filter(
+            citing_document=document.pk
+        ).delete()
+
+        objects_to_create = [
+            OpinionsCitedByRECAPDocument(
+                citing_document_id=document.pk,
+                cited_opinion_id=opinion_object.pk,
+                depth=len(cits),
+            )
+            for opinion_object, cits in citation_resolutions.items()
+        ]
+
+        OpinionsCitedByRECAPDocument.objects.bulk_create(objects_to_create)

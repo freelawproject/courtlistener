@@ -1207,16 +1207,6 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         ),
         blank=True,
     )
-    # opinions_cited = models.OneToManyField()
-    # opinions_cited = models.ManyToManyField(
-    #     "self",
-    #     help_text="Opinions cited by this document",
-    #     through="OpinionsCitedByRECAPDocument",
-    #     through_fields=("citing_document", "cited_opinion"),
-    #     symmetrical=False,
-    #     related_name="documents_citing",
-    #     blank=True,
-    # )
 
     class Meta:
         unique_together = (
