@@ -1,0 +1,28 @@
+{% load pacer %}
+{% load tz %}
+<div class="fake-table col-xs-12" id="docket-entry-table">
+    <div class="row bold">
+        <div class="col-xs-1 text-center">
+            <p class="hidden-xs">Document Number</p>
+        </div>
+        <div class="col-xs-3 col-sm-2">Date&nbsp;Filed</div>
+        <div class="col-xs-7 col-sm-6">Description</div>
+    </div>
+    <div class="card accordion" id="top-accordion" >
+        <div class="card-header" id="quick-top" >
+            <h4 class="mb-0" >
+                <button class="btn btn-link collapsed" data-toggle="collapse" data-target="#quick-body" aria-expand="true" aria-controls="quick-top" >
+                    Quick Look
+                </button>
+            </h4>
+        </div>
+
+        <div id="quick-body" class="collapse" aria-labeledby="quick-top" data-parent="top-accordion" >
+            <div class="card-body" >
+                {% include "includes/de_list.html" with docket_entries=first_entry %}
+                {% include "includes/de_list.html" with docket_entries=last_entries %}
+            </div>
+        </div>
+    </div>
+    {% include "includes/de_list.html" %}
+</div>

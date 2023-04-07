@@ -1428,3 +1428,20 @@ textarea {
   max-width: 100%;
   height: auto;
 }
+/* Docket Accordion support */
+/* Sourced from: https://codepen.io/tofanelli/pen/waadRY 2023-04-07 */
+.accordion {
+    margin-left: -15px;
+    margin-right: -15px;
+}
+.accordion button:before {
+    /* symbol for "opening" panels */
+    font-family: "Glyphicons Halflings";
+    content: "\e114  ";
+    color: grey;
+}
+
+.accordion button.collapsed:before {
+    content: "\e080  ";
+}
+

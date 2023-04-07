@@ -26,7 +26,7 @@
 {% block tab-content %}
 {% if docket_entries.paginator.count %}
   {% include "includes/de_filter.html" %}
-  {% include "includes/de_list.html" %}
+  {% include "includes/de_list_w_accordion.html" %}
 {% else %}
   <div class="row">
     <div class="col-sm-8">

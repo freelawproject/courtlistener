@@ -264,6 +264,24 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     sort_order_asc = True
 
     de_list = docket.docket_entries.all().prefetch_related("recap_documents")
+    de_as_list = list(de_list)
+    first_entry = de_as_list[:1]
+    n = min(len(de_as_list) - 1, 4)
+    if n < 4:
+        last_entries = de_as_list[-n:]
+    else:
+        last_entries = de_as_list[-n:]
+        current = last_entries[0]
+        n = n - 1
+        while (
+            n > 0
+            and current.date_filed
+            and de_as_list[n].date_filed
+            and de_as_list[n].date_filed == current.date_filed
+        ):
+            current = de_as_list[n]
+            n = n - 1
+            last_entries.insert(0, current)
     form = DocketEntryFilterForm(request.GET, request=request)
     if form.is_valid():
         cd = form.cleaned_data
@@ -295,6 +313,8 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
         {
             "parties": docket.parties.exists(),  # Needed to show/hide parties tab.
             "docket_entries": docket_entries,
+            "first_entry": first_entry,
+            "last_entries": last_entries,
             "sort_order_asc": sort_order_asc,
             "form": form,
             "get_string": make_get_string(request),
