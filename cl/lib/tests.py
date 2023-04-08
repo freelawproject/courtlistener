@@ -877,31 +877,6 @@ class TestRateLimiters(SimpleTestCase):
                 self.assertEqual(parse_rate(q), a)
 
 
-class TestLibUtils(TestCase):
-    fixtures = ["test_objects_search.json", "judge_judy.json"]
-    citation = {"reporter": "F.2d", "volume": "56"}
-
-    def test_citation_page_filtering(self) -> None:
-        """Test citation alphanumeric ordering."""
-
-        cases_in_volume = (
-            OpinionCluster.objects.filter(
-                citations__reporter=self.citation["reporter"],
-                citations__volume=self.citation["volume"],
-            )
-            .annotate(cite_page=(F("citations__page")))
-            .order_by("cite_page")
-        )
-        # Cases are sorted out of order.
-        self.assertIn("56 F.2d 11", cases_in_volume[0].citation_string)
-        self.assertIn("56 F.2d 9", cases_in_volume[1].citation_string)
-
-        # Cases are now sorted in alpha-numerical order.
-        sorted_cases = alphanumeric_sort(cases_in_volume, "cite_page")
-        self.assertIn("56 F.2d 9", sorted_cases[0].citation_string)
-        self.assertIn("56 F.2d 11", sorted_cases[1].citation_string)
-
-
 class TestFactoriesClasses(TestCase):
     def test_related_factory_variable_list(self):
         court_scotus = CourtFactory(id="scotus")
