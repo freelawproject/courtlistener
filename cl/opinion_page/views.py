@@ -270,9 +270,7 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     #
     # if there are less than 6 entries than we have what we need but in
     # the wrong order
-    if len(quick_entries) < 6:
-        quick_entries.reverse()
-    else:
+    if len(quick_entries) > 5:
         current_de = quick_entries[4]
         next_de = quick_entries[5]
         n = 5
@@ -285,10 +283,11 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
             n = n + 1
             current_de = next_de
             current_de = quick_entries[n]
-        quick_entries = quick_entries[0:n]
+        quick_entries = quick_entries[: n - 1]
         quick_entries.append(de_list[0])
         quick_entries.reverse()
-
+    else:
+        pass  # all entries will be removed by the removal loop
     form = DocketEntryFilterForm(request.GET, request=request)
     if form.is_valid():
         cd = form.cleaned_data
@@ -315,6 +314,12 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
         docket_entries = paginator.page(1)
     except EmptyPage:
         docket_entries = paginator.page(paginator.num_pages)
+
+    for de in docket_entries:
+        try:
+            quick_entries.remove(de)
+        except ValueError:
+            pass
 
     context.update(
         {

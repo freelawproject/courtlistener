@@ -8,20 +8,22 @@
         <div class="col-xs-3 col-sm-2">Date&nbsp;Filed</div>
         <div class="col-xs-7 col-sm-6">Description</div>
     </div>
-    <div class="card accordion" id="top-accordion" >
-        <div class="card-header" id="quick-top" >
-            <h4 class="mb-0" >
-                <button class="btn btn-link collapsed" data-toggle="collapse" data-target="#quick-body" aria-expand="true" aria-controls="quick-top" >
-                    Quick Look
-                </button>
-            </h4>
-        </div>
+    {% if quick_entries  %}
+        <div class="card accordion" id="top-accordion" >
+            <div class="card-header" id="quick-top" >
+                <h4 class="mb-0" >
+                    <button class="btn btn-link collapsed" data-toggle="collapse" data-target="#quick-body" aria-expand="true" aria-controls="quick-top" >
+                        Quick Look
+                    </button>
+                </h4>
+            </div>
 
-        <div id="quick-body" class="collapse" aria-labeledby="quick-top" data-parent="top-accordion" >
-            <div class="card-body" >
-                {% include "includes/de_list.html" with docket_entries=quick_entries %}
+            <div id="quick-body" class="collapse" aria-labeledby="quick-top" data-parent="top-accordion" >
+                <div class="card-body" >
+                    {% include "includes/de_list.html" with docket_entries=quick_entries %}
+                </div>
             </div>
         </div>
-    </div>
+    {% endif %}
     {% include "includes/de_list.html" %}
 </div>
