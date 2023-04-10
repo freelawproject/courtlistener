@@ -1,4 +1,4 @@
-﻿BEGIN;
+BEGIN;
 --
 -- Remove trigger snapshot_insert from model grouppermissions
 --
@@ -103,9 +103,10 @@ BEGIN
             RETURN NEW;
         END IF;
     END IF;
-    INSERT INTO "users_grouppermissionsevent" ("group_id", "id", "permission_id", "pgh_context_id", "pgh_created_at",
-                                               "pgh_label")
-    VALUES (OLD."group_id", OLD."id", OLD."permission_id", _pgh_attach_context(), NOW(), 'update_or_delete_snapshot');
+    INSERT INTO "users_grouppermissionsevent" ("group_id", "id", "permission_id", "pgh_context_id",
+                                               "pgh_created_at", "pgh_label")
+    VALUES (OLD."group_id", OLD."id", OLD."permission_id", _pgh_attach_context(), NOW(),
+            'update_or_delete_snapshot');
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
@@ -162,9 +163,10 @@ BEGIN
             RETURN NEW;
         END IF;
     END IF;
-    INSERT INTO "users_grouppermissionsevent" ("group_id", "id", "permission_id", "pgh_context_id", "pgh_created_at",
-                                               "pgh_label")
-    VALUES (OLD."group_id", OLD."id", OLD."permission_id", _pgh_attach_context(), NOW(), 'update_or_delete_snapshot');
+    INSERT INTO "users_grouppermissionsevent" ("group_id", "id", "permission_id", "pgh_context_id",
+                                               "pgh_created_at", "pgh_label")
+    VALUES (OLD."group_id", OLD."id", OLD."permission_id", _pgh_attach_context(), NOW(),
+            'update_or_delete_snapshot');
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
@@ -220,8 +222,10 @@ BEGIN
             RETURN NEW;
         END IF;
     END IF;
-    INSERT INTO "users_groupproxyevent" ("id", "name", "pgh_context_id", "pgh_created_at", "pgh_label", "pgh_obj_id")
-    VALUES (OLD."id", OLD."name", _pgh_attach_context(), NOW(), 'update_or_delete_snapshot', OLD."id");
+    INSERT INTO "users_groupproxyevent" ("id", "name", "pgh_context_id", "pgh_created_at",
+                                         "pgh_label", "pgh_obj_id")
+    VALUES (OLD."id", OLD."name", _pgh_attach_context(), NOW(), 'update_or_delete_snapshot',
+            OLD."id");
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
@@ -278,8 +282,10 @@ BEGIN
             RETURN NEW;
         END IF;
     END IF;
-    INSERT INTO "users_groupproxyevent" ("id", "name", "pgh_context_id", "pgh_created_at", "pgh_label", "pgh_obj_id")
-    VALUES (OLD."id", OLD."name", _pgh_attach_context(), NOW(), 'update_or_delete_snapshot', OLD."id");
+    INSERT INTO "users_groupproxyevent" ("id", "name", "pgh_context_id", "pgh_created_at",
+                                         "pgh_label", "pgh_obj_id")
+    VALUES (OLD."id", OLD."name", _pgh_attach_context(), NOW(), 'update_or_delete_snapshot',
+            OLD."id");
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
@@ -335,10 +341,11 @@ BEGIN
             RETURN NEW;
         END IF;
     END IF;
-    INSERT INTO "users_permissionproxyevent" ("codename", "content_type_id", "id", "name", "pgh_context_id",
-                                              "pgh_created_at", "pgh_label", "pgh_obj_id")
-    VALUES (OLD."codename", OLD."content_type_id", OLD."id", OLD."name", _pgh_attach_context(), NOW(),
-            'update_or_delete_snapshot', OLD."id");
+    INSERT INTO "users_permissionproxyevent" ("codename", "content_type_id", "id", "name",
+                                              "pgh_context_id", "pgh_created_at", "pgh_label",
+                                              "pgh_obj_id")
+    VALUES (OLD."codename", OLD."content_type_id", OLD."id", OLD."name", _pgh_attach_context(),
+            NOW(), 'update_or_delete_snapshot', OLD."id");
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
@@ -395,10 +402,11 @@ BEGIN
             RETURN NEW;
         END IF;
     END IF;
-    INSERT INTO "users_permissionproxyevent" ("codename", "content_type_id", "id", "name", "pgh_context_id",
-                                              "pgh_created_at", "pgh_label", "pgh_obj_id")
-    VALUES (OLD."codename", OLD."content_type_id", OLD."id", OLD."name", _pgh_attach_context(), NOW(),
-            'update_or_delete_snapshot', OLD."id");
+    INSERT INTO "users_permissionproxyevent" ("codename", "content_type_id", "id", "name",
+                                              "pgh_context_id", "pgh_created_at", "pgh_label",
+                                              "pgh_obj_id")
+    VALUES (OLD."codename", OLD."content_type_id", OLD."id", OLD."name", _pgh_attach_context(),
+            NOW(), 'update_or_delete_snapshot', OLD."id");
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
@@ -454,8 +462,10 @@ BEGIN
             RETURN NEW;
         END IF;
     END IF;
-    INSERT INTO "users_usergroupsevent" ("group_id", "id", "pgh_context_id", "pgh_created_at", "pgh_label", "user_id")
-    VALUES (OLD."group_id", OLD."id", _pgh_attach_context(), NOW(), 'update_or_delete_snapshot', OLD."user_id");
+    INSERT INTO "users_usergroupsevent" ("group_id", "id", "pgh_context_id", "pgh_created_at",
+                                         "pgh_label", "user_id")
+    VALUES (OLD."group_id", OLD."id", _pgh_attach_context(), NOW(), 'update_or_delete_snapshot',
+            OLD."user_id");
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
@@ -512,8 +522,10 @@ BEGIN
             RETURN NEW;
         END IF;
     END IF;
-    INSERT INTO "users_usergroupsevent" ("group_id", "id", "pgh_context_id", "pgh_created_at", "pgh_label", "user_id")
-    VALUES (OLD."group_id", OLD."id", _pgh_attach_context(), NOW(), 'update_or_delete_snapshot', OLD."user_id");
+    INSERT INTO "users_usergroupsevent" ("group_id", "id", "pgh_context_id", "pgh_created_at",
+                                         "pgh_label", "user_id")
+    VALUES (OLD."group_id", OLD."id", _pgh_attach_context(), NOW(), 'update_or_delete_snapshot',
+            OLD."user_id");
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
@@ -569,9 +581,10 @@ BEGIN
             RETURN NEW;
         END IF;
     END IF;
-    INSERT INTO "users_userpermissionsevent" ("id", "permission_id", "pgh_context_id", "pgh_created_at", "pgh_label",
-                                              "user_id")
-    VALUES (OLD."id", OLD."permission_id", _pgh_attach_context(), NOW(), 'update_or_delete_snapshot', OLD."user_id");
+    INSERT INTO "users_userpermissionsevent" ("id", "permission_id", "pgh_context_id",
+                                              "pgh_created_at", "pgh_label", "user_id")
+    VALUES (OLD."id", OLD."permission_id", _pgh_attach_context(), NOW(),
+            'update_or_delete_snapshot', OLD."user_id");
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
@@ -628,9 +641,10 @@ BEGIN
             RETURN NEW;
         END IF;
     END IF;
-    INSERT INTO "users_userpermissionsevent" ("id", "permission_id", "pgh_context_id", "pgh_created_at", "pgh_label",
-                                              "user_id")
-    VALUES (OLD."id", OLD."permission_id", _pgh_attach_context(), NOW(), 'update_or_delete_snapshot', OLD."user_id");
+    INSERT INTO "users_userpermissionsevent" ("id", "permission_id", "pgh_context_id",
+                                              "pgh_created_at", "pgh_label", "user_id")
+    VALUES (OLD."id", OLD."permission_id", _pgh_attach_context(), NOW(),
+            'update_or_delete_snapshot', OLD."user_id");
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
@@ -686,16 +700,20 @@ BEGIN
             RETURN NEW;
         END IF;
     END IF;
-    INSERT INTO "users_userprofileevent" ("activation_key", "address1", "address2", "auto_subscribe", "avatar", "city",
-                                          "email_confirmed", "employer", "id", "is_tester", "key_expires", "notes",
-                                          "pgh_context_id", "pgh_created_at", "pgh_label", "pgh_obj_id",
-                                          "plaintext_preferred", "recap_email", "state", "stub_account",
-                                          "unlimited_docket_alerts", "user_id", "wants_newsletter", "zip_code")
-    VALUES (OLD."activation_key", OLD."address1", OLD."address2", OLD."auto_subscribe", OLD."avatar", OLD."city",
-            OLD."email_confirmed", OLD."employer", OLD."id", OLD."is_tester", OLD."key_expires", OLD."notes",
-            _pgh_attach_context(), NOW(), 'update_or_delete_snapshot', OLD."id", OLD."plaintext_preferred",
-            OLD."recap_email", OLD."state", OLD."stub_account", OLD."unlimited_docket_alerts", OLD."user_id",
-            OLD."wants_newsletter", OLD."zip_code");
+    INSERT INTO "users_userprofileevent" ("activation_key", "address1", "address2",
+                                          "auto_subscribe", "avatar", "city",
+                                          "docket_default_order_desc", "email_confirmed",
+                                          "employer", "id", "is_tester", "key_expires", "notes",
+                                          "pgh_context_id", "pgh_created_at", "pgh_label",
+                                          "pgh_obj_id", "plaintext_preferred", "recap_email",
+                                          "state", "stub_account", "unlimited_docket_alerts",
+                                          "user_id", "wants_newsletter", "zip_code")
+    VALUES (OLD."activation_key", OLD."address1", OLD."address2", OLD."auto_subscribe",
+            OLD."avatar", OLD."city", OLD."docket_default_order_desc", OLD."email_confirmed",
+            OLD."employer", OLD."id", OLD."is_tester", OLD."key_expires", OLD."notes",
+            _pgh_attach_context(), NOW(), 'update_or_delete_snapshot', OLD."id",
+            OLD."plaintext_preferred", OLD."recap_email", OLD."state", OLD."stub_account",
+            OLD."unlimited_docket_alerts", OLD."user_id", OLD."wants_newsletter", OLD."zip_code");
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
@@ -710,7 +728,7 @@ CREATE TRIGGER pgtrigger_update_or_delete_snapshot_update_c9b7b
     WHEN (OLD.* IS DISTINCT FROM NEW.*)
 EXECUTE PROCEDURE pgtrigger_update_or_delete_snapshot_update_c9b7b();
 
-COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_update_c9b7b ON "users_userprofile" IS 'cf1f77487c682baa71b084d27a42aa7ec2a57b96';
+COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_update_c9b7b ON "users_userprofile" IS '0dde39ef7888bd8ac1239a2f665b33b8de703af4';
 ;
 --
 -- Create trigger update_or_delete_snapshot_delete on model userprofile
@@ -752,16 +770,20 @@ BEGIN
             RETURN NEW;
         END IF;
     END IF;
-    INSERT INTO "users_userprofileevent" ("activation_key", "address1", "address2", "auto_subscribe", "avatar", "city",
-                                          "email_confirmed", "employer", "id", "is_tester", "key_expires", "notes",
-                                          "pgh_context_id", "pgh_created_at", "pgh_label", "pgh_obj_id",
-                                          "plaintext_preferred", "recap_email", "state", "stub_account",
-                                          "unlimited_docket_alerts", "user_id", "wants_newsletter", "zip_code")
-    VALUES (OLD."activation_key", OLD."address1", OLD."address2", OLD."auto_subscribe", OLD."avatar", OLD."city",
-            OLD."email_confirmed", OLD."employer", OLD."id", OLD."is_tester", OLD."key_expires", OLD."notes",
-            _pgh_attach_context(), NOW(), 'update_or_delete_snapshot', OLD."id", OLD."plaintext_preferred",
-            OLD."recap_email", OLD."state", OLD."stub_account", OLD."unlimited_docket_alerts", OLD."user_id",
-            OLD."wants_newsletter", OLD."zip_code");
+    INSERT INTO "users_userprofileevent" ("activation_key", "address1", "address2",
+                                          "auto_subscribe", "avatar", "city",
+                                          "docket_default_order_desc", "email_confirmed",
+                                          "employer", "id", "is_tester", "key_expires", "notes",
+                                          "pgh_context_id", "pgh_created_at", "pgh_label",
+                                          "pgh_obj_id", "plaintext_preferred", "recap_email",
+                                          "state", "stub_account", "unlimited_docket_alerts",
+                                          "user_id", "wants_newsletter", "zip_code")
+    VALUES (OLD."activation_key", OLD."address1", OLD."address2", OLD."auto_subscribe",
+            OLD."avatar", OLD."city", OLD."docket_default_order_desc", OLD."email_confirmed",
+            OLD."employer", OLD."id", OLD."is_tester", OLD."key_expires", OLD."notes",
+            _pgh_attach_context(), NOW(), 'update_or_delete_snapshot', OLD."id",
+            OLD."plaintext_preferred", OLD."recap_email", OLD."state", OLD."stub_account",
+            OLD."unlimited_docket_alerts", OLD."user_id", OLD."wants_newsletter", OLD."zip_code");
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
@@ -775,7 +797,7 @@ CREATE TRIGGER pgtrigger_update_or_delete_snapshot_delete_f463b
     FOR EACH ROW
 EXECUTE PROCEDURE pgtrigger_update_or_delete_snapshot_delete_f463b();
 
-COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_delete_f463b ON "users_userprofile" IS '34a18350410976f4b8089060dde6490fb153a9d1';
+COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_delete_f463b ON "users_userprofile" IS 'f3a89f21d5285009b1c78a6e6434dc51da5b9314';
 ;
 --
 -- Create trigger update_or_delete_snapshot_update on model userprofilebarmembership
@@ -817,10 +839,11 @@ BEGIN
             RETURN NEW;
         END IF;
     END IF;
-    INSERT INTO "users_userprofilebarmembershipevent" ("barmembership_id", "id", "pgh_context_id", "pgh_created_at",
-                                                       "pgh_label", "userprofile_id")
-    VALUES (OLD."barmembership_id", OLD."id", _pgh_attach_context(), NOW(), 'update_or_delete_snapshot',
-            OLD."userprofile_id");
+    INSERT INTO "users_userprofilebarmembershipevent" ("barmembership_id", "id", "pgh_context_id",
+                                                       "pgh_created_at", "pgh_label",
+                                                       "userprofile_id")
+    VALUES (OLD."barmembership_id", OLD."id", _pgh_attach_context(), NOW(),
+            'update_or_delete_snapshot', OLD."userprofile_id");
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
@@ -877,10 +900,11 @@ BEGIN
             RETURN NEW;
         END IF;
     END IF;
-    INSERT INTO "users_userprofilebarmembershipevent" ("barmembership_id", "id", "pgh_context_id", "pgh_created_at",
-                                                       "pgh_label", "userprofile_id")
-    VALUES (OLD."barmembership_id", OLD."id", _pgh_attach_context(), NOW(), 'update_or_delete_snapshot',
-            OLD."userprofile_id");
+    INSERT INTO "users_userprofilebarmembershipevent" ("barmembership_id", "id", "pgh_context_id",
+                                                       "pgh_created_at", "pgh_label",
+                                                       "userprofile_id")
+    VALUES (OLD."barmembership_id", OLD."id", _pgh_attach_context(), NOW(),
+            'update_or_delete_snapshot', OLD."userprofile_id");
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
@@ -936,12 +960,13 @@ BEGIN
             RETURN NEW;
         END IF;
     END IF;
-    INSERT INTO "users_userproxyevent" ("date_joined", "email", "first_name", "id", "is_active", "is_staff",
-                                        "is_superuser", "last_login", "last_name", "password", "pgh_context_id",
-                                        "pgh_created_at", "pgh_label", "pgh_obj_id", "username")
-    VALUES (OLD."date_joined", OLD."email", OLD."first_name", OLD."id", OLD."is_active", OLD."is_staff",
-            OLD."is_superuser", OLD."last_login", OLD."last_name", OLD."password", _pgh_attach_context(), NOW(),
-            'update_or_delete_snapshot', OLD."id", OLD."username");
+    INSERT INTO "users_userproxyevent" ("date_joined", "email", "first_name", "id", "is_active",
+                                        "is_staff", "is_superuser", "last_login", "last_name",
+                                        "password", "pgh_context_id", "pgh_created_at",
+                                        "pgh_label", "pgh_obj_id", "username")
+    VALUES (OLD."date_joined", OLD."email", OLD."first_name", OLD."id", OLD."is_active",
+            OLD."is_staff", OLD."is_superuser", OLD."last_login", OLD."last_name", OLD."password",
+            _pgh_attach_context(), NOW(), 'update_or_delete_snapshot', OLD."id", OLD."username");
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
@@ -998,12 +1023,13 @@ BEGIN
             RETURN NEW;
         END IF;
     END IF;
-    INSERT INTO "users_userproxyevent" ("date_joined", "email", "first_name", "id", "is_active", "is_staff",
-                                        "is_superuser", "last_login", "last_name", "password", "pgh_context_id",
-                                        "pgh_created_at", "pgh_label", "pgh_obj_id", "username")
-    VALUES (OLD."date_joined", OLD."email", OLD."first_name", OLD."id", OLD."is_active", OLD."is_staff",
-            OLD."is_superuser", OLD."last_login", OLD."last_name", OLD."password", _pgh_attach_context(), NOW(),
-            'update_or_delete_snapshot', OLD."id", OLD."username");
+    INSERT INTO "users_userproxyevent" ("date_joined", "email", "first_name", "id", "is_active",
+                                        "is_staff", "is_superuser", "last_login", "last_name",
+                                        "password", "pgh_context_id", "pgh_created_at",
+                                        "pgh_label", "pgh_obj_id", "username")
+    VALUES (OLD."date_joined", OLD."email", OLD."first_name", OLD."id", OLD."is_active",
+            OLD."is_staff", OLD."is_superuser", OLD."last_login", OLD."last_name", OLD."password",
+            _pgh_attach_context(), NOW(), 'update_or_delete_snapshot', OLD."id", OLD."username");
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
