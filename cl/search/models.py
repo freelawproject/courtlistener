@@ -82,7 +82,7 @@ SOURCES = (
 
 
 @pghistory.track(
-    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(),
 )
 class OriginatingCourtInformation(AbstractDateTimeModel):
     """Lower court metadata to associate with appellate cases.
@@ -187,7 +187,7 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
 
 
 @pghistory.track(
-    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(),
     exclude=["view_count"],
 )
 class Docket(AbstractDateTimeModel):
@@ -994,7 +994,7 @@ class DocketPanel(Docket.panel.through):
 
 
 @pghistory.track(
-    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(),
 )
 class DocketEntry(AbstractDateTimeModel):
     docket = models.ForeignKey(
@@ -1170,7 +1170,7 @@ class AbstractPacerDocument(models.Model):
 
 
 @pghistory.track(
-    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(),
 )
 class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
     """The model for Docket Documents and Attachments."""
@@ -1532,7 +1532,7 @@ class RECAPDocumentTags(RECAPDocument.tags.through):
 
 
 @pghistory.track(
-    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(),
 )
 class BankruptcyInformation(AbstractDateTimeModel):
     docket = models.OneToOneField(
@@ -1577,7 +1577,7 @@ class BankruptcyInformation(AbstractDateTimeModel):
 
 
 @pghistory.track(
-    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(),
 )
 class Claim(AbstractDateTimeModel):
     docket = models.ForeignKey(
@@ -1705,7 +1705,7 @@ class ClaimTags(Claim.tags.through):
 
 
 @pghistory.track(
-    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(),
 )
 class ClaimHistory(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
     DOCKET_ENTRY = 1
@@ -1826,7 +1826,7 @@ class FederalCourtsQuerySet(models.QuerySet):
 
 
 @pghistory.track(
-    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(),
 )
 class Court(models.Model):
     """A class to represent some information about each court, can be extended
@@ -2081,7 +2081,7 @@ class ClusterCitationQuerySet(models.query.QuerySet):
 
 
 @pghistory.track(
-    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(),
 )
 class OpinionCluster(AbstractDateTimeModel):
     """A class representing a cluster of court opinions."""
@@ -2620,7 +2620,7 @@ class OpinionClusterNonParticipatingJudges(
 
 
 @pghistory.track(
-    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(),
 )
 class Citation(models.Model):
     """A simple class to hold citations."""
@@ -2743,7 +2743,7 @@ def sort_cites(c):
 
 
 @pghistory.track(
-    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(),
 )
 class Opinion(AbstractDateTimeModel):
     COMBINED = "010combined"
@@ -3176,7 +3176,7 @@ TaggableType = TypeVar("TaggableType", Docket, DocketEntry, RECAPDocument)
 
 
 @pghistory.track(
-    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(),
 )
 class Tag(AbstractDateTimeModel):
     name = models.CharField(

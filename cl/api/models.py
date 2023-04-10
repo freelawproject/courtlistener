@@ -23,7 +23,7 @@ HttpStatusCodes = models.IntegerChoices(  # type: ignore
 
 
 @pghistory.track(
-    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(),
     model_name="WebhookHistoryEvent",
 )
 class Webhook(AbstractDateTimeModel):

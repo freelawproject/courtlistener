@@ -9,7 +9,7 @@ from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
 from cl.search.models import Docket, OpinionCluster, RECAPDocument
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True))
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Note(models.Model):
     date_created = models.DateTimeField(
         help_text="The original creation date for the item",
@@ -70,7 +70,7 @@ class Note(models.Model):
         )
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True))
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class DocketTag(models.Model):
     """Through table linking dockets to tags"""
 
@@ -88,7 +88,7 @@ class DocketTag(models.Model):
 
 
 @pghistory.track(
-    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(),
     exclude=["view_count"],
 )
 class UserTag(AbstractDateTimeModel):
@@ -133,7 +133,7 @@ class UserTag(AbstractDateTimeModel):
         index_together = (("user", "name"),)
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True))
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Prayer(models.Model):
     WAITING = 1
     GRANTED = 2

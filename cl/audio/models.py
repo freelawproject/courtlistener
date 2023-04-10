@@ -22,7 +22,7 @@ from cl.people_db.models import Person
 from cl.search.models import SOURCES, Docket
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True))
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Audio(AbstractDateTimeModel):
     """A class representing oral arguments and their associated metadata"""
 

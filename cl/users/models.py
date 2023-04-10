@@ -42,7 +42,7 @@ class BarMembership(models.Model):
 
 
 @pghistory.track(
-    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(),
 )
 class UserProfile(models.Model):
     user = models.OneToOneField(
@@ -524,7 +524,7 @@ def generate_recap_email(user_profile: UserProfile, append: int = None) -> str:
 
 
 @pghistory.track(
-    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(),
 )
 class UserProxy(User):
     """A proxy model class to track auth user model"""
@@ -534,7 +534,7 @@ class UserProxy(User):
 
 
 @pghistory.track(
-    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(),
 )
 class GroupProxy(Group):
     """A proxy model class to track auth group model"""
@@ -544,7 +544,7 @@ class GroupProxy(Group):
 
 
 @pghistory.track(
-    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(),
 )
 class PermissionProxy(Permission):
     """A proxy model class to track auth permission model"""

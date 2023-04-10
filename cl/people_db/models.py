@@ -61,7 +61,7 @@ DATE_GRANULARITIES = (
 
 
 @pghistory.track(
-    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(),
 )
 class Person(AbstractDateTimeModel):
     RELIGIONS = (
@@ -395,7 +395,7 @@ class Person(AbstractDateTimeModel):
 
 
 @pghistory.track(
-    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(),
 )
 class School(AbstractDateTimeModel):
     is_alias_of = models.ForeignKey(
@@ -438,7 +438,7 @@ class School(AbstractDateTimeModel):
 
 
 @pghistory.track(
-    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(),
 )
 class Position(AbstractDateTimeModel):
     """A role held by a person, and the details about it."""
@@ -1069,7 +1069,7 @@ class Position(AbstractDateTimeModel):
 
 
 @pghistory.track(
-    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(),
 )
 class RetentionEvent(AbstractDateTimeModel):
     RETENTION_TYPES = (
@@ -1143,7 +1143,7 @@ class RetentionEvent(AbstractDateTimeModel):
 
 
 @pghistory.track(
-    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(),
 )
 class Education(AbstractDateTimeModel):
     DEGREE_LEVELS = (
@@ -1213,7 +1213,7 @@ class Education(AbstractDateTimeModel):
 
 
 @pghistory.track(
-    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(),
 )
 class Race(models.Model):
     RACES = (
@@ -1249,7 +1249,7 @@ class PersonRace(Person.race.through):
 
 
 @pghistory.track(
-    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(),
 )
 class PoliticalAffiliation(AbstractDateTimeModel):
     POLITICAL_AFFILIATION_SOURCE = (
@@ -1321,7 +1321,7 @@ class PoliticalAffiliation(AbstractDateTimeModel):
 
 
 @pghistory.track(
-    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(),
 )
 class Source(AbstractDateTimeModel):
     person = models.ForeignKey(
@@ -1349,7 +1349,7 @@ class Source(AbstractDateTimeModel):
 
 
 @pghistory.track(
-    AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True),
+    AfterUpdateOrDeleteSnapshot(),
 )
 class ABARating(AbstractDateTimeModel):
     ABA_RATINGS = (

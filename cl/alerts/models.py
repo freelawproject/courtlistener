@@ -8,7 +8,7 @@ from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
 from cl.search.models import SEARCH_TYPES, Docket
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True))
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Alert(AbstractDateTimeModel):
     REAL_TIME = "rt"
     DAILY = "dly"
@@ -66,7 +66,7 @@ class DocketAlertManager(models.Manager):
         return self.filter(alert_type=DocketAlert.SUBSCRIPTION)
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True))
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class DocketAlert(AbstractDateTimeModel):
     UNSUBSCRIPTION = 0
     SUBSCRIPTION = 1

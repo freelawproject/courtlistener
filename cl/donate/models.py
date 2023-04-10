@@ -43,7 +43,7 @@ class PROVIDERS(object):
     )
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True))
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Donation(AbstractDateTimeModel):
     # These statuses are shown on the profile page. Be warned.
     AWAITING_PAYMENT = 0
@@ -124,7 +124,7 @@ class Donation(AbstractDateTimeModel):
         ordering = ["-date_created"]
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot(ignore_auto_now_fields=True))
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class MonthlyDonation(AbstractDateTimeModel):
     """The metadata needed to associate a monthly donation with a user."""
 
