@@ -65,6 +65,7 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.search.views import do_search
+from cl.users.models import UserProfile
 
 
 def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
@@ -260,11 +261,13 @@ def core_docket_data(
 def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     docket, context = core_docket_data(request, pk)
     increment_view_count(docket, request)
+    sort_order_asc = True
 
     de_list = docket.docket_entries.all().prefetch_related("recap_documents")
-    form = DocketEntryFilterForm(request.GET)
+    form = DocketEntryFilterForm(request.GET, request=request)
     if form.is_valid():
         cd = form.cleaned_data
+
         if cd.get("entry_gte"):
             de_list = de_list.filter(entry_number__gte=cd["entry_gte"])
         if cd.get("entry_lte"):
@@ -274,6 +277,7 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
         if cd.get("filed_before"):
             de_list = de_list.filter(date_filed__lte=cd["filed_before"])
         if cd.get("order_by") == DocketEntryFilterForm.DESCENDING:
+            sort_order_asc = False
             de_list = de_list.order_by(
                 "-recap_sequence_number", "-entry_number"
             )
@@ -291,6 +295,7 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
         {
             "parties": docket.parties.exists(),  # Needed to show/hide parties tab.
             "docket_entries": docket_entries,
+            "sort_order_asc": sort_order_asc,
             "form": form,
             "get_string": make_get_string(request),
         }
@@ -440,6 +445,7 @@ def view_recap_document(
     """This view can either load an attachment or a regular document,
     depending on the URL pattern that is matched.
     """
+    redirect_to_pacer_modal = False
     try:
         rd = RECAPDocument.objects.filter(
             docket_entry__docket__id=docket_id,
@@ -449,15 +455,21 @@ def view_recap_document(
 
         # Check if the user has requested automatic redirection to the document
         rd_download_redirect = request.GET.get("redirect_to_download", False)
-        if rd_download_redirect:
+        redirect_or_modal = request.GET.get("redirect_or_modal", False)
+        if rd_download_redirect or redirect_or_modal:
             # Check if the document is available from CourtListener and
             # if it is, redirect to the local document
-            # if it isn't, redirect to PACER if pacer_url is available
+            # if it isn't, if pacer_url is available and
+            # rd_download_redirect is True, redirect to PACER. If redirect_or_modal
+            # is True set redirect_to_pacer_modal to True to open the modal.
             if rd.is_available:
                 return HttpResponseRedirect(rd.filepath_local.url)
             else:
-                if rd.pacer_url:
+                if rd.pacer_url and rd_download_redirect:
                     return HttpResponseRedirect(rd.pacer_url)
+                if rd.pacer_url and redirect_or_modal:
+                    redirect_to_pacer_modal = True
+
     except IndexError:
         raise Http404("No RECAPDocument matches the given query.")
 
@@ -487,6 +499,7 @@ def view_recap_document(
             "timezone": COURT_TIMEZONES.get(
                 rd.docket_entry.docket.court_id, "US/Eastern"
             ),
+            "redirect_to_pacer_modal": redirect_to_pacer_modal,
         },
     )
 

@@ -158,6 +158,7 @@
                     </p>
                 {% endif %}
             </div>
+
             <div class="form-group">
                 <label for="id_wants_newsletter">
                     {{ profile_form.wants_newsletter }}
@@ -170,6 +171,20 @@
                     </p>
                 {% endif %}
             </div>
+
+            <div class="form-group" >
+                <label for="id_docket_default_order_desc" >
+                    {{ profile_form.docket_default_order_desc }}
+                    Sort dockets in descending order</label>
+                {% if profile_form.docket_default_order_desc.errors %}
+                    <p class="help-block">
+                        {% for error in profile_form.docket_default_order_desc.errors %}
+                            {{ error|escape }}
+                        {% endfor %}
+                    </p>
+                {% endif %}
+            </div>
+
             <div class="form-group v-offset-below-4">
                 <label for="id_is_tester">
                     {{ profile_form.is_tester }}
@@ -182,6 +197,7 @@
                     </p>
                 {% endif %}
             </div>
+
             <input type="hidden" value="{{user.username}}" name="user" id="id_user">
             <button type="submit" class="btn btn-primary btn-lg float-right">Save Changes</button>
             <a href="{% url "delete_account" %}"><i class="fa fa-trash-o gray"></i>&nbsp;Delete my account&hellip;</a><br>

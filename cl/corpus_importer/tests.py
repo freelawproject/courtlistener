@@ -13,6 +13,7 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.utils.timezone import make_aware, utc
 from factory import RelatedFactory
+from juriscraper.lib.string_utils import harmonize
 
 from cl.corpus_importer.court_regexes import match_court_string
 from cl.corpus_importer.factories import (
@@ -676,6 +677,34 @@ Appeals, No. 19667-4-III, October 31, 2002. Denied September 30, 2003."
         # Test some docket attributes
         docket = cite.cluster.docket
         self.assertEqual(docket.docket_number, case_law["docket_number"])
+
+    def test_existing_docket_lookup(self):
+        """Can we update an existing docket instead of creating a new one?"""
+
+        case_law = CaseLawFactory()
+        DocketFactory(
+            docket_number=case_law["docket_number"],
+            court_id="harvard",
+            source=Docket.HARVARD,
+            pacer_case_id=None,
+            idb_data=None,
+        )
+
+        self.read_json_func.return_value = case_law
+        self.assertSuccessfulParse(1)
+
+        cite = self._get_cite(case_law)
+
+        dockets = Docket.objects.all()
+        self.assertEqual(dockets.count(), 1)
+
+        # Test some docket attributes
+        docket = cite.cluster.docket
+        self.assertEqual(docket.docket_number, case_law["docket_number"])
+        self.assertEqual(
+            docket.case_name, harmonize(case_law["name_abbreviation"])
+        )
+        self.assertEqual(docket.ia_needs_upload, False)
 
     def test_new_bankruptcy_case(self):
         """Can we add a bankruptcy court?"""
