@@ -121,6 +121,8 @@ def get(mapping, key):
 @register.simple_tag
 def random_int(a: int, b: int) -> int:
     return random.randint(a, b)
+
+
 # sourced from: https://stackoverflow.com/questions/2272370/sortable-table-columns-in-django
 @register.simple_tag
 def url_replace(request, value):
