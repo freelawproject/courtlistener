@@ -9,7 +9,7 @@ class AfterUpdateOrDeleteSnapshot(Snapshot):
 
     Usage example:
 
-    @pghistory.track(IgnoreAutoFieldsSnapshot())
+    @pghistory.track(AfterUpdateOrDeleteSnapshot())
 
     """
 
