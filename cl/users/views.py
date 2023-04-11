@@ -88,9 +88,25 @@ def view_search_alerts(request: HttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_docket_alerts(request: HttpRequest) -> HttpResponse:
+    order_by = request.GET.get("order_by", "date_created")
+    if order_by.startswith("-"):
+        direction = "-"
+        order_by = order_by.lstrip("-")
+    else:
+        direction = ""
+    name_map = {
+        "name": "docket__case_name",
+        "court": "docket__court__short_name",
+        "hit": "date_last_hit",
+    }
+    if order_by not in name_map.keys():
+        order_by = "date_created"
+    else:
+        order_by = direction + name_map[order_by]
     docket_alerts = request.user.docket_alerts.filter(
         alert_type=DocketAlert.SUBSCRIPTION
-    ).order_by("date_created")
+    ).order_by(order_by)
+
     return TemplateResponse(
         request,
         "profile/alerts.html",
