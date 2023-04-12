@@ -1,5 +1,6 @@
 import json
 import os
+from copy import deepcopy
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
@@ -13,6 +14,7 @@ from django.contrib.auth.models import User
 from django.core import mail
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db.models import Q
 from django.test import RequestFactory
 from django.urls import reverse
 from django.utils.timezone import now
@@ -58,9 +60,12 @@ from cl.recap.api_serializers import PacerFetchQueueSerializer
 from cl.recap.factories import (
     AppellateAttachmentFactory,
     AppellateAttachmentPageFactory,
+    DocketDataFactory,
     DocketEntriesDataFactory,
     DocketEntryDataFactory,
+    FeedMinuteDocketEntryDataFactory,
     FjcIntegratedDatabaseFactory,
+    MinuteDocketEntryDataFactory,
     PacerFetchQueueFactory,
     ProcessingQueueFactory,
     RECAPEmailDocketDataFactory,
@@ -78,9 +83,11 @@ from cl.recap.mergers import (
     add_attorney,
     add_docket_entries,
     add_parties_and_attorneys,
+    check_if_there_is_a_match,
     find_docket_object,
     get_order_of_docket,
     normalize_long_description,
+    reduce_matched_entries,
     update_case_names,
     update_docket_metadata,
 )
@@ -6187,7 +6194,8 @@ class CalculateRecapsSequenceNumbersTest(TestCase):
         for de in docket_entries_nyed:
             self.assertEqual(de.entry_number, entry_number)
             self.assertEqual(
-                de.recap_sequence_number, f"2021-10-15.00{entry_number}"
+                de.recap_sequence_number,
+                f"2021-10-15T22:46:51.00{entry_number}",
             )
             entry_number += 1
 
@@ -6217,10 +6225,13 @@ class CalculateRecapsSequenceNumbersTest(TestCase):
         for de in docket_entries_nysd:
             if not prev_de or de.date_filed == prev_de.date_filed:
                 self.assertEqual(
-                    de.recap_sequence_number, f"2021-10-15.00{entry_number}"
+                    de.recap_sequence_number,
+                    f"2021-10-15T22:46:51.00{entry_number}",
                 )
             else:
-                self.assertEqual(de.recap_sequence_number, f"2021-10-16.001")
+                self.assertEqual(
+                    de.recap_sequence_number, f"2021-10-16T22:46:51.001"
+                )
             self.assertEqual(de.entry_number, entry_number)
             entry_number += 1
             prev_de = de
@@ -6567,3 +6578,1216 @@ class CleanUpDuplicateAppellateEntries(TestCase):
         )
         docket_entries = DocketEntry.objects.all()
         self.assertEqual(docket_entries.count(), 1)
+
+
+class MinuteEntriesMerger(TestCase):
+    """Test minute entries long description merger."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.cand = CourtFactory(id="cand", jurisdiction="FD")
+        cls.d = DocketFactory(
+            source=Docket.RECAP,
+            court=cls.cand,
+            pacer_case_id="308490",
+            case_name="Eolas Technologies Incorporated v. Google LLC",
+            docket_number="4:17-cv-01138",
+        )
+
+    @classmethod
+    def _confirm_merge_was_correct(cls, d, feed) -> bool:
+        matched = True
+        for de in feed:
+            query = Q(recap_documents__description=de["short_description"])
+            docket_entry_exists = DocketEntry.objects.filter(
+                query, docket=d, description=de["description"]
+            ).exists()
+            if not docket_entry_exists:
+                matched = False
+                break
+        return matched
+
+    def test_reduce_entries_matched(self):
+        input_dict = {
+            223: [
+                {
+                    "description": "Des 1",
+                },
+                {
+                    "description": "Des 2",
+                },
+            ],
+            224: [
+                {
+                    "description": "Des 2",
+                }
+            ],
+            225: [
+                {
+                    "description": "Des 1",
+                },
+                {
+                    "description": "Des 3",
+                },
+            ],
+        }
+
+        expected_dict = {
+            223: [
+                {
+                    "description": "Des 1",
+                },
+            ],
+            224: [
+                {
+                    "description": "Des 2",
+                }
+            ],
+            225: [
+                {
+                    "description": "Des 3",
+                }
+            ],
+        }
+
+        result_dict = reduce_matched_entries(input_dict)
+        self.assertEqual(result_dict, expected_dict)
+
+        input_dict = {
+            223: [
+                {
+                    "description": "Des 1",
+                },
+                {
+                    "description": "Des 2",
+                },
+            ],
+            224: [
+                {
+                    "description": "Des 2",
+                }
+            ],
+            225: [
+                {
+                    "description": "Des 1",
+                },
+                {
+                    "description": "Des 3",
+                },
+            ],
+            226: [
+                {
+                    "description": "Des 5",
+                },
+                {
+                    "description": "Des 4",
+                },
+            ],
+            227: [],
+        }
+
+        expected_dict = {
+            223: [
+                {
+                    "description": "Des 1",
+                },
+            ],
+            224: [
+                {
+                    "description": "Des 2",
+                }
+            ],
+            225: [
+                {
+                    "description": "Des 3",
+                }
+            ],
+            226: [
+                {
+                    "description": "Des 5",
+                },
+                {
+                    "description": "Des 4",
+                },
+            ],
+            227: [],
+        }
+
+        result_dict = reduce_matched_entries(input_dict)
+        self.assertEqual(result_dict, expected_dict)
+
+        input_dict = {
+            223: [
+                {
+                    "description": "Des 2",
+                },
+            ],
+            224: [
+                {
+                    "description": "Des 2",
+                }
+            ],
+            225: [
+                {
+                    "description": "Des 2",
+                },
+                {
+                    "description": "Des 3",
+                },
+            ],
+            226: [],
+        }
+
+        expected_dict = {
+            223: [
+                {
+                    "description": "Des 2",
+                }
+            ],
+            224: [
+                {
+                    "description": "Des 2",
+                }
+            ],
+            225: [
+                {
+                    "description": "Des 3",
+                }
+            ],
+            226: [],
+        }
+
+        result_dict = reduce_matched_entries(input_dict)
+        self.assertEqual(result_dict, expected_dict)
+
+        input_dict = {
+            223: [
+                {
+                    "description": "Des 1",
+                },
+                {
+                    "description": "Des 2",
+                },
+            ],
+            224: [
+                {
+                    "description": "Des 2",
+                }
+            ],
+            225: [
+                {
+                    "description": "Des 1",
+                },
+                {
+                    "description": "Des 2",
+                },
+                {
+                    "description": "Des 3",
+                },
+            ],
+            226: [
+                {
+                    "description": "Des 5",
+                },
+                {
+                    "description": "Des 4",
+                },
+            ],
+            227: [],
+        }
+
+        expected_dict = {
+            223: [
+                {
+                    "description": "Des 1",
+                },
+            ],
+            224: [
+                {
+                    "description": "Des 2",
+                }
+            ],
+            225: [
+                {
+                    "description": "Des 3",
+                }
+            ],
+            226: [
+                {
+                    "description": "Des 5",
+                },
+                {
+                    "description": "Des 4",
+                },
+            ],
+            227: [],
+        }
+
+        result_dict = reduce_matched_entries(input_dict)
+        self.assertEqual(result_dict, expected_dict)
+
+    def test_check_if_there_is_a_match(self):
+        """Test check_if_there_is_a_match method that matches entries descriptions
+        by word matching.
+        """
+
+        samples_with_match = [
+            (
+                "Arrest - Other District",
+                "Arrest of GARY JAMES HARMON in Ohio. (bb)",
+            ),
+            ("Case Unsealed", "Case unsealed as to GARY JAMES HARMON (bb)"),
+            (
+                "Motion to Appoint Counsel",
+                "ORAL MOTION by Defendant GARY JAMES HARMON to Appoint Counsel. (kk)",
+            ),
+            (
+                "Order on Motion to Appoint Counsel",
+                "ORAL MOTION by Defendant GARY JAMES HARMON to Appoint Counsel. (kk)",
+            ),
+            (
+                ".Order",
+                "MINUTE ORDER (paperless) DIRECTING defendant, by 4pm today, to advise the Court",
+            ),
+            (
+                "Set/Reset Deadlines",
+                "Set/Reset Deadlines as to GARY JAMES HARMON: Response to Order of the Court due by 4:00 PM on 9/13/2021. (ztg)",
+            ),
+            (
+                "Order on Motion to Continue",
+                "MINUTE ORDER granting [17] Joint Motion to Continue Hearing on Pretrial Detention as to GARY JAMES HARMON. Upon consideration of the joint motion",
+            ),
+            (
+                "Motion Hearing",
+                " Minute Entry for proceedings held before Chief Judge Beryl A. Howell: Motion Hearing as to GARY JAMES HARMON not held on 9/17/2021. ",
+            ),
+            (
+                "Motion AND Case Unsealed",
+                " Minute Entry for proceedings held before Chief Judge Beryl A. Howell: Motion Hearing as to GARY JAMES HARMON not held on 9/17/2021. ",
+            ),
+        ]
+        matched = True
+        for short_des, long_des in samples_with_match:
+            match = check_if_there_is_a_match(short_des, long_des)
+            if not match:
+                matched = False
+
+        self.assertEqual(matched, True)
+
+        samples_with_no_match = [
+            ("Case Unsealed", "Arrest of GARY JAMES HARMON in Ohio. (bb)"),
+            (
+                "Motion to Appoint Counsel",
+                "ORAL MOTION by USA for Temporary Detention (3-day hold request) of Defendant GARY JAMES HARMON. (kk)",
+            ),
+            (
+                "Set/Reset Deadlines",
+                "MINUTE ORDER (paperless) DIRECTING defendant, by 4pm today, to advise the Court about his position regarding the conditions for pre-trial release agreed to in US v. Larry Harmon",
+            ),
+            (
+                "Terminate Deadlines and Hearings",
+                "Set/Reset Hearings as to GARY JAMES HARMON: Motion Hearing RESCHEDULED for 9/24/2021",
+            ),
+            (
+                "Order on Motion to Vacate",
+                "Terminate Deadlines as to GARY JAMES HARMON: Pretrial deadlines VACATED. (ztg)",
+            ),
+            (
+                "Order on Motion to Appoint Counsel",
+                "SCHEDULING ORDER as to Ng Chong Hwa. Sentencing set for 9/13/2022 at 10:00 AM",
+            ),
+            (
+                "Order",
+                "Minute Entry for proceedings held before Chief Judge Margo K. Brodie: Jury Trial as to Ng Chong Hwa held on 3/30/2022.",
+            ),
+            (
+                "Jury Trial",
+                "ORDER granting [159] Motion for Leave to Appear. The attorney shall register for ECF, registration is available online at www.pacer.gov.",
+            ),
+        ]
+        matched = False
+        for short_des, long_des in samples_with_no_match:
+            match = check_if_there_is_a_match(short_des, long_des)
+            if match:
+                matched = True
+        self.assertEqual(matched, False)
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_merge_single_minute_entry(
+        self,
+        mock_webhook_post,
+    ):
+        """Test merge a single incoming minute entry on a specific date:
+
+        - Short description minute entries: 1
+        - Long description minute entries: 1
+
+        Merge entries directly.
+        """
+        entries_feed = [
+            FeedMinuteDocketEntryDataFactory(
+                date_filed=datetime(2021, 5, 14, 14, 41, 11, tzinfo=tzutc()),
+                description="Electronic filing error. REMINDER (Filed on 5/13/2021)",
+                short_description="Electronic Filing Error",
+            ),
+        ]
+        docket_data = DocketDataFactory(
+            ordered_by="date_filed",
+            docket_entries=[
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2021, 5, 13),
+                    date_entered=date(2021, 5, 14),
+                    description="Electronic filing error. REMINDER (Filed on 5/13/2021) (Entered: 05/14/2021)",
+                ),
+            ],
+        )
+
+        feed = deepcopy(entries_feed)
+        for de in feed:
+            de["description"] = ""
+            add_docket_entries(self.d, [de])
+
+        docket_entries = DocketEntry.objects.all()
+        self.assertEqual(docket_entries.count(), 1)
+
+        data = docket_data
+        add_docket_entries(
+            self.d, data["docket_entries"], order_by=data.get("ordered_by")
+        )
+
+        docket_entries = DocketEntry.objects.filter(docket=self.d)
+        self.assertEqual(docket_entries.count(), 1)
+
+        original_feed = deepcopy(entries_feed)
+        self.assertEqual(
+            self._confirm_merge_was_correct(self.d, original_feed), True
+        )
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_merge_equal_short_descriptions_minute_entries_date_filed(
+        self,
+        mock_webhook_post,
+    ):
+        """Test merge equal minute entries on a specific date:
+
+        - Short description minute entries: 2
+        - Long description minute entries: 2
+        - Short descriptions are the same
+        - Ordered by: date_filed
+
+        Merge entries directly.
+        """
+        entries_feed = [
+            FeedMinuteDocketEntryDataFactory(
+                date_filed=datetime(2021, 5, 14, 14, 7, 4, tzinfo=tzutc()),
+                description="Electronic filing error. REMINDER (Filed on 5/13/2021)",
+                short_description="Electronic Filing Error",
+            ),
+            FeedMinuteDocketEntryDataFactory(
+                date_filed=datetime(2021, 5, 14, 14, 41, 11, tzinfo=tzutc()),
+                description="Re: 139 Notice of Change of Address (Filed on 5/13/2021)",
+                short_description="Electronic Filing Error",
+            ),
+        ]
+        docket_data = DocketDataFactory(
+            ordered_by="date_filed",
+            docket_entries=[
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2021, 5, 13),
+                    date_entered=date(2021, 5, 14),
+                    description="Re: 139 Notice of Change of Address (Filed on 5/13/2021) (Entered: 05/14/2021)",
+                ),
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2021, 5, 13),
+                    date_entered=date(2021, 5, 14),
+                    description="Electronic filing error. REMINDER (Filed on 5/13/2021) (Entered: 05/14/2021)",
+                ),
+            ],
+        )
+
+        feed = deepcopy(entries_feed)
+        for de in feed:
+            de["description"] = ""
+            add_docket_entries(self.d, [de])
+
+        docket_entries = DocketEntry.objects.all()
+        self.assertEqual(docket_entries.count(), 2)
+
+        data = docket_data
+        add_docket_entries(
+            self.d, data["docket_entries"], order_by=data.get("ordered_by")
+        )
+
+        self.assertEqual(docket_entries.count(), 2)
+        original_feed = deepcopy(entries_feed)
+        self.assertEqual(
+            self._confirm_merge_was_correct(self.d, original_feed), True
+        )
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_merge_equal_short_descriptions_minute_entries_date_entered(
+        self,
+        mock_webhook_post,
+    ):
+        """Test merge equal minute entries on a specific date:
+
+        - Short description minute entries: 2
+        - Long description minute entries: 2
+        - Short descriptions are the same
+        - Ordered by: date_entered
+
+        Merge entries directly.
+        """
+
+        entries_feed = [
+            FeedMinuteDocketEntryDataFactory(
+                date_filed=datetime(2021, 5, 14, 14, 7, 4, tzinfo=tzutc()),
+                description="Electronic filing error. REMINDER (Filed on 5/13/2021)",
+                short_description="Electronic Filing Error",
+            ),
+            FeedMinuteDocketEntryDataFactory(
+                date_filed=datetime(2021, 5, 14, 14, 41, 11, tzinfo=tzutc()),
+                description="Re: 139 Notice of Change of Address (Filed on 5/13/2021)",
+                short_description="Electronic Filing Error",
+            ),
+        ]
+        docket_data = DocketDataFactory(
+            ordered_by="date_filed",
+            docket_entries=[
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2021, 5, 13),
+                    date_entered=date(2021, 5, 14),
+                    description="Re: 139 Notice of Change of Address (Filed on 5/13/2021) (Entered: 05/14/2021)",
+                ),
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2021, 5, 13),
+                    date_entered=date(2021, 5, 14),
+                    description="Electronic filing error. REMINDER (Filed on 5/13/2021) (Entered: 05/14/2021)",
+                ),
+            ],
+        )
+
+        feed = deepcopy(entries_feed)
+
+        for de in feed:
+            de["description"] = ""
+            add_docket_entries(self.d, [de])
+
+        docket_entries = DocketEntry.objects.all()
+        self.assertEqual(docket_entries.count(), 2)
+
+        data = docket_data
+        add_docket_entries(
+            self.d, data["docket_entries"], order_by=data.get("ordered_by")
+        )
+        self.assertEqual(docket_entries.count(), 2)
+
+        original_feed = deepcopy(entries_feed)
+        self.assertEqual(
+            self._confirm_merge_was_correct(self.d, original_feed), True
+        )
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_merge_not_equivalent_entries_on_a_date(
+        self,
+        mock_webhook_post,
+    ):
+        """Test merge not equal minute entries on a specific date:
+
+        - Short description minute entries: 1
+        - Long description minute entries: 3
+        - Ordered by: date_filed
+
+        Merge one entry by word matching and add the rest as new entries.
+        """
+
+        entries_feed = [
+            FeedMinuteDocketEntryDataFactory(
+                date_filed=datetime(2021, 5, 14, 14, 41, 11, tzinfo=tzutc()),
+                description="Electronic filing error. REMINDER (Filed on 5/13/2021)",
+                short_description="Electronic Filing Error",
+            ),
+        ]
+
+        docket_data = DocketDataFactory(
+            ordered_by="date_filed",
+            docket_entries=[
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2021, 5, 13),
+                    date_entered=date(2021, 5, 14),
+                    description="The local counsel listed on your application (Filed on 5/13/2021) (Entered: 05/14/2021)",
+                ),
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2021, 5, 13),
+                    date_entered=date(2021, 5, 14),
+                    description="Re: 139 Notice of Change of Address (Filed on 5/13/2021) (Entered: 05/14/2021)",
+                ),
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2021, 5, 13),
+                    date_entered=date(2021, 5, 14),
+                    description="Electronic filing error. REMINDER (Filed on 5/13/2021) (Entered: 05/14/2021)",
+                ),
+            ],
+        )
+
+        feed = deepcopy(entries_feed)
+        for de in feed:
+            de["description"] = ""
+            add_docket_entries(self.d, [de])
+
+        docket_entries = DocketEntry.objects.all()
+        self.assertEqual(docket_entries.count(), 1)
+
+        data = docket_data
+        add_docket_entries(
+            self.d, data["docket_entries"], order_by=data.get("ordered_by")
+        )
+
+        docket_entries = DocketEntry.objects.filter(docket=self.d)
+        self.assertEqual(docket_entries.count(), 3)
+
+        original_feed = deepcopy(entries_feed)
+        self.assertEqual(
+            self._confirm_merge_was_correct(self.d, original_feed), True
+        )
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_merge_not_equivalent_entries_on_a_date_more_one_match(
+        self,
+        mock_webhook_post,
+    ):
+        """Test merge not equal minute entries on a specific date:
+
+        - Short description minute entries: 3
+        - Long description minute entries: 2
+        - Ordered by: date_filed
+
+        Merge entries by word matching, one short description has two matches
+        and one only one match. Merge coincidences without conflicts and
+        solve other conflicts.
+        """
+
+        entries_feed = [
+            FeedMinuteDocketEntryDataFactory(
+                date_filed=datetime(2021, 5, 14, 14, 7, 4, tzinfo=tzutc()),
+                description="Re: 139 Notice of Change of Address (Filed on 5/13/2021)",
+                short_description="Notice of Change",
+            ),
+            FeedMinuteDocketEntryDataFactory(
+                date_filed=datetime(2021, 5, 14, 14, 41, 11, tzinfo=tzutc()),
+                description="Electronic filing error. REMINDER: Counsel. Re: 139 Notice of Change of Address (Filed on 5/13/2021)",
+                short_description="Electronic Filing Error",
+            ),
+            FeedMinuteDocketEntryDataFactory(
+                date_filed=datetime(2021, 5, 14, 15, 30, 11, tzinfo=tzutc()),
+                description="",
+                short_description="Order",
+            ),
+        ]
+
+        docket_data = DocketDataFactory(
+            ordered_by="date_filed",
+            docket_entries=[
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2021, 5, 13),
+                    date_entered=date(2021, 5, 14),
+                    description="Re: 139 Notice of Change of Address (Filed on 5/13/2021) (Entered: 05/14/2021)",
+                ),
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2021, 5, 13),
+                    date_entered=date(2021, 5, 14),
+                    description="Electronic filing error. REMINDER: Counsel. Re: 139 Notice of Change of Address (Filed on 5/13/2021) (Entered: 05/14/2021)",
+                ),
+            ],
+        )
+
+        feed = deepcopy(entries_feed)
+        for de in feed:
+            de["description"] = ""
+            add_docket_entries(self.d, [de])
+
+        docket_entries = DocketEntry.objects.all()
+        self.assertEqual(docket_entries.count(), 3)
+        data = docket_data
+
+        add_docket_entries(
+            self.d, data["docket_entries"], order_by=data.get("ordered_by")
+        )
+        docket_entries = DocketEntry.objects.filter(docket=self.d)
+        self.assertEqual(docket_entries.count(), 3)
+
+        original_feed = deepcopy(entries_feed)
+        self.assertEqual(
+            self._confirm_merge_was_correct(self.d, original_feed), True
+        )
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_merge_entries_by_order_date_entered(
+        self,
+        mock_webhook_post,
+    ):
+        """Test merge equivalent minute entries on a specific date with
+        different short descriptions.
+
+        - Short description minute entries: 2
+        - Long description minute entries: 2
+        - Ordered by: date_entered
+        - Different short descriptions
+
+        Merge entries based on the order entries were entered and the order
+        they appear in the docket sheet.
+        """
+
+        entries_feed = [
+            FeedMinuteDocketEntryDataFactory(
+                date_filed=datetime(2021, 5, 14, 14, 41, 11, tzinfo=tzutc()),
+                description="Electronic filing error. REMINDER (Filed on 5/13/2021)",
+                short_description="Lorem Ipsum Dolor",
+            ),
+            FeedMinuteDocketEntryDataFactory(
+                date_filed=datetime(2021, 5, 14, 14, 7, 4, tzinfo=tzutc()),
+                description="Re: 139 Notice of Change of Address (Filed on 5/13/2021)",
+                short_description="Lorem Ipsum Dolor 2",
+            ),
+        ]
+
+        docket_data = DocketDataFactory(
+            ordered_by="date_entered",
+            docket_entries=[
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2021, 5, 14),
+                    date_entered=date(2021, 5, 14),
+                    description="Re: 139 Notice of Change of Address (Filed on 5/13/2021) (Entered: 05/14/2021)",
+                ),
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2021, 5, 14),
+                    date_entered=date(2021, 5, 14),
+                    description="Electronic filing error. REMINDER (Filed on 5/13/2021) (Entered: 05/14/2021)",
+                ),
+            ],
+        )
+
+        feed = deepcopy(entries_feed)
+        for de in feed:
+            de["description"] = ""
+            add_docket_entries(self.d, [de])
+
+        docket_entries = DocketEntry.objects.all()
+        self.assertEqual(docket_entries.count(), 2)
+
+        data = docket_data
+        add_docket_entries(
+            self.d, data["docket_entries"], order_by=data.get("ordered_by")
+        )
+        docket_entries = DocketEntry.objects.filter(docket=self.d)
+        self.assertEqual(docket_entries.count(), 2)
+
+        original_feed = deepcopy(entries_feed)
+        self.assertEqual(
+            self._confirm_merge_was_correct(self.d, original_feed), True
+        )
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_merge_entries_by_order_date_filed(
+        self,
+        mock_webhook_post,
+    ):
+        """Test merge equivalent minute entries on a specific date with
+        different short descriptions.
+
+        - Short description minute entries: 2
+        - Long description minute entries: 2
+        - Ordered by: date_filed
+        - Different short descriptions
+
+        Merge entries based on the order entries were entered and the order
+        they appear in the docket sheet.
+        """
+
+        entries_feed = [
+            FeedMinuteDocketEntryDataFactory(
+                date_filed=datetime(2021, 5, 14, 14, 41, 11, tzinfo=tzutc()),
+                description="Electronic filing error. REMINDER (Filed on 5/13/2021)",
+                short_description="Lorem Ipsum Dolor",
+            ),
+            FeedMinuteDocketEntryDataFactory(
+                date_filed=datetime(2021, 5, 14, 14, 7, 4, tzinfo=tzutc()),
+                description="Re: 139 Notice of Change of Address (Filed on 5/13/2021)",
+                short_description="Lorem Ipsum Dolor 2",
+            ),
+        ]
+
+        docket_data = DocketDataFactory(
+            ordered_by="date_filed",
+            docket_entries=[
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2021, 5, 14),
+                    date_entered=date(2021, 5, 14),
+                    description="Re: 139 Notice of Change of Address (Filed on 5/13/2021) (Entered: 05/14/2021)",
+                ),
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2021, 5, 14),
+                    date_entered=date(2021, 5, 14),
+                    description="Electronic filing error. REMINDER (Filed on 5/13/2021) (Entered: 05/14/2021)",
+                ),
+            ],
+        )
+
+        feed = deepcopy(entries_feed)
+        for de in feed:
+            de["description"] = ""
+            add_docket_entries(self.d, [de])
+
+        docket_entries = DocketEntry.objects.all()
+        self.assertEqual(docket_entries.count(), 2)
+
+        data = docket_data
+        add_docket_entries(
+            self.d, data["docket_entries"], order_by=data.get("ordered_by")
+        )
+        docket_entries = DocketEntry.objects.filter(docket=self.d)
+        self.assertEqual(docket_entries.count(), 2)
+
+        original_feed = deepcopy(entries_feed)
+        self.assertEqual(
+            self._confirm_merge_was_correct(self.d, original_feed), True
+        )
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_merge_entries_by_order_date_filed_not_equal(
+        self,
+        mock_webhook_post,
+    ):
+        """Test merge equivalent minute entries on a specific date with
+        different short descriptions and the date_entered is differs from the
+        date_filed.
+
+        - Short description minute entries: 2
+        - Long description minute entries: 2
+        - Ordered by: date_filed
+        - Different short descriptions
+
+        Merge entries based on the order entries were entered and the order
+        they appear in the docket sheet.
+        """
+
+        entries_feed = [
+            FeedMinuteDocketEntryDataFactory(
+                date_filed=datetime(2021, 5, 14, 14, 41, 11, tzinfo=tzutc()),
+                description="",
+                short_description="Lorem Ipsum Dolor",
+            ),
+            FeedMinuteDocketEntryDataFactory(
+                date_filed=datetime(2021, 5, 14, 14, 7, 4, tzinfo=tzutc()),
+                description="Re: 139 Notice of Change of Address (Filed on 5/13/2021)",
+                short_description="Notice of change",
+            ),
+        ]
+
+        docket_data = DocketDataFactory(
+            ordered_by="date_filed",
+            docket_entries=[
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2021, 5, 13),
+                    date_entered=date(2021, 5, 14),
+                    description="Re: 139 Notice of Change of Address (Filed on 5/13/2021) (Entered: 05/14/2021)",
+                ),
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2021, 5, 13),
+                    date_entered=date(2021, 5, 14),
+                    description="Electronic filing error. REMINDER (Filed on 5/13/2021) (Entered: 05/14/2021)",
+                ),
+            ],
+        )
+
+        feed = deepcopy(entries_feed)
+        for de in feed:
+            de["description"] = ""
+            add_docket_entries(self.d, [de])
+
+        docket_entries = DocketEntry.objects.all()
+        self.assertEqual(docket_entries.count(), 2)
+
+        data = docket_data
+        add_docket_entries(
+            self.d, data["docket_entries"], order_by=data.get("ordered_by")
+        )
+        docket_entries = DocketEntry.objects.filter(docket=self.d)
+        self.assertEqual(docket_entries.count(), 3)
+
+        original_feed = deepcopy(entries_feed)
+        self.assertEqual(
+            self._confirm_merge_was_correct(self.d, original_feed), True
+        )
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_merge_entries_no_order_available_date_entered_equals_date_filed(
+        self,
+        mock_webhook_post,
+    ):
+        """Test merge equivalent minute entries on a specific date with
+        different short descriptions. There is no order available on the docket
+        sheet, but the date_entered is the same as the date_filed.
+
+        - Short description minute entries: 2
+        - Long description minute entries: 2
+        - Ordered by: None
+        - Different short descriptions
+
+        Merge entries based on the order entries were entered and the order
+        they appear in the docket sheet.
+        """
+
+        entries_feed = [
+            FeedMinuteDocketEntryDataFactory(
+                date_filed=datetime(2021, 5, 14, 14, 41, 11, tzinfo=tzutc()),
+                description="Electronic filing error. REMINDER (Filed on 5/13/2021)",
+                short_description="Lorem Ipsum Dolor",
+            ),
+            FeedMinuteDocketEntryDataFactory(
+                date_filed=datetime(2021, 5, 14, 14, 7, 4, tzinfo=tzutc()),
+                description="Re: 139 Notice of Change of Address (Filed on 5/13/2021)",
+                short_description="Lorem Ipsum Dolor 2",
+            ),
+        ]
+
+        docket_data = DocketDataFactory(
+            ordered_by=None,
+            docket_entries=[
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2021, 5, 14),
+                    date_entered=date(2021, 5, 14),
+                    description="Re: 139 Notice of Change of Address (Filed on 5/13/2021) (Entered: 05/14/2021)",
+                ),
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2021, 5, 14),
+                    date_entered=date(2021, 5, 14),
+                    description="Electronic filing error. REMINDER (Filed on 5/13/2021) (Entered: 05/14/2021)",
+                ),
+            ],
+        )
+
+        feed = deepcopy(entries_feed)
+        for de in feed:
+            de["description"] = ""
+            add_docket_entries(self.d, [de])
+
+        docket_entries = DocketEntry.objects.all()
+        self.assertEqual(docket_entries.count(), 2)
+
+        data = docket_data
+        add_docket_entries(
+            self.d, data["docket_entries"], order_by=data.get("ordered_by")
+        )
+        docket_entries = DocketEntry.objects.filter(docket=self.d)
+        self.assertEqual(docket_entries.count(), 2)
+
+        original_feed = deepcopy(entries_feed)
+        self.assertEqual(
+            self._confirm_merge_was_correct(self.d, original_feed), True
+        )
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_merge_entries_no_order_available_date_entered_diff_date_filed(
+        self,
+        mock_webhook_post,
+    ):
+        """Test merge equivalent minute entries on a specific date with
+        different short descriptions. There is no order available on the docket
+        sheet, and date_entered differs from the date_filed.
+
+        - Short description minute entries: 2
+        - Long description minute entries: 2
+        - Ordered by: None
+        - Different short descriptions
+
+        The docket sheet order can't be used to merge entries.
+        Try word matching to merge entries.
+        """
+
+        entries_feed = [
+            FeedMinuteDocketEntryDataFactory(
+                date_filed=datetime(2021, 5, 14, 14, 41, 11, tzinfo=tzutc()),
+                description="Electronic filing error. REMINDER (Filed on 5/13/2021)",
+                short_description="Electronic filing error",
+            ),
+            FeedMinuteDocketEntryDataFactory(
+                date_filed=datetime(2021, 5, 14, 14, 7, 4, tzinfo=tzutc()),
+                description="",
+                short_description="Lorem Ipsum Dolor 2",
+            ),
+        ]
+
+        docket_data = DocketDataFactory(
+            ordered_by=None,
+            docket_entries=[
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2021, 5, 15),
+                    date_entered=date(2021, 5, 14),
+                    description="Re: 139 Notice of Change of Address (Filed on 5/13/2021) (Entered: 05/14/2021)",
+                ),
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2021, 5, 15),
+                    date_entered=date(2021, 5, 14),
+                    description="Electronic filing error. REMINDER (Filed on 5/13/2021) (Entered: 05/14/2021)",
+                ),
+            ],
+        )
+
+        feed = deepcopy(entries_feed)
+        for de in feed:
+            de["description"] = ""
+            add_docket_entries(self.d, [de])
+
+        docket_entries = DocketEntry.objects.all()
+        self.assertEqual(docket_entries.count(), 2)
+
+        data = docket_data
+        add_docket_entries(
+            self.d, data["docket_entries"], order_by=data.get("ordered_by")
+        )
+        docket_entries = DocketEntry.objects.filter(docket=self.d)
+        self.assertEqual(docket_entries.count(), 3)
+
+        original_feed = deepcopy(entries_feed)
+        self.assertEqual(
+            self._confirm_merge_was_correct(self.d, original_feed), True
+        )
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_merge_entries_date_filed_order_some_entries_no_date_entered(
+        self,
+        mock_webhook_post,
+    ):
+        """Test merge equivalent minute entries on a specific date with
+        different short descriptions. Entries ordered by date_filed. However,
+        some entries don't have a date entered available.
+
+        - Short description minute entries: 2
+        - Long description minute entries: 2
+        - Ordered by: date_filed
+        - Different short descriptions
+
+        The docket sheet order can't be used to merge entries.
+        Try word matching to merge entries.
+        """
+
+        entries_feed = [
+            FeedMinuteDocketEntryDataFactory(
+                date_filed=datetime(2021, 5, 14, 14, 41, 11, tzinfo=tzutc()),
+                description="Electronic filing error. REMINDER (Filed on 5/13/2021)",
+                short_description="Electronic filing error",
+            ),
+            FeedMinuteDocketEntryDataFactory(
+                date_filed=datetime(2021, 5, 14, 14, 7, 4, tzinfo=tzutc()),
+                description="",
+                short_description="Lorem Ipsum Dolor 2",
+            ),
+        ]
+
+        docket_data = DocketDataFactory(
+            ordered_by="date_filed",
+            docket_entries=[
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2021, 5, 15),
+                    date_entered=None,
+                    description="Re: 139 Notice of Change of Address (Filed on 5/13/2021) (Entered: 05/14/2021)",
+                ),
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2021, 5, 15),
+                    date_entered=date(2021, 5, 14),
+                    description="Electronic filing error. REMINDER (Filed on 5/13/2021) (Entered: 05/14/2021)",
+                ),
+            ],
+        )
+
+        feed = deepcopy(entries_feed)
+        for de in feed:
+            de["description"] = ""
+            add_docket_entries(self.d, [de])
+
+        docket_entries = DocketEntry.objects.all()
+        self.assertEqual(docket_entries.count(), 2)
+
+        data = docket_data
+        add_docket_entries(
+            self.d, data["docket_entries"], order_by=data.get("ordered_by")
+        )
+        docket_entries = DocketEntry.objects.filter(docket=self.d)
+        self.assertEqual(docket_entries.count(), 3)
+
+        original_feed = deepcopy(entries_feed)
+        self.assertEqual(
+            self._confirm_merge_was_correct(self.d, original_feed), True
+        )
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_merge_entries_date_entered_order_some_entries_no_date_entered(
+        self,
+        mock_webhook_post,
+    ):
+        """Test merge equivalent minute entries on a specific date with
+        different short descriptions. Entries ordered by date_entered. However,
+        some entries don't have a date entered available.
+
+        - Short description minute entries: 2
+        - Long description minute entries: 2
+        - Ordered by: date_entered
+        - Different short descriptions
+
+        The docket sheet is ordered by date_entered, it's possible to use order
+        to merge entries.
+        """
+
+        entries_feed = [
+            FeedMinuteDocketEntryDataFactory(
+                date_filed=datetime(2021, 5, 14, 14, 7, 4, tzinfo=tzutc()),
+                description="Re: 139 Notice of Change of Address (Filed on 5/13/2021)",
+                short_description="Notice of Change of Address",
+            ),
+            FeedMinuteDocketEntryDataFactory(
+                date_filed=datetime(2021, 5, 14, 14, 41, 11, tzinfo=tzutc()),
+                description="Electronic filing error. REMINDER (Filed on 5/13/2021)",
+                short_description="Electronic filing error",
+            ),
+        ]
+
+        docket_data = DocketDataFactory(
+            ordered_by="date_entered",
+            docket_entries=[
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2021, 5, 14),
+                    date_entered=date(2021, 5, 14),
+                    description="Re: 139 Notice of Change of Address (Filed on 5/13/2021) (Entered: 05/14/2021)",
+                ),
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2021, 5, 14),
+                    date_entered=None,
+                    description="Electronic filing error. REMINDER (Filed on 5/13/2021) (Entered: 05/14/2021)",
+                ),
+            ],
+        )
+
+        feed = deepcopy(entries_feed)
+        for de in feed:
+            de["description"] = ""
+            add_docket_entries(self.d, [de])
+
+        docket_entries = DocketEntry.objects.all()
+        self.assertEqual(docket_entries.count(), 2)
+
+        data = docket_data
+        add_docket_entries(
+            self.d, data["docket_entries"], order_by=data.get("ordered_by")
+        )
+        docket_entries = DocketEntry.objects.filter(docket=self.d)
+        self.assertEqual(docket_entries.count(), 2)
+
+        original_feed = deepcopy(entries_feed)
+        self.assertEqual(
+            self._confirm_merge_was_correct(self.d, original_feed), True
+        )
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_avoid_merging_entries_date_entered_mismatch(
+        self,
+        mock_webhook_post,
+    ):
+        """Test avoid merging minute entries where they date_entered doesn't
+        match short description date_entered.
+
+        - Short description minute entries: 2
+        - Long description minute entries: 2
+        - Ordered by: date_filed
+        - Different short descriptions
+
+        Avoid merging entries, add as new entries.
+        """
+
+        entries_feed = [
+            FeedMinuteDocketEntryDataFactory(
+                date_filed=datetime(2021, 5, 14, 14, 7, 4, tzinfo=tzutc()),
+                description="",
+                short_description="Notice of Change of Address",
+            ),
+            FeedMinuteDocketEntryDataFactory(
+                date_filed=datetime(2021, 5, 14, 14, 41, 11, tzinfo=tzutc()),
+                description="",
+                short_description="Electronic filing error",
+            ),
+        ]
+
+        docket_data = DocketDataFactory(
+            ordered_by="date_filed",
+            docket_entries=[
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2021, 5, 14),
+                    date_entered=date(2021, 5, 15),
+                    description="Re: 139 Notice of Change of Address (Filed on 5/13/2021) (Entered: 05/14/2021)",
+                ),
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2021, 5, 14),
+                    date_entered=None,
+                    description="Electronic filing error. REMINDER (Filed on 5/13/2021) (Entered: 05/14/2021)",
+                ),
+            ],
+        )
+
+        feed = deepcopy(entries_feed)
+        for de in feed:
+            de["description"] = ""
+            add_docket_entries(self.d, [de])
+
+        docket_entries = DocketEntry.objects.all()
+        self.assertEqual(docket_entries.count(), 2)
+
+        data = docket_data
+        add_docket_entries(
+            self.d, data["docket_entries"], order_by=data.get("ordered_by")
+        )
+        docket_entries = DocketEntry.objects.filter(docket=self.d)
+        self.assertEqual(docket_entries.count(), 4)
+
+        original_feed = deepcopy(entries_feed)
+        self.assertEqual(
+            self._confirm_merge_was_correct(self.d, original_feed), True
+        )

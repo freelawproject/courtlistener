@@ -567,7 +567,7 @@ def process_recap_docket(self, pk):
     )
 
     des_returned, rds_created, content_updated = add_docket_entries(
-        d, data["docket_entries"]
+        d, data["docket_entries"], order_by=data.get("ordered_by")
     )
     add_parties_and_attorneys(d, data["parties"])
     process_orphan_documents(rds_created, pq.court_id, d.date_filed)

@@ -2,7 +2,7 @@
 import logging
 import re
 from copy import deepcopy
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from django.core.exceptions import ValidationError
@@ -25,6 +25,7 @@ from cl.lib.pacer import (
     normalize_attorney_role,
 )
 from cl.lib.privacy_tools import anonymize
+from cl.lib.stop_words import STOP_WORDS
 from cl.lib.timezone_helpers import localize_date_and_time
 from cl.lib.utils import previous_and_next, remove_duplicate_dicts
 from cl.people_db.lookup_utils import lookup_judge_by_full_name_and_set_attr
@@ -450,7 +451,7 @@ def get_order_of_docket(docket_entries):
 
 
 def make_recap_sequence_number(
-    date_filed: date, recap_sequence_index: int
+    date_filed: date | datetime, recap_sequence_index: int
 ) -> str:
     """Make a sequence number using a date and index.
 
@@ -502,11 +503,20 @@ def calculate_recap_sequence_numbers(docket_entries: list, court_id: str):
         current_date_filed, current_time_filed = localize_date_and_time(
             court_id, de["date_filed"]
         )
+        if current_time_filed:
+            current_date_filed = datetime.combine(
+                current_date_filed, current_time_filed
+            )
         prev_date_filed = None
         if prev is not None:
             prev_date_filed, prev_time_filed = localize_date_and_time(
                 court_id, prev["date_filed"]
             )
+            if prev_time_filed:
+                prev_date_filed = datetime.combine(
+                    prev_date_filed, prev_time_filed
+                )
+
         if prev is not None and current_date_filed == prev_date_filed:
             # Previous item has same date. Increment the sequence number.
             de["recap_sequence_index"] = prev["recap_sequence_index"] + 1
@@ -571,6 +581,50 @@ def merge_unnumbered_docket_entries(des):
     return winner
 
 
+def find_minute_entry_by_description(d, docket_entry):
+    normalize_long_description(docket_entry)
+    query = Q()
+    if docket_entry.get("description"):
+        query |= Q(description=docket_entry["description"])
+    if docket_entry.get("short_description"):
+        query |= Q(
+            recap_documents__description=docket_entry["short_description"]
+        )
+
+    date_filed, time_filed = localize_date_and_time(
+        d.court.pk, docket_entry["date_filed"]
+    )
+    des = DocketEntry.objects.filter(
+        query,
+        docket=d,
+        date_filed=date_filed,
+        time_filed=time_filed,
+        entry_number=docket_entry["document_number"],
+    )
+    count = des.count()
+    if count == 0:
+        de = DocketEntry(
+            docket=d, entry_number=docket_entry["document_number"]
+        )
+        de_created = True
+    elif count == 1:
+        de = des[0]
+        de_created = False
+    else:
+        logger.warning(
+            "Multiple docket entries returned for unnumbered docket "
+            "entry on date: %s while processing %s. Attempting merge",
+            docket_entry["date_filed"],
+            d,
+        )
+        # There's so little metadata with unnumbered des that if there's
+        # more than one match, we can just select the oldest as canonical.
+        de = merge_unnumbered_docket_entries(des)
+        de_created = False
+
+    return de, de_created
+
+
 def get_or_make_docket_entry(d, docket_entry):
     """Lookup or create a docket entry to match the one that was scraped.
 
@@ -608,46 +662,150 @@ def get_or_make_docket_entry(d, docket_entry):
     else:
         # Unnumbered entry. The only thing we can be sure we have is a
         # date. Try to find it by date and description (short or long)
-        normalize_long_description(docket_entry)
-        query = Q()
-        if docket_entry.get("description"):
-            query |= Q(description=docket_entry["description"])
-        if docket_entry.get("short_description"):
-            query |= Q(
-                recap_documents__description=docket_entry["short_description"]
-            )
+        de, de_created = find_minute_entry_by_description(d, docket_entry)
 
-        des = DocketEntry.objects.filter(
-            query,
-            docket=d,
-            date_filed=docket_entry["date_filed"],
-            entry_number=docket_entry["document_number"],
-        )
-        count = des.count()
-        if count == 0:
-            de = DocketEntry(
-                docket=d, entry_number=docket_entry["document_number"]
-            )
-            de_created = True
-        elif count == 1:
-            de = des[0]
-            de_created = False
-        else:
-            logger.warning(
-                "Multiple docket entries returned for unnumbered docket "
-                "entry on date: %s while processing %s. Attempting merge",
-                docket_entry["date_filed"],
-                d,
-            )
-            # There's so little metadata with unnumbered des that if there's
-            # more than one match, we can just select the oldest as canonical.
-            de = merge_unnumbered_docket_entries(des)
-            de_created = False
     return de, de_created
 
 
+def update_docket_entry_rd(
+    content_updated: bool,
+    d: Docket,
+    de: DocketEntry,
+    de_created: bool,
+    docket_entry: dict[str, any],
+    des_returned: list[DocketEntry],
+    known_filing_dates: list[date],
+    rds_created: list[RECAPDocument],
+    tags: list[Tag] | None,
+) -> bool | str:
+    """Update or create a docket entry and associated RECAPDocument based on
+    the data in the docket_entry dict.
+
+    :param content_updated: Whether the content of the docket entry has been created.
+    :param d: The Docket instance related to the DocketEntry and RECAPDocument.
+    :param de: The DocketEntry instance to be updated.
+    :param de_created: Whether the DocketEntry instance is newly created.
+    :param docket_entry: A dict containing the DocketEntry date to update.
+    :param des_returned: List of DocketEntry objects returned after processing.
+    :param known_filing_dates: List of known filing dates related.
+    :param rds_created: List of RECAPDocument objects created.
+    :param tags: List of Tag instances to be associated with the DocketEntry
+    and RECAPDocument.
+    :return: content_updated or a string saying the parent for loop to continue
+    """
+
+    de.description = docket_entry["description"] or de.description
+    date_filed, time_filed = localize_date_and_time(
+        de.docket.court.pk, docket_entry["date_filed"]
+    )
+    if not time_filed:
+        # If not time data is available, compare if date_filed changed if
+        # so restart time_filed to None, otherwise keep the current time.
+        if de.date_filed != docket_entry["date_filed"]:
+            de.time_filed = None
+    else:
+        de.time_filed = time_filed
+    de.date_filed = date_filed
+    de.pacer_sequence_number = (
+        docket_entry.get("pacer_seq_no") or de.pacer_sequence_number
+    )
+    de.recap_sequence_number = docket_entry["recap_sequence_number"]
+    des_returned.append(de)
+    de.save()
+    if tags:
+        for tag in tags:
+            tag.tag_object(de)
+
+    if de_created:
+        content_updated = True
+        known_filing_dates.append(de.date_filed)
+
+    # Then make the RECAPDocument object. Try to find it. If we do, update
+    # the pacer_doc_id field if it's blank. If we can't find it, create it
+    # or throw an error.
+    params = {
+        "docket_entry": de,
+        # Normalize to "" here. Unsure why, but RECAPDocuments have a
+        # char field for this field while DocketEntries have a integer
+        # field.
+        "document_number": docket_entry["document_number"] or "",
+    }
+    if not docket_entry["document_number"] and docket_entry.get(
+        "short_description"
+    ):
+        params["description"] = docket_entry["short_description"]
+
+    if docket_entry.get("attachment_number"):
+        params["document_type"] = RECAPDocument.ATTACHMENT
+        params["attachment_number"] = docket_entry["attachment_number"]
+    else:
+        params["document_type"] = RECAPDocument.PACER_DOCUMENT
+
+    appellate_court_ids = (
+        Court.federal_courts.appellate_pacer_courts().values_list(
+            "pk", flat=True
+        )
+    )
+
+    # Unlike district and bankr. dockets, where you always have a main
+    # RD and can optionally have attachments to the main RD, Appellate
+    # docket entries can either they *only* have a main RD (with no
+    # attachments) or they *only* have attachments (with no main doc).
+    # Unfortunately, when we ingest a docket, we don't know if the entries
+    # have attachments, so we begin by assuming they don't and create
+    # main RDs for each entry. Later, if/when we get attachment pages for
+    # particular entries, we convert the main documents into attachment
+    # RDs. The check here ensures that if that happens for a particular
+    # entry, we avoid creating the main RD a second+ time when we get the
+    # docket sheet a second+ time.
+    if de_created is False and d.court.pk in appellate_court_ids:
+        appellate_rd_att_exists = de.recap_documents.filter(
+            document_type=RECAPDocument.ATTACHMENT
+        ).exists()
+        if appellate_rd_att_exists:
+            params["document_type"] = RECAPDocument.ATTACHMENT
+    try:
+        rd = RECAPDocument.objects.get(**params)
+    except RECAPDocument.DoesNotExist:
+        try:
+            rd = RECAPDocument.objects.create(
+                pacer_doc_id=docket_entry["pacer_doc_id"],
+                is_available=False,
+                **params,
+            )
+        except ValidationError:
+            # Happens from race conditions.
+            # continue
+            return "Continue"
+        rds_created.append(rd)
+    except RECAPDocument.MultipleObjectsReturned:
+        logger.info(
+            "Multiple recap documents found for document entry number'%s' "
+            "while processing '%s'" % (docket_entry["document_number"], d)
+        )
+        # continue
+        return "Continue"
+
+    rd.pacer_doc_id = rd.pacer_doc_id or docket_entry["pacer_doc_id"]
+    rd.description = docket_entry.get("short_description") or rd.description
+    try:
+        rd.save()
+    except ValidationError:
+        # Happens from race conditions.
+        # continue
+        return "Continue"
+    if tags:
+        for tag in tags:
+            tag.tag_object(rd)
+
+    return content_updated
+
+
 def add_docket_entries(
-    d, docket_entries, tags=None, do_not_update_existing=False
+    d: Docket,
+    docket_entries: list[dict[str, any]],
+    tags: list[Tag] | None = None,
+    order_by: str | None = None,
 ):
     """Update or create the docket entries and documents.
 
@@ -655,8 +813,8 @@ def add_docket_entries(
     :param docket_entries: A list of dicts containing docket entry data.
     :param tags: A list of tag objects to apply to the recap documents and
     docket entries created or updated in this function.
-    :param do_not_update_existing: Whether docket entries should only be created and avoid
-    updating an existing one.
+    :param order_by: Optional, whether the docket entries are ordered by
+    date_filed or date_entered
     :returns tuple of a list of created or existing
     DocketEntry objects,  a list of RECAPDocument objects created, whether
     any docket entry was created.
@@ -669,6 +827,47 @@ def add_docket_entries(
     content_updated = False
     calculate_recap_sequence_numbers(docket_entries, d.court_id)
     known_filing_dates = [d.date_last_filing]
+
+    # Filter minute entries with long descriptions, avoid docket history
+    # report entries, exclude entries with no date_entered.
+    minute_entries_long_des_date_entered = [
+        entry
+        for entry in docket_entries
+        if entry["description"]
+        and entry.get("date_entered")
+        and not entry["document_number"]
+        and not entry["pacer_doc_id"]
+        and not entry.get("short_description")
+    ]
+
+    # If the docket sheet is ordered by "date_entered", we can still try to
+    # merge minute entries without date_entered.
+    minute_entries_long_des_not_date_entered = []
+    if order_by == "date_entered":
+        minute_entries_long_des_not_date_entered = [
+            entry
+            for entry in docket_entries
+            if entry["description"]
+            and not entry.get("date_entered")
+            and not entry["document_number"]
+            and not entry["pacer_doc_id"]
+            and not entry.get("short_description")
+        ]
+
+    minute_entries_long_des = (
+        minute_entries_long_des_date_entered
+        + minute_entries_long_des_not_date_entered
+    )
+
+    if minute_entries_long_des:
+        # If there are minute entries with long descriptions, let's only merge
+        # no minute entries with the normal method.
+        docket_entries = [
+            entry
+            for entry in docket_entries
+            if entry not in minute_entries_long_des
+        ]
+
     for docket_entry in docket_entries:
         response = get_or_make_docket_entry(d, docket_entry)
         if response is None:
@@ -676,110 +875,36 @@ def add_docket_entries(
         else:
             de, de_created = response[0], response[1]
 
-        de.description = docket_entry["description"] or de.description
-        date_filed, time_filed = localize_date_and_time(
-            de.docket.court.pk, docket_entry["date_filed"]
+        response = update_docket_entry_rd(
+            content_updated,
+            d,
+            de,
+            de_created,
+            docket_entry,
+            des_returned,
+            known_filing_dates,
+            rds_created,
+            tags,
         )
-        if not time_filed:
-            # If not time data is available, compare if date_filed changed if
-            # so restart time_filed to None, otherwise keep the current time.
-            if de.date_filed != docket_entry["date_filed"]:
-                de.time_filed = None
-        else:
-            de.time_filed = time_filed
-        de.date_filed = date_filed
-        de.pacer_sequence_number = (
-            docket_entry.get("pacer_seq_no") or de.pacer_sequence_number
-        )
-        de.recap_sequence_number = docket_entry["recap_sequence_number"]
-        des_returned.append(de)
-        if do_not_update_existing and not de_created:
-            return des_returned, rds_created, content_updated
-        de.save()
-        if tags:
-            for tag in tags:
-                tag.tag_object(de)
-
-        if de_created:
-            content_updated = True
-            known_filing_dates.append(de.date_filed)
-
-        # Then make the RECAPDocument object. Try to find it. If we do, update
-        # the pacer_doc_id field if it's blank. If we can't find it, create it
-        # or throw an error.
-        params = {
-            "docket_entry": de,
-            # Normalize to "" here. Unsure why, but RECAPDocuments have a
-            # char field for this field while DocketEntries have a integer
-            # field.
-            "document_number": docket_entry["document_number"] or "",
-        }
-        if not docket_entry["document_number"] and docket_entry.get(
-            "short_description"
-        ):
-            params["description"] = docket_entry["short_description"]
-
-        if docket_entry.get("attachment_number"):
-            params["document_type"] = RECAPDocument.ATTACHMENT
-            params["attachment_number"] = docket_entry["attachment_number"]
-        else:
-            params["document_type"] = RECAPDocument.PACER_DOCUMENT
-
-        appellate_court_ids = (
-            Court.federal_courts.appellate_pacer_courts().values_list(
-                "pk", flat=True
-            )
-        )
-
-        # Unlike district and bankr. dockets, where you always have a main
-        # RD and can optionally have attachments to the main RD, Appellate
-        # docket entries can either they *only* have a main RD (with no
-        # attachments) or they *only* have attachments (with no main doc).
-        # Unfortunately, when we ingest a docket, we don't know if the entries
-        # have attachments, so we begin by assuming they don't and create
-        # main RDs for each entry. Later, if/when we get attachment pages for
-        # particular entries, we convert the main documents into attachment
-        # RDs. The check here ensures that if that happens for a particular
-        # entry, we avoid creating the main RD a second+ time when we get the
-        # docket sheet a second+ time.
-        if de_created is False and d.court.pk in appellate_court_ids:
-            appellate_rd_att_exists = de.recap_documents.filter(
-                document_type=RECAPDocument.ATTACHMENT
-            ).exists()
-            if appellate_rd_att_exists:
-                params["document_type"] = RECAPDocument.ATTACHMENT
-        try:
-            rd = RECAPDocument.objects.get(**params)
-        except RECAPDocument.DoesNotExist:
-            try:
-                rd = RECAPDocument.objects.create(
-                    pacer_doc_id=docket_entry["pacer_doc_id"],
-                    is_available=False,
-                    **params,
-                )
-            except ValidationError:
-                # Happens from race conditions.
-                continue
-            rds_created.append(rd)
-        except RECAPDocument.MultipleObjectsReturned:
-            logger.info(
-                "Multiple recap documents found for document entry number'%s' "
-                "while processing '%s'" % (docket_entry["document_number"], d)
-            )
+        if response == "Continue":
             continue
+        content_updated = response
 
-        rd.pacer_doc_id = rd.pacer_doc_id or docket_entry["pacer_doc_id"]
-        rd.description = (
-            docket_entry.get("short_description") or rd.description
-        )
-        try:
-            rd.save()
-        except ValidationError:
-            # Happens from race conditions.
-            continue
-        if tags:
-            for tag in tags:
-                tag.tag_object(rd)
+    (
+        des_returned,
+        rds_created,
+        content_updated,
+        known_filing_dates,
+    ) = merge_long_description_minute_entries(
+        content_updated,
+        d,
+        des_returned,
+        known_filing_dates,
+        minute_entries_long_des,
+        order_by,
+        rds_created,
+        tags,
+    )
 
     known_filing_dates = set(filter(None, known_filing_dates))
     if known_filing_dates:
@@ -788,6 +913,401 @@ def add_docket_entries(
         )
 
     return des_returned, rds_created, content_updated
+
+
+def merge_long_description_minute_entries(
+    content_updated: bool,
+    d: Docket,
+    des_returned: list[DocketEntry],
+    known_filing_dates: list[date],
+    minute_entries_long_des: list[dict[str, any]],
+    order_by: str | None,
+    rds_created: list[RECAPDocument],
+    tags: list[Tag],
+) -> tuple[list[DocketEntry], list[RECAPDocument], bool, list[date]]:
+    """Merges short and long description minute entries in a given docket.
+
+    :param content_updated: Flag indicating whether a new docket entry has been
+    created.
+    :param d: A Docket object for which minute entries are being merged.
+    :param des_returned: List of returned DocketEntry objects.
+    :param known_filing_dates: List of known filing dates.
+    :param minute_entries_long_des: List of dicts containing the long
+     description minute entries.
+    :param order_by: Ordering method, can be either "date_entered",
+     "date_filed" or None.
+    :param rds_created: List of RECAPDocument objects that were created.
+    :param tags: List of Tag objects.
+
+    :return: A four-tuple with list of returned DocketEntry objects, list of
+      RECAPDocument objects created, whether a new docket entry was created
+      and a list of known filing dates.
+    """
+
+    # Get unique dates on which try to merge entries.
+    unique_dates = []
+    for entry in minute_entries_long_des:
+        date_entered = entry.get("date_entered")
+        if entry.get("ordered_by") == "date_entered":
+            date_entered = entry["date_filed"]
+
+        if not date_entered:
+            continue
+
+        if date_entered not in unique_dates:
+            unique_dates.append(date_entered)
+
+    short_description_entries = {}
+    long_description_entries = {}
+
+    de_created = False
+    query = Q(recap_documents__pacer_doc_id="")
+    for date_entered in unique_dates:
+        minute_entries_to_merge = DocketEntry.objects.filter(
+            query,
+            docket=d,
+            date_filed=date_entered,
+            entry_number=None,
+            description="",
+        ).order_by("recap_sequence_number")
+        short_description_entries[date_entered] = list(minute_entries_to_merge)
+
+        if order_by == "date_entered":
+            long_description_entries[date_entered] = [
+                entry
+                for entry in minute_entries_long_des
+                if entry["date_filed"] == date_entered
+            ]
+        else:
+            long_description_entries[date_entered] = [
+                entry
+                for entry in minute_entries_long_des
+                if entry["date_entered"] == date_entered
+            ]
+
+        entries_to_merge, entries_to_add = look_for_minute_entries_matches(
+            d,
+            short_description_entries[date_entered],
+            long_description_entries[date_entered],
+            order_by,
+        )
+
+        with transaction.atomic():
+            docket = Docket.objects.select_for_update().get(pk=d.pk)
+            for entry_to_merge in entries_to_merge:
+                de = DocketEntry.objects.get(
+                    docket=docket, pk=entry_to_merge[0]
+                )
+                docket_entry = entry_to_merge[1]
+                normalize_long_description(docket_entry)
+                response = update_docket_entry_rd(
+                    content_updated,
+                    d,
+                    de,
+                    de_created,
+                    docket_entry,
+                    des_returned,
+                    known_filing_dates,
+                    rds_created,
+                    tags,
+                )
+                if response == "Continue":
+                    continue
+                content_updated = response
+
+            for entry_to_add in entries_to_add:
+                de = DocketEntry.objects.create(
+                    docket=docket, entry_number=entry_to_add["document_number"]
+                )
+                docket_entry = entry_to_add
+                de_created = True
+                response = update_docket_entry_rd(
+                    content_updated,
+                    d,
+                    de,
+                    de_created,
+                    docket_entry,
+                    des_returned,
+                    known_filing_dates,
+                    rds_created,
+                    tags,
+                )
+                if response == "Continue":
+                    continue
+                content_updated = response
+
+    return des_returned, rds_created, content_updated, known_filing_dates
+
+
+def look_for_minute_entries_matches(
+    d: Docket,
+    short_des_entries: list[DocketEntry],
+    long_des_entries: list[dict[str, any]],
+    order_by: str | None,
+) -> tuple[list[tuple[int, dict[str, any]]], list[dict[str, any]]]:
+    """This method looks for matching minute entries in the given short and
+    long description lists and returns the entries to be merged and the entries
+    to be added.
+
+    :param d: The Docket object to which the minute entries belong.
+    :param short_des_entries: A list of short description minute entries.
+    :param long_des_entries: A list of long description minute entries.
+    :param order_by: A string indicating the order for merging the entries.
+    Can be 'date_entered', 'date_filed' or None.
+
+    :return: A two-tuple of, a list of tuples where each tuple contains the pk
+    of the short description entry and its corresponding long description entry,
+    a list of long description entries that have no matching short description
+    entry and should be added to the Docket.
+    """
+
+    entries_to_merge = []
+    if len(short_des_entries) == len(long_des_entries):
+        # Same number of minute entries in both sides.
+        if len(long_des_entries) == 1:
+            # Only one minute entry, merge it directly
+            entry = (short_des_entries[0].pk, long_des_entries[0])
+            entries_to_merge.append(entry)
+
+        short_descriptions = [
+            short_de.recap_documents.all()[0].description
+            for short_de in short_des_entries
+        ]
+        short_descriptions_equal = all(
+            x == short_descriptions[0] for x in short_descriptions
+        )
+        if short_descriptions and short_descriptions_equal:
+            # All short descriptions are the same, merge them directly.
+            for i, short_de in enumerate(short_des_entries):
+                entry = (short_de.pk, long_des_entries[i])
+                entries_to_merge.append(entry)
+
+        elif short_descriptions and not short_descriptions_equal:
+            # Short descriptions are not the same, use order as helper to merge
+            sorted_long_des = sorted(
+                long_des_entries, key=lambda x: x["recap_sequence_number"]
+            )
+            if order_by == "date_entered":
+                # date_entered order, merge them.
+                for i, short_de in enumerate(short_des_entries):
+                    entry = (
+                        short_de.pk,
+                        sorted_long_des[i],
+                    )
+                    entries_to_merge.append(entry)
+
+            elif order_by == "date_filed" or order_by is None:
+                # date_filed or None order, confirm each date_entered dates is
+                # equal to its date_filed
+                date_entered_equal = all(
+                    entry.get("date_entered") == entry["date_filed"]
+                    for entry in long_des_entries
+                )
+                if date_entered_equal:
+                    # If all date_filed equals their date_entered, merge them
+                    for i, short_de in enumerate(short_des_entries):
+                        entry = (
+                            short_de.pk,
+                            sorted_long_des[i],
+                        )
+                        entries_to_merge.append(entry)
+
+        matched_entries = [x[1] for x in entries_to_merge]
+        no_matched_entries = [
+            x for x in long_des_entries if x not in matched_entries
+        ]
+
+        # Try to find matches in not_matches_entries using word matching as a
+        # fallback, append matches to previous matches.
+        entries_to_merge_word_matching, no_matched_entries = do_word_matching(
+            short_des_entries, no_matched_entries
+        )
+        entries_to_merge = entries_to_merge + entries_to_merge_word_matching
+
+    else:
+        # Not the same number of minute entries in both sides. We need to try
+        # word marching.
+        entries_to_merge, no_matched_entries = do_word_matching(
+            short_des_entries, long_des_entries
+        )
+
+    entries_to_add = []
+    for docket_entry in no_matched_entries:
+        # Confirm that no matching entries do not exist yet.
+        de, de_created = find_minute_entry_by_description(d, docket_entry)
+        if de_created:
+            entries_to_add.append(docket_entry)
+
+        # No need to return de, since de description and date is already the
+        # same, no need to update it.
+    return entries_to_merge, entries_to_add
+
+
+def do_word_matching(
+    short_des_entries: list[DocketEntry],
+    long_des_entries: list[dict[str, any]],
+) -> tuple[list[tuple[int, dict[str, any]]], list[dict[str, any]]]:
+    """This method performs word matching between short description minute
+    entries and long description minute entries to find potential matches and returns
+    the entries to be merged and the entries to be added.
+
+    :param short_des_entries: A list of short description minute entries.
+    :param long_des_entries: A list of long description minute entries.
+
+    :return: A two-tuple of entries to merge and entries to add.
+    """
+
+    entries_to_merge = []
+    matched_entries = {}
+    long_des_matched = []
+
+    for short_des_entry in short_des_entries:
+        matched_entries[short_des_entry.pk] = []
+        for long_des_entry in long_des_entries:
+            # Check if there is a match between the short and long description
+            # entries
+            short_description = short_des_entry.recap_documents.all()[
+                0
+            ].description
+            matched = check_if_there_is_a_match(
+                short_description, long_des_entry["description"]
+            )
+            if matched:
+                matched_entries[short_des_entry.pk].append(long_des_entry)
+
+    # Reduce matched entries after removing match conflicts.
+    matches_after_reduce = reduce_matched_entries(matched_entries)
+    for short_des_pk, matches in matches_after_reduce.items():
+        if len(matches) == 1:
+            # If there is only one matched long description entry, add it to
+            # the entries_to_merge list
+            entries_to_merge.append((short_des_pk, matches[0]))
+            long_des_matched.append(matches[0])
+
+    # Find entries that have no match and should be added
+    entries_to_add = [x for x in long_des_entries if x not in long_des_matched]
+    return entries_to_merge, entries_to_add
+
+
+def reduce_matched_entries(
+    matched_entries: dict[int, list[dict[str, any]]]
+) -> dict[int, list[dict[str, any]]]:
+    """This method reduces the matched entries dictionary by ensuring that
+    each short description entry has at most one matching long description
+    entry.
+    The method solves conflicts by removing duplicate matches and updates the
+    dictionary accordingly
+
+    :param: matched_entries: A dictionary where the keys are the pk of short
+    description minute entries, and the values are lists of matching long
+    description minute entries.
+
+    :return: The matched_entries dict after solving match conflicts.
+    """
+
+    matches_after_reduce = dict(matched_entries)
+    single_element_keys = set()
+
+    # Find entries with a single element in their lists
+    for key, value in matches_after_reduce.items():
+        if len(value) == 1:
+            single_element_keys.add(key)
+
+    # Process entries with single elements
+    while single_element_keys:
+        single_element_key = single_element_keys.pop()
+        single_element = matches_after_reduce[single_element_key][0]
+
+        # Remove the element from other entries lists
+        for key, value in matches_after_reduce.items():
+            if key != single_element_key and single_element in value:
+                removed = False
+                if not len(value) == 1:
+                    value.remove(single_element)
+                    removed = True
+                if len(value) == 1 and removed:
+                    single_element_keys.add(key)
+    return matches_after_reduce
+
+
+def check_if_there_is_a_match(
+    short_description: str,
+    long_description: str,
+) -> bool:
+    """This method checks if there is a match between a long description
+    minute entry and a short description minute entry based on the number of
+    matched words in their descriptions.
+
+    :param short_description: The short description minute entry.
+    :param long_description: The long description minute entry.
+
+    :return: True if the long description entry and the short description
+    entry are considered a match based on their matched words count, False otherwise.
+    """
+
+    matched_words_count = count_words_in_text(
+        short_description, long_description
+    )
+    if matched_words_count:
+        count_short_words = len(clean_and_split_words(short_description))
+        half_words = round(count_short_words / 2)
+        if "AND" in short_description or "-" in short_description:
+            half_words = round(half_words / 2)
+        if matched_words_count >= half_words:
+            return True
+    return False
+
+
+def count_words_in_text(short_text: str, long_text: str) -> int:
+    """This method counts the number of words from the short text that are
+    present in the long text. It ensures that each unique word from the short
+    text is counted only once.
+
+    :param short_text: The short text to check for matching words.
+    :param long_text: The long text to compare against the short text.
+
+    :return: The number of unique words from the short text that are present in
+    the long text.
+    """
+
+    short_words = clean_and_split_words(short_text)
+    long_words = clean_and_split_words(long_text)
+    long_set = set(long_words)
+
+    # Initialize a counter for the number of matching words
+    count = 0
+    unique_words = {}
+    # Iterate over the words in the short text and count how many are in the
+    # long text
+    for word in short_words:
+        unique_word = unique_words.get(word)
+        if word in long_set and not unique_word:
+            unique_words[word] = True
+            count += 1
+
+    return count
+
+
+def clean_and_split_words(text: str) -> list[str]:
+    """This method cleans a given text by converting it to lowercase and
+    removing specific characters and stop words, the cleaned text is then
+    split into tokens.
+
+    :param text: The input text to be cleaned and split.
+    :return: A list of cleaned and split tokens from the input text.
+    """
+
+    cleaned_text = text.lower()
+    cleaned_text = (
+        cleaned_text.replace(".", " ")
+        .replace("(", " ")
+        .replace(")", " ")
+        .replace("*", " ")
+        .replace("<", " ")
+        .replace("/", " ")
+    )
+    tokens = [word for word in cleaned_text.split() if word not in STOP_WORDS]
+    return tokens
 
 
 def check_json_for_terminated_entities(parties) -> bool:
@@ -1319,7 +1839,10 @@ def merge_pacer_docket_into_cl_docket(
     )
 
     des_returned, rds_created, content_updated = add_docket_entries(
-        d, docket_data["docket_entries"], tags=tags
+        d,
+        docket_data["docket_entries"],
+        tags=tags,
+        order_by=docket_data.get("ordered_by"),
     )
     add_parties_and_attorneys(d, docket_data["parties"])
     process_orphan_documents(rds_created, d.court_id, d.date_filed)
