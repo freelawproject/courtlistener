@@ -120,3 +120,46 @@ def get(mapping, key):
 @register.simple_tag
 def random_int(a: int, b: int) -> int:
     return random.randint(a, b)
+
+
+@register.filter
+def page_prev_range(page_obj, num=5):
+    if not page_obj.has_previous():
+        return ""
+    first = max(page_obj.number - num, 1)
+    return range(first, page_obj.number)
+
+
+@register.filter
+def page_next_range(page_obj, num=5):
+    if not page_obj.has_next():
+        return ""
+    last = min(page_obj.paginator.num_pages, page_obj.number + num)
+    return range(page_obj.number + 1, last + 1)
+
+
+# sourced from: https://stackoverflow.com/questions/2272370/sortable-table-columns-in-django
+@register.simple_tag
+def url_replace(request, value):
+    field = "order_by"
+    dict_ = request.GET.copy()
+    if field in dict_.keys():
+        if dict_[field].startswith("-") and dict_[field].lstrip("-") == value:
+            dict_[field] = value  # desc to asc
+        elif dict_[field] == value:
+            dict_[field] = "-" + value
+        else:  # order_by for different column
+            dict_[field] = value
+    else:  # No order_by
+        dict_[field] = value
+    return urlencode(sorted(dict_.items()))
+
+
+@register.simple_tag
+def sort_caret(request, value) -> SafeString:
+    current = request.GET.get("order_by", "*UP*")
+    caret = '&nbsp;<i class="gray fa fa-angle-up"></i>'
+    if current == value or current == "-" + value:
+        if current.startswith("-"):
+            caret = '&nbsp;<i class="gray fa fa-angle-down"></i>'
+    return mark_safe(caret)

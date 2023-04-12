@@ -56,9 +56,5 @@
 {% endif %}
 
 
-{% if docket_entries.paginator.num_pages > 1 %}
-    <div class="col-xs-12">
-    {% include "includes/pagination.html" with results=docket_entries %}
-    </div>
-{% endif %}
+{% include "includes/new_pagination.html" with page_obj=docket_entries %}
 {% endblock %}
