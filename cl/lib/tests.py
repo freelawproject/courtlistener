@@ -26,7 +26,6 @@ from cl.lib.privacy_tools import anonymize
 from cl.lib.ratelimiter import parse_rate
 from cl.lib.search_utils import make_fq
 from cl.lib.string_utils import normalize_dashes, trunc
-from cl.lib.utils import alphanumeric_sort
 from cl.people_db.models import Role
 from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
 from cl.search.factories import (
