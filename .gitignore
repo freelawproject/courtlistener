@@ -36,6 +36,7 @@ cl/assets/static/
 cl/settings/*private.py
 cl/settings/google_auth.json
 .DS_Store
+.dir-locals.el
 
 cl/node_modules
 /.env.dev
