@@ -132,7 +132,7 @@ def url_replace(request, value):
         if dict_[field].startswith("-") and dict_[field].lstrip("-") == value:
             dict_[field] = value  # desc to asc
         elif dict_[field] == value:
-            dict_[field] = "-" + value
+            dict_[field] = f"-{value}"
         else:  # order_by for different column
             dict_[field] = value
     else:  # No order_by
@@ -144,7 +144,7 @@ def url_replace(request, value):
 def sort_caret(request, value) -> SafeString:
     current = request.GET.get("order_by", "*UP*")
     caret = '&nbsp;<i class="gray fa fa-angle-up"></i>'
-    if current == value or current == "-" + value:
+    if current == value or current == f"-{value}":
         if current.startswith("-"):
             caret = '&nbsp;<i class="gray fa fa-angle-down"></i>'
     return mark_safe(caret)
