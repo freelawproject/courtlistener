@@ -1855,10 +1855,8 @@ description = "An API to scrape American court websites for metadata."
 category = "main"
 optional = false
 python-versions = "*"
-files = [
-    {file = "juriscraper-2.5.41-py27-none-any.whl", hash = "sha256:6df1cfcb6f61dfb5ff879cd9af73f4d92f2886a64f58b3cebc9e2c34be6f64e9"},
-    {file = "juriscraper-2.5.41.tar.gz", hash = "sha256:7fe8c26bcf36ad327a69e567b35b017d26f370b5dfdf4a53f7c4f56146167e9e"},
-]
+files = []
+develop = false
 
 [package.dependencies]
 argparse = "*"
@@ -1875,6 +1873,12 @@ python-dateutil = "2.8.2"
 requests = ">=2.20.0"
 selenium = "4.0.0.a7"
 tldextract = "*"
+
+[package.source]
+type = "git"
+url = "https://github.com/freelawproject/juriscraper"
+reference = "query-list-of-creditors"
+resolved_reference = "2629c13c64fda877f6267d868b294ee47407672e"
 
 [[package]]
 name = "kdtree"
@@ -4079,4 +4083,4 @@ h11 = ">=0.9.0,<1"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10, <3.11"
-content-hash = "8f1e824c3059404787a1dff64d668082f167f715034b4d0ab38161de8c3b7c3b"
+content-hash = "c5f3cafc5c86b555eec64bfd2974cfc64dd28c805f7720eeb4f377049cac42b1"
