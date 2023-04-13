@@ -66,7 +66,6 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.search.views import do_search
-from cl.users.models import UserProfile
 
 
 def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
@@ -848,7 +847,7 @@ def citation_handler(
 
         # Natural sort page numbers ascending order
         sort_possible_matches = natsort.natsorted(
-            closest_opinion_clusters, key=lambda item: item[1], reverse=True
+            closest_opinion_clusters, key=lambda item: item[1]
         )
 
         # Find the position of the item that we added
