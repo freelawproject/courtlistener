@@ -1,4 +1,5 @@
 import random
+import re
 
 from django import template
 from django.core.exceptions import ValidationError
@@ -7,6 +8,8 @@ from django.utils.formats import date_format
 from django.utils.html import format_html
 from django.utils.http import urlencode
 from django.utils.safestring import SafeString, mark_safe
+
+from cl.search.models import Docket, DocketEntry
 
 register = template.Library()
 
@@ -144,7 +147,67 @@ def url_replace(request, value):
 def sort_caret(request, value) -> SafeString:
     current = request.GET.get("order_by", "*UP*")
     caret = '&nbsp;<i class="gray fa fa-angle-up"></i>'
-    if current == value or current == "-" + value:
+    if current == value or current == f"-{value}":
         if current.startswith("-"):
             caret = '&nbsp;<i class="gray fa fa-angle-down"></i>'
     return mark_safe(caret)
+
+
+@register.simple_tag
+def citation(obj, fmt=None) -> SafeString:
+    if isinstance(obj, Docket):
+        docket = obj
+        date_of_interest = (
+            docket.date_terminated
+            if docket.date_terminated
+            else docket.date_last_filing
+        )
+        ecf = ""
+    elif isinstance(obj, DocketEntry):
+        docket = obj.docket
+        date_of_interest = obj.date_filed
+        ecf = obj.entry_number
+    else:
+        return mark_safe("Unknown object type")
+    if not fmt:
+        fmt = (
+            "{name_bb}, {case_bb} {ecf_bb}, {reporter} ({court_bb} {date_bb})"
+        )
+    # for now we don't know what to use as reporter
+    reporter = ""
+    if date_of_interest:
+        date_of_interest = date_of_interest.strftime("%b %d, %Y")
+    if not docket.court.citation_string:
+        # remove all references to court
+        fmt = re.sub(r"\{court.*?\}\s*", "", fmt)
+    if not date_of_interest:
+        # remove all references to date
+        fmt = re.sub(r"\{date.*?\}\s*", "", fmt)
+    if not reporter:
+        # remove all references to reporter
+        fmt = re.sub(r"\{reporter.*?\}\s*", "", fmt)
+    if not ecf:
+        # remove all references to ecf
+        fmt = re.sub(r"\{ecf.*?\}\s*", "", fmt)
+    fmt = re.sub(r"\(\s*?\)", "", fmt)  # remove empty ()
+    fmt = re.sub(
+        r"\s\s+", " ", fmt
+    )  # change multiple spaces to a single space
+    fmt = re.sub(r",\s?,+", ",", fmt)  # change double comma to a single comma
+    fmt = re.sub(r"\s+$", "", fmt)  # remove trailing whitespace
+    fmt = re.sub(r",+$", "", fmt)  # remove trailing commas
+    return mark_safe(
+        fmt.format(
+            name=docket.case_name,
+            name_bb=docket.case_name,
+            name_full=docket.case_name_full,
+            name_short=docket.case_name_short,
+            case_bb=f"No. {docket.docket_number}",
+            reporter="",
+            court_bb=docket.court.citation_string,
+            court_short=docket.court.short_name,
+            court_full=docket.court.full_name,
+            date_bb=date_of_interest,
+            ecf_bb=f"ECF {ecf}",
+        )
+    )

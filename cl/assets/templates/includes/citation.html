@@ -1,0 +1,7 @@
+{% load extras %}
+<p class="bottm" >
+  <span class="meta-data-header" >Citation:</span>
+  <span id="citation" href="" class="meta-data-value">{% citation obj fmt %}</span>
+  <i class="fa fa-copy" onClick="navigator.clipboard.writeText(document.getElementById('citation').textContent);" title="Copy citation"></i>
+  URL<i class="fa fa-copy" onClick="navigator.clipboard.writeText(window.location.href)" title="Copy URL"></i>
+</p>
