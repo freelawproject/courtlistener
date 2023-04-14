@@ -1,7 +1,7 @@
 {% extends "profile/nav.html" %}
 {% load static %}
 {% load text_filters %}
-
+{% load extras %}
 {% block title %} {{ page_title }} – CourtListener.com{% endblock %}
 
 {% block nav-alerts %}active{% endblock %}
@@ -125,9 +125,9 @@
         <table class="table settings-table">
           <thead>
           <tr>
-            <th>Case Name</th>
-            <th>Court</th>
-            <th colspan="2">Last&nbsp;Hit</th>
+              <th><a class="no-underline black-link" href="?{% url_replace request 'name' %}">Case Name{% sort_caret request 'name' %}</a></th>
+              <th><a class="no-underline black-link" href="?{% url_replace request 'court' %}">Court{% sort_caret request 'court' %}</a></th>
+              <th colspan="2"><a class="no-underline black-link" href="?{% url_replace request 'hit' %}"> Last&nbsp;Hit{% sort_caret request 'hit' %}</a></th>
           </tr>
           </thead>
           <tbody>
