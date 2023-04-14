@@ -1,0 +1,37 @@
+[
+  {
+    "fields": {
+      "filepath_local": "recap/gov.uscourts.ca5.213145/gov.uscourts.ca5.213145.52.1.pdf",
+      "is_free_on_pacer": true,
+      "date_upload": "2023-04-11T12:24:28.051275-07:00",
+      "description": "",
+      "date_modified": "2023-04-12T09:40:46.185444-07:00",
+      "document_number": "2",
+      "page_count": 25,
+      "plain_text": "",
+      "pacer_doc_id": "pacer_doc_id",
+      "sha1": "ca9b890579044ace444f835402751af620498e07",
+      "attachment_number": 1,
+      "docket_entry": 2,
+      "is_available": true,
+      "filepath_ia": "https://archive.org/download/gov.uscourts.ca5.213145/gov.uscourts.ca5.213145.52.1.pdf",
+      "date_created": "2017-04-14T23:24:59.323Z",
+      "document_type": 2,
+      "ocr_status": 2
+    },
+    "model": "search.recapdocument",
+    "pk": 2
+  },
+  {
+    "fields": {
+      "description": "COURT ORDER granting Motion to file amicus brief filed by NAACP Legal Defense and Educational Fund, Incorporated [90], granting Motion to file amicus brief filed by Former U.S. Department of Justice Officials [87], granting Motion to file amicus brief filed by Charlotte Lozier Institute [92]; granting Amicus Brief [84] [23-10362] (MAS) [Entered: 04/11/2023 11:23 PM]",
+      "date_modified": "2023-04-14T07:41:52.447225-07:00",
+      "date_filed": "2023-04-11",
+      "entry_number": 2,
+      "date_created": "2023-04-11T12:22:39.466533-07:00",
+      "docket": 1
+    },
+    "model": "search.docketentry",
+    "pk": 2
+  }
+]

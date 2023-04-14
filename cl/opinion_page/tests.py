@@ -74,6 +74,25 @@ class SimpleLoadTest(TestCase):
         self.assertEqual(response.status_code, HTTP_200_OK)
 
 
+class DocumentPageRedirection(TestCase):
+    """
+    Test to make sure the document page of appellate entries redirect users
+    to the attachment page if the main document got converted into an attachment
+    """
+
+    fixtures = ["recap_docs.json", "appellate_attachment_doc.json"]
+
+    def test_redirect_to_attachment_page(self) -> None:
+        """Does the page redirect to the attachment page?"""
+        path = reverse(
+            "view_recap_document",
+            kwargs={"docket_id": 1, "doc_num": "2", "slug": "asdf"},
+        )
+        r = self.client.get(path, follow=True)
+        self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
+        self.assertEqual(r.status_code, HTTP_200_OK)
+
+
 class CitationRedirectorTest(TestCase):
     """Tests to make sure that the basic citation redirector is working."""
 

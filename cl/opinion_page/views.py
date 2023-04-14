@@ -471,6 +471,34 @@ def view_recap_document(
                     redirect_to_pacer_modal = True
 
     except IndexError:
+        # Avoid checking if a document got converted when the user tries
+        # to load an attachment
+        if att_num:
+            raise Http404("No RECAPDocument matches the given query.")
+
+        # check if the main document was converted to an attachment and
+        # if it was, redirect the user to the attachment page
+        rd = RECAPDocument.objects.filter(
+            docket_entry__docket__id=docket_id,
+            document_number=doc_num,
+            attachment_number=1,
+        ).first()
+        if rd:
+            # Get the URL to the attachment page and use the querystring
+            # if the request included one
+            attachment_page = reverse(
+                "view_recap_attachment",
+                kwargs={
+                    "docket_id": docket_id,
+                    "doc_num": doc_num,
+                    "att_num": 1,
+                    "slug": slug,
+                },
+            )
+            if request.GET.urlencode():
+                attachment_page += f"?{request.GET.urlencode()}"
+            return HttpResponseRedirect(attachment_page)
+
         raise Http404("No RECAPDocument matches the given query.")
 
     title = make_rd_title(rd)
