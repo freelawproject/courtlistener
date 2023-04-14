@@ -135,7 +135,7 @@ def url_replace(request, value):
         if dict_[field].startswith("-") and dict_[field].lstrip("-") == value:
             dict_[field] = value  # desc to asc
         elif dict_[field] == value:
-            dict_[field] = "-" + value
+            dict_[field] = f"-{value}"
         else:  # order_by for different column
             dict_[field] = value
     else:  # No order_by
