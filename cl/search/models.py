@@ -114,31 +114,6 @@ class SOURCES:
     )
 
 
-# SOURCES = (
-#     ("C", "court website"),
-#     ("R", "public.resource.org"),
-#     ("CR", "court website merged with resource.org"),
-#     ("L", "lawbox"),
-#     ("LC", "lawbox merged with court"),
-#     ("LR", "lawbox merged with resource.org"),
-#     ("LCR", "lawbox merged with court and resource.org"),
-#     ("M", "manual input"),
-#     ("A", "internet archive"),
-#     ("H", "brad heath archive"),
-#     ("Z", "columbia archive"),
-#     ("ZC", "columbia merged with court"),
-#     ("ZLC", "columbia merged with lawbox and court"),
-#     ("ZLR", "columbia merged with lawbox and resource.org"),
-#     ("ZLCR", "columbia merged with lawbox, court, and resource.org"),
-#     ("ZR", "columbia merged with resource.org"),
-#     ("ZCR", "columbia merged with court and resource.org"),
-#     ("ZL", "columbia merged with lawbox"),
-#     ("U", "Harvard, Library Innovation Lab Case Law Access Project"),
-#     ("CU", "court website merged with Harvard"),
-#     ("D", "direct court input"),
-# )
-
-
 @pghistory.track(
     pghistory.Snapshot(),
 )
