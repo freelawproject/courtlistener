@@ -55,29 +55,88 @@ class PRECEDENTIAL_STATUS:
     )
 
 
-SOURCES = (
-    ("C", "court website"),
-    ("R", "public.resource.org"),
-    ("CR", "court website merged with resource.org"),
-    ("L", "lawbox"),
-    ("LC", "lawbox merged with court"),
-    ("LR", "lawbox merged with resource.org"),
-    ("LCR", "lawbox merged with court and resource.org"),
-    ("M", "manual input"),
-    ("A", "internet archive"),
-    ("H", "brad heath archive"),
-    ("Z", "columbia archive"),
-    ("ZC", "columbia merged with court"),
-    ("ZLC", "columbia merged with lawbox and court"),
-    ("ZLR", "columbia merged with lawbox and resource.org"),
-    ("ZLCR", "columbia merged with lawbox, court, and resource.org"),
-    ("ZR", "columbia merged with resource.org"),
-    ("ZCR", "columbia merged with court and resource.org"),
-    ("ZL", "columbia merged with lawbox"),
-    ("U", "Harvard, Library Innovation Lab Case Law Access Project"),
-    ("CU", "court website merged with Harvard"),
-    ("D", "direct court input"),
-)
+class SOURCES:
+    COURT_WEBSITE = "C"
+    PUBLIC_RESOURCE = "R"
+    COURT_WEBSITE_RESOURCE = "CR"
+    LAWBOX = "L"
+    LAWBOX_M_COURT = "LC"
+    LAWBOX_M_RESOURCE = "LR"
+    LAWBOX_M_COURT_RESOURCE = "LCR"
+    MANUAL_INPUT = "M"
+    INTERNET_ARCHIVE = "A"
+    BRAD_HEATH_ARCHIVE = "H"
+    COLUMBIA_ARCHIVE = "Z"
+    COLUMBIA_M_COURT = "ZC"
+    COLUMBIA_M_LAWBOX_COURT = "ZLC"
+    COLUMBIA_M_LAWBOX_RESOURCE = "ZLR"
+    COLUMBIA_M_LAWBOX_COURT_RESOURCE = "ZLCR"
+    COLUMBIA_M_RESOURCE = "ZR"
+    COLUMBIA_M_COURT_RESOURCE = "ZCR"
+    COLUMBIA_M_LAWBOX = "ZL"
+    HARVARD_CASELAW = "U"
+    COURT_M_HARVARD = "CU"
+    DIRECT_COURT_INPUT = "D"
+    NAMES = (
+        (COURT_WEBSITE, "court website"),
+        (PUBLIC_RESOURCE, "public.resource.org"),
+        (COURT_WEBSITE_RESOURCE, "court website merged with resource.org"),
+        (LAWBOX, "lawbox"),
+        (LAWBOX_M_COURT, "lawbox merged with court"),
+        (LAWBOX_M_RESOURCE, "lawbox merged with resource.org"),
+        (LAWBOX_M_COURT_RESOURCE, "lawbox merged with court and resource.org"),
+        (MANUAL_INPUT, "manual input"),
+        (INTERNET_ARCHIVE, "internet archive"),
+        (BRAD_HEATH_ARCHIVE, "brad heath archive"),
+        (COLUMBIA_ARCHIVE, "columbia archive"),
+        (COLUMBIA_M_COURT, "columbia merged with court"),
+        (COLUMBIA_M_LAWBOX_COURT, "columbia merged with lawbox and court"),
+        (
+            COLUMBIA_M_LAWBOX_RESOURCE,
+            "columbia merged with lawbox and resource.org",
+        ),
+        (
+            COLUMBIA_M_LAWBOX_COURT_RESOURCE,
+            "columbia merged with lawbox, court, and resource.org",
+        ),
+        (COLUMBIA_M_RESOURCE, "columbia merged with resource.org"),
+        (
+            COLUMBIA_M_COURT_RESOURCE,
+            "columbia merged with court and resource.org",
+        ),
+        (COLUMBIA_M_LAWBOX, "columbia merged with lawbox"),
+        (
+            HARVARD_CASELAW,
+            "Harvard, Library Innovation Lab Case Law Access Project",
+        ),
+        (COURT_M_HARVARD, "court website merged with Harvard"),
+        (DIRECT_COURT_INPUT, "direct court input"),
+    )
+
+
+# SOURCES = (
+#     ("C", "court website"),
+#     ("R", "public.resource.org"),
+#     ("CR", "court website merged with resource.org"),
+#     ("L", "lawbox"),
+#     ("LC", "lawbox merged with court"),
+#     ("LR", "lawbox merged with resource.org"),
+#     ("LCR", "lawbox merged with court and resource.org"),
+#     ("M", "manual input"),
+#     ("A", "internet archive"),
+#     ("H", "brad heath archive"),
+#     ("Z", "columbia archive"),
+#     ("ZC", "columbia merged with court"),
+#     ("ZLC", "columbia merged with lawbox and court"),
+#     ("ZLR", "columbia merged with lawbox and resource.org"),
+#     ("ZLCR", "columbia merged with lawbox, court, and resource.org"),
+#     ("ZR", "columbia merged with resource.org"),
+#     ("ZCR", "columbia merged with court and resource.org"),
+#     ("ZL", "columbia merged with lawbox"),
+#     ("U", "Harvard, Library Innovation Lab Case Law Access Project"),
+#     ("CU", "court website merged with Harvard"),
+#     ("D", "direct court input"),
+# )
 
 
 @pghistory.track(
@@ -2182,9 +2241,9 @@ class OpinionCluster(AbstractDateTimeModel):
     )
     source = models.CharField(
         help_text="the source of the cluster, one of: %s"
-        % ", ".join(["%s (%s)" % (t[0], t[1]) for t in SOURCES]),
+        % ", ".join(["%s (%s)" % (t[0], t[1]) for t in SOURCES.NAMES]),
         max_length=10,
-        choices=SOURCES,
+        choices=SOURCES.NAMES,
         blank=True,
     )
     procedural_history = models.TextField(
