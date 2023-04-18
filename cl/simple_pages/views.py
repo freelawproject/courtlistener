@@ -33,7 +33,13 @@ from cl.donate.utils import get_donation_totals_by_email
 from cl.lib.ratelimiter import ratelimiter_unsafe_3_per_m
 from cl.people_db.models import Person
 from cl.search.forms import SearchForm
-from cl.search.models import Court, Docket, OpinionCluster, RECAPDocument
+from cl.search.models import (
+    SOURCES,
+    Court,
+    Docket,
+    OpinionCluster,
+    RECAPDocument,
+)
 from cl.simple_pages.forms import ContactForm
 
 logger = logging.getLogger(__name__)
@@ -228,11 +234,11 @@ def get_coverage_data_o(request: HttpRequest) -> dict[str, Any]:
         count_lawbox = 0
         count_scraper = 0
         for d in counts:
-            if "R" in d["source"]:
+            if SOURCES.PUBLIC_RESOURCE in d["source"]:
                 count_pro += d["source__count"]
-            if "C" in d["source"]:
+            if SOURCES.COURT_WEBSITE in d["source"]:
                 count_scraper += d["source__count"]
-            if "L" in d["source"]:
+            if SOURCES.LAWBOX in d["source"]:
                 count_lawbox += d["source__count"]
 
         opinion_courts = Court.objects.filter(
