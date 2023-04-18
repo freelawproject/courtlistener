@@ -831,9 +831,11 @@ def citation_handler(
     else:
         cluster_count = clusters.count()
 
-    if cluster_count == 0 and page.isdigit():
-        # Do a second pass for the closest opinion and check if we have
-        # a page cite that matches -- if it does give the requested opinion
+    if cluster_count == 0:
+        # We didn't get an exact match on the volume/reporter/page. Perhaps it's a pincite.
+        # Try to find the citation immediately *before* this one in the same book. To do so,
+        # Get all the opinions from the book, sort them by page number (in Python, b/c pages
+        # can have letters), then find the citation just before the requested one.
 
         possible_match = None
 
@@ -863,9 +865,9 @@ def citation_handler(
             # if the position is greater than 0, then the previous item in
             # the list is the closest citation, we get the id of the
             # previous item, and we get the object
-            possible_match = OpinionCluster.objects.filter(
+            possible_match = OpinionCluster.objects.get(
                 id=sort_possible_matches[citation_item_position - 1][0]
-            ).first()
+            )
 
         if possible_match:
             # There may be different page cite formats that aren't yet
