@@ -8,7 +8,7 @@ from cl.search.models import SOURCES, Docket
 
 class AudioFilter(NoEmptyFilterSet):
     docket = filters.RelatedFilter(DocketFilter, queryset=Docket.objects.all())
-    source = filters.MultipleChoiceFilter(choices=SOURCES)
+    source = filters.MultipleChoiceFilter(choices=SOURCES.NAMES)
 
     class Meta:
         model = Audio

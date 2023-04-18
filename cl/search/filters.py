@@ -146,7 +146,7 @@ class OpinionClusterFilter(NoEmptyFilterSet):
     sub_opinions = filters.RelatedFilter(
         OpinionFilter, queryset=Opinion.objects.all()
     )
-    source = filters.MultipleChoiceFilter(choices=SOURCES)
+    source = filters.MultipleChoiceFilter(choices=SOURCES.NAMES)
     citations = filters.RelatedFilter(
         CitationFilter, queryset=Citation.objects.all()
     )
