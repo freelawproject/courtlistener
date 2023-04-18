@@ -23,7 +23,7 @@ from rest_framework.status import (
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import SimpleUserDataMixin, SitemapTest
 from cl.opinion_page.forms import CourtUploadForm
-from cl.opinion_page.views import make_docket_title
+from cl.opinion_page.views import get_prev_next_volumes, make_docket_title
 from cl.people_db.factories import PersonFactory, PositionFactory
 from cl.people_db.models import Person
 from cl.search.factories import (
@@ -248,6 +248,84 @@ class CitationRedirectorTest(TestCase):
         )
         self.assertEqual(r.status_code, HTTP_302_FOUND)
         self.assertEqual(r.url, "/c/f2d/56/9/")
+
+    def test_volume_pagination(self) -> None:
+        """Can we properly paginate reporter volume numbers?"""
+
+        # Create test data usign factories
+        test_obj = CitationWithParentsFactory.create(
+            volume="2016",
+            reporter="COA",
+            page="1",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=CourtFactory(id="coloctapp")),
+                case_name="In re the Marriage of Morton",
+                date_filed=datetime.date(2016, 1, 14),
+            ),
+        )
+
+        CitationWithParentsFactory.create(
+            volume="2017",
+            reporter="COA",
+            page="3",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=CourtFactory(id="coloctapp")),
+                case_name="Begley v. Ireson",
+                date_filed=datetime.date(2017, 1, 12),
+            ),
+        )
+
+        CitationWithParentsFactory.create(
+            volume="2018",
+            reporter="COA",
+            page="1",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=CourtFactory(id="coloctapp")),
+                case_name="People v. Sparks",
+                date_filed=datetime.date(2018, 1, 11),
+            ),
+        )
+
+        CitationWithParentsFactory.create(
+            volume="2018",
+            reporter="COA",
+            page="1",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=CourtFactory(id="coloctapp")),
+                case_name="People v. Sparks",
+                date_filed=datetime.date(2018, 1, 11),
+            ),
+        )
+
+        # Get previous and next volume for "2017 COA"
+        volume_next, volume_previous = get_prev_next_volumes("COA", "2017")
+        self.assertEqual(volume_previous, 2016)
+        self.assertEqual(volume_next, 2018)
+
+        # Delete previous
+        test_obj.delete()
+
+        # Only get next volume for "2017 COA"
+        volume_next, volume_previous = get_prev_next_volumes("COA", "2017")
+        self.assertEqual(volume_previous, None)
+        self.assertEqual(volume_next, 2018)
+
+        # Create new test data
+        CitationWithParentsFactory.create(
+            volume="454",
+            reporter="U.S.",
+            page="1",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=CourtFactory(id="scotus")),
+                case_name="Duckworth v. Serrano",
+                date_filed=datetime.date(1981, 10, 19),
+            ),
+        )
+
+        # No next or previous volume for "454 U.S."
+        volume_next, volume_previous = get_prev_next_volumes("U.S.", "454")
+        self.assertEqual(volume_previous, None)
+        self.assertEqual(volume_next, None)
 
     def test_avoid_exception_possible_matches_page_with_letter(self) -> None:
         """Can we order the possible matches when page number contains a
