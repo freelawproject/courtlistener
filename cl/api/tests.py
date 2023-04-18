@@ -843,7 +843,7 @@ class DRFSearchAppAndAudioAppApiFilterTest(TestCase, FilteringCountTestCase):
         sources = [SOURCES.COURT_WEBSITE]
         self.q["source"] = sources
         self.assertCountInResults(2)
-        sources.append(SOURCES.COURT_WEBSITE_RESOURCE)
+        sources.append(SOURCES.COURT_M_RESOURCE)
         self.assertCountInResults(3)
 
     def test_opinion_cited_filters(self) -> None:

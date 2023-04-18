@@ -58,7 +58,7 @@ class PRECEDENTIAL_STATUS:
 class SOURCES:
     COURT_WEBSITE = "C"
     PUBLIC_RESOURCE = "R"
-    COURT_WEBSITE_RESOURCE = "CR"
+    COURT_M_RESOURCE = "CR"
     LAWBOX = "L"
     LAWBOX_M_COURT = "LC"
     LAWBOX_M_RESOURCE = "LR"
@@ -80,7 +80,7 @@ class SOURCES:
     NAMES = (
         (COURT_WEBSITE, "court website"),
         (PUBLIC_RESOURCE, "public.resource.org"),
-        (COURT_WEBSITE_RESOURCE, "court website merged with resource.org"),
+        (COURT_M_RESOURCE, "court website merged with resource.org"),
         (LAWBOX, "lawbox"),
         (LAWBOX_M_COURT, "lawbox merged with court"),
         (LAWBOX_M_RESOURCE, "lawbox merged with resource.org"),

@@ -135,10 +135,8 @@ def merge_or_add_opinions(
         )
 
     # Merge with scrape or add opinion to cluster with harvard
-    if (
-        OpinionCluster.objects.get(pk=cluster_id).source
-        == SOURCES.COURT_WEBSITE
-    ):
+    cluster_source = OpinionCluster.objects.get(pk=cluster_id).source
+    if cluster_source == SOURCES.COURT_WEBSITE:
         opinion = Opinion.objects.get(cluster_id=cluster_id)
         logger.info("Merge with Harvard data")
         opinion.html_anon_2020 = html_str
