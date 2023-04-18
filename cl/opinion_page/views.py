@@ -47,7 +47,6 @@ from cl.lib.search_utils import (
 from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_404
-from cl.lib.utils import alphanumeric_sort
 from cl.lib.view_utils import increment_view_count
 from cl.opinion_page.forms import (
     CitationRedirectorForm,
@@ -664,6 +663,29 @@ def throw_404(request: HttpRequest, context: Dict) -> HttpResponse:
     )
 
 
+def get_prev_next_volumes(reporter: str, volume: str) -> tuple[int, int]:
+    """Get the volume before and after the current one.
+
+    :param reporter: The reporter where the volume is found
+    :param volume: The volume we're inspecting
+    :return Tuple of the volume number we have prior to the selected one, and
+    of the volume number after it.
+    """
+    volumes = list(
+        (
+            Citation.objects.filter(reporter=reporter)
+            .annotate(as_integer=Cast("volume", IntegerField()))
+            .values_list("as_integer", flat=True)
+            .distinct()
+            .order_by("as_integer")
+        )
+    )
+    index = volumes.index(int(volume))
+    volume_previous = volumes[index - 1] if index > 0 else None
+    volume_next = volumes[index + 1] if index + 1 < len(volumes) else None
+    return volume_next, volume_previous
+
+
 def reporter_or_volume_handler(
     request: HttpRequest, reporter: str, volume: str | None = None
 ) -> HttpResponse:
@@ -724,14 +746,9 @@ def reporter_or_volume_handler(
         )
 
     # Show all the cases for a volume-reporter dyad
-    cases_in_volume = (
-        OpinionCluster.objects.filter(
-            citations__reporter=reporter, citations__volume=volume
-        )
-        .annotate(cite_page=(F("citations__page")))
-        .order_by("cite_page")
-    )
-    cases_in_volume = alphanumeric_sort(cases_in_volume, "cite_page")
+    cases_in_volume = OpinionCluster.objects.filter(
+        citations__reporter=reporter, citations__volume=volume
+    ).order_by("date_filed")
 
     if not cases_in_volume:
         return throw_404(
@@ -745,18 +762,7 @@ def reporter_or_volume_handler(
             },
         )
 
-    volumes = list(
-        (
-            Citation.objects.filter(reporter=reporter)
-            .annotate(as_integer=Cast("volume", IntegerField()))
-            .values_list("as_integer", flat=True)
-            .distinct()
-            .order_by("as_integer")
-        )
-    )
-    index = volumes.index(int(volume))
-    volume_previous = volumes[index - 1] if index > 0 else None
-    volume_next = volumes[index + 1] if index + 1 < len(volumes) else None
+    volume_next, volume_previous = get_prev_next_volumes(reporter, volume)
 
     paginator = Paginator(cases_in_volume, 100, orphans=5)
     page = request.GET.get("page", 1)
