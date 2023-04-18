@@ -12,6 +12,7 @@ from queue import Queue
 from typing import Any, DefaultDict, Mapping, TypedDict
 from urllib.parse import unquote
 
+from dateutil.parser import ParserError
 from django.db import DataError, IntegrityError, transaction
 from django.db.models import Q
 from django.utils.text import slugify
@@ -588,8 +589,13 @@ def iterate_and_import_files(
         if not court_id:
             # Probably a court we don't know
             continue
-
-        feed_data, build_date = parse_file(binary, court_id)
+        try:
+            feed_data, build_date = parse_file(binary, court_id)
+        except ParserError:
+            logger.info(
+                f"Skipping: {item_path=} with {court_id=} due to incorrect date format. \n"
+            )
+            continue
         rds_for_solr, dockets_created = merge_rss_data(
             feed_data, court_id, build_date
         )
