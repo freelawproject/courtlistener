@@ -23,7 +23,7 @@ from cl.scrapers.utils import (
     get_extension,
     update_or_create_docket,
 )
-from cl.search.models import SEARCH_TYPES, Court, Docket
+from cl.search.models import SEARCH_TYPES, SOURCES, Court, Docket
 
 cnt = CaseNameTweaker()
 
@@ -85,7 +85,7 @@ def make_objects(
 
     audio_file = Audio(
         judges=item.get("judges", ""),
-        source=item.get("cluster_source") or "C",
+        source=item.get("cluster_source") or SOURCES.COURT_WEBSITE,
         case_name=item["case_names"],
         case_name_short=case_name_short,
         sha1=sha1_hash,

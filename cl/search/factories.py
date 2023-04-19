@@ -112,7 +112,7 @@ class OpinionClusterFactory(DjangoModelFactory):
     case_name_full = Faker("case_name", full=True)
     date_filed = Faker("date")
     slug = Faker("slug")
-    source = FuzzyChoice(SOURCES, getter=lambda c: c[0])
+    source = FuzzyChoice(SOURCES.NAMES, getter=lambda c: c[0])
     precedential_status = FuzzyChoice(
         PRECEDENTIAL_STATUS.NAMES, getter=lambda c: c[0]
     )

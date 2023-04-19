@@ -57,6 +57,7 @@ itypes = "^1.1.0"
 kombu = "^4.6.4"
 lxml = "==4.*"
 markdown2 = "==2.4.*"
+natsort = "^8.3.1"
 ndg-httpsclient = "^0.5.1"
 networkx = "^3.1"
 nose = "*"
@@ -106,7 +107,7 @@ ipython = "^8.10.0"
 time-machine = "^2.9.0"
 dateparser = "1.1.6"
 types-dateparser = "^1.1.4.6"
-juriscraper = "^2.5.41"
+juriscraper = "^2.5.43"
 
 
 [tool.poetry.group.dev.dependencies]

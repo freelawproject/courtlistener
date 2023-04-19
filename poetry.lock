@@ -930,14 +930,14 @@ files = [
 
 [[package]]
 name = "django-pghistory"
-version = "2.7.0"
+version = "2.6.0"
 description = "History tracking for Django and Postgres"
 category = "main"
 optional = false
 python-versions = ">=3.7.0,<4"
 files = [
-    {file = "django_pghistory-2.7.0-py3-none-any.whl", hash = "sha256:9c79ca6ff2efcf97c38e96f3a8b533b46467c3af6fd32d20258d4caf248dde4a"},
-    {file = "django_pghistory-2.7.0.tar.gz", hash = "sha256:918920038ca4aa9f0c2e7e4fba996c16bfd0b0a2f7bc75737abdece43303a062"},
+    {file = "django_pghistory-2.6.0-py3-none-any.whl", hash = "sha256:73429f0b7bbbe8751ceb3a44c24cd76df5ba39e38ee7a3d4a99874bfc8daf624"},
+    {file = "django_pghistory-2.6.0.tar.gz", hash = "sha256:07debaed6d48f3722b29dc65ef9b10628c090548037465267ef824ca455251d1"},
 ]
 
 [package.dependencies]
@@ -1850,14 +1850,14 @@ requests = ">=2.0,<3.0"
 
 [[package]]
 name = "juriscraper"
-version = "2.5.41"
+version = "2.5.43"
 description = "An API to scrape American court websites for metadata."
 category = "main"
 optional = false
 python-versions = "*"
 files = [
-    {file = "juriscraper-2.5.41-py27-none-any.whl", hash = "sha256:6df1cfcb6f61dfb5ff879cd9af73f4d92f2886a64f58b3cebc9e2c34be6f64e9"},
-    {file = "juriscraper-2.5.41.tar.gz", hash = "sha256:7fe8c26bcf36ad327a69e567b35b017d26f370b5dfdf4a53f7c4f56146167e9e"},
+    {file = "juriscraper-2.5.43-py27-none-any.whl", hash = "sha256:f057048b345505f013d2056a21af0ef7e19ed19f9fa89d0b8b0216bb6f39b0ba"},
+    {file = "juriscraper-2.5.43.tar.gz", hash = "sha256:ca15bb793a3a7cfbcb554b4759f80b0d78ca9f7157273db40c7bda69c137acad"},
 ]
 
 [package.dependencies]
@@ -2235,6 +2235,22 @@ files = [
     {file = "nameparser-1.1.1-py2.py3-none-any.whl", hash = "sha256:8166a5cbce24e31d33219c64e7235b1096904224c95a09948bb9809c4bf56b28"},
     {file = "nameparser-1.1.1.tar.gz", hash = "sha256:ce8336ed7464fa7b9b8745f48b9c62dea6bed931b99715ca9479360544992143"},
 ]
+
+[[package]]
+name = "natsort"
+version = "8.3.1"
+description = "Simple yet flexible natural sorting in Python."
+category = "main"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "natsort-8.3.1-py3-none-any.whl", hash = "sha256:d583bc9050dd10538de36297c960b93f873f0cd01671a3c50df5bd86dd391dcb"},
+    {file = "natsort-8.3.1.tar.gz", hash = "sha256:517595492dde570a4fd6b6a76f644440c1ba51e2338c8a671d7f0475fda8f9fd"},
+]
+
+[package.extras]
+fast = ["fastnumbers (>=2.0.0)"]
+icu = ["PyICU (>=1.0.0)"]
 
 [[package]]
 name = "ndg-httpsclient"
@@ -4079,4 +4095,4 @@ h11 = ">=0.9.0,<1"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10, <3.11"
-content-hash = "35b8b65d5d2d78bceec0894f0ce407ad11245be1dd0ebafe191dd96fd8e0d073"
+content-hash = "1965c0d34218aab8d0629d02a9b32d8b563e5ea220d61945c3960a8216aeb5c3"
