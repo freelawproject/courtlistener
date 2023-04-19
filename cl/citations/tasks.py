@@ -22,7 +22,7 @@ from cl.citations.match_citations import (
 from cl.citations.parenthetical_utils import create_parenthetical_groups
 from cl.citations.score_parentheticals import parenthetical_score
 from cl.lib.types import MatchedResourceType, SupportedCitationType
-from cl.search.models import (  # OpinionsCitedByRECAPDocument,
+from cl.search.models import (
     Opinion,
     OpinionCluster,
     OpinionsCited,

@@ -29,12 +29,12 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--start-id",
             type=int,
-            help="start id for a range of documents (inclusive)",
+            help="start id for the range of documents (inclusive) to parse for citations",
         )
         parser.add_argument(
             "--end-id",
             type=int,
-            help="end id for a range of documents (inclusive)",
+            help="end id for the range of documents (inclusive) to parse for citations",
         )
         parser.add_argument(
             "--start-db-date",
