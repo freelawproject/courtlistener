@@ -254,7 +254,7 @@ def store_opinion_citations_and_update_parentheticals(
 
 def store_recap_citations(document: RECAPDocument) -> None:
     """
-    Updates counts of citations to other opinions within a given court opinion.
+    Identify citations from federal filings to opinions.
 
     :param document: A search.RECAPDocument object.
 
