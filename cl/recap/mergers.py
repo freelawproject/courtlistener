@@ -667,7 +667,7 @@ def get_or_make_docket_entry(d, docket_entry):
     return de, de_created
 
 
-def update_docket_entry_rd(
+def save_docket_entry_and_rd(
     content_updated: bool,
     d: Docket,
     de: DocketEntry,
@@ -828,46 +828,20 @@ def add_docket_entries(
     calculate_recap_sequence_numbers(docket_entries, d.court_id)
     known_filing_dates = [d.date_last_filing]
 
-    # Filter minute entries with long descriptions, avoid docket history
-    # report entries, exclude entries with no date_entered.
-    minute_entries_long_des_date_entered = [
-        entry
-        for entry in docket_entries
-        if entry["description"]
-        and entry.get("date_entered")
-        and not entry["document_number"]
-        and not entry["pacer_doc_id"]
-        and not entry.get("short_description")
-    ]
-
-    # If the docket sheet is ordered by "date_entered", we can still try to
-    # merge minute entries without date_entered.
-    minute_entries_long_des_not_date_entered = []
-    if order_by == "date_entered":
-        minute_entries_long_des_not_date_entered = [
-            entry
-            for entry in docket_entries
-            if entry["description"]
-            and not entry.get("date_entered")
-            and not entry["document_number"]
-            and not entry["pacer_doc_id"]
-            and not entry.get("short_description")
-        ]
-
-    minute_entries_long_des = (
-        minute_entries_long_des_date_entered
-        + minute_entries_long_des_not_date_entered
+    minute_entries_long_des = filter_long_description_minute_entries_to_merge(
+        docket_entries, order_by
     )
-
     if minute_entries_long_des:
-        # If there are minute entries with long descriptions, let's only merge
-        # no minute entries with the normal method.
+        # If there are minute entries with long descriptions to merge. Only
+        # add/merge entries not included in minute_entries_long_des with the
+        # normal method.
         docket_entries = [
             entry
             for entry in docket_entries
             if entry not in minute_entries_long_des
         ]
 
+    # Add/merge not long description minute entries with the traditional method
     for docket_entry in docket_entries:
         response = get_or_make_docket_entry(d, docket_entry)
         if response is None:
@@ -875,7 +849,7 @@ def add_docket_entries(
         else:
             de, de_created = response[0], response[1]
 
-        response = update_docket_entry_rd(
+        response = save_docket_entry_and_rd(
             content_updated,
             d,
             de,
@@ -890,6 +864,7 @@ def add_docket_entries(
             continue
         content_updated = response
 
+    # Add/merge long description minute entries
     (
         des_returned,
         rds_created,
@@ -913,6 +888,54 @@ def add_docket_entries(
         )
 
     return des_returned, rds_created, content_updated
+
+
+def filter_long_description_minute_entries_to_merge(
+    docket_entries: list[dict[str, any]], order_by: str | None = None
+) -> list[dict[str, any]]:
+    """
+    Filters and returns minute entries with long descriptions from the given
+    docket_entries.
+
+    :param docket_entries: A list of docket entries to filter.
+    :param order_by: Optional, whether the docket entries are ordered by
+    date_filed or date_entered.
+    :return: A list of filtered minute entries with long descriptions to merge.
+    """
+
+    # Filter minute entries with long descriptions, avoid docket history
+    # report entries, exclude entries with no date_entered.
+    minute_entries_long_des_date_entered = [
+        entry
+        for entry in docket_entries
+        if entry["description"]
+        and entry.get("date_entered")
+        and not entry["document_number"]
+        and not entry["pacer_doc_id"]
+        and not entry.get("short_description")
+    ]
+
+    # If the docket sheet is ordered by "date_entered", we can try to
+    # merge minute entries without date_entered, since the entry date_filed
+    # equals to the date_entered.
+    minute_entries_long_des_not_date_entered = []
+    if order_by == "date_entered":
+        minute_entries_long_des_not_date_entered = [
+            entry
+            for entry in docket_entries
+            if entry["description"]
+            and not entry.get("date_entered")
+            and not entry["document_number"]
+            and not entry["pacer_doc_id"]
+            and not entry.get("short_description")
+        ]
+
+    minute_entries_long_des = (
+        minute_entries_long_des_date_entered
+        + minute_entries_long_des_not_date_entered
+    )
+
+    return minute_entries_long_des
 
 
 def merge_long_description_minute_entries(
@@ -950,10 +973,8 @@ def merge_long_description_minute_entries(
         date_entered = entry.get("date_entered")
         if entry.get("ordered_by") == "date_entered":
             date_entered = entry["date_filed"]
-
         if not date_entered:
             continue
-
         if date_entered not in unique_dates:
             unique_dates.append(date_entered)
 
@@ -972,6 +993,7 @@ def merge_long_description_minute_entries(
         ).order_by("recap_sequence_number")
         short_description_entries[date_entered] = list(minute_entries_to_merge)
 
+        # Filter entries by date.
         if order_by == "date_entered":
             long_description_entries[date_entered] = [
                 entry
@@ -1000,7 +1022,7 @@ def merge_long_description_minute_entries(
                 )
                 docket_entry = entry_to_merge[1]
                 normalize_long_description(docket_entry)
-                response = update_docket_entry_rd(
+                response = save_docket_entry_and_rd(
                     content_updated,
                     d,
                     de,
@@ -1015,13 +1037,13 @@ def merge_long_description_minute_entries(
                     continue
                 content_updated = response
 
-            for entry_to_add in entries_to_add:
+            for docket_entry in entries_to_add:
                 de = DocketEntry.objects.create(
-                    docket=docket, entry_number=entry_to_add["document_number"]
+                    docket=docket, entry_number=docket_entry["document_number"]
                 )
-                docket_entry = entry_to_add
                 de_created = True
-                response = update_docket_entry_rd(
+                normalize_long_description(docket_entry)
+                response = save_docket_entry_and_rd(
                     content_updated,
                     d,
                     de,
@@ -1065,7 +1087,7 @@ def look_for_minute_entries_matches(
     if len(short_des_entries) == len(long_des_entries):
         # Same number of minute entries in both sides.
         if len(long_des_entries) == 1:
-            # Only one minute entry, merge it directly
+            # Case 1: One entry both sides, merge it directly.
             entry = (short_des_entries[0].pk, long_des_entries[0])
             entries_to_merge.append(entry)
 
@@ -1076,8 +1098,9 @@ def look_for_minute_entries_matches(
         short_descriptions_equal = all(
             x == short_descriptions[0] for x in short_descriptions
         )
+        # Case 2: Same number of entries and short descriptions are the same.
+        # Merge them directly.
         if short_descriptions and short_descriptions_equal:
-            # All short descriptions are the same, merge them directly.
             for i, short_de in enumerate(short_des_entries):
                 entry = (short_de.pk, long_des_entries[i])
                 entries_to_merge.append(entry)
@@ -1088,12 +1111,10 @@ def look_for_minute_entries_matches(
                 long_des_entries, key=lambda x: x["recap_sequence_number"]
             )
             if order_by == "date_entered":
-                # date_entered order, merge them.
+                # Case 3: Short descriptions are not the same. Use date_entered
+                # order as helper, merge them.
                 for i, short_de in enumerate(short_des_entries):
-                    entry = (
-                        short_de.pk,
-                        sorted_long_des[i],
-                    )
+                    entry = (short_de.pk, sorted_long_des[i])
                     entries_to_merge.append(entry)
 
             elif order_by == "date_filed" or order_by is None:
@@ -1104,19 +1125,16 @@ def look_for_minute_entries_matches(
                     for entry in long_des_entries
                 )
                 if date_entered_equal:
-                    # If all date_filed equals their date_entered, merge them
+                    # Case 4: If all date_filed equals their date_entered,
+                    # merge them.
                     for i, short_de in enumerate(short_des_entries):
-                        entry = (
-                            short_de.pk,
-                            sorted_long_des[i],
-                        )
+                        entry = (short_de.pk, sorted_long_des[i])
                         entries_to_merge.append(entry)
 
         matched_entries = [x[1] for x in entries_to_merge]
         no_matched_entries = [
             x for x in long_des_entries if x not in matched_entries
         ]
-
         # Try to find matches in not_matches_entries using word matching as a
         # fallback, append matches to previous matches.
         entries_to_merge_word_matching, no_matched_entries = do_word_matching(
@@ -1125,8 +1143,8 @@ def look_for_minute_entries_matches(
         entries_to_merge = entries_to_merge + entries_to_merge_word_matching
 
     else:
-        # Not the same number of minute entries in both sides. We need to try
-        # word marching.
+        # Case 4: Not the same number of minute entries in both sides.
+        # We try word marching.
         entries_to_merge, no_matched_entries = do_word_matching(
             short_des_entries, long_des_entries
         )
