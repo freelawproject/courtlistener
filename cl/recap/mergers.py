@@ -583,6 +583,7 @@ def merge_unnumbered_docket_entries(des):
 
 def find_minute_entry_by_description(d, docket_entry):
     normalize_long_description(docket_entry)
+
     query = Q()
     if docket_entry.get("description"):
         query |= Q(description=docket_entry["description"])
@@ -594,11 +595,16 @@ def find_minute_entry_by_description(d, docket_entry):
     date_filed, time_filed = localize_date_and_time(
         d.court.pk, docket_entry["date_filed"]
     )
+    # Query by date_filed by default.
+    query_date = Q(date_filed=date_filed)
+    # If time_filed is available, use it too.
+    if time_filed:
+        query_date = Q(date_filed=date_filed, time_filed=time_filed)
+
     des = DocketEntry.objects.filter(
         query,
+        query_date,
         docket=d,
-        date_filed=date_filed,
-        time_filed=time_filed,
         entry_number=docket_entry["document_number"],
     )
     count = des.count()
@@ -865,21 +871,22 @@ def add_docket_entries(
         content_updated = response
 
     # Add/merge long description minute entries
-    (
-        des_returned,
-        rds_created,
-        content_updated,
-        known_filing_dates,
-    ) = merge_long_description_minute_entries(
-        content_updated,
-        d,
-        des_returned,
-        known_filing_dates,
-        minute_entries_long_des,
-        order_by,
-        rds_created,
-        tags,
-    )
+    if minute_entries_long_des:
+        (
+            des_returned,
+            rds_created,
+            content_updated,
+            known_filing_dates,
+        ) = merge_long_description_minute_entries(
+            content_updated,
+            d,
+            des_returned,
+            known_filing_dates,
+            minute_entries_long_des,
+            order_by,
+            rds_created,
+            tags,
+        )
 
     known_filing_dates = set(filter(None, known_filing_dates))
     if known_filing_dates:
@@ -1142,12 +1149,15 @@ def look_for_minute_entries_matches(
         )
         entries_to_merge = entries_to_merge + entries_to_merge_word_matching
 
-    else:
+    elif short_des_entries:
         # Case 4: Not the same number of minute entries in both sides.
         # We try word marching.
         entries_to_merge, no_matched_entries = do_word_matching(
             short_des_entries, long_des_entries
         )
+    else:
+        # Case 5: No short description entries to merge in, add new entries.
+        no_matched_entries = long_des_entries
 
     entries_to_add = []
     for docket_entry in no_matched_entries:

@@ -6953,12 +6953,19 @@ class MinuteEntriesMerger(TestCase):
         docket_entries = DocketEntry.objects.all()
         self.assertEqual(docket_entries.count(), 1)
 
-        data = docket_data
+        data = deepcopy(docket_data)
         add_docket_entries(
             self.d, data["docket_entries"], order_by=data.get("ordered_by")
         )
 
         docket_entries = DocketEntry.objects.filter(docket=self.d)
+        self.assertEqual(docket_entries.count(), 1)
+
+        # Merge docket again to confirm no duplicates are created.
+        data = deepcopy(docket_data)
+        add_docket_entries(
+            self.d, data["docket_entries"], order_by=data.get("ordered_by")
+        )
         self.assertEqual(docket_entries.count(), 1)
 
         original_feed = deepcopy(entries_feed)
@@ -7019,12 +7026,19 @@ class MinuteEntriesMerger(TestCase):
         docket_entries = DocketEntry.objects.all()
         self.assertEqual(docket_entries.count(), 2)
 
-        data = docket_data
+        data = deepcopy(docket_data)
         add_docket_entries(
             self.d, data["docket_entries"], order_by=data.get("ordered_by")
         )
-
         self.assertEqual(docket_entries.count(), 2)
+
+        # Merge docket again to confirm no duplicates are created.
+        data = deepcopy(docket_data)
+        add_docket_entries(
+            self.d, data["docket_entries"], order_by=data.get("ordered_by")
+        )
+        self.assertEqual(docket_entries.count(), 2)
+
         original_feed = deepcopy(entries_feed)
         self.assertEqual(
             self._confirm_merge_was_correct(self.d, original_feed), True
@@ -7085,7 +7099,14 @@ class MinuteEntriesMerger(TestCase):
         docket_entries = DocketEntry.objects.all()
         self.assertEqual(docket_entries.count(), 2)
 
-        data = docket_data
+        data = deepcopy(docket_data)
+        add_docket_entries(
+            self.d, data["docket_entries"], order_by=data.get("ordered_by")
+        )
+        self.assertEqual(docket_entries.count(), 2)
+
+        # Merge docket again to confirm no duplicates are created.
+        data = deepcopy(docket_data)
         add_docket_entries(
             self.d, data["docket_entries"], order_by=data.get("ordered_by")
         )
@@ -7150,12 +7171,17 @@ class MinuteEntriesMerger(TestCase):
         docket_entries = DocketEntry.objects.all()
         self.assertEqual(docket_entries.count(), 1)
 
-        data = docket_data
+        data = deepcopy(docket_data)
         add_docket_entries(
             self.d, data["docket_entries"], order_by=data.get("ordered_by")
         )
+        self.assertEqual(docket_entries.count(), 3)
 
-        docket_entries = DocketEntry.objects.filter(docket=self.d)
+        # Merge docket again to confirm no duplicates are created.
+        data = deepcopy(docket_data)
+        add_docket_entries(
+            self.d, data["docket_entries"], order_by=data.get("ordered_by")
+        )
         self.assertEqual(docket_entries.count(), 3)
 
         original_feed = deepcopy(entries_feed)
@@ -7223,12 +7249,18 @@ class MinuteEntriesMerger(TestCase):
 
         docket_entries = DocketEntry.objects.all()
         self.assertEqual(docket_entries.count(), 3)
-        data = docket_data
+        data = deepcopy(docket_data)
 
         add_docket_entries(
             self.d, data["docket_entries"], order_by=data.get("ordered_by")
         )
-        docket_entries = DocketEntry.objects.filter(docket=self.d)
+        self.assertEqual(docket_entries.count(), 3)
+
+        # Merge docket again to confirm no duplicates are created.
+        data = deepcopy(docket_data)
+        add_docket_entries(
+            self.d, data["docket_entries"], order_by=data.get("ordered_by")
+        )
         self.assertEqual(docket_entries.count(), 3)
 
         original_feed = deepcopy(entries_feed)
@@ -7293,11 +7325,17 @@ class MinuteEntriesMerger(TestCase):
         docket_entries = DocketEntry.objects.all()
         self.assertEqual(docket_entries.count(), 2)
 
-        data = docket_data
+        data = deepcopy(docket_data)
         add_docket_entries(
             self.d, data["docket_entries"], order_by=data.get("ordered_by")
         )
-        docket_entries = DocketEntry.objects.filter(docket=self.d)
+        self.assertEqual(docket_entries.count(), 2)
+
+        # Merge docket again to confirm no duplicates are created.
+        data = deepcopy(docket_data)
+        add_docket_entries(
+            self.d, data["docket_entries"], order_by=data.get("ordered_by")
+        )
         self.assertEqual(docket_entries.count(), 2)
 
         original_feed = deepcopy(entries_feed)
@@ -7362,11 +7400,17 @@ class MinuteEntriesMerger(TestCase):
         docket_entries = DocketEntry.objects.all()
         self.assertEqual(docket_entries.count(), 2)
 
-        data = docket_data
+        data = deepcopy(docket_data)
         add_docket_entries(
             self.d, data["docket_entries"], order_by=data.get("ordered_by")
         )
-        docket_entries = DocketEntry.objects.filter(docket=self.d)
+        self.assertEqual(docket_entries.count(), 2)
+
+        # Merge docket again to confirm no duplicates are created.
+        data = deepcopy(docket_data)
+        add_docket_entries(
+            self.d, data["docket_entries"], order_by=data.get("ordered_by")
+        )
         self.assertEqual(docket_entries.count(), 2)
 
         original_feed = deepcopy(entries_feed)
@@ -7432,11 +7476,17 @@ class MinuteEntriesMerger(TestCase):
         docket_entries = DocketEntry.objects.all()
         self.assertEqual(docket_entries.count(), 2)
 
-        data = docket_data
+        data = deepcopy(docket_data)
         add_docket_entries(
             self.d, data["docket_entries"], order_by=data.get("ordered_by")
         )
-        docket_entries = DocketEntry.objects.filter(docket=self.d)
+        self.assertEqual(docket_entries.count(), 3)
+
+        # Merge docket again to confirm no duplicates are created.
+        data = deepcopy(docket_data)
+        add_docket_entries(
+            self.d, data["docket_entries"], order_by=data.get("ordered_by")
+        )
         self.assertEqual(docket_entries.count(), 3)
 
         original_feed = deepcopy(entries_feed)
@@ -7502,11 +7552,18 @@ class MinuteEntriesMerger(TestCase):
         docket_entries = DocketEntry.objects.all()
         self.assertEqual(docket_entries.count(), 2)
 
-        data = docket_data
+        data = deepcopy(docket_data)
         add_docket_entries(
             self.d, data["docket_entries"], order_by=data.get("ordered_by")
         )
-        docket_entries = DocketEntry.objects.filter(docket=self.d)
+        self.assertEqual(docket_entries.count(), 2)
+
+        # Merge docket again to confirm no duplicates are created.
+        data = deepcopy(docket_data)
+        add_docket_entries(
+            self.d, data["docket_entries"], order_by=data.get("ordered_by")
+        )
+        docket_entries = DocketEntry.objects.all()
         self.assertEqual(docket_entries.count(), 2)
 
         original_feed = deepcopy(entries_feed)
@@ -7572,11 +7629,17 @@ class MinuteEntriesMerger(TestCase):
         docket_entries = DocketEntry.objects.all()
         self.assertEqual(docket_entries.count(), 2)
 
-        data = docket_data
+        data = deepcopy(docket_data)
         add_docket_entries(
             self.d, data["docket_entries"], order_by=data.get("ordered_by")
         )
-        docket_entries = DocketEntry.objects.filter(docket=self.d)
+        self.assertEqual(docket_entries.count(), 3)
+
+        # Merge docket again to confirm no duplicates are created.
+        data = deepcopy(docket_data)
+        add_docket_entries(
+            self.d, data["docket_entries"], order_by=data.get("ordered_by")
+        )
         self.assertEqual(docket_entries.count(), 3)
 
         original_feed = deepcopy(entries_feed)
@@ -7642,11 +7705,17 @@ class MinuteEntriesMerger(TestCase):
         docket_entries = DocketEntry.objects.all()
         self.assertEqual(docket_entries.count(), 2)
 
-        data = docket_data
+        data = deepcopy(docket_data)
         add_docket_entries(
             self.d, data["docket_entries"], order_by=data.get("ordered_by")
         )
-        docket_entries = DocketEntry.objects.filter(docket=self.d)
+        self.assertEqual(docket_entries.count(), 3)
+
+        # Merge docket again to confirm no duplicates are created.
+        data = deepcopy(docket_data)
+        add_docket_entries(
+            self.d, data["docket_entries"], order_by=data.get("ordered_by")
+        )
         self.assertEqual(docket_entries.count(), 3)
 
         original_feed = deepcopy(entries_feed)
@@ -7712,11 +7781,17 @@ class MinuteEntriesMerger(TestCase):
         docket_entries = DocketEntry.objects.all()
         self.assertEqual(docket_entries.count(), 2)
 
-        data = docket_data
+        data = deepcopy(docket_data)
         add_docket_entries(
             self.d, data["docket_entries"], order_by=data.get("ordered_by")
         )
-        docket_entries = DocketEntry.objects.filter(docket=self.d)
+        self.assertEqual(docket_entries.count(), 2)
+
+        # Merge docket again to confirm no duplicates are created.
+        data = deepcopy(docket_data)
+        add_docket_entries(
+            self.d, data["docket_entries"], order_by=data.get("ordered_by")
+        )
         self.assertEqual(docket_entries.count(), 2)
 
         original_feed = deepcopy(entries_feed)
@@ -7780,11 +7855,17 @@ class MinuteEntriesMerger(TestCase):
         docket_entries = DocketEntry.objects.all()
         self.assertEqual(docket_entries.count(), 2)
 
-        data = docket_data
+        data = deepcopy(docket_data)
         add_docket_entries(
             self.d, data["docket_entries"], order_by=data.get("ordered_by")
         )
-        docket_entries = DocketEntry.objects.filter(docket=self.d)
+        self.assertEqual(docket_entries.count(), 4)
+
+        # Merge docket again to confirm no duplicates are created.
+        data = deepcopy(docket_data)
+        add_docket_entries(
+            self.d, data["docket_entries"], order_by=data.get("ordered_by")
+        )
         self.assertEqual(docket_entries.count(), 4)
 
         original_feed = deepcopy(entries_feed)
