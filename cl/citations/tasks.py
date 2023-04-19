@@ -88,7 +88,12 @@ def find_citations_and_parantheticals_for_recap_documents(
     """
     documents: List[RECAPDocument] = RECAPDocument.objects.filter(
         pk__in=doc_ids
-    ).filter(ocr_status=RECAPDocument.OCR_COMPLETE)
+    ).filter(
+        ocr_status__in=[
+            RECAPDocument.OCR_UNNECESSARY,
+            RECAPDocument.OCR_COMPLETE,
+        ]
+    )
 
     for d in documents:
         try:
@@ -255,11 +260,6 @@ def store_recap_citations(document: RECAPDocument) -> None:
 
     :return: None
     """
-    ######
-    """
-    TODO: check whether need to show cited opinions on front-end in RECAP doc pages
-    """
-    ########
 
     document_text = document.plain_text
 
@@ -278,9 +278,6 @@ def store_recap_citations(document: RECAPDocument) -> None:
 
     # Delete the unmatched citations
     citation_resolutions.pop(NO_MATCH_RESOURCE, None)
-
-    # put parenthetical storage code here if such a feature is requested or desired; base off of the same functionality in `store_opinion_citations_and_update_parentheticals`
-    # https://github.com/freelawproject/courtlistener/issues/607#issuecomment-1500336779
 
     with transaction.atomic():
         # delete existing citation entries
