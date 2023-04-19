@@ -3,6 +3,7 @@ from typing import Dict, List, Set, Tuple
 
 from django.db import transaction
 from django.db.models import F
+from django.db.models.query import QuerySet
 from eyecite import get_citations
 from eyecite.models import CitationBase
 
@@ -86,7 +87,7 @@ def find_citations_and_parantheticals_for_recap_documents(
 
     :return: None
     """
-    documents: List[RECAPDocument] = RECAPDocument.objects.filter(
+    documents: QuerySet[RECAPDocument] = RECAPDocument.objects.filter(
         pk__in=doc_ids
     ).filter(
         ocr_status__in=[
@@ -115,7 +116,7 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
     :param index: Whether to add the items to Solr
     :return: None
     """
-    opinions: List[Opinion] = Opinion.objects.filter(pk__in=opinion_pks)
+    opinions: QuerySet[Opinion] = Opinion.objects.filter(pk__in=opinion_pks)
     for opinion in opinions:
         try:
             store_opinion_citations_and_update_parentheticals(opinion, index)
