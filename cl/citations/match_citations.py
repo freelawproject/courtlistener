@@ -284,12 +284,12 @@ def do_resolve_citations(
     # Set the citing opinion on FullCaseCitation objects for later matching
     for c in citations:
         if type(c) is FullCaseCitation:
-            citing_attr = (
-                "citing_opinion"
-                if type(citing_document) == Opinion
-                else "citing_document"
-            )
-            setattr(c, citing_attr, citing_document)
+            if isinstance(citing_document, Opinion):
+                c.citing_opinion = citing_opinion
+            elif isinstance(citing_document, RECAPDocument):
+                c.citing_document = citing_opinion
+            else:
+                raise "Unknown citing type."
 
     # Call and return eyecite's resolve_citations() function
     return resolve_citations(
