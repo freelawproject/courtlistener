@@ -10,7 +10,7 @@ from eyecite.utils import clean_text
 
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.solr_core_admin import get_term_frequency
-from cl.search.models import Docket, Opinion, OpinionCluster
+from cl.search.models import SOURCES, Docket, Opinion, OpinionCluster
 
 from ...people_db.lookup_utils import (
     lookup_judge_by_last_name,
@@ -387,7 +387,7 @@ def make_and_save(
         case_name_short=item["case_name_short"] or "",
         case_name=item["case_name"] or "",
         case_name_full=item["case_name_full"] or "",
-        source="Z",
+        source=SOURCES.COLUMBIA_ARCHIVE,
         attorneys=item["attorneys"] or "",
         posture=item["posture"] or "",
     )

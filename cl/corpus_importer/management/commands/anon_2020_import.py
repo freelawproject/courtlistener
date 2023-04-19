@@ -15,7 +15,7 @@ from reporters_db import REPORTERS
 from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_utils import trunc
-from cl.search.models import Citation, Docket, Opinion, OpinionCluster
+from cl.search.models import SOURCES, Citation, Docket, Opinion, OpinionCluster
 from cl.search.tasks import add_items_to_solr
 
 cnt = CaseNameTweaker()
@@ -135,7 +135,8 @@ def merge_or_add_opinions(
         )
 
     # Merge with scrape or add opinion to cluster with harvard
-    if OpinionCluster.objects.get(pk=cluster_id).source == "C":
+    cluster_source = OpinionCluster.objects.get(pk=cluster_id).source
+    if cluster_source == SOURCES.COURT_WEBSITE:
         opinion = Opinion.objects.get(cluster_id=cluster_id)
         logger.info("Merge with Harvard data")
         opinion.html_anon_2020 = html_str
