@@ -327,6 +327,37 @@ class CitationRedirectorTest(TestCase):
         self.assertEqual(volume_previous, None)
         self.assertEqual(volume_next, None)
 
+    def test_avoid_exception_possible_matches_page_with_letter(self) -> None:
+        """Can we order the possible matches when page number contains a
+        letter without getting a DataError exception?"""
+
+        # See: freelawproject/courtlistener#2474
+
+        # Create the citation that contains 40M as page number and was
+        # causing the exception
+        CitationWithParentsFactory.create(
+            volume="2017",
+            reporter="COA",
+            page="40M",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=CourtFactory(id="coloctapp")),
+                case_name="People v. Davis",
+                date_filed=datetime.date(2017, 5, 4),
+            ),
+        )
+
+        r = self.client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={
+                    "reporter": "coa",
+                    "volume": "2017",
+                    "page": "157",
+                },
+            ),
+        )
+        self.assertStatus(r, HTTP_404_NOT_FOUND)
+
 
 class ViewRecapDocketTest(TestCase):
     @classmethod

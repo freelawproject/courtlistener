@@ -31,7 +31,14 @@ from cl.lib.string_utils import trunc
 from cl.lib.utils import human_sort
 from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.scrapers.utils import update_or_create_docket
-from cl.search.models import Citation, Court, Docket, Opinion, OpinionCluster
+from cl.search.models import (
+    SOURCES,
+    Citation,
+    Court,
+    Docket,
+    Opinion,
+    OpinionCluster,
+)
 from cl.search.tasks import add_items_to_solr
 
 cnt = CaseNameTweaker()
@@ -510,7 +517,7 @@ def add_new_case(
             case_name_full=case_name_full,
             precedential_status="Published",
             docket_id=docket.id,
-            source="U",
+            source=SOURCES.HARVARD_CASELAW,
             date_filed=date_filed,
             date_filed_is_approximate=is_approximate,
             attorneys=short_data["attorneys"],

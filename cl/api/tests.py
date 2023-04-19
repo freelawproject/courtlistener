@@ -25,7 +25,7 @@ from cl.audio.api_views import AudioViewSet
 from cl.lib.redis_utils import make_redis_interface
 from cl.lib.test_helpers import IndexedSolrTestCase, SimpleUserDataMixin
 from cl.recap.factories import ProcessingQueueFactory
-from cl.search.models import Opinion
+from cl.search.models import SOURCES, Opinion
 from cl.stats.models import Event
 from cl.tests.cases import SimpleTestCase, TestCase, TransactionTestCase
 from cl.tests.utils import MockResponse
@@ -840,10 +840,10 @@ class DRFSearchAppAndAudioAppApiFilterTest(TestCase, FilteringCountTestCase):
 
         # Multiple choice filter
         self.q = dict()
-        sources = ["C"]
+        sources = [SOURCES.COURT_WEBSITE]
         self.q["source"] = sources
         self.assertCountInResults(2)
-        sources.append("CR")
+        sources.append(SOURCES.COURT_M_RESOURCE)
         self.assertCountInResults(3)
 
     def test_opinion_cited_filters(self) -> None:
