@@ -44,7 +44,7 @@
               <a class="btn btn-default" href="?{{ get_string }}page={{ page }}">{{page}}</a>
             {% endfor %}
           {% else %}
-            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+            <span class="hidden-xs" >Page</span> {{ page_obj.number|intcomma }} of {{ page_obj.paginator.num_pages|intcomma }}
           {% endif %}
         </div>
         <div class="col-xs-2 text-right" >
