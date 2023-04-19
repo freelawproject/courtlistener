@@ -37,11 +37,11 @@
         <div class="col-xs-8 text-center">
           {% if not hide_numbers %}
             {% for page in page_obj|page_prev_range %}
-              <a class="btn btn-default" href="?{{ get_string }}page={{ page }}">{{page}}</a>
+              <a class="btn btn-default" href="?{{ get_string }}page={{ page }}">{{page|intcomma}}</a>
             {% endfor %}
             <span class="btn btn-default disabled"> {{ page_obj.number }}</span>
             {% for page in page_obj|page_next_range %}
-              <a class="btn btn-default" href="?{{ get_string }}page={{ page }}">{{page}}</a>
+              <a class="btn btn-default" href="?{{ get_string }}page={{ page }}">{{page|intcomma}}</a>
             {% endfor %}
           {% else %}
             <span class="hidden-xs" >Page</span> {{ page_obj.number|intcomma }} of {{ page_obj.paginator.num_pages|intcomma }}
