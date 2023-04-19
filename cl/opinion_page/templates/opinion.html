@@ -406,7 +406,7 @@
                             <a href="#{{ sub_opinion.type }}{{ forloop.counter }}"
                                aria-controls="{{ sub_opinion.type }}{{ forloop.counter }}"
                                role="tab"
-                               data-toggle="tab">{{ sub_opinion.get_type_display }}</a>
+                               data-toggle="tab">{{ sub_opinion.get_type_display }} {% if sub_opinion.author_str or sub_opinion.author %}<span class="text-capitalize">({% if sub_opinion.author_str %}{{ sub_opinion.author_str }}{% else %}{{ sub_opinion.author.name_full }}{% endif %})</span>{% endif %}</a>
                         </li>
                     {% endfor %}
                 </ul>
