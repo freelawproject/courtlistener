@@ -266,10 +266,7 @@ class Audio(AbstractDateTimeModel):
         return normalize_search_dicts(out)
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-    obj_field=None,
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
 class AudioPanel(Audio.panel.through):  # type: ignore
     """A model class to track audio panel m2m relation"""
 

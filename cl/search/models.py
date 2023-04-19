@@ -115,9 +115,7 @@ class SOURCES:
     )
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class OriginatingCourtInformation(AbstractDateTimeModel):
     """Lower court metadata to associate with appellate cases.
 
@@ -220,10 +218,7 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
         verbose_name_plural = "Originating Court Information"
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-    exclude=["view_count"],
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), exclude=["view_count"])
 class Docket(AbstractDateTimeModel):
     """A class to sit above OpinionClusters, Audio files, and Docket Entries,
     and link them together.
@@ -1005,10 +1000,7 @@ class Docket(AbstractDateTimeModel):
             )
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-    obj_field=None,
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
 class DocketTags(Docket.tags.through):
     """A model class to track docket tags m2m relation"""
 
@@ -1016,10 +1008,7 @@ class DocketTags(Docket.tags.through):
         proxy = True
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-    obj_field=None,
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
 class DocketPanel(Docket.panel.through):
     """A model class to track docket panel m2m relation"""
 
@@ -1027,9 +1016,7 @@ class DocketPanel(Docket.panel.through):
         proxy = True
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class DocketEntry(AbstractDateTimeModel):
     docket = models.ForeignKey(
         Docket,
@@ -1138,10 +1125,7 @@ class DocketEntry(AbstractDateTimeModel):
         return None
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-    obj_field=None,
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
 class DocketEntryTags(DocketEntry.tags.through):
     """A model class to track docket entry tags m2m relation"""
 
@@ -1203,9 +1187,7 @@ class AbstractPacerDocument(models.Model):
         abstract = True
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
     """The model for Docket Documents and Attachments."""
 
@@ -1554,10 +1536,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         return normalize_search_dicts(out)
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-    obj_field=None,
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
 class RECAPDocumentTags(RECAPDocument.tags.through):
     """A model class to track recap document tags m2m relation"""
 
@@ -1565,9 +1544,7 @@ class RECAPDocumentTags(RECAPDocument.tags.through):
         proxy = True
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class BankruptcyInformation(AbstractDateTimeModel):
     docket = models.OneToOneField(
         Docket,
@@ -1610,9 +1587,7 @@ class BankruptcyInformation(AbstractDateTimeModel):
         return f"Bankruptcy Info for docket {self.docket_id}"
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Claim(AbstractDateTimeModel):
     docket = models.ForeignKey(
         Docket,
@@ -1727,10 +1702,7 @@ class Claim(AbstractDateTimeModel):
         )
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-    obj_field=None,
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
 class ClaimTags(Claim.tags.through):
     """A model class to track claim tags m2m relation"""
 
@@ -1738,9 +1710,7 @@ class ClaimTags(Claim.tags.through):
         proxy = True
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class ClaimHistory(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
     DOCKET_ENTRY = 1
     CLAIM_ENTRY = 2
@@ -1859,9 +1829,7 @@ class FederalCourtsQuerySet(models.QuerySet):
         return self.filter(jurisdictions__in=Court.TERRITORY_JURISDICTIONS)
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Court(models.Model):
     """A class to represent some information about each court, can be extended
     as needed."""
@@ -2114,9 +2082,7 @@ class ClusterCitationQuerySet(models.query.QuerySet):
         return clone
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class OpinionCluster(AbstractDateTimeModel):
     """A class representing a cluster of court opinions."""
 
@@ -2628,10 +2594,7 @@ class OpinionCluster(AbstractDateTimeModel):
         return search_list
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-    obj_field=None,
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
 class OpinionClusterPanel(OpinionCluster.panel.through):
     """A model class to track opinion cluster panel m2m relation"""
 
@@ -2639,10 +2602,7 @@ class OpinionClusterPanel(OpinionCluster.panel.through):
         proxy = True
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-    obj_field=None,
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
 class OpinionClusterNonParticipatingJudges(
     OpinionCluster.non_participating_judges.through
 ):
@@ -2653,9 +2613,7 @@ class OpinionClusterNonParticipatingJudges(
         proxy = True
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Citation(models.Model):
     """A simple class to hold citations."""
 
@@ -2776,9 +2734,7 @@ def sort_cites(c):
         return 8
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Opinion(AbstractDateTimeModel):
     COMBINED = "010combined"
     UNANIMOUS = "015unamimous"
@@ -3065,10 +3021,7 @@ class Opinion(AbstractDateTimeModel):
         return normalize_search_dicts(out)
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-    obj_field=None,
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
 class OpinionJoinedBy(Opinion.joined_by.through):
     """A model class to track opinion joined_by m2m relation"""
 
@@ -3209,9 +3162,7 @@ class ParentheticalGroup(models.Model):
 TaggableType = TypeVar("TaggableType", Docket, DocketEntry, RECAPDocument)
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Tag(AbstractDateTimeModel):
     name = models.CharField(
         help_text="The name of the tag.",

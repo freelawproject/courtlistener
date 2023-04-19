@@ -23,8 +23,7 @@ HttpStatusCodes = models.IntegerChoices(  # type: ignore
 
 
 @pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-    model_name="WebhookHistoryEvent",
+    AfterUpdateOrDeleteSnapshot(), model_name="WebhookHistoryEvent"
 )
 class Webhook(AbstractDateTimeModel):
     user = models.ForeignKey(

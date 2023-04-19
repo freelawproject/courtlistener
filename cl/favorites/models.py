@@ -87,10 +87,7 @@ class DocketTag(models.Model):
         unique_together = (("docket", "tag"),)
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-    exclude=["view_count"],
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), exclude=["view_count"])
 class UserTag(AbstractDateTimeModel):
     """Tags that can be added by users to various objects"""
 

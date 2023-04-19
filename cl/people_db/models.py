@@ -60,9 +60,7 @@ DATE_GRANULARITIES = (
 )
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Person(AbstractDateTimeModel):
     RELIGIONS = (
         ("ca", "Catholic"),
@@ -394,9 +392,7 @@ class Person(AbstractDateTimeModel):
         return normalize_search_dicts(out)
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class School(AbstractDateTimeModel):
     is_alias_of = models.ForeignKey(
         "self",
@@ -437,9 +433,7 @@ class School(AbstractDateTimeModel):
         super(School, self).clean_fields(*args, **kwargs)
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Position(AbstractDateTimeModel):
     """A role held by a person, and the details about it."""
 
@@ -1068,9 +1062,7 @@ class Position(AbstractDateTimeModel):
         super(Position, self).clean_fields(*args, **kwargs)
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class RetentionEvent(AbstractDateTimeModel):
     RETENTION_TYPES = (
         ("reapp_gov", "Governor Reappointment"),
@@ -1142,9 +1134,7 @@ class RetentionEvent(AbstractDateTimeModel):
         super(RetentionEvent, self).clean_fields(*args, **kwargs)
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Education(AbstractDateTimeModel):
     DEGREE_LEVELS = (
         ("ba", "Bachelor's (e.g. B.A.)"),
@@ -1212,9 +1202,7 @@ class Education(AbstractDateTimeModel):
         super(Education, self).clean_fields(*args, **kwargs)
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Race(models.Model):
     RACES = (
         ("w", "White"),
@@ -1237,10 +1225,7 @@ class Race(models.Model):
         return f"{self.race}"
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-    obj_field=None,
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
 class PersonRace(Person.race.through):
     """A model class to track person race m2m relation"""
 
@@ -1248,9 +1233,7 @@ class PersonRace(Person.race.through):
         proxy = True
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class PoliticalAffiliation(AbstractDateTimeModel):
     POLITICAL_AFFILIATION_SOURCE = (
         ("b", "Ballot"),
@@ -1320,9 +1303,7 @@ class PoliticalAffiliation(AbstractDateTimeModel):
         super(PoliticalAffiliation, self).clean_fields(*args, **kwargs)
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Source(AbstractDateTimeModel):
     person = models.ForeignKey(
         Person,
@@ -1348,9 +1329,7 @@ class Source(AbstractDateTimeModel):
     )
 
 
-@pghistory.track(
-    AfterUpdateOrDeleteSnapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class ABARating(AbstractDateTimeModel):
     ABA_RATINGS = (
         ("ewq", "Exceptionally Well Qualified"),
