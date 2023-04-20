@@ -453,23 +453,6 @@ def view_recap_document(
             attachment_number=att_num,
         ).order_by("pk")[0]
 
-        # Check if the user has requested automatic redirection to the document
-        rd_download_redirect = request.GET.get("redirect_to_download", False)
-        redirect_or_modal = request.GET.get("redirect_or_modal", False)
-        if rd_download_redirect or redirect_or_modal:
-            # Check if the document is available from CourtListener and
-            # if it is, redirect to the local document
-            # if it isn't, if pacer_url is available and
-            # rd_download_redirect is True, redirect to PACER. If redirect_or_modal
-            # is True set redirect_to_pacer_modal to True to open the modal.
-            if rd.is_available:
-                return HttpResponseRedirect(rd.filepath_local.url)
-            else:
-                if rd.pacer_url and rd_download_redirect:
-                    return HttpResponseRedirect(rd.pacer_url)
-                if rd.pacer_url and redirect_or_modal:
-                    redirect_to_pacer_modal = True
-
     except IndexError:
         # Unable to find the docket entry the normal way. In appellate courts, this
         # can be because the main document was converted to an attachment, leaving no
@@ -506,6 +489,23 @@ def view_recap_document(
             return HttpResponseRedirect(attachment_page)
 
         raise Http404("No RECAPDocument matches the given query.")
+
+    # Check if the user has requested automatic redirection to the document
+    rd_download_redirect = request.GET.get("redirect_to_download", False)
+    redirect_or_modal = request.GET.get("redirect_or_modal", False)
+    if rd_download_redirect or redirect_or_modal:
+        # Check if the document is available from CourtListener and
+        # if it is, redirect to the local document
+        # if it isn't, if pacer_url is available and
+        # rd_download_redirect is True, redirect to PACER. If redirect_or_modal
+        # is True set redirect_to_pacer_modal to True to open the modal.
+        if rd.is_available:
+            return HttpResponseRedirect(rd.filepath_local.url)
+        else:
+            if rd.pacer_url and rd_download_redirect:
+                return HttpResponseRedirect(rd.pacer_url)
+            if rd.pacer_url and redirect_or_modal:
+                redirect_to_pacer_modal = True
 
     title = make_rd_title(rd)
     rd = make_thumb_if_needed(request, rd)
