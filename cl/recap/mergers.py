@@ -581,9 +581,18 @@ def merge_unnumbered_docket_entries(des):
     return winner
 
 
-def find_minute_entry_by_description(d, docket_entry):
-    normalize_long_description(docket_entry)
+def find_minute_entry_by_description(
+    d: Docket, docket_entry: dict[str, any]
+) -> tuple[DocketEntry, bool]:
+    """Finds or creates a DocketEntry object based on the provided
+    docket_entry dictionary.
 
+    :param d: The related Docket object.
+    :param docket_entry: The docket entry dict.
+    :returns: A two-tuple containing the DocketEntry object and a boolean
+    indicating whether the DocketEntry object was created or not.
+    """
+    normalize_long_description(docket_entry)
     query = Q()
     if docket_entry.get("description"):
         query |= Q(description=docket_entry["description"])
