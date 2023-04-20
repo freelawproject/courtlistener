@@ -1287,8 +1287,11 @@ def check_if_there_is_a_match(
     if matched_words_count:
         count_short_words = len(clean_and_split_words(short_description))
         half_words = round(count_short_words / 2)
+        separator_count = short_description.count("AND")
         if "AND" in short_description or "-" in short_description:
-            half_words = round(half_words / 2)
+            if separator_count == 1 or separator_count == 0:
+                separator_count = 2
+            half_words = round(half_words / separator_count)
         if matched_words_count >= half_words:
             return True
     return False

@@ -6863,7 +6863,11 @@ class MinuteEntriesMerger(TestCase):
             ),
             (
                 "Motion AND Case Unsealed",
-                " Minute Entry for proceedings held before Chief Judge Beryl A. Howell: Motion Hearing as to GARY JAMES HARMON not held on 9/17/2021. ",
+                "Minute Entry for proceedings held before Chief Judge Beryl A. Howell: Motion Hearing as to GARY JAMES HARMON not held on 9/17/2021. ",
+            ),
+            (
+                "Motion AND Case Unsealed AND Order AND Arrest AND Test",
+                "Minute Entry for proceedings held before Chief Judge Beryl A. Howell: Motion Hearing as to GARY JAMES HARMON not held on 9/17/2021. ",
             ),
         ]
         matched = True
