@@ -3265,3 +3265,57 @@ class SEARCH_TYPES:
         (PEOPLE, "People"),
     )
     ALL_TYPES = [OPINION, RECAP, ORAL_ARGUMENT, PEOPLE]
+
+
+class StubCase(AbstractDateTimeModel):
+    """A class representing a stub case"""
+
+    case_name = models.TextField(
+        help_text="The shortened name of the case", blank=True
+    )
+
+    case_name_full = models.TextField(
+        help_text="The full name of the case", blank=True
+    )
+
+    date_filed = models.DateField(
+        help_text="The date the case was filed", null=True, blank=True
+    )
+
+    date_decided = models.DateField(
+        help_text="The date the case was decided", null=True, blank=True
+    )
+
+    date_argued = models.DateField(
+        help_text="The date the case was argued", null=True, blank=True
+    )
+
+    date_revised = models.DateField(
+        help_text="The date the case was revised", null=True, blank=True
+    )
+
+    court = models.ForeignKey(
+        "Court",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+
+    court_str = models.TextField(
+        help_text=(
+            "Court represented as simple text. This field is used when we "
+            "can't get a court from courts-db or we can't find it in the "
+            "system. "
+        ),
+        blank=True,
+    )
+
+    docket_number = models.TextField(blank=True)
+
+    citations_str = models.TextField(
+        help_text=("Raw value of citations from data"), blank=True
+    )
+
+    citations = models.JSONField(
+        help_text="Extracted citations from data", blank=True, null=True
+    )

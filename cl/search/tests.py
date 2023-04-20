@@ -48,6 +48,7 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     RECAPDocument,
+    StubCase,
     sort_cites,
 )
 from cl.search.tasks import add_docket_to_solr_by_rds
@@ -2073,3 +2074,45 @@ class DocketEntriesTimezone(TestCase):
             datetime.datetime(2023, 1, 15, 21, 46, 51)
         )
         self.assertEqual(de_nyed_utc.datetime_filed, target_date_aware)
+
+
+class StubCases(TestCase):
+    """Test creation of stub cases"""
+
+    def test_add_stub_case(self):
+        """Can we add a stub case?"""
+
+        # From lexis dataset
+        stub_case_1 = StubCase.objects.create(
+            case_name_full="ANTHONY C. KENNEY, Plaintiff, v. SSA ODAR "
+            "HEARING et al., Defendants.",
+            date_decided=datetime.date(2015, 9, 23),
+            date_filed=datetime.date(2015, 9, 23),
+            court=CourtFactory(id="okwd"),
+            court_str="United States District Court for the Western District "
+            "of Oklahoma",
+            citations_str="2015 WL 6160378;2015 U.S. Dist. LEXIS 142327",
+            citations={
+                "citation_1": "2015 WL 6160378",
+                "citation_2": "2015 U.S. Dist. LEXIS 142327",
+            },
+        )
+
+        # We have two citations in json field
+        self.assertEqual(len(stub_case_1.citations), 2)
+
+        # From westlaw dataset
+        stub_case_2 = StubCase.objects.create(
+            case_name="Kordulak v. Prudential Ins. Co. of America",
+            date_filed=datetime.date(1937, 2, 16),
+            docket_number="245687",
+            court_str="District Court of Jersey City, New Jersey.",
+            citations_str="15 N.J. Misc. 242;190 A. 325",
+            citations={
+                "citation_1": "15 N.J. Misc. 242",
+                "citation_2": "190 A. 325",
+            },
+        )
+
+        # We have two citations in json field
+        self.assertEqual(len(stub_case_2.citations), 2)
