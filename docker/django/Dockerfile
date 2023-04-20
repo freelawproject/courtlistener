@@ -117,6 +117,8 @@ CMD gunicorn cl_wsgi:application \
     --group www-data \
     # Set high number of workers. Docs recommend 2-4× core count`
     --workers ${NUM_WORKERS:-48} \
+    --worker-class gthread \
+    --threads 10 \
     # Allow longer queries to solr.
     --limit-request-line 6000 \
     # Reset each worker once in a while
