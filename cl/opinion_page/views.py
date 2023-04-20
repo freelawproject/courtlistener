@@ -471,8 +471,14 @@ def view_recap_document(
                     redirect_to_pacer_modal = True
 
     except IndexError:
-        # Avoid checking if a document got converted when the user tries
-        # to load an attachment
+        # Unable to find the docket entry the normal way. In appellate courts, this
+        # can be because the main document was converted to an attachment, leaving no
+        # main document behind. See:
+        #
+        # https://github.com/freelawproject/courtlistener/pull/2413
+        #
+        # When this happens, try redirecting to the first attachment for the entry,
+        # if it exists.
         if att_num:
             raise Http404("No RECAPDocument matches the given query.")
 
