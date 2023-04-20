@@ -1091,23 +1091,31 @@ def look_for_minute_entries_matches(
     """
 
     entries_to_merge = []
+    short_descriptions = [
+        short_de.recap_documents.all()[0].description
+        for short_de in short_des_entries
+    ]
+    short_descriptions_equal = all(
+        x == short_descriptions[0] for x in short_descriptions
+    )
     if len(short_des_entries) == len(long_des_entries):
         # Same number of minute entries in both sides.
         if len(long_des_entries) == 1:
-            # Case 1: One entry both sides, merge it directly.
-            entry = (short_des_entries[0].pk, long_des_entries[0])
-            entries_to_merge.append(entry)
+            # Case 1: One entry on both sides, merge it directly if date_filed
+            # and date_entered are the same in order to guarantee a proper merge
+            if (
+                order_by == "date_filed" or order_by is None
+            ) and long_des_entries[0].get("date_entered") == long_des_entries[
+                0
+            ][
+                "date_filed"
+            ]:
+                entry = (short_des_entries[0].pk, long_des_entries[0])
+                entries_to_merge.append(entry)
 
-        short_descriptions = [
-            short_de.recap_documents.all()[0].description
-            for short_de in short_des_entries
-        ]
-        short_descriptions_equal = all(
-            x == short_descriptions[0] for x in short_descriptions
-        )
         # Case 2: Same number of entries and short descriptions are the same.
         # Merge them directly.
-        if short_descriptions and short_descriptions_equal:
+        elif short_descriptions and short_descriptions_equal:
             for i, short_de in enumerate(short_des_entries):
                 entry = (short_de.pk, long_des_entries[i])
                 entries_to_merge.append(entry)
@@ -1150,13 +1158,13 @@ def look_for_minute_entries_matches(
         entries_to_merge = entries_to_merge + entries_to_merge_word_matching
 
     elif short_des_entries:
-        # Case 4: Not the same number of minute entries in both sides.
+        # Case 5: Not the same number of minute entries in both sides.
         # We try word marching.
         entries_to_merge, no_matched_entries = do_word_matching(
             short_des_entries, long_des_entries
         )
     else:
-        # Case 5: No short description entries to merge in, add new entries.
+        # Case 6: No short description entries to merge in, add new entries.
         no_matched_entries = long_des_entries
 
     entries_to_add = []
