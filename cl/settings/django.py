@@ -224,3 +224,7 @@ SILENCED_SYSTEM_CHECKS = [
     # Don't warn about HSTS being used
     "security.W004",
 ]
+
+DEFAULT_CITE_FORMAT = (
+    "{name_bb}, {case_bb} {ecf_bb}, {reporter} ({court_bb} {date_bb})"
+)

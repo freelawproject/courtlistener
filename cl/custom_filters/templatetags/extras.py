@@ -2,6 +2,7 @@ import random
 import re
 
 from django import template
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.template import Context
 from django.utils.formats import date_format
@@ -156,23 +157,20 @@ def sort_caret(request, value) -> SafeString:
 @register.simple_tag
 def citation(obj, fmt=None) -> SafeString:
     if isinstance(obj, Docket):
+        # Dockets do not have dates associated with them.  This is more
+        # of a "weak citation".  It is there to allow people to find the
+        # docket
         docket = obj
-        date_of_interest = (
-            docket.date_terminated
-            if docket.date_terminated
-            else docket.date_last_filing
-        )
+        date_of_interest = None
         ecf = ""
     elif isinstance(obj, DocketEntry):
         docket = obj.docket
         date_of_interest = obj.date_filed
         ecf = obj.entry_number
     else:
-        return mark_safe("Unknown object type")
+        raise NotImplementedError(f"Object not recongized in {__name__}")
     if not fmt:
-        fmt = (
-            "{name_bb}, {case_bb} {ecf_bb}, {reporter} ({court_bb} {date_bb})"
-        )
+        fmt = settings.DEFAULT_CITE_FORMAT
     # for now we don't know what to use as reporter
     reporter = ""
     if date_of_interest:
