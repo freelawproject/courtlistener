@@ -50,7 +50,7 @@
                     {% if perms.search.change_opinion %}
                         {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
                             <a href="{% url 'admin:search_opinion_change' sub_opinion.pk %}"
-                               class="btn btn-primary btn-xs">{{ sub_opinion.type }} opinion</a>
+                               class="btn btn-primary btn-xs">{{ sub_opinion.get_type_display }} opinion</a>
                         {% endfor %}
                     {% endif %}
                     {% if request.user.is_superuser %}
