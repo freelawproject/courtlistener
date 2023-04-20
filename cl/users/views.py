@@ -12,7 +12,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.core.mail import send_mail
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db.models import Count
+from django.db.models import Count, F
 from django.http import (
     HttpRequest,
     HttpResponse,
@@ -99,10 +99,18 @@ def view_docket_alerts(request: HttpRequest) -> HttpResponse:
         "court": "docket__court__short_name",
         "hit": "date_last_hit",
     }
-    order_by = direction + name_map.get(order_by, "date_created")
+    order_by = name_map.get(order_by, "date_created")
     docket_alerts = request.user.docket_alerts.filter(
         alert_type=DocketAlert.SUBSCRIPTION
-    ).order_by(order_by)
+    )
+    if not direction:
+        docket_alerts = docket_alerts.order_by(
+            F(order_by).asc(nulls_last=True)
+        )
+    else:
+        docket_alerts = docket_alerts.order_by(
+            F(order_by).desc(nulls_last=False)
+        )
 
     return TemplateResponse(
         request,
