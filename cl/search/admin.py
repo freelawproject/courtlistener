@@ -19,6 +19,7 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     OpinionsCited,
+    OpinionStub,
     OriginatingCourtInformation,
     Parenthetical,
     ParentheticalGroup,
@@ -332,4 +333,15 @@ class ParentheticalGroupAdmin(CursorPaginatorAdmin):
     raw_id_fields = (
         "opinion",
         "representative",
+    )
+
+
+@admin.register(OpinionStub)
+class OpinionStubAdmin(CursorPaginatorAdmin):
+    list_display = (
+        "id",
+        "case_name",
+        "case_name_full",
+        "date_filed",
+        "court_str",
     )
