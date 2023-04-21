@@ -47,8 +47,8 @@ from cl.search.models import (
     DocketEntry,
     Opinion,
     OpinionCluster,
+    OpinionStub,
     RECAPDocument,
-    StubCase,
     sort_cites,
 )
 from cl.search.tasks import add_docket_to_solr_by_rds
@@ -2083,7 +2083,7 @@ class StubCases(TestCase):
         """Can we add a stub case?"""
 
         # From lexis dataset
-        stub_case_1 = StubCase.objects.create(
+        stub_1 = OpinionStub.objects.create(
             case_name_full="ANTHONY C. KENNEY, Plaintiff, v. SSA ODAR "
             "HEARING et al., Defendants.",
             date_decided=datetime.date(2015, 9, 23),
@@ -2099,10 +2099,10 @@ class StubCases(TestCase):
         )
 
         # We have two citations in json field
-        self.assertEqual(len(stub_case_1.citations), 2)
+        self.assertEqual(len(stub_1.citations), 2)
 
         # From westlaw dataset
-        stub_case_2 = StubCase.objects.create(
+        stub_2 = OpinionStub.objects.create(
             case_name="Kordulak v. Prudential Ins. Co. of America",
             date_filed=datetime.date(1937, 2, 16),
             docket_number="245687",
@@ -2115,4 +2115,4 @@ class StubCases(TestCase):
         )
 
         # We have two citations in json field
-        self.assertEqual(len(stub_case_2.citations), 2)
+        self.assertEqual(len(stub_2.citations), 2)
