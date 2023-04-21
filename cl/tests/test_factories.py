@@ -21,10 +21,14 @@ class TestFactoryCreation(TestCase):
         DocketWithChildrenFactory.create()
 
         # Check for a docket, opinion cluster, opinion, and parenthetical
-        self.assertGreaterEqual(Docket.objects.count(), 1)
+        num_dockets = Docket.objects.count()
+        self.assertGreaterEqual(num_dockets, 1)
         self.assertGreaterEqual(OpinionCluster.objects.count(), 1)
         self.assertGreaterEqual(Opinion.objects.count(), 1)
         self.assertGreaterEqual(Parenthetical.objects.count(), 1)
+        docket = Docket.objects.all()[0]
+        FACTORIES[107].create(parent_id=docket.id)
+        self.assertEqual(Docket.objects.count(), num_dockets)
 
     def test_making_specific_objects(self) -> None:
         """Can each of our basic factories be run properly?"""

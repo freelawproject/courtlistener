@@ -2,6 +2,7 @@ import string
 
 from factory import (
     Faker,
+    Iterator,
     LazyAttribute,
     RelatedFactory,
     SelfAttribute,
@@ -180,11 +181,41 @@ class DocketEntryFactory(DjangoModelFactory):
     description = Faker("text", max_nb_chars=750)
 
 
+class DocketReuseParentMixin(DjangoModelFactory):
+    docket = Iterator(Docket.objects.all())
+
+
+class DocketEntryForDocketFactory(DjangoModelFactory):
+    class Meta:
+        model = DocketEntry
+
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        """Override default docket"""
+        docket_id = kwargs.pop("parent_id", None)
+        if not docket_id:
+            return None
+        kwargs["docket_id"] = docket_id
+        manager = cls._get_manager(model_class)
+        return manager.create(*args, **kwargs)
+
+    description = Faker("text", max_nb_chars=750)
+
+
 class DocketEntryWithParentsFactory(
     DocketEntryFactory,
     DocketParentMixin,
 ):
     """Make a DocketEntry with Docket parents"""
+
+    pass
+
+
+class DocketEntryReuseParentsFactory(
+    DocketEntryFactory,
+    DocketReuseParentMixin,
+):
+    """Make a DocketEntry using existing Dockets as parents"""
 
     pass
 
