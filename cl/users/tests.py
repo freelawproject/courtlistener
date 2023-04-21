@@ -305,24 +305,23 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         docket_2 = DocketFactory()
         docket_alert = DocketAlertFactory(docket=docket, user=user_1.user)
         docket_alert_2 = DocketAlertFactory(docket=docket_2, user=user_1.user)
-        DocketAlertFactory(docket=docket_2, user=user_2.user)
+        docket_alert_3 = DocketAlertFactory(docket=docket_2, user=user_2.user)
 
         # Confirm docket alert objects are created.
         docket_alerts = DocketAlert.objects.all()
         self.assertEqual(docket_alerts.count(), 3)
 
-        # Confirm docket alert history objects are created.
-        docket_alert_events = DocketAlertEvent.objects.all()
-        self.assertEqual(docket_alert_events.count(), 3)
-
         # Trigger a change for docket alert objects.
         docket_alert.alert_type = DocketAlert.UNSUBSCRIPTION
         docket_alert.save()
         docket_alert_2.alert_type = DocketAlert.UNSUBSCRIPTION
-        docket_alert.save()
+        docket_alert_2.save()
+        docket_alert_3.alert_type = DocketAlert.UNSUBSCRIPTION
+        docket_alert_3.save()
 
+        docket_alert_events = DocketAlertEvent.objects.all()
         # More docket alert history objects should be created.
-        self.assertEqual(docket_alert_events.count(), 5)
+        self.assertEqual(docket_alert_events.count(), 3)
 
         # Delete user account.
         self.assertTrue(
@@ -348,6 +347,7 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         """
 
         docket_1 = DocketFactory()
+        docket_2 = DocketFactory()
         user_1 = UserProfileWithParentsFactory()
         user_2 = UserProfileWithParentsFactory()
 
@@ -363,9 +363,16 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         self.assertEqual(docket_tags.count(), 2)
 
         # Confirm user tags and docket tags history objects are created.
+        tag_1_user_1.name = "tag_1_user_1_1"
+        tag_1_user_1.save()
+        tag_1_user_2.name = "tag_1_user_2_2"
+        tag_1_user_2.save()
         user_tag_events = UserTagEvent.objects.all()
-        docket_tag_events = DocketTagEvent.objects.all()
         self.assertEqual(user_tag_events.count(), 2)
+
+        tag_1_user_1.docket_tags.all().update(docket=docket_2)
+        tag_1_user_2.docket_tags.all().update(docket=docket_2)
+        docket_tag_events = DocketTagEvent.objects.all()
         self.assertEqual(docket_tag_events.count(), 2)
 
         # Delete user account.
