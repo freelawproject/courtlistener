@@ -3319,3 +3319,9 @@ class OpinionStub(AbstractDateTimeModel):
     citations = models.JSONField(
         help_text="Extracted citations from data", blank=True, null=True
     )
+
+    def __str__(self) -> str:
+        return f"{self.pk}"
+
+    class Meta:
+        verbose_name_plural = "Opinion stubs"
