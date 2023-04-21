@@ -50,7 +50,7 @@
                     {% if perms.search.change_opinion %}
                         {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
                             <a href="{% url 'admin:search_opinion_change' sub_opinion.pk %}"
-                               class="btn btn-primary btn-xs">{{ sub_opinion.get_type_display }} opinion</a>
+                               class="btn btn-primary btn-xs">{{ sub_opinion.get_type_display|cut:"Opinion" }} opinion</a>
                         {% endfor %}
                     {% endif %}
                     {% if request.user.is_superuser %}
@@ -406,7 +406,7 @@
                             <a href="#{{ sub_opinion.type }}{{ forloop.counter }}"
                                aria-controls="{{ sub_opinion.type }}{{ forloop.counter }}"
                                role="tab"
-                               data-toggle="tab">{{ sub_opinion.get_type_display }} {% if sub_opinion.author_str or sub_opinion.author %}<span class="text-capitalize">({% if sub_opinion.author %}{{ sub_opinion.author.name_last }}{% else %}{{ sub_opinion.author_str }}{% endif %})</span>{% endif %}</a>
+                               data-toggle="tab">{{ sub_opinion.get_type_display|cut:"Opinion" }} {% if sub_opinion.author_str or sub_opinion.author %}<span class="text-capitalize">({% if sub_opinion.author %}{{ sub_opinion.author.name_last }}{% else %}{{ sub_opinion.author_str }}{% endif %})</span>{% endif %}</a>
                         </li>
                     {% endfor %}
                 </ul>

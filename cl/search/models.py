@@ -2749,12 +2749,12 @@ class Opinion(AbstractDateTimeModel):
     ON_THE_MERITS = "080onthemerits"
     ON_MOTION_TO_STRIKE = "090onmotiontostrike"
     OPINION_TYPES = (
-        (COMBINED, "Combined"),
-        (UNANIMOUS, "Unanimous"),
-        (LEAD, "Lead"),
-        (PLURALITY, "Plurality"),
-        (CONCURRENCE, "Concurrence"),
-        (CONCUR_IN_PART, "In Part"),
+        (COMBINED, "Combined Opinion"),
+        (UNANIMOUS, "Unanimous Opinion"),
+        (LEAD, "Lead Opinion"),
+        (PLURALITY, "Plurality Opinion"),
+        (CONCURRENCE, "Concurrence Opinion"),
+        (CONCUR_IN_PART, "In Part Opinion"),
         (DISSENT, "Dissent"),
         (ADDENDUM, "Addendum"),
         (REMITTUR, "Remittitur"),
