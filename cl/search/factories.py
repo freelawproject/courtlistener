@@ -192,7 +192,9 @@ class DocketEntryForDocketFactory(DjangoModelFactory):
     @classmethod
     def _create(cls, model_class, *args, **kwargs):
         """Override default docket"""
-        docket_id = kwargs.pop("parent_id", 1)
+        docket_id = kwargs.pop("parent_id", None)
+        if not docket_id:
+            return None
         kwargs["docket_id"] = docket_id
         manager = cls._get_manager(model_class)
         return manager.create(*args, **kwargs)
