@@ -3267,8 +3267,8 @@ class SEARCH_TYPES:
     ALL_TYPES = [OPINION, RECAP, ORAL_ARGUMENT, PEOPLE]
 
 
-class StubCase(AbstractDateTimeModel):
-    """A class representing a stub case"""
+class OpinionStub(AbstractDateTimeModel):
+    """A class representing a stub opinion"""
 
     case_name = models.TextField(
         help_text="The shortened name of the case", blank=True
@@ -3313,7 +3313,7 @@ class StubCase(AbstractDateTimeModel):
     docket_number = models.TextField(blank=True)
 
     citations_str = models.TextField(
-        help_text=("Raw value of citations from data"), blank=True
+        help_text="Raw value of citations from data", blank=True
     )
 
     citations = models.JSONField(
