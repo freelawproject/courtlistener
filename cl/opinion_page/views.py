@@ -4,6 +4,7 @@ from itertools import groupby
 from typing import Dict, Tuple, Union
 from urllib.parse import urlencode
 
+import natsort
 from django.contrib import messages
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
@@ -47,7 +48,6 @@ from cl.lib.search_utils import (
 from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_404
-from cl.lib.utils import alphanumeric_sort
 from cl.lib.view_utils import increment_view_count
 from cl.opinion_page.forms import (
     CitationRedirectorForm,
@@ -65,7 +65,6 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.search.views import do_search
-from cl.users.models import UserProfile
 
 
 def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
@@ -293,7 +292,8 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
 
     context.update(
         {
-            "parties": docket.parties.exists(),  # Needed to show/hide parties tab.
+            "parties": docket.parties.exists(),
+            # Needed to show/hide parties tab.
             "docket_entries": docket_entries,
             "sort_order_asc": sort_order_asc,
             "form": form,
@@ -698,6 +698,29 @@ def throw_404(request: HttpRequest, context: Dict) -> HttpResponse:
     )
 
 
+def get_prev_next_volumes(reporter: str, volume: str) -> tuple[int, int]:
+    """Get the volume before and after the current one.
+
+    :param reporter: The reporter where the volume is found
+    :param volume: The volume we're inspecting
+    :return Tuple of the volume number we have prior to the selected one, and
+    of the volume number after it.
+    """
+    volumes = list(
+        (
+            Citation.objects.filter(reporter=reporter)
+            .annotate(as_integer=Cast("volume", IntegerField()))
+            .values_list("as_integer", flat=True)
+            .distinct()
+            .order_by("as_integer")
+        )
+    )
+    index = volumes.index(int(volume))
+    volume_previous = volumes[index - 1] if index > 0 else None
+    volume_next = volumes[index + 1] if index + 1 < len(volumes) else None
+    return volume_next, volume_previous
+
+
 def reporter_or_volume_handler(
     request: HttpRequest, reporter: str, volume: str | None = None
 ) -> HttpResponse:
@@ -758,14 +781,9 @@ def reporter_or_volume_handler(
         )
 
     # Show all the cases for a volume-reporter dyad
-    cases_in_volume = (
-        OpinionCluster.objects.filter(
-            citations__reporter=reporter, citations__volume=volume
-        )
-        .annotate(cite_page=(F("citations__page")))
-        .order_by("cite_page")
-    )
-    cases_in_volume = alphanumeric_sort(cases_in_volume, "cite_page")
+    cases_in_volume = OpinionCluster.objects.filter(
+        citations__reporter=reporter, citations__volume=volume
+    ).order_by("date_filed")
 
     if not cases_in_volume:
         return throw_404(
@@ -779,18 +797,7 @@ def reporter_or_volume_handler(
             },
         )
 
-    volumes = list(
-        (
-            Citation.objects.filter(reporter=reporter)
-            .annotate(as_integer=Cast("volume", IntegerField()))
-            .values_list("as_integer", flat=True)
-            .distinct()
-            .order_by("as_integer")
-        )
-    )
-    index = volumes.index(int(volume))
-    volume_previous = volumes[index - 1] if index > 0 else None
-    volume_next = volumes[index + 1] if index + 1 < len(volumes) else None
+    volume_next, volume_previous = get_prev_next_volumes(reporter, volume)
 
     paginator = Paginator(cases_in_volume, 100, orphans=5)
     page = request.GET.get("page", 1)
@@ -858,19 +865,43 @@ def citation_handler(
     else:
         cluster_count = clusters.count()
 
-    if cluster_count == 0 and page.isdigit():
-        # Do a second pass for the closest opinion and check if we have
-        # a page cite that matches -- if it does give the requested opinion
-        possible_match = (
+    if cluster_count == 0:
+        # We didn't get an exact match on the volume/reporter/page. Perhaps it's a pincite.
+        # Try to find the citation immediately *before* this one in the same book. To do so,
+        # Get all the opinions from the book, sort them by page number (in Python, b/c pages
+        # can have letters), then find the citation just before the requested one.
+
+        possible_match = None
+
+        # Create a list of the closest opinion clusters id and page to the
+        # input citation
+        closest_opinion_clusters = list(
             OpinionCluster.objects.filter(
-                citations__reporter=reporter,
-                citations__volume=volume,
+                citations__reporter=reporter, citations__volume=volume
             )
-            .annotate(as_integer=Cast("citations__page", IntegerField()))
-            .exclude(as_integer__gte=page)
-            .order_by("-as_integer")
-            .first()
+            .annotate(cite_page=(F("citations__page")))
+            .values_list("id", "cite_page")
         )
+
+        # Create a temporal item and add it to the values list
+        citation_item = (0, page)
+        closest_opinion_clusters.append((0, page))
+
+        # Natural sort page numbers ascending order
+        sort_possible_matches = natsort.natsorted(
+            closest_opinion_clusters, key=lambda item: item[1]
+        )
+
+        # Find the position of the item that we added
+        citation_item_position = sort_possible_matches.index(citation_item)
+
+        if citation_item_position > 0:
+            # if the position is greater than 0, then the previous item in
+            # the list is the closest citation, we get the id of the
+            # previous item, and we get the object
+            possible_match = OpinionCluster.objects.get(
+                id=sort_possible_matches[citation_item_position - 1][0]
+            )
 
         if possible_match:
             # There may be different page cite formats that aren't yet

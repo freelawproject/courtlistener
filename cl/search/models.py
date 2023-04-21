@@ -25,6 +25,7 @@ from cl.lib.model_helpers import (
     make_upload_path,
 )
 from cl.lib.models import AbstractDateTimeModel, AbstractPDF, s3_warning_note
+from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
 from cl.lib.search_index_utils import (
     InvalidDocumentError,
     normalize_search_dicts,
@@ -55,34 +56,66 @@ class PRECEDENTIAL_STATUS:
     )
 
 
-SOURCES = (
-    ("C", "court website"),
-    ("R", "public.resource.org"),
-    ("CR", "court website merged with resource.org"),
-    ("L", "lawbox"),
-    ("LC", "lawbox merged with court"),
-    ("LR", "lawbox merged with resource.org"),
-    ("LCR", "lawbox merged with court and resource.org"),
-    ("M", "manual input"),
-    ("A", "internet archive"),
-    ("H", "brad heath archive"),
-    ("Z", "columbia archive"),
-    ("ZC", "columbia merged with court"),
-    ("ZLC", "columbia merged with lawbox and court"),
-    ("ZLR", "columbia merged with lawbox and resource.org"),
-    ("ZLCR", "columbia merged with lawbox, court, and resource.org"),
-    ("ZR", "columbia merged with resource.org"),
-    ("ZCR", "columbia merged with court and resource.org"),
-    ("ZL", "columbia merged with lawbox"),
-    ("U", "Harvard, Library Innovation Lab Case Law Access Project"),
-    ("CU", "court website merged with Harvard"),
-    ("D", "direct court input"),
-)
+class SOURCES:
+    COURT_WEBSITE = "C"
+    PUBLIC_RESOURCE = "R"
+    COURT_M_RESOURCE = "CR"
+    LAWBOX = "L"
+    LAWBOX_M_COURT = "LC"
+    LAWBOX_M_RESOURCE = "LR"
+    LAWBOX_M_COURT_RESOURCE = "LCR"
+    MANUAL_INPUT = "M"
+    INTERNET_ARCHIVE = "A"
+    BRAD_HEATH_ARCHIVE = "H"
+    COLUMBIA_ARCHIVE = "Z"
+    COLUMBIA_M_COURT = "ZC"
+    COLUMBIA_M_LAWBOX_COURT = "ZLC"
+    COLUMBIA_M_LAWBOX_RESOURCE = "ZLR"
+    COLUMBIA_M_LAWBOX_COURT_RESOURCE = "ZLCR"
+    COLUMBIA_M_RESOURCE = "ZR"
+    COLUMBIA_M_COURT_RESOURCE = "ZCR"
+    COLUMBIA_M_LAWBOX = "ZL"
+    HARVARD_CASELAW = "U"
+    COURT_M_HARVARD = "CU"
+    DIRECT_COURT_INPUT = "D"
+    NAMES = (
+        (COURT_WEBSITE, "court website"),
+        (PUBLIC_RESOURCE, "public.resource.org"),
+        (COURT_M_RESOURCE, "court website merged with resource.org"),
+        (LAWBOX, "lawbox"),
+        (LAWBOX_M_COURT, "lawbox merged with court"),
+        (LAWBOX_M_RESOURCE, "lawbox merged with resource.org"),
+        (LAWBOX_M_COURT_RESOURCE, "lawbox merged with court and resource.org"),
+        (MANUAL_INPUT, "manual input"),
+        (INTERNET_ARCHIVE, "internet archive"),
+        (BRAD_HEATH_ARCHIVE, "brad heath archive"),
+        (COLUMBIA_ARCHIVE, "columbia archive"),
+        (COLUMBIA_M_COURT, "columbia merged with court"),
+        (COLUMBIA_M_LAWBOX_COURT, "columbia merged with lawbox and court"),
+        (
+            COLUMBIA_M_LAWBOX_RESOURCE,
+            "columbia merged with lawbox and resource.org",
+        ),
+        (
+            COLUMBIA_M_LAWBOX_COURT_RESOURCE,
+            "columbia merged with lawbox, court, and resource.org",
+        ),
+        (COLUMBIA_M_RESOURCE, "columbia merged with resource.org"),
+        (
+            COLUMBIA_M_COURT_RESOURCE,
+            "columbia merged with court and resource.org",
+        ),
+        (COLUMBIA_M_LAWBOX, "columbia merged with lawbox"),
+        (
+            HARVARD_CASELAW,
+            "Harvard, Library Innovation Lab Case Law Access Project",
+        ),
+        (COURT_M_HARVARD, "court website merged with Harvard"),
+        (DIRECT_COURT_INPUT, "direct court input"),
+    )
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class OriginatingCourtInformation(AbstractDateTimeModel):
     """Lower court metadata to associate with appellate cases.
 
@@ -185,10 +218,7 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
         verbose_name_plural = "Originating Court Information"
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-    exclude=["view_count"],
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), exclude=["view_count"])
 class Docket(AbstractDateTimeModel):
     """A class to sit above OpinionClusters, Audio files, and Docket Entries,
     and link them together.
@@ -970,10 +1000,7 @@ class Docket(AbstractDateTimeModel):
             )
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-    obj_field=None,
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
 class DocketTags(Docket.tags.through):
     """A model class to track docket tags m2m relation"""
 
@@ -981,10 +1008,7 @@ class DocketTags(Docket.tags.through):
         proxy = True
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-    obj_field=None,
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
 class DocketPanel(Docket.panel.through):
     """A model class to track docket panel m2m relation"""
 
@@ -992,9 +1016,7 @@ class DocketPanel(Docket.panel.through):
         proxy = True
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class DocketEntry(AbstractDateTimeModel):
     docket = models.ForeignKey(
         Docket,
@@ -1103,10 +1125,7 @@ class DocketEntry(AbstractDateTimeModel):
         return None
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-    obj_field=None,
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
 class DocketEntryTags(DocketEntry.tags.through):
     """A model class to track docket entry tags m2m relation"""
 
@@ -1168,9 +1187,7 @@ class AbstractPacerDocument(models.Model):
         abstract = True
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
     """The model for Docket Documents and Attachments."""
 
@@ -1519,10 +1536,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         return normalize_search_dicts(out)
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-    obj_field=None,
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
 class RECAPDocumentTags(RECAPDocument.tags.through):
     """A model class to track recap document tags m2m relation"""
 
@@ -1530,9 +1544,7 @@ class RECAPDocumentTags(RECAPDocument.tags.through):
         proxy = True
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class BankruptcyInformation(AbstractDateTimeModel):
     docket = models.OneToOneField(
         Docket,
@@ -1575,9 +1587,7 @@ class BankruptcyInformation(AbstractDateTimeModel):
         return f"Bankruptcy Info for docket {self.docket_id}"
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Claim(AbstractDateTimeModel):
     docket = models.ForeignKey(
         Docket,
@@ -1692,10 +1702,7 @@ class Claim(AbstractDateTimeModel):
         )
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-    obj_field=None,
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
 class ClaimTags(Claim.tags.through):
     """A model class to track claim tags m2m relation"""
 
@@ -1703,9 +1710,7 @@ class ClaimTags(Claim.tags.through):
         proxy = True
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class ClaimHistory(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
     DOCKET_ENTRY = 1
     CLAIM_ENTRY = 2
@@ -1824,9 +1829,7 @@ class FederalCourtsQuerySet(models.QuerySet):
         return self.filter(jurisdictions__in=Court.TERRITORY_JURISDICTIONS)
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Court(models.Model):
     """A class to represent some information about each court, can be extended
     as needed."""
@@ -2079,9 +2082,7 @@ class ClusterCitationQuerySet(models.query.QuerySet):
         return clone
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class OpinionCluster(AbstractDateTimeModel):
     """A class representing a cluster of court opinions."""
 
@@ -2182,9 +2183,9 @@ class OpinionCluster(AbstractDateTimeModel):
     )
     source = models.CharField(
         help_text="the source of the cluster, one of: %s"
-        % ", ".join(["%s (%s)" % (t[0], t[1]) for t in SOURCES]),
+        % ", ".join(["%s (%s)" % (t[0], t[1]) for t in SOURCES.NAMES]),
         max_length=10,
-        choices=SOURCES,
+        choices=SOURCES.NAMES,
         blank=True,
     )
     procedural_history = models.TextField(
@@ -2593,10 +2594,7 @@ class OpinionCluster(AbstractDateTimeModel):
         return search_list
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-    obj_field=None,
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
 class OpinionClusterPanel(OpinionCluster.panel.through):
     """A model class to track opinion cluster panel m2m relation"""
 
@@ -2604,10 +2602,7 @@ class OpinionClusterPanel(OpinionCluster.panel.through):
         proxy = True
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-    obj_field=None,
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
 class OpinionClusterNonParticipatingJudges(
     OpinionCluster.non_participating_judges.through
 ):
@@ -2618,9 +2613,7 @@ class OpinionClusterNonParticipatingJudges(
         proxy = True
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Citation(models.Model):
     """A simple class to hold citations."""
 
@@ -2741,9 +2734,7 @@ def sort_cites(c):
         return 8
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Opinion(AbstractDateTimeModel):
     COMBINED = "010combined"
     UNANIMOUS = "015unamimous"
@@ -3030,10 +3021,7 @@ class Opinion(AbstractDateTimeModel):
         return normalize_search_dicts(out)
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-    obj_field=None,
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
 class OpinionJoinedBy(Opinion.joined_by.through):
     """A model class to track opinion joined_by m2m relation"""
 
@@ -3174,9 +3162,7 @@ class ParentheticalGroup(models.Model):
 TaggableType = TypeVar("TaggableType", Docket, DocketEntry, RECAPDocument)
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Tag(AbstractDateTimeModel):
     name = models.CharField(
         help_text="The name of the tag.",

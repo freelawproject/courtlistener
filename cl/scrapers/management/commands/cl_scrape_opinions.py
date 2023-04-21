@@ -30,6 +30,7 @@ from cl.scrapers.utils import (
 )
 from cl.search.models import (
     SEARCH_TYPES,
+    SOURCES,
     Citation,
     Court,
     Docket,
@@ -102,7 +103,7 @@ def make_objects(
         date_filed_is_approximate=item["date_filed_is_approximate"],
         case_name=item["case_names"],
         case_name_short=case_name_short,
-        source=item.get("cluster_source") or "C",
+        source=item.get("cluster_source") or SOURCES.COURT_WEBSITE,
         precedential_status=item["precedential_statuses"],
         nature_of_suit=item.get("nature_of_suit", ""),
         blocked=blocked,

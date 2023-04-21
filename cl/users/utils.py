@@ -89,15 +89,9 @@ def convert_to_stub_account(user: User) -> User:
 def delete_user_assets(user: User) -> None:
     """Delete any associated data from a user account and profile"""
 
-    # Nuke history objects related to the user first.
-    DocketAlertEvent.objects.filter(user_id=user.pk).delete()
-    AlertEvent.objects.filter(user_id=user.pk).delete()
-    NoteEvent.objects.filter(user_id=user.pk).delete()
-    UserTagEvent.objects.filter(user_id=user.pk).delete()
+    # Store user_tags before deleting the user-related objects.
     user_tags = user.user_tags.all()
     user_tags_ids = [user_tag.pk for user_tag in user_tags]
-    DocketTagEvent.objects.filter(tag__id__in=user_tags_ids).delete()
-    WebhookHistoryEvent.objects.filter(user_id=user.pk).delete()
 
     user.alerts.all().delete()
     user.webhooks.all().delete()
@@ -106,6 +100,15 @@ def delete_user_assets(user: User) -> None:
     user_tags.delete()
     user.monthly_donations.all().update(enabled=False)
     user.scotus_maps.all().update(deleted=True)
+
+    # After deleting user-related objects, nuke history objects related to the
+    # user so that events generated due to delete() are also removed.
+    DocketAlertEvent.objects.filter(user_id=user.pk).delete()
+    AlertEvent.objects.filter(user_id=user.pk).delete()
+    NoteEvent.objects.filter(user_id=user.pk).delete()
+    UserTagEvent.objects.filter(user_id=user.pk).delete()
+    DocketTagEvent.objects.filter(tag__id__in=user_tags_ids).delete()
+    WebhookHistoryEvent.objects.filter(user_id=user.pk).delete()
 
 
 emails: Dict[str, EmailType] = {

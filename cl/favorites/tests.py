@@ -355,11 +355,11 @@ class FavoritesTest(TestCase):
         test_tag.description = "Description updated"
         test_tag.save()
 
-        # Revert object to previous change, we use the second-to-last because
-        # the latest event always contains the current version of the model
+        # Revert object to previous change, we use the last result because it
+        # always contains the latest change
         # Trying to revert objects with untracked fields throws an exception
         with self.assertRaises(RuntimeError):
-            test_tag.event.order_by("-pgh_id")[1].revert()
+            test_tag.event.order_by("-pgh_id")[0].revert()
 
     def test_revert_tracked_model(self):
         # We can revert an object being tracked with django-pghistory
@@ -374,9 +374,9 @@ class FavoritesTest(TestCase):
         # Check that we updated the value
         self.assertEqual(favorite_obj.name, "Updated alert name")
 
-        # Revert to previous event object, we use the second-to-last because
-        # the latest event always contains the current version of the model
-        favorite_obj = favorite_obj.event.order_by("-pgh_id")[1].revert()
+        # Revert object to previous change, we use the last result because it
+        # always contains the latest change
+        favorite_obj = favorite_obj.event.order_by("-pgh_id")[0].revert()
         favorite_obj.refresh_from_db()
 
         # Check that the object name was reverted to original name
