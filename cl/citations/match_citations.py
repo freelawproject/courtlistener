@@ -142,47 +142,98 @@ def search_db_for_fullcitation(
         "fq": [
             "status:Precedential",  # Non-precedential documents aren't cited
         ],
-        "caller": "citation.match_citations.match_citation",
+        "caller": "citations.match_citations.search_db_for_fullcitation",
     }
+
+    # Filter out self-cites
     if full_citation.citing_opinion is not None:
-        # Eliminate self-cites.
         main_params["fq"].append(f"-id:{full_citation.citing_opinion.pk}")
-    # Set up filter parameters
+
+    # Filter by court if possible
+    if full_citation.metadata.court:
+        main_params["fq"].append(f"court_exact:{full_citation.metadata.court}")
+
+    # Filter by citation's known year if possible
     if full_citation.year:
         start_year = end_year = full_citation.year
     else:
-        start_year, end_year = get_years_from_reporter(full_citation)
+        start_year = end_year = None
+
+    # Take 1: If the citation is missing its page, the best we can do is try
+    #   a case name query
+    if full_citation.groups["page"] is None:
+        # If we have a defendant and year, search
+        if (
+            full_citation.citing_opinion is not None
+            and full_citation.metadata.defendant
+            and (end_year or full_citation.citing_opinion.cluster.date_filed)
+        ):
+            # Unless already known, set the date range to be within five years
+            # of the citing opinion's filing year to guard against false
+            # positives. (Citations missing their pages are likely to have
+            # been cited pretty recently, relative to the citing opinion year.)
+            if not end_year:
+                end_year = full_citation.citing_opinion.cluster.date_filed.year
+                start_year = end_year - 5
+
+            # Update the filter params
+            main_params["fq"].append(
+                f"dateFiled:{build_date_range(start_year, end_year)}"
+            )
+
+            return case_name_query(
+                si, main_params, full_citation, full_citation.citing_opinion
+            )
+
+        # If not, don't search because there will be too many false positives
+        # with only a volume and reporter to go off of
+        else:
+            return []
+
+    # Take 2: If the citation *does* have its full page information,
+    #   we can use that information to perform a citation query first
+    else:
+        main_params["fq"].append(
+            f'citation:("{full_citation.corrected_citation()}")',
+        )
+
+        # Unless already known, set the date range to simply be the range
+        # of years covered by the reporter
+        if not end_year:
+            start_year, end_year = get_years_from_reporter(full_citation)
+
+        # Tighten the end year date if possible
         if (
             full_citation.citing_opinion is not None
             and full_citation.citing_opinion.cluster.date_filed
         ):
             end_year = min(
-                end_year, full_citation.citing_opinion.cluster.date_filed.year
+                end_year,
+                full_citation.citing_opinion.cluster.date_filed.year,
             )
-    main_params["fq"].append(
-        f"dateFiled:{build_date_range(start_year, end_year)}"
-    )
 
-    if full_citation.metadata.court:
-        main_params["fq"].append(f"court_exact:{full_citation.metadata.court}")
+        # Update the filter params
+        main_params["fq"].append(
+            f"dateFiled:{build_date_range(start_year, end_year)}",
+        )
 
-    # Take 1: Use a phrase query to search the citation field.
-    main_params["fq"].append(
-        f'citation:("{full_citation.corrected_citation()}")'
-    )
-    results = si.query().add_extra(**main_params).execute()
-    si.conn.http_connection.close()
-    if len(results) == 1:
-        return results
-    if len(results) > 1:
-        if (
-            full_citation.citing_opinion is not None
-            and full_citation.metadata.defendant
-        ):  # Refine using defendant, if there is one
-            results = case_name_query(
-                si, main_params, full_citation, full_citation.citing_opinion
-            )
+        results = si.query().add_extra(**main_params).execute()
+        si.conn.http_connection.close()
+        if len(results) == 1:
             return results
+        if len(results) > 1:
+            # Refine using the citation's case name, if it at least knows who
+            # the defendant is
+            if (
+                full_citation.citing_opinion is not None
+                and full_citation.metadata.defendant
+            ):
+                return case_name_query(
+                    si,
+                    main_params,
+                    full_citation,
+                    full_citation.citing_opinion,
+                )
 
     # Give up.
     return []

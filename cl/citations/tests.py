@@ -89,6 +89,12 @@ class CitationTextTest(SimpleTestCase):
              'citation no-link">123\nU.S. 456</span><pre class="inline">, '
              'upholding foo bar</pre>'),
 
+            # Full citation missing a page number
+            ('asdf John v. Doe, 123 U.S. __, upholding foo bar',
+             '<pre class="inline">asdf John v. Doe, </pre><span class="'
+             'citation no-link">123 U.S. __</span><pre class="inline">, '
+             'upholding foo bar</pre>'),
+
             # Basic short form citation
             ('existing text asdf, 515 U.S., at 240. foobar',
              '<pre class="inline">existing text asdf, </pre><span class="'
@@ -328,6 +334,12 @@ class CitationObjectTest(IndexedSolrTestCase):
                 ),  # Year must equal text in citation4
             ),
         )
+        cls.citation1a = CitationWithParentsFactory.create(  # Extra citation for same OpinionCluster as above
+            volume="2",
+            reporter="S.Ct.",
+            page="2",
+            cluster=OpinionCluster.objects.get(pk=cls.citation1.cluster_id),
+        )
 
         # Citation 2
         cls.citation2 = CitationWithParentsFactory.create(
@@ -355,6 +367,10 @@ class CitationObjectTest(IndexedSolrTestCase):
             cluster=OpinionClusterFactoryWithChildrenAndParents(
                 docket=DocketFactory(court=court_scotus),
                 case_name="Lorem v. Ipsum",
+                date_filed=date.today()
+                - timedelta(
+                    days=365
+                ),  # Must be within 5 years of opinion5 for missing page test
             ),
         )
 
@@ -366,6 +382,12 @@ class CitationObjectTest(IndexedSolrTestCase):
             cluster=OpinionClusterFactoryWithChildrenAndParents(
                 docket=DocketFactory(court=court_scotus),
                 case_name="Abcdef v. Ipsum",
+                date_filed=OpinionCluster.objects.get(
+                    pk=cls.citation1.cluster_id
+                ).date_filed
+                + timedelta(
+                    days=1
+                ),  # Must be after citation1 date for test_no_duplicate_parentheticals_from_parallel_cites test
                 sub_opinions=RelatedFactory(
                     OpinionWithChildrenFactory,
                     factory_related_name="cluster",
@@ -386,7 +408,7 @@ class CitationObjectTest(IndexedSolrTestCase):
                 sub_opinions=RelatedFactory(
                     OpinionWithChildrenFactory,
                     factory_related_name="cluster",
-                    plain_text="Blah blah Foo v. Bar 1 U.S. 1, 77 blah blah. Asdf asdf Qwerty v. Uiop 2 F.3d 2, 555. Also check out Foo, 1 U.S. at 99 (holding that crime is illegal). Then let's cite Qwerty, supra, at 666 (noting that CourtListener is a great tool and everyone should use it). See also Foo, supra, at 101 as well. Another full citation is Lorem v. Ipsum 1 U. S. 50. Quoting Qwerty, “something something”, 2 F.3d 2, at 59. This case is similar to Fake, supra, and Qwerty supra, as well. This should resolve to the foregoing. Ibid. This should also convert appropriately, see Id., at 57. This should fail to resolve because the reporter and citation is ambiguous, 1 U. S., at 51. However, this should succeed, Lorem, 1 U.S., at 52.",
+                    plain_text="Blah blah Foo v. Bar 1 U.S. 1, 77 blah blah. Asdf asdf Qwerty v. Uiop 2 F.3d 2, 555. Also check out Foo, 1 U.S. at 99 (holding that crime is illegal). Then let's cite Qwerty, supra, at 666 (noting that CourtListener is a great tool and everyone should use it). See also Foo, supra, at 101 as well. Another full citation is Lorem v. Ipsum 1 U. S. 50. Same with missing page Lorem v. Ipsum 1 U.S. ___, __ blah blah. Quoting Qwerty, “something something”, 2 F.3d 2, at 59. This case is similar to Fake, supra, and Qwerty supra, as well. This should resolve to the foregoing. Ibid. This should also convert appropriately, see Id., at 57. This should fail to resolve because the reporter and citation is ambiguous, 1 U. S., at 51. However, this should succeed, Lorem, 1 U.S., at 52.",
                 ),
             ),
         )
@@ -410,6 +432,14 @@ class CitationObjectTest(IndexedSolrTestCase):
             reporter_found="U.S.",
             metadata={"court": "scotus"},
         )
+        full1_without_page = case_citation(
+            volume="1",
+            reporter="U.S.",
+            page=None,
+            index=1,
+            reporter_found="U.S.",
+            metadata={"court": "scotus", "defendant": "Bar"},
+        )
         full2 = case_citation(
             volume="2",
             reporter="F.3d",
@@ -425,6 +455,34 @@ class CitationObjectTest(IndexedSolrTestCase):
             index=1,
             reporter_found="U.S.",
             metadata={"court": "scotus"},
+        )
+        full3_without_page = case_citation(
+            volume="1",
+            reporter="U.S.",
+            page=None,
+            index=1,
+            reporter_found="U.S.",
+            metadata={"court": "scotus"},
+        )
+        full3_without_page_but_with_defendant = case_citation(
+            volume="1",
+            reporter="U.S.",
+            page=None,
+            index=1,
+            reporter_found="U.S.",
+            metadata={"court": "scotus", "defendant": "Ipsum"},
+        )
+        full3_without_page_but_with_year = case_citation(
+            volume="1",
+            reporter="U.S.",
+            page=None,
+            index=1,
+            reporter_found="U.S.",
+            metadata={
+                "court": "scotus",
+                "defendant": "Ipsum",
+                "year": opinion3.cluster.date_filed.year,  # Must equal year of opinion3
+            },
         )
         full4 = case_citation(
             volume="1",
@@ -515,8 +573,31 @@ class CitationObjectTest(IndexedSolrTestCase):
             ([full1], {opinion1: [full1]}),
             # Test matching multiple full citations to different documents
             ([full1, full2], {opinion1: [full1], opinion2: [full2]}),
-            # Test matching an unmatchacble full citation
+            # Test matching an unmatchable full citation
             ([full_na], {NO_MATCH_RESOURCE: [full_na]}),
+            # Test matching a full citation with a missing page. We expect this
+            # to fail since there's not enough information.
+            ([full3_without_page], {NO_MATCH_RESOURCE: [full3_without_page]}),
+            # Test matching a full citation with a missing page, but with a
+            # useful defendant, and the year given by the citing opinion
+            (
+                [full3_without_page_but_with_defendant],
+                {opinion3: [full3_without_page_but_with_defendant]},
+            ),
+            # Test matching a full citation with a missing page, but with a
+            # useful defendant, and the year given by the citation itself
+            (
+                [full3_without_page_but_with_year],
+                {opinion3: [full3_without_page_but_with_year]},
+            ),
+            # Test matching a full citation with a missing page when the cited
+            # opinion's date is not within 5 years of the citing opinion's
+            # date. We expect this match to fail since the years are too far
+            # away and it may simply be a false positive.
+            (
+                [full1_without_page],
+                {NO_MATCH_RESOURCE: [full1_without_page]},
+            ),
             # Test resolving a supra citation
             ([full1, supra1], {opinion1: [full1, supra1]}),
             # Test resolving a supra citation when its antecedent guess matches
@@ -579,6 +660,15 @@ class CitationObjectTest(IndexedSolrTestCase):
             (
                 [full1, full_na, id],
                 {opinion1: [full1], NO_MATCH_RESOURCE: [full_na, id]},
+            ),
+            # Test resolving an Id. citation when the previous citation match
+            # failed because it was missing a page. We expect the Id. citation
+            # to fail.
+            (
+                [full3_without_page, id],
+                {
+                    NO_MATCH_RESOURCE: [full3_without_page],
+                },
             ),
             # Test resolving an Id. citation when the previous citation is to a
             # non-opinion document. Since we can't match those documents (yet),
@@ -658,10 +748,11 @@ class CitationObjectTest(IndexedSolrTestCase):
         # test all combinations, but this test case is made to be deliberately
         # complex, in an effort to "trick" the algorithm. Cited opinions:
         # opinion1: 1 FullCaseCitation, 1 ShortCaseCitation, 1 SupraCitation (depth=3)
-        # (case name Foo)
+        #   (case name Foo)
         # opinion2: 1 FullCaseCitation, 2 IdCitation (one Id. and one Ibid.),
         #   1 ShortCaseCitation, 2 SupraCitation (depth=6) (case name Qwerty)
-        # opinion3: 1 FullCaseCitation, 1 ShortCaseCitation (depth=2) (case name Lorem)
+        # opinion3: 2 FullCaseCitation (one with missing page),
+        #   1 ShortCaseCitation (depth=3) (case name Lorem)
         opinion1 = Opinion.objects.get(cluster__pk=self.citation1.cluster_id)
         opinion2 = Opinion.objects.get(cluster__pk=self.citation2.cluster_id)
         opinion3 = Opinion.objects.get(cluster__pk=self.citation3.cluster_id)
@@ -675,7 +766,7 @@ class CitationObjectTest(IndexedSolrTestCase):
         citation_test_pairs = [
             (opinion1, 3),
             (opinion2, 6),
-            (opinion3, 2),
+            (opinion3, 3),
         ]
 
         for cited, depth in citation_test_pairs:
