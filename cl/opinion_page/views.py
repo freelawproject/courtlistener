@@ -453,25 +453,59 @@ def view_recap_document(
             attachment_number=att_num,
         ).order_by("pk")[0]
 
-        # Check if the user has requested automatic redirection to the document
-        rd_download_redirect = request.GET.get("redirect_to_download", False)
-        redirect_or_modal = request.GET.get("redirect_or_modal", False)
-        if rd_download_redirect or redirect_or_modal:
-            # Check if the document is available from CourtListener and
-            # if it is, redirect to the local document
-            # if it isn't, if pacer_url is available and
-            # rd_download_redirect is True, redirect to PACER. If redirect_or_modal
-            # is True set redirect_to_pacer_modal to True to open the modal.
-            if rd.is_available:
-                return HttpResponseRedirect(rd.filepath_local.url)
-            else:
-                if rd.pacer_url and rd_download_redirect:
-                    return HttpResponseRedirect(rd.pacer_url)
-                if rd.pacer_url and redirect_or_modal:
-                    redirect_to_pacer_modal = True
-
     except IndexError:
+        # Unable to find the docket entry the normal way. In appellate courts, this
+        # can be because the main document was converted to an attachment, leaving no
+        # main document behind. See:
+        #
+        # https://github.com/freelawproject/courtlistener/pull/2413
+        #
+        # When this happens, try redirecting to the first attachment for the entry,
+        # if it exists.
+        if att_num:
+            raise Http404("No RECAPDocument matches the given query.")
+
+        # check if the main document was converted to an attachment and
+        # if it was, redirect the user to the attachment page
+        rd = RECAPDocument.objects.filter(
+            docket_entry__docket__id=docket_id,
+            document_number=doc_num,
+            attachment_number=1,
+        ).first()
+        if rd:
+            # Get the URL to the attachment page and use the querystring
+            # if the request included one
+            attachment_page = reverse(
+                "view_recap_attachment",
+                kwargs={
+                    "docket_id": docket_id,
+                    "doc_num": doc_num,
+                    "att_num": 1,
+                    "slug": slug,
+                },
+            )
+            if request.GET.urlencode():
+                attachment_page += f"?{request.GET.urlencode()}"
+            return HttpResponseRedirect(attachment_page)
+
         raise Http404("No RECAPDocument matches the given query.")
+
+    # Check if the user has requested automatic redirection to the document
+    rd_download_redirect = request.GET.get("redirect_to_download", False)
+    redirect_or_modal = request.GET.get("redirect_or_modal", False)
+    if rd_download_redirect or redirect_or_modal:
+        # Check if the document is available from CourtListener and
+        # if it is, redirect to the local document
+        # if it isn't, if pacer_url is available and
+        # rd_download_redirect is True, redirect to PACER. If redirect_or_modal
+        # is True set redirect_to_pacer_modal to True to open the modal.
+        if rd.is_available:
+            return HttpResponseRedirect(rd.filepath_local.url)
+        else:
+            if rd.pacer_url and rd_download_redirect:
+                return HttpResponseRedirect(rd.pacer_url)
+            if rd.pacer_url and redirect_or_modal:
+                redirect_to_pacer_modal = True
 
     title = make_rd_title(rd)
     rd = make_thumb_if_needed(request, rd)

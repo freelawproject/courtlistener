@@ -26,6 +26,13 @@ from cl.opinion_page.forms import CourtUploadForm
 from cl.opinion_page.views import get_prev_next_volumes, make_docket_title
 from cl.people_db.factories import PersonFactory, PositionFactory
 from cl.people_db.models import Person
+from cl.recap.factories import (
+    AppellateAttachmentFactory,
+    AppellateAttachmentPageFactory,
+    DocketEntriesDataFactory,
+    DocketEntryDataFactory,
+)
+from cl.recap.mergers import add_docket_entries, merge_attachment_page_data
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -74,6 +81,62 @@ class SimpleLoadTest(TestCase):
         )
         response = self.client.get(path)
         self.assertEqual(response.status_code, HTTP_200_OK)
+
+
+class DocumentPageRedirection(TestCase):
+    """
+    Test to make sure the document page of appellate entries redirect users
+    to the attachment page if the main document got converted into an attachment
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="ca1", jurisdiction="F")
+        cls.docket = DocketFactory(
+            court=cls.court, source=Docket.RECAP, pacer_case_id="104490"
+        )
+        cls.de_data = DocketEntriesDataFactory(
+            docket_entries=[
+                DocketEntryDataFactory(
+                    pacer_doc_id="288651",
+                    document_number=1,
+                )
+            ],
+        )
+        add_docket_entries(cls.docket, cls.de_data["docket_entries"])
+
+        cls.att_data = AppellateAttachmentPageFactory(
+            attachments=[
+                AppellateAttachmentFactory(
+                    attachment_number=1, pacer_doc_id="288651"
+                ),
+                AppellateAttachmentFactory(),
+            ],
+            pacer_doc_id="288651",
+            pacer_case_id="104490",
+        )
+        merge_attachment_page_data(
+            cls.court,
+            cls.att_data["pacer_case_id"],
+            cls.att_data["pacer_doc_id"],
+            None,
+            "",
+            cls.att_data["attachments"],
+        )
+
+    def test_redirect_to_attachment_page(self) -> None:
+        """Does the page redirect to the attachment page?"""
+        path = reverse(
+            "view_recap_document",
+            kwargs={
+                "docket_id": self.docket.pk,
+                "doc_num": 1,
+                "slug": self.docket.slug,
+            },
+        )
+        r = self.client.get(path, follow=True)
+        self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
+        self.assertEqual(r.status_code, HTTP_200_OK)
 
 
 class CitationRedirectorTest(TestCase):
