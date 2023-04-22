@@ -2,7 +2,6 @@ import random
 import re
 
 from django import template
-from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.template import Context
 from django.utils.formats import date_format
@@ -169,43 +168,19 @@ def citation(obj, fmt=None) -> SafeString:
         ecf = obj.entry_number
     else:
         raise NotImplementedError(f"Object not recongized in {__name__}")
-    if not fmt:
-        fmt = settings.DEFAULT_CITE_FORMAT
-    # for now we don't know what to use as reporter
-    reporter = ""
+
+    # We want to build a citation that follows the Bluebook format as much
+    # as possible.  For documents from a case that looks like:
+    #   name_bb, case_bb, (court_bb date_bb) ECF No. {ecf}"
+    # If this is a citation to just a docket then we leave off the ECF number
+    # For opinions there is no need as the title of the block IS the citation
     if date_of_interest:
         date_of_interest = date_of_interest.strftime("%b %d, %Y")
-    if not docket.court.citation_string:
-        # remove all references to court
-        fmt = re.sub(r"\{court.*?\}\s*", "", fmt)
-    if not date_of_interest:
-        # remove all references to date
-        fmt = re.sub(r"\{date.*?\}\s*", "", fmt)
-    if not reporter:
-        # remove all references to reporter
-        fmt = re.sub(r"\{reporter.*?\}\s*", "", fmt)
-    if not ecf:
-        # remove all references to ecf
-        fmt = re.sub(r"\{ecf.*?\}\s*", "", fmt)
-    fmt = re.sub(r"\(\s*?\)", "", fmt)  # remove empty ()
-    fmt = re.sub(
-        r"\s\s+", " ", fmt
-    )  # change multiple spaces to a single space
-    fmt = re.sub(r",\s?,+", ",", fmt)  # change double comma to a single comma
-    fmt = re.sub(r"\s+$", "", fmt)  # remove trailing whitespace
-    fmt = re.sub(r",+$", "", fmt)  # remove trailing commas
-    return mark_safe(
-        fmt.format(
-            name=docket.case_name,
-            name_bb=docket.case_name,
-            name_full=docket.case_name_full,
-            name_short=docket.case_name_short,
-            case_bb=f"No. {docket.docket_number}",
-            reporter="",
-            court_bb=docket.court.citation_string,
-            court_short=docket.court.short_name,
-            court_full=docket.court.full_name,
-            date_bb=date_of_interest,
-            ecf_bb=f"ECF {ecf}",
-        )
-    )
+    result = f"{docket.case_name}, {docket.docket_number}, ("
+    result = result + docket.court.citation_string
+    if date_of_interest:
+        result = f"{result} {date_of_interest}"
+    result = f"{result})"
+    if ecf:
+        result = f"{result} ECF No. {ecf}"
+    return result
