@@ -4,73 +4,63 @@
   {% if page_obj.has_other_pages %}
     <div class="well v-offset-above-3 hidden-print">
       <div class="row">
-	      <div class="col-xs-2">
+	      <div class="col-xs-3">
           {% if page_obj.has_previous %}
             {% if not hide_first %}
               <a href="?{{ get_string }}page=1"
-                 rel="first" class="btn btn-default" >
+                 rel="first" class="hidden-xs btn btn-default" >
                 <i class="fa fa-caret-left no-underline" ></i>
                 <i class="fa fa-caret-left no-underline" ></i>
-			          <span class="hidden-xs hidden-md">First</span>
+			          <span class="">First</span>
               </a>
             {% endif %}
             <a href="?{{ get_string }}page={{ page_obj.previous_page_number }}"
                rel="prev"
                class="btn btn-default" >
               <i class="fa fa-caret-left no-underline" ></i>
-			        <span class="hidden-xs hidden-md">Prev.</span>
+			        <span class="hidden-xs">Prev.</span>
             </a>
           {% else %}
             {% if not hide_first %}
-              <span class="btn btn-default" >
+              <span class="hidden-xs btn btn-default" >
                 <i class="fa fa-caret-left no-underline" ></i>
                 <i class="fa fa-caret-left no-underline" ></i>
-			          <span class="hidden-xs hidden-md">First</span>
+			          <span class="">First</span>
               </span>
             {% endif %}
             <span class="btn btn-default" >
               <i class="fa fa-caret-left no-underline" ></i>
-			        <span class="hidden-xs hidden-md">Prev.</span>
+			        <span class="hidden-xs">Prev.</span>
             </span>
           {% endif %}
         </div>
-        <div class="col-xs-8 text-center">
-          {% if not hide_numbers %}
-            {% for page in page_obj|page_prev_range %}
-              <a class="btn btn-default" href="?{{ get_string }}page={{ page }}">{{page|intcomma}}</a>
-            {% endfor %}
-            <span class="btn btn-default disabled"> {{ page_obj.number }}</span>
-            {% for page in page_obj|page_next_range %}
-              <a class="btn btn-default" href="?{{ get_string }}page={{ page }}">{{page|intcomma}}</a>
-            {% endfor %}
-          {% else %}
-            <span class="hidden-xs" >Page</span> {{ page_obj.number|intcomma }} of {{ page_obj.paginator.num_pages|intcomma }}
-          {% endif %}
+        <div class="col-xs-6 text-center large">
+          <span class="hidden-xs" >Page</span> {{ page_obj.number|intcomma }} of {{ page_obj.paginator.num_pages|intcomma }}
         </div>
-        <div class="col-xs-2 text-right" >
+        <div class="col-xs-3 text-right" >
           {% if page_obj.has_next %}
             <a href="?{{ get_string }}page={{ page_obj.next_page_number }}"
                rel="next"
                class="btn btn-default" >
-			        <span class="hidden-xs hidden-md">Next</span>
+			        <span class="hidden-xs">Next</span>
               <i class="fa fa-caret-right no-underline" ></i>
             </a>
             {% if not hide_last %}
               <a href="?{{ get_string }}page={{ page_obj.paginator.num_pages }}"
-                 rel="last" class="btn btn-default" >
-			          <span class="hidden-xs hidden-md">Last</span>
+                 rel="last" class="hidden-xs btn btn-default" >
+			          <span class="">Last</span>
                 <i class="fa fa-caret-right no-underline" ></i>
                 <i class="fa fa-caret-right no-underline" ></i>
               </a>
             {% endif %}
           {% else %}
             <span class="btn btn-default" >
-			        <span class="hidden-xs hidden-md">Next</span>
+			        <span class="hidden-xs">Next</span>
               <i class="fa fa-caret-right no-underline" ></i>
             </span>
             {% if not hide_last %}
-              <span class="btn btn-default" >
-			          <span class="hidden-xs hidden-md">Last</span>
+              <span class="hidden-xs btn btn-default" >
+			          <span class="">Last</span>
                 <i class="fa fa-caret-right no-underline" ></i>
                 <i class="fa fa-caret-right no-underline" ></i>
               </span>

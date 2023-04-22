@@ -123,22 +123,6 @@ def random_int(a: int, b: int) -> int:
     return random.randint(a, b)
 
 
-@register.filter
-def page_prev_range(page_obj, num=5):
-    if not page_obj.has_previous():
-        return ""
-    first = max(page_obj.number - num, 1)
-    return range(first, page_obj.number)
-
-
-@register.filter
-def page_next_range(page_obj, num=5):
-    if not page_obj.has_next():
-        return ""
-    last = min(page_obj.paginator.num_pages, page_obj.number + num)
-    return range(page_obj.number + 1, last + 1)
-
-
 # sourced from: https://stackoverflow.com/questions/2272370/sortable-table-columns-in-django
 @register.simple_tag
 def url_replace(request, value):
