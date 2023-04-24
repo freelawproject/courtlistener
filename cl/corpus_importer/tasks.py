@@ -2,6 +2,7 @@ import copy
 import logging
 import os
 import shutil
+import time
 from datetime import date
 from io import BytesIO
 from tempfile import NamedTemporaryFile
@@ -390,12 +391,14 @@ def get_and_save_free_document_report(
             nature_of_suit=row.nature_of_suit,
             cause=row.cause,
         )
+        # Wait for 0.5 seconds before creating the next row.
+        time.sleep(0.5)
 
     return PACERFreeDocumentLog.SCRAPE_SUCCESSFUL
 
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
-@throttle_task("2/s", key="court_id")
+@throttle_task("1/2s", key="court_id")
 def process_free_opinion_result(
     self,
     row_pk: int,
@@ -546,7 +549,7 @@ def process_free_opinion_result(
     interval_step=5,
     ignore_result=True,
 )
-@throttle_task("1/s", key="court_id")
+@throttle_task("1/4s", key="court_id")
 def get_and_process_free_pdf(
     self: Task,
     data: TaskData,
