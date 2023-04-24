@@ -377,8 +377,9 @@ def get_and_save_free_document_report(
             return PACERFreeDocumentLog.SCRAPE_FAILED
         raise self.retry(exc=exc, countdown=5)
 
+    document_rows_to_create = []
     for row in results:
-        PACERFreeDocumentRow.objects.create(
+        document_row = PACERFreeDocumentRow(
             court_id=row.court_id,
             pacer_case_id=row.pacer_case_id,
             docket_number=row.docket_number,
@@ -391,14 +392,16 @@ def get_and_save_free_document_report(
             nature_of_suit=row.nature_of_suit,
             cause=row.cause,
         )
-        # Wait for 0.5 seconds before creating the next row.
-        time.sleep(0.5)
+        document_rows_to_create.append(document_row)
+
+    # Create PACERFreeDocumentRow in bulk
+    PACERFreeDocumentRow.objects.bulk_create(document_rows_to_create)
 
     return PACERFreeDocumentLog.SCRAPE_SUCCESSFUL
 
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
-@throttle_task("1/2s", key="court_id")
+@throttle_task("1/4s", key="court_id")
 def process_free_opinion_result(
     self,
     row_pk: int,
@@ -549,7 +552,7 @@ def process_free_opinion_result(
     interval_step=5,
     ignore_result=True,
 )
-@throttle_task("1/4s", key="court_id")
+@throttle_task("1/6s", key="court_id")
 def get_and_process_free_pdf(
     self: Task,
     data: TaskData,
