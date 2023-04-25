@@ -338,10 +338,6 @@ function copy_text(selector_id) {
   text_area.select();
   navigator.clipboard.writeText(text_area.value);
 }
-function copy_element_text(selector_id) {
-  let elm = document.getElementById(selector_id)
-  navigator.clipboard.writeText(elm.textContent)
-}
 
 /*
   Disable the signup form submit button on submit to avoid repeated submissions.
