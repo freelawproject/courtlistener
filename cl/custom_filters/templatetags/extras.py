@@ -1,5 +1,4 @@
 import random
-import re
 
 from django import template
 from django.core.exceptions import ValidationError
