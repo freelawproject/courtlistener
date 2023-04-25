@@ -1,3 +1,4 @@
+import logging
 import string
 
 from django.db.utils import IntegrityError
@@ -29,6 +30,8 @@ from cl.search.models import (
 )
 from cl.tests.providers import LegalProvider
 
+logger = logging.getLogger(__name__)
+
 Faker.add_provider(LegalProvider)
 
 cnt = CaseNameTweaker()
@@ -56,7 +59,7 @@ class CourtFactory(DjangoModelFactory):
                 obj.save()
                 return obj
             except IntegrityError as exp:
-                print(f"Unexpected {exp=}, {type(exp)=}")
+                logger.info(f"Unexpected {exp=}, {type(exp)=}")
                 kwargs["position"] = Faker(
                     "pyfloat", positive=True, right_digits=4, left_digits=3
                 ).evaluate(None, None, {"locale": None})
