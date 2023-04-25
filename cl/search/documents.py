@@ -1,6 +1,8 @@
 from django.conf import settings
 from django_elasticsearch_dsl import Document, Index, fields
 
+from cl.audio.models import Audio
+from cl.lib.utils import deepgetattr
 from cl.search.models import Citation, ParentheticalGroup
 
 # Define parenthetical elasticsearch index
@@ -109,3 +111,47 @@ class ParentheticalGroupDocument(Document):
 
     def prepare_status(self, instance):
         return instance.opinion.cluster.get_precedential_status_display()
+
+
+# Define oral arguments elasticsearch index
+oral_arguments_index = Index("oral_arguments")
+oral_arguments_index.settings(
+    number_of_shards=settings.ELASTICSEARCH_NUMBER_OF_SHARDS,
+    number_of_replicas=settings.ELASTICSEARCH_NUMBER_OF_REPLICAS,
+)
+
+
+@oral_arguments_index.document
+class AudioDocument(Document):
+    caseName = fields.TextField(attr="case_name")
+    court = fields.KeywordField(attr="docket.court.full_name")
+    court_id = fields.KeywordField(attr="docket.court.pk")
+    docket_id = fields.IntegerField(attr="docket.pk")
+    dateArgued = fields.DateField(attr="docket.date_argued")
+    dateReargued = fields.DateField(attr="docket.date_reargued")
+    dateReargumentDenied = fields.DateField(
+        attr="docket.date_reargument_denied"
+    )
+    docketNumber = fields.KeywordField(attr="docket.docket_number")
+    docket_slug = fields.KeywordField(attr="docket.slug")
+    duration = fields.IntegerField(attr="duration")
+    download_url = fields.KeywordField(attr="download_url")
+    file_size_mp3 = fields.IntegerField()
+    id = fields.IntegerField(attr="pk")
+    judge = fields.TextField(
+        attr="judges",
+    )
+    local_path = fields.KeywordField(attr="local_path")
+    panel_ids = fields.ListField(
+        fields.IntegerField(),
+    )
+    source = fields.KeywordField(attr="source")
+
+    class Django:
+        model = Audio
+
+    def prepare_panel_ids(self, instance):
+        return [judge.pk for judge in instance.panel.all()]
+
+    def prepare_file_size_mp3(self, instance):
+        return deepgetattr(instance, "local_path_mp3.size", None)
