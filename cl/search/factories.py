@@ -1,5 +1,7 @@
+import logging
 import string
 
+from django.db.utils import IntegrityError
 from factory import (
     Faker,
     Iterator,
@@ -28,6 +30,8 @@ from cl.search.models import (
 )
 from cl.tests.providers import LegalProvider
 
+logger = logging.getLogger(__name__)
+
 Faker.add_provider(LegalProvider)
 
 cnt = CaseNameTweaker()
@@ -45,6 +49,23 @@ class CourtFactory(DjangoModelFactory):
     url = Faker("url")
     jurisdiction = FuzzyChoice(Court.JURISDICTIONS, getter=lambda c: c[0])
     in_use = True
+
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        count = 1
+        while True:
+            try:
+                obj = model_class(*args, **kwargs)
+                obj.save()
+                return obj
+            except IntegrityError as exp:
+                logger.info(f"Unexpected {exp=}, {type(exp)=}")
+                kwargs["position"] = Faker(
+                    "pyfloat", positive=True, right_digits=4, left_digits=3
+                ).evaluate(None, None, {"locale": None})
+                count = count + 1
+                if count > 3:
+                    raise (exp)
 
 
 class ParentheticalFactory(DjangoModelFactory):
@@ -135,7 +156,7 @@ class DocketParentMixin(DjangoModelFactory):
             lambda self: getattr(
                 self.factory_parent,
                 "case_name",
-                str(Faker("case_name")),
+                Faker("case_name").evaluate(None, None, {"locale": None}),
             )
         ),
         case_name_short=LazyAttribute(
@@ -149,7 +170,9 @@ class DocketParentMixin(DjangoModelFactory):
             lambda self: getattr(
                 self.factory_parent,
                 "case_name_full",
-                str(Faker("case_name", full=True)),
+                Faker("case_name", full=True).evaluate(
+                    None, None, {"locale": None}
+                ),
             )
         ),
     )
