@@ -127,6 +127,19 @@ PGPASSWORD=$DB_PASSWORD psql \
 	bzip2 | \
 	aws s3 cp - s3://com-courtlistener-storage/bulk-data/citation-map-`date -I`.csv.bz2 --acl public-read
 
+echo "Streaming search_citation to S3"
+PGPASSWORD=$DB_PASSWORD psql \
+	--command \
+	  'set statement_timeout to 0;
+	   COPY search_citation (
+	       id, volume, reporter, page, type, cluster_id
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
+	--host $DB_HOST \
+	--username $DB_USER \
+	--dbname courtlistener | \
+	bzip2 | \
+	aws s3 cp - s3://com-courtlistener-storage/bulk-data/citations-`date -I`.csv.bz2 --acl public-read
+
 echo "Streaming search_parenthetical to S3"
 PGPASSWORD=$DB_PASSWORD psql \
 	--command \
