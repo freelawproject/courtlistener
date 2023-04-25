@@ -154,7 +154,7 @@ def sort_caret(request, value) -> SafeString:
 
 
 @register.simple_tag
-def citation(obj, fmt=None) -> SafeString:
+def citation(obj) -> SafeString:
     if isinstance(obj, Docket):
         # Dockets do not have dates associated with them.  This is more
         # of a "weak citation".  It is there to allow people to find the
