@@ -1,5 +1,4 @@
 {% load humanize %}
-{% load extras %}
 <div class="col-xs-12" >
   {% if page_obj.has_other_pages %}
     <div class="well v-offset-above-3 hidden-print">
@@ -20,18 +19,6 @@
               <i class="fa fa-caret-left no-underline" ></i>
 			        <span class="hidden-xs">Prev.</span>
             </a>
-          {% else %}
-            {% if not hide_first %}
-              <span class="hidden-xs btn btn-default" >
-                <i class="fa fa-caret-left no-underline" ></i>
-                <i class="fa fa-caret-left no-underline" ></i>
-			          <span class="">First</span>
-              </span>
-            {% endif %}
-            <span class="btn btn-default" >
-              <i class="fa fa-caret-left no-underline" ></i>
-			        <span class="hidden-xs">Prev.</span>
-            </span>
           {% endif %}
         </div>
         <div class="col-xs-6 text-center large">
@@ -52,18 +39,6 @@
                 <i class="fa fa-caret-right no-underline" ></i>
                 <i class="fa fa-caret-right no-underline" ></i>
               </a>
-            {% endif %}
-          {% else %}
-            <span class="btn btn-default" >
-			        <span class="hidden-xs">Next</span>
-              <i class="fa fa-caret-right no-underline" ></i>
-            </span>
-            {% if not hide_last %}
-              <span class="hidden-xs btn btn-default" >
-			          <span class="">Last</span>
-                <i class="fa fa-caret-right no-underline" ></i>
-                <i class="fa fa-caret-right no-underline" ></i>
-              </span>
             {% endif %}
           {% endif %}
         </div>
