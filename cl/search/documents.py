@@ -154,4 +154,5 @@ class AudioDocument(Document):
         return [judge.pk for judge in instance.panel.all()]
 
     def prepare_file_size_mp3(self, instance):
-        return deepgetattr(instance, "local_path_mp3.size", None)
+        if instance.local_path_mp3:
+            return deepgetattr(instance, "local_path_mp3.size", None)
