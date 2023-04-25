@@ -9,6 +9,8 @@ from cl.recap.factories import FjcIntegratedDatabaseFactory
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
+    DocketEntryForDocketFactory,
+    DocketEntryReuseParentsFactory,
     DocketEntryWithParentsFactory,
     DocketFactory,
     DocketWithChildrenFactory,
@@ -27,6 +29,8 @@ FACTORIES = {
     104: DocketEntryWithParentsFactory,
     105: ParentheticalWithParentsFactory,
     106: FjcIntegratedDatabaseFactory,
+    107: DocketEntryForDocketFactory,
+    108: DocketEntryReuseParentsFactory,
     # People DB app
     200: PersonFactory,
     201: PersonWithChildrenFactory,
@@ -70,6 +74,12 @@ class Command(VerboseCommand):
             required=False,
             help="Print the list of possible objects",
         )
+        parser.add_argument(
+            "--parent-id",
+            type=int,
+            required=False,
+            help=f"The parent of the object(s) being made",
+        )
 
     def handle(self, *args, **options) -> None:
         super(Command, self).handle(*args, **options)
@@ -84,6 +94,8 @@ class Command(VerboseCommand):
             f"Creating dummy data. Making at least {count} "
             f"objects of each type."
         )
+        parent_id = options["parent_id"] if options["parent_id"] else None
+
         if options["make_objects"] is None:
             # Just make a bit of everything. Start with a docket and build all
             # the children below it.
@@ -114,4 +126,7 @@ class Command(VerboseCommand):
                     f"Making {count} items and their dependant parents using "
                     f"object type #{object_type}: {Factory}"
                 )
-                Factory.create_batch(count)
+                if parent_id:
+                    Factory.create_batch(count, parent_id=parent_id)
+                else:
+                    Factory.create_batch(count)
