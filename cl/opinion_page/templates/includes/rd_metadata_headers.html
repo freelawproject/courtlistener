@@ -14,6 +14,7 @@
     </a>
   </span>
 </p>
+{% include "includes/citation.html" with obj=rd.docket_entry %}
 {% if rd.docket_entry.date_filed %}
 <p class="bottom">
   <span class="meta-data-header">Date Filed:</span>

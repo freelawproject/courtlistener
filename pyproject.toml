@@ -41,7 +41,7 @@ django-filter = "^2.4.0"
 django-localflavor = "^3.1"
 django-markdown-deux = "*"
 django-mathfilters = "*"
-django-pghistory = "^2.6.0"
+django-pghistory = "^2.7.0"
 django-ratelimit = "^4.0.0"
 django-redis-cache = "^3.0.0"
 django-storages = "^1.13.2"
@@ -107,7 +107,7 @@ ipython = "^8.10.0"
 time-machine = "^2.9.0"
 dateparser = "1.1.6"
 types-dateparser = "^1.1.4.6"
-juriscraper = "^2.5.43"
+juriscraper = "^2.5.44"
 
 
 [tool.poetry.group.dev.dependencies]

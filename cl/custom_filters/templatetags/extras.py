@@ -8,6 +8,8 @@ from django.utils.html import format_html
 from django.utils.http import urlencode
 from django.utils.safestring import SafeString, mark_safe
 
+from cl.search.models import Docket, DocketEntry
+
 register = template.Library()
 
 
@@ -148,3 +150,36 @@ def sort_caret(request, value) -> SafeString:
         if current.startswith("-"):
             caret = '&nbsp;<i class="gray fa fa-angle-down"></i>'
     return mark_safe(caret)
+
+
+@register.simple_tag
+def citation(obj) -> SafeString:
+    if isinstance(obj, Docket):
+        # Dockets do not have dates associated with them.  This is more
+        # of a "weak citation".  It is there to allow people to find the
+        # docket
+        docket = obj
+        date_of_interest = None
+        ecf = ""
+    elif isinstance(obj, DocketEntry):
+        docket = obj.docket
+        date_of_interest = obj.date_filed
+        ecf = obj.entry_number
+    else:
+        raise NotImplementedError(f"Object not recongized in {__name__}")
+
+    # We want to build a citation that follows the Bluebook format as much
+    # as possible.  For documents from a case that looks like:
+    #   name_bb, case_bb, (court_bb date_bb) ECF No. {ecf}"
+    # If this is a citation to just a docket then we leave off the ECF number
+    # For opinions there is no need as the title of the block IS the citation
+    if date_of_interest:
+        date_of_interest = date_of_interest.strftime("%b %d, %Y")
+    result = f"{docket.case_name}, {docket.docket_number}, ("
+    result = result + docket.court.citation_string
+    if date_of_interest:
+        result = f"{result} {date_of_interest}"
+    result = f"{result})"
+    if ecf:
+        result = f"{result} ECF No. {ecf}"
+    return result
