@@ -17,6 +17,7 @@ from cl.search.factories import (
     OpinionClusterWithParentsFactory,
     OpinionWithParentsFactory,
     ParentheticalWithParentsFactory,
+    RECAPDocumentFactory,
 )
 from cl.users.factories import UserFactory
 
@@ -31,6 +32,7 @@ FACTORIES = {
     106: FjcIntegratedDatabaseFactory,
     107: DocketEntryForDocketFactory,
     108: DocketEntryReuseParentsFactory,
+    109: RECAPDocumentFactory,
     # People DB app
     200: PersonFactory,
     201: PersonWithChildrenFactory,
