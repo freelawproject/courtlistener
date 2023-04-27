@@ -822,14 +822,6 @@ input.court-checkbox, input.status-checkbox {
 
 #id_filed_after, #id_filed_before {
   width: 95px;
-  padding: 6px 8px;
-}
-#id_navigate_btns a {
-    padding: 6px 6px;
-}
-#sort-buttons button {
-    padding: 6px 6px;
-    margin: 0px 0px;
 }
 
 #docket-entry-table .row {
@@ -1446,11 +1438,17 @@ textarea {
   display: inline-block;
   vertical-align: middle;
 }
+
+.tight-input input, .tight-input a {
+  padding: 6px 6px;
+  margin: 0px 0px;
+}
+
 @media (max-width: 768px) {
-  .cl-xs-pull-left {
+  .xs-pull-left {
     float: left !important;
   }
-  .cl-xs-pull-right {
+  .xs-pull-right {
     float: right !important;
   }
 }
