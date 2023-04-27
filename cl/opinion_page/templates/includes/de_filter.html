@@ -33,7 +33,7 @@
           </div>
         {% endif %}
         <!-- date select -->
-        <div class="cl-col-xxs-12 cl-col-xs-6 col-sm-6 col-md-4 col-lg-3">
+        <div class="col-xs-6 col-sm-5 col-md-4 col-lg-3">
           <div class="cl-form-group{% if form.filed_after.errors %} has-error{% endif %}">
             <label for="id_filed_after"
                    class="control-label">Filed</label>
@@ -46,7 +46,7 @@
           </div>
         </div>
         <!-- Document group -->
-        <div class="cl-col-xxs-12 cl-col-xs-6 col-sm-6 col-md-3">
+        <div class="col-xs-6 col-sm-4 col-md-3">
           <div class="cl-form-group{% if form.entry_gte.errors %} has-error{% endif %}">
             <label for="id_entry_gte" class="control-label">Documents</label>
             {{ form.entry_gte }}
@@ -58,9 +58,9 @@
           </div>
         </div>
         <!-- sort ordering -->
-        <div class="cl-col-xxs-6 cl-col-xs-6 col-sm-6 col-md-2">
+        <div class="col-xs-6 col-sm-3 col-md-2">
           <div id="sort-buttons"
-               class="btn-group pull-right cl-xxs-pull-left cl-xs-pull-left cl-sm-pull-left"
+               class="btn-group pull-right cl-xs-pull-left cl-sm-pull-left"
                data-toggle="buttons"
                role="group"
                aria-label="sorting buttons">
@@ -81,7 +81,7 @@
           </div>
         </div>
         <!-- Navigate buttons -->
-        <div id="id_navigate_btns" class="cl-col-xxs-6 cl-col-xs-6 col-sm-6 col-md-1 col-lg-2" >
+        <div id="id_navigate_btns" class="col-xs-6 hidden-sm col-sm-6 col-md-1 col-lg-2" >
           <div class="pull-right" >
             {% if docket_entries.has_previous %}
               <a class="btn btn-default" href="?page={{ docket_entries.previous_page_number }}" rel="prev" >
