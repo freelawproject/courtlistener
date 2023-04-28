@@ -5,9 +5,6 @@ from django.utils.timezone import now
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-from cl.corpus_importer.management.commands.harvard_opinions import (
-    compare_documents,
-)
 from cl.lib.string_diff import get_cosine_similarity
 from cl.search.models import Docket
 
@@ -72,6 +69,11 @@ def match_lists(list1: [str], list2: [str]) -> bool | dict[int, Any]:
     :param list2: CL opinions
     :return: Matches if found or False
     """
+    # We import this here to avoid a circular import
+    from cl.corpus_importer.management.commands.harvard_opinions import (
+        compare_documents,
+    )
+
     # Convert harvard HTML to Text to compare
     list1 = [h.text_content() for h in list1]
     scores = similarity_scores(list1, list2)

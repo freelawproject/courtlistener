@@ -30,6 +30,15 @@ from cl.corpus_importer.import_columbia.parse_opinions import (
 from cl.corpus_importer.management.commands.clean_up_mis_matched_dockets import (
     find_and_fix_mis_matched_dockets,
 )
+from cl.corpus_importer.management.commands.harvard_merge import (
+    combine_non_overlapping_data,
+    merge_case_names,
+    merge_cluster_dates,
+    merge_docket_numbers,
+    merge_judges,
+    merge_opinion_clusters,
+    start_merger,
+)
 from cl.corpus_importer.management.commands.harvard_opinions import (
     clean_body_content,
     compare_documents,
@@ -38,7 +47,6 @@ from cl.corpus_importer.management.commands.harvard_opinions import (
     winnow_case_name,
 )
 from cl.corpus_importer.management.commands.normalize_judges_opinions import (
-    Command,
     normalize_authors_in_opinions,
     normalize_panel_in_opinioncluster,
 )
@@ -61,6 +69,8 @@ from cl.search.factories import (
     CourtFactory,
     DocketEntryWithParentsFactory,
     DocketFactory,
+    OpinionClusterFactory,
+    OpinionClusterFactoryMultipleOpinions,
     OpinionClusterFactoryWithChildrenAndParents,
     OpinionClusterWithParentsFactory,
     OpinionWithChildrenFactory,
@@ -2376,3 +2386,430 @@ class CleanUpMisMatchedDockets(TestCase):
         # The mis matched docket is preserved, fix its source to RECAP.
         mis_matched_docket.refresh_from_db()
         self.assertEqual(mis_matched_docket.source, Docket.RECAP)
+
+
+class HarvardMergerTests(TestCase):
+    def setUp(self):
+        """Setup harvard tests
+
+        This setup is a little distinct from normal ones.  Here we are actually
+        setting up our patches which are used by the majority of the tests.
+        Each one can be used or turned off.  See the teardown for more.
+        :return:
+        """
+        self.read_json_patch = patch(
+            "cl.corpus_importer.management.commands.harvard_merge.read_json"
+        )
+        self.read_json_func = self.read_json_patch.start()
+
+    def tearDown(self) -> None:
+        """Tear down patches and remove added objects"""
+        Docket.objects.all().delete()
+        self.read_json_patch.stop()
+
+    def test_merger(self):
+        """Can we identify opinions correctly even when they are slightly different."""
+
+        case_data = {
+            "name": "CANNON v. THE STATE",
+            "name_abbreviation": "Cannon v. State",
+            "decision_date": "1944-11-18",
+            "docket_number": "30614",
+            "casebody": {
+                "status": "ok",
+                "data": '<casebody firstpage="757" lastpage="758" xmlns="http://nrs.harvard.edu/urn-3:HLS.Libr.US_Case_Law.Schema.Case_Body:v1">\n  <docketnumber id="b795-7">30614.</docketnumber>\n  <parties id="AAY">CANNON <em>v. </em>THE STATE.</parties>\n  <decisiondate id="b795-9">Decided November 18, 1944.</decisiondate>\n  <attorneys id="b796-4"><page-number citation-index="1" label="758">*758</page-number><em>B. B. Giles, </em>for plaintiff in error.</attorneys>\n  <attorneys id="b796-5"><em>Lindley W. Gamp, solicitor, John A. Boyhin, solicitor-general,. Durwood T. Bye, </em>contra.</attorneys>\n  <opinion type="majority">\n    <author id="b796-6">Broyles, C. J.</author>\n    <p id="Auq">(After stating the foregoing facts.) After the-disposal of counts 2 and 3, the only charge before the court and jury was that the defendant had sold distilled spirits and alcohol as a retail dealer, without first obtaining a license from the State Revenue Commissioner. The evidence adduced to show the guilt, of the accused on count 1 was wholly circumstantial, and was insufficient to exclude every reasonable hypothesis except that of his-guilt, and it failed to show beyond a reasonable doubt that he had sold distilled spirits or alcohol. The cases of <em>Thomas </em>v. <em>State, </em>65 <em>Ga. App. </em>749 (16 S. E. 2d, 447), and <em>Martin </em>v. <em>State, </em>68 <em>Ga. App. </em>169 (22 S. E. 2d, 193), cited in behalf of the defendant in error, are distinguished by their facts from this case. The verdict was-contrary to law and the evidence; and the overruling of the certiorari was error. <em>Judgment reversed.</em></p>\n    <judges id="Ae85">\n      <em>MacIntyre, J., concurs.</em>\n    </judges>\n  </opinion>\n  <opinion type="concurrence">\n    <author id="b796-7">Gardner, J.,</author>\n    <p id="AK2">concurring specially: Under the record the judgment should be reversed for another reason. Since the jury, based on the same evidence, found the defendant not guilty on count 2 for possessing liquors, and a verdict finding him guilty on count 1 for selling intoxicating liquors, the verdicts are repugnant and void as being inconsistent verdicts by the same jury based on the same \'evidence. <em>Britt </em>v. <em>State, </em>36 <em>Ga. App. </em>668 (137 S. E. 791), and cit.; <em>Kuck </em>v. <em>State, </em>149 <em>Ga. </em>191 (99 S. E. 622). I concur in the reversal for this additional reason.</p>\n  </opinion>\n</casebody>\n',
+            },
+        }
+        self.read_json_func.return_value = case_data
+
+        lead = """<p>The overruling of the certiorari was error.</p>
+            <p><center>                       DECIDED NOVEMBER 18, 1944.</center>
+            John Cannon was tried in the criminal court of Fulton County on an accusation containing three counts. Count I charged that in said county on July 24, 1943, he "did engage in and sell, as a retail dealer, distilled spirits and alcohol, without first obtaining a license from the State Revenue Commissioner of the State of Georgia." Count 2 charged that on July 24, 1943, he possessed forty-eight half pints and three pints of whisky in Fulton County, and had not been licensed by the State Revenue Commissioner to sell whisky as a retail or wholesale dealer. Count 3 charged that on September 24, 1943, in said county, he sold malt beverages as a retail dealer, without first securing a license from the State Revenue Commissioner. On the trial, after the close of the State's evidence, counsel for the accused made a motion that count 2 be stricken, and that a verdict for the defendant be directed on counts 1 and 3. The court sustained the motion as to counts 2 and 3, but overruled it as to count 1. The jury returned a verdict of guilty on count 1, and of not guilty on counts 2 and 3. Subsequently the defendant's certiorari was overruled by a judge of the superior court and that judgment is assigned as error. <span class="star-pagination">*Page 758</span>
+            After the disposal of counts 2 and 3, the only charge before the court and jury was that the defendant had sold distilled spirits and alcohol as a retail dealer, without first obtaining a license from the State Revenue Commissioner. The evidence adduced to show the guilt of the accused on count 1 was wholly circumstantial, and was insufficient to exclude every reasonable hypothesis except that of his guilt, and it failed to show beyond a reasonable doubt that he had sold distilled spirits or alcohol. The cases of <em>Thomas</em> v. <em>State,</em> <cross_reference><span class="citation no-link">65 Ga. App. 749</span></cross_reference> (<cross_reference><span class="citation" data-id="3407553"><a href="/opinion/3412403/thomas-v-state/">16 S.E.2d 447</a></span></cross_reference>), and <em>Martin</em> v. <em>State,</em> <cross_reference><span class="citation no-link">68 Ga. App. 169</span></cross_reference> (<cross_reference><span class="citation" data-id="3405716"><a href="/opinion/3410794/martin-v-state/">22 S.E.2d 193</a></span></cross_reference>), cited in behalf of the defendant in error, are distinguished by their facts from this case. The verdict was contrary to law and the evidence; and the overruling of the certiorari was error.</p>
+            <p><em>Judgment reversed. MacIntyre, J., concurs.</em></p>"""
+        concurrence = """<p>Under the record the judgment should be reversed for another reason. Since the jury, based on the same evidence, found the defendant not guilty on count 2 for possessing liquors, and a verdict finding him guilty on count 1 for selling intoxicating liquors, the verdicts are repugnant and void as being inconsistent verdicts by the same jury based on the same evidence. <em>Britt</em> v. <em>State,</em> <cross_reference><span class="citation no-link">36 Ga. App. 668</span></cross_reference>
+            (<cross_reference><span class="citation no-link">137 S.E. 791</span></cross_reference>), and cit.; <em>Kuck</em> v. <em>State,</em> <cross_reference><span class="citation" data-id="5582722"><a href="/opinion/5732248/kuck-v-state/">149 Ga. 191</a></span></cross_reference>
+            (<cross_reference><span class="citation no-link">99 S.E. 622</span></cross_reference>). I concur in the reversal for this additional reason.</p>"""
+
+        cluster = OpinionClusterFactoryMultipleOpinions(
+            docket=DocketFactory(source=Docket.COLUMBIA),
+            sub_opinions__data=[
+                {"type": "020lead", "html_with_citations": lead},
+                {"type": "030concurrence", "html_with_citations": concurrence},
+            ],
+        )
+
+        self.assertEqual(
+            OpinionCluster.objects.get(id=cluster.id).attorneys, "", msg="WHAT"
+        )
+
+        self.assertEqual(Opinion.objects.all().count(), 2)
+        merge_opinion_clusters(cluster_id=cluster.id)
+        self.assertEqual(Opinion.objects.all().count(), 2)
+
+    def test_non_overlapping(self):
+        """Can we find fields that need merging"""
+
+        case_data = {
+            "casebody": {
+                "data": '<casebody> <attorneys><page-number citation-index="1" label="758">*758</page-number><em>B. B. Giles, </em>for plaintiff in error.</attorneys>\n  <attorneys id="b796-5"><em>Lindley W. Gamp, solicitor, John A. Boyhin, solicitor-general,. Durwood T. Bye, </em>contra.</attorneys>\n  <opinion type="majority"> a simple opinion</opinion>\n</casebody>\n',
+            },
+        }
+        self.read_json_func.return_value = case_data
+
+        cluster = OpinionClusterFactoryMultipleOpinions(
+            docket=DocketFactory(),
+            attorneys="B. B. Giles, Lindley W. Gamp, and John A. Boyhin",
+            # cl value
+        )
+        clean_dictionary = combine_non_overlapping_data(cluster.id, case_data)
+        self.assertEqual(
+            clean_dictionary,
+            {
+                "attorneys": (
+                    "B. B. Giles, for plaintiff in error., Lindley W. Gamp, solicitor, John A. Boyhin, solicitor-general,. Durwood T. Bye, contra.",
+                    "B. B. Giles, Lindley W. Gamp, and John A. Boyhin",
+                )
+            },
+            msg="Should find differences to merge",
+        )
+
+        # Test that we can ignore matching fields
+        cluster = OpinionClusterFactoryMultipleOpinions(
+            docket=DocketFactory(),
+            attorneys="B. B. Giles, for plaintiff in error., Lindley W. Gamp, solicitor, John A. Boyhin, solicitor-general,. Durwood T. Bye, contra.",
+        )
+        clean_dictionary = combine_non_overlapping_data(cluster.id, case_data)
+        self.assertEqual(clean_dictionary, {}, msg="Attorneys are the same")
+
+    def test_docket_number_merger(self):
+        """Can we choose the correct docket number"""
+        docket = DocketFactory(docket_number="17-3000")
+        cluster = OpinionClusterWithParentsFactory(docket=docket)
+        merge_docket_numbers(cluster.id, "Master Docket No. 17-3000L")
+        docket.refresh_from_db()
+        self.assertEqual(docket.docket_number, "Master Docket No. 17-3000L")
+
+    def test_sources_query(self):
+        """Test query for Non Harvard Sources"""
+        OpinionClusterFactory(
+            docket=DocketFactory(source=Docket.COLUMBIA),
+            id=1,
+            filepath_json_harvard="/the/file/path.json",
+        )
+        OpinionClusterFactory(
+            docket=DocketFactory(source=Docket.HARVARD),
+            id=2,
+            filepath_json_harvard="/a/file/path.json",
+        )
+        OpinionClusterFactory(
+            docket=DocketFactory(source=Docket.COLUMBIA_AND_HARVARD),
+            id=3,
+            filepath_json_harvard="/some/file/path.json",
+        )
+        OpinionClusterFactory(
+            docket=DocketFactory(source=Docket.SCRAPER),
+            id=4,
+            filepath_json_harvard="/my/file/path.json",
+        )
+        OpinionClusterFactory(
+            docket=DocketFactory(source=Docket.SCRAPER),
+            id=5,
+            filepath_json_harvard=None,
+        )
+        OpinionClusterFactory(
+            docket=DocketFactory(source=Docket.HARVARD),
+            id=6,
+            filepath_json_harvard="",
+        )
+
+        SC = Docket.SOURCE_CHOICES
+        cluster_ids = (
+            OpinionCluster.objects.filter(
+                docket__source__in=[s[0] for s in SC if "Harvard" not in s[1]],
+                filepath_json_harvard__isnull=False,
+            )
+            .exclude(filepath_json_harvard__exact="")
+            .values_list("id", flat=True)
+        )
+        # Find the two opinions we want to import
+        self.assertEqual([1, 4], list(cluster_ids))
+        case_data = {
+            "docket_number": "345",
+            "name_abbreviation": "A v. B",
+            "name": "A v. B",
+            "casebody": {
+                "data": "<casebody><opinion>An opinion</opinion></casebody>"
+            },
+        }
+        self.read_json_func.return_value = case_data
+        start_merger(cluster_id=None)
+        cluster_ids = OpinionCluster.objects.filter(
+            docket__source__in=[s[0] for s in SC if "Harvard" not in s[1]],
+            filepath_json_harvard__isnull=False,
+        ).values_list("id", flat=True)
+        # Validate that our two opinions were imported and no more exist
+        self.assertEqual([], list(cluster_ids))
+
+    def test_add_opinions_without_authors_in_cl(self):
+        """Can we add opinion and update authors"""
+        cluster = OpinionClusterFactoryMultipleOpinions(
+            docket=DocketFactory(source=Docket.COLUMBIA),
+            sub_opinions__data=[
+                {"author_str": "", "plain_text": "My opinion"},
+                {"author_str": "", "plain_text": "I disagree"},
+            ],
+        )
+        case_data = {
+            "docket_number": "345",
+            "name_abbreviation": "A v. B",
+            "name": "A v. B",
+            "casebody": {
+                "data": '<casebody> <opinion type="majority"> '
+                "<author>Broyles, C. J.</author>My opinion</opinion>"
+                ' <opinion type="dissent"><author>Gardner, J.,</author>'
+                "I disagree </opinion>"
+                "</casebody>",
+            },
+        }
+        self.read_json_func.return_value = case_data
+        author_query = Opinion.objects.filter(
+            cluster_id=cluster.id
+        ).values_list("author_str", flat=True)
+        authors = list(author_query)
+
+        self.assertEqual(authors, ["", ""])
+        start_merger(cluster_id=None)  # allow the system to find the cluster
+        cluster.refresh_from_db()
+
+        author_query = Opinion.objects.filter(
+            cluster_id=cluster.id
+        ).values_list("author_str", flat=True)
+        authors = list(author_query)
+        # Validate we didnt create a new opinion
+        self.assertEqual(
+            Opinion.objects.filter(cluster_id=cluster.id).count(),
+            2,
+            msg="Oops",
+        )
+        # Check that we added xml
+        self.assertNotEqual(
+            Opinion.objects.filter(cluster_id=cluster.id)[0].xml_harvard, ""
+        )
+        # Make sure we updated our source
+        self.assertEqual(cluster.docket.source, Docket.COLUMBIA_AND_HARVARD)
+        # Check judges were added to our opinions
+        self.assertEqual(authors, ["Broyles, C. J.", "Gardner, J.,"])
+
+    def test_add_opinions_with_authors_in_cl(self):
+        """Can we update an opinion and leave author_str alone if already assigned"""
+        cluster = OpinionClusterFactoryMultipleOpinions(
+            docket=DocketFactory(source=Docket.COLUMBIA),
+            sub_opinions__data=[
+                {"author_str": "Broyles", "plain_text": "My opinion"},
+                {"author_str": "Gardner", "plain_text": "I disagree"},
+            ],
+        )
+        case_data = {
+            "docket_number": "345",
+            "name_abbreviation": "A v. B",
+            "name": "A v. B",
+            "casebody": {
+                "data": '<casebody> <opinion type="majority"> '
+                "<author>Broyles, C. J.</author>My opinion</opinion>"
+                ' <opinion type="dissent"><author>Gardner, J.,</author>'
+                "I disagree </opinion>"
+                "</casebody>",
+            },
+        }
+
+        self.read_json_func.return_value = case_data
+        author_query = Opinion.objects.filter(
+            cluster_id=cluster.id
+        ).values_list("author_str", flat=True)
+        authors = sorted(list(author_query))
+
+        self.assertEqual(authors, ["Broyles", "Gardner"])
+        # Import the opinion
+        start_merger(cluster_id=cluster.id)
+
+        cluster.refresh_from_db()
+        author_query = Opinion.objects.filter(
+            cluster_id=cluster.id
+        ).values_list("author_str", flat=True)
+        authors = sorted(list(author_query))
+        # Validate we didnt create a new opinion
+        self.assertEqual(
+            Opinion.objects.filter(cluster_id=cluster.id).count(),
+            2,
+            msg="Oops",
+        )
+        # Check that we added xml
+        self.assertNotEqual(
+            Opinion.objects.filter(cluster_id=cluster.id)[0].xml_harvard, ""
+        )
+        # Make sure we updated our source
+        self.assertEqual(cluster.docket.source, Docket.COLUMBIA_AND_HARVARD)
+        # Check judges were added to our opinions
+        self.assertEqual(authors, ["Broyles", "Gardner"])
+
+    def test_merge_overlap_judges(self):
+        """Can we merge overlap judge names?"""
+
+        for item in [
+            # Format: (cl judge, harvard prepared data, expected output)
+            # CL item #4575556
+            (
+                "Barbera",
+                "Adkins, Barbera, Getty, Greene, Hotten, McDonald, Watts",
+                "Adkins, Barbera, Getty, Greene, Hotten, McDonald, Watts",
+            ),
+            # CL item #4573873
+            (
+                "Simpson, J. ~ Concurring Opinion by Pellegrini, Senior Judge",
+                "Simpson",
+                "Simpson, J. ~ Concurring Opinion by Pellegrini, Senior Judge",
+            ),
+            (
+                "January 1st 2020",  # CL  #bad data example
+                "Simpson, J. ~ Concurring Opinion by Pellegrini, Senior Judge",
+                # Harvard
+                "Simpson, Pellegrini",  # Expected result
+            ),
+            # CL item #4576003
+            (
+                "French, J.",
+                "Fischer, French, Kennedy",
+                "Fischer, French, Kennedy",
+            ),
+            # CL item #4576003
+            (
+                "Leavitt, President Judge",
+                "Leavitt",
+                "Leavitt, President Judge",
+            ),
+        ]:
+            cluster = OpinionClusterWithParentsFactory(
+                judges=item[0],
+            )
+            merge_judges(cluster.pk, (item[1], item[0]))
+            cluster.refresh_from_db()
+            self.assertEqual(cluster.judges, item[2])
+
+    def test_merge_overlap_casenames(self):
+        """Can we merge overlap case names?"""
+
+        for item in [
+            # CL item #4571581
+            # Test that the case name is not changed,
+            # but the full case name is filled
+            (
+                {
+                    "name": "Vivian PEREZ, Administratrix (Estate of Andres "
+                    "Burgos) v. METROPOLITAN DISTRICT COMMISSION",
+                    "name_abbreviation": "Perez v. Metro. Dist. Comm'n",
+                },
+                {
+                    "cl_case_name": "Perez v. Metropolitan District Commisssion",
+                    "cl_case_name_full": "",
+                },
+                {
+                    "expected_case_name": "Perez v. Metropolitan District "
+                    "Commisssion",
+                    "expected_case_name_full": "Vivian PEREZ, Administratrix "
+                    "(Estate of Andres Burgos) v. "
+                    "METROPOLITAN DISTRICT "
+                    "COMMISSION",
+                },
+            ),
+            # CL item #4574207
+            # Test that we can override the cluster case name when the
+            # harvard case name is better and also fill in the full case
+            # name when empty
+            (
+                {
+                    "name": "Randy WEYERMAN v. FREEMAN EXPOSITIONS, INC., "
+                    "Employer, and Old Republic Insurance Company, "
+                    "Insurance Carrier",
+                    "name_abbreviation": "Weyerman v. Freeman Expositions, "
+                    "Inc.",
+                },
+                {
+                    "cl_case_name": "Weyerman v. Freeman Expositions",
+                    "cl_case_name_full": "",
+                },
+                {
+                    "expected_case_name": "Weyerman v. Freeman Expositions, "
+                    "Inc.",
+                    "expected_case_name_full": "Randy WEYERMAN v. FREEMAN "
+                    "EXPOSITIONS, INC., Employer, "
+                    "and Old Republic Insurance "
+                    "Company, Insurance Carrier",
+                },
+            ),
+            # CL item #4576005
+            # Test that we can find the best case name but
+            # also swap data when the case name is longer than the full case
+            # name
+            (
+                {
+                    "name": "The STATE EX REL. MURRAY v. STATE EMPLOYMENT "
+                    "RELATIONS BOARD",
+                    "name_abbreviation": "State ex rel. Murray v. State "
+                    "Emp't Relations Bd",
+                },
+                {
+                    "cl_case_name": "State ex rel. Murray v. State Emp. "
+                    "Relations Bd. (Slip Opinion)",
+                    "cl_case_name_full": "",
+                },
+                {
+                    "expected_case_name": "The State Ex Rel. Murray v. State "
+                    "Employment Relations Board",
+                    "expected_case_name_full": "State Ex Rel. Murray v. "
+                    "State Emp. Relations Bd. ("
+                    "Slip Opinion)",
+                },
+            ),
+        ]:
+            # Create cluster with case_name and case_name_full
+            cluster = OpinionClusterWithParentsFactory(
+                case_name=item[1].get("cl_case_name"),
+                case_name_full=item[1].get("cl_case_name_full"),
+            )
+
+            merge_case_names(cluster.pk, item[0])
+            cluster.refresh_from_db()
+
+            # Check case_name
+            self.assertEqual(
+                cluster.case_name, item[2].get("expected_case_name")
+            )
+            # Check case_name_full
+            self.assertEqual(
+                cluster.case_name_full, item[2].get("expected_case_name_full")
+            )
+
+    def test_merge_date_filed(self):
+        """Can we merge date filed?"""
+
+        # Test that harvard date is different that cl date, if docket
+        # source is SCRAPER then use harvard data
+        # Item format: (harvard_decision_date, cl date_filed, expected output)
+        for item in [
+            # CL item #4549197
+            ("2018-10-23", date(2018, 11, 1), date(2018, 10, 23)),
+            # CL item #4549214
+            ("2018-10-19", date(2018, 11, 1), date(2018, 10, 19)),
+            # CL item #4548724
+            ("2018-10-30", date(2018, 11, 6), date(2018, 10, 30)),
+        ]:
+            cluster = OpinionClusterWithParentsFactory(
+                date_filed=item[1], docket=DocketFactory(source=Docket.SCRAPER)
+            )
+
+            merge_cluster_dates(cluster.pk, "date_filed", (item[0], item[1]))
+            cluster.refresh_from_db()
+
+            # Check case_name_full
+            self.assertEqual(cluster.date_filed, item[2])
