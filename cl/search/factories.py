@@ -1,7 +1,10 @@
+import logging
 import string
 
+from django.db.utils import IntegrityError
 from factory import (
     Faker,
+    Iterator,
     LazyAttribute,
     RelatedFactory,
     SelfAttribute,
@@ -27,6 +30,8 @@ from cl.search.models import (
 )
 from cl.tests.providers import LegalProvider
 
+logger = logging.getLogger(__name__)
+
 Faker.add_provider(LegalProvider)
 
 cnt = CaseNameTweaker()
@@ -44,6 +49,23 @@ class CourtFactory(DjangoModelFactory):
     url = Faker("url")
     jurisdiction = FuzzyChoice(Court.JURISDICTIONS, getter=lambda c: c[0])
     in_use = True
+
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        count = 1
+        while True:
+            try:
+                obj = model_class(*args, **kwargs)
+                obj.save()
+                return obj
+            except IntegrityError as exp:
+                logger.info(f"Unexpected {exp=}, {type(exp)=}")
+                kwargs["position"] = Faker(
+                    "pyfloat", positive=True, right_digits=4, left_digits=3
+                ).evaluate(None, None, {"locale": None})
+                count = count + 1
+                if count > 3:
+                    raise (exp)
 
 
 class ParentheticalFactory(DjangoModelFactory):
@@ -112,7 +134,7 @@ class OpinionClusterFactory(DjangoModelFactory):
     case_name_full = Faker("case_name", full=True)
     date_filed = Faker("date")
     slug = Faker("slug")
-    source = FuzzyChoice(SOURCES, getter=lambda c: c[0])
+    source = FuzzyChoice(SOURCES.NAMES, getter=lambda c: c[0])
     precedential_status = FuzzyChoice(
         PRECEDENTIAL_STATUS.NAMES, getter=lambda c: c[0]
     )
@@ -134,7 +156,7 @@ class DocketParentMixin(DjangoModelFactory):
             lambda self: getattr(
                 self.factory_parent,
                 "case_name",
-                str(Faker("case_name")),
+                Faker("case_name").evaluate(None, None, {"locale": None}),
             )
         ),
         case_name_short=LazyAttribute(
@@ -148,7 +170,9 @@ class DocketParentMixin(DjangoModelFactory):
             lambda self: getattr(
                 self.factory_parent,
                 "case_name_full",
-                str(Faker("case_name", full=True)),
+                Faker("case_name", full=True).evaluate(
+                    None, None, {"locale": None}
+                ),
             )
         ),
     )
@@ -180,11 +204,41 @@ class DocketEntryFactory(DjangoModelFactory):
     description = Faker("text", max_nb_chars=750)
 
 
+class DocketReuseParentMixin(DjangoModelFactory):
+    docket = Iterator(Docket.objects.all())
+
+
+class DocketEntryForDocketFactory(DjangoModelFactory):
+    class Meta:
+        model = DocketEntry
+
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        """Override default docket"""
+        docket_id = kwargs.pop("parent_id", None)
+        if not docket_id:
+            return None
+        kwargs["docket_id"] = docket_id
+        manager = cls._get_manager(model_class)
+        return manager.create(*args, **kwargs)
+
+    description = Faker("text", max_nb_chars=750)
+
+
 class DocketEntryWithParentsFactory(
     DocketEntryFactory,
     DocketParentMixin,
 ):
     """Make a DocketEntry with Docket parents"""
+
+    pass
+
+
+class DocketEntryReuseParentsFactory(
+    DocketEntryFactory,
+    DocketReuseParentMixin,
+):
+    """Make a DocketEntry using existing Dockets as parents"""
 
     pass
 

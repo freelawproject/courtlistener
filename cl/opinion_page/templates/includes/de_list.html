@@ -19,7 +19,13 @@
             {% endif %}
     >
       <div class="col-xs-1 text-center"><p>{{ de.entry_number|default_if_none:"" }}</p></div>
-      <div class="col-xs-3 col-sm-2"><p>{{ de.date_filed|date:"M j, Y"|default:'<em class="gray">Unknown</em>' }}</p></div>
+      <div class="col-xs-3 col-sm-2"><p>
+        {% if de.datetime_filed %}
+          <span title="{{ de.datetime_filed|timezone:timezone}}">{{ de.datetime_filed|timezone:timezone|date:"M j, Y" }}</span>
+        {% else %}
+          {{ de.date_filed|date:"M j, Y"|default:'<em class="gray">Unknown</em>' }}
+        {% endif %}
+      </p></div>
       <div class="col-xs-8 col-lg-7">
         {% if de.description %}
           <p>{{ de.description|safe }}</p>
@@ -104,14 +110,6 @@
                                   {% if rd.is_free_on_pacer %}From PACER{% else %}Buy on PACER{% endif %} {% if rd.page_count %}(${{ rd|price }}){% endif %}
                               </a>
                           </li>
-                          {% if rd.pacerdash_url and not rd.is_free_on_pacer %}
-                            <li>
-                                <a href="{{ rd.pacerdash_url }}"
-                                target="_blank"
-                                rel="nofollow">
-                                Buy on PacerDash {% if rd.page_count %}(${{ rd|pacerdash_price }}){% endif %}</a>
-                            </li>
-                          {% endif %}
                         {% endif %}
                     </ul>
                   {% else %}
@@ -130,23 +128,6 @@
                             target="_blank"
                             rel="nofollow">Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}
                         </a>
-                        {% if rd.pacerdash_url %}
-                          <button type="button"
-                            class="btn btn-default btn-xs dropdown-toggle"
-                            data-toggle="dropdown"
-                            aria-haspopup="true"
-                            aria-expanded="false">
-                          <span class="caret"></span>
-                          <span class="sr-only">Toggle Dropdown</span>
-                          </button>
-                            <ul class="dropdown-menu btn-pacerdash">
-                              <li>
-                                <a href="{{ rd.pacerdash_url }}"
-                                  target="_blank"
-                                  rel="nofollow">Buy on PacerDash {% if rd.page_count %}(${{ rd|pacerdash_price }}){% endif %}</a>
-                              </li>
-                            </ul>
-                        {% endif %}
                       {% endif %}
                     {% endif %}
                   {% endif %}

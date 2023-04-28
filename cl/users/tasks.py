@@ -36,16 +36,16 @@ def update_moosend_subscription(self: Task, email: str, action: str) -> None:
     """
     allowed_actions = ["subscribe", "unsubscribe"]
     assert action in allowed_actions, f"'{action}' is not an allowed action."
-    params = {"apikey": settings.MOOSEND_API_KEY}
+    params = {"apikey": settings.MOOSEND_API_KEY}  # type: ignore
 
     if action == "subscribe":
-        path = f"/v3/subscribers/{settings.MOOSEND_DEFAULT_LIST_ID}/subscribe.json"
+        path = f"/v3/subscribers/{settings.MOOSEND_DEFAULT_LIST_ID}/subscribe.json"  # type: ignore
     else:
-        path = f"/v3/subscribers/{settings.MOOSEND_DEFAULT_LIST_ID}/unsubscribe.json"
+        path = f"/v3/subscribers/{settings.MOOSEND_DEFAULT_LIST_ID}/unsubscribe.json"  # type: ignore
 
     try:
         r = requests.post(
-            url=urljoin(settings.MOOSEND_API_URL, path),
+            url=urljoin(settings.MOOSEND_API_URL, path),  # type: ignore
             params=params,
             json={
                 "Email": email,

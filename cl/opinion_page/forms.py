@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import Any
+from typing import Any, MutableMapping
 
 from django import forms
 from django.core.exceptions import ValidationError
@@ -18,7 +18,14 @@ from cl.scrapers.management.commands.cl_scrape_opinions import (
 )
 from cl.scrapers.tasks import extract_doc_content
 from cl.search.fields import CeilingDateField, FloorDateField
-from cl.search.models import Citation, Court, Docket, Opinion, OpinionCluster
+from cl.search.models import (
+    SOURCES,
+    Citation,
+    Court,
+    Docket,
+    Opinion,
+    OpinionCluster,
+)
 
 
 class CitationRedirectorForm(forms.Form):
@@ -96,8 +103,24 @@ class DocketEntryFilterForm(forms.Form):
         widget=forms.Select(),
     )
 
+    def __init__(self, *args, **kwargs):
+        self.request = kwargs.pop("request", None)
+        super(DocketEntryFilterForm, self).__init__(*args, **kwargs)
+
+    def clean_order_by(self):
+        data = self.cleaned_data["order_by"]
+        if data:
+            return data
+        if not self.request.user.is_authenticated:
+            return data
+        user: UserProfile.user = self.request.user
+        if user.profile.docket_default_order_desc:
+            return DocketEntryFilterForm.DESCENDING
+        return data
+
 
 class CourtUploadForm(forms.Form):
+    initial: MutableMapping[str, Any]
 
     court_str = forms.CharField(required=True, widget=forms.HiddenInput())
     case_title = forms.CharField(
@@ -274,8 +297,8 @@ class CourtUploadForm(forms.Form):
             "third_judge",
             "panel",
         ]:
-            self.fields[field_name].queryset = q_judges
-            self.fields[field_name].label_from_instance = self.person_label
+            self.fields[field_name].queryset = q_judges  # type: ignore[attr-defined]
+            self.fields[field_name].label_from_instance = self.person_label  # type: ignore[attr-defined]
 
         if self.pk == "tennworkcompcl":
             self.fields["cite_reporter"].widget = forms.Select(
@@ -360,7 +383,7 @@ class CourtUploadForm(forms.Form):
                 )
 
     def clean_pdf_upload(self) -> bytes:
-        pdf_data = self.cleaned_data.get("pdf_upload").read()
+        pdf_data = self.cleaned_data["pdf_upload"].read()
         sha1_hash = sha1(force_bytes(pdf_data))
         ops = Opinion.objects.filter(sha1=sha1_hash)
         if len(ops) > 0:
@@ -401,13 +424,13 @@ class CourtUploadForm(forms.Form):
         lead_author = self.cleaned_data.get("lead_author")
         self.cleaned_data["item"] = {
             "source": Docket.DIRECT_INPUT,
-            "cluster_source": "D",
+            "cluster_source": SOURCES.DIRECT_COURT_INPUT,
             "case_names": self.cleaned_data.get("case_title"),
             "case_dates": self.cleaned_data["publication_date"],
             "precedential_statuses": "Published",
             "docket_numbers": self.cleaned_data["docket_number"],
             "judges": ", ".join(
-                [j.name_full for j in self.cleaned_data.get("panel")]
+                [j.name_full for j in self.cleaned_data["panel"]]
             ),
             "author_id": lead_author.id if lead_author else None,
             "author": lead_author,

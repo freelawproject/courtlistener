@@ -34,11 +34,6 @@
              {% endif %}
               target="_blank"
               rel="nofollow">Buy on PACER</a>
-            {% if rd.pacerdash_url %}
-              <a href="{{ rd.pacerdash_url }}"
-              target="_blank"
-              rel="nofollow">Buy on PacerDash</a>
-            {% endif %}
         </li>
       {% endif %}
     </ul>
@@ -57,23 +52,6 @@
           {% endif %}
           target="_blank"
           rel="nofollow"><i class="fa fa-external-link"></i> Buy on PACER</a>
-        {% if rd.pacerdash_url %}
-          <button type="button"
-            class="btn btn-primary dropdown-toggle"
-            data-toggle="dropdown"
-            aria-haspopup="true"
-            aria-expanded="false">
-          <span class="caret"></span>
-          <span class="sr-only">Toggle Dropdown</span>
-          </button>
-          <ul class="dropdown-menu">
-          <li>
-              <a href="{{ rd.pacerdash_url }}"
-              target="_blank"
-              rel="nofollow"><i class="fa fa-external-link"></i> Buy on PacerDash</a>
-          </li>
-          </ul>
-        {% endif %}
       {% endif %}
     {% endif %}
   {% endif %}

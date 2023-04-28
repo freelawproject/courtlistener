@@ -46,7 +46,7 @@
     {% if doc0.solr_highlights.docketNumber.0 %}
       <div class="inline-block">
         <span class="meta-data-header">Docket Number:</span>
-        <span class="meta-data-value">{{ doc0.solr_highlights.docketNumber.0|safe }}</span>
+        <span class="meta-data-value select-all">{{ doc0.solr_highlights.docketNumber.0|safe }}</span>
       </div>
     {% endif %}
     <div class="inline-block">
@@ -303,7 +303,7 @@
       {% if result.solr_highlights.docketNumber.0 %}
         <div class="inline-block">
           <span class="meta-data-header">Docket Number:</span>
-          <span class="meta-data-value">{{ result.solr_highlights.docketNumber.0|safe }}</span>
+          <span class="meta-data-value select-all">{{ result.solr_highlights.docketNumber.0|safe }}</span>
         </div>
       {% endif %}
     {% endif %}

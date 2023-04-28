@@ -2,7 +2,7 @@ import json
 import logging
 import re
 from datetime import timedelta
-from typing import Dict, List, Optional, Union
+from typing import Any
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -33,7 +33,13 @@ from cl.donate.utils import get_donation_totals_by_email
 from cl.lib.ratelimiter import ratelimiter_unsafe_3_per_m
 from cl.people_db.models import Person
 from cl.search.forms import SearchForm
-from cl.search.models import Court, Docket, OpinionCluster, RECAPDocument
+from cl.search.models import (
+    SOURCES,
+    Court,
+    Docket,
+    OpinionCluster,
+    RECAPDocument,
+)
 from cl.simple_pages.forms import ContactForm
 
 logger = logging.getLogger(__name__)
@@ -79,15 +85,15 @@ def help_home(request: HttpRequest) -> HttpResponse:
 
 
 def alert_help(request: HttpRequest) -> HttpResponse:
-    no_feeds = Court.federal_courts.district_pacer_courts().filter(
+    no_feeds = Court.federal_courts.all_pacer_courts().filter(
         pacer_has_rss_feed=False,
     )
     partial_feeds = (
-        Court.federal_courts.district_pacer_courts()
+        Court.federal_courts.all_pacer_courts()
         .filter(pacer_has_rss_feed=True)
         .exclude(pacer_rss_entry_types="all")
     )
-    full_feeds = Court.federal_courts.district_pacer_courts().filter(
+    full_feeds = Court.federal_courts.all_pacer_courts().filter(
         pacer_has_rss_feed=True, pacer_rss_entry_types="all"
     )
     cache_key = "alert-help-stats"
@@ -131,7 +137,7 @@ def markdown_help(request: HttpRequest) -> HttpResponse:
     )
 
 
-def tag_favorites_help(request: HttpRequest) -> HttpResponse:
+def tag_notes_help(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "help/tags_help.html", {"private": False})
 
 
@@ -149,7 +155,7 @@ def broken_email_help(request: HttpRequest) -> HttpResponse:
     )
 
 
-def build_court_dicts(courts: QuerySet) -> List[Dict[str, str]]:
+def build_court_dicts(courts: QuerySet) -> list[dict[str, str]]:
     """Takes the court objects, and manipulates them into a list of more useful
     dictionaries"""
     court_dicts = [{"pk": "all", "short_name": "All Courts"}]
@@ -163,9 +169,14 @@ def build_court_dicts(courts: QuerySet) -> List[Dict[str, str]]:
     return court_dicts
 
 
-def coverage_fds(request: HttpRequest) -> HttpResponse:
-    """The financial disclosure coverage page"""
-    coverage_key = "coverage-data.fd2"
+def get_coverage_data_fds() -> dict[str, int]:
+    """Get stats on the disclosure data
+
+    Attempt the cache if possible.
+
+    :return: A dict mapping item types to their counts.
+    """
+    coverage_key = "coverage-data.fd3"
     coverage_data = cache.get(coverage_key)
     if coverage_data is None:
         coverage_data = {
@@ -183,15 +194,26 @@ def coverage_fds(request: HttpRequest) -> HttpResponse:
         for k, model in coverage_data.items():
             coverage_data[k] = model.objects.all().count()
 
+        coverage_data["private"] = False
         one_week = 60 * 60 * 24 * 7
         cache.set(coverage_key, coverage_data, one_week)
 
-    coverage_data["private"] = False
-    return TemplateResponse(request, "coverage_fds.html", coverage_data)
+    return coverage_data
 
 
-def coverage_graph(request: HttpRequest) -> HttpResponse:
-    coverage_cache_key = "coverage-data-v2"
+def coverage_fds(request: HttpRequest) -> HttpResponse:
+    """The financial disclosure coverage page"""
+    coverage_data = get_coverage_data_fds()
+    return TemplateResponse(request, "help/coverage_fds.html", coverage_data)
+
+
+def get_coverage_data_o(request: HttpRequest) -> dict[str, Any]:
+    """Get the opinion coverage data
+
+    :param request: The user's request
+    :return:
+    """
+    coverage_cache_key = "coverage-data-v3"
     coverage_data = cache.get(coverage_cache_key)
     if coverage_data is None:
         courts = Court.objects.filter(in_use=True)
@@ -212,11 +234,11 @@ def coverage_graph(request: HttpRequest) -> HttpResponse:
         count_lawbox = 0
         count_scraper = 0
         for d in counts:
-            if "R" in d["source"]:
+            if SOURCES.PUBLIC_RESOURCE in d["source"]:
                 count_pro += d["source__count"]
-            if "C" in d["source"]:
+            if SOURCES.COURT_WEBSITE in d["source"]:
                 count_scraper += d["source__count"]
-            if "L" in d["source"]:
+            if SOURCES.LAWBOX in d["source"]:
                 count_lawbox += d["source__count"]
 
         opinion_courts = Court.objects.filter(
@@ -225,6 +247,9 @@ def coverage_graph(request: HttpRequest) -> HttpResponse:
         oral_argument_courts = Court.objects.filter(
             in_use=True, has_oral_argument_scraper=True
         )
+        count_fds = FinancialDisclosure.objects.all().count()
+        count_investments = Investment.objects.all().count()
+        count_people = Person.objects.all().count()
 
         oa_duration = Audio.objects.aggregate(Sum("duration"))["duration__sum"]
         if oa_duration:
@@ -237,14 +262,21 @@ def coverage_graph(request: HttpRequest) -> HttpResponse:
             "count_pro": count_pro,
             "count_lawbox": count_lawbox,
             "count_scraper": count_scraper,
+            "count_fds": count_fds,
+            "count_investments": count_investments,
+            "count_people": count_people,
             "courts_with_opinion_scrapers": opinion_courts,
             "courts_with_oral_argument_scrapers": oral_argument_courts,
             "private": False,
         }
         one_day = 60 * 60 * 24
         cache.set(coverage_cache_key, coverage_data, one_day)
+    return coverage_data
 
-    return TemplateResponse(request, "coverage.html", coverage_data)
+
+def coverage_graph(request: HttpRequest) -> HttpResponse:
+    coverage_data_o = get_coverage_data_o(request)
+    return TemplateResponse(request, "help/coverage.html", coverage_data_o)
 
 
 def feeds(request: HttpRequest) -> HttpResponse:
@@ -282,8 +314,8 @@ def contribute(request: HttpRequest) -> HttpResponse:
 def contact(
     request: HttpRequest,
     template_path: str = "contact_form.html",
-    template_data: Optional[Dict[str, Union[ContactForm, str, bool]]] = None,
-    initial: Optional[Dict[str, str]] = None,
+    template_data: dict[str, ContactForm | str | bool] | None = None,
+    initial: dict[str, str] | None = None,
 ) -> HttpResponse:
     """This is a fairly run-of-the-mill contact form, except that it can be
     overridden in various ways so that its logic can be called from other
@@ -347,7 +379,7 @@ def contact_thanks(request: HttpRequest) -> HttpResponse:
 
 def advanced_search(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(
-        request, "advanced_search.html", {"private": False}
+        request, "help/advanced_search.html", {"private": False}
     )
 
 

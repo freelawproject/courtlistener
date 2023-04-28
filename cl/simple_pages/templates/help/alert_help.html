@@ -125,7 +125,7 @@
     <p>The courts below have complete RSS feeds.</p>
 
     <ul class="nav nav-tabs" role="tablist">
-      <li role="presentation" class="active"><a href="#full-feeds-FD" aria-controls="full-feeds-district" role="tab" data-toggle="tab">District Courts</a></li>
+      <li role="presentation"><a href="#full-feeds-FD" aria-controls="full-feeds-district" role="tab" data-toggle="tab">District Courts</a></li>
       <li role="presentation"><a href="#full-feeds-FB" aria-controls="full-feeds-bankr" role="tab" data-toggle="tab">Bankruptcy Courts</a></li>
     </ul>
 
@@ -151,14 +151,15 @@
     <h4 class="v-offset-above-2">Partial RSS Feeds</h4>
     <p>Other courts only provide some types of documents in their RSS feeds. You can see which docket entry types are provided by these courts below.</p>
     <ul class="nav nav-tabs" role="tablist">
-      <li role="presentation" class="active"><a href="#partial-feeds-FD" aria-controls="partial-feeds-district" role="tab" data-toggle="tab">District Courts</a></li>
+      <li role="presentation" class="active"><a href="#partial-feeds-F" aria-controls="partial-feeds-appellate" role="tab" data-toggle="tab">Appellate Courts</a></li>
+      <li role="presentation"><a href="#partial-feeds-FD" aria-controls="partial-feeds-district" role="tab" data-toggle="tab">District Courts</a></li>
       <li role="presentation"><a href="#partial-feeds-FB" aria-controls="partial-feeds-bankr" role="tab" data-toggle="tab">Bankruptcy Courts</a></li>
     </ul>
 
     {% regroup partial_feeds|dictsort:"jurisdiction" by jurisdiction as partial_feed_courts %}
     <div class="tab-content">
       {% for group in partial_feed_courts %}
-        <div role="tabpanel" class="tab-pane {% if group.grouper == "FD" %}active{% endif %}" id="partial-feeds-{{ group.grouper }}">
+        <div role="tabpanel" class="tab-pane {% if group.grouper == "F" %}active{% endif %}" id="partial-feeds-{{ group.grouper }}">
           <table class="table table-striped">
             {% for court in group.list %}
               <tr>
@@ -175,18 +176,19 @@
 
 
     <h4 class="v-offset-above-2">No RSS Feeds</h4>
-    <p>In addition to the federal Circuit Courts, the following courts do not provide RSS feeds of their latest filings:
+    <p>The following courts do not provide RSS feeds of their latest filings:
     </p>
 
     <ul class="nav nav-tabs" role="tablist">
-      <li role="presentation" class="active"><a href="#no-feeds-FD" aria-controls="no-feeds-district" role="tab" data-toggle="tab">District Courts</a></li>
+      <li role="presentation" class="active"><a href="#no-feeds-F" aria-controls="no-feeds-appellate" role="tab" data-toggle="tab">Appellate Courts</a></li>
+      <li role="presentation"><a href="#no-feeds-FD" aria-controls="no-feeds-district" role="tab" data-toggle="tab">District Courts</a></li>
       <li role="presentation"><a href="#no-feeds-FB" aria-controls="no-feeds-bankr" role="tab" data-toggle="tab">Bankruptcy Courts</a></li>
     </ul>
 
     {% regroup no_feeds|dictsort:"jurisdiction" by jurisdiction as no_feed_courts %}
     <div class="tab-content">
       {% for group in no_feed_courts %}
-        <div role="tabpanel" class="tab-pane {% if group.grouper == "FD" %}active{% endif %}" id="no-feeds-{{ group.grouper }}">
+        <div role="tabpanel" class="tab-pane {% if group.grouper == "F" %}active{% endif %}" id="no-feeds-{{ group.grouper }}">
           <div class="row v-offset-above-1">
             {% for row in group.list|rows:2 %}
               <div class="col-xs-12 col-sm-6">

@@ -1,5 +1,6 @@
 {% load text_filters %}
 {% load humanize %}
+{% load tz %}
 
 <!DOCTYPE html>
 <html style="font-size: 100.01%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0; padding: 0;">
@@ -62,7 +63,7 @@
 
     {% if notes or tags %}
       <p style="font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 1em 0 1em; padding: 0;">
-        <strong>Your Note: </strong><span>{% if notes %}{{ notes }}{% else %}You have not added notes to this case. <a href="https://www.courtlistener.com{% url 'tag_favorites_help' %}">Learn more</a>{% endif %}</span>
+        <strong>Your Note: </strong><span>{% if notes %}{{ notes }}{% else %}You have not added notes to this case. <a href="https://www.courtlistener.com{% url 'tag_notes_help' %}">Learn more</a>{% endif %}</span>
       </p>
       <p style="font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 1em 0 1em; padding: 0;">
         <strong>Your Tags: </strong>
@@ -72,12 +73,12 @@
               <a href="https://www.courtlistener.com{% url 'view_tag' username tag.name %}">{{ tag.name }}</a>{% if not forloop.last %}, {% endif %}
             {% endfor %}
           {% else %}
-            No tags yet. <a href="https://www.courtlistener.com{% url 'tag_favorites_help' %}">Learn more</a>
+            No tags yet. <a href="https://www.courtlistener.com{% url 'tag_notes_help' %}">Learn more</a>
           {% endif %}
         </span>
       </p>
     {% else %}
-      <p style="font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 1em 0 1em; padding: 0;">Use notes and tags to organize and share the cases you follow. <a href="https://www.courtlistener.com{% url 'tag_favorites_help' %}">Learn more</a></p>
+      <p style="font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 1em 0 1em; padding: 0;">Use notes and tags to organize and share the cases you follow. <a href="https://www.courtlistener.com{% url 'tag_notes_help' %}">Learn more</a></p>
     {% endif %}
     <hr style="background: #ddd; color: #ddd; clear: both; float: none; width: 60%; height: .1em; margin: 0 0 1.45em; border: none;">
     <table cellpadding="8">
@@ -94,7 +95,13 @@
         {% for rd in de.recap_documents.all %}
           <tr>
             <td style="text-align: center">{{ de.entry_number }}{% if rd.attachment_number  %}-{{ rd.attachment_number }}{% endif %}</td>
-            <td>{{ de.date_filed|date:"M j, Y"|default:'<em>Unknown</em>' }}</td>
+            <td>
+              {% if de.datetime_filed %}
+                <span title="{{ de.datetime_filed|timezone:timezone}}">{{ de.datetime_filed|timezone:timezone|date:"M j, Y" }}</span>
+              {% else %}
+                {{ de.date_filed|date:"M j, Y"|default:'<em class="gray">Unknown</em>' }}
+              {% endif %}
+            </td>
             <td {% if not rd.document_number %}colspan="2"{% endif %}>
               {% if rd.description %}
                 {{ rd.description|safe }}
@@ -107,6 +114,8 @@
                 {% if rd.filepath_local %}
                   <a href="{{ rd.filepath_local.url }}">For free from RECAP
                   </a>
+                 {% elif rd.is_sealed %}
+                  <span>Sealed on PACER</span>
                 {% else %}
                   <a href="https://www.courtlistener.com{{ rd.get_absolute_url }}?redirect_to_download=True">From RECAP with PACER fallback
                   </a>

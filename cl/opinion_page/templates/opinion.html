@@ -20,7 +20,7 @@
 
 {% block footer-scripts %}
     <script defer type="text/javascript" src="{% static "js/jquery.NobleCount.min.js" %}"></script>
-    <script defer type="text/javascript" src="{% static "js/save-favorites.js" %}"></script>
+    <script defer type="text/javascript" src="{% static "js/save-notes.js" %}"></script>
     {% if request.user.is_staff %}
         <script defer type="text/javascript" src="{% static "js/admin_tools.js" %}"></script>
         {% if DEBUG %}
@@ -68,16 +68,16 @@
             </div>
         {% endif %}
 
-        {# show this div if it is a favorite, otherwise, put it in place, in anticipation of it becoming one. #}
-        <div class="{% if not favorite_form.instance.cluster_id %}hidden{% endif %} sidebar-section" id="sidebar-notes">
+        {# show this div if there is a note, otherwise, put it in place, in anticipation of it becoming one. #}
+        <div class="{% if not note_form.instance.cluster_id %}hidden{% endif %} sidebar-section" id="sidebar-notes">
             <div>
                 <h3 class="inline"><span>Your Notes</span></h3>
-                <p class="inline" data-toggle="modal" data-target="#modal-save-favorite">
-                    (<a href="#favorite-editor">edit</a>)
+                <p class="inline" data-toggle="modal" data-target="#modal-save-note">
+                    (<a href="#note-editor">edit</a>)
                      <i class="fa fa-pencil gray pointer"></i>
                 </p>
                 <p id="sidebar-notes-text">
-                    {{ favorite_form.instance.notes|default:"(none)" }}
+                    {{ note_form.instance.notes|default:"(none)" }}
                 </p>
             </div>
         </div>
@@ -232,15 +232,13 @@
 {% block content %}
     <article class="col-sm-9">
         {% with opinion_count=cluster.sub_opinions.all.count %}
-            <i id="favorites-star"
-               class="{% if favorite_form.instance.cluster_id %}gold fa-star{% else %}gray fa-star-o bold{% endif %} pointer fa inline"
-               data-toggle="modal"
-               data-target="#modal-save-favorite, #modal-logged-out"
-               title="Save this record as a favorite in your profile"></i>
             <h2 class="inline">{{ cluster.caption|safe|v_wrapper }}</h2>
-            {% include "includes/favorites_modal.html" %}
+            {% include "includes/notes_modal.html" %}
 
             <h3>{{ cluster.docket.court }}</h3>
+            <p>
+              {% include "includes/add_note_button.html" with form_instance_id=note_form.instance.cluster_id %}
+            </p>
             {% if cluster.syllabus %}
                 <div class="well well-sm">
                     <h4>Summary of Opinion</h4>
@@ -284,7 +282,7 @@
             {% if cluster.docket.court_id != "olc" %}
                 <p class="bottom">
                     <span class="meta-data-header">Docket Number:</span>
-                    <span class="meta-data-value">
+                    <span class="meta-data-value select-all">
                         {{ cluster.docket.docket_number|default:"Unknown" }}
                     </span>
                 </p>

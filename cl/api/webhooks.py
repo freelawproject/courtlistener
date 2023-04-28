@@ -1,3 +1,5 @@
+import json
+
 import requests
 from django.conf import settings
 from rest_framework.renderers import JSONRenderer
@@ -32,7 +34,7 @@ def send_webhook_event(
     the webhook is sent.
     """
     proxy_server = {
-        "http": settings.EGRESS_PROXY_HOST,
+        "http": settings.EGRESS_PROXY_HOST,  # type: ignore
     }
     headers = {
         "Content-type": "application/json",
@@ -47,6 +49,10 @@ def send_webhook_event(
             webhook_event.content,
             accepted_media_type="application/json;",
         )
+
+    json_data = json.loads(json_bytes)
+    if json_data == {}:
+        raise ValueError("Webhook payload is empty.")
     try:
         # To send a POST to an HTTPS target and using webhook-sentry as proxy,
         # you needed to change the protocol to HTTP and set the X-WhSentry-TLS
@@ -55,7 +61,7 @@ def send_webhook_event(
         response = requests.post(
             url,
             proxies=proxy_server,
-            data=json_bytes,
+            json=json_data,
             timeout=(3, 3),
             stream=True,
             headers=headers,

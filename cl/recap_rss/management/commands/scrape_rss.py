@@ -76,7 +76,7 @@ class Command(VerboseCommand):
 
         # Loop over the PACER sites that have RSS feeds and see if they're
         # ready to do.
-        courts = Court.federal_courts.district_pacer_courts().filter(
+        courts = Court.federal_courts.all_pacer_courts().filter(
             pacer_has_rss_feed=True,
         )
         if options["courts"] != ["all"]:

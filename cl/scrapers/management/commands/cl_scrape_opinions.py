@@ -22,9 +22,15 @@ from cl.people_db.lookup_utils import lookup_judges_by_messy_str
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.models import ErrorLog
 from cl.scrapers.tasks import extract_doc_content
-from cl.scrapers.utils import get_binary_content, get_extension, signal_handler
+from cl.scrapers.utils import (
+    get_binary_content,
+    get_extension,
+    signal_handler,
+    update_or_create_docket,
+)
 from cl.search.models import (
     SEARCH_TYPES,
+    SOURCES,
     Citation,
     Court,
     Docket,
@@ -81,14 +87,14 @@ def make_objects(
         item["case_names"]
     )
 
-    docket = Docket(
-        docket_number=item.get("docket_numbers", ""),
-        case_name=item["case_names"],
-        case_name_short=case_name_short,
-        court=court,
+    docket = update_or_create_docket(
+        item["case_names"],
+        case_name_short,
+        court.pk,
+        item.get("docket_numbers", ""),
+        item.get("source") or Docket.SCRAPER,
         blocked=blocked,
         date_blocked=date_blocked,
-        source=item.get("source") or Docket.SCRAPER,
     )
 
     cluster = OpinionCluster(
@@ -97,7 +103,7 @@ def make_objects(
         date_filed_is_approximate=item["date_filed_is_approximate"],
         case_name=item["case_names"],
         case_name_short=case_name_short,
-        source=item.get("cluster_source") or "C",
+        source=item.get("cluster_source") or SOURCES.COURT_WEBSITE,
         precedential_status=item["precedential_statuses"],
         nature_of_suit=item.get("nature_of_suit", ""),
         blocked=blocked,

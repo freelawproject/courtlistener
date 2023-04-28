@@ -5,6 +5,9 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from django.db import transaction
 
+from cl.alerts.models import AlertEvent, DocketAlertEvent
+from cl.api.models import WebhookHistoryEvent
+from cl.favorites.models import DocketTagEvent, NoteEvent, UserTagEvent
 from cl.lib.crypto import md5
 from cl.lib.types import EmailType
 from cl.users.models import UserProfile
@@ -85,12 +88,27 @@ def convert_to_stub_account(user: User) -> User:
 
 def delete_user_assets(user: User) -> None:
     """Delete any associated data from a user account and profile"""
+
+    # Store user_tags before deleting the user-related objects.
+    user_tags = user.user_tags.all()
+    user_tags_ids = [user_tag.pk for user_tag in user_tags]
+
     user.alerts.all().delete()
+    user.webhooks.all().delete()
     user.docket_alerts.all().delete()
-    user.favorites.all().delete()
-    user.user_tags.all().delete()
+    user.notes.all().delete()
+    user_tags.delete()
     user.monthly_donations.all().update(enabled=False)
     user.scotus_maps.all().update(deleted=True)
+
+    # After deleting user-related objects, nuke history objects related to the
+    # user so that events generated due to delete() are also removed.
+    DocketAlertEvent.objects.filter(user_id=user.pk).delete()
+    AlertEvent.objects.filter(user_id=user.pk).delete()
+    NoteEvent.objects.filter(user_id=user.pk).delete()
+    UserTagEvent.objects.filter(user_id=user.pk).delete()
+    DocketTagEvent.objects.filter(tag__id__in=user_tags_ids).delete()
+    WebhookHistoryEvent.objects.filter(user_id=user.pk).delete()
 
 
 emails: Dict[str, EmailType] = {

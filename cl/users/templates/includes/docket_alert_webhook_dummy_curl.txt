@@ -7,6 +7,7 @@ curl --request POST \
       "results":[
          {
             "id":2208776613,
+            "docket": 4214664,
             "date_filed":"2022-10-11",
             "description":"MOTION for Settlement Preliminary Approval by ALLIANCE FOR JUSTICE, NATIONAL CONSUMER LAW CENTER, NATIONAL VETERANS LEGAL SERVICES PROGRAM. (Attachments: # 1 Text of Proposed Order Proposed Order)(Gupta, Deepak) (Entered: 10/11/2022)",
             "date_created":"2022-10-11T14:21:40.855097-07:00",

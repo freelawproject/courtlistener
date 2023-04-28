@@ -1,3 +1,4 @@
+# mypy: disable-error-code=attr-defined
 import datetime
 import os
 import shutil
@@ -22,12 +23,21 @@ from rest_framework.status import (
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import SimpleUserDataMixin, SitemapTest
 from cl.opinion_page.forms import CourtUploadForm
-from cl.opinion_page.views import make_docket_title
+from cl.opinion_page.views import get_prev_next_volumes, make_docket_title
 from cl.people_db.factories import PersonFactory, PositionFactory
 from cl.people_db.models import Person
+from cl.recap.factories import (
+    AppellateAttachmentFactory,
+    AppellateAttachmentPageFactory,
+    DocketEntriesDataFactory,
+    DocketEntryDataFactory,
+)
+from cl.recap.mergers import add_docket_entries, merge_attachment_page_data
 from cl.search.factories import (
+    CitationWithParentsFactory,
     CourtFactory,
     DocketFactory,
+    OpinionClusterFactoryWithChildrenAndParents,
     OpinionClusterWithParentsFactory,
 )
 from cl.search.models import (
@@ -71,6 +81,62 @@ class SimpleLoadTest(TestCase):
         )
         response = self.client.get(path)
         self.assertEqual(response.status_code, HTTP_200_OK)
+
+
+class DocumentPageRedirection(TestCase):
+    """
+    Test to make sure the document page of appellate entries redirect users
+    to the attachment page if the main document got converted into an attachment
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="ca1", jurisdiction="F")
+        cls.docket = DocketFactory(
+            court=cls.court, source=Docket.RECAP, pacer_case_id="104490"
+        )
+        cls.de_data = DocketEntriesDataFactory(
+            docket_entries=[
+                DocketEntryDataFactory(
+                    pacer_doc_id="288651",
+                    document_number=1,
+                )
+            ],
+        )
+        add_docket_entries(cls.docket, cls.de_data["docket_entries"])
+
+        cls.att_data = AppellateAttachmentPageFactory(
+            attachments=[
+                AppellateAttachmentFactory(
+                    attachment_number=1, pacer_doc_id="288651"
+                ),
+                AppellateAttachmentFactory(),
+            ],
+            pacer_doc_id="288651",
+            pacer_case_id="104490",
+        )
+        merge_attachment_page_data(
+            cls.court,
+            cls.att_data["pacer_case_id"],
+            cls.att_data["pacer_doc_id"],
+            None,
+            "",
+            cls.att_data["attachments"],
+        )
+
+    def test_redirect_to_attachment_page(self) -> None:
+        """Does the page redirect to the attachment page?"""
+        path = reverse(
+            "view_recap_document",
+            kwargs={
+                "docket_id": self.docket.pk,
+                "doc_num": 1,
+                "slug": self.docket.slug,
+            },
+        )
+        r = self.client.get(path, follow=True)
+        self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
+        self.assertEqual(r.status_code, HTTP_200_OK)
 
 
 class CitationRedirectorTest(TestCase):
@@ -246,13 +312,135 @@ class CitationRedirectorTest(TestCase):
         self.assertEqual(r.status_code, HTTP_302_FOUND)
         self.assertEqual(r.url, "/c/f2d/56/9/")
 
+    def test_volume_pagination(self) -> None:
+        """Can we properly paginate reporter volume numbers?"""
+
+        # Create test data usign factories
+        test_obj = CitationWithParentsFactory.create(
+            volume="2016",
+            reporter="COA",
+            page="1",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=CourtFactory(id="coloctapp")),
+                case_name="In re the Marriage of Morton",
+                date_filed=datetime.date(2016, 1, 14),
+            ),
+        )
+
+        CitationWithParentsFactory.create(
+            volume="2017",
+            reporter="COA",
+            page="3",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=CourtFactory(id="coloctapp")),
+                case_name="Begley v. Ireson",
+                date_filed=datetime.date(2017, 1, 12),
+            ),
+        )
+
+        CitationWithParentsFactory.create(
+            volume="2018",
+            reporter="COA",
+            page="1",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=CourtFactory(id="coloctapp")),
+                case_name="People v. Sparks",
+                date_filed=datetime.date(2018, 1, 11),
+            ),
+        )
+
+        CitationWithParentsFactory.create(
+            volume="2018",
+            reporter="COA",
+            page="1",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=CourtFactory(id="coloctapp")),
+                case_name="People v. Sparks",
+                date_filed=datetime.date(2018, 1, 11),
+            ),
+        )
+
+        # Get previous and next volume for "2017 COA"
+        volume_next, volume_previous = get_prev_next_volumes("COA", "2017")
+        self.assertEqual(volume_previous, 2016)
+        self.assertEqual(volume_next, 2018)
+
+        # Delete previous
+        test_obj.delete()
+
+        # Only get next volume for "2017 COA"
+        volume_next, volume_previous = get_prev_next_volumes("COA", "2017")
+        self.assertEqual(volume_previous, None)
+        self.assertEqual(volume_next, 2018)
+
+        # Create new test data
+        CitationWithParentsFactory.create(
+            volume="454",
+            reporter="U.S.",
+            page="1",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=CourtFactory(id="scotus")),
+                case_name="Duckworth v. Serrano",
+                date_filed=datetime.date(1981, 10, 19),
+            ),
+        )
+
+        # No next or previous volume for "454 U.S."
+        volume_next, volume_previous = get_prev_next_volumes("U.S.", "454")
+        self.assertEqual(volume_previous, None)
+        self.assertEqual(volume_next, None)
+
+    def test_avoid_exception_possible_matches_page_with_letter(self) -> None:
+        """Can we order the possible matches when page number contains a
+        letter without getting a DataError exception?"""
+
+        # See: freelawproject/courtlistener#2474
+
+        # Create the citation that contains 40M as page number and was
+        # causing the exception
+        CitationWithParentsFactory.create(
+            volume="2017",
+            reporter="COA",
+            page="40M",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=CourtFactory(id="coloctapp")),
+                case_name="People v. Davis",
+                date_filed=datetime.date(2017, 5, 4),
+            ),
+        )
+
+        r = self.client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={
+                    "reporter": "coa",
+                    "volume": "2017",
+                    "page": "157",
+                },
+            ),
+        )
+        self.assertStatus(r, HTTP_404_NOT_FOUND)
+
 
 class ViewRecapDocketTest(TestCase):
-    fixtures = ["test_objects_search.json", "judge_judy.json"]
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.docket = DocketFactory(
+            court=cls.court,
+            source=Docket.RECAP,
+        )
+        cls.court_appellate = CourtFactory(id="ca1", jurisdiction="F")
+        cls.docket_appellate = DocketFactory(
+            court=cls.court_appellate,
+            source=Docket.RECAP,
+        )
 
     def test_regular_docket_url(self) -> None:
         """Can we load a regular docket sheet?"""
-        r = self.client.get(reverse("view_docket", args=[1, "case-name"]))
+        r = self.client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
         self.assertEqual(r.status_code, HTTP_200_OK)
 
     def test_recap_docket_url(self) -> None:
@@ -262,15 +450,50 @@ class ViewRecapDocketTest(TestCase):
         r = self.client.get(
             reverse(
                 "redirect_docket_recap",
-                kwargs={"court": "test", "pacer_case_id": "666666"},
+                kwargs={
+                    "court": self.court.pk,
+                    "pacer_case_id": self.docket.pacer_case_id,
+                },
             ),
             follow=True,
         )
         self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
 
+    def test_docket_view_counts_increment_by_one(self) -> None:
+        """Test the view count for a Docket increments on page view"""
+
+        old_view_count = self.docket.view_count
+        r = self.client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.docket.refresh_from_db(fields=["view_count"])
+        self.assertEqual(old_view_count + 1, self.docket.view_count)
+
+    def test_appellate_docket_no_pacer_case_id_increment_view_count(
+        self,
+    ) -> None:
+        """Test the view count for a RECAP Docket without pacer_case_id
+        increments on page view
+        """
+
+        # Set pacer_case_id blank
+        Docket.objects.filter(pk=self.docket_appellate.pk).update(
+            pacer_case_id=None
+        )
+        old_view_count = self.docket_appellate.view_count
+        r = self.client.get(
+            reverse(
+                "view_docket",
+                args=[self.docket_appellate.pk, self.docket_appellate.slug],
+            )
+        )
+        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.docket_appellate.refresh_from_db(fields=["view_count"])
+        self.assertEqual(old_view_count + 1, self.docket_appellate.view_count)
+
 
 class OgRedirectLookupViewTest(TestCase):
-
     fixtures = ["recap_docs.json"]
 
     def setUp(self) -> None:

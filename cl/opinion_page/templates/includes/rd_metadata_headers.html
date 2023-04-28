@@ -1,3 +1,4 @@
+{% load tz %}
 <h3>
   {% if rd.description %}{{ rd.description }}
     <span class="gray">&mdash;</span>
@@ -13,11 +14,16 @@
     </a>
   </span>
 </p>
+{% include "includes/citation.html" with obj=rd.docket_entry %}
 {% if rd.docket_entry.date_filed %}
 <p class="bottom">
   <span class="meta-data-header">Date Filed:</span>
   <span class="meta-data-value">
-    {{ rd.docket_entry.date_filed|date:"F jS, Y" }}
+    {% if rd.docket_entry.datetime_filed %}
+      {{ rd.docket_entry.datetime_filed|timezone:timezone|date:"F jS, Y, P e" }}
+    {% else %}
+      {{ rd.docket_entry.date_filed|date:"F jS, Y" }}
+    {% endif %}
   </span>
 </p>
 {% endif %}
@@ -31,6 +37,9 @@
 {% endif %}
 
 <div class="v-offset-below-3 v-offset-above-1">
-  {% include "includes/rd_download_button.html" %}
+  <div class="btn-group">
+    {% include "includes/add_note_button.html" with form_instance_id=note_form.instance.recap_doc_id %}
+  </div>
   {% include "includes/rd_doc_search_button.html" %}
+  {% include "includes/rd_download_button.html" %}
 </div>

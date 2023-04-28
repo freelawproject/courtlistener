@@ -1,50 +1,94 @@
 {% extends "base.html" %}
 
-{% block title %}Contribute – CourtListener.com{% endblock %}
+{% block title %}Contribute to Free Law Project – CourtListener.com{% endblock %}
+{% block sidebar %}{% endblock %}
 
 {% block content %}
-    <div class="col-xs-12">
-        <h2 id="get-involved">Contribute</h2>
-    </div>
+<div class="hidden-xs hidden-sm col-md-3">
+  <div id="toc">
+    <h3>Table of Contents</h3>
+    <ul>
+      <li><a href="#overview">How to Help</a></li>
+      <ul>
+        <li><a href="#as-a-person">As a Regular Person</a></li>
+        <li><a href="#as-a-user">As a User</a></li>
+        <li><a href="#as-a-developer">As a Developer</a></li>
+        <li><a href="#as-a-journalist">As a Journalist</a></li>
+        <li><a href="#as-a-librarian">As a Librarian</a></li>
+        <li><a href="#as-a-attorney">As a Attorney</a></li>
+  </div>
+</div>
 
-    <div class="col-sm-9">
-        <h3 id="overview">Overview</h3>
+<div class="col-xs-12 col-md-8 col-lg-6">
+  <h1>Contributing to CourtListener and Free&nbsp;Law&nbsp;Project</h1>
+  <p class="lead">CourtListener is an initiative of Free Law Project, a 501(c)(3) non-profit that uses advocacy and software to make the legal sector more competitive and equitable. We always need help to accomplish our goals.
+  </p>
+  <p>If you are looking to support our work, the first thing you can do to help is donate to Free Law Project. This allows us to hire more full time, long term staff members. It can be gauche to say so directly, but nothing makes as big a difference as financial support. Please consider donating if you can.
+  </p>
+  <p>
+    <a href="{% url "donate" %}?referrer=contribute-page" class="btn btn-danger btn-lg">Donate Now</a>
+  </p>
 
-        <p>This is an open source and open data project. Its success hinges on
-            the support and <a href="{% url "donate" %}?referrer=contribute-page">donations</a> of its users. You can help to make it better.</p>
+  <h2 id="other-ways">Other Ways to Contribute</h2>
+  <h3 id="as-a-person">As a Regular Person</h3>
+  <p>Everybody can help us in these ways:</p>
+  <ul>
+    <p>
+      <li>Simply spread the word. Tell your colleagues to use RECAP and CourtListener. Use our links when referring to court materials. Follow and share our social media accounts.</li>
+    </p>
+    <p>
+      <li>Write a review of RECAP on the <a href="https://chrome.google.com/webstore/detail/recap/oiillickanjlaeghobeeknbddaonmjnc">Chrome</a>, <a href="https://apps.apple.com/us/app/recap/id1600281788">Apple</a>, or <a href="https://addons.mozilla.org/en-US/firefox/addon/recap-195534/">Firefox</a> store.</li>
+    </p>
+    <p>
+      <li>You can encourage your organization to <a href="https://free.law/become-a-sponsor/">become a corporate sponsor</a>.</li>
+    </p>
+    <p>
+      <li>You can check out <a href="{% url "donation_help" %}#other-ways">our other ways to contribute financially</a>.</li>
+    </p>
+  </ul>
 
-        <p>There are many ways to help. The easiest way is to <a
-                href="/contact/">give us your feedback via the contact form</a>.
-            If you notice something wrong or something great, let us know.</p>
 
-        <p>Developers, we welcome your contributions to <a
-                href="https://github.com/freelawproject/courtlistener">our
-            code</a>.</p>
-
-        <p>Attorneys, if you are using this site and discover that something is
-            worded wrong, looks wrong, or is just plain wrong, please let us
-            know, and we'll get it fixed.</p>
-
-        <p>We're also looking for people to help with data cleanup, and legal research. If you're interested, <a href="{% url "contact" %}">drop us a line on the contact page</a>.</p>
+  <h3 id="as-a-user">As a User</h3>
+  <p>If you use CourtListener, then your feedback is invaluable. Please let us know what bugs you and what you love. Feel free to repeat yourself if you feel like you're not being heard. Get in touch!
+  </p>
+  <p>
+    <a href="{% url "contact" %}" class="btn btn-default btn-lg">Give Us Feedback</a>
+  </p>
 
 
-        <h3 id="bugs">Bugs</h3>
-        <p>If you find any problems with CourtListener at all, please let us
-            know. To file a bug, please go to our bug tracker, and fill out <a
-                    href="https://github.com/freelawproject/courtlistener/issues/new">this
-                form</a> with as much detail about what you were doing and what
-            happened. This gives us valuable feedback to keep things running properly.</p>
-    </div>
+  <h3 id="as-a-developer">As a Software Developer</h3>
+  <p>All of our code is open source and we have more work than we can ever complete.</p>
+  <p>If you want to contribute to our work, get in touch with an email noting your skills and time availability. If you have a recent résumé, include it. When we get your email, we'll try to think of a project that'd be right for you.
+  </p>
+  <p>We also maintain a project board for volunteer developers, where you can sometimes just grab something to work on.</p>
+  <p>
+    <a href="https://github.com/orgs/freelawproject/projects/31/views/1" class="btn btn-default btn-lg">Review the Project Board</a>
+    <a href="{% url "contact" %}" class="btn btn-default btn-lg">Get in Touch</a>
 
-    <div class="col-sm-3">
-        <h3 id="quick-actions">Quick actions</h3>
-        <ul class="top">
-            <li>
-                <a href="https://github.com/freelawproject/courtlistener/issues/new">File
-                    a bug in our bug tracker</a></li>
-            <li><a href="https://github.com/freelawproject/courtlistener/">Browse
-                and contribute to the code</a></li>
-            <li><a href="{% url "contact" %}">Contact us with your ideas</a></li>
-        </ul>
-    </div>
+  </p>
+
+
+  <h3 id="as-a-journalist">As a Journalist</h3>
+  <p>You probably know what to do: Use our links and tell people about our initiatives.</p>
+  <p>Beyond this, we hope you'll use and evangelize <a href="https://free.law/recap/">RECAP</a> and <a href="{% url "alert_help" %}">our alerts system</a>. Some news organizations pay for alert subscriptions. Maybe you know the decision-maker at your organization?
+  </p>
+
+
+  <h3 id="as-a-librarian">As a Librarian</h3>
+  <p>We need help getting the next generation of users. Library Guides help! If you can write guides about our materials and put them on your library's website, that really helps get the word out. Let us know if you have questions while developing any kind of material.
+  </p>
+  <p>If you have time to volunteer, we regularly need research or data gathering help and have a #librarians channel in our Slack workspace where we hope you'll hang out. Get in touch to get started.
+  </p>
+
+
+  <h3 id="as-an-attorney">As an Attorney</h3>
+  <p>If you are an attorney that works in federal court, we encourage you to use <a href="{% url "recap_email_help" %}">@recap.email</a> so all of your cases are automatically available to the public. If you like, it can be done <a href="{% url "recap_email_help" %}#whats-the-best-way-to-simply-contribute-to-the%C2%A0cause">somewhat anonymously</a>.
+  </p>
+  <p>Beyond this, if you're using our system, we hope you'll give us your feedback. The legal space is endlessly complicated, but we can often make changes to address newly identified corner cases or issues.
+  </p>
+  <p>
+    <a href="{% url "recap_email_help" %}" class="btn btn-default btn-lg">Check out @recap.email</a>
+  </p>
+
+</div>
 {% endblock %}

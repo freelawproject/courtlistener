@@ -22,7 +22,6 @@ from .models import (
 
 @admin.register(FinancialDisclosure)
 class FinancialDisclosureAdmin(admin.ModelAdmin):
-
     list_display = ("__str__", "get_name", "year", "filepath")
 
     def get_name(self, obj):
@@ -39,7 +38,6 @@ class FinancialDisclosureAdmin(admin.ModelAdmin):
 
 @admin.register(Investment)
 class InvestmentAdmin(CursorPaginatorAdmin):
-
     raw_id_fields = ("financial_disclosure",)
 
     list_display = (

@@ -6,6 +6,7 @@ from unittest import mock
 from unittest.mock import ANY
 
 import time_machine
+from dateutil.tz import tzutc
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
@@ -67,6 +68,9 @@ from cl.recap.factories import (
     RECAPEmailNotificationDataFactory,
 )
 from cl.recap.management.commands.import_idb import Command
+from cl.recap.management.commands.remove_appellate_entries_with_long_numbers import (
+    clean_up_duplicate_appellate_entries,
+)
 from cl.recap.management.commands.reprocess_recap_dockets import (
     extract_unextracted_rds_and_add_to_solr,
 )
@@ -75,6 +79,7 @@ from cl.recap.mergers import (
     add_docket_entries,
     add_parties_and_attorneys,
     find_docket_object,
+    get_order_of_docket,
     normalize_long_description,
     update_case_names,
     update_docket_metadata,
@@ -101,8 +106,10 @@ from cl.recap.tasks import (
     process_recap_pdf,
     process_recap_zip,
 )
+from cl.recap_rss.tasks import merge_rss_feed_contents
 from cl.search.factories import (
     CourtFactory,
+    DocketEntryFactory,
     DocketEntryWithParentsFactory,
     DocketFactory,
     RECAPDocumentFactory,
@@ -137,8 +144,12 @@ class RecapUploadsTest(TestCase):
 
         cls.att_data = AppellateAttachmentPageFactory(
             attachments=[
-                AppellateAttachmentFactory(pacer_doc_id="04505578698"),
-                AppellateAttachmentFactory(),
+                AppellateAttachmentFactory(
+                    pacer_doc_id="04505578698", attachment_number=1
+                ),
+                AppellateAttachmentFactory(
+                    pacer_doc_id="04505578699", attachment_number=2
+                ),
             ],
             pacer_doc_id="04505578698",
             pacer_case_id="104490",
@@ -454,7 +465,6 @@ class RecapUploadsTest(TestCase):
             "cl.recap.tasks.get_data_from_appellate_att_report",
             side_effect=lambda x, y: self.att_data,
         ):
-
             process_recap_appellate_attachment(pq_1.pk)
 
         # Process the attachment page again, no new attachments should be added
@@ -576,6 +586,23 @@ class RecapUploadsTest(TestCase):
         )
         r = self.client.get(path)
         self.assertEqual(r.status_code, HTTP_200_OK)
+
+    def test_recap_upload_validate_pacer_case_id(self, mock):
+        """Can we properly validate the pacer_case_id doesn't contain a dash -?"""
+        self.data.update(
+            {
+                "upload_type": UPLOAD_TYPE.DOCKET,
+                "document_number": "",
+                "pacer_case_id": "12-2334",
+            }
+        )
+        del self.data["pacer_doc_id"]
+        r = self.client.post(self.path, self.data)
+        j = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertIn(
+            "PACER case ID can not contains dashes -", j["non_field_errors"][0]
+        )
 
 
 @mock.patch("cl.recap.tasks.DocketReport", new=fakes.FakeDocketReport)
@@ -700,6 +727,7 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
         }
         cls.request = RequestFactory().request()
         cls.request.user = cls.user
+        cls.court = CourtFactory(id="canb", jurisdiction="FB", in_use=True)
 
     def test_simple_request_serialization(self, mock) -> None:
         """Can we serialize a simple request?"""
@@ -713,6 +741,22 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
         )
 
         serialized_fq.save()
+
+    def test_recap_fetch_validate_pacer_case_id(self, mock):
+        """Can we properly validate the pacer_case_id doesn't contain a dash -?"""
+        self.fetch_attributes.update(
+            {"pacer_case_id": "12-2334", "court": "canb"}
+        )
+        del self.fetch_attributes["docket_id"]
+        serialized_fq = PacerFetchQueueSerializer(
+            data=self.fetch_attributes,
+            context={"request": self.request},
+        )
+        serialized_fq.is_valid()
+        self.assertIn(
+            serialized_fq.errors["non_field_errors"][0],
+            "PACER case ID can not contains dashes -",
+        )
 
     def test_key_serialization_with_client_code(self, mock) -> None:
         """Does the API have the fields we expect?"""
@@ -1806,6 +1850,76 @@ class RecapMinuteEntriesTest(TestCase):
         expected_item_count = 1
         self.assertEqual(d.docket_entries.count(), expected_item_count)
 
+    @mock.patch("cl.recap_rss.tasks.enqueue_docket_alert")
+    def test_appellate_rss_feed_ingestion(self, mock_enqueue_de) -> None:
+        """Can we ingest Appellate RSS feeds?"""
+
+        court_ca10 = CourtFactory(id="ca10", jurisdiction="F")
+        rss_feed = PacerRssFeed(court_ca10.pk)
+        with open(self.make_path("rss_ca10.xml"), "rb") as f:
+            text = f.read().decode()
+        rss_feed._parse_text(text)
+        merge_rss_feed_contents(rss_feed.data, court_ca10.pk)
+
+        dockets = Docket.objects.all()
+        self.assertEqual(dockets.count(), 3)
+        for docket in dockets:
+            self.assertEqual(docket.docket_entries.count(), 1)
+
+    @mock.patch("cl.recap_rss.tasks.enqueue_docket_alert")
+    def test_appellate_merge_rss_feed_with_case_id(
+        self, mock_enqueue_de
+    ) -> None:
+        """Can we merge an Appellate RSS feeds into an existing docket with
+        pacer_case_id?
+        """
+        court_ca10 = CourtFactory(id="ca10", jurisdiction="F")
+        docket = DocketFactory(
+            case_name="Navarette v. Horton, et al",
+            docket_number="22-2127",
+            court=court_ca10,
+            source=Docket.RECAP,
+            pacer_case_id="12524",
+        )
+
+        self.assertEqual(docket.docket_entries.count(), 0)
+        rss_feed = PacerRssFeed(court_ca10.pk)
+        with open(self.make_path("rss_ca10.xml"), "rb") as f:
+            text = f.read().decode()
+        rss_feed._parse_text(text)
+        merge_rss_feed_contents(rss_feed.data, court_ca10.pk)
+        docket.refresh_from_db()
+        self.assertEqual(docket.docket_entries.count(), 1)
+        self.assertEqual(docket.pacer_case_id, "12524")
+        self.assertEqual(docket.docket_number, "22-2127")
+
+    @mock.patch("cl.recap_rss.tasks.enqueue_docket_alert")
+    def test_appellate_merge_rss_feed_no_case_id(
+        self, mock_enqueue_de
+    ) -> None:
+        """Can we merge an Appellate RSS feeds into a docket with no
+        pacer_case_id?
+        """
+        court_ca10 = CourtFactory(id="ca10", jurisdiction="F")
+        docket = DocketFactory(
+            case_name="Navarette v. Horton, et al",
+            docket_number="22-2127",
+            court=court_ca10,
+            source=Docket.RECAP,
+            pacer_case_id=None,
+        )
+
+        self.assertEqual(docket.docket_entries.count(), 0)
+        rss_feed = PacerRssFeed(court_ca10.pk)
+        with open(self.make_path("rss_ca10.xml"), "rb") as f:
+            text = f.read().decode()
+        rss_feed._parse_text(text)
+        merge_rss_feed_contents(rss_feed.data, court_ca10.pk)
+        docket.refresh_from_db()
+        self.assertEqual(docket.docket_entries.count(), 1)
+        self.assertEqual(docket.pacer_case_id, "")
+        self.assertEqual(docket.docket_number, "22-2127")
+
 
 class DescriptionCleanupTest(SimpleTestCase):
     def test_cleanup(self) -> None:
@@ -1892,6 +2006,17 @@ class RecapDocketTaskTest(TestCase):
         self.assertEqual(d.source, Docket.RECAP_AND_SCRAPER)
         self.assertTrue(d.case_name)
         self.assertEqual(existing_d.pacer_case_id, d.pacer_case_id)
+
+    def test_adding_harvard_and_recap_source(self) -> None:
+        """Is the HARVARD_AND_RECAP source properly added when updating a
+        docket by RECAP, originally added by Harvard?
+        """
+        Docket.objects.create(
+            source=Docket.HARVARD, pacer_case_id="asdf", court_id="scotus"
+        )
+        returned_data = process_recap_docket(self.pq.pk)
+        d = Docket.objects.get(pk=returned_data["docket_pk"])
+        self.assertEqual(d.source, Docket.HARVARD_AND_RECAP)
 
     def test_docket_and_de_already_exist(self) -> None:
         """Can we parse if the docket and the docket entry already exist?"""
@@ -2383,6 +2508,39 @@ class RecapEmailDocketAlerts(TestCase):
             ],
         )
 
+        minute_entry_data = RECAPEmailDocketEntryDataFactory(
+            pacer_magic_num=None,
+            document_number=None,
+            document_url=None,
+            pacer_doc_id=None,
+            pacer_seq_no=None,
+            pacer_case_id="12345",
+        )
+
+        cls.minute_entry_data = RECAPEmailNotificationDataFactory(
+            contains_attachments=False,
+            dockets=[
+                RECAPEmailDocketDataFactory(
+                    docket_entries=[minute_entry_data],
+                )
+            ],
+        )
+
+        minute_entry_data_2 = minute_entry_data.copy()
+        minute_entry_data_2["pacer_case_id"] = "12346"
+        cls.multi_nef_minute_entry_data = RECAPEmailNotificationDataFactory(
+            contains_attachments=False,
+            appellate=False,
+            dockets=[
+                RECAPEmailDocketDataFactory(
+                    docket_entries=[minute_entry_data],
+                ),
+                RECAPEmailDocketDataFactory(
+                    docket_entries=[minute_entry_data_2],
+                ),
+            ],
+        )
+
     def setUp(self) -> None:
         self.client = APIClient()
         self.user = User.objects.get(username="recap-email")
@@ -2469,6 +2627,8 @@ class RecapEmailDocketAlerts(TestCase):
         pacer_doc_id = content["payload"]["results"][0]["recap_documents"][0][
             "pacer_doc_id"
         ]
+        docket_id = content["payload"]["results"][0]["docket"]
+        self.assertEqual(docket.pk, docket_id)
         self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
 
     @mock.patch(
@@ -3171,7 +3331,10 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d: (
+            MockResponse(200, b""),
+            "OK",
+        ),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -3244,11 +3407,16 @@ class RecapEmailDocketAlerts(TestCase):
             "recap_documents"
         ]
         self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
+        # Document available from magic link, not sealed.
+        self.assertEqual(recap_document[0].is_sealed, False)
         # We should send 10 recap documents in this webhook example
         self.assertEqual(len(recap_documents_webhook), 10)
         # Compare content for the main document and the first attachment
         # Main document
-        self.assertEqual(recap_documents_webhook[0]["description"], "")
+        self.assertEqual(
+            recap_documents_webhook[0]["description"],
+            "Case Management Statement",
+        )
         self.assertEqual(
             recap_documents_webhook[0]["pacer_doc_id"], "123019137279"
         )
@@ -3265,6 +3433,12 @@ class RecapEmailDocketAlerts(TestCase):
         )
         self.assertEqual(recap_documents_webhook[1]["document_number"], "16")
         self.assertEqual(recap_documents_webhook[1]["attachment_number"], 1)
+
+        # Confirm documents are not sealed in the webhook payload
+        is_sealed = content["payload"]["results"][0]["recap_documents"][0][
+            "is_sealed"
+        ]
+        self.assertEqual(is_sealed, False)
 
         # Trigger the recap.email notification again for the same user, it
         # should be processed.
@@ -3661,6 +3835,10 @@ class RecapEmailDocketAlerts(TestCase):
         "cl.recap.tasks.get_document_number_for_appellate",
         side_effect=lambda z, x, y: "011112443447",
     )
+    @mock.patch(
+        "cl.recap.tasks.is_pacer_doc_sealed",
+        side_effect=lambda z, x: False,
+    )
     def test_recap_email_no_magic_number(
         self,
         mock_bucket_open,
@@ -3669,6 +3847,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
         mock_get_document_number_appellate,
+        mock_is_pacer_doc_sealed,
     ):
         """Can we add docket entries from a recap email notification that don't
         contain a valid magic number?
@@ -3709,6 +3888,245 @@ class RecapEmailDocketAlerts(TestCase):
             pq[0].error_message,
             "No magic number available to download the document.",
         )
+
+        # Mock returns the document is not sealed.
+        self.assertEqual(recap_document[0].is_sealed, False)
+        webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
+        content = webhook_triggered.first().content
+        # Confirm document is not sealed in the webhook payload.
+        is_sealed = content["payload"]["results"][0]["recap_documents"][0][
+            "is_sealed"
+        ]
+        self.assertEqual(is_sealed, False)
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (
+            None,
+            "Document not available from magic link.",
+        ),
+    )
+    @mock.patch(
+        "cl.corpus_importer.tasks.get_document_number_from_confirmation_page",
+        side_effect=lambda z, x: "",
+    )
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_mark_as_sealed_nda_document_not_available_from_magic_link(
+        self,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+        mock_download_pdf,
+        mock_get_document_number_from_confirmation_page,
+        mock_webhook_post,
+    ):
+        """This test checks if we can mark as sealed a NDA document when the
+        download is not available through the magic link.
+        """
+
+        # Trigger a new nda recap.email notification from testing_1@recap.email
+        self.client.post(self.path, self.data_5, format="json")
+
+        recap_document = RECAPDocument.objects.all()
+        self.assertEqual(len(recap_document), 1)
+
+        # Confirm the document is marked as sealed.
+        self.assertEqual(recap_document[0].is_sealed, True)
+        webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
+        content = webhook_triggered.first().content
+        # Is the document sealed in the webhook payload?
+        is_sealed = content["payload"]["results"][0]["recap_documents"][0][
+            "is_sealed"
+        ]
+        self.assertEqual(is_sealed, True)
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (None, ""),
+    )
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    @mock.patch(
+        "cl.recap.tasks.requests.get",
+        side_effect=lambda *args, **kwargs: MockResponse(
+            200, mock_bucket_open("nyed_123019137279.html", "r", True)
+        ),
+    )
+    def test_mark_as_sealed_nef_documents_not_available_from_magic_link(
+        self,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+        mock_download_pacer_pdf_by_rd,
+        mock_webhook_post,
+        mock_att_response,
+    ):
+        """This test verifies if a recap.email notification with attachments
+        comes in and the documents are not available from the magic link,
+        documents are mark as sealed.
+        """
+
+        # Trigger a new recap.email notification
+        self.client.post(self.path, self.data_4, format="json")
+
+        recap_document = RECAPDocument.objects.all()
+        # Main document is marked as sealed.
+        self.assertEqual(recap_document[0].is_sealed, True)
+        self.assertEqual(len(recap_document), 10)
+
+        webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
+        content = webhook_triggered.first().content
+        # Compare the content of the webhook to the recap document
+        recap_documents_webhook = content["payload"]["results"][0][
+            "recap_documents"
+        ]
+        # We should send 10 recap documents in this webhook example
+        self.assertEqual(len(recap_documents_webhook), 10)
+        # All the documents including the attachments should be sealed.
+        for rd in recap_documents_webhook:
+            self.assertEqual(rd["is_sealed"], True)
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    @mock.patch(
+        "cl.recap.tasks.get_document_number_for_appellate",
+        side_effect=lambda z, x, y: "011112443447",
+    )
+    @mock.patch(
+        "cl.recap.tasks.is_pacer_doc_sealed",
+        side_effect=lambda z, x: True,
+    )
+    def test_recap_email_no_magic_number_sealed_document(
+        self,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+        mock_get_document_number_appellate,
+        mock_webhook_post,
+        mock_is_pacer_doc_sealed,
+    ):
+        """This test checks if a document without magic number that is not
+        available on PACER is marked as sealed.
+        """
+
+        with mock.patch(
+            "cl.recap.tasks.open_and_validate_email_notification",
+            side_effect=lambda x, y: (self.no_magic_number_data, "HTML"),
+        ):
+            # Trigger a new recap.email notification from testing_1@recap.email
+            # auto-subscription option enabled
+            self.client.post(self.path, self.data, format="json")
+
+        recap_document = RECAPDocument.objects.all()
+        self.assertEqual(len(recap_document), 1)
+
+        # Document is marked as sealed.
+        self.assertEqual(recap_document[0].is_sealed, True)
+        webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
+        content = webhook_triggered.first().content
+        # Confirm the document is sealed in webhook payload.
+        is_sealed = content["payload"]["results"][0]["recap_documents"][0][
+            "is_sealed"
+        ]
+        self.assertEqual(is_sealed, True)
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_recap_email_minute_entry(
+        self,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+        mock_webhook_post,
+    ):
+        """Can we add docket entries from a minute entry recap email
+        notification?
+        """
+
+        with mock.patch(
+            "cl.recap.tasks.open_and_validate_email_notification",
+            side_effect=lambda x, y: (self.minute_entry_data, "HTML"),
+        ):
+            # Trigger a new recap.email notification from testing_1@recap.email
+            # auto-subscription option enabled
+            self.client.post(self.path, self.data, format="json")
+
+        # Compare docket entry data.
+        recap_document = RECAPDocument.objects.all()
+        self.assertEqual(len(recap_document), 1)
+        docket = recap_document[0].docket_entry.docket
+        self.assertEqual(docket.pacer_case_id, "12345")
+        self.assertEqual(recap_document[0].pacer_doc_id, "")
+        self.assertEqual(recap_document[0].docket_entry.entry_number, None)
+
+        # A DocketAlert email for the recap.email user should go out
+        self.assertEqual(len(mail.outbox), 1)
+
+        # We can't set the seal status of a minute entry.
+        self.assertEqual(recap_document[0].is_sealed, None)
+        webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
+        content = webhook_triggered.first().content
+        is_sealed = content["payload"]["results"][0]["recap_documents"][0][
+            "is_sealed"
+        ]
+        self.assertEqual(is_sealed, None)
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (None, ""),
+    )
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_recap_email_minute_entry_multi_nef(
+        self,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+        mock_download_pacer_pdf_by_rd,
+        mock_webhook_post,
+    ):
+        """Can we add docket entries from a multi-nef minute entry recap email
+        notification?
+        """
+
+        with mock.patch(
+            "cl.recap.tasks.open_and_validate_email_notification",
+            side_effect=lambda x, y: (
+                self.multi_nef_minute_entry_data,
+                "HTML",
+            ),
+        ):
+            # Trigger a new nda recap.email notification from testing_1@recap.email
+            # Multi Docket NEF.
+            self.client.post(self.path, self.data, format="json")
+
+        # Compare docket entry data.
+        dockets = Docket.objects.all()
+        self.assertEqual(len(dockets), 2)
+        docket_entries = DocketEntry.objects.all()
+        self.assertEqual(len(docket_entries), 2)
+        recap_documents = RECAPDocument.objects.all()
+        self.assertEqual(len(recap_documents), 2)
+
+        for rd in recap_documents:
+            self.assertEqual(rd.pacer_doc_id, "")
+            self.assertEqual(rd.is_sealed, None)
+            self.assertEqual(rd.document_number, "")
+            self.assertEqual(rd.docket_entry.entry_number, None)
+
+        # A DocketAlert email for the recap.email user should go out
+        self.assertEqual(len(mail.outbox), 2)
 
 
 class GetAndCopyRecapAttachments(TestCase):
@@ -5235,7 +5653,6 @@ class WebhooksRetries(TestCase):
             # Deliver webhook_e1 successfully.
             next_retry_date = fake_now + timedelta(minutes=3)
             with time_machine.travel(next_retry_date, tick=False):
-
                 webhooks_to_retry = retry_webhook_events()
                 self.assertEqual(webhooks_to_retry, 1)
                 self.assertEqual(
@@ -5654,3 +6071,502 @@ class RecapFetchWebhooksTest(TestCase):
             content["payload"]["status"], PROCESSING_STATUS.SUCCESSFUL
         )
         self.assertNotEqual(content["payload"]["date_completed"], None)
+
+
+class CalculateRecapsSequenceNumbersTest(TestCase):
+    """Test calculate_recap_sequence_numbers considering docket entries court
+    timezone.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.cand = CourtFactory(id="cand", jurisdiction="FB")
+        cls.nyed = CourtFactory(id="nyed", jurisdiction="FB")
+        cls.nysd = CourtFactory(id="nysd", jurisdiction="FB")
+
+        cls.d_cand = DocketFactory(
+            source=Docket.RECAP,
+            court=cls.cand,
+            pacer_case_id="104490",
+        )
+        cls.d_nyed = DocketFactory(
+            source=Docket.RECAP,
+            court=cls.nyed,
+            pacer_case_id="104491",
+        )
+        cls.d_nysd = DocketFactory(
+            source=Docket.RECAP,
+            court=cls.nysd,
+            pacer_case_id="104492",
+        )
+
+        cls.de_date_asc = DocketEntriesDataFactory(
+            docket_entries=[
+                DocketEntryDataFactory(
+                    date_filed=date(2021, 10, 15),
+                    document_number=1,
+                ),
+                DocketEntryDataFactory(
+                    date_filed=date(2021, 10, 15),
+                    document_number=2,
+                ),
+                DocketEntryDataFactory(
+                    date_filed=date(2021, 10, 15),
+                    document_number=3,
+                ),
+            ],
+        )
+
+        cls.de_datetime_desc = DocketEntriesDataFactory(
+            docket_entries=[
+                DocketEntryDataFactory(
+                    date_filed=datetime(
+                        2021, 10, 16, 2, 46, 51, tzinfo=tzutc()
+                    ),
+                    document_number=3,
+                ),
+                DocketEntryDataFactory(
+                    date_filed=datetime(
+                        2021, 10, 16, 2, 46, 51, tzinfo=tzutc()
+                    ),
+                    document_number=2,
+                ),
+                DocketEntryDataFactory(
+                    date_filed=datetime(
+                        2021, 10, 16, 2, 46, 51, tzinfo=tzutc()
+                    ),
+                    document_number=1,
+                ),
+            ],
+        )
+
+        cls.de_datetime_prev_differs = DocketEntriesDataFactory(
+            docket_entries=[
+                DocketEntryDataFactory(
+                    date_filed=datetime(
+                        2021, 10, 17, 2, 46, 51, tzinfo=tzutc()
+                    ),
+                    document_number=3,
+                ),
+                DocketEntryDataFactory(
+                    date_filed=datetime(
+                        2021, 10, 16, 2, 46, 51, tzinfo=tzutc()
+                    ),
+                    document_number=2,
+                ),
+                DocketEntryDataFactory(
+                    date_filed=datetime(
+                        2021, 10, 16, 2, 46, 51, tzinfo=tzutc()
+                    ),
+                    document_number=1,
+                ),
+            ],
+        )
+
+    def test_get_order_of_docket(self):
+        """Test get_order_of_docket method"""
+
+        order_asc = get_order_of_docket(self.de_date_asc["docket_entries"])
+        self.assertEqual(order_asc, "asc")
+
+        order_desc = get_order_of_docket(
+            self.de_datetime_desc["docket_entries"]
+        )
+        self.assertEqual(order_desc, "desc")
+
+    def test_calculate_recap_sequence_numbers(self):
+        """Does calculate_recap_sequence_numbers method works properly using
+        court timezone when time is available?
+        """
+
+        add_docket_entries(
+            self.d_nyed, self.de_datetime_desc["docket_entries"]
+        )
+        docket_entries_nyed = DocketEntry.objects.filter(
+            docket__court=self.nyed
+        ).order_by("recap_sequence_number")
+        entry_number = 1
+        # Validate recap_sequence_number generated from entries in desc order
+        for de in docket_entries_nyed:
+            self.assertEqual(de.entry_number, entry_number)
+            self.assertEqual(
+                de.recap_sequence_number, f"2021-10-15.00{entry_number}"
+            )
+            entry_number += 1
+
+        add_docket_entries(self.d_cand, self.de_date_asc["docket_entries"])
+        docket_entries_cand = DocketEntry.objects.filter(
+            docket__court=self.cand
+        ).order_by("recap_sequence_number")
+        entry_number = 1
+        # Validate recap_sequence_number generated from entries in asc order
+        for de in docket_entries_cand:
+            self.assertEqual(de.entry_number, entry_number)
+            self.assertEqual(
+                de.recap_sequence_number, f"2021-10-15.00{entry_number}"
+            )
+            entry_number += 1
+
+        add_docket_entries(
+            self.d_nysd, self.de_datetime_prev_differs["docket_entries"]
+        )
+        docket_entries_nysd = DocketEntry.objects.filter(
+            docket__court=self.nysd
+        ).order_by("recap_sequence_number")
+        # Validate recap_sequence_number changes if the previous entry date
+        # differs
+        entry_number = 1
+        prev_de = None
+        for de in docket_entries_nysd:
+            if not prev_de or de.date_filed == prev_de.date_filed:
+                self.assertEqual(
+                    de.recap_sequence_number, f"2021-10-15.00{entry_number}"
+                )
+            else:
+                self.assertEqual(de.recap_sequence_number, f"2021-10-16.001")
+            self.assertEqual(de.entry_number, entry_number)
+            entry_number += 1
+            prev_de = de
+
+
+class LookupDocketsTest(TestCase):
+    """Test find_docket_object lookups work properly, avoid overwriting
+    dockets with identical docket_number_core if they are different cases.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.court_appellate = CourtFactory(id="ca1", jurisdiction="F")
+
+        cls.docket_1 = DocketFactory(
+            case_name="Young v. State",
+            docket_number="No. 3:17-CV-01477",
+            court=cls.court,
+            source=Docket.HARVARD,
+            pacer_case_id=None,
+        )
+        cls.docket_core_data = RECAPEmailDocketDataFactory(
+            case_name="Young v. State", docket_number="3:17-CV-01477"
+        )
+        cls.docket_2 = DocketFactory(
+            case_name="Young 2 v. State",
+            docket_number="212-213",
+            docket_number_core=None,
+            court=cls.court,
+            source=Docket.HARVARD,
+            pacer_case_id=None,
+        )
+        cls.docket_no_core_data = RECAPEmailDocketDataFactory(
+            case_name="Young v. State", docket_number="212-213"
+        )
+        cls.docket_case_id = DocketFactory(
+            case_name="Barton v. State",
+            docket_number="No. 3:17-mj-01477",
+            court=cls.court,
+            source=Docket.HARVARD,
+            pacer_case_id="12345",
+        )
+        cls.docket_case_id_2 = DocketFactory(
+            case_name="Barton v. State",
+            docket_number="No. 4:20-cv-01245",
+            court=cls.court,
+            source=Docket.HARVARD,
+            pacer_case_id="54321",
+        )
+        cls.docket_data = RECAPEmailDocketDataFactory(
+            case_name="Barton v. State", docket_number="3:17-mj-01477"
+        )
+
+    def test_case_id_and_docket_number_core_lookup(self):
+        """Confirm if lookup by pacer_case_id and docket_number_core works
+        properly.
+        """
+
+        d = find_docket_object(
+            self.court.pk, "12345", self.docket_data["docket_number"]
+        )
+        update_docket_metadata(d, self.docket_data)
+        d.save()
+
+        # Successful lookup, dockets matched
+        self.assertEqual(d.id, self.docket_case_id.id)
+        self.assertEqual(
+            d.docket_number_core, self.docket_case_id.docket_number_core
+        )
+
+    def test_case_id_lookup(self):
+        """Confirm if lookup by only pacer_case_id works properly."""
+
+        d = find_docket_object(
+            self.court.pk, "54321", self.docket_data["docket_number"]
+        )
+        update_docket_metadata(d, self.docket_data)
+        d.save()
+
+        # Successful lookup, dockets matched
+        self.assertEqual(d.id, self.docket_case_id_2.id)
+        self.assertEqual(
+            d.docket_number_core, self.docket_case_id_2.docket_number_core
+        )
+
+    def test_docket_number_core_lookup(self):
+        """Confirm if lookup by only docket_number_core works properly."""
+
+        d = find_docket_object(
+            self.court.pk,
+            self.docket_core_data["docket_entries"][0]["pacer_case_id"],
+            self.docket_core_data["docket_number"],
+        )
+        update_docket_metadata(d, self.docket_core_data)
+        d.save()
+
+        # Successful lookup, dockets matched
+        self.assertEqual(d.id, self.docket_1.id)
+        self.assertEqual(
+            d.docket_number_core, self.docket_1.docket_number_core
+        )
+
+    def test_docket_number_lookup(self):
+        """Confirm if lookup by only docket_number works properly."""
+
+        d = find_docket_object(
+            self.court.pk,
+            self.docket_no_core_data["docket_entries"][0]["pacer_case_id"],
+            self.docket_no_core_data["docket_number"],
+        )
+        update_docket_metadata(d, self.docket_no_core_data)
+        d.save()
+
+        # Successful lookup, dockets matched
+        self.assertEqual(d.id, self.docket_2.id)
+        self.assertEqual(
+            d.docket_number_core, self.docket_2.docket_number_core
+        )
+
+    def test_avoid_overwrite_docket_by_number_core(self):
+        """Can we avoid overwriting a docket when we got two identical
+        docket_number_core in the same court, but they are different dockets?
+        """
+
+        d = find_docket_object(
+            self.court.pk,
+            self.docket_data["docket_entries"][0]["pacer_case_id"],
+            self.docket_data["docket_number"],
+        )
+
+        update_docket_metadata(d, self.docket_data)
+        d.save()
+
+        # Docket is not overwritten a new one is created instead.
+        self.assertNotEqual(d.id, self.docket_1.id)
+        self.assertEqual(
+            d.docket_number_core, self.docket_1.docket_number_core
+        )
+
+    def test_avoid_overwrite_docket_by_number_core_multiple_results(self):
+        """Can we avoid overwriting a docket when we got multiple results for a
+        docket_number_core in the same court but they are different dockets?
+        """
+
+        DocketFactory(
+            case_name="Young v. State",
+            docket_number="No. 3:17-CV-01477",
+            court=self.court,
+            source=Docket.HARVARD,
+            pacer_case_id=None,
+        )
+
+        d = find_docket_object(
+            self.court.pk,
+            self.docket_data["docket_entries"][0]["pacer_case_id"],
+            self.docket_data["docket_number"],
+        )
+
+        update_docket_metadata(d, self.docket_data)
+        d.save()
+
+        # Docket is not overwritten a new one is created instead.
+        self.assertNotEqual(d.id, self.docket_1.id)
+        self.assertEqual(
+            d.docket_number_core, self.docket_1.docket_number_core
+        )
+
+    def test_lookup_by_normalized_docket_number_case(self):
+        """Can we match a docket which its docket number case is different
+        from the incoming data?
+        """
+        d = DocketFactory(
+            case_name="Young v. State",
+            docket_number="No. 3:18-MJ-01477",
+            court=self.court_appellate,
+            source=Docket.RECAP,
+            pacer_case_id=None,
+        )
+
+        docket_data_lower_number = RECAPEmailDocketDataFactory(
+            case_name="Barton v. State",
+            docket_number="3:18-mj-01477",
+            docket_entries=[
+                RECAPEmailDocketEntryDataFactory(pacer_case_id="1234568")
+            ],
+        )
+        new_d = find_docket_object(
+            self.court_appellate.pk,
+            docket_data_lower_number["docket_entries"][0]["pacer_case_id"],
+            docket_data_lower_number["docket_number"],
+        )
+        update_docket_metadata(new_d, docket_data_lower_number)
+        new_d.save()
+        # The existing docket is matched instead of creating a new one.
+        self.assertEqual(new_d.pk, d.pk)
+
+
+class CleanUpDuplicateAppellateEntries(TestCase):
+    """Test clean_up_duplicate_appellate_entries method that finds and clean
+    duplicated entries after a court enables document numbers.
+    """
+
+    @mock.patch(
+        "cl.recap.management.commands.remove_appellate_entries_with_long_numbers.logger"
+    )
+    def test_clean_duplicate_appellate_entries(self, mock_logger):
+        """Test clean duplicated entries by document number and description"""
+
+        court = CourtFactory(id="ca5", jurisdiction="F")
+        docket = DocketFactory(
+            court=court,
+            case_name="Foo v. Bar",
+            docket_number="12-40601",
+            pacer_case_id="12345",
+        )
+
+        # Duplicated entry by pacer_doc_id as number
+        de1 = DocketEntryFactory(
+            docket=docket,
+            entry_number=506585234,
+        )
+        RECAPDocumentFactory(
+            docket_entry=de1,
+            pacer_doc_id="00506585234",
+            document_number="00506585234",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+        # This entry should be preserved.
+        de1_2 = DocketEntryFactory(
+            docket=docket,
+            entry_number=1,
+        )
+        RECAPDocumentFactory(
+            docket_entry=de1_2,
+            pacer_doc_id="00506585234",
+            document_number="1",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+
+        # Duplicated entry with no entry number and no pacer_doc_id
+        de2 = DocketEntryFactory(
+            docket=docket,
+            entry_number=None,
+            description="Lorem ipsum dolor sit amet",
+        )
+        RECAPDocumentFactory(
+            docket_entry=de2,
+            pacer_doc_id="",
+            document_number="",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+        # This entry should be preserved.
+        de2_2 = DocketEntryFactory(
+            docket=docket,
+            entry_number=2,
+            description="Lorem ipsum dolor sit amet",
+        )
+        RECAPDocumentFactory(
+            docket_entry=de2_2,
+            pacer_doc_id="",
+            document_number="2",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+
+        # No duplicated entry with pacer_doc_id as number
+        de3 = DocketEntryFactory(
+            docket=docket,
+            entry_number=506585238,
+        )
+        RECAPDocumentFactory(
+            docket_entry=de3,
+            pacer_doc_id="00506585238",
+            document_number="00506585238",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+
+        # No duplicated entry with document number.
+        de4 = DocketEntryFactory(
+            docket=docket,
+            entry_number=105,
+        )
+        RECAPDocumentFactory(
+            docket_entry=de4,
+            pacer_doc_id="00506585239",
+            document_number="105",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+
+        docket_entries = DocketEntry.objects.all()
+        recap_documents = RECAPDocument.objects.all()
+        self.assertEqual(docket_entries.count(), 6)
+        self.assertEqual(recap_documents.count(), 6)
+
+        # Clean up duplicated entries.
+        clean_up_duplicate_appellate_entries([court.pk], None, True)
+
+        # After the cleanup, 2 entries should be removed.
+        mock_logger.info.assert_called_with(
+            f"Cleaned 2 entries in {court.pk} after 2023-01-08."
+        )
+        self.assertEqual(docket_entries.count(), 4)
+        self.assertEqual(recap_documents.count(), 4)
+
+        # Confirm the right entries are preserved.
+        pass_test = True
+        for de in docket_entries:
+            if not de.entry_number in [105, 506585238, 1, 2]:
+                pass_test = False
+        self.assertEqual(pass_test, True)
+
+    @mock.patch(
+        "cl.recap.management.commands.remove_appellate_entries_with_long_numbers.logger"
+    )
+    def test_skip_entries_before_date(self, mock_logger):
+        """Test skip looking for duplicated entries created before the date
+        the court enabled document numbers
+        """
+
+        court = CourtFactory(id="ca11", jurisdiction="F")
+        docket = DocketFactory(
+            court=court,
+            case_name="Foo v. ca11",
+            docket_number="12-40601",
+            pacer_case_id="12345",
+        )
+        with time_machine.travel(
+            datetime(year=2022, month=9, day=4), tick=False
+        ):
+            de1 = DocketEntryFactory(
+                docket=docket,
+                entry_number=506585234,
+            )
+            RECAPDocumentFactory(
+                docket_entry=de1,
+                pacer_doc_id="00506585234",
+                document_number="00506585234",
+                document_type=RECAPDocument.PACER_DOCUMENT,
+            )
+
+        clean_up_duplicate_appellate_entries([court.pk], None, True)
+        mock_logger.info.assert_called_with(
+            f"Skipping {court.pk}, no entries created after 2022-10-01 found."
+        )
+        docket_entries = DocketEntry.objects.all()
+        self.assertEqual(docket_entries.count(), 1)

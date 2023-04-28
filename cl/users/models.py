@@ -4,8 +4,9 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Dict
 
+import pghistory
 from django.conf import settings
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, Permission, User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import FieldError
 from django.core.mail import EmailMessage, EmailMultiAlternatives
@@ -17,6 +18,7 @@ from localflavor.us.models import USStateField
 from cl.api.utils import invert_user_logs
 from cl.lib.model_helpers import invert_choices_group_lookup
 from cl.lib.models import AbstractDateTimeModel
+from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
 
 donation_exclusion_codes = [
     1,  # Unknown error
@@ -39,6 +41,7 @@ class BarMembership(models.Model):
         ordering = ["barMembership"]
 
 
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class UserProfile(models.Model):
     user = models.OneToOneField(
         User,
@@ -134,6 +137,10 @@ class UserProfile(models.Model):
         "subscribe to the case.",
         default=True,
     )
+    docket_default_order_desc = models.BooleanField(
+        help_text="Sort dockets in descending order by default",
+        default=False,
+    )
 
     @property
     def total_donated_last_year(self) -> Decimal:
@@ -220,6 +227,14 @@ class UserProfile(models.Model):
     class Meta:
         verbose_name = "user profile"
         verbose_name_plural = "user profiles"
+
+
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
+class UserProfileBarMembership(UserProfile.barmembership.through):
+    """A model class to track user profile barmembership m2m relation"""
+
+    class Meta:
+        proxy = True
 
 
 class EMAIL_NOTIFICATIONS(object):
@@ -505,3 +520,51 @@ def generate_recap_email(user_profile: UserProfile, append: int = None) -> str:
     elif len(user_profiles_with_match) > 0:
         return generate_recap_email(user_profile, (append or 0) + 1)
     return recap_email
+
+
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
+class UserProxy(User):
+    """A proxy model class to track auth user model"""
+
+    class Meta:
+        proxy = True
+
+
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
+class GroupProxy(Group):
+    """A proxy model class to track auth group model"""
+
+    class Meta:
+        proxy = True
+
+
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
+class PermissionProxy(Permission):
+    """A proxy model class to track auth permission model"""
+
+    class Meta:
+        proxy = True
+
+
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
+class GroupPermissions(Group.permissions.through):
+    """A proxy model class to track group permissions m2m relation"""
+
+    class Meta:
+        proxy = True
+
+
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
+class UserGroups(User.groups.through):
+    """A proxy model class to track user groups m2m relation"""
+
+    class Meta:
+        proxy = True
+
+
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
+class UserPermissions(User.user_permissions.through):
+    """A proxy model class to track user permissions m2m relation"""
+
+    class Meta:
+        proxy = True

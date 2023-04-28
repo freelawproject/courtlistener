@@ -1,6 +1,7 @@
 import os
 import sys
 import traceback
+from datetime import date
 from typing import Optional, Tuple
 from urllib.parse import urljoin
 
@@ -16,8 +17,9 @@ from requests.cookies import RequestsCookieJar
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.decorators import retry
 from cl.lib.microservice_utils import microservice
+from cl.recap.mergers import find_docket_object
 from cl.scrapers.tasks import extract_recap_pdf
-from cl.search.models import RECAPDocument
+from cl.search.models import Docket, RECAPDocument
 
 
 @retry(
@@ -200,3 +202,56 @@ def extract_recap_documents(
             logger.info(msg)
             sys.stdout.write(f"\r{msg}")
             sys.stdout.flush()
+
+
+def update_or_create_docket(
+    case_name: str,
+    case_name_short: str,
+    court_id: str,
+    docket_number: str,
+    source: int,
+    blocked: bool = False,
+    case_name_full: str = "",
+    date_blocked: date | None = None,
+    date_argued: date | None = None,
+    ia_needs_upload: bool | None = None,
+) -> Docket:
+    """Look for an existing Docket and update it or create a new one if it's
+    not found.
+
+    :param case_name: The docket case_name.
+    :param case_name_short: The docket case_name_short
+    :param court_id: The court id the docket belongs to.
+    :param docket_number: The docket number.
+    :param source: The docket source.
+    :param blocked: If the docket should be blocked, default False.
+    :param case_name_full: The docket case_name_full.
+    :param date_blocked: The docket date_blocked if it's blocked.
+    :param date_argued: The docket date_argued if it's an oral argument.
+    :param ia_needs_upload: If the docket needs upload to IA, default None.
+    :return: The docket docket.
+    """
+    docket = find_docket_object(court_id, None, docket_number)
+    if docket.pk:
+        docket.case_name = case_name
+        docket.case_name_short = case_name_short
+        docket.case_name_full = case_name_full
+        docket.source = source
+        docket.blocked = blocked
+        docket.date_blocked = date_blocked
+        docket.date_argued = date_argued
+        docket.ia_needs_upload = ia_needs_upload
+    else:
+        docket = Docket(
+            case_name=case_name,
+            case_name_short=case_name_short,
+            case_name_full=case_name_full,
+            docket_number=docket_number,
+            court_id=court_id,
+            source=source,
+            blocked=blocked,
+            date_blocked=date_blocked,
+            date_argued=date_argued,
+            ia_needs_upload=ia_needs_upload,
+        )
+    return docket

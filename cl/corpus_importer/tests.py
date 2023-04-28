@@ -1,10 +1,19 @@
 import json
+import os
+import time
 from datetime import date, datetime
+from pathlib import Path
+from queue import Queue
+from random import randint
 from unittest.mock import patch
 
 import eyecite
 import pytest
+from django.conf import settings
+from django.core.files.base import ContentFile
+from django.utils.timezone import make_aware, utc
 from factory import RelatedFactory
+from juriscraper.lib.string_utils import harmonize
 
 from cl.corpus_importer.court_regexes import match_court_string
 from cl.corpus_importer.factories import (
@@ -12,18 +21,14 @@ from cl.corpus_importer.factories import (
     CaseLawCourtFactory,
     CaseLawFactory,
     CitationFactory,
+    RssDocketDataFactory,
+    RssDocketEntryDataFactory,
 )
 from cl.corpus_importer.import_columbia.parse_opinions import (
     get_state_court_object,
 )
-from cl.corpus_importer.management.commands.harvard_merge import (
-    combine_non_overlapping_data,
-    merge_case_names,
-    merge_docket_numbers,
-    merge_judges,
-    merge_opinion_clusters,
-    start_merger,
-    merge_cluster_dates,
+from cl.corpus_importer.management.commands.clean_up_mis_matched_dockets import (
+    find_and_fix_mis_matched_dockets,
 )
 from cl.corpus_importer.management.commands.harvard_opinions import (
     clean_body_content,
@@ -33,27 +38,36 @@ from cl.corpus_importer.management.commands.harvard_opinions import (
     winnow_case_name,
 )
 from cl.corpus_importer.management.commands.normalize_judges_opinions import (
+    Command,
     normalize_authors_in_opinions,
     normalize_panel_in_opinioncluster,
+)
+from cl.corpus_importer.management.commands.troller_bk import (
+    download_files_concurrently,
+    log_added_items_to_redis,
+    merge_rss_data,
 )
 from cl.corpus_importer.tasks import generate_ia_json
 from cl.corpus_importer.utils import get_start_of_quarter
 from cl.lib.pacer import process_docket_data
+from cl.lib.redis_utils import make_redis_interface
+from cl.lib.timezone_helpers import localize_date_and_time
 from cl.people_db.factories import PersonWithChildrenFactory, PositionFactory
 from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
 from cl.recap.models import UPLOAD_TYPE
+from cl.recap_rss.models import RssItemCache
 from cl.search.factories import (
     CourtFactory,
+    DocketEntryWithParentsFactory,
     DocketFactory,
-    OpinionClusterFactory,
-    OpinionClusterFactoryMultipleOpinions,
     OpinionClusterFactoryWithChildrenAndParents,
     OpinionClusterWithParentsFactory,
-    OpinionFactory,
     OpinionWithChildrenFactory,
+    RECAPDocumentFactory,
 )
 from cl.search.models import (
+    BankruptcyInformation,
     Citation,
     Court,
     Docket,
@@ -664,6 +678,34 @@ Appeals, No. 19667-4-III, October 31, 2002. Denied September 30, 2003."
         docket = cite.cluster.docket
         self.assertEqual(docket.docket_number, case_law["docket_number"])
 
+    def test_existing_docket_lookup(self):
+        """Can we update an existing docket instead of creating a new one?"""
+
+        case_law = CaseLawFactory()
+        DocketFactory(
+            docket_number=case_law["docket_number"],
+            court_id="harvard",
+            source=Docket.HARVARD,
+            pacer_case_id=None,
+            idb_data=None,
+        )
+
+        self.read_json_func.return_value = case_law
+        self.assertSuccessfulParse(1)
+
+        cite = self._get_cite(case_law)
+
+        dockets = Docket.objects.all()
+        self.assertEqual(dockets.count(), 1)
+
+        # Test some docket attributes
+        docket = cite.cluster.docket
+        self.assertEqual(docket.docket_number, case_law["docket_number"])
+        self.assertEqual(
+            docket.case_name, harmonize(case_law["name_abbreviation"])
+        )
+        self.assertEqual(docket.ia_needs_upload, False)
+
     def test_new_bankruptcy_case(self):
         """Can we add a bankruptcy court?"""
 
@@ -994,428 +1036,1343 @@ class CorpusImporterManagementCommmandsTests(TestCase):
         self.assertEqual(len(cluster.panel.all()), 2)
 
 
-class HarvardMergerTests(TestCase):
-    def setUp(self):
-        """Setup harvard tests
+def mock_download_file(item_path, order):
+    time.sleep(randint(1, 10) / 100)
+    return b"", item_path, order
 
-        This setup is a little distinct from normal ones.  Here we are actually
-        setting up our patches which are used by the majority of the tests.
-        Each one can be used or turned off.  See the teardown for more.
-        :return:
+
+class TrollerBKTests(TestCase):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        # District factories
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.court_neb = CourtFactory(id="nebraskab", jurisdiction="FD")
+        cls.court_pamd = CourtFactory(id="pamd", jurisdiction="FD")
+        cls.docket_d_before_2018 = DocketFactory(
+            case_name="Young v. State",
+            docket_number="3:17-CV-01477",
+            court=cls.court,
+            source=Docket.HARVARD,
+            pacer_case_id="1234",
+        )
+
+        cls.docket_d_after_2018 = DocketFactory(
+            case_name="Dragon v. State",
+            docket_number="3:15-CV-01455",
+            court=cls.court,
+            source=Docket.HARVARD,
+            pacer_case_id="5431",
+        )
+
+        cls.de_d_before_2018 = DocketEntryWithParentsFactory(
+            docket__court=cls.court,
+            docket__case_name="Young Entry v. Dragon",
+            docket__docket_number="3:87-CV-01400",
+            docket__source=Docket.HARVARD,
+            docket__pacer_case_id="9038",
+            entry_number=1,
+            date_filed=make_aware(datetime(year=2018, month=1, day=4), utc),
+        )
+
+        # Appellate factories
+        cls.court_appellate = CourtFactory(id="ca1", jurisdiction="F")
+        cls.docket_a_before_2018 = DocketFactory(
+            case_name="Young v. State",
+            docket_number="12-2532",
+            court=cls.court_appellate,
+            source=Docket.HARVARD,
+            pacer_case_id=None,
+        )
+        cls.docket_a_after_2018 = DocketFactory(
+            case_name="Dragon v. State",
+            docket_number="15-1232",
+            court=cls.court_appellate,
+            source=Docket.HARVARD,
+            pacer_case_id=None,
+        )
+        cls.de_a_before_2018 = DocketEntryWithParentsFactory(
+            docket__court=cls.court_appellate,
+            docket__case_name="Young Entry v. Dragon",
+            docket__docket_number="12-3242",
+            docket__source=Docket.HARVARD,
+            docket__pacer_case_id=None,
+            entry_number=1,
+            date_filed=make_aware(datetime(year=2018, month=1, day=4), utc),
+        )
+        cls.docket_a_2018_case_id = DocketFactory(
+            case_name="Young v. State",
+            docket_number="12-5674",
+            court=cls.court_appellate,
+            source=Docket.RECAP,
+            pacer_case_id="12524",
+        )
+
+    def setUp(self) -> None:
+        self.r = make_redis_interface("STATS")
+        self.r.flushdb()
+
+    def test_merge_district_rss_before_2018(self):
+        """1 Test merge district RSS file before 2018-4-20 into an existing
+        docket
+
+        Before 2018-4-20
+        District
+        Docket exists
+        No docket entries
+
+        Merge docket entries, avoid updating metadata.
         """
-        self.read_json_patch = patch(
-            "cl.corpus_importer.management.commands.harvard_merge.read_json"
-        )
-        self.read_json_func = self.read_json_patch.start()
-
-    def tearDown(self) -> None:
-        """Tear down patches and remove added objects"""
-        Docket.objects.all().delete()
-        self.read_json_patch.stop()
-
-    def test_merger(self):
-        """Can we identify opinions correctly even when they are slightly different."""
-
-        case_data = {
-            "name": "CANNON v. THE STATE",
-            "name_abbreviation": "Cannon v. State",
-            "decision_date": "1944-11-18",
-            "docket_number": "30614",
-            "casebody": {
-                "status": "ok",
-                "data": '<casebody firstpage="757" lastpage="758" xmlns="http://nrs.harvard.edu/urn-3:HLS.Libr.US_Case_Law.Schema.Case_Body:v1">\n  <docketnumber id="b795-7">30614.</docketnumber>\n  <parties id="AAY">CANNON <em>v. </em>THE STATE.</parties>\n  <decisiondate id="b795-9">Decided November 18, 1944.</decisiondate>\n  <attorneys id="b796-4"><page-number citation-index="1" label="758">*758</page-number><em>B. B. Giles, </em>for plaintiff in error.</attorneys>\n  <attorneys id="b796-5"><em>Lindley W. Gamp, solicitor, John A. Boyhin, solicitor-general,. Durwood T. Bye, </em>contra.</attorneys>\n  <opinion type="majority">\n    <author id="b796-6">Broyles, C. J.</author>\n    <p id="Auq">(After stating the foregoing facts.) After the-disposal of counts 2 and 3, the only charge before the court and jury was that the defendant had sold distilled spirits and alcohol as a retail dealer, without first obtaining a license from the State Revenue Commissioner. The evidence adduced to show the guilt, of the accused on count 1 was wholly circumstantial, and was insufficient to exclude every reasonable hypothesis except that of his-guilt, and it failed to show beyond a reasonable doubt that he had sold distilled spirits or alcohol. The cases of <em>Thomas </em>v. <em>State, </em>65 <em>Ga. App. </em>749 (16 S. E. 2d, 447), and <em>Martin </em>v. <em>State, </em>68 <em>Ga. App. </em>169 (22 S. E. 2d, 193), cited in behalf of the defendant in error, are distinguished by their facts from this case. The verdict was-contrary to law and the evidence; and the overruling of the certiorari was error. <em>Judgment reversed.</em></p>\n    <judges id="Ae85">\n      <em>MacIntyre, J., concurs.</em>\n    </judges>\n  </opinion>\n  <opinion type="concurrence">\n    <author id="b796-7">Gardner, J.,</author>\n    <p id="AK2">concurring specially: Under the record the judgment should be reversed for another reason. Since the jury, based on the same evidence, found the defendant not guilty on count 2 for possessing liquors, and a verdict finding him guilty on count 1 for selling intoxicating liquors, the verdicts are repugnant and void as being inconsistent verdicts by the same jury based on the same \'evidence. <em>Britt </em>v. <em>State, </em>36 <em>Ga. App. </em>668 (137 S. E. 791), and cit.; <em>Kuck </em>v. <em>State, </em>149 <em>Ga. </em>191 (99 S. E. 622). I concur in the reversal for this additional reason.</p>\n  </opinion>\n</casebody>\n',
-            },
-        }
-        self.read_json_func.return_value = case_data
-
-        lead = """<p>The overruling of the certiorari was error.</p>
-            <p><center>                       DECIDED NOVEMBER 18, 1944.</center>
-            John Cannon was tried in the criminal court of Fulton County on an accusation containing three counts. Count I charged that in said county on July 24, 1943, he "did engage in and sell, as a retail dealer, distilled spirits and alcohol, without first obtaining a license from the State Revenue Commissioner of the State of Georgia." Count 2 charged that on July 24, 1943, he possessed forty-eight half pints and three pints of whisky in Fulton County, and had not been licensed by the State Revenue Commissioner to sell whisky as a retail or wholesale dealer. Count 3 charged that on September 24, 1943, in said county, he sold malt beverages as a retail dealer, without first securing a license from the State Revenue Commissioner. On the trial, after the close of the State's evidence, counsel for the accused made a motion that count 2 be stricken, and that a verdict for the defendant be directed on counts 1 and 3. The court sustained the motion as to counts 2 and 3, but overruled it as to count 1. The jury returned a verdict of guilty on count 1, and of not guilty on counts 2 and 3. Subsequently the defendant's certiorari was overruled by a judge of the superior court and that judgment is assigned as error. <span class="star-pagination">*Page 758</span>
-            After the disposal of counts 2 and 3, the only charge before the court and jury was that the defendant had sold distilled spirits and alcohol as a retail dealer, without first obtaining a license from the State Revenue Commissioner. The evidence adduced to show the guilt of the accused on count 1 was wholly circumstantial, and was insufficient to exclude every reasonable hypothesis except that of his guilt, and it failed to show beyond a reasonable doubt that he had sold distilled spirits or alcohol. The cases of <em>Thomas</em> v. <em>State,</em> <cross_reference><span class="citation no-link">65 Ga. App. 749</span></cross_reference> (<cross_reference><span class="citation" data-id="3407553"><a href="/opinion/3412403/thomas-v-state/">16 S.E.2d 447</a></span></cross_reference>), and <em>Martin</em> v. <em>State,</em> <cross_reference><span class="citation no-link">68 Ga. App. 169</span></cross_reference> (<cross_reference><span class="citation" data-id="3405716"><a href="/opinion/3410794/martin-v-state/">22 S.E.2d 193</a></span></cross_reference>), cited in behalf of the defendant in error, are distinguished by their facts from this case. The verdict was contrary to law and the evidence; and the overruling of the certiorari was error.</p>
-            <p><em>Judgment reversed. MacIntyre, J., concurs.</em></p>"""
-        concurrence = """<p>Under the record the judgment should be reversed for another reason. Since the jury, based on the same evidence, found the defendant not guilty on count 2 for possessing liquors, and a verdict finding him guilty on count 1 for selling intoxicating liquors, the verdicts are repugnant and void as being inconsistent verdicts by the same jury based on the same evidence. <em>Britt</em> v. <em>State,</em> <cross_reference><span class="citation no-link">36 Ga. App. 668</span></cross_reference>
-            (<cross_reference><span class="citation no-link">137 S.E. 791</span></cross_reference>), and cit.; <em>Kuck</em> v. <em>State,</em> <cross_reference><span class="citation" data-id="5582722"><a href="/opinion/5732248/kuck-v-state/">149 Ga. 191</a></span></cross_reference>
-            (<cross_reference><span class="citation no-link">99 S.E. 622</span></cross_reference>). I concur in the reversal for this additional reason.</p>"""
-
-        cluster = OpinionClusterFactoryMultipleOpinions(
-            docket=DocketFactory(source=Docket.COLUMBIA),
-            sub_opinions__data=[
-                {"type": "020lead", "html_with_citations": lead},
-                {"type": "030concurrence", "html_with_citations": concurrence},
-            ],
-        )
-
-        self.assertEqual(
-            OpinionCluster.objects.get(id=cluster.id).attorneys, "", msg="WHAT"
-        )
-
-        self.assertEqual(Opinion.objects.all().count(), 2)
-        merge_opinion_clusters(cluster_id=cluster.id)
-        self.assertEqual(Opinion.objects.all().count(), 2)
-
-    def test_non_overlapping(self):
-        """Can we find fields that need merging"""
-
-        case_data = {
-            "casebody": {
-                "data": '<casebody> <attorneys><page-number citation-index="1" label="758">*758</page-number><em>B. B. Giles, </em>for plaintiff in error.</attorneys>\n  <attorneys id="b796-5"><em>Lindley W. Gamp, solicitor, John A. Boyhin, solicitor-general,. Durwood T. Bye, </em>contra.</attorneys>\n  <opinion type="majority"> a simple opinion</opinion>\n</casebody>\n',
-            },
-        }
-        self.read_json_func.return_value = case_data
-
-        cluster = OpinionClusterFactoryMultipleOpinions(
-            docket=DocketFactory(),
-            attorneys="B. B. Giles, Lindley W. Gamp, and John A. Boyhin",
-            # cl value
-        )
-        clean_dictionary = combine_non_overlapping_data(cluster.id, case_data)
-        self.assertEqual(
-            clean_dictionary,
-            {
-                "attorneys": (
-                    "B. B. Giles, for plaintiff in error., Lindley W. Gamp, solicitor, John A. Boyhin, solicitor-general,. Durwood T. Bye, contra.",
-                    "B. B. Giles, Lindley W. Gamp, and John A. Boyhin",
+        d_rss_data_before_2018 = RssDocketDataFactory(
+            court_id=self.court.pk,
+            case_name="Young v. Dragon",
+            docket_number="3:17-CV-01473",
+            pacer_case_id="1234",
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    date_filed=make_aware(
+                        datetime(year=2017, month=1, day=4), utc
+                    )
                 )
-            },
-            msg="Should find differences to merge",
-        )
-
-        # Test that we can ignore matching fields
-        cluster = OpinionClusterFactoryMultipleOpinions(
-            docket=DocketFactory(),
-            attorneys="B. B. Giles, for plaintiff in error., Lindley W. Gamp, solicitor, John A. Boyhin, solicitor-general,. Durwood T. Bye, contra.",
-        )
-        clean_dictionary = combine_non_overlapping_data(cluster.id, case_data)
-        self.assertEqual(clean_dictionary, {}, msg="Attorneys are the same")
-
-    def test_docket_number_merger(self):
-        """Can we choose the correct docket number"""
-        docket = DocketFactory(docket_number="17-3000")
-        cluster = OpinionClusterWithParentsFactory(docket=docket)
-        merge_docket_numbers(cluster.id, "Master Docket No. 17-3000L")
-        docket.refresh_from_db()
-        self.assertEqual(docket.docket_number, "Master Docket No. 17-3000L")
-
-    def test_sources_query(self):
-        """Test query for Non Harvard Sources"""
-        OpinionClusterFactory(
-            docket=DocketFactory(source=Docket.COLUMBIA),
-            id=1,
-            filepath_json_harvard="/the/file/path.json",
-        )
-        OpinionClusterFactory(
-            docket=DocketFactory(source=Docket.HARVARD),
-            id=2,
-            filepath_json_harvard="/a/file/path.json",
-        )
-        OpinionClusterFactory(
-            docket=DocketFactory(source=Docket.COLUMBIA_AND_HARVARD),
-            id=3,
-            filepath_json_harvard="/some/file/path.json",
-        )
-        OpinionClusterFactory(
-            docket=DocketFactory(source=Docket.SCRAPER),
-            id=4,
-            filepath_json_harvard="/my/file/path.json",
-        )
-        OpinionClusterFactory(
-            docket=DocketFactory(source=Docket.SCRAPER),
-            id=5,
-            filepath_json_harvard=None,
-        )
-        OpinionClusterFactory(
-            docket=DocketFactory(source=Docket.HARVARD),
-            id=6,
-            filepath_json_harvard="",
-        )
-
-        SC = Docket.SOURCE_CHOICES
-        cluster_ids = (
-            OpinionCluster.objects.filter(
-                docket__source__in=[s[0] for s in SC if "Harvard" not in s[1]],
-                filepath_json_harvard__isnull=False,
-            )
-            .exclude(filepath_json_harvard__exact="")
-            .values_list("id", flat=True)
-        )
-        # Find the two opinions we want to import
-        self.assertEqual([1, 4], list(cluster_ids))
-        case_data = {
-            "docket_number": "345",
-            "name_abbreviation": "A v. B",
-            "name": "A v. B",
-            "casebody": {
-                "data": "<casebody><opinion>An opinion</opinion></casebody>"
-            },
-        }
-        self.read_json_func.return_value = case_data
-        start_merger(cluster_id=None)
-        cluster_ids = OpinionCluster.objects.filter(
-            docket__source__in=[s[0] for s in SC if "Harvard" not in s[1]],
-            filepath_json_harvard__isnull=False,
-        ).values_list("id", flat=True)
-        # Validate that our two opinions were imported and no more exist
-        self.assertEqual([], list(cluster_ids))
-
-    def test_add_opinions_without_authors_in_cl(self):
-        """Can we add opinion and update authors"""
-        cluster = OpinionClusterFactoryMultipleOpinions(
-            docket=DocketFactory(source=Docket.COLUMBIA),
-            sub_opinions__data=[
-                {"author_str": "", "plain_text": "My opinion"},
-                {"author_str": "", "plain_text": "I disagree"},
             ],
         )
-        case_data = {
-            "docket_number": "345",
-            "name_abbreviation": "A v. B",
-            "name": "A v. B",
-            "casebody": {
-                "data": '<casebody> <opinion type="majority"> '
-                "<author>Broyles, C. J.</author>My opinion</opinion>"
-                ' <opinion type="dissent"><author>Gardner, J.,</author>'
-                "I disagree </opinion>"
-                "</casebody>",
-            },
-        }
-        self.read_json_func.return_value = case_data
-        author_query = Opinion.objects.filter(
-            cluster_id=cluster.id
-        ).values_list("author_str", flat=True)
-        authors = list(author_query)
 
-        self.assertEqual(authors, ["", ""])
-        start_merger(cluster_id=None)  # allow the system to find the cluster
-        cluster.refresh_from_db()
-
-        author_query = Opinion.objects.filter(
-            cluster_id=cluster.id
-        ).values_list("author_str", flat=True)
-        authors = list(author_query)
-        # Validate we didnt create a new opinion
+        build_date = d_rss_data_before_2018["docket_entries"][0]["date_filed"]
         self.assertEqual(
-            Opinion.objects.filter(cluster_id=cluster.id).count(),
-            2,
-            msg="Oops",
+            len(self.docket_d_before_2018.docket_entries.all()), 0
         )
-        # Check that we added xml
-        self.assertNotEqual(
-            Opinion.objects.filter(cluster_id=cluster.id)[0].xml_harvard, ""
+        rds_created, d_created = merge_rss_data(
+            [d_rss_data_before_2018], self.court.pk, build_date
         )
-        # Make sure we updated our source
-        self.assertEqual(cluster.docket.source, Docket.COLUMBIA_AND_HARVARD)
-        # Check judges were added to our opinions
-        self.assertEqual(authors, ["Broyles, C. J.", "Gardner, J.,"])
+        self.assertEqual(len(rds_created), 1)
+        self.assertEqual(d_created, 0)
+        self.docket_d_before_2018.refresh_from_db()
+        self.assertEqual(self.docket_d_before_2018.case_name, "Young v. State")
+        self.assertEqual(
+            self.docket_d_before_2018.docket_number, "3:17-CV-01477"
+        )
+        self.assertEqual(
+            len(self.docket_d_before_2018.docket_entries.all()), 1
+        )
+        self.assertEqual(
+            self.docket_d_before_2018.source, Docket.HARVARD_AND_RECAP
+        )
 
-    def test_add_opinions_with_authors_in_cl(self):
-        """Can we update an opinion and leave author_str alone if already assigned"""
-        cluster = OpinionClusterFactoryMultipleOpinions(
-            docket=DocketFactory(source=Docket.COLUMBIA),
-            sub_opinions__data=[
-                {"author_str": "Broyles", "plain_text": "My opinion"},
-                {"author_str": "Gardner", "plain_text": "I disagree"},
+    def test_avoid_merging_district_rss_after_2018(self):
+        """2 Test avoid merging district RSS file after 2018-4-20
+
+        After 2018-4-20
+        District
+        Docket exists
+        No docket entries
+
+        Don't merge docket entries, avoid updating metadata.
+        """
+        d_rss_data_after_2018 = RssDocketDataFactory(
+            court_id=self.court.pk,
+            case_name="Dragon 1 v. State",
+            docket_number="3:15-CV-01456",
+            pacer_case_id="5431",
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    date_filed=make_aware(
+                        datetime(year=2018, month=4, day=21), utc
+                    )
+                )
             ],
         )
-        case_data = {
-            "docket_number": "345",
-            "name_abbreviation": "A v. B",
-            "name": "A v. B",
-            "casebody": {
-                "data": '<casebody> <opinion type="majority"> '
-                "<author>Broyles, C. J.</author>My opinion</opinion>"
-                ' <opinion type="dissent"><author>Gardner, J.,</author>'
-                "I disagree </opinion>"
-                "</casebody>",
-            },
-        }
 
-        self.read_json_func.return_value = case_data
-        author_query = Opinion.objects.filter(
-            cluster_id=cluster.id
-        ).values_list("author_str", flat=True)
-        authors = sorted(list(author_query))
+        build_date = d_rss_data_after_2018["docket_entries"][0]["date_filed"]
+        self.assertEqual(len(self.docket_d_after_2018.docket_entries.all()), 0)
+        rds_created, d_created = merge_rss_data(
+            [d_rss_data_after_2018], self.court.pk, build_date
+        )
+        self.assertEqual(len(rds_created), 0)
+        self.assertEqual(d_created, 0)
+        self.docket_d_after_2018.refresh_from_db()
+        self.assertEqual(self.docket_d_after_2018.case_name, "Dragon v. State")
+        self.assertEqual(
+            self.docket_d_after_2018.docket_number, "3:15-CV-01455"
+        )
+        self.assertEqual(len(self.docket_d_after_2018.docket_entries.all()), 0)
+        self.assertEqual(self.docket_d_after_2018.source, Docket.HARVARD)
 
-        self.assertEqual(authors, ["Broyles", "Gardner"])
-        # Import the opinion
-        start_merger(cluster_id=cluster.id)
+    def test_merge_district_courts_rss_exceptions_after_2018(self):
+        """Test merging district RSS exceptions after 2018-4-20
+
+        After 2018-4-20
+        District ["miwb", "nceb", "pamd", "cit"]
+        Docket doesn't exists
+        No docket entries
+
+        Create docket, merge docket entries.
+        """
+        d_rss_data_after_2018 = RssDocketDataFactory(
+            court_id=self.court_pamd.pk,
+            case_name="Dragon 1 v. State",
+            docket_number="3:15-CV-01456",
+            pacer_case_id="5431",
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    date_filed=make_aware(
+                        datetime(year=2018, month=4, day=21), utc
+                    )
+                )
+            ],
+        )
+
+        build_date = d_rss_data_after_2018["docket_entries"][0]["date_filed"]
+        self.assertEqual(len(self.docket_d_after_2018.docket_entries.all()), 0)
+        rds_created, d_created = merge_rss_data(
+            [d_rss_data_after_2018], self.court_pamd.pk, build_date
+        )
+        dockets = Docket.objects.filter(pacer_case_id="5431")
+        self.assertEqual(len(rds_created), 1)
+        self.assertEqual(d_created, 1)
+        self.assertEqual(dockets[0].case_name, "Dragon 1 v. State")
+        self.assertEqual(dockets[0].docket_number, "3:15-CV-01456")
+
+    def test_merging_district_docket_with_entries_before_2018(self):
+        """3 Test merge district RSS file before 2018-4-20 into a
+        docket with entries.
+
+        Before 2018-4-20
+        District
+        Docket exists
+        Docket entries
+
+        Only merge entry if it doesn't exist, avoid updating metadata.
+        """
+        d_rss_data_before_2018 = RssDocketDataFactory(
+            court_id=self.court.pk,
+            case_name="Young v. Dragon",
+            docket_number="3:17-CV-01473",
+            pacer_case_id="9038",
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    document_number="2",
+                    date_filed=make_aware(
+                        datetime(year=2017, month=1, day=4), utc
+                    ),
+                )
+            ],
+        )
+
+        build_date = d_rss_data_before_2018["docket_entries"][0]["date_filed"]
+        self.assertEqual(
+            len(self.de_d_before_2018.docket.docket_entries.all()), 1
+        )
+        rds_created, d_created = merge_rss_data(
+            [d_rss_data_before_2018], self.court.pk, build_date
+        )
+        self.assertEqual(len(rds_created), 1)
+        self.assertEqual(d_created, 0)
+        self.de_d_before_2018.refresh_from_db()
+        self.assertEqual(
+            self.de_d_before_2018.docket.case_name, "Young Entry v. Dragon"
+        )
+        self.assertEqual(
+            self.de_d_before_2018.docket.docket_number, "3:87-CV-01400"
+        )
+        self.assertEqual(
+            len(self.de_d_before_2018.docket.docket_entries.all()), 2
+        )
+        self.assertEqual(
+            self.de_d_before_2018.docket.source, Docket.HARVARD_AND_RECAP
+        )
+
+    def test_avoid_merging_updating_docket_item_without_docket_entries(
+        self,
+    ):
+        """Test avoid merging or updating the docket when the RSS item doesn't
+        contain entries.
+
+        Docket exists
+        Docket entries
+
+        Avoid updating metadata.
+        """
+        d_rss_data_before_2018 = RssDocketDataFactory(
+            court_id=self.court.pk,
+            case_name="Young v. Dragon",
+            docket_number="3:17-CV-01473",
+            pacer_case_id="9038",
+            docket_entries=[],
+        )
+
+        build_date = make_aware(datetime(year=2017, month=1, day=4), utc)
+        self.assertEqual(
+            len(self.de_d_before_2018.docket.docket_entries.all()), 1
+        )
+        rds_created, d_created = merge_rss_data(
+            [d_rss_data_before_2018], self.court.pk, build_date
+        )
+        self.assertEqual(len(rds_created), 0)
+        self.assertEqual(d_created, 0)
+        self.assertEqual(self.de_d_before_2018.docket.source, Docket.HARVARD)
+
+    def test_add_new_district_rss_before_2018(self):
+        """4 Test adds a district RSS file before 2018-4-20, new docket.
+
+        Before: 2018-4-20
+        District
+        Docket doesn't exist
+        No docket entries
+
+        Create docket, merge docket entries.
+        """
+        d_rss_data_before_2018 = RssDocketDataFactory(
+            court_id=self.court.pk,
+            case_name="Youngs v. Dragon",
+            docket_number="3:20-CV-01473",
+            pacer_case_id="43562",
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    date_filed=make_aware(
+                        datetime(year=2017, month=1, day=4), utc
+                    )
+                )
+            ],
+        )
+
+        build_date = d_rss_data_before_2018["docket_entries"][0]["date_filed"]
+        dockets = Docket.objects.filter(pacer_case_id="43562")
+        self.assertEqual(dockets.count(), 0)
+        rds_created, d_created = merge_rss_data(
+            [d_rss_data_before_2018], self.court.pk, build_date
+        )
+        self.assertEqual(len(rds_created), 1)
+        self.assertEqual(d_created, 1)
+        self.assertEqual(dockets[0].case_name, "Youngs v. Dragon")
+        self.assertEqual(dockets[0].docket_number, "3:20-CV-01473")
+        self.assertEqual(len(dockets[0].docket_entries.all()), 1)
+        self.assertEqual(dockets[0].source, Docket.RECAP)
+
+    def test_avoid_merging_rss_docket_with_entries_district_after_2018(self):
+        """5 Test avoid merging district RSS file after 2018-4-20 into a
+        docket with entries.
+
+        After 2018-4-20
+        District
+        Docket exists
+        Docket entries
+
+        Don't merge docket entries, avoid updating metadata.
+        """
+        d_rss_data_after_2018 = RssDocketDataFactory(
+            court_id=self.court.pk,
+            case_name="Young v. Dragons 2",
+            docket_number="3:57-CV-01453",
+            pacer_case_id="9038",
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    document_number="2",
+                    date_filed=make_aware(
+                        datetime(year=2019, month=1, day=4), utc
+                    ),
+                )
+            ],
+        )
+
+        build_date = d_rss_data_after_2018["docket_entries"][0]["date_filed"]
+        self.assertEqual(
+            len(self.de_d_before_2018.docket.docket_entries.all()), 1
+        )
+        rds_created, d_created = merge_rss_data(
+            [d_rss_data_after_2018], self.court.pk, build_date
+        )
+        self.assertEqual(len(rds_created), 0)
+        self.assertEqual(d_created, 0)
+        self.de_d_before_2018.refresh_from_db()
+        self.assertEqual(
+            self.de_d_before_2018.docket.case_name, "Young Entry v. Dragon"
+        )
+        self.assertEqual(
+            self.de_d_before_2018.docket.docket_number, "3:87-CV-01400"
+        )
+        self.assertEqual(
+            len(self.de_d_before_2018.docket.docket_entries.all()), 1
+        )
+        self.assertEqual(self.de_d_before_2018.docket.source, Docket.HARVARD)
+
+    def test_avoid_adding_new_district_rss_after_2018(self):
+        """6 Test avoid adding district RSS file after 2018-4-20.
+
+        After 2018-4-20
+        District
+        Docket doesn't exist
+        No docket entries
+
+        Do not create docket, do not merge docket entries.
+        """
+        d_rss_data_after_2018 = RssDocketDataFactory(
+            court_id=self.court.pk,
+            case_name="Youngs v. Dragon",
+            docket_number="3:20-CV-01473",
+            pacer_case_id="53432",
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    date_filed=make_aware(
+                        datetime(year=2019, month=1, day=4), utc
+                    )
+                )
+            ],
+        )
+
+        build_date = d_rss_data_after_2018["docket_entries"][0]["date_filed"]
+        rds_created, d_created = merge_rss_data(
+            [d_rss_data_after_2018], self.court.pk, build_date
+        )
+        self.assertEqual(len(rds_created), 0)
+        self.assertEqual(d_created, 0)
+
+    # Appellate
+    def test_merge_appellate_rss_before_2018(self):
+        """7 Test merge an appellate RSS file before 2018-4-20
+
+        Before 2018-4-20
+        Appellate
+        Docket exists
+        No docket entries
+
+        Merge docket entries, avoid updating metadata.
+        """
+        a_rss_data_before_2018 = RssDocketDataFactory(
+            court_id=self.court_appellate.pk,
+            case_name="Young v. Dragon",
+            docket_number="12-2532",
+            pacer_case_id=None,
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    date_filed=make_aware(
+                        datetime(year=2017, month=1, day=4), utc
+                    )
+                )
+            ],
+        )
+
+        build_date = a_rss_data_before_2018["docket_entries"][0]["date_filed"]
+        self.assertEqual(
+            len(self.docket_a_before_2018.docket_entries.all()), 0
+        )
+        rds_created, d_created = merge_rss_data(
+            [a_rss_data_before_2018], self.court_appellate.pk, build_date
+        )
+        self.assertEqual(len(rds_created), 1)
+        self.assertEqual(d_created, 0)
+        self.docket_a_before_2018.refresh_from_db()
+        self.assertEqual(self.docket_a_before_2018.case_name, "Young v. State")
+        self.assertEqual(self.docket_a_before_2018.docket_number, "12-2532")
+        self.assertEqual(
+            len(self.docket_a_before_2018.docket_entries.all()), 1
+        )
+        self.assertEqual(
+            self.docket_a_before_2018.source, Docket.HARVARD_AND_RECAP
+        )
+
+    def test_merging_appellate_rss_after_2018(self):
+        """8 Test appellate RSS file after 2018-4-20
+
+        After 2018-4-20
+        Appellate
+        Docket exists
+        No docket entries
+
+        Merge docket entries, avoid updating metadata.
+        """
+        a_rss_data_after_2018 = RssDocketDataFactory(
+            court_id=self.court_appellate.pk,
+            case_name="Dragon 1 v. State",
+            docket_number="15-1232",
+            pacer_case_id=None,
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    date_filed=make_aware(
+                        datetime(year=2018, month=4, day=21), utc
+                    )
+                )
+            ],
+        )
+
+        build_date = a_rss_data_after_2018["docket_entries"][0]["date_filed"]
+        self.assertEqual(len(self.docket_a_after_2018.docket_entries.all()), 0)
+        rds_created, d_created = merge_rss_data(
+            [a_rss_data_after_2018], self.court_appellate.pk, build_date
+        )
+        self.assertEqual(len(rds_created), 1)
+        self.assertEqual(d_created, 0)
+        self.docket_a_after_2018.refresh_from_db()
+        self.assertEqual(self.docket_a_after_2018.case_name, "Dragon v. State")
+        self.assertEqual(self.docket_a_after_2018.docket_number, "15-1232")
+        self.assertEqual(len(self.docket_a_after_2018.docket_entries.all()), 1)
+        self.assertEqual(
+            self.docket_a_after_2018.source, Docket.HARVARD_AND_RECAP
+        )
+
+    def test_avoid_merging_existing_appellate_entry_before_2018(self):
+        """9 Test avoid merging appellate RSS file before 2018-4-20, docket
+        with entries.
+
+        Before 2018-4-20
+        Appellate
+        Docket exists
+        Docket entries
+
+        Don't merge docket entries, avoid updating metadata.
+        """
+        a_rss_data_before_2018 = RssDocketDataFactory(
+            court_id=self.court_appellate.pk,
+            case_name="Young v. Dragon",
+            docket_number="12-3242",
+            pacer_case_id=None,
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    document_number="2",
+                    date_filed=make_aware(
+                        datetime(year=2017, month=1, day=4), utc
+                    ),
+                )
+            ],
+        )
+
+        build_date = a_rss_data_before_2018["docket_entries"][0]["date_filed"]
+        self.assertEqual(
+            len(self.de_a_before_2018.docket.docket_entries.all()), 1
+        )
+        rds_created, d_created = merge_rss_data(
+            [a_rss_data_before_2018], self.court_appellate.pk, build_date
+        )
+        self.assertEqual(len(rds_created), 1)
+        self.assertEqual(d_created, 0)
+        self.de_a_before_2018.refresh_from_db()
+        self.assertEqual(
+            self.de_a_before_2018.docket.case_name, "Young Entry v. Dragon"
+        )
+        self.assertEqual(self.de_a_before_2018.docket.docket_number, "12-3242")
+        self.assertEqual(
+            len(self.de_a_before_2018.docket.docket_entries.all()), 2
+        )
+        self.assertEqual(
+            self.de_a_before_2018.docket.source, Docket.HARVARD_AND_RECAP
+        )
+
+    def test_merge_new_appellate_rss_before_2018(self):
+        """10 Merge a new appellate RSS file before 2018-4-20
+
+        Before: 2018-4-20
+        Appellate
+        Docket doesn't exist
+        No docket entries
+
+        Create docket, merge docket entries.
+        """
+        a_rss_data_before_2018 = RssDocketDataFactory(
+            court_id=self.court_appellate.pk,
+            case_name="Youngs v. Dragon",
+            docket_number="23-4233",
+            pacer_case_id=None,
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    date_filed=make_aware(
+                        datetime(year=2017, month=1, day=4), utc
+                    )
+                )
+            ],
+        )
+
+        build_date = a_rss_data_before_2018["docket_entries"][0]["date_filed"]
+        dockets = Docket.objects.filter(docket_number="23-4233")
+        self.assertEqual(dockets.count(), 0)
+        rds_created, d_created = merge_rss_data(
+            [a_rss_data_before_2018], self.court_appellate.pk, build_date
+        )
+        self.assertEqual(len(rds_created), 1)
+        self.assertEqual(d_created, 1)
+        self.assertEqual(dockets[0].case_name, "Youngs v. Dragon")
+        self.assertEqual(dockets[0].docket_number, "23-4233")
+        self.assertEqual(len(dockets[0].docket_entries.all()), 1)
+        self.assertEqual(dockets[0].source, Docket.RECAP)
+
+    def test_avoid_merging_existing_appellate_entry_after_2018(self):
+        """11 Test avoid merging appellate RSS file after 2018-4-20, docket with
+        entries.
+
+        After: 2018-4-20
+        Appellate
+        Docket exists
+        Docket entry exist
+
+        Don't merge the existing entry, avoid updating metadata.
+        """
+        a_rss_data_before_2018 = RssDocketDataFactory(
+            court_id=self.court_appellate.pk,
+            case_name="Young v. Dragon",
+            docket_number="12-3242",
+            pacer_case_id=None,
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    document_number="1",
+                    date_filed=make_aware(
+                        datetime(year=2019, month=1, day=4), utc
+                    ),
+                )
+            ],
+        )
+
+        build_date = a_rss_data_before_2018["docket_entries"][0]["date_filed"]
+        self.assertEqual(
+            len(self.de_a_before_2018.docket.docket_entries.all()), 1
+        )
+        rds_created, d_created = merge_rss_data(
+            [a_rss_data_before_2018], self.court_appellate.pk, build_date
+        )
+        self.assertEqual(len(rds_created), 0)
+        self.assertEqual(d_created, 0)
+
+    def test_merging_appellate_docket_with_entries_after_2018(self):
+        """Test merge appellate RSS file after 2018-4-20, docket with
+        entries.
+
+        After: 2018-4-20
+        Appellate
+        Docket exists
+        Docket entries
+
+        Only merge entry if it doesn't exist, avoid updating metadata.
+        """
+        a_rss_data_before_2018 = RssDocketDataFactory(
+            court_id=self.court_appellate.pk,
+            case_name="Young v. Dragon",
+            docket_number="12-3242",
+            pacer_case_id=None,
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    document_number="2",
+                    date_filed=make_aware(
+                        datetime(year=2019, month=1, day=4), utc
+                    ),
+                )
+            ],
+        )
+
+        build_date = a_rss_data_before_2018["docket_entries"][0]["date_filed"]
+        self.assertEqual(
+            len(self.de_a_before_2018.docket.docket_entries.all()), 1
+        )
+        rds_created, d_created = merge_rss_data(
+            [a_rss_data_before_2018], self.court_appellate.pk, build_date
+        )
+        self.assertEqual(len(rds_created), 1)
+        self.assertEqual(d_created, 0)
+        self.de_a_before_2018.refresh_from_db()
+        self.assertEqual(
+            self.de_a_before_2018.docket.case_name, "Young Entry v. Dragon"
+        )
+        self.assertEqual(self.de_a_before_2018.docket.docket_number, "12-3242")
+        self.assertEqual(
+            len(self.de_a_before_2018.docket.docket_entries.all()), 2
+        )
+        self.assertEqual(
+            self.de_a_before_2018.docket.source, Docket.HARVARD_AND_RECAP
+        )
+
+    def test_merge_new_appellate_rss_after_2018(self):
+        """12 Merge a new appellate RSS file after 2018-4-20
+
+        After: 2018-4-20
+        Appellate
+        Docket doesn't exist
+        No docket entries
+
+        Create docket, merge docket entries, .
+        """
+
+        d_rss_data_after_2018 = RssDocketDataFactory(
+            court_id=self.court_appellate.pk,
+            case_name="Youngs v. Dragon",
+            docket_number="45-3232",
+            pacer_case_id=None,
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    date_filed=make_aware(
+                        datetime(year=2019, month=1, day=4), utc
+                    )
+                )
+            ],
+        )
+
+        build_date = d_rss_data_after_2018["docket_entries"][0]["date_filed"]
+        dockets = Docket.objects.filter(docket_number="45-3232")
+        self.assertEqual(dockets.count(), 0)
+        rds_created, d_created = merge_rss_data(
+            [d_rss_data_after_2018], self.court_appellate.pk, build_date
+        )
+        self.assertEqual(len(rds_created), 1)
+        self.assertEqual(d_created, 1)
+        self.assertEqual(dockets.count(), 1)
+        self.assertEqual(dockets[0].case_name, "Youngs v. Dragon")
+        self.assertEqual(dockets[0].docket_number, "45-3232")
+        self.assertEqual(len(dockets[0].docket_entries.all()), 1)
+        self.assertEqual(dockets[0].source, Docket.RECAP)
+
+    def test_merging_appellate_docket_with_entries_case_id(self):
+        """Test merge an appellate RSS file into a docket with pacer_case_id
+        Find docket by docket_number_core, avoid duplicating.
+        Merge docket entries, avoid updating metadata.
+        """
+        a_rss_data_before_2018 = RssDocketDataFactory(
+            court_id=self.court_appellate.pk,
+            case_name="Young v. Dragon",
+            docket_number="12-5674",
+            pacer_case_id=None,
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    document_number="2",
+                    date_filed=make_aware(
+                        datetime(year=2019, month=1, day=4), utc
+                    ),
+                )
+            ],
+        )
+
+        build_date = a_rss_data_before_2018["docket_entries"][0]["date_filed"]
+        self.assertEqual(
+            len(self.docket_a_2018_case_id.docket_entries.all()), 0
+        )
+        rds_created, d_created = merge_rss_data(
+            [a_rss_data_before_2018], self.court_appellate.pk, build_date
+        )
+        self.assertEqual(len(rds_created), 1)
+        self.assertEqual(d_created, 0)
+        self.docket_a_2018_case_id.refresh_from_db()
+        self.assertEqual(
+            self.docket_a_2018_case_id.case_name, "Young v. State"
+        )
+        self.assertEqual(self.docket_a_2018_case_id.docket_number, "12-5674")
+        self.assertEqual(self.docket_a_2018_case_id.pacer_case_id, "12524")
+        self.assertEqual(
+            len(self.docket_a_2018_case_id.docket_entries.all()), 1
+        )
+        self.assertEqual(self.docket_a_2018_case_id.source, Docket.RECAP)
+
+    def test_log_added_items_to_redis(self):
+        """Can we log dockets and rds added to redis, adding the previous
+        value?
+        """
+        last_values = log_added_items_to_redis(100, 100, 50)
+        self.assertEqual(last_values["total_dockets"], 100)
+        self.assertEqual(last_values["total_rds"], 100)
+        self.assertEqual(last_values["last_line"], 50)
+
+        last_values = log_added_items_to_redis(50, 80, 100)
+        self.assertEqual(last_values["total_dockets"], 150)
+        self.assertEqual(last_values["total_rds"], 180)
+        self.assertEqual(last_values["last_line"], 100)
+
+        self.r.flushdb()
+
+    def test_merge_mapped_court_rss_before_2018(self):
+        """Merge a court mapped RSS file before 2018-4-20
+
+        before: 2018-4-20
+        District neb -> nebraskab
+        Docket doesn't exist
+        No docket entries
+
+        Create docket, merge docket entries, verify is assigned to nebraskab.
+        """
+
+        d_rss_data_before_2018 = RssDocketDataFactory(
+            court_id="neb",
+            case_name="Youngs v. Dragon",
+            docket_number="3:20-CV-01473",
+            pacer_case_id="43565",
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    date_filed=make_aware(
+                        datetime(year=2017, month=1, day=4), utc
+                    )
+                )
+            ],
+        )
+
+        build_date = d_rss_data_before_2018["docket_entries"][0]["date_filed"]
+        dockets = Docket.objects.filter(docket_number="3:20-CV-01473")
+        self.assertEqual(dockets.count(), 0)
+        rds_created, d_created = merge_rss_data(
+            [d_rss_data_before_2018], "neb", build_date
+        )
+        self.assertEqual(len(rds_created), 1)
+        self.assertEqual(d_created, 1)
+        self.assertEqual(dockets.count(), 1)
+        self.assertEqual(dockets[0].case_name, "Youngs v. Dragon")
+        self.assertEqual(dockets[0].docket_number, "3:20-CV-01473")
+        self.assertEqual(len(dockets[0].docket_entries.all()), 1)
+        self.assertEqual(dockets[0].source, Docket.RECAP)
+        self.assertEqual(dockets[0].court.pk, "nebraskab")
+
+    def test_avoid_merging_district_mapped_court_rss_after_2018(self):
+        """Avoid merging a new district RSS file with mapped court
+        after 2018-4-20.
+
+        After: 2018-4-20
+        District neb -> nebraskab
+        Docket doesn't exist
+        No docket entries
+
+        Don't merge.
+        """
+
+        d_rss_data_after_2018 = RssDocketDataFactory(
+            court_id="neb",
+            case_name="Youngs v. Dragon",
+            docket_number="3:20-CV-01473",
+            pacer_case_id="43565",
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    date_filed=make_aware(
+                        datetime(year=2019, month=1, day=4), utc
+                    )
+                )
+            ],
+        )
+        build_date = d_rss_data_after_2018["docket_entries"][0]["date_filed"]
+        rds_created, d_created = merge_rss_data(
+            [d_rss_data_after_2018], "neb", build_date
+        )
+        self.assertEqual(len(rds_created), 0)
+        self.assertEqual(d_created, 0)
+
+    def test_avoid_updating_docket_entry_metadata(self):
+        """Test merge appellate RSS file after 2018-4-20, docket with
+        entries.
+
+        After: 2018-4-20
+        Appellate
+        Docket exists
+        Docket entries
+
+        Only merge entry if it doesn't exist, avoid updating metadata.
+        """
+
+        de_a_unnumbered = DocketEntryWithParentsFactory(
+            docket__court=self.court_appellate,
+            docket__case_name="Young Entry v. Dragon",
+            docket__docket_number="12-3245",
+            docket__source=Docket.HARVARD,
+            docket__pacer_case_id=None,
+            entry_number=None,
+            description="Original docket entry description",
+            date_filed=make_aware(datetime(year=2018, month=1, day=5), utc),
+        )
+        RECAPDocumentFactory(
+            docket_entry=de_a_unnumbered, description="Opinion Issued"
+        )
+
+        a_rss_data_unnumbered = RssDocketDataFactory(
+            court_id=self.court_appellate.pk,
+            case_name="Young v. Dragon",
+            docket_number="12-3245",
+            pacer_case_id=None,
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    document_number=None,
+                    description="New docket entry description",
+                    short_description="Opinion Issued",
+                    date_filed=make_aware(
+                        datetime(year=2018, month=1, day=5), utc
+                    ),
+                )
+            ],
+        )
+        build_date = a_rss_data_unnumbered["docket_entries"][0]["date_filed"]
+        self.assertEqual(len(de_a_unnumbered.docket.docket_entries.all()), 1)
+        rds_created, d_created = merge_rss_data(
+            [a_rss_data_unnumbered], self.court_appellate.pk, build_date
+        )
+        self.assertEqual(len(rds_created), 0)
+        self.assertEqual(d_created, 0)
+        de_a_unnumbered.refresh_from_db()
+        self.assertEqual(
+            de_a_unnumbered.docket.case_name, "Young Entry v. Dragon"
+        )
+        self.assertEqual(de_a_unnumbered.docket.docket_number, "12-3245")
+        self.assertEqual(
+            de_a_unnumbered.description, "Original docket entry description"
+        )
+        self.assertEqual(len(de_a_unnumbered.docket.docket_entries.all()), 1)
+        self.assertEqual(
+            de_a_unnumbered.date_filed,
+            datetime(year=2018, month=1, day=4).date(),
+        )
+        self.assertEqual(de_a_unnumbered.docket.source, Docket.HARVARD)
+
+    @patch("cl.corpus_importer.management.commands.troller_bk.logger")
+    def test_avoid_cached_items(self, mock_logger):
+        """Can we skip a whole file when a cached item is hit?"""
+
+        a_rss_data_0 = RssDocketDataFactory(
+            court_id=self.court_appellate.pk,
+            docket_number="12-3247",
+            pacer_case_id=None,
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    document_number=1,
+                    date_filed=make_aware(
+                        datetime(year=2018, month=1, day=5), utc
+                    ),
+                ),
+            ],
+        )
+
+        a_rss_data_1 = RssDocketDataFactory(
+            court_id=self.court_appellate.pk,
+            docket_number="12-3245",
+            pacer_case_id=None,
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    document_number=1,
+                    date_filed=make_aware(
+                        datetime(year=2018, month=1, day=5), utc
+                    ),
+                )
+            ],
+        )
+        a_rss_data_2 = RssDocketDataFactory(
+            court_id=self.court_appellate.pk,
+            docket_number="12-3246",
+            pacer_case_id=None,
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    document_number=1,
+                    date_filed=make_aware(
+                        datetime(year=2018, month=1, day=5), utc
+                    ),
+                )
+            ],
+        )
+
+        list_rss_data_1 = [a_rss_data_1, a_rss_data_2]
+        list_rss_data_2 = [a_rss_data_0, a_rss_data_1]
+
+        cached_items = RssItemCache.objects.all()
+        self.assertEqual(cached_items.count(), 0)
+        build_date = a_rss_data_0["docket_entries"][0]["date_filed"]
+        rds_created, d_created = merge_rss_data(
+            list_rss_data_1, self.court_appellate.pk, build_date
+        )
+        self.assertEqual(len(rds_created), 2)
+        self.assertEqual(d_created, 2)
+        self.assertEqual(cached_items.count(), 2)
+
+        # Remove recap_sequence_number from the dict to simulate the same item
+        del a_rss_data_1["docket_entries"][0]["recap_sequence_number"]
+        rds_created, d_created = merge_rss_data(
+            list_rss_data_2, self.court_appellate.pk, build_date
+        )
+
+        # The file is aborted when a cached item is hit
+        self.assertEqual(len(rds_created), 1)
+        self.assertEqual(d_created, 1)
+        self.assertEqual(cached_items.count(), 3)
+        mock_logger.info.assert_called_with(
+            f"Finished adding {self.court_appellate.pk} feed. Added {len(rds_created)} RDs."
+        )
+
+    @patch(
+        "cl.corpus_importer.management.commands.troller_bk.download_file",
+        side_effect=mock_download_file,
+    )
+    def test_download_files_concurrently(self, mock_download):
+        """Test the download_files_concurrently method to verify proper
+        fetching of the next paths to download from a file. Concurrently
+        download these paths and add them to a queue in the original chronological order.
+        """
+        test_dir = (
+            Path(settings.INSTALL_ROOT)
+            / "cl"
+            / "corpus_importer"
+            / "test_assets"
+        )
+        import_filename = "import.csv"
+        import_path = os.path.join(test_dir, import_filename)
+
+        files_queue = Queue()
+        threads = []
+        files_downloaded_offset = 0
+
+        with open(import_path, "rb") as f:
+            files_downloaded_offset = download_files_concurrently(
+                files_queue, f.name, files_downloaded_offset, threads
+            )
+            self.assertEqual(len(threads), 1)
+            self.assertEqual(files_downloaded_offset, 3)
+            files_downloaded_offset = download_files_concurrently(
+                files_queue, f.name, files_downloaded_offset, threads
+            )
+
+        for thread in threads:
+            thread.join()
+
+        self.assertEqual(len(threads), 2)
+        self.assertEqual(files_downloaded_offset, 6)
+        self.assertEqual(files_queue.qsize(), 6)
+
+        # Verifies original chronological order.
+        binary, item_path, order = files_queue.get()
+        self.assertEqual(order, 0)
+        self.assertEqual(item_path.split("|")[1], "1575330086")
+        files_queue.task_done()
+
+        binary, item_path, order = files_queue.get()
+        self.assertEqual(order, 1)
+        self.assertEqual(item_path.split("|")[1], "1575333374")
+        files_queue.task_done()
+
+        binary, item_path, order = files_queue.get()
+        self.assertEqual(order, 2)
+        self.assertEqual(item_path.split("|")[1], "1575336978")
+        files_queue.task_done()
+
+        binary, item_path, order = files_queue.get()
+        self.assertEqual(order, 0)
+        self.assertEqual(item_path.split("|")[1], "1575340576")
+        files_queue.task_done()
+
+        binary, item_path, order = files_queue.get()
+        self.assertEqual(order, 1)
+        self.assertEqual(item_path.split("|")[1], "1575344176")
+        files_queue.task_done()
+
+        binary, item_path, order = files_queue.get()
+        self.assertEqual(order, 2)
+        self.assertEqual(item_path.split("|")[1], "1575380176")
+        files_queue.task_done()
+
+        self.assertEqual(files_queue.qsize(), 0)
+
+    def test_add_objects_in_bulk(self):
+        """Can we properly add related RSS feed objects in bulk?"""
+
+        a_rss_data_0 = RssDocketDataFactory(
+            court_id=self.court_appellate.pk,
+            docket_number="15-3247",
+            pacer_case_id=None,
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    document_number=1,
+                    date_filed=make_aware(
+                        datetime(year=2018, month=1, day=5), utc
+                    ),
+                ),
+            ],
+        )
+
+        a_rss_data_1 = RssDocketDataFactory(
+            court_id=self.court_appellate.pk,
+            docket_number="15-3245",
+            pacer_case_id=None,
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    document_number=1,
+                    date_filed=make_aware(
+                        datetime(year=2018, month=1, day=5), utc
+                    ),
+                )
+            ],
+        )
+        a_rss_data_2 = RssDocketDataFactory(
+            court_id=self.court_appellate.pk,
+            docket_number="15-3247",
+            pacer_case_id=None,
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    document_number=2,
+                    date_filed=make_aware(
+                        datetime(year=2018, month=1, day=5), utc
+                    ),
+                )
+            ],
+        )
+
+        a_rss_data_3 = RssDocketDataFactory(
+            court_id=self.court_appellate.pk,
+            docket_number="12-2532",
+            pacer_case_id=None,
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    document_number=5,
+                    date_filed=make_aware(
+                        datetime(year=2018, month=1, day=5), utc
+                    ),
+                )
+            ],
+        )
+
+        list_rss_data = [
+            a_rss_data_0,
+            a_rss_data_1,
+            a_rss_data_2,
+            a_rss_data_3,
+        ]
+        cached_items = RssItemCache.objects.all()
+        self.assertEqual(cached_items.count(), 0)
+
+        build_date = a_rss_data_0["docket_entries"][0]["date_filed"]
+        rds_created, d_created = merge_rss_data(
+            list_rss_data, self.court_appellate.pk, build_date
+        )
+
+        date_filed, time_filed = localize_date_and_time(
+            self.court_appellate.pk, build_date
+        )
+
+        # Only two dockets created: 15-3247 and 15-3245, 12-2532 already exists
+        self.assertEqual(d_created, 2)
+        self.assertEqual(len(rds_created), 4)
+
+        # Compare docket entries and rds created for each docket.
+        des_to_compare = [("15-3245", 1), ("15-3247", 2), ("12-2532", 1)]
+        for d_number, de_count in des_to_compare:
+            docket = Docket.objects.get(docket_number=d_number)
+            self.assertEqual(len(docket.docket_entries.all()), de_count)
+
+            # For every docket entry there is one recap document created.
+            docket_entries = docket.docket_entries.all()
+            for de in docket_entries:
+                self.assertEqual(len(de.recap_documents.all()), 1)
+                self.assertEqual(de.time_filed, time_filed)
+                self.assertEqual(de.date_filed, date_filed)
+                self.assertNotEqual(de.recap_sequence_number, "")
+
+            # docket_number_core generated for every docket
+            self.assertNotEqual(docket.docket_number_core, "")
+            # Slug is generated for every docket
+            self.assertNotEqual(docket.slug, "")
+
+            # Verify RECAP source is added to existing and new dockets.
+            if d_number == "12-2532":
+                self.assertEqual(docket.source, Docket.HARVARD_AND_RECAP)
+            else:
+                self.assertEqual(docket.source, Docket.RECAP)
+                # Confirm date_last_filing is added to each new docket.
+                self.assertEqual(docket.date_last_filing, date_filed)
+
+        # BankruptcyInformation is added only on new dockets.
+        bankr_objs_created = BankruptcyInformation.objects.all()
+        self.assertEqual(len(bankr_objs_created), 3)
+
+        # Compare bankruptcy data is linked correctly to the parent docket.
+        bankr_d_1 = BankruptcyInformation.objects.get(
+            docket__docket_number=a_rss_data_0["docket_number"]
+        )
+        self.assertEqual(bankr_d_1.chapter, str(a_rss_data_0["chapter"]))
+        self.assertEqual(
+            bankr_d_1.trustee_str, str(a_rss_data_0["trustee_str"])
+        )
+
+        bankr_d_2 = BankruptcyInformation.objects.get(
+            docket__docket_number=a_rss_data_1["docket_number"]
+        )
+        self.assertEqual(bankr_d_2.chapter, str(a_rss_data_1["chapter"]))
+        self.assertEqual(
+            bankr_d_2.trustee_str, str(a_rss_data_1["trustee_str"])
+        )
+
+        bankr_d_3 = BankruptcyInformation.objects.get(
+            docket__docket_number=a_rss_data_3["docket_number"]
+        )
+        self.assertEqual(bankr_d_3.chapter, str(a_rss_data_3["chapter"]))
+        self.assertEqual(
+            bankr_d_3.trustee_str, str(a_rss_data_3["trustee_str"])
+        )
+
+    def test_avoid_adding_district_dockets_no_pacer_case_id_in_bulk(self):
+        """Can we avoid adding district/bankr dockets that don't have a
+        pacer_case_id?"""
+
+        a_rss_data_0 = RssDocketDataFactory(
+            court_id=self.court_neb.pk,
+            docket_number="15-3247",
+            pacer_case_id=None,
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    document_number=1,
+                    date_filed=make_aware(
+                        datetime(year=2018, month=1, day=5), utc
+                    ),
+                ),
+            ],
+        )
+
+        a_rss_data_1 = RssDocketDataFactory(
+            court_id=self.court_neb.pk,
+            docket_number="15-3245",
+            pacer_case_id="12345",
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    document_number=1,
+                    date_filed=make_aware(
+                        datetime(year=2018, month=1, day=5), utc
+                    ),
+                )
+            ],
+        )
+
+        list_rss_data = [
+            a_rss_data_0,
+            a_rss_data_1,
+        ]
+
+        build_date = a_rss_data_0["docket_entries"][0]["date_filed"]
+        rds_created, d_created = merge_rss_data(
+            list_rss_data, self.court_neb.pk, build_date
+        )
+
+        # Only one docket created: 15-3245, since 15-3247 don't have pacer_case_id
+        self.assertEqual(d_created, 1)
+        self.assertEqual(len(rds_created), 1)
+
+        # Compare docket entries and rds created for each docket.
+        des_to_compare = [("15-3245", 1)]
+        for d_number, de_count in des_to_compare:
+            docket = Docket.objects.get(docket_number=d_number)
+            self.assertEqual(len(docket.docket_entries.all()), de_count)
+            # For every docket entry there is one recap document created.
+            docket_entries = docket.docket_entries.all()
+            for de in docket_entries:
+                self.assertEqual(len(de.recap_documents.all()), 1)
+                self.assertNotEqual(de.recap_sequence_number, "")
+
+            # docket_number_core generated for every docket
+            self.assertNotEqual(docket.docket_number_core, "")
+            # Slug is generated for every docket
+            self.assertNotEqual(docket.slug, "")
+            self.assertEqual(docket.source, Docket.RECAP)
+
+        # BankruptcyInformation is added only on new dockets.
+        bankr_objs_created = BankruptcyInformation.objects.all()
+        self.assertEqual(len(bankr_objs_created), 1)
+
+    def test_avoid_adding_existing_entries_by_description(self):
+        """Can we avoid adding district/bankr dockets that don't have a
+        pacer_case_id?"""
+
+        de = DocketEntryWithParentsFactory(
+            docket__court=self.court,
+            docket__case_name="Young Entry v. Dragon",
+            docket__docket_number="3:87-CV-01409",
+            docket__source=Docket.HARVARD,
+            docket__pacer_case_id="90385",
+            entry_number=None,
+            date_filed=make_aware(datetime(year=2018, month=1, day=5), utc),
+        )
+        RECAPDocumentFactory(docket_entry=de, description="Opinion Issued")
+        a_rss_data_0 = RssDocketDataFactory(
+            court_id=self.court,
+            docket_number="3:87-CV-01409",
+            pacer_case_id="90385",
+            docket_entries=[
+                RssDocketEntryDataFactory(
+                    document_number=None,
+                    short_description="Opinion Issued",
+                    date_filed=make_aware(
+                        datetime(year=2018, month=1, day=5), utc
+                    ),
+                ),
+            ],
+        )
+        list_rss_data = [
+            a_rss_data_0,
+        ]
+        build_date = a_rss_data_0["docket_entries"][0]["date_filed"]
+        rds_created, d_created = merge_rss_data(
+            list_rss_data, self.court.pk, build_date
+        )
+
+        # No docket entry should be created
+        self.assertEqual(d_created, 0)
+        self.assertEqual(len(rds_created), 0)
+
+
+@patch(
+    "cl.corpus_importer.management.commands.clean_up_mis_matched_dockets.download_file",
+    side_effect=lambda a: {
+        "name_abbreviation": "Benedict v. Hankook",
+        "name": "Robert BENEDICT, Plaintiff, v. HANKOOK",
+        "docket_number": "Civil Action No. 3:17\u2013cv\u2013109",
+    },
+)
+class CleanUpMisMatchedDockets(TestCase):
+    """Test find_and_fix_mis_matched_dockets method that finds and fixes mis
+    matched opinion dockets added by Harvard importer.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        # Opinion cluster with mis matched docket.
+        cls.cluster = (
+            OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(
+                    court=cls.court,
+                    source=Docket.HARVARD,
+                    case_name="Glover vs Pridemore",
+                    case_name_full="Glover vs Pridemore",
+                    docket_number="2:17-cv-00109",
+                    pacer_case_id="12345",
+                ),
+                case_name="Foo v. Bar",
+                date_filed=date.today(),
+            ),
+        )
+        cf = ContentFile(b"Hello World att 1")
+        cls.cluster[0].filepath_json_harvard.save("file.json", cf)
+
+        # Opinion cluster with correct docket
+        cluster_2 = (
+            OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(
+                    court=cls.court,
+                    source=Docket.HARVARD,
+                    case_name="Foo v. Bar",
+                    case_name_full="Foo v. Bar",
+                    docket_number="2:17-cv-00109",
+                    pacer_case_id=None,
+                ),
+                case_name="Foo v. Bar",
+                date_filed=date.today(),
+            ),
+        )
+        cf = ContentFile(b"Hello World att 1")
+        cluster_2[0].filepath_json_harvard.save("file.json", cf)
+
+    def test_find_mis_matched_docket(self, mock_download_ia):
+        """Test only find and report mis matched dockets."""
+
+        dockets = Docket.objects.all()
+        self.assertEqual(dockets.count(), 2)
+        mis_matched_dockets = find_and_fix_mis_matched_dockets(fix=False)
+        self.assertEqual(len(mis_matched_dockets), 1)
+        self.assertEqual(dockets.count(), 2)
+
+    def test_find_and_fix_mis_matched_dockets(self, mock_download_ia):
+        """Test find and fix mis matched dockets"""
+
+        cluster = self.cluster[0]
+        mis_matched_docket = cluster.docket
+        dockets = Docket.objects.all()
+        self.assertEqual(dockets.count(), 2)
+        mis_matched_dockets = find_and_fix_mis_matched_dockets(fix=True)
+        self.assertEqual(len(mis_matched_dockets), 1)
+        self.assertEqual(dockets.count(), 3)
 
         cluster.refresh_from_db()
-        author_query = Opinion.objects.filter(
-            cluster_id=cluster.id
-        ).values_list("author_str", flat=True)
-        authors = sorted(list(author_query))
-        # Validate we didnt create a new opinion
         self.assertEqual(
-            Opinion.objects.filter(cluster_id=cluster.id).count(),
-            2,
-            msg="Oops",
+            cluster.docket.docket_number, "Civil Action No. 3:17–cv–109"
         )
-        # Check that we added xml
-        self.assertNotEqual(
-            Opinion.objects.filter(cluster_id=cluster.id)[0].xml_harvard, ""
-        )
-        # Make sure we updated our source
-        self.assertEqual(cluster.docket.source, Docket.COLUMBIA_AND_HARVARD)
-        # Check judges were added to our opinions
-        self.assertEqual(authors, ["Broyles", "Gardner"])
+        self.assertEqual(cluster.docket.case_name, "Benedict v. Hankook")
+        self.assertEqual(cluster.docket.source, Docket.HARVARD)
 
-    def test_merge_overlap_judges(self):
-        """Can we merge overlap judge names?"""
-
-        for item in [
-            # Format: (cl judge, harvard prepared data, expected output)
-            # CL item #4575556
-            (
-                "Barbera",
-                "Adkins, Barbera, Getty, Greene, Hotten, McDonald, Watts",
-                "Adkins, Barbera, Getty, Greene, Hotten, McDonald, Watts",
-            ),
-            # CL item #4573873
-            (
-                "Simpson, J. ~ Concurring Opinion by Pellegrini, Senior Judge",
-                "Simpson",
-                "Simpson, J. ~ Concurring Opinion by Pellegrini, Senior Judge",
-            ),
-            (
-                "January 1st 2020",  # CL  #bad data example
-                "Simpson, J. ~ Concurring Opinion by Pellegrini, Senior Judge",
-                # Harvard
-                "Simpson, Pellegrini",  # Expected result
-            ),
-            # CL item #4576003
-            (
-                "French, J.",
-                "Fischer, French, Kennedy",
-                "Fischer, French, Kennedy",
-            ),
-            # CL item #4576003
-            (
-                "Leavitt, President Judge",
-                "Leavitt",
-                "Leavitt, President Judge",
-            ),
-        ]:
-            cluster = OpinionClusterWithParentsFactory(
-                judges=item[0],
-            )
-            merge_judges(cluster.pk, (item[1], item[0]))
-            cluster.refresh_from_db()
-            self.assertEqual(cluster.judges, item[2])
-
-    def test_merge_overlap_casenames(self):
-        """Can we merge overlap case names?"""
-
-        for item in [
-            # CL item #4571581
-            # Test that the case name is not changed,
-            # but the full case name is filled
-            (
-                {
-                    "name": "Vivian PEREZ, Administratrix (Estate of Andres "
-                    "Burgos) v. METROPOLITAN DISTRICT COMMISSION",
-                    "name_abbreviation": "Perez v. Metro. Dist. Comm'n",
-                },
-                {
-                    "cl_case_name": "Perez v. Metropolitan District Commisssion",
-                    "cl_case_name_full": "",
-                },
-                {
-                    "expected_case_name": "Perez v. Metropolitan District "
-                    "Commisssion",
-                    "expected_case_name_full": "Vivian PEREZ, Administratrix "
-                    "(Estate of Andres Burgos) v. "
-                    "METROPOLITAN DISTRICT "
-                    "COMMISSION",
-                },
-            ),
-            # CL item #4574207
-            # Test that we can override the cluster case name when the
-            # harvard case name is better and also fill in the full case
-            # name when empty
-            (
-                {
-                    "name": "Randy WEYERMAN v. FREEMAN EXPOSITIONS, INC., "
-                    "Employer, and Old Republic Insurance Company, "
-                    "Insurance Carrier",
-                    "name_abbreviation": "Weyerman v. Freeman Expositions, "
-                    "Inc.",
-                },
-                {
-                    "cl_case_name": "Weyerman v. Freeman Expositions",
-                    "cl_case_name_full": "",
-                },
-                {
-                    "expected_case_name": "Weyerman v. Freeman Expositions, "
-                    "Inc.",
-                    "expected_case_name_full": "Randy WEYERMAN v. FREEMAN "
-                    "EXPOSITIONS, INC., Employer, "
-                    "and Old Republic Insurance "
-                    "Company, Insurance Carrier",
-                },
-            ),
-            # CL item #4576005
-            # Test that we can find the best case name but
-            # also swap data when the case name is longer than the full case
-            # name
-            (
-                {
-                    "name": "The STATE EX REL. MURRAY v. STATE EMPLOYMENT "
-                    "RELATIONS BOARD",
-                    "name_abbreviation": "State ex rel. Murray v. State "
-                    "Emp't Relations Bd",
-                },
-                {
-                    "cl_case_name": "State ex rel. Murray v. State Emp. "
-                    "Relations Bd. (Slip Opinion)",
-                    "cl_case_name_full": "",
-                },
-                {
-                    "expected_case_name": "The State Ex Rel. Murray v. State "
-                    "Employment Relations Board",
-                    "expected_case_name_full": "State Ex Rel. Murray v. "
-                    "State Emp. Relations Bd. ("
-                    "Slip Opinion)",
-                },
-            ),
-        ]:
-            # Create cluster with case_name and case_name_full
-            cluster = OpinionClusterWithParentsFactory(
-                case_name=item[1].get("cl_case_name"),
-                case_name_full=item[1].get("cl_case_name_full"),
-            )
-
-            merge_case_names(cluster.pk, item[0])
-            cluster.refresh_from_db()
-
-            # Check case_name
-            self.assertEqual(
-                cluster.case_name, item[2].get("expected_case_name")
-            )
-            # Check case_name_full
-            self.assertEqual(
-                cluster.case_name_full, item[2].get("expected_case_name_full")
-            )
-
-    def test_merge_date_filed(self):
-        """Can we merge date filed?"""
-
-        # Test that harvard date is different that cl date, if docket
-        # source is SCRAPER then use harvard data
-        # Item format: (harvard_decision_date, cl date_filed, expected output)
-        for item in [
-            # CL item #4549197
-            ("2018-10-23", date(2018, 11, 1), date(2018, 10, 23)),
-            # CL item #4549214
-            ("2018-10-19", date(2018, 11, 1), date(2018, 10, 19)),
-            # CL item #4548724
-            ("2018-10-30", date(2018, 11, 6), date(2018, 10, 30)),
-        ]:
-            cluster = OpinionClusterWithParentsFactory(
-                date_filed=item[1], docket=DocketFactory(source=Docket.SCRAPER)
-            )
-
-            merge_cluster_dates(cluster.pk, "date_filed", (item[0], item[1]))
-            cluster.refresh_from_db()
-
-            # Check case_name_full
-            self.assertEqual(cluster.date_filed, item[2])
+        # The mis matched docket is preserved, fix its source to RECAP.
+        mis_matched_docket.refresh_from_db()
+        self.assertEqual(mis_matched_docket.source, Docket.RECAP)

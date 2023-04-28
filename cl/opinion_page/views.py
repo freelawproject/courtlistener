@@ -4,6 +4,7 @@ from itertools import groupby
 from typing import Dict, Tuple, Union
 from urllib.parse import urlencode
 
+import natsort
 from django.contrib import messages
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
@@ -31,8 +32,8 @@ from rest_framework.status import HTTP_300_MULTIPLE_CHOICES, HTTP_404_NOT_FOUND
 from cl.alerts.models import DocketAlert
 from cl.citations.parenthetical_utils import get_or_create_parenthetical_groups
 from cl.custom_filters.templatetags.text_filters import best_case_name
-from cl.favorites.forms import FavoriteForm
-from cl.favorites.models import Favorite
+from cl.favorites.forms import NoteForm
+from cl.favorites.models import Note
 from cl.lib.auth import group_required
 from cl.lib.bot_detector import is_og_bot
 from cl.lib.http import is_ajax
@@ -47,7 +48,6 @@ from cl.lib.search_utils import (
 from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_404
-from cl.lib.utils import alphanumeric_sort
 from cl.lib.view_utils import increment_view_count
 from cl.opinion_page.forms import (
     CitationRedirectorForm,
@@ -223,23 +223,23 @@ def user_has_alert(user: Union[AnonymousUser, User], docket: Docket) -> bool:
 def core_docket_data(
     request: HttpRequest,
     pk: int,
-) -> Tuple[Docket, Dict[str, Union[bool, str, Docket, FavoriteForm]]]:
+) -> Tuple[Docket, Dict[str, Union[bool, str, Docket, NoteForm]]]:
     """Gather the core data for a docket, party, or IDB page."""
     docket = get_object_or_404(Docket, pk=pk)
     title = make_docket_title(docket)
 
     try:
-        fave = Favorite.objects.get(docket_id=docket.pk, user=request.user)
+        note = Note.objects.get(docket_id=docket.pk, user=request.user)
     except (ObjectDoesNotExist, TypeError):
-        # Not favorited or anonymous user
-        favorite_form = FavoriteForm(
+        # Not saved in notes or anonymous user
+        note_form = NoteForm(
             initial={
                 "docket_id": docket.pk,
                 "name": trunc(best_case_name(docket), 100, ellipsis="..."),
             }
         )
     else:
-        favorite_form = FavoriteForm(instance=fave)
+        note_form = NoteForm(instance=note)
 
     has_alert = user_has_alert(request.user, docket)
 
@@ -248,7 +248,7 @@ def core_docket_data(
         {
             "docket": docket,
             "title": title,
-            "favorite_form": favorite_form,
+            "note_form": note_form,
             "has_alert": has_alert,
             "timezone": COURT_TIMEZONES.get(docket.court_id, "US/Eastern"),
             "private": docket.blocked,
@@ -260,11 +260,13 @@ def core_docket_data(
 def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     docket, context = core_docket_data(request, pk)
     increment_view_count(docket, request)
+    sort_order_asc = True
 
     de_list = docket.docket_entries.all().prefetch_related("recap_documents")
-    form = DocketEntryFilterForm(request.GET)
+    form = DocketEntryFilterForm(request.GET, request=request)
     if form.is_valid():
         cd = form.cleaned_data
+
         if cd.get("entry_gte"):
             de_list = de_list.filter(entry_number__gte=cd["entry_gte"])
         if cd.get("entry_lte"):
@@ -274,6 +276,7 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
         if cd.get("filed_before"):
             de_list = de_list.filter(date_filed__lte=cd["filed_before"])
         if cd.get("order_by") == DocketEntryFilterForm.DESCENDING:
+            sort_order_asc = False
             de_list = de_list.order_by(
                 "-recap_sequence_number", "-entry_number"
             )
@@ -289,8 +292,10 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
 
     context.update(
         {
-            "parties": docket.parties.exists(),  # Needed to show/hide parties tab.
+            "parties": docket.parties.exists(),
+            # Needed to show/hide parties tab.
             "docket_entries": docket_entries,
+            "sort_order_asc": sort_order_asc,
             "form": form,
             "get_string": make_get_string(request),
         }
@@ -440,6 +445,7 @@ def view_recap_document(
     """This view can either load an attachment or a regular document,
     depending on the URL pattern that is matched.
     """
+    redirect_to_pacer_modal = False
     try:
         rd = RECAPDocument.objects.filter(
             docket_entry__docket__id=docket_id,
@@ -447,34 +453,74 @@ def view_recap_document(
             attachment_number=att_num,
         ).order_by("pk")[0]
 
-        # Check if the user has requested automatic redirection to the document
-        rd_download_redirect = request.GET.get("redirect_to_download", False)
-        if rd_download_redirect:
-            # Check if the document is available from CourtListener and
-            # if it is, redirect to the local document
-            # if it isn't, redirect to PACER if pacer_url is available
-            if rd.is_available:
-                return HttpResponseRedirect(rd.filepath_local.url)
-            else:
-                if rd.pacer_url:
-                    return HttpResponseRedirect(rd.pacer_url)
     except IndexError:
+        # Unable to find the docket entry the normal way. In appellate courts, this
+        # can be because the main document was converted to an attachment, leaving no
+        # main document behind. See:
+        #
+        # https://github.com/freelawproject/courtlistener/pull/2413
+        #
+        # When this happens, try redirecting to the first attachment for the entry,
+        # if it exists.
+        if att_num:
+            raise Http404("No RECAPDocument matches the given query.")
+
+        # check if the main document was converted to an attachment and
+        # if it was, redirect the user to the attachment page
+        rd = RECAPDocument.objects.filter(
+            docket_entry__docket__id=docket_id,
+            document_number=doc_num,
+            attachment_number=1,
+        ).first()
+        if rd:
+            # Get the URL to the attachment page and use the querystring
+            # if the request included one
+            attachment_page = reverse(
+                "view_recap_attachment",
+                kwargs={
+                    "docket_id": docket_id,
+                    "doc_num": doc_num,
+                    "att_num": 1,
+                    "slug": slug,
+                },
+            )
+            if request.GET.urlencode():
+                attachment_page += f"?{request.GET.urlencode()}"
+            return HttpResponseRedirect(attachment_page)
+
         raise Http404("No RECAPDocument matches the given query.")
+
+    # Check if the user has requested automatic redirection to the document
+    rd_download_redirect = request.GET.get("redirect_to_download", False)
+    redirect_or_modal = request.GET.get("redirect_or_modal", False)
+    if rd_download_redirect or redirect_or_modal:
+        # Check if the document is available from CourtListener and
+        # if it is, redirect to the local document
+        # if it isn't, if pacer_url is available and
+        # rd_download_redirect is True, redirect to PACER. If redirect_or_modal
+        # is True set redirect_to_pacer_modal to True to open the modal.
+        if rd.is_available:
+            return HttpResponseRedirect(rd.filepath_local.url)
+        else:
+            if rd.pacer_url and rd_download_redirect:
+                return HttpResponseRedirect(rd.pacer_url)
+            if rd.pacer_url and redirect_or_modal:
+                redirect_to_pacer_modal = True
 
     title = make_rd_title(rd)
     rd = make_thumb_if_needed(request, rd)
     try:
-        fave = Favorite.objects.get(recap_doc_id=rd.pk, user=request.user)
+        note = Note.objects.get(recap_doc_id=rd.pk, user=request.user)
     except (ObjectDoesNotExist, TypeError):
-        # Not favorited or anonymous user
-        favorite_form = FavoriteForm(
+        # Not saved in notes or anonymous user
+        note_form = NoteForm(
             initial={
                 "recap_doc_id": rd.pk,
                 "name": trunc(title, 100, ellipsis="..."),
             }
         )
     else:
-        favorite_form = FavoriteForm(instance=fave)
+        note_form = NoteForm(instance=note)
 
     return TemplateResponse(
         request,
@@ -482,8 +528,12 @@ def view_recap_document(
         {
             "rd": rd,
             "title": title,
-            "favorite_form": favorite_form,
+            "note_form": note_form,
             "private": True,  # Always True for RECAP docs.
+            "timezone": COURT_TIMEZONES.get(
+                rd.docket_entry.docket.court_id, "US/Eastern"
+            ),
+            "redirect_to_pacer_modal": redirect_to_pacer_modal,
         },
     )
 
@@ -493,12 +543,12 @@ def view_recap_document(
 def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     """Using the cluster ID, return the cluster of opinions.
 
-    We also test if the cluster ID is a favorite for the user, and send data
-    if needed. If it's a favorite, we send the bound form for the favorite so
-    it can populate the form on the page. If it is not a favorite, we send the
+    We also test if the cluster ID has a user note, and send data
+    if needed. If it's a note, we send the bound form for the note so
+    it can populate the form on the page. If it has note a note, we send the
     unbound form.
     """
-    # Look up the court, cluster, title and favorite information
+    # Look up the court, cluster, title and note information
     cluster = get_object_or_404(OpinionCluster, pk=pk)
     title = ", ".join(
         [
@@ -518,17 +568,17 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     get_string = make_get_string(request)
 
     try:
-        fave = Favorite.objects.get(cluster_id=cluster.pk, user=request.user)
+        note = Note.objects.get(cluster_id=cluster.pk, user=request.user)
     except (ObjectDoesNotExist, TypeError):
-        # Not favorited or anonymous user
-        favorite_form = FavoriteForm(
+        # Not note or anonymous user
+        note_form = NoteForm(
             initial={
                 "cluster_id": cluster.pk,
                 "name": trunc(best_case_name(cluster), 100, ellipsis="..."),
             }
         )
     else:
-        favorite_form = FavoriteForm(instance=fave)
+        note_form = NoteForm(instance=note)
 
     citing_clusters, citing_cluster_count = get_citing_clusters_with_cache(
         cluster
@@ -559,7 +609,7 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
             "title": title,
             "cluster": cluster,
             "has_downloads": has_downloads,
-            "favorite_form": favorite_form,
+            "note_form": note_form,
             "get_string": get_string,
             "private": cluster.blocked,
             "citing_clusters": citing_clusters,
@@ -648,6 +698,29 @@ def throw_404(request: HttpRequest, context: Dict) -> HttpResponse:
     )
 
 
+def get_prev_next_volumes(reporter: str, volume: str) -> tuple[int, int]:
+    """Get the volume before and after the current one.
+
+    :param reporter: The reporter where the volume is found
+    :param volume: The volume we're inspecting
+    :return Tuple of the volume number we have prior to the selected one, and
+    of the volume number after it.
+    """
+    volumes = list(
+        (
+            Citation.objects.filter(reporter=reporter)
+            .annotate(as_integer=Cast("volume", IntegerField()))
+            .values_list("as_integer", flat=True)
+            .distinct()
+            .order_by("as_integer")
+        )
+    )
+    index = volumes.index(int(volume))
+    volume_previous = volumes[index - 1] if index > 0 else None
+    volume_next = volumes[index + 1] if index + 1 < len(volumes) else None
+    return volume_next, volume_previous
+
+
 def reporter_or_volume_handler(
     request: HttpRequest, reporter: str, volume: str | None = None
 ) -> HttpResponse:
@@ -708,14 +781,9 @@ def reporter_or_volume_handler(
         )
 
     # Show all the cases for a volume-reporter dyad
-    cases_in_volume = (
-        OpinionCluster.objects.filter(
-            citations__reporter=reporter, citations__volume=volume
-        )
-        .annotate(cite_page=(F("citations__page")))
-        .order_by("cite_page")
-    )
-    cases_in_volume = alphanumeric_sort(cases_in_volume, "cite_page")
+    cases_in_volume = OpinionCluster.objects.filter(
+        citations__reporter=reporter, citations__volume=volume
+    ).order_by("date_filed")
 
     if not cases_in_volume:
         return throw_404(
@@ -729,18 +797,7 @@ def reporter_or_volume_handler(
             },
         )
 
-    volumes = list(
-        (
-            Citation.objects.filter(reporter=reporter)
-            .annotate(as_integer=Cast("volume", IntegerField()))
-            .values_list("as_integer", flat=True)
-            .distinct()
-            .order_by("as_integer")
-        )
-    )
-    index = volumes.index(int(volume))
-    volume_previous = volumes[index - 1] if index > 0 else None
-    volume_next = volumes[index + 1] if index + 1 < len(volumes) else None
+    volume_next, volume_previous = get_prev_next_volumes(reporter, volume)
 
     paginator = Paginator(cases_in_volume, 100, orphans=5)
     page = request.GET.get("page", 1)
@@ -808,19 +865,43 @@ def citation_handler(
     else:
         cluster_count = clusters.count()
 
-    if cluster_count == 0 and page.isdigit():
-        # Do a second pass for the closest opinion and check if we have
-        # a page cite that matches -- if it does give the requested opinion
-        possible_match = (
+    if cluster_count == 0:
+        # We didn't get an exact match on the volume/reporter/page. Perhaps it's a pincite.
+        # Try to find the citation immediately *before* this one in the same book. To do so,
+        # Get all the opinions from the book, sort them by page number (in Python, b/c pages
+        # can have letters), then find the citation just before the requested one.
+
+        possible_match = None
+
+        # Create a list of the closest opinion clusters id and page to the
+        # input citation
+        closest_opinion_clusters = list(
             OpinionCluster.objects.filter(
-                citations__reporter=reporter,
-                citations__volume=volume,
+                citations__reporter=reporter, citations__volume=volume
             )
-            .annotate(as_integer=Cast("citations__page", IntegerField()))
-            .exclude(as_integer__gte=page)
-            .order_by("-as_integer")
-            .first()
+            .annotate(cite_page=(F("citations__page")))
+            .values_list("id", "cite_page")
         )
+
+        # Create a temporal item and add it to the values list
+        citation_item = (0, page)
+        closest_opinion_clusters.append((0, page))
+
+        # Natural sort page numbers ascending order
+        sort_possible_matches = natsort.natsorted(
+            closest_opinion_clusters, key=lambda item: item[1]
+        )
+
+        # Find the position of the item that we added
+        citation_item_position = sort_possible_matches.index(citation_item)
+
+        if citation_item_position > 0:
+            # if the position is greater than 0, then the previous item in
+            # the list is the closest citation, we get the id of the
+            # previous item, and we get the object
+            possible_match = OpinionCluster.objects.get(
+                id=sort_possible_matches[citation_item_position - 1][0]
+            )
 
         if possible_match:
             # There may be different page cite formats that aren't yet

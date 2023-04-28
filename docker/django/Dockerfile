@@ -18,7 +18,7 @@ RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
 
 # poetry
 # https://python-poetry.org/docs/configuration/#using-environment-variables
-ENV POETRY_VERSION=1.2.1 \
+ENV POETRY_VERSION=1.3.2 \
     # make poetry install to this location
     POETRY_HOME="/opt/poetry" \
     # Don't build a virtualenv to save space
@@ -61,7 +61,7 @@ ADD https://raw.githubusercontent.com/freelawproject/courtlistener/main/poetry.l
 ADD https://raw.githubusercontent.com/freelawproject/courtlistener/main/pyproject.toml /opt/pyproject.toml
 
 # install runtime deps - uses $POETRY_VIRTUALENVS_IN_PROJECT internally
-RUN poetry install --no-root
+RUN poetry install --no-root --without dev
 
 ADD https://github.com/freelawproject/courtlistener/archive/main.tar.gz /opt/courtlistener.tar.gz
 WORKDIR /opt
@@ -117,6 +117,8 @@ CMD gunicorn cl_wsgi:application \
     --group www-data \
     # Set high number of workers. Docs recommend 2-4× core count`
     --workers ${NUM_WORKERS:-48} \
+    --worker-class gthread \
+    --threads 10 \
     # Allow longer queries to solr.
     --limit-request-line 6000 \
     # Reset each worker once in a while

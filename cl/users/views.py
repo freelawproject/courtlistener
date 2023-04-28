@@ -12,13 +12,14 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.core.mail import send_mail
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db.models import Count
+from django.db.models import Count, F
 from django.http import (
     HttpRequest,
     HttpResponse,
     HttpResponseRedirect,
     QueryDict,
 )
+from django.shortcuts import get_object_or_404
 from django.template.defaultfilters import urlencode
 from django.template.response import TemplateResponse
 from django.urls import reverse
@@ -35,7 +36,7 @@ from rest_framework.renderers import JSONRenderer
 from cl.alerts.models import DocketAlert
 from cl.api.models import WEBHOOK_EVENT_STATUS, WebhookEvent, WebhookEventType
 from cl.custom_filters.decorators import check_honeypot
-from cl.favorites.forms import FavoriteForm
+from cl.favorites.forms import NoteForm
 from cl.lib.crypto import sha1_activation_key
 from cl.lib.ratelimiter import ratelimiter_unsafe_10_per_m
 from cl.lib.types import AuthenticatedHttpRequest, EmailType
@@ -87,9 +88,30 @@ def view_search_alerts(request: HttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_docket_alerts(request: HttpRequest) -> HttpResponse:
+    order_by = request.GET.get("order_by", "date_created")
+    if order_by.startswith("-"):
+        direction = "-"
+        order_by = order_by.lstrip("-")
+    else:
+        direction = ""
+    name_map = {
+        "name": "docket__case_name",
+        "court": "docket__court__short_name",
+        "hit": "date_last_hit",
+    }
+    order_by = name_map.get(order_by, "date_created")
     docket_alerts = request.user.docket_alerts.filter(
         alert_type=DocketAlert.SUBSCRIPTION
-    ).order_by("date_created")
+    )
+    if not direction:
+        docket_alerts = docket_alerts.order_by(
+            F(order_by).asc(nulls_last=True)
+        )
+    else:
+        docket_alerts = docket_alerts.order_by(
+            F(order_by).desc(nulls_last=False)
+        )
+
     return TemplateResponse(
         request,
         "profile/alerts.html",
@@ -104,37 +126,34 @@ def view_docket_alerts(request: HttpRequest) -> HttpResponse:
 
 @login_required
 @never_cache
-def view_favorites(request: AuthenticatedHttpRequest) -> HttpResponse:
-    favorites = request.user.favorites.all().order_by("pk")
-    favorite_forms = OrderedDict()
-    favorite_forms["Dockets"] = []
-    favorite_forms["RECAP Documents"] = []
-    favorite_forms["Opinions"] = []
-    favorite_forms["Oral Arguments"] = []
-    for favorite in favorites:
-        if favorite.cluster_id:
+def view_notes(request: AuthenticatedHttpRequest) -> HttpResponse:
+    notes = request.user.notes.all().order_by("pk")
+    note_forms = OrderedDict()
+    note_forms["Dockets"] = []
+    note_forms["RECAP Documents"] = []
+    note_forms["Opinions"] = []
+    note_forms["Oral Arguments"] = []
+    for note in notes:
+        if note.cluster_id:
             key = "Opinions"
-        elif favorite.audio_id:
+        elif note.audio_id:
             key = "Oral Arguments"
-        elif favorite.recap_doc_id:
+        elif note.recap_doc_id:
             key = "RECAP Documents"
-        elif favorite.docket_id:
+        elif note.docket_id:
             key = "Dockets"
-        favorite_forms[key].append(FavoriteForm(instance=favorite))
+        note_forms[key].append(NoteForm(instance=note))
     docket_search_url = (
         "/?type=r&q=xxx AND docket_id:("
         + " OR ".join(
-            [str(a.instance.docket_id.pk) for a in favorite_forms["Dockets"]]
+            [str(a.instance.docket_id.pk) for a in note_forms["Dockets"]]
         )
         + ")"
     )
     oral_search_url = (
         "/?type=oa&q=xxx AND id:("
         + " OR ".join(
-            [
-                str(a.instance.audio_id.pk)
-                for a in favorite_forms["Oral Arguments"]
-            ]
+            [str(a.instance.audio_id.pk) for a in note_forms["Oral Arguments"]]
         )
         + ")"
     )
@@ -143,7 +162,7 @@ def view_favorites(request: AuthenticatedHttpRequest) -> HttpResponse:
         + " OR ".join(
             [
                 str(a.instance.recap_doc_id.pk)
-                for a in favorite_forms["RECAP Documents"]
+                for a in note_forms["RECAP Documents"]
             ]
         )
         + ")"
@@ -151,17 +170,17 @@ def view_favorites(request: AuthenticatedHttpRequest) -> HttpResponse:
     opinion_search_url = (
         "/?q=xxx AND cluster_id:("
         + " OR ".join(
-            [str(a.instance.cluster_id.pk) for a in favorite_forms["Opinions"]]
+            [str(a.instance.cluster_id.pk) for a in note_forms["Opinions"]]
         )
         + ")&stat_Precedential=on&stat_Non-Precedential=on&stat_Errata=on&stat_Separate%20Opinion=on&stat_In-chambers=on&stat_Relating-to%20orders=on&stat_Unknown%20Status=on"
     )
     return TemplateResponse(
         request,
-        "profile/favorites.html",
+        "profile/notes.html",
         {
             "private": True,
-            "favorite_forms": favorite_forms,
-            "blank_favorite_form": FavoriteForm(),
+            "note_forms": note_forms,
+            "blank_note_form": NoteForm(),
             "docket_search_url": docket_search_url,
             "oral_search_url": oral_search_url,
             "recap_search_url": recap_search_url,
@@ -390,6 +409,7 @@ def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
         {
             "non_deleted_map_count": non_deleted_map_count,
             "delete_form": delete_form,
+            "page": "profile_settings",
             "private": True,
         },
     )
@@ -772,7 +792,9 @@ def view_webhook_logs_detail(
 ) -> HttpResponse:
     """Render the webhook event detail page"""
 
-    webhook_event = WebhookEvent.objects.get(webhook__user=request.user, pk=pk)
+    webhook_event = get_object_or_404(
+        WebhookEvent, webhook__user=request.user, pk=pk
+    )
     renderer = JSONRenderer()
     json_content = renderer.render(
         webhook_event.content,

@@ -1,19 +1,9 @@
 {% extends "base.html" %}
-{% load extras static %}
+{% load extras static humanize %}
 
 {% block title %}Bulk Legal Data – CourtListener.com{% endblock %}
-{% block description %}
-Free legal bulk data for federal and state opinions,
-dockets, oral arguments, and judges from Free Law Project, a
-501(c)(3) nonprofit. A complete Supreme Court corpus and the most complete
-and comprehensive database of American judges.
-{% endblock %}
-{% block og_description %}
-Free legal bulk data for federal and state opinions,
-dockets, oral arguments, and judges from Free Law Project, a
-501(c)(3) nonprofit. A complete Supreme Court corpus and the most complete
-and comprehensive database of American judges.
-{% endblock %}
+{% block description %}Free legal bulk data for federal and state opinions, dockets, oral arguments, and judges from Free Law Project, a 501(c)(3) nonprofit. A complete Supreme Court corpus and the most complete and comprehensive database of American judges.{% endblock %}
+{% block og_description %}Free legal bulk data for federal and state opinions, dockets, oral arguments, and judges from Free Law Project, a 501(c)(3) nonprofit. A complete Supreme Court corpus and the most complete and comprehensive database of American judges.{% endblock %}
 
 {% block sidebar %}{% endblock %}
 
@@ -22,20 +12,44 @@ and comprehensive database of American judges.
 {% endblock %}
 
 {% block content %}
-  <div class="col-xs-12">
+<div class="col-xs-12">
 <div class="row">
-  <div class="hidden-xs col-sm-2 col-md-3"></div>
-  <div class="col-xs-12 col-sm-8 col-md-6">
+  <div class="hidden-xs hidden-sm col-md-3">
+    <div id="toc">
+      <h3>Table of Contents</h3>
+      <ul>
+        <li><a href="#about">Overview</a></li>
+        <li><a href="#browsing">Browsing the Files</a></li>
+        <li><a href="#formats">Data Definitions</a></li>
+        <li><a href="#schemas">Schema Diagrams</a></li>
+        <ul>
+          <li><a href="#opinions-db">Opinions Data</a></li>
+          <li><a href="#disclosures">Disclosures Data</a></li>
+          <li><a href="#people-db">Judge Data</a></li>
+          <li><a href="#audio-db">Oral Argument Data</a></li>
+        </ul>
+        <li><a href="#odds-and-ends">Odds and Ends</a></li>
+        <ul>
+          <li><a href="#schedule">Data Generation Schedule</a></li>
+          <li><a href="#contributing">Contributions</a></li>
+          <li><a href="#old">Old Formats</a></li>
+          <li><a herf="#copyright">Copyright</a></li>
+        </ul>
+      </ul>
+    </div>
+  </div>
+
+  <div class="col-xs-12 col-md-8 col-lg-6">
     <h1 id="about">Bulk Legal Data</h1>
     <p>For developers, legal researchers, journalists, and the public, we provide bulk files containing many types of data. In general the files that are available correspond to the major types of data we have in our database, such as opinions, oral arguments, dockets, and judges.
     </p>
     <p><a href="{% url "contact" %}">Get in touch</a> if you're interested in types of data not provided here.
     </p>
-    <p>If you have questions about the data, <a href="https://flp.discourse.group/">please use our forum</a> and we'll get back to you as soon as possible.
+    <p>If you have questions about the data, <a href="https://github.com/freelawproject/courtlistener/discussions">please use our forum</a> and we'll get back to you as soon as possible.
     </p>
 
 
-    <h2>Browsing the Data Files</h2>
+    <h2 id="browsing">Browsing the Data Files</h2>
     <p>As they are generated, files are streamed to an AWS S3 bucket. Dates are added to the filenames indicating when their generation began (in the UTC timezone).
     </p>
     <p>
@@ -43,10 +57,10 @@ and comprehensive database of American judges.
     </p>
 
 
-    <h2>Data Format and Field Definitions</h2>
-    <p>Files are generated using the PostgreSQL <a href="https://www.postgresql.org/docs/current/sql-copy.html"><code>COPY TO</code></a> command. This generates CSV files that correspond with the tables in our database. Files are provided using the CSV output format, in the UTF-8 encoding, with a header row on the top. If you are using PostgreSQL, the easiest way to import these files is to use the <code>COPY FROM</code> command. Details about the CSVs we generate can be found in the COPY documentation.
+    <h2 id="formats">Data Format and Field Definitions</h2>
+    <p>Files are generated using the PostgreSQL <a href="https://www.postgresql.org/docs/current/sql-copy.html"><code>COPY TO</code></a> command. This generates CSV files that correspond with the tables in our database. Files are provided using the CSV output format, in the UTF-8 encoding, with a header row on the top. If you are using PostgreSQL, the easiest way to import these files is to use the <code>COPY FROM</code> command. Details about the CSVs we generate can be found in the <a href="https://www.postgresql.org/docs/current/sql-copy.html">COPY documentation</a> or by reading <a href="https://github.com/freelawproject/courtlistener/blob/main/scripts/make_bulk_data.sh">the code we use to generate these files</a>.
     </p>
-    <p>SQL commands to generate our database schema (including tables, columns, indexes, and constraints) are dumped whenever we generate the bulk data files. You can import the schema file into your own database with something like:
+    <p>The SQL commands to generate our database schema (including tables, columns, indexes, and constraints) are dumped whenever we generate the bulk data files. You can import the schema file into your own database with something like:
     </p>
     <blockquote>
       <code>psql [various connection parameters] < schema.sql</code>
@@ -59,7 +73,7 @@ and comprehensive database of American judges.
   </div>
 </div>
 
-<div class="row">
+<div class="row" id="schemas">
   <div class="hidden-xs hidden-sm col-md-1"></div>
   <div class="col-xs-7 col-md-6">
     <a href="{% static "png/people-model-v3.13.png" %}"
@@ -85,8 +99,8 @@ and comprehensive database of American judges.
 </div>
 
 <div class="row">
-  <div class="hidden-xs col-sm-2 col-md-3"></div>
-  <div class="col-xs-12 col-sm-8 col-md-6">
+  <div class="hidden-xs hidden-sm col-md-3"></div>
+  <div class="col-xs-12 col-md-8 col-lg-6">
     <h2 id="bulk-data">Bulk Data Files</h2>
     <h3 id="opinions-db">Opinions Data</h3>
     <p>The following bulk data files are available for our opinions database. Use
@@ -112,8 +126,15 @@ and comprehensive database of American judges.
         <p><strong>Parentheticals</strong> &mdash; Parentheticals are short summaries of opinions written by the Court. <a href="https://free.law/2022/03/17/summarizing-important-cases">Learn more about them from our blog</a>.
         </p>
       </li>
+      <li>
+        <p><strong>Integrated DB</strong> — We regularly import the <a href="https://www.fjc.gov/research/idb">FJC Integrated Database</a> into our database, merging it with the data we have.
+        </p>
+      </li>
     </ul>
 
+    <h3 id="disclosures">Financial Disclosure Data</h3>
+    <p>We have built a database of {{ disclosures|intcomma }} financial disclosure documents containing {{ investments|intcomma }} investments. To learn more about this data, please read the <a href="{% url "rest_docs" %}">REST API documentation</a> or the <a href="{% url "coverage_fds" %}">disclosures coverage page</a>.
+    </p>
 
     <h3 id="people-db">Judge Data</h3>
     <p>Our judge database is described in detail in our <a href="{% url "rest_docs" %}">REST API documentation</a>. To learn more about that data, we suggest you read that documentation. Before you can import this data, you will need to import the court data.
@@ -124,16 +145,16 @@ and comprehensive database of American judges.
     </p>
 
 
-    <h2>Odds and Ends</h2>
-    <h3>Generation Times</h3>
+    <h2 id="odds-and-ends">Odds and Ends</h2>
+    <h3 id="schedule">Generation Schedule</h3>
     <p>As can be seen on the public <a href="https://www.google.com/calendar/embed?src=michaeljaylissner.com_fvcq09gchprghkghqa69be5hl0@group.calendar.google.com&ctz=America/Los_Angeles">CourtListener maintenance calendar</a>, bulk data files are regenerated on the last day of every month beginning at 3AM PST. Generation can take many hours, but in general is expected to conclude before the 1st of each month. Check the date in the filename to be sure you have the most recent data.
     </p>
 
-    <h3>Adding Features and Fixing Bugs</h3>
+    <h3 id="contributing">Adding Features and Fixing Bugs</h3>
     <p>Like all Free Law Project initiatives, CourtListener is an open source project. If you are a developer and you notice bugs or missing features, we enthusiastically welcome your contributions <a href="https://github.com/freelawproject/courtlistener">on Github</a>.
     </p>
 
-    <h3>Obsoleted Bulk Data Formats</h3>
+    <h3 id="old">Obsoleted Bulk Data Formats</h3>
     <p>This is the third version of our bulk data system. Previous versions were available by jurisdiction, by day, month, or year, and in JSON format corresponding to our REST API. We also previously provided our CiteGeist data file. Each of these features has been removed in an effort to simply the feature. For more information, see <a href="https://github.com/freelawproject/courtlistener/issues/285">here (removing day/month/year files)</a> and <a href="https://github.com/freelawproject/courtlistener/issues/1983">here (removing the JSON format and switching to PostgreSQL dumps)</a>.
     </p>
 

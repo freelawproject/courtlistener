@@ -14,11 +14,12 @@
 {% endblock %}
 
 {% block content %}
-<div class="hidden-xs col-sm-2 col-md-3">
+<div class="hidden-xs hidden-sm col-md-3">
   <div id="toc">
     <h3>Table of Contents</h3>
     <ul>
       <li><a href="#getting-started">Getting Started</a></li>
+      <li><a href="#pricing">Pricing</a></li>
       <li><a href="#overview-of-events">Overview of Events</a></li>
       <ul>
         <li><a href="#headers">Headers</a></li>
@@ -39,13 +40,23 @@
   </div>
 </div>
 
-<div class="col-xs-12 col-sm-8 col-md-6">
+<div class="col-xs-12 col-md-8 col-lg-6">
   <h1 id="about">Webhook API</h1>
   <p class="lead">CourtListener’s webhook system allows us to push information to you, enabling bi-directional APIs without polling.
   </p>
   <p>To set this up, you create a URL on your server where CourtListener can send data. Then, whenever something important happens in CourtListener, we will POST an “event” to that URL as JSON data. When you receive the event, you can process it and perform whatever actions your system needs in response.
   </p>
   <p>Currently, CourtListener can send webhook events whenever dockets are updated, search alerts are triggered, docket alerts expire, or when RECAP Fetch tasks complete. If you have other events of interest, please get in touch.
+  </p>
+
+  <h2 id="pricing">Pricing</h2>
+  <p>CourtListener is hosted by <a href="https://free.law">Free Law Project</a>, a non-profit that has "Free" in its name, but we do charge reasonable fees to organizations using advanced features like Webhooks and APIs. We use these fees to maintain our paid and free services.
+  </p>
+  <p>When we see an organization starting a new project using Webhooks, we will get in touch to discuss the project and set up an agreement that works for everybody.
+  </p>
+  <p>Questions? Get in touch to start the conversation.</p>
+  <p>
+    <a href="{% url "contact" %}" class="btn btn-default">Contact Us</a>
   </p>
 
   <h2 id="getting-started">Getting Started With Webhooks</h2>
@@ -103,11 +114,17 @@
   </div>
   <hr>
   <h3 id="security">Webhook Security</h3>
-  <p>At present, our webhook system does not have an authentication mechanism to verify that a POST to your endpoint came from CourtListener. To provide some level of safety, <strong>we recommend you use a long, random URL as your endpoint</strong>, and we advise you to keep that URL secret.
+  <p>Our webhook events will be sent from one of two IP addresses:</p>
+  <ol>
+    <li><code>34.210.230.218</code></li>
+    <li><code>54.189.59.91</code></li>
+  </ol>
+  <p>We recommend adding these IP addresses to your network allow list and/or verifying that the webhook events you receive come from these addresses.
   </p>
-  <p>The <a href="https://github.com/freelawproject/courtlistener/issues/1650" rel="nofollow" target="_blank">decision not to support an authentication mechanism</a> was made after analyzing the risk of lacking authentication and after completing a review of the Stripe payments platform (which defaults to not using authentication despite being a high-risk environment).
+  <p>We also recommend you protect your webhook endpoints by giving them long, random, secret URLs instead of short preditable ones.</p>
+  <p>Beyond this, our webhook system does not have an authentication mechanism to verify that a POST to your endpoint came from CourtListener. The <a href="https://github.com/freelawproject/courtlistener/issues/1650" rel="nofollow" target="_blank">decision not to support an authentication mechanism</a> was made after analyzing the risk of lacking authentication and after completing a review of the Stripe payments platform (which defaults to not using authentication despite being a high-risk environment).
   </p>
-  <p>So far, none of our clients have requested that we add this feature nor demonstrated a need for it. If the need for webhook authentication is a blocker for your organization, <a href="{% url 'contact' %}">please let us know</a> and we can build a solution together.
+  <p>If the need for webhook authentication is a blocker for your organization, <a href="{% url 'contact' %}">please let us know</a> and we can revisit this decision.
   </p>
 
   <h3 id="retries">Retries and Automatic Endpoint Disablement</h3>
@@ -242,10 +259,10 @@ xargs curl -X POST \
 }
   </pre>
   <p>
-    The <code>results</code> key is based on the  <a href="{% url 'rest_docs' %}#docket-entry-endpoint">Docket Entry API</a> and has all the same fields. If you already have access to that API, you can <a href="{% url "docketentry-detail" version="v3" pk=20615503 %}">see an example object here</a>, and do an HTTP OPTIONS request to get a description of the fields:
+    The <code>results</code> key is based on the  <a href="{% url 'rest_docs' %}#docket-entry-endpoint">Docket Entry API</a> and has all the same fields except for the <code>resource_uri</code> and <code>tags</code> fields, which are omitted, and the <code>docket</code> field is an <code>ID</code> instead of a URL. If you already have access to that API, you can <a href="{% url "docketentry-detail" version="v3" pk=20615503 %}">see an example object here</a>, and do an HTTP OPTIONS request to get a description of the fields:
   </p>
   <pre class="v-offset-below-1 scrollable" >curl -X OPTIONS \
-  --url '{% get_full_host %}{% url "recapdocument-list" version="v3" %}' \
+  --url '{% get_full_host %}{% url "docketentry-list" version="v3" %}' \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'</pre>
   <p>
     If you do not yet have access to the Docket Entry API, please <a href="{% url "contact" %}">let us know</a>. In the meantime, another way to see an example event is via <a href="{% url "webhooks_getting_started" %}#testing">the webhook testing tool</a>.

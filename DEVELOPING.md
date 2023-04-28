@@ -20,7 +20,7 @@ On with the show.
 
 # Discussing things
 
-We host [a Discourse forum](https://flp.discourse.group/c/developer-discussions/8) where you can ask questions and search past ones. We should use this more, but mostly people seem to get into our Slack and ask things there. When they do that, the answers to their questions go into a black hole and only ever help the person that asked them. Ah well.
+You can use [Github Discussions][ghd] to ask questions and search past ones. We should use this more, but mostly people seem to get into our Slack and ask things there. When they do that, the answers to their questions go into a black hole and only ever help the person that asked them. Ah well.
 
 
 ## Architecture
@@ -104,6 +104,8 @@ To set up a development machine, do the following:
         docker exec -it cl-django python /opt/courtlistener/manage.py make_dev_data
 
     If this does not make an object that you want for your work, you should update it so it does. It's a relatively new tool and it's growing as we use it.
+
+    If you need specific data from CourtListener (to debug something, say), you can use `clone_from_cl`, which pulls data from the CourtListener API into your dev database.
 
 1. Finally, create a new superuser login by running this command, and entering the required information:
 
@@ -447,3 +449,4 @@ When code is merged into `main`, we also automatically build and push new docker
 [dr]: https://github.com/freelawproject/doctor/
 [env]: https://django-environ.readthedocs.io/en/latest/index.html
 [3]: https://12factor.net/config
+[ghd]: https://github.com/freelawproject/courtlistener/discussions

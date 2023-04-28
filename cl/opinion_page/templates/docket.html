@@ -4,13 +4,9 @@
 {% load static %}
 
 {% block title %}{{ title }} – CourtListener.com{% endblock %}
-{% block og_title %}Docket for {{ title }} - CourtListener.com{% endblock %}
-{% block description %}Docket for {{ title }} — Brought to you by the RECAP
-  Initiative and Free Law Project, a non-profit dedicated to creating high
-  quality open legal information.{% endblock %}
-{% block og_description %}Docket for {{ title }} — Brought to you by the RECAP
-  Initiative and Free Law Project, a non-profit dedicated to creating high
-  quality open legal information.{% endblock %}
+{% block og_title %}{{ title }} - CourtListener.com{% endblock %}
+{% block description %}Docket for {{ title }} — Brought to you by Free Law Project, a non-profit dedicated to creating high quality open legal information.{% endblock %}
+{% block og_description %}Docket for {{ title }} — Brought to you by Free Law Project, a non-profit dedicated to creating high quality open legal information.{% endblock %}
 
 {% block head %}
   {% if DEBUG %}
@@ -59,10 +55,9 @@
   </div>
 {% endif %}
 
-
-{% if docket_entries.paginator.num_pages > 1 %}
-    <div class="col-xs-12">
-    {% include "includes/pagination.html" with results=docket_entries %}
-    </div>
+{% if docket_entries.has_other_pages %}
+  <div class="col-xs-12" >
+    {% include "includes/pagination.html" with page_obj=docket_entries %}
+  </div>
 {% endif %}
 {% endblock %}

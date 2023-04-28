@@ -27,9 +27,24 @@ from rest_framework.status import (
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
+from cl.alerts.factories import DocketAlertFactory
+from cl.alerts.models import DocketAlert, DocketAlertEvent
 from cl.api.factories import WebhookEventFactory, WebhookFactory
-from cl.api.models import Webhook, WebhookEvent, WebhookEventType
+from cl.api.models import (
+    Webhook,
+    WebhookEvent,
+    WebhookEventType,
+    WebhookHistoryEvent,
+)
+from cl.favorites.factories import UserTagFactory
+from cl.favorites.models import (
+    DocketTag,
+    DocketTagEvent,
+    UserTag,
+    UserTagEvent,
+)
 from cl.lib.test_helpers import SimpleUserDataMixin
+from cl.search.factories import DocketFactory
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import APITestCase, LiveServerTestCase, TestCase
 from cl.tests.utils import MockResponse as MockPostResponse
@@ -278,6 +293,108 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         # Test username lowercasing
         up = UserProfileWithParentsFactory(user__username="Test.User")
         self.assertEqual(up.recap_email, "test.user@recap.email")
+
+    def test_nuke_user_history_objects_assets_deleting_account(self) -> None:
+        """Are user related history objects properly removed when deleting the
+        user account?
+        """
+
+        user_1 = UserProfileWithParentsFactory()
+        user_2 = UserProfileWithParentsFactory()
+        docket = DocketFactory()
+        docket_2 = DocketFactory()
+        docket_alert = DocketAlertFactory(docket=docket, user=user_1.user)
+        docket_alert_2 = DocketAlertFactory(docket=docket_2, user=user_1.user)
+        docket_alert_3 = DocketAlertFactory(docket=docket_2, user=user_2.user)
+
+        # Confirm docket alert objects are created.
+        docket_alerts = DocketAlert.objects.all()
+        self.assertEqual(docket_alerts.count(), 3)
+
+        # Trigger a change for docket alert objects.
+        docket_alert.alert_type = DocketAlert.UNSUBSCRIPTION
+        docket_alert.save()
+        docket_alert_2.alert_type = DocketAlert.UNSUBSCRIPTION
+        docket_alert_2.save()
+        docket_alert_3.alert_type = DocketAlert.UNSUBSCRIPTION
+        docket_alert_3.save()
+
+        docket_alert_events = DocketAlertEvent.objects.all()
+        # More docket alert history objects should be created.
+        self.assertEqual(docket_alert_events.count(), 3)
+
+        # Delete user account.
+        self.assertTrue(
+            self.client.login(
+                username=user_1.user.username, password="password"
+            )
+        )
+        self.client.post(
+            reverse("delete_account"),
+            {"password": "password"},
+            follow=True,
+        )
+
+        # Confirm that only history events objects related to the user deleted
+        # are removed from the events table.
+        self.assertEqual(docket_alerts.count(), 1)
+        self.assertEqual(docket_alert_events.count(), 1)
+
+    def test_nuke_user_tag_and_docket_tag_history_objects(self) -> None:
+        """Are user_tag and docket_tag history objects properly removed when
+        deleting the user account?  This is different from the previous test
+        since docket_tag is no directly related to the user.
+        """
+
+        docket_1 = DocketFactory()
+        docket_2 = DocketFactory()
+        user_1 = UserProfileWithParentsFactory()
+        user_2 = UserProfileWithParentsFactory()
+
+        tag_1_user_1 = UserTagFactory(user=user_1.user, name="tag_1_user_1")
+        tag_1_user_1.dockets.add(docket_1.pk)
+        tag_1_user_2 = UserTagFactory(user=user_2.user, name="tag_1_user_2")
+        tag_1_user_2.dockets.add(docket_1.pk)
+
+        # Confirm user tags and docket tags are created.
+        user_tags = UserTag.objects.all()
+        docket_tags = DocketTag.objects.all()
+        self.assertEqual(user_tags.count(), 2)
+        self.assertEqual(docket_tags.count(), 2)
+
+        # Confirm user tags and docket tags history objects are created.
+        tag_1_user_1.name = "tag_1_user_1_1"
+        tag_1_user_1.save()
+        tag_1_user_2.name = "tag_1_user_2_2"
+        tag_1_user_2.save()
+        user_tag_events = UserTagEvent.objects.all()
+        self.assertEqual(user_tag_events.count(), 2)
+
+        tag_1_user_1.docket_tags.all().update(docket=docket_2)
+        tag_1_user_2.docket_tags.all().update(docket=docket_2)
+        docket_tag_events = DocketTagEvent.objects.all()
+        self.assertEqual(docket_tag_events.count(), 2)
+
+        # Delete user account.
+        self.assertTrue(
+            self.client.login(
+                username=user_1.user.username, password="password"
+            )
+        )
+        self.client.post(
+            reverse("delete_account"),
+            {"password": "password"},
+            follow=True,
+        )
+
+        # Confirm that only history events objects related to the user deleted
+        # are removed from the events table.
+        self.assertEqual(user_tags.count(), 1)
+        self.assertEqual(docket_tags.count(), 1)
+        self.assertEqual(user_tag_events.count(), 1)
+        self.assertEqual(docket_tag_events.count(), 1)
+        self.assertEqual(user_tag_events[0].name, "tag_1_user_2")
+        self.assertEqual(docket_tag_events[0].tag_id, tag_1_user_2.pk)
 
 
 class DisposableEmailTest(SimpleUserDataMixin, TestCase):
