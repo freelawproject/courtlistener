@@ -2128,12 +2128,24 @@ def query_and_save_list_of_creditors(
     # omit it. Otherwise, query the pacer_case_id and the list of creditors
     # report
     if not os.path.exists(html_file):
-        report_hidden_api = PossibleCaseNumberApi(court_id, s)
-        report_hidden_api.query(docket_number)
-        result = report_hidden_api.data(
-            office_number=row["OFFICE"],
-            docket_number_letters="bk",
-        )
+        try:
+            report_hidden_api = PossibleCaseNumberApi(court_id, s)
+            report_hidden_api.query(docket_number)
+            result = report_hidden_api.data(
+                office_number=row["OFFICE"],
+                docket_number_letters="bk",
+            )
+        except ParsingException:
+            logger.info(
+                f"No valid hidden API response for {docket_number} in court: "
+                f"{court_id}, possibly a sealed case."
+            )
+            delete_redis_semaphore(
+                "CACHE",
+                make_list_of_creditors_key(court_id, d_number_file_name),
+            )
+            return None
+
         if not result:
             logger.info(
                 f"Skipping row: {i} in court: {court_id}, docket: "
