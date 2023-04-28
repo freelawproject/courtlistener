@@ -103,14 +103,17 @@ def view_docket_alerts(request: HttpRequest) -> HttpResponse:
     docket_alerts = request.user.docket_alerts.filter(
         alert_type=DocketAlert.SUBSCRIPTION
     )
-    if not direction:
-        docket_alerts = docket_alerts.order_by(
-            F(order_by).asc(nulls_last=True)
-        )
+    if order_by == "date_last_hit":
+        if direction:
+            docket_alerts = docket_alerts.order_by(
+                F(order_by).desc(nulls_last=True)
+            )
+        else:
+            docket_alerts = docket_alerts.order_by(
+                F(order_by).asc(nulls_first=True)
+            )
     else:
-        docket_alerts = docket_alerts.order_by(
-            F(order_by).desc(nulls_last=False)
-        )
+        docket_alerts = docket_alerts.order_by(f"{direction}{order_by}")
 
     return TemplateResponse(
         request,
