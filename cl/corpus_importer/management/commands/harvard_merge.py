@@ -4,9 +4,9 @@ import json
 import logging
 from typing import Any, Dict, Optional, Tuple
 
+import requests
 from bs4 import BeautifulSoup
 from django.db import transaction
-from juriscraper.lib.html_utils import get_html_from_element
 from juriscraper.lib.string_utils import harmonize, titlecase
 from lxml.html import fromstring
 
@@ -16,7 +16,7 @@ from cl.corpus_importer.management.commands.harvard_opinions import (
     validate_dt,
 )
 from cl.corpus_importer.utils import match_lists
-from cl.lib.command_utils import VerboseCommand
+from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_diff import get_cosine_similarity
 from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.search.models import Docket, Opinion, OpinionCluster
@@ -44,8 +44,47 @@ def read_json(cluster_id: int) -> Dict[str, Any] | None:
     """
     cluster = OpinionCluster.objects.get(id=cluster_id)
     if cluster.filepath_json_harvard:
-        return json.load(cluster.filepath_json_harvard)
+        try:
+            local_data = json.load(cluster.filepath_json_harvard)
+        except ValueError:
+            logger.warning(
+                f"Empty json: missing case at: {cluster.filepath_json_harvard.path}"
+            )
+            return None
+        except Exception as e:
+            logger.warning(
+                f"Unknown error {e} for: {cluster.filepath_json_harvard.path}"
+            )
+            return None
+
+        identifier = "/".join(
+            cluster.filepath_json_harvard.path.rsplit("/", 2)[1:]
+        )
+
+        # Fetch fix if exists
+        fix = requests.get(
+            f"https://raw.githubusercontent.com/freelawproject/opinionated/main/data/harvard/{identifier}",
+            timeout=10,
+        )
+        if fix.status_code == 200:
+            local_data.update(fix.json())
+
+        return local_data
     return None
+
+
+def get_data_source(harvard_data: Dict[str, Any]) -> None | str:
+    """Get json data source: Fastcase, CAP, Harvard, etc
+
+    :param harvard_data: case data as dict
+    :return: data source or None
+    """
+    data_source = None
+    data_provenance = harvard_data.get("provenance")
+    if data_provenance:
+        data_source = data_provenance.get("source")
+
+    return data_source
 
 
 def fetch_non_harvard_data(harvard_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -383,8 +422,6 @@ def update_cluster_source(cluster_id: int) -> None:
         cluster.source = "CU"
         cluster.save()
 
-    # TODO what to do when source is different? is possible?
-
 
 def merge_opinion_clusters(cluster_id: Optional[int]) -> None:
     """Merge opinion cluster, docket and opinion data from Harvard
@@ -394,8 +431,12 @@ def merge_opinion_clusters(cluster_id: Optional[int]) -> None:
     """
     harvard_data = read_json(cluster_id)
     if harvard_data:
+        source = get_data_source(harvard_data)
         try:
             with transaction.atomic():
+                if source == "Fastcase":
+                    # Do something special for fastcase
+                    pass
                 map_and_merge_opinions(cluster_id, harvard_data)
                 clean_dictionary = combine_non_overlapping_data(
                     cluster_id, harvard_data
@@ -449,6 +490,9 @@ def fetch_cl_opinion_content(sub_opinions: [Opinion]) -> [str]:
     :return: Opinion text as a list
     """
     cl_opinions = []
+
+    # Note: harvard importer stores opinion in xml_harvard field, we need to
+    # add it to the list
     for sub_opinion in sub_opinions:
         for name in (
             "html_columbia",
@@ -456,13 +500,14 @@ def fetch_cl_opinion_content(sub_opinions: [Opinion]) -> [str]:
             "html",
             "html_lawbox",
             "plain_text",
+            "xml_harvard",
         ):
             op_type = name
             opinion_content = getattr(sub_opinion, name)
             if not opinion_content:
                 continue
             break
-        if "html" in op_type:
+        if op_type in ["html", "xml_harvard"]:
             html = fromstring(opinion_content)
             opinion_content = html.text_content()
         cl_opinions.append(opinion_content)
@@ -479,9 +524,12 @@ def map_and_merge_opinions(cluster: int, harvard_data: Dict[str, Any]) -> None:
     used_combined_opinions = False
     case_body = harvard_data["casebody"]["data"]
     sub_opinions = Opinion.objects.filter(cluster__id=cluster)
-    harvard_html = fromstring(case_body.encode()).xpath(".//opinion")
+
+    soup = BeautifulSoup(case_body, "lxml")
+    harvard_html = soup.find_all("opinion")
     harvard_opinions = [op for op in harvard_html]
     cl_opinions = fetch_cl_opinion_content(sub_opinions=sub_opinions)
+
     if len(harvard_opinions) != len(cl_opinions):
         used_combined_opinions = True
     else:
@@ -494,20 +542,26 @@ def map_and_merge_opinions(cluster: int, harvard_data: Dict[str, Any]) -> None:
             for k, v in matches.items():
                 op = sub_opinions[k]
                 if op.author_str != "" and op.author is None:
-                    hvd = harvard_opinions[v].xpath(".//author/text()")[0]
-                    if extract_judge_last_name(
-                        op.author_str
-                    ) != extract_judge_last_name(hvd):
-                        raise AuthorException(
-                            "Authors don't match - log error"
-                        )
+                    author_str = ""
+                    author = harvard_opinions[v].find("author")
 
-                    op.author_str = harvard_opinions[v].xpath(
-                        ".//author/text()"
-                    )[0]
-                op.xml_harvard = str(
-                    get_html_from_element(harvard_opinions[v])
-                )
+                    if author:
+                        author_tag_str = titlecase(author.text.strip(":"))
+                        author_str = titlecase(
+                            "".join(extract_judge_last_name(author_tag_str))
+                        )
+                        if (
+                            extract_judge_last_name(op.author_str)
+                            != author_str
+                        ):
+                            raise AuthorException(
+                                "Authors don't match - log error"
+                            )
+
+                    if author_str:
+                        op.author_str = author_str
+
+                op.xml_harvard = str(harvard_opinions[v])
                 op.save()
 
     if used_combined_opinions:
