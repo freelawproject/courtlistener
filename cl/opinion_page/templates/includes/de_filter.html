@@ -84,7 +84,7 @@
         <div class="tight-input col-xs-6 hidden-sm col-sm-6 col-md-1 col-lg-2" >
           <div class="pull-right" >
             {% if docket_entries.has_previous %}
-              <a class="btn btn-default" href="?page={{ docket_entries.previous_page_number }}" rel="prev" >
+              <a class="btn btn-default" href="?{{ get_string }}page={{ docket_entries.previous_page_number }}" rel="prev" >
                 <i class="fa fa-caret-left" ></i><span class="hidden-md" >&nbsp;Prev.</span>
               </a>
             {% else %}
@@ -93,7 +93,7 @@
               </a>
             {% endif %}
             {% if docket_entries.has_next %}
-              <a class="btn btn-default" href="?page={{ docket_entries.next_page_number }}" rel="next" >
+              <a class="btn btn-default" href="?{{ get_string }}page={{ docket_entries.next_page_number }}" rel="next" >
                 <span class="hidden-md" >Next&nbsp;</span><i class="fa fa-caret-right"></i>
               </a>
             {% else %}
