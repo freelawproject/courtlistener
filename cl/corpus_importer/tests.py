@@ -47,6 +47,7 @@ from cl.corpus_importer.management.commands.harvard_opinions import (
     winnow_case_name,
 )
 from cl.corpus_importer.management.commands.normalize_judges_opinions import (
+    Command,
     normalize_authors_in_opinions,
     normalize_panel_in_opinioncluster,
 )
@@ -2586,7 +2587,8 @@ class HarvardMergerTests(TestCase):
             cluster_id=cluster.id
         ).values_list("author_str", flat=True)
         authors = list(author_query)
-        # Validate we didnt create a new opinion
+
+        # Validate we didn't create a new opinion
         self.assertEqual(
             Opinion.objects.filter(cluster_id=cluster.id).count(),
             2,
@@ -2638,7 +2640,7 @@ class HarvardMergerTests(TestCase):
             cluster_id=cluster.id
         ).values_list("author_str", flat=True)
         authors = sorted(list(author_query))
-        # Validate we didnt create a new opinion
+        # Validate we didn't create a new opinion
         self.assertEqual(
             Opinion.objects.filter(cluster_id=cluster.id).count(),
             2,

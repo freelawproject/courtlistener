@@ -47,7 +47,7 @@ def get_start_of_quarter(d: Optional[date] = None) -> date:
     return max([q for q in quarter_dates if q <= d])
 
 
-def similarity_scores(list1: [str], list2: [str]) -> list[list[float]]:
+def similarity_scores(list1: list[str], list2: list[str]) -> list[list[float]]:
     """Get similiarity scores between two sets of lists
 
     Using TF-IDF/Term Frequency-Inverse Document Frequency
@@ -62,7 +62,7 @@ def similarity_scores(list1: [str], list2: [str]) -> list[list[float]]:
     return scores
 
 
-def match_lists(list1: [str], list2: [str]) -> bool | dict[int, Any]:
+def match_lists(list1: list, list2: list[str]) -> dict[int, Any]:
     """Generate matching lists above threshold
 
     :param list1: Harvard Opinions
@@ -75,12 +75,12 @@ def match_lists(list1: [str], list2: [str]) -> bool | dict[int, Any]:
     )
 
     # Convert harvard HTML to Text to compare
-    list1 = [h.text_content() for h in list1]
+    list1 = [h.getText() for h in list1]
     scores = similarity_scores(list1, list2)
 
     matches = {}
     for i, row in enumerate(scores):
-        j = row.argmax()
+        j = row.argmax()  # type: ignore
         # Lower threshold for small opinions.
         if get_cosine_similarity(list1[i], list2[j]) < 0.60:
             continue
@@ -94,5 +94,5 @@ def match_lists(list1: [str], list2: [str]) -> bool | dict[int, Any]:
         == sorted(list(matches.keys()))
         == sorted(list(matches.values()))
     ):
-        return False
+        return {}
     return matches

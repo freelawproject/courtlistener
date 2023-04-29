@@ -1,14 +1,13 @@
-import datetime
 import itertools
 import json
 import logging
+from datetime import date
 from typing import Any, Dict, Optional, Tuple
 
 import requests
 from bs4 import BeautifulSoup
 from django.db import transaction
 from juriscraper.lib.string_utils import harmonize, titlecase
-from lxml.html import fromstring
 
 from cl.corpus_importer.management.commands.harvard_opinions import (
     clean_docket_number,
@@ -128,8 +127,8 @@ def fetch_non_harvard_data(harvard_data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def combine_non_overlapping_data(
-    cluster_id: int, harvard_data: Dict[str, Any]
-) -> Dict[str, Tuple]:
+    cluster_id: int, harvard_data: dict
+) -> dict[str, Tuple]:
     """Combine non overlapping data and return dictionary of data for merging
 
     :param cluster_id: Cluster id to merge
@@ -138,7 +137,7 @@ def combine_non_overlapping_data(
     """
     opinion_cluster = OpinionCluster.objects.get(id=cluster_id)
     all_data = fetch_non_harvard_data(harvard_data)
-    clean_dictionary = {}
+    clean_dictionary: dict[str, Tuple] = {}
     for key, value in all_data.items():
         cl_value = getattr(opinion_cluster, key)
         if not cl_value:
@@ -156,7 +155,9 @@ def combine_non_overlapping_data(
 
 
 def merge_long_fields(
-    cluster_id: int, field_name: str, overlapping_data: Tuple[str, str]
+    cluster_id: int,
+    field_name: str,
+    overlapping_data: Optional[Tuple[str, str]],
 ) -> None:
     """Merge two long text fields
 
@@ -165,23 +166,25 @@ def merge_long_fields(
     :param overlapping_data: data to compare from harvard and courtlistener
     :return: None
     """
-    harvard_data, cl_data = overlapping_data[0], overlapping_data[1]
-    # Do some text comparison
-    similarity = get_cosine_similarity(harvard_data, cl_data)
-    if similarity < 0.9:
-        # they are not too similar, choose the larger one
-        if len(harvard_data) > len(cl_data):
-            OpinionCluster.objects.filter(id=cluster_id).update(
-                **{field_name: harvard_data}
-            )
-    else:
-        pass
-        # should we log long data not really being similar?
+    if overlapping_data:
+        if overlapping_data[0] and overlapping_data[1]:
+            harvard_data, cl_data = overlapping_data[0], overlapping_data[1]
+            # Do some text comparison
+            similarity = get_cosine_similarity(harvard_data, cl_data)
+            if similarity < 0.9:
+                # they are not too similar, choose the larger one
+                if len(harvard_data) > len(cl_data):
+                    OpinionCluster.objects.filter(id=cluster_id).update(
+                        **{field_name: harvard_data}
+                    )
+            else:
+                pass
+                # should we log long data not really being similar?
 
 
 def merge_judges(
     cluster_id: int,
-    overlapping_data: Tuple[str, str],
+    overlapping_data: Optional[Tuple[str, str]],
 ) -> None:
     """Merge overlapping judge values
 
@@ -189,23 +192,25 @@ def merge_judges(
     :param overlapping_data: data to compare from harvard and courtlistener
     :return: None
     """
-    harvard_data, cl_data = overlapping_data
 
-    # Get last names from each source
-    cl_clean = set(extract_judge_last_name(cl_data))
-    harvard_clean = set(extract_judge_last_name(harvard_data))
-    judges = titlecase(", ".join(extract_judge_last_name(harvard_data)))
+    if overlapping_data:
+        harvard_data, cl_data = overlapping_data
 
-    if harvard_clean.issuperset(cl_clean) and harvard_clean != cl_clean:
-        OpinionCluster.objects.filter(id=cluster_id).update(judges=judges)
-    elif not harvard_clean.intersection(cl_clean):
-        raise JudgeException("Judges are completely different.")
+        # Get last names from each source
+        cl_clean = set(extract_judge_last_name(cl_data))
+        harvard_clean = set(extract_judge_last_name(harvard_data))
+        judges = titlecase(", ".join(extract_judge_last_name(harvard_data)))
+
+        if harvard_clean.issuperset(cl_clean) and harvard_clean != cl_clean:
+            OpinionCluster.objects.filter(id=cluster_id).update(judges=judges)
+        elif not harvard_clean.intersection(cl_clean):
+            raise JudgeException("Judges are completely different.")
 
 
 def merge_cluster_dates(
     cluster_id: int,
     field_name: str,
-    overlapping_data: Tuple[str, datetime.date],
+    overlapping_data: Optional[Tuple[str | None, date]],
 ) -> None:
     """Compare two dates and choose the best to update the opinion cluster
     the value if one value is better than the other
@@ -215,22 +220,27 @@ def merge_cluster_dates(
     :param overlapping_data: data to compare
     :return: None
     """
-    harvard_data, cl_date = overlapping_data
-    cluster = OpinionCluster.objects.filter(id=cluster_id).first()
-    harvard_date, harvard_date_is_approximate = validate_dt(harvard_data)
-    if cluster.docket.source == Docket.SCRAPER:
-        # Give preference to harvard data
-        if harvard_date != cl_date:
-            OpinionCluster.objects.filter(id=cluster_id).update(
-                **{field_name: harvard_date}
+    if overlapping_data:
+        harvard_data, cl_date = overlapping_data
+        cluster = OpinionCluster.objects.filter(id=cluster_id).first()
+        if harvard_data:
+            harvard_date, harvard_date_is_approximate = validate_dt(
+                harvard_data
             )
-    elif cluster.date_filed_is_approximate and not harvard_date_is_approximate:
-        # For some reason docket source is different, then check if one date
-        # is approximate and the other is not
-        # if harvard date is not approximate, it should be better
-        OpinionCluster.objects.filter(id=cluster_id).update(
-            **{field_name: harvard_date}
-        )
+            if cluster.docket.source == Docket.SCRAPER:
+                # Give preference to harvard data
+                if harvard_date != cl_date:
+                    OpinionCluster.objects.filter(id=cluster_id).update(
+                        **{field_name: harvard_date}
+                    )
+            elif (
+                cluster.date_filed_is_approximate
+                and not harvard_date_is_approximate
+            ):
+                # For some reason docket source is different, then check if one date is approximate and the other is not if harvard date is not approximate, it should be better
+                OpinionCluster.objects.filter(id=cluster_id).update(
+                    **{field_name: harvard_date}
+                )
 
 
 def merge_strings(
@@ -332,7 +342,7 @@ def merge_case_names(cluster_id: int, harvard_data: Dict[str, Any]) -> None:
         OpinionCluster.objects.filter(id=cluster_id).update(**update_dict)
 
 
-def merge_date_filed(cluster_id: int, harvard_data: Dict[str, Any]) -> None:
+def merge_date_filed(cluster_id: int, harvard_data: dict) -> None:
     """Merge date filed
 
     :param cluster_id: The cluster id of the merging item
@@ -347,9 +357,7 @@ def merge_date_filed(cluster_id: int, harvard_data: Dict[str, Any]) -> None:
     )
 
 
-def merge_overlapping_data(
-    cluster_id: int, clean_dictionary: Dict[str, Any]
-) -> None:
+def merge_overlapping_data(cluster_id: int, clean_dictionary: dict) -> None:
     """Merge overlapping data
 
     :param cluster_id: the cluster id
@@ -392,7 +400,7 @@ def merge_overlapping_data(
             merge_strings(
                 cluster_id,
                 field_name,
-                clean_dictionary.get(field_name),
+                clean_dictionary.get(field_name, ""),
             )
         else:
             logging.info(f"Field not considered in the process: {field_name}")
@@ -423,7 +431,7 @@ def update_cluster_source(cluster_id: int) -> None:
         cluster.save()
 
 
-def merge_opinion_clusters(cluster_id: Optional[int]) -> None:
+def merge_opinion_clusters(cluster_id: int) -> None:
     """Merge opinion cluster, docket and opinion data from Harvard
 
     :param cluster_id: The cluster ID to merger
@@ -481,7 +489,7 @@ def start_merger(cluster_id=None) -> None:
         merge_opinion_clusters(cluster_id=cluster_id)
 
 
-def fetch_cl_opinion_content(sub_opinions: [Opinion]) -> [str]:
+def fetch_cl_opinion_content(sub_opinions: list[Opinion]) -> list[str]:
     """Fetch CL opinion Content
 
     This is a simple helper function to grab an opinion content to compare
@@ -507,9 +515,10 @@ def fetch_cl_opinion_content(sub_opinions: [Opinion]) -> [str]:
             if not opinion_content:
                 continue
             break
-        if op_type in ["html", "xml_harvard"]:
-            html = fromstring(opinion_content)
-            opinion_content = html.text_content()
+        if "html" in op_type or op_type == "xml_harvard":
+            opinion_content = BeautifulSoup(
+                opinion_content, "html.parser"
+            ).getText()
         cl_opinions.append(opinion_content)
     return cl_opinions
 
@@ -541,25 +550,26 @@ def map_and_merge_opinions(cluster: int, harvard_data: Dict[str, Any]) -> None:
         if not used_combined_opinions:
             for k, v in matches.items():
                 op = sub_opinions[k]
-                if op.author_str != "" and op.author is None:
-                    author_str = ""
-                    author = harvard_opinions[v].find("author")
-
-                    if author:
-                        author_tag_str = titlecase(author.text.strip(":"))
-                        author_str = titlecase(
-                            "".join(extract_judge_last_name(author_tag_str))
-                        )
-                        if (
-                            extract_judge_last_name(op.author_str)
-                            != author_str
-                        ):
+                author_str = ""
+                author = harvard_opinions[v].find("author")
+                if author:
+                    # Prettify the name a bit
+                    author_str = titlecase(author.text.strip(":"))
+                if op.author_str == "":
+                    # We have an empty author name
+                    if author_str:
+                        # Store the name extracted from the author tag
+                        op.author_str = author_str
+                else:
+                    if author_str:
+                        if extract_judge_last_name(
+                            op.author_str
+                        ) != extract_judge_last_name(author_str):
+                            # Raise an exception, check in the log for
+                            # difference between author names
                             raise AuthorException(
                                 "Authors don't match - log error"
                             )
-
-                    if author_str:
-                        op.author_str = author_str
 
                 op.xml_harvard = str(harvard_opinions[v])
                 op.save()
