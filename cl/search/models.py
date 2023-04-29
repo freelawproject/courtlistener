@@ -249,6 +249,7 @@ class Docket(AbstractDateTimeModel):
     HARVARD = 16
     HARVARD_AND_RECAP = 17
     SCRAPER_AND_HARVARD = 18
+    COLUMBIA_AND_HARVARD = 20
     DIRECT_INPUT = 32
     ANON_2020 = 64
     ANON_2020_AND_SCRAPER = 66
@@ -277,6 +278,7 @@ class Docket(AbstractDateTimeModel):
         (HARVARD, "Harvard"),
         (HARVARD_AND_RECAP, "Harvard and RECAP"),
         (SCRAPER_AND_HARVARD, "Scraper and Harvard"),
+        (COLUMBIA_AND_HARVARD, "Columbia and Harvard"),
         (DIRECT_INPUT, "Direct court input"),
         (ANON_2020, "2020 anonymous database"),
         (ANON_2020_AND_SCRAPER, "2020 anonymous database and Scraper"),
