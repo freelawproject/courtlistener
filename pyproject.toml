@@ -83,7 +83,7 @@ unidecode = "*"
 usaddress = "^0.5.10"
 scorched = {git = "https://github.com/freelawproject/scorched.git", branch="main"}
 djangorestframework-filters = "1.0.0.dev2"
-gunicorn = "^20.0.4"
+gunicorn = {extras = ["gevent"], version = "^20.1.0"}
 django-hCaptcha = "^0.2.0"
 reporters-db = "^3.2.36"
 django-waffle = "^3.0.0"
@@ -108,6 +108,7 @@ time-machine = "^2.9.0"
 dateparser = "1.1.6"
 types-dateparser = "^1.1.4.6"
 juriscraper = "^2.5.46"
+psycogreen = "^1.0.2"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -128,6 +129,8 @@ djangorestframework-stubs = "^1.10.0"
 black = "^22.3.0"
 types-simplejson = "^3.18.0.1"
 lxml-stubs = "^0.4.0"
+psutil = "^5.9.5"
+geventmp = "^0.0.7"
 
 [tool.black]
 include = '''
