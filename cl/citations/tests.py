@@ -44,8 +44,8 @@ from cl.citations.match_citations import (
 )
 from cl.citations.score_parentheticals import parenthetical_score
 from cl.citations.tasks import (
-    find_citations_and_parentheticals_for_opinion_by_pks,
     find_citations_and_parantheticals_for_recap_documents,
+    find_citations_and_parentheticals_for_opinion_by_pks,
 )
 from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.search.factories import (
