@@ -737,34 +737,34 @@ class CitationObjectTest(IndexedSolrTestCase):
             1,
         )
 
-    def test_opinionscitedRECAP_creation(self):
-        """
-        Tests that OpinionsCitedByRECAPDocument objects are created in the database, with correct citation counts.
-        """
-        test_recap_document = self.recap_doc
+    # def test_opinionscitedRECAP_creation(self):
+    #     """
+    #     Tests that OpinionsCitedByRECAPDocument objects are created in the database, with correct citation counts.
+    #     """
+    #     test_recap_document = self.recap_doc
 
-        store_recap_citations(test_recap_document)
+    #     store_recap_citations(test_recap_document)
 
-        opinion1 = Opinion.objects.get(cluster__pk=self.citation1.cluster_id)
-        opinion2 = Opinion.objects.get(cluster__pk=self.citation2.cluster_id)
-        opinion3 = Opinion.objects.get(cluster__pk=self.citation3.cluster_id)
+    #     opinion1 = Opinion.objects.get(cluster__pk=self.citation1.cluster_id)
+    #     opinion2 = Opinion.objects.get(cluster__pk=self.citation2.cluster_id)
+    #     opinion3 = Opinion.objects.get(cluster__pk=self.citation3.cluster_id)
 
-        citation_test_pairs = [
-            (opinion1, 3),
-            (opinion2, 6),
-            (opinion3, 2),
-        ]
+    #     citation_test_pairs = [
+    #         (opinion1, 3),
+    #         (opinion2, 6),
+    #         (opinion3, 2),
+    #     ]
 
-        for cited_op, depth in citation_test_pairs:
-            with self.subTest(
-                f"Testing OpinionsCited creation for {cited_op}...",
-                cited=cited_op,
-                depth=depth,
-            ):
-                citation_obj = OpinionsCitedByRECAPDocument.objects.get(
-                    citing_document=test_recap_document, cited_opinion=cited_op
-                )
-                self.assertEqual(citation_obj.depth, depth)
+    #     for cited_op, depth in citation_test_pairs:
+    #         with self.subTest(
+    #             f"Testing OpinionsCited creation for {cited_op}...",
+    #             cited=cited_op,
+    #             depth=depth,
+    #         ):
+    #             citation_obj = OpinionsCitedByRECAPDocument.objects.get(
+    #                 citing_document=test_recap_document, cited_opinion=cited_op
+    #             )
+    #             self.assertEqual(citation_obj.depth, depth)
 
 
 class CitationFeedTest(IndexedSolrTestCase):

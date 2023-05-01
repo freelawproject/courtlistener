@@ -41,3 +41,4 @@ cl/settings/google_auth.json
 cl/node_modules
 /.env.dev
 /.env
+.vscode/*
