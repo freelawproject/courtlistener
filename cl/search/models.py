@@ -1143,7 +1143,9 @@ class DocketEntry(AbstractDateTimeModel):
 
     class Meta:
         verbose_name_plural = "Docket Entries"
-        index_together = ("recap_sequence_number", "entry_number")
+        indexes = [
+            models.Index(fields=["recap_sequence_number", "entry_number"])
+        ]
         ordering = ("recap_sequence_number", "entry_number")
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
 
@@ -1271,10 +1273,14 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             "attachment_number",
         )
         ordering = ("document_type", "document_number", "attachment_number")
-        index_together = [
-            ["document_type", "document_number", "attachment_number"],
-        ]
         indexes = [
+            models.Index(
+                fields=[
+                    "document_type",
+                    "document_number",
+                    "attachment_number",
+                ]
+            ),
             models.Index(
                 fields=["filepath_local"],
                 name="search_recapdocument_filepath_local_7dc6b0e53ccf753_uniq",
@@ -2720,12 +2726,12 @@ class Citation(models.Model):
         return self.cluster.get_absolute_url()
 
     class Meta:
-        index_together = (
+        indexes = [
             # To look up individual citations
-            ("volume", "reporter", "page"),
+            models.Index(fields=["volume", "reporter", "page"]),
             # To generate reporter volume lists
-            ("volume", "reporter"),
-        )
+            models.Index(fields=["volume", "reporter"]),
+        ]
         unique_together = (("cluster", "volume", "reporter", "page"),)
 
 
