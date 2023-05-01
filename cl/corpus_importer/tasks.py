@@ -2198,9 +2198,10 @@ def query_and_save_list_of_creditors(
 
     raw_data = report.data
     pipe_limited_data = raw_data.get("data", "")
-    # Save report HTML in disk.
-    with open(pipe_limited_file, "w", encoding="utf-8") as file:
-        file.write(pipe_limited_data)
+    if pipe_limited_data:
+        # Save report HTML in disk.
+        with open(pipe_limited_file, "w", encoding="utf-8") as file:
+            file.write(pipe_limited_data)
 
     if pipe_limited_data:
         make_csv_file(pipe_limited_file, court_id, d_number_file_name)
