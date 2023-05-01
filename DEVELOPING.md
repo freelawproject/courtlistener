@@ -1,4 +1,4 @@
-# Developing in CourtListener
+# Developing CourtListener
 
 CourtListener is built upon a few key pieces of technology that need to come together. Whether you're contributing platform code, web design, etc. it helps to know the easiest ways to run and test the project.
 
