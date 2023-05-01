@@ -1,3 +1,8 @@
+import django
+from django.utils.encoding import force_str
+
+# https://github.com/trentm/django-markdown-deux/pull/34
+django.utils.encoding.force_text = force_str  # type: ignore[assignment]
 import re
 
 MARKDOWN_DEUX_STYLES = {
