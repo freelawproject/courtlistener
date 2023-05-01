@@ -46,6 +46,7 @@ from cl.citations.score_parentheticals import parenthetical_score
 from cl.citations.tasks import (
     find_citations_and_parentheticals_for_opinion_by_pks,
     find_citations_and_parantheticals_for_recap_documents,
+    store_recap_citations
 )
 from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.search.factories import (
@@ -742,9 +743,7 @@ class CitationObjectTest(IndexedSolrTestCase):
         """
         test_recap_document = self.recap_doc
 
-        find_citations_and_parantheticals_for_recap_documents(
-            [test_recap_document.pk]
-        )
+        store_recap_citations(test_recap_document)
 
         opinion1 = Opinion.objects.get(cluster__pk=self.citation1.cluster_id)
         opinion2 = Opinion.objects.get(cluster__pk=self.citation2.cluster_id)
