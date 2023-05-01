@@ -124,7 +124,7 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
             )
             if newly_enqueued:
                 throttle.maybe_wait()
-                query_and_save_list_of_creditors.delay(
+                query_and_save_list_of_creditors.si(
                     session.cookies,
                     court_id,
                     d_number_file_name,
@@ -132,7 +132,7 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
                     html_file,
                     i,
                     row,
-                )
+                ).set(queue=q).apply_async()
             else:
                 logger.info(
                     f"The report {html_file} is currently being processed in "
