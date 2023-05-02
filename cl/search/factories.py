@@ -250,6 +250,9 @@ class RECAPDocumentFactory(DjangoModelFactory):
     description = Faker("text", max_nb_chars=750)
     document_type = RECAPDocument.PACER_DOCUMENT
     pacer_doc_id = Faker("pyint", min_value=100_000, max_value=400_000)
+    docket_entry = RelatedFactory(
+        DocketEntryFactory,
+    )
 
 
 class DocketFactory(DjangoModelFactory):
