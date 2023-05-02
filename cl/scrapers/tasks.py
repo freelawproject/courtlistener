@@ -29,8 +29,6 @@ from cl.lib.utils import is_iter
 from cl.recap.mergers import save_iquery_to_docket
 from cl.search.models import Docket, Opinion, RECAPDocument
 
-DEVNULL = open("/dev/null", "w")
-
 logger = logging.getLogger(__name__)
 
 ExtractProcessResult = Tuple[str, Optional[str]]
