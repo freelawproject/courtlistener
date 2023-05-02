@@ -52,7 +52,7 @@ from cl.lib.search_utils import (
 )
 from cl.search.constants import RELATED_PATTERN
 from cl.search.documents import ParentheticalGroupDocument
-from cl.search.forms import ParentheticalSearchForm, SearchForm, _clean_form
+from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import SEARCH_TYPES, Court, Opinion, OpinionCluster
 from cl.stats.models import Stat
 from cl.stats.utils import tally_stat
@@ -534,7 +534,7 @@ def es_search(request: HttpRequest) -> HttpResponse:
         courts = Court.objects.filter(in_use=True)
         render_dict.update({"search_type": "parenthetical"})
         obj_type = SEARCH_TYPES.PARENTHETICAL
-        search_form = ParentheticalSearchForm({"type": obj_type})
+        search_form = SearchForm({"type": obj_type})
         if search_form.is_valid():
             search_form = _clean_form(
                 request.GET.copy(),
@@ -572,7 +572,7 @@ def do_es_search(get_params):
     courts = Court.objects.filter(in_use=True)
     query_time = total_pa_groups = 0
 
-    search_form = ParentheticalSearchForm(get_params)
+    search_form = SearchForm(get_params)
     document_type = ParentheticalGroupDocument
     search_query = None
     top_hits_limit = 5
