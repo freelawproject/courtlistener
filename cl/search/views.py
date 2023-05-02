@@ -576,11 +576,11 @@ def do_es_search(get_params):
         cd = search_form.cleaned_data
         # Create necessary filters to execute ES query
         search_query = document_type.search()
-        s, total_pa_groups, top_hits_limit = build_es_main_query(
-            search_query, cd
-        )
 
         try:
+            s, total_pa_groups, top_hits_limit = build_es_main_query(
+                search_query, cd
+            )
             hits = s.execute()
             query_time = hits.took
             groups = hits.aggregations.groups.buckets
