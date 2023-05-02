@@ -1,5 +1,4 @@
 import logging
-import re
 import traceback
 from datetime import date, datetime, timedelta
 from urllib.parse import quote
@@ -30,9 +29,7 @@ from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.bot_detector import is_bot
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
-    build_sort_results,
     convert_str_date_fields_to_date_objects,
-    group_search_results,
     merge_courts_from_db,
     set_results_highlights,
 )
@@ -567,41 +564,24 @@ def do_es_search(get_params):
     """
 
     paged_results = None
-    cd = {}
     error = False
     courts = Court.objects.filter(in_use=True)
     query_time = total_pa_groups = 0
+    top_hits_limit = 5
 
     search_form = SearchForm(get_params)
     document_type = ParentheticalGroupDocument
-    search_query = None
-    top_hits_limit = 5
 
-    if search_form:
-        if search_form.is_valid():
-            cd = search_form.cleaned_data
-            # Create necessary filters to execute ES query
-            search_query = document_type.search()
-            search_query = build_es_main_query(search_query, cd)
-        else:
-            error = True
+    if search_form.is_valid():
+        cd = search_form.cleaned_data
+        # Create necessary filters to execute ES query
+        search_query = document_type.search()
+        s, total_pa_groups, top_hits_limit = build_es_main_query(
+            search_query, cd
+        )
 
-    if search_query:
         try:
-            total_pa_groups = search_query.count()
-            # If docket_query set the top_hits_limit to 100
-            # Top hits limit in elasticsearch is 100
-            cluster_query = re.search(r"cluster_id:\d+", cd["q"])
-            top_hits_limit = top_hits_limit if not cluster_query else 100
-
-            # Create groups aggregation.
-            group_search_results(
-                search_query,
-                "cluster_id",
-                build_sort_results(cd),
-                top_hits_limit,
-            )
-            hits = search_query.execute()
+            hits = s.execute()
             query_time = hits.took
             groups = hits.aggregations.groups.buckets
             paged_results = do_es_pagination(
@@ -615,6 +595,8 @@ def do_es_search(get_params):
             logger.warning(f"Error was: {e}")
             if settings.DEBUG is True:
                 traceback.print_exc()
+    else:
+        error = True
 
     search_form = _clean_form(
         get_params,
@@ -665,9 +647,10 @@ def do_es_pagination(get_params, hits, rows_per_page=5):
     except EmptyPage:
         results = paginator.page(paginator.num_pages)
 
+    search_type = get_params.get("type")
     # Set highlights in results.
-    set_results_highlights(results)
-    convert_str_date_fields_to_date_objects(results, "dateFiled")
-    merge_courts_from_db(results)
+    set_results_highlights(results, search_type)
+    convert_str_date_fields_to_date_objects(results, "dateFiled", search_type)
+    merge_courts_from_db(results, search_type)
 
     return results

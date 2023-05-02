@@ -2009,6 +2009,11 @@ class ElasticSearchTest(TestCase):
             datetime.datetime(1976, 8, 30, 0, 0),
         )
 
+    @staticmethod
+    def get_article_count(r):
+        """Get the article count in a query response"""
+        return len(html.fromstring(r.content.decode()).xpath("//article"))
+
     def test_build_daterange_query(self) -> None:
         """Test build es daterange query"""
         filters = []
@@ -2050,9 +2055,12 @@ class ElasticSearchTest(TestCase):
             "filed_after": datetime.datetime(1976, 8, 30, 0, 0).date(),
             "filed_before": datetime.datetime(1978, 3, 10, 0, 0).date(),
             "q": "responsibility",
+            "type": "pa",
         }
         search_query = ParentheticalGroupDocument.search()
-        s = build_es_main_query(search_query, cd)
+        s, total_query_results, top_hits_limit = build_es_main_query(
+            search_query, cd
+        )
         self.assertEqual(s.count(), 1)
 
     def test_cd_query_2(self) -> None:
@@ -2119,10 +2127,11 @@ class ElasticSearchTest(TestCase):
     def test_group_results(self) -> None:
         """Test retrieve results grouped by group_id"""
 
+        cd = {"type": "pa", "q": ""}
         q1 = build_fulltext_query("representative_text", "Necessary")
         s = ParentheticalGroupDocument.search().query(q1)
         # Group results.
-        group_search_results(s, "cluster_id", {"score": {"order": "desc"}}, 5)
+        group_search_results(s, cd, {"score": {"order": "desc"}})
         hits = s.execute()
         groups = hits.aggregations.groups.buckets
 
@@ -2174,6 +2183,79 @@ class ElasticSearchTest(TestCase):
         self.assertEqual(type(results[0].scdb_id), str)
         self.assertEqual(type(results[0].status), str)
         self.assertEqual(type(results[0].suitNature), str)
+
+    def test_pa_search_form_search_and_filtering(self) -> None:
+        """Test Parenthetical search directly from the form."""
+        r = self.client.get(
+            reverse("show_results"),
+            {
+                "q": "Necessary",
+                "type": SEARCH_TYPES.PARENTHETICAL,
+            },
+        )
+        actual = self.get_article_count(r)
+        expected = 2
+        self.assertEqual(
+            actual,
+            expected,
+            msg="Did not get expected number of results when filtering by "
+            "case name. Expected %s, but got %s." % (expected, actual),
+        )
+
+        r = self.client.get(
+            reverse("show_results"),
+            {
+                "q": "",
+                "docket_number": "1:98-cr-35856",
+                "type": SEARCH_TYPES.PARENTHETICAL,
+            },
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(
+            actual,
+            expected,
+            msg="Did not get expected number of results when filtering by "
+            "case name. Expected %s, but got %s." % (expected, actual),
+        )
+        r = self.client.get(
+            reverse("show_results"),
+            {
+                "q": "",
+                "filed_after": "1978/02/10",
+                "type": SEARCH_TYPES.PARENTHETICAL,
+            },
+        )
+        actual = self.get_article_count(r)
+        expected = 2
+        self.assertEqual(
+            actual,
+            expected,
+            msg="Did not get expected number of results when filtering by "
+            "case name. Expected %s, but got %s." % (expected, actual),
+        )
+        r = self.client.get(
+            reverse("show_results"),
+            {
+                "q": "",
+                "order_by": "dateFiled asc",
+                "type": SEARCH_TYPES.PARENTHETICAL,
+            },
+        )
+        actual = self.get_article_count(r)
+        expected = 3
+        self.assertEqual(
+            actual,
+            expected,
+            msg="Did not get expected number of results when filtering by "
+            "case name. Expected %s, but got %s." % (expected, actual),
+        )
+        self.assertTrue(
+            r.content.decode().index("Riley")
+            < r.content.decode().index("Peck")
+            < r.content.decode().index("Smith"),
+            msg="'Riley' should come before 'Peck' and before 'Smith' when order_by asc.",
+        )
 
 
 class DocketEntriesTimezone(TestCase):

@@ -10,7 +10,7 @@ from elasticsearch_dsl import A, Q
 from elasticsearch_dsl.query import QueryString, Range
 
 from cl.lib.types import CleanData
-from cl.search.models import Court
+from cl.search.models import SEARCH_TYPES, Court
 
 
 def build_daterange_query(
@@ -162,14 +162,17 @@ def build_es_filters(cd: CleanData) -> List:
     return queries_list
 
 
-def build_es_main_query(search_query: Search, cd: CleanData) -> Search:
+def build_es_main_query(
+    search_query: Search, cd: CleanData
+) -> tuple[Search, int, int | None]:
     """Builds and returns an elasticsearch query based on the given cleaned
      data.
     :param search_query: The Elasticsearch search query object.
     :param cd: The cleaned data object containing the query and filters.
 
-    :return: The Elasticsearch search query object after applying filters and
-    string query.
+    :return: A three tuple, the Elasticsearch search query object after applying
+    filters, string query and grouping if needed, the total number of results,
+    the total number of top hits returned by a group if applicable.
     """
 
     filters = build_es_filters(cd)
@@ -184,18 +187,26 @@ def build_es_main_query(search_query: Search, cd: CleanData) -> Search:
             search_query = search_query.query(string_query)
     else:
         search_query = search_query.query("match_all")
+    total_query_results = search_query.count()
 
-    return search_query
+    # Create groups aggregation if needed.
+    top_hits_limit = group_search_results(
+        search_query,
+        cd,
+        build_sort_results(cd),
+    )
+
+    return search_query, total_query_results, top_hits_limit
 
 
-def set_results_highlights(results: Page) -> None:
+def set_results_highlights(results: Page, search_type: str) -> None:
     """Sets the highlights for each search result in a Page object by updating
     related fields in _source dict.
 
     :param results: The Page object containing search results.
+    :param search_type: The search type to perform.
     :return: None, the function updates the results in place.
     """
-
     for result in results.object_list:
         top_hits = result.grouped_by_opinion_cluster_id.hits.hits
         for hit in top_hits:
@@ -210,65 +221,73 @@ def set_results_highlights(results: Page) -> None:
 
 def group_search_results(
     search: Search,
-    group_by: str,
+    cd: CleanData,
     order_by: dict[str, dict[str, str]],
-    size: int,
-) -> None:
+) -> int | None:
     """Group search results by a specified field and return top hits for each
     group.
 
     :param search: The elasticsearch Search object representing the query.
-    :param group_by: The field name to group the results by.
+    :param cd: The cleaned data object containing the query and filters.
     :param order_by: The field name to use for sorting the top hits.
-    :param  size: The number of top hits to return for each group.
-    :return: None, results are returned as part of the Elasticsearch search object.
+    :return: The top_hits_limit or None.
     """
 
-    aggregation = A("terms", field=group_by, size=1_000_000)
-    sub_aggregation = A(
-        "top_hits",
-        size=size,
-        sort={"_score": {"order": "desc"}},
-        highlight={
-            "fields": {
-                "representative_text": {},
-                "docketNumber": {},
+    top_hits_limit = 5
+    if cd["type"] == SEARCH_TYPES.PARENTHETICAL:
+        # If cluster_id query set the top_hits_limit to 100
+        # Top hits limit in elasticsearch is 100
+        cluster_query = re.search(r"cluster_id:\d+", cd["q"])
+        size = top_hits_limit if not cluster_query else 100
+        group_by = "cluster_id"
+        aggregation = A("terms", field=group_by, size=1_000_000)
+        sub_aggregation = A(
+            "top_hits",
+            size=size,
+            sort={"_score": {"order": "desc"}},
+            highlight={
+                "fields": {
+                    "representative_text": {},
+                    "docketNumber": {},
+                },
+                "pre_tags": ["<mark>"],
+                "post_tags": ["</mark>"],
             },
-            "pre_tags": ["<mark>"],
-            "post_tags": ["</mark>"],
-        },
-    )
-    aggregation.bucket("grouped_by_opinion_cluster_id", sub_aggregation)
-
-    order_by_field = list(order_by.keys())[0]
-    if order_by_field != "score":
-        # If order field is other than score (elasticsearch relevance)
-        # Add a max aggregation to calculate the max value of the provided
-        # field to order, for each bucket.
-        max_value_field = A("max", field=order_by_field)
-        aggregation.bucket("max_value_field", max_value_field)
-
-        # Add a bucket_sort aggregation to sort the result buckets based on
-        # the max_value_field aggregation
-        bucket_sort = A(
-            "bucket_sort", sort=[{"max_value_field": order_by[order_by_field]}]
         )
-        aggregation.bucket("sorted_buckets", bucket_sort)
-    else:
-        # If order field score (elasticsearch relevance)
-        # Add a max aggregation to calculate the max value of _score
-        max_score = A("max", script="_score")
-        aggregation.bucket("max_score", max_score)
-        bucket_sort_score = A(
-            "bucket_sort", sort=[{"max_score": {"order": "desc"}}]
-        )
-        aggregation.bucket("sorted_buckets", bucket_sort_score)
+        aggregation.bucket("grouped_by_opinion_cluster_id", sub_aggregation)
 
-    search.aggs.bucket("groups", aggregation)
+        order_by_field = list(order_by.keys())[0]
+        if order_by_field != "score":
+            # If order field is other than score (elasticsearch relevance)
+            # Add a max aggregation to calculate the max value of the provided
+            # field to order, for each bucket.
+            max_value_field = A("max", field=order_by_field)
+            aggregation.bucket("max_value_field", max_value_field)
+
+            # Add a bucket_sort aggregation to sort the result buckets based on
+            # the max_value_field aggregation
+            bucket_sort = A(
+                "bucket_sort",
+                sort=[{"max_value_field": order_by[order_by_field]}],
+            )
+            aggregation.bucket("sorted_buckets", bucket_sort)
+        else:
+            # If order field score (elasticsearch relevance)
+            # Add a max aggregation to calculate the max value of _score
+            max_score = A("max", script="_score")
+            aggregation.bucket("max_score", max_score)
+            bucket_sort_score = A(
+                "bucket_sort", sort=[{"max_score": {"order": "desc"}}]
+            )
+            aggregation.bucket("sorted_buckets", bucket_sort_score)
+
+        search.aggs.bucket("groups", aggregation)
+
+    return top_hits_limit
 
 
 def convert_str_date_fields_to_date_objects(
-    results: Page, date_field_name: str
+    results: Page, date_field_name: str, search_type: str
 ) -> None:
     """Converts string date fields in Elasticsearch search results to date
     objects.
@@ -276,39 +295,43 @@ def convert_str_date_fields_to_date_objects(
     :param results: A Page object containing the search results to be modified.
     :param date_field_name: The date field name containing the date strings
     to be converted.
+    :param search_type: The search type to perform.
     :return: None, the function modifies the search results object in place.
     """
 
     for result in results.object_list:
-        top_hits = result.grouped_by_opinion_cluster_id.hits.hits
-        for hit in top_hits:
-            date_str = hit["_source"][date_field_name]
-            date_obj = date.fromisoformat(date_str)
-            hit["_source"][date_field_name] = date_obj
+        if search_type == SEARCH_TYPES.PARENTHETICAL:
+            top_hits = result.grouped_by_opinion_cluster_id.hits.hits
+            for hit in top_hits:
+                date_str = hit["_source"][date_field_name]
+                date_obj = date.fromisoformat(date_str)
+                hit["_source"][date_field_name] = date_obj
 
 
-def merge_courts_from_db(results: Page) -> None:
+def merge_courts_from_db(results: Page, search_type: str) -> None:
     """Merges court citation strings from the database into search results.
 
     :param results: A Page object containing the search results to be modified.
+    :param search_type: The search type to perform.
     :return: None, the function modifies the search results object in place.
     """
 
-    court_ids = [
-        d["grouped_by_opinion_cluster_id"]["hits"]["hits"][0]["_source"][
-            "court_id"
+    if search_type == SEARCH_TYPES.PARENTHETICAL:
+        court_ids = [
+            d["grouped_by_opinion_cluster_id"]["hits"]["hits"][0]["_source"][
+                "court_id"
+            ]
+            for d in results
         ]
-        for d in results
-    ]
-    courts_in_page = Court.objects.filter(pk__in=court_ids).only(
-        "pk", "citation_string"
-    )
-    courts_dict = {}
-    for court in courts_in_page:
-        courts_dict[court.pk] = court.citation_string
+        courts_in_page = Court.objects.filter(pk__in=court_ids).only(
+            "pk", "citation_string"
+        )
+        courts_dict = {}
+        for court in courts_in_page:
+            courts_dict[court.pk] = court.citation_string
 
-    for result in results.object_list:
-        top_hits = result.grouped_by_opinion_cluster_id.hits.hits
-        for hit in top_hits:
-            court_id = hit["_source"]["court_id"]
-            hit["_source"]["citation_string"] = courts_dict.get(court_id)
+        for result in results.object_list:
+            top_hits = result.grouped_by_opinion_cluster_id.hits.hits
+            for hit in top_hits:
+                court_id = hit["_source"]["court_id"]
+                hit["_source"]["citation_string"] = courts_dict.get(court_id)
