@@ -1,7 +1,9 @@
 from django.conf import settings
+from django.template import loader
 from django_elasticsearch_dsl import Document, Index, fields
 
 from cl.audio.models import Audio
+from cl.lib.search_index_utils import null_map
 from cl.lib.utils import deepgetattr
 from cl.search.models import Citation, ParentheticalGroup
 
@@ -146,6 +148,7 @@ class AudioDocument(Document):
         fields.IntegerField(),
     )
     source = fields.KeywordField(attr="source")
+    text = fields.TextField()
 
     class Django:
         model = Audio
@@ -156,3 +159,7 @@ class AudioDocument(Document):
     def prepare_file_size_mp3(self, instance):
         if instance.local_path_mp3:
             return deepgetattr(instance, "local_path_mp3.size", None)
+
+    def prepare_text(self, instance):
+        text_template = loader.get_template("indexes/audio_text.txt")
+        return text_template.render({"item": instance}).translate(null_map)

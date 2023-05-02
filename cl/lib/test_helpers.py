@@ -3,6 +3,7 @@ from typing import Sized, cast
 import scorched
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
+from django.core.management import call_command
 from django.test.testcases import SerializeMixin
 from django.test.utils import override_settings
 from lxml import etree
@@ -96,6 +97,58 @@ class SolrTestCase(SimpleUserDataMixin, EmptySolrTestCase):
         self.court = Court.objects.get(pk="test")
         self.expected_num_results_opinion = 6
         self.expected_num_results_audio = 2
+
+
+class IndexedElasticTestCase(SimpleUserDataMixin, TestCase):
+    """A standard Solr test case with content included in the database,  but not
+    yet indexed into the database.
+    """
+
+    fixtures = [
+        "test_court.json",
+        "judge_judy.json",
+        "test_objects_search.json",
+    ]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.author = PersonFactory.create()
+        cls.audio_1 = AudioFactory.create(
+            case_name="SEC v. Frank J. Custable, Jr.",
+            docket_id=1,
+            duration=420,
+            judges="",
+        )
+        cls.audio_2 = AudioFactory.create(
+            case_name="Jose A. Dominguez v. Loretta E. Lynch",
+            docket_id=2,
+            duration=837,
+            judges="",
+        )
+        cls.audio_3 = AudioFactory.create(
+            case_name="Hong Liu Yang v. Lynch-Loretta E.",
+            docket_id=3,
+            duration=653,
+            judges="",
+        )
+        cls.audio_4 = AudioFactory.create(
+            case_name="Hong Liu Lorem v. Lynch-Loretta E.",
+            docket_id=3,
+            duration=653,
+            judges="John Smith",
+        )
+        cls.audio_4.panel.add(cls.author)
+
+    def rebuild_index(self):
+        """
+        Create and populate the Elasticsearch index and mapping
+        """
+
+        # -f rebuilds index without prompt for confirmation
+        call_command("search_index", "--rebuild", "-f")
+
+    def setUp(self) -> None:
+        self.rebuild_index()
 
 
 class IndexedSolrTestCase(SolrTestCase):

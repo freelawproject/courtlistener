@@ -43,6 +43,7 @@ from cl.lib.search_utils import cleanup_main_query
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
     EmptySolrTestCase,
+    IndexedElasticTestCase,
     IndexedSolrTestCase,
     SolrTestCase,
 )
@@ -2524,7 +2525,7 @@ class DocketEntriesTimezone(TestCase):
         self.assertEqual(de_nyed_utc.datetime_filed, target_date_aware)
 
 
-class OASearchTest(IndexedSolrTestCase):
+class OASearchTest(IndexedElasticTestCase):
     """Oral argument search tests"""
 
     @classmethod
@@ -2694,9 +2695,9 @@ class OASearchTest(IndexedSolrTestCase):
         expected = 2
         self.assertEqual(actual, expected)
         self.assertTrue(
-            r.content.decode().index("Yang")
-            < r.content.decode().index("Lorem"),
-            msg="'Yang' should come BEFORE 'Lorem' when order_by relevance.",
+            r.content.decode().index("Lorem")
+            < r.content.decode().index("Yang"),
+            msg="'Lorem' should come BEFORE 'Yang' when order_by relevance.",
         )
 
         # Text query combine case name and docket name.

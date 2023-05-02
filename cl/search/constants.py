@@ -24,7 +24,7 @@ SOLR_RECAP_HL_FIELDS = [
     "suitNature",
     "text",
 ]
-SOLR_ORAL_ARGUMENT_HL_FIELDS = [
+SEARCH_ORAL_ARGUMENT_HL_FIELDS = [
     "text",
     "caseName",
     "judge",

@@ -10,6 +10,7 @@ from elasticsearch_dsl import A, Q
 from elasticsearch_dsl.query import QueryString, Range
 
 from cl.lib.types import CleanData
+from cl.search.constants import SEARCH_ORAL_ARGUMENT_HL_FIELDS
 from cl.search.models import SEARCH_TYPES, Court
 
 
@@ -44,11 +45,13 @@ def build_daterange_query(
     return []
 
 
-def build_fulltext_query(field: str, value: str) -> QueryString | None:
+def build_fulltext_query(
+    fields: list[str], value: str, query_type="query_string"
+) -> QueryString | None:
     """Given the cleaned data from a form, return a Elastic Search string query or []
     https://www.elastic.co/guide/en/elasticsearch/reference/current/full-text-queries.html
 
-    :param field: The name of the field to search in.
+    :param fields: A list of name fields to search in.
     :param value: The string value to search for.
     :return: A Elasticsearch QueryString or None if the "value" param is empty.
     """
@@ -68,7 +71,25 @@ def build_fulltext_query(field: str, value: str) -> QueryString | None:
                     f"docketNumber:{docket_number}",
                     value,
                 )
-        return Q("query_string", query=value, fields=[field])
+        if query_type == "query_string":
+            return Q("query_string", query=value, fields=fields)
+        elif query_type == "multi_match":
+            # return Q("multi_match", query=value, fields=fields, type="phrase", tie_breaker=0.3)
+
+            return Q(
+                "bool",
+                should=[
+                    Q(
+                        "multi_match",
+                        query=value,
+                        fields=fields,
+                        type="phrase",
+                        tie_breaker=0.3,
+                    ),
+                    Q("query_string", query=value),
+                ],
+            )
+
     return None
 
 
@@ -84,6 +105,21 @@ def build_term_query(field: str, value: str) -> List:
     """
     if value:
         return [Q("term", **{field: value})]
+    return []
+
+
+def build_text_filter(field: str, value: str) -> List:
+    """Given field name and value, return Elastic Search term query or [].
+    "term" Returns documents that contain an exact term in a provided field
+    NOTE: Use it only whe you want an exact match, avoid using this with text fields
+    https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-term-query.html
+
+    :param field: elasticsearch index fieldname
+    :param value: term to find
+    :return: Empty list or list with DSL Match query
+    """
+    if value:
+        return [Q("match_phrase", **{field: value})]
     return []
 
 
@@ -112,11 +148,20 @@ def build_sort_results(cd: CleanData) -> Dict:
     :return: The short dict.
     """
 
-    order_by_map = {
-        "score desc": {"score": {"order": "desc"}},
-        "dateFiled desc": {"dateFiled": {"order": "desc"}},
-        "dateFiled asc": {"dateFiled": {"order": "asc"}},
-    }
+    if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
+        order_by_map = {
+            "score desc": {"_score": {"order": "desc"}},
+            "dateArgued desc": {"dateArgued": {"order": "desc"}},
+            "dateArgued asc": {"dateArgued": {"order": "asc"}},
+        }
+
+    else:
+        order_by_map = {
+            "score desc": {"score": {"order": "desc"}},
+            "dateFiled desc": {"dateFiled": {"order": "desc"}},
+            "dateFiled asc": {"dateFiled": {"order": "asc"}},
+        }
+
     order_by = cd.get("order_by")
     if order_by and order_by in order_by_map:
         return order_by_map[order_by]
@@ -134,30 +179,52 @@ def build_es_filters(cd: CleanData) -> List:
 
     queries_list = []
 
-    # Build daterange query
-    queries_list.extend(
-        build_daterange_query(
-            "dateFiled",
-            cd.get("filed_before", ""),
-            cd.get("filed_after", ""),
+    if (
+        cd["type"] == SEARCH_TYPES.PARENTHETICAL
+        or cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT
+    ):
+        # Build court terms filter
+        queries_list.extend(
+            build_terms_query(
+                "court_id",
+                cd.get("court", "").split(),
+            )
         )
-    )
+        # Build docket number term query
+        queries_list.extend(
+            build_term_query(
+                "docketNumber",
+                cd.get("docket_number", ""),
+            )
+        )
 
-    # Build court terms filter
-    queries_list.extend(
-        build_terms_query(
-            "court_id",
-            cd.get("court", "").split(),
+    if cd["type"] == SEARCH_TYPES.PARENTHETICAL:
+        # Build daterange query
+        queries_list.extend(
+            build_daterange_query(
+                "dateFiled",
+                cd.get("filed_before", ""),
+                cd.get("filed_after", ""),
+            )
         )
-    )
 
-    # Build docket number term query
-    queries_list.extend(
-        build_term_query(
-            "docketNumber",
-            cd.get("docket_number", ""),
+    if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
+        # Build daterange query
+        queries_list.extend(
+            build_daterange_query(
+                "dateArgued",
+                cd.get("argued_before", ""),
+                cd.get("argued_after", ""),
+            )
         )
-    )
+
+        # Build court terms filter
+        queries_list.extend(
+            build_text_filter("caseName", cd.get("case_name", ""))
+        )
+
+        # Build court terms filter
+        queries_list.extend(build_text_filter("judge", cd.get("judge", "")))
 
     return queries_list
 
@@ -175,8 +242,20 @@ def build_es_main_query(
     the total number of top hits returned by a group if applicable.
     """
 
+    string_query = None
     filters = build_es_filters(cd)
-    string_query = build_fulltext_query("representative_text", cd.get("q", ""))
+    if cd["type"] == SEARCH_TYPES.PARENTHETICAL:
+        string_query = build_fulltext_query(
+            ["representative_text"], cd.get("q", "")
+        )
+
+    elif cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
+        string_query = build_fulltext_query(
+            ["caseName^5", "docketNumber^2", "text^1"],
+            cd.get("q", ""),
+            "multi_match",
+        )
+
     if filters or string_query:
         # Apply filters first if there is at least one set.
         if filters:
@@ -196,7 +275,47 @@ def build_es_main_query(
         build_sort_results(cd),
     )
 
+    search_query = add_es_highlighting(search_query, cd)
+    if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
+        search_query = search_query.sort(build_sort_results(cd))
+
     return search_query, total_query_results, top_hits_limit
+
+
+def add_es_highlighting(search_query, cd):
+    if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
+        ffl = [
+            "id",
+            "absolute_url",
+            "court_id",
+            "local_path",
+            "source",
+            "download_url",
+            "docket_id",
+            "dateArgued",
+            "duration",
+            "docket_slug",
+            "caseName",
+            "docketNumber",
+            "text",
+        ]
+        # hlfl = SEARCH_ORAL_ARGUMENT_HL_FIELDS
+        hlfl = [
+            "text",
+            "caseName",
+            "judge",
+            "docketNumber",
+        ]
+        search_query = search_query.source(ffl)
+        for field in hlfl:
+            search_query = search_query.highlight(
+                field,
+                number_of_fragments=0,
+                pre_tags=["<mark>"],
+                post_tags=["</mark>"],
+            )
+
+    return search_query
 
 
 def set_results_highlights(results: Page, search_type: str) -> None:
@@ -207,16 +326,25 @@ def set_results_highlights(results: Page, search_type: str) -> None:
     :param search_type: The search type to perform.
     :return: None, the function updates the results in place.
     """
+
     for result in results.object_list:
-        top_hits = result.grouped_by_opinion_cluster_id.hits.hits
-        for hit in top_hits:
-            if hasattr(hit, "highlight"):
-                highlighted_fields = [
-                    k for k in dir(hit.highlight) if not k.startswith("_")
-                ]
-                for highlighted_field in highlighted_fields:
-                    highlight = hit.highlight[highlighted_field][0]
-                    hit["_source"][highlighted_field] = highlight
+        if search_type == SEARCH_TYPES.PARENTHETICAL:
+            top_hits = result.grouped_by_opinion_cluster_id.hits.hits
+            for hit in top_hits:
+                if hasattr(hit, "highlight"):
+                    highlighted_fields = [
+                        k for k in dir(hit.highlight) if not k.startswith("_")
+                    ]
+                    for highlighted_field in highlighted_fields:
+                        highlight = hit.highlight[highlighted_field][0]
+                        hit["_source"][highlighted_field] = highlight
+        else:
+            if hasattr(result.meta, "highlight"):
+                for (
+                    field,
+                    highlight_list,
+                ) in result.meta.highlight.to_dict().items():
+                    result[field] = highlight_list[0]
 
 
 def group_search_results(
@@ -298,14 +426,14 @@ def convert_str_date_fields_to_date_objects(
     :param search_type: The search type to perform.
     :return: None, the function modifies the search results object in place.
     """
-
-    for result in results.object_list:
-        if search_type == SEARCH_TYPES.PARENTHETICAL:
-            top_hits = result.grouped_by_opinion_cluster_id.hits.hits
-            for hit in top_hits:
-                date_str = hit["_source"][date_field_name]
-                date_obj = date.fromisoformat(date_str)
-                hit["_source"][date_field_name] = date_obj
+    if search_type == SEARCH_TYPES.PARENTHETICAL:
+        for result in results.object_list:
+            if search_type == SEARCH_TYPES.PARENTHETICAL:
+                top_hits = result.grouped_by_opinion_cluster_id.hits.hits
+                for hit in top_hits:
+                    date_str = hit["_source"][date_field_name]
+                    date_obj = date.fromisoformat(date_str)
+                    hit["_source"][date_field_name] = date_obj
 
 
 def merge_courts_from_db(results: Page, search_type: str) -> None:
@@ -335,3 +463,16 @@ def merge_courts_from_db(results: Page, search_type: str) -> None:
             for hit in top_hits:
                 court_id = hit["_source"]["court_id"]
                 hit["_source"]["citation_string"] = courts_dict.get(court_id)
+
+    if search_type == SEARCH_TYPES.ORAL_ARGUMENT:
+        court_ids = [d["court_id"] for d in results]
+        courts_in_page = Court.objects.filter(pk__in=court_ids).only(
+            "pk", "citation_string"
+        )
+        courts_dict = {}
+        for court in courts_in_page:
+            courts_dict[court.pk] = court.citation_string
+
+        for result in results.object_list:
+            court_id = result["court_id"]
+            result["citation_string"] = courts_dict.get(court_id)

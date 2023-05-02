@@ -48,7 +48,7 @@ from cl.lib.search_utils import (
     regroup_snippets,
 )
 from cl.search.constants import RELATED_PATTERN
-from cl.search.documents import ParentheticalGroupDocument
+from cl.search.documents import AudioDocument, ParentheticalGroupDocument
 from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import SEARCH_TYPES, Court, Opinion, OpinionCluster
 from cl.stats.models import Stat
@@ -400,7 +400,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
             # Get the results from the oral arguments as well
             render_dict.update(
                 {
-                    "results_oa": do_search(
+                    "results_oa": do_es_search(
                         mutable_GET,
                         rows=5,
                         override_params={
@@ -460,6 +460,14 @@ def show_results(request: HttpRequest) -> HttpResponse:
                 if request.GET.get("type") == SEARCH_TYPES.PARENTHETICAL:
                     search_results = do_es_search(request.GET.copy())
                     render_dict.update(search_results)
+                elif request.GET.get("type") == SEARCH_TYPES.ORAL_ARGUMENT:
+                    search_results = do_es_search(request.GET.copy())
+                    render_dict.update(search_results)
+                    # Set the value to the query as a convenience
+                    alert_form.fields["name"].widget.attrs[
+                        "value"
+                    ] = render_dict["search_summary_str"]
+                    render_dict.update({"alert_form": alert_form})
 
                 else:
                     render_dict.update(do_search(request.GET.copy()))
@@ -556,11 +564,22 @@ def es_search(request: HttpRequest) -> HttpResponse:
     return render(request, template, render_dict)
 
 
-def do_es_search(get_params):
+def do_es_search(
+    get_params, rows=20, override_params=None, facet=True, cache_key=None
+):
     """Run Elasticsearch searching and filtering and prepare data to display
+
     :param get_params: The request.GET params sent by user.
-    :param search_type: indicates search type by name
-    :return: dict
+    :param rows: The number of solr results to request
+    :param override_params: A dict with additional or different GET params to
+    be sent to solr.
+    :param facet: Whether to complete faceting in the query
+    :param cache_key: A cache key with which to save the results. Note that it
+    does not do anything clever with the actual query, so if you use this, your
+    cache key should *already* have factored in the query. If None, no caching
+    is set or used. Results are saved for six hours.
+    :return: A big dict of variables for use in the search results, homepage, or
+    other location.
     """
 
     paged_results = None
@@ -568,11 +587,19 @@ def do_es_search(get_params):
     courts = Court.objects.filter(in_use=True)
     query_time = total_pa_groups = 0
     top_hits_limit = 5
+    document_type = None
+
+    # Add additional or overridden GET parameters
+    if override_params:
+        get_params.update(override_params)
 
     search_form = SearchForm(get_params)
-    document_type = ParentheticalGroupDocument
+    if get_params.get("type") == SEARCH_TYPES.PARENTHETICAL:
+        document_type = ParentheticalGroupDocument
+    elif get_params.get("type") == SEARCH_TYPES.ORAL_ARGUMENT:
+        document_type = AudioDocument
 
-    if search_form.is_valid():
+    if search_form.is_valid() and document_type:
         cd = search_form.cleaned_data
         # Create necessary filters to execute ES query
         search_query = document_type.search()
@@ -582,10 +609,13 @@ def do_es_search(get_params):
                 search_query, cd
             )
             hits = s.execute()
+
             query_time = hits.took
-            groups = hits.aggregations.groups.buckets
-            paged_results = do_es_pagination(
-                get_params, groups, rows_per_page=10
+            if get_params.get("type") == SEARCH_TYPES.PARENTHETICAL:
+                hits = hits.aggregations.groups.buckets
+
+            paged_results = paginate_cached_es_results(
+                get_params, hits, rows, cache_key
             )
         except (TransportError, ConnectionError, RequestError) as e:
             error = True
@@ -623,13 +653,22 @@ def do_es_search(get_params):
     }
 
 
-def do_es_pagination(get_params, hits, rows_per_page=5):
+def paginate_cached_es_results(
+    get_params, hits, rows_per_page=5, cache_key=str
+):
     """Paginate elasticsearch results
     :param get_params: url get params
     :param hits: elasticsearch results
     :param rows_per_page: number of records per page
+    :param cache_key: The cache key to use.
     :return: paginated results
     """
+
+    # Run the query and set up pagination
+    if cache_key is not None:
+        results = cache.get(cache_key)
+        if results is not None:
+            return results
 
     try:
         page = int(get_params.get("page", 1))
@@ -652,5 +691,9 @@ def do_es_pagination(get_params, hits, rows_per_page=5):
     set_results_highlights(results, search_type)
     convert_str_date_fields_to_date_objects(results, "dateFiled", search_type)
     merge_courts_from_db(results, search_type)
+
+    if cache_key is not None:
+        six_hours = 60 * 60 * 6
+        cache.set(cache_key, results, six_hours)
 
     return results
