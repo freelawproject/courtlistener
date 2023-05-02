@@ -26,7 +26,6 @@ from cl.lib.privacy_tools import anonymize
 from cl.lib.ratelimiter import parse_rate
 from cl.lib.search_utils import make_fq
 from cl.lib.string_utils import normalize_dashes, trunc
-from cl.lib.utils import alphanumeric_sort
 from cl.people_db.models import Role
 from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
 from cl.search.factories import (
@@ -875,31 +874,6 @@ class TestRateLimiters(SimpleTestCase):
         for q, a in qa_pairs:
             with self.subTest("Parsing rates...", rate=q):
                 self.assertEqual(parse_rate(q), a)
-
-
-class TestLibUtils(TestCase):
-    fixtures = ["test_objects_search.json", "judge_judy.json"]
-    citation = {"reporter": "F.2d", "volume": "56"}
-
-    def test_citation_page_filtering(self) -> None:
-        """Test citation alphanumeric ordering."""
-
-        cases_in_volume = (
-            OpinionCluster.objects.filter(
-                citations__reporter=self.citation["reporter"],
-                citations__volume=self.citation["volume"],
-            )
-            .annotate(cite_page=(F("citations__page")))
-            .order_by("cite_page")
-        )
-        # Cases are sorted out of order.
-        self.assertIn("56 F.2d 11", cases_in_volume[0].citation_string)
-        self.assertIn("56 F.2d 9", cases_in_volume[1].citation_string)
-
-        # Cases are now sorted in alpha-numerical order.
-        sorted_cases = alphanumeric_sort(cases_in_volume, "cite_page")
-        self.assertIn("56 F.2d 9", sorted_cases[0].citation_string)
-        self.assertIn("56 F.2d 11", sorted_cases[1].citation_string)
 
 
 class TestFactoriesClasses(TestCase):

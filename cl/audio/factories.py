@@ -11,7 +11,7 @@ class AudioFactory(DjangoModelFactory):
     class Meta:
         model = Audio
 
-    source = FuzzyChoice(SOURCES, getter=lambda c: c[0])
+    source = FuzzyChoice(SOURCES.NAMES, getter=lambda c: c[0])
     case_name = Faker("case_name")
     sha1 = Faker("sha1")
     download_url = Faker("url")

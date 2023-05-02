@@ -284,7 +284,7 @@
             {% include "includes/no_results.html" %}
         {% endif %}
 
-        {% include "includes/pagination.html" %}
+        {% include "includes/pagination.html" with page_obj=results hide_last=True %}
         {% include "includes/random_tip.html" %}
         {% include "includes/jurisdiction_picker_modal.html" %}
     </div>

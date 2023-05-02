@@ -4,6 +4,7 @@ from itertools import groupby
 from typing import Dict, Tuple, Union
 from urllib.parse import urlencode
 
+import natsort
 from django.contrib import messages
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
@@ -47,7 +48,6 @@ from cl.lib.search_utils import (
 from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_404
-from cl.lib.utils import alphanumeric_sort
 from cl.lib.view_utils import increment_view_count
 from cl.opinion_page.forms import (
     CitationRedirectorForm,
@@ -65,7 +65,6 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.search.views import do_search
-from cl.users.models import UserProfile
 
 
 def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
@@ -293,7 +292,8 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
 
     context.update(
         {
-            "parties": docket.parties.exists(),  # Needed to show/hide parties tab.
+            "parties": docket.parties.exists(),
+            # Needed to show/hide parties tab.
             "docket_entries": docket_entries,
             "sort_order_asc": sort_order_asc,
             "form": form,
@@ -453,25 +453,59 @@ def view_recap_document(
             attachment_number=att_num,
         ).order_by("pk")[0]
 
-        # Check if the user has requested automatic redirection to the document
-        rd_download_redirect = request.GET.get("redirect_to_download", False)
-        redirect_or_modal = request.GET.get("redirect_or_modal", False)
-        if rd_download_redirect or redirect_or_modal:
-            # Check if the document is available from CourtListener and
-            # if it is, redirect to the local document
-            # if it isn't, if pacer_url is available and
-            # rd_download_redirect is True, redirect to PACER. If redirect_or_modal
-            # is True set redirect_to_pacer_modal to True to open the modal.
-            if rd.is_available:
-                return HttpResponseRedirect(rd.filepath_local.url)
-            else:
-                if rd.pacer_url and rd_download_redirect:
-                    return HttpResponseRedirect(rd.pacer_url)
-                if rd.pacer_url and redirect_or_modal:
-                    redirect_to_pacer_modal = True
-
     except IndexError:
+        # Unable to find the docket entry the normal way. In appellate courts, this
+        # can be because the main document was converted to an attachment, leaving no
+        # main document behind. See:
+        #
+        # https://github.com/freelawproject/courtlistener/pull/2413
+        #
+        # When this happens, try redirecting to the first attachment for the entry,
+        # if it exists.
+        if att_num:
+            raise Http404("No RECAPDocument matches the given query.")
+
+        # check if the main document was converted to an attachment and
+        # if it was, redirect the user to the attachment page
+        rd = RECAPDocument.objects.filter(
+            docket_entry__docket__id=docket_id,
+            document_number=doc_num,
+            attachment_number=1,
+        ).first()
+        if rd:
+            # Get the URL to the attachment page and use the querystring
+            # if the request included one
+            attachment_page = reverse(
+                "view_recap_attachment",
+                kwargs={
+                    "docket_id": docket_id,
+                    "doc_num": doc_num,
+                    "att_num": 1,
+                    "slug": slug,
+                },
+            )
+            if request.GET.urlencode():
+                attachment_page += f"?{request.GET.urlencode()}"
+            return HttpResponseRedirect(attachment_page)
+
         raise Http404("No RECAPDocument matches the given query.")
+
+    # Check if the user has requested automatic redirection to the document
+    rd_download_redirect = request.GET.get("redirect_to_download", False)
+    redirect_or_modal = request.GET.get("redirect_or_modal", False)
+    if rd_download_redirect or redirect_or_modal:
+        # Check if the document is available from CourtListener and
+        # if it is, redirect to the local document
+        # if it isn't, if pacer_url is available and
+        # rd_download_redirect is True, redirect to PACER. If redirect_or_modal
+        # is True set redirect_to_pacer_modal to True to open the modal.
+        if rd.is_available:
+            return HttpResponseRedirect(rd.filepath_local.url)
+        else:
+            if rd.pacer_url and rd_download_redirect:
+                return HttpResponseRedirect(rd.pacer_url)
+            if rd.pacer_url and redirect_or_modal:
+                redirect_to_pacer_modal = True
 
     title = make_rd_title(rd)
     rd = make_thumb_if_needed(request, rd)
@@ -664,6 +698,29 @@ def throw_404(request: HttpRequest, context: Dict) -> HttpResponse:
     )
 
 
+def get_prev_next_volumes(reporter: str, volume: str) -> tuple[int, int]:
+    """Get the volume before and after the current one.
+
+    :param reporter: The reporter where the volume is found
+    :param volume: The volume we're inspecting
+    :return Tuple of the volume number we have prior to the selected one, and
+    of the volume number after it.
+    """
+    volumes = list(
+        (
+            Citation.objects.filter(reporter=reporter)
+            .annotate(as_integer=Cast("volume", IntegerField()))
+            .values_list("as_integer", flat=True)
+            .distinct()
+            .order_by("as_integer")
+        )
+    )
+    index = volumes.index(int(volume))
+    volume_previous = volumes[index - 1] if index > 0 else None
+    volume_next = volumes[index + 1] if index + 1 < len(volumes) else None
+    return volume_next, volume_previous
+
+
 def reporter_or_volume_handler(
     request: HttpRequest, reporter: str, volume: str | None = None
 ) -> HttpResponse:
@@ -724,14 +781,9 @@ def reporter_or_volume_handler(
         )
 
     # Show all the cases for a volume-reporter dyad
-    cases_in_volume = (
-        OpinionCluster.objects.filter(
-            citations__reporter=reporter, citations__volume=volume
-        )
-        .annotate(cite_page=(F("citations__page")))
-        .order_by("cite_page")
-    )
-    cases_in_volume = alphanumeric_sort(cases_in_volume, "cite_page")
+    cases_in_volume = OpinionCluster.objects.filter(
+        citations__reporter=reporter, citations__volume=volume
+    ).order_by("date_filed")
 
     if not cases_in_volume:
         return throw_404(
@@ -745,18 +797,7 @@ def reporter_or_volume_handler(
             },
         )
 
-    volumes = list(
-        (
-            Citation.objects.filter(reporter=reporter)
-            .annotate(as_integer=Cast("volume", IntegerField()))
-            .values_list("as_integer", flat=True)
-            .distinct()
-            .order_by("as_integer")
-        )
-    )
-    index = volumes.index(int(volume))
-    volume_previous = volumes[index - 1] if index > 0 else None
-    volume_next = volumes[index + 1] if index + 1 < len(volumes) else None
+    volume_next, volume_previous = get_prev_next_volumes(reporter, volume)
 
     paginator = Paginator(cases_in_volume, 100, orphans=5)
     page = request.GET.get("page", 1)
@@ -824,19 +865,43 @@ def citation_handler(
     else:
         cluster_count = clusters.count()
 
-    if cluster_count == 0 and page.isdigit():
-        # Do a second pass for the closest opinion and check if we have
-        # a page cite that matches -- if it does give the requested opinion
-        possible_match = (
+    if cluster_count == 0:
+        # We didn't get an exact match on the volume/reporter/page. Perhaps it's a pincite.
+        # Try to find the citation immediately *before* this one in the same book. To do so,
+        # Get all the opinions from the book, sort them by page number (in Python, b/c pages
+        # can have letters), then find the citation just before the requested one.
+
+        possible_match = None
+
+        # Create a list of the closest opinion clusters id and page to the
+        # input citation
+        closest_opinion_clusters = list(
             OpinionCluster.objects.filter(
-                citations__reporter=reporter,
-                citations__volume=volume,
+                citations__reporter=reporter, citations__volume=volume
             )
-            .annotate(as_integer=Cast("citations__page", IntegerField()))
-            .exclude(as_integer__gte=page)
-            .order_by("-as_integer")
-            .first()
+            .annotate(cite_page=(F("citations__page")))
+            .values_list("id", "cite_page")
         )
+
+        # Create a temporal item and add it to the values list
+        citation_item = (0, page)
+        closest_opinion_clusters.append((0, page))
+
+        # Natural sort page numbers ascending order
+        sort_possible_matches = natsort.natsorted(
+            closest_opinion_clusters, key=lambda item: item[1]
+        )
+
+        # Find the position of the item that we added
+        citation_item_position = sort_possible_matches.index(citation_item)
+
+        if citation_item_position > 0:
+            # if the position is greater than 0, then the previous item in
+            # the list is the closest citation, we get the id of the
+            # previous item, and we get the object
+            possible_match = OpinionCluster.objects.get(
+                id=sort_possible_matches[citation_item_position - 1][0]
+            )
 
         if possible_match:
             # There may be different page cite formats that aren't yet

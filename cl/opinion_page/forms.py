@@ -18,7 +18,14 @@ from cl.scrapers.management.commands.cl_scrape_opinions import (
 )
 from cl.scrapers.tasks import extract_doc_content
 from cl.search.fields import CeilingDateField, FloorDateField
-from cl.search.models import Citation, Court, Docket, Opinion, OpinionCluster
+from cl.search.models import (
+    SOURCES,
+    Citation,
+    Court,
+    Docket,
+    Opinion,
+    OpinionCluster,
+)
 
 
 class CitationRedirectorForm(forms.Form):
@@ -417,7 +424,7 @@ class CourtUploadForm(forms.Form):
         lead_author = self.cleaned_data.get("lead_author")
         self.cleaned_data["item"] = {
             "source": Docket.DIRECT_INPUT,
-            "cluster_source": "D",
+            "cluster_source": SOURCES.DIRECT_COURT_INPUT,
             "case_names": self.cleaned_data.get("case_title"),
             "case_dates": self.cleaned_data["publication_date"],
             "precedential_statuses": "Published",
