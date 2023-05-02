@@ -2,6 +2,7 @@ from celery import chain
 from django.conf import settings
 from django.core.paginator import Paginator
 from juriscraper.pacer import PacerSession
+from requests import Session
 
 from cl.corpus_importer.tasks import get_pacer_doc_by_rd
 from cl.lib.celery_utils import CeleryThrottle
@@ -27,9 +28,11 @@ def docket_pks_for_query(query_string):
     )
     main_query["group.limit"] = 0
     main_query["sort"] = "dateFiled asc"
-    si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode="r")
-    search = si.query().add_extra(**main_query)
-    si.conn.http_connection.close()
+    with Session() as session:
+        si = ExtraSolrInterface(
+            settings.SOLR_RECAP_URL, http_connection=session, mode="r"
+        )
+        search = si.query().add_extra(**main_query)
     page_size = 100
     paginator = Paginator(search, page_size)
     for page_number in paginator.page_range:
