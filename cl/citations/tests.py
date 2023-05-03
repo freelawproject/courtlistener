@@ -65,7 +65,7 @@ from cl.search.models import (
     OpinionsCitedByRECAPDocument,
     Parenthetical,
     ParentheticalGroup,
-    RECAPDocument
+    RECAPDocument,
 )
 from cl.tests.cases import SimpleTestCase
 
@@ -398,7 +398,7 @@ class CitationObjectTest(IndexedSolrTestCase):
 
         cls.recap_doc = RECAPDocumentFactory.create(
             plain_text="Blah blah Foo v. Bar 1 U.S. 1, 77 blah blah. Asdf asdf Qwerty v. Uiop 2 F.3d 2, 555. Also check out Foo, 1 U.S. at 99 (holding that crime is illegal). Then let's cite Qwerty, supra, at 666 (noting that CourtListener is a great tool and everyone should use it). See also Foo, supra, at 101 as well. Another full citation is Lorem v. Ipsum 1 U. S. 50. Quoting Qwerty, “something something”, 2 F.3d 2, at 59. This case is similar to Fake, supra, and Qwerty supra, as well. This should resolve to the foregoing. Ibid. This should also convert appropriately, see Id., at 57. This should fail to resolve because the reporter and citation is ambiguous, 1 U. S., at 51. However, this should succeed, Lorem, 1 U.S., at 52.",
-            ocr_status=RECAPDocument.OCR_UNNECESSARY
+            ocr_status=RECAPDocument.OCR_UNNECESSARY,
         )
         super().setUpTestData()
 
