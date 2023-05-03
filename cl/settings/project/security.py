@@ -1,3 +1,5 @@
+import socket
+
 import environ
 
 from ..django import DATABASES, TESTING
@@ -29,7 +31,11 @@ if DEVELOPMENT:
     SESSION_COOKIE_DOMAIN = None
     # For debug_toolbar
     # INSTALLED_APPS.append('debug_toolbar')
-    INTERNAL_IPS = ("127.0.0.1",)
+
+    hostname, _, ips = socket.gethostbyname_ex(socket.gethostname())
+    INTERNAL_IPS = [".".join(ip.split(".")[:-1] + ["1"]) for ip in ips] + [
+        "127.0.0.1"
+    ]
 
     if TESTING:
         db = DATABASES["default"]
