@@ -796,6 +796,22 @@ files = [
 Django = ">=3.2"
 
 [[package]]
+name = "django-debug-toolbar"
+version = "4.0.0"
+description = "A configurable set of panels that display various debug information about the current request/response."
+category = "dev"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "django_debug_toolbar-4.0.0-py3-none-any.whl", hash = "sha256:bad339d68520652ddc1580c76f136fcbc3e020fd5ed96510a89a02ec81bb3fb1"},
+    {file = "django_debug_toolbar-4.0.0.tar.gz", hash = "sha256:89619f6e0ea1057dca47bfc429ed99b237ef70074dabc065a7faa5f00e1459cf"},
+]
+
+[package.dependencies]
+django = ">=3.2.4"
+sqlparse = ">=0.2"
+
+[[package]]
 name = "django-elasticsearch-dsl"
 version = "7.3"
 description = "Wrapper around elasticsearch-dsl-py for django models"
@@ -4130,4 +4146,4 @@ h11 = ">=0.9.0,<1"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10, <3.11"
-content-hash = "3f5e45fcea50de852a995bda565e3f3c61c859e3926ae1da502307cdd393cc40"
+content-hash = "18cc287ea5b3af383c8a04509cd633d5d6c93dc807c210ef8574b7a38d7992f1"
