@@ -4,6 +4,7 @@ from typing import Iterable
 
 from django.apps import apps
 from django.conf import settings
+from requests import Session
 
 from cl.lib.argparse_types import valid_date_time
 from cl.lib.celery_utils import CeleryThrottle
@@ -391,12 +392,13 @@ class Command(VerboseCommand):
         """Run the optimize command on all indexes."""
         urls = set(settings.SOLR_URLS.values())
         self.stdout.write(f"Found {len(urls)} indexes. Optimizing...\n")
-        for url in urls:
-            self.stdout.write(f" - {url}\n")
-            try:
-                si = ExtraSolrInterface(url)
-            except EnvironmentError:
-                self.stderr.write("   Couldn't load schema!")
-                continue
-            si.optimize()
+        with Session() as session:
+            for url in urls:
+                self.stdout.write(f" - {url}\n")
+                try:
+                    si = ExtraSolrInterface(url, http_connection=session)
+                except EnvironmentError:
+                    self.stderr.write("   Couldn't load schema!")
+                    continue
+                si.optimize()
         self.stdout.write("Done.\n")
