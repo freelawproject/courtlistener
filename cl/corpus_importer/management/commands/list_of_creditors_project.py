@@ -75,17 +75,19 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
     )
     session.login()
     throttle = CeleryThrottle(queue_name=q)
+    completed = 0
     for i, rows in enumerate(
         itertools.zip_longest(*(t[1] for t in csv_files), fillvalue=None)
     ):
         # Iterate over all the courts files at the same time.
-        if i < options["offset"]:
-            continue
-        if i >= options["limit"] > 0:
-            break
-
         for j, row in enumerate(rows):
             # Iterate over each court and row court.
+            completed += 1
+            if completed < options["offset"]:
+                continue
+            if completed >= options["limit"] > 0:
+                break
+
             court_id = csv_files[j][0]
             if row is None:
                 # Some courts have fewer rows than others; if a row in this
