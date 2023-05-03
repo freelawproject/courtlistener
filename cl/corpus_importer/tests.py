@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 import eyecite
 import pytest
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.utils.timezone import make_aware
@@ -1144,7 +1145,7 @@ class TrollerBKTests(TestCase):
         self.assertEqual(
             len(self.docket_d_before_2018.docket_entries.all()), 0
         )
-        rds_created, d_created = merge_rss_data(
+        rds_created, d_created = async_to_sync(merge_rss_data)(
             [d_rss_data_before_2018], self.court.pk, build_date
         )
         self.assertEqual(len(rds_created), 1)
@@ -1187,7 +1188,7 @@ class TrollerBKTests(TestCase):
 
         build_date = d_rss_data_after_2018["docket_entries"][0]["date_filed"]
         self.assertEqual(len(self.docket_d_after_2018.docket_entries.all()), 0)
-        rds_created, d_created = merge_rss_data(
+        rds_created, d_created = async_to_sync(merge_rss_data)(
             [d_rss_data_after_2018], self.court.pk, build_date
         )
         self.assertEqual(len(rds_created), 0)
@@ -1226,7 +1227,7 @@ class TrollerBKTests(TestCase):
 
         build_date = d_rss_data_after_2018["docket_entries"][0]["date_filed"]
         self.assertEqual(len(self.docket_d_after_2018.docket_entries.all()), 0)
-        rds_created, d_created = merge_rss_data(
+        rds_created, d_created = async_to_sync(merge_rss_data)(
             [d_rss_data_after_2018], self.court_pamd.pk, build_date
         )
         self.assertEqual(len(rds_created), 1)
@@ -1266,7 +1267,7 @@ class TrollerBKTests(TestCase):
         self.assertEqual(
             len(self.de_d_before_2018.docket.docket_entries.all()), 1
         )
-        rds_created, d_created = merge_rss_data(
+        rds_created, d_created = async_to_sync(merge_rss_data)(
             [d_rss_data_before_2018], self.court.pk, build_date
         )
         self.assertEqual(len(rds_created), 1)
@@ -1310,7 +1311,7 @@ class TrollerBKTests(TestCase):
         self.assertEqual(
             len(self.de_d_before_2018.docket.docket_entries.all()), 1
         )
-        rds_created, d_created = merge_rss_data(
+        rds_created, d_created = async_to_sync(merge_rss_data)(
             [d_rss_data_before_2018], self.court.pk, build_date
         )
         self.assertEqual(len(rds_created), 0)
@@ -1344,7 +1345,7 @@ class TrollerBKTests(TestCase):
         build_date = d_rss_data_before_2018["docket_entries"][0]["date_filed"]
         dockets = Docket.objects.filter(pacer_case_id="43562")
         self.assertEqual(dockets.count(), 0)
-        rds_created, d_created = merge_rss_data(
+        rds_created, d_created = async_to_sync(merge_rss_data)(
             [d_rss_data_before_2018], self.court.pk, build_date
         )
         self.assertEqual(len(rds_created), 1)
@@ -1384,7 +1385,7 @@ class TrollerBKTests(TestCase):
         self.assertEqual(
             len(self.de_d_before_2018.docket.docket_entries.all()), 1
         )
-        rds_created, d_created = merge_rss_data(
+        rds_created, d_created = async_to_sync(merge_rss_data)(
             [d_rss_data_after_2018], self.court.pk, build_date
         )
         self.assertEqual(len(rds_created), 0)
@@ -1426,7 +1427,7 @@ class TrollerBKTests(TestCase):
         )
 
         build_date = d_rss_data_after_2018["docket_entries"][0]["date_filed"]
-        rds_created, d_created = merge_rss_data(
+        rds_created, d_created = async_to_sync(merge_rss_data)(
             [d_rss_data_after_2018], self.court.pk, build_date
         )
         self.assertEqual(len(rds_created), 0)
@@ -1461,7 +1462,7 @@ class TrollerBKTests(TestCase):
         self.assertEqual(
             len(self.docket_a_before_2018.docket_entries.all()), 0
         )
-        rds_created, d_created = merge_rss_data(
+        rds_created, d_created = async_to_sync(merge_rss_data)(
             [a_rss_data_before_2018], self.court_appellate.pk, build_date
         )
         self.assertEqual(len(rds_created), 1)
@@ -1502,7 +1503,7 @@ class TrollerBKTests(TestCase):
 
         build_date = a_rss_data_after_2018["docket_entries"][0]["date_filed"]
         self.assertEqual(len(self.docket_a_after_2018.docket_entries.all()), 0)
-        rds_created, d_created = merge_rss_data(
+        rds_created, d_created = async_to_sync(merge_rss_data)(
             [a_rss_data_after_2018], self.court_appellate.pk, build_date
         )
         self.assertEqual(len(rds_created), 1)
@@ -1545,7 +1546,7 @@ class TrollerBKTests(TestCase):
         self.assertEqual(
             len(self.de_a_before_2018.docket.docket_entries.all()), 1
         )
-        rds_created, d_created = merge_rss_data(
+        rds_created, d_created = async_to_sync(merge_rss_data)(
             [a_rss_data_before_2018], self.court_appellate.pk, build_date
         )
         self.assertEqual(len(rds_created), 1)
@@ -1589,7 +1590,7 @@ class TrollerBKTests(TestCase):
         build_date = a_rss_data_before_2018["docket_entries"][0]["date_filed"]
         dockets = Docket.objects.filter(docket_number="23-4233")
         self.assertEqual(dockets.count(), 0)
-        rds_created, d_created = merge_rss_data(
+        rds_created, d_created = async_to_sync(merge_rss_data)(
             [a_rss_data_before_2018], self.court_appellate.pk, build_date
         )
         self.assertEqual(len(rds_created), 1)
@@ -1629,7 +1630,7 @@ class TrollerBKTests(TestCase):
         self.assertEqual(
             len(self.de_a_before_2018.docket.docket_entries.all()), 1
         )
-        rds_created, d_created = merge_rss_data(
+        rds_created, d_created = async_to_sync(merge_rss_data)(
             [a_rss_data_before_2018], self.court_appellate.pk, build_date
         )
         self.assertEqual(len(rds_created), 0)
@@ -1665,7 +1666,7 @@ class TrollerBKTests(TestCase):
         self.assertEqual(
             len(self.de_a_before_2018.docket.docket_entries.all()), 1
         )
-        rds_created, d_created = merge_rss_data(
+        rds_created, d_created = async_to_sync(merge_rss_data)(
             [a_rss_data_before_2018], self.court_appellate.pk, build_date
         )
         self.assertEqual(len(rds_created), 1)
@@ -1710,7 +1711,7 @@ class TrollerBKTests(TestCase):
         build_date = d_rss_data_after_2018["docket_entries"][0]["date_filed"]
         dockets = Docket.objects.filter(docket_number="45-3232")
         self.assertEqual(dockets.count(), 0)
-        rds_created, d_created = merge_rss_data(
+        rds_created, d_created = async_to_sync(merge_rss_data)(
             [d_rss_data_after_2018], self.court_appellate.pk, build_date
         )
         self.assertEqual(len(rds_created), 1)
@@ -1745,7 +1746,7 @@ class TrollerBKTests(TestCase):
         self.assertEqual(
             len(self.docket_a_2018_case_id.docket_entries.all()), 0
         )
-        rds_created, d_created = merge_rss_data(
+        rds_created, d_created = async_to_sync(merge_rss_data)(
             [a_rss_data_before_2018], self.court_appellate.pk, build_date
         )
         self.assertEqual(len(rds_created), 1)
@@ -1805,7 +1806,7 @@ class TrollerBKTests(TestCase):
         build_date = d_rss_data_before_2018["docket_entries"][0]["date_filed"]
         dockets = Docket.objects.filter(docket_number="3:20-CV-01473")
         self.assertEqual(dockets.count(), 0)
-        rds_created, d_created = merge_rss_data(
+        rds_created, d_created = async_to_sync(merge_rss_data)(
             [d_rss_data_before_2018], "neb", build_date
         )
         self.assertEqual(len(rds_created), 1)
@@ -1843,7 +1844,7 @@ class TrollerBKTests(TestCase):
             ],
         )
         build_date = d_rss_data_after_2018["docket_entries"][0]["date_filed"]
-        rds_created, d_created = merge_rss_data(
+        rds_created, d_created = async_to_sync(merge_rss_data)(
             [d_rss_data_after_2018], "neb", build_date
         )
         self.assertEqual(len(rds_created), 0)
@@ -1895,7 +1896,7 @@ class TrollerBKTests(TestCase):
         )
         build_date = a_rss_data_unnumbered["docket_entries"][0]["date_filed"]
         self.assertEqual(len(de_a_unnumbered.docket.docket_entries.all()), 1)
-        rds_created, d_created = merge_rss_data(
+        rds_created, d_created = async_to_sync(merge_rss_data)(
             [a_rss_data_unnumbered], self.court_appellate.pk, build_date
         )
         self.assertEqual(len(rds_created), 0)
@@ -1966,7 +1967,7 @@ class TrollerBKTests(TestCase):
         cached_items = RssItemCache.objects.all()
         self.assertEqual(cached_items.count(), 0)
         build_date = a_rss_data_0["docket_entries"][0]["date_filed"]
-        rds_created, d_created = merge_rss_data(
+        rds_created, d_created = async_to_sync(merge_rss_data)(
             list_rss_data_1, self.court_appellate.pk, build_date
         )
         self.assertEqual(len(rds_created), 2)
@@ -1975,7 +1976,7 @@ class TrollerBKTests(TestCase):
 
         # Remove recap_sequence_number from the dict to simulate the same item
         del a_rss_data_1["docket_entries"][0]["recap_sequence_number"]
-        rds_created, d_created = merge_rss_data(
+        rds_created, d_created = async_to_sync(merge_rss_data)(
             list_rss_data_2, self.court_appellate.pk, build_date
         )
 
@@ -2127,7 +2128,7 @@ class TrollerBKTests(TestCase):
         self.assertEqual(cached_items.count(), 0)
 
         build_date = a_rss_data_0["docket_entries"][0]["date_filed"]
-        rds_created, d_created = merge_rss_data(
+        rds_created, d_created = async_to_sync(merge_rss_data)(
             list_rss_data, self.court_appellate.pk, build_date
         )
 
@@ -2233,7 +2234,7 @@ class TrollerBKTests(TestCase):
         ]
 
         build_date = a_rss_data_0["docket_entries"][0]["date_filed"]
-        rds_created, d_created = merge_rss_data(
+        rds_created, d_created = async_to_sync(merge_rss_data)(
             list_rss_data, self.court_neb.pk, build_date
         )
 
@@ -2296,7 +2297,7 @@ class TrollerBKTests(TestCase):
             a_rss_data_0,
         ]
         build_date = a_rss_data_0["docket_entries"][0]["date_filed"]
-        rds_created, d_created = merge_rss_data(
+        rds_created, d_created = async_to_sync(merge_rss_data)(
             list_rss_data, self.court.pk, build_date
         )
 

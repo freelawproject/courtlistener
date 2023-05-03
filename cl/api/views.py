@@ -85,7 +85,7 @@ def api_index(request: HttpRequest) -> HttpResponse:
     )
 
 
-def replication_docs(request: HttpRequest) -> HttpResponse:
+async def replication_docs(request: HttpRequest) -> HttpResponse:
     return render(request, "replication.html", {"private": False})
 
 
@@ -159,7 +159,7 @@ def coverage_data(request, version, court):
     )
 
 
-def get_result_count(request, version, day_count):
+async def get_result_count(request, version, day_count):
     """Get the count of results for the past `day_count` number of days
 
     GET parameters will be a complete search string
@@ -199,7 +199,7 @@ def get_result_count(request, version, day_count):
     return JsonResponse({"count": response.result.numFound}, safe=True)
 
 
-def deprecated_api(request, v):
+async def deprecated_api(request, v):
     return JsonResponse(
         {
             "meta": {
@@ -213,12 +213,12 @@ def deprecated_api(request, v):
     )
 
 
-def webhooks_getting_started(request):
+async def webhooks_getting_started(request):
     context = {"private": False}
     return render(request, "webhooks-getting-started.html", context)
 
 
-def webhooks_docs(request, version=None):
+async def webhooks_docs(request, version=None):
     """Show the correct version of the webhooks docs"""
 
     context = {"private": False}

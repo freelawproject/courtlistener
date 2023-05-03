@@ -1,6 +1,7 @@
 import json
 import os
 
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.urls import reverse
 from selenium.common.exceptions import NoSuchElementException
@@ -86,7 +87,7 @@ class DisclosureIngestionTest(TestCase):
             pdf_bytes = f.read()
         Investment.objects.all().delete()
 
-        extracted_data = microservice(
+        extracted_data = async_to_sync(microservice)(
             service="extract-disclosure",
             file_type="pdf",
             file=pdf_bytes,
