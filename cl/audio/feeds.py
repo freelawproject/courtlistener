@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.templatetags.static import static
+from requests import Session
 
 from cl.lib import search_utils
 from cl.lib.podcast import iTunesPodcastsFeedGenerator
@@ -30,18 +31,20 @@ class JurisdictionPodcast(JurisdictionFeed):
         """
         Returns a list of items to publish in this feed.
         """
-        solr = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode="r")
-        params = {
-            "q": "*",
-            "fq": f"court_exact:{obj.pk}",
-            "sort": "dateArgued desc",
-            "rows": "20",
-            "start": "0",
-            "caller": "JurisdictionPodcast",
-        }
-        items = solr.query().add_extra(**params).execute()
-        solr.conn.http_connection.close()
-        return items
+        with Session() as session:
+            solr = ExtraSolrInterface(
+                settings.SOLR_AUDIO_URL, http_connection=session, mode="r"
+            )
+            params = {
+                "q": "*",
+                "fq": f"court_exact:{obj.pk}",
+                "sort": "dateArgued desc",
+                "rows": "20",
+                "start": "0",
+                "caller": "JurisdictionPodcast",
+            }
+            items = solr.query().add_extra(**params).execute()
+            return items
 
     def feed_extra_kwargs(self, obj):
         extra_args = {
@@ -96,17 +99,19 @@ class AllJurisdictionsPodcast(JurisdictionPodcast):
         return None
 
     def items(self, obj):
-        solr = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode="r")
-        params = {
-            "q": "*",
-            "sort": "dateArgued desc",
-            "rows": "20",
-            "start": "0",
-            "caller": "AllJurisdictionsPodcast",
-        }
-        items = solr.query().add_extra(**params).execute()
-        solr.conn.http_connection.close()
-        return items
+        with Session() as session:
+            solr = ExtraSolrInterface(
+                settings.SOLR_AUDIO_URL, http_connection=session, mode="r"
+            )
+            params = {
+                "q": "*",
+                "sort": "dateArgued desc",
+                "rows": "20",
+                "start": "0",
+                "caller": "AllJurisdictionsPodcast",
+            }
+            items = solr.query().add_extra(**params).execute()
+            return items
 
 
 class SearchPodcast(JurisdictionPodcast):
@@ -119,20 +124,22 @@ class SearchPodcast(JurisdictionPodcast):
         search_form = SearchForm(obj.GET)
         if search_form.is_valid():
             cd = search_form.cleaned_data
-            solr = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode="r")
-            main_params = search_utils.build_main_query(
-                cd, highlight=False, facet=False
-            )
-            main_params.update(
-                {
-                    "sort": "dateArgued desc",
-                    "rows": "20",
-                    "start": "0",
-                    "caller": "SearchFeed",
-                }
-            )
-            items = solr.query().add_extra(**main_params).execute()
-            solr.conn.http_connection.close()
-            return items
+            with Session() as session:
+                solr = ExtraSolrInterface(
+                    settings.SOLR_AUDIO_URL, http_connection=session, mode="r"
+                )
+                main_params = search_utils.build_main_query(
+                    cd, highlight=False, facet=False
+                )
+                main_params.update(
+                    {
+                        "sort": "dateArgued desc",
+                        "rows": "20",
+                        "start": "0",
+                        "caller": "SearchFeed",
+                    }
+                )
+                items = solr.query().add_extra(**main_params).execute()
+                return items
         else:
             return []
