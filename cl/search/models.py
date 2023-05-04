@@ -78,6 +78,18 @@ class SOURCES:
     HARVARD_CASELAW = "U"
     COURT_M_HARVARD = "CU"
     DIRECT_COURT_INPUT = "D"
+    ANON_2020 = "Q"
+    ANON_2020_M_HARVARD = "QU"
+    COURT_M_HARVARD = "CU"
+    COURT_M_RESOURCE_M_HARVARD = "CRU"
+    DIRECT_COURT_INPUT_M_HARVARD = "DU"
+    LAWBOX_M_HARVARD = "LU"
+    LAWBOX_M_COURT_M_HARVARD = "LCU"
+    LAWBOX_M_RESOURCE_M_HARVARD = "LRU"
+    LAWBOX_M_COURT_RESOURCE_M_HARVARD = "LCRU"
+    MANUAL_INPUT_M_HARVARD = "MU"
+    PUBLIC_RESOURCE_M_HARVARD = "RU"
+    COLUMBIA_ARCHIVE_M_HARVARD = "ZU"
     NAMES = (
         (COURT_WEBSITE, "court website"),
         (PUBLIC_RESOURCE, "public.resource.org"),
@@ -112,6 +124,29 @@ class SOURCES:
         ),
         (COURT_M_HARVARD, "court website merged with Harvard"),
         (DIRECT_COURT_INPUT, "direct court input"),
+        (ANON_2020, "2020 anonymous database"),
+        (ANON_2020_M_HARVARD, "2020 anonymous database merged with Harvard"),
+        (COURT_M_HARVARD, "court website merged with Harvard"),
+        (
+            COURT_M_RESOURCE_M_HARVARD,
+            "court website merged with public.resource.org and Harvard",
+        ),
+        (
+            DIRECT_COURT_INPUT_M_HARVARD,
+            "direct court input merged with Harvard",
+        ),
+        (LAWBOX_M_HARVARD, "lawbox merged with Harvard"),
+        (
+            LAWBOX_M_COURT_M_HARVARD,
+            "Lawbox merged with court website and Harvard",
+        ),
+        (
+            LAWBOX_M_RESOURCE_M_HARVARD,
+            "Lawbox merged with public.resource.org and with Harvard",
+        ),
+        (MANUAL_INPUT_M_HARVARD, "Manual input merged with Harvard"),
+        (PUBLIC_RESOURCE_M_HARVARD, "public.resource.org merged with Harvard"),
+        (COLUMBIA_ARCHIVE_M_HARVARD, "columbia archive merged with Harvard"),
     )
 
 
@@ -249,7 +284,9 @@ class Docket(AbstractDateTimeModel):
     HARVARD = 16
     HARVARD_AND_RECAP = 17
     SCRAPER_AND_HARVARD = 18
+    HARVARD_AND_COLUMBIA = 20
     DIRECT_INPUT = 32
+    DIRECT_INPUT_AND_HARVARD = 48
     ANON_2020 = 64
     ANON_2020_AND_SCRAPER = 66
     ANON_2020_AND_HARVARD = 80
@@ -277,7 +314,9 @@ class Docket(AbstractDateTimeModel):
         (HARVARD, "Harvard"),
         (HARVARD_AND_RECAP, "Harvard and RECAP"),
         (SCRAPER_AND_HARVARD, "Scraper and Harvard"),
+        (HARVARD_AND_COLUMBIA, "Harvard and Columbia"),
         (DIRECT_INPUT, "Direct court input"),
+        (DIRECT_INPUT_AND_HARVARD, "Direct court input and Harvard"),
         (ANON_2020, "2020 anonymous database"),
         (ANON_2020_AND_SCRAPER, "2020 anonymous database and Scraper"),
         (ANON_2020_AND_HARVARD, "2020 anonymous database and Harvard"),
@@ -3265,3 +3304,17 @@ class SEARCH_TYPES:
         (PEOPLE, "People"),
     )
     ALL_TYPES = [OPINION, RECAP, ORAL_ARGUMENT, PEOPLE]
+
+
+# sources_without_harvard = [
+#     source[0]
+#     for source in Docket.SOURCE_CHOICES
+#     if "Harvard" not in source[1]
+#     ]
+#
+# cluster_ids = OpinionCluster.objects.filter(
+#     docket__source__in=sources_without_harvard,
+#     filepath_json_harvard__isnull=False,
+#     )
+
+["64", "C", "CR", "D", "L", "LC", "LCR", "LR", "M", "R", "Z"]
