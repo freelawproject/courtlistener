@@ -2091,7 +2091,6 @@ class OpinionClusterStub(TestCase):
             court=CourtFactory(id="okwd"),
             court_str="United States District Court for the Western District "
             "of Oklahoma",
-            citations_str="2015 WL 6160378;2015 U.S. Dist. LEXIS 142327",
             citations={
                 "citation_1": "2015 WL 6160378",
                 "citation_2": "2015 U.S. Dist. LEXIS 142327",
@@ -2107,7 +2106,6 @@ class OpinionClusterStub(TestCase):
             date_filed=datetime.date(1937, 2, 16),
             docket_number="245687",
             court_str="District Court of Jersey City, New Jersey.",
-            citations_str="15 N.J. Misc. 242;190 A. 325",
             citations={
                 "citation_1": "15 N.J. Misc. 242",
                 "citation_2": "190 A. 325",
