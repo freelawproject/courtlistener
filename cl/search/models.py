@@ -2759,13 +2759,6 @@ class Citation(models.Model):
     def get_absolute_url(self) -> str:
         return self.cluster.get_absolute_url()
 
-    def clean(self):
-        # either way do some validation.
-        if not self.opinion_cluster and not self.cluster_stub:
-            raise ValidationError(
-                "At least one of opinion_cluster or cluster_stub is required."
-            )
-
     class Meta:
         index_together = (
             # To look up individual citations
@@ -2777,6 +2770,12 @@ class Citation(models.Model):
             ("cluster", "volume", "reporter", "page"),
             ("cluster_stub", "volume", "reporter", "page"),
         )
+        constraints = [
+            models.CheckConstraint(
+                check=Q(cluster__isnull=False) | Q(cluster_stub__isnull=False),
+                name="not_both_null",
+            )
+        ]
 
 
 def sort_cites(c):
