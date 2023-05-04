@@ -79,7 +79,7 @@
         <a href="{% url "citation_redirector" reporter|slugify %}">{{ volume_names|oxford_join }}</a>&nbsp;({{ reporter|nbsp }})
       </h1>
       {% include "includes/reporter_variations.html" %}
-      {% include "includes/pagination.html" with page_obj=cases only%}
+      {% include "includes/pagination.html" with page_obj=cases%}
     </div>
     <div class="hidden-sm hidden-xs col-md-1 col-lg-2"></div>
     <div class="clearfix"></div>
