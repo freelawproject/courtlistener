@@ -176,6 +176,7 @@ INSTALLED_APPS = [
 
 if DEVELOPMENT:
     INSTALLED_APPS.append("django_extensions")
+    MIDDLEWARE.append("debug_toolbar.middleware.DebugToolbarMiddleware")
 
 
 ################

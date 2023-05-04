@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.template import TemplateDoesNotExist
+from requests import Session
 from rest_framework import status
 from rest_framework.status import HTTP_400_BAD_REQUEST
 
@@ -46,9 +47,11 @@ def annotate_courts_with_counts(courts, court_count_tuples):
 
 def make_court_variable():
     courts = Court.objects.exclude(jurisdiction=Court.TESTING_COURT)
-    si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
-    response = si.query().add_extra(**build_court_count_query()).execute()
-    si.conn.http_connection.close()
+    with Session() as session:
+        si = ExtraSolrInterface(
+            settings.SOLR_OPINION_URL, http_connection=session, mode="r"
+        )
+        response = si.query().add_extra(**build_court_count_query()).execute()
     court_count_tuples = response.facet_counts.facet_fields["court_exact"]
     courts = annotate_courts_with_counts(courts, court_count_tuples)
     return courts
@@ -131,14 +134,16 @@ def coverage_data(request, version, court):
     else:
         court_str = "all"
     q = request.GET.get("q")
-    si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
-    facet_field = "dateFiled"
-    response = (
-        si.query()
-        .add_extra(**build_coverage_query(court_str, q, facet_field))
-        .execute()
-    )
-    si.conn.http_connection.close()
+    with Session() as session:
+        si = ExtraSolrInterface(
+            settings.SOLR_OPINION_URL, http_connection=session, mode="r"
+        )
+        facet_field = "dateFiled"
+        response = (
+            si.query()
+            .add_extra(**build_coverage_query(court_str, q, facet_field))
+            .execute()
+        )
     counts = response.facet_counts.facet_ranges[facet_field]["counts"]
     counts = strip_zero_years(counts)
 
@@ -175,22 +180,22 @@ def get_result_count(request, version, day_count):
         )
 
     cd = search_form.cleaned_data
-    try:
-        si = get_solr_interface(cd)
-    except NotImplementedError:
-        logger.error(
-            "Tried getting solr connection for %s, but it's not "
-            "implemented yet",
-            cd["type"],
-        )
-        raise
+    with Session() as session:
+        try:
+            si = get_solr_interface(cd, http_connection=session)
+        except NotImplementedError:
+            logger.error(
+                "Tried getting solr connection for %s, but it's not "
+                "implemented yet",
+                cd["type"],
+            )
+            raise
 
-    response = (
-        si.query()
-        .add_extra(**build_alert_estimation_query(cd, int(day_count)))
-        .execute()
-    )
-    si.conn.http_connection.close()
+        response = (
+            si.query()
+            .add_extra(**build_alert_estimation_query(cd, int(day_count)))
+            .execute()
+        )
     return JsonResponse({"count": response.result.numFound}, safe=True)
 
 

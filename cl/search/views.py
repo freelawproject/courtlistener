@@ -17,7 +17,7 @@ from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.timezone import make_aware, utc
 from django.views.decorators.cache import never_cache
-from requests import RequestException
+from requests import RequestException, Session
 from scorched.exc import SolrError
 
 from cl.alerts.forms import CreateAlertForm
@@ -130,59 +130,55 @@ def do_search(
         cd = search_form.cleaned_data
 
         # Do the query, hitting the cache if desired
-        try:
-            si = get_solr_interface(cd)
-        except NotImplementedError:
-            si.conn.http_connection.close()
-            logger.error(
-                "Tried getting solr connection for %s, but it's not "
-                "implemented yet",
-                cd["type"],
-            )
-            raise
-
-        try:
-            # Is this a `related:<pks>` prefix query?
-            related_prefix_match = RELATED_PATTERN.search(cd["q"])
-            if related_prefix_match:
-                # Seed IDs
-                related_cluster_pks = related_prefix_match.group("pks").split(
-                    ","
+        with Session() as session:
+            try:
+                si = get_solr_interface(cd, http_connection=session)
+            except NotImplementedError:
+                logger.error(
+                    "Tried getting solr connection for %s, but it's not "
+                    "implemented yet",
+                    cd["type"],
                 )
-                results = get_mlt_query(
-                    si,
-                    cd.copy(),
-                    facet,
-                    related_cluster_pks,
-                    # Original query
-                    cd["q"].replace(related_prefix_match.group("pfx"), ""),
-                )
-                si.conn.http_connection.close()
-            else:
-                # Regular search queries
-                results = si.query().add_extra(
-                    **build_main_query(cd, facet=facet)
-                )
-                si.conn.http_connection.close()
+                raise
 
-            si.conn.http_connection.close()
+            try:
+                # Is this a `related:<pks>` prefix query?
+                related_prefix_match = RELATED_PATTERN.search(cd["q"])
+                if related_prefix_match:
+                    # Seed IDs
+                    related_cluster_pks = related_prefix_match.group(
+                        "pks"
+                    ).split(",")
+                    results = get_mlt_query(
+                        si,
+                        cd.copy(),
+                        facet,
+                        related_cluster_pks,
+                        # Original query
+                        cd["q"].replace(related_prefix_match.group("pfx"), ""),
+                    )
+                else:
+                    # Regular search queries
+                    results = si.query().add_extra(
+                        **build_main_query(cd, facet=facet)
+                    )
 
-            paged_results = paginate_cached_solr_results(
-                get_params, cd, results, rows, cache_key
-            )
-            cited_cluster = add_depth_counts(
-                # Also returns cited cluster if found
-                search_data=cd,
-                search_results=paged_results,
-            )
-        except (NotImplementedError, RequestException, SolrError) as e:
-            error = True
-            logger.warning(
-                f"Error loading search page with request: {get_params}"
-            )
-            logger.warning(f"Error was: {e}")
-            if settings.DEBUG is True:
-                traceback.print_exc()
+                paged_results = paginate_cached_solr_results(
+                    get_params, cd, results, rows, cache_key
+                )
+                cited_cluster = add_depth_counts(
+                    # Also returns cited cluster if found
+                    search_data=cd,
+                    search_results=paged_results,
+                )
+            except (NotImplementedError, RequestException, SolrError) as e:
+                error = True
+                logger.warning(
+                    f"Error loading search page with request: {get_params}"
+                )
+                logger.warning(f"Error was: {e}")
+                if settings.DEBUG is True:
+                    traceback.print_exc()
 
         # A couple special variables for particular search types
         search_form = _clean_form(get_params, cd, courts)
