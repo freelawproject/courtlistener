@@ -63,7 +63,6 @@ def send_webhook_event(
             proxies=proxy_server,
             json=json_data,
             timeout=(3, 3),
-            stream=True,
             headers=headers,
             allow_redirects=False,
         )
