@@ -3304,17 +3304,3 @@ class SEARCH_TYPES:
         (PEOPLE, "People"),
     )
     ALL_TYPES = [OPINION, RECAP, ORAL_ARGUMENT, PEOPLE]
-
-
-# sources_without_harvard = [
-#     source[0]
-#     for source in Docket.SOURCE_CHOICES
-#     if "Harvard" not in source[1]
-#     ]
-#
-# cluster_ids = OpinionCluster.objects.filter(
-#     docket__source__in=sources_without_harvard,
-#     filepath_json_harvard__isnull=False,
-#     )
-
-["64", "C", "CR", "D", "L", "LC", "LCR", "LR", "M", "R", "Z"]
