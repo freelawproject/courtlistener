@@ -5,6 +5,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.paginator import Paginator
 from juriscraper.pacer import PacerSession
+from requests import Session
 
 from cl.corpus_importer.tasks import (
     add_tags,
@@ -49,9 +50,11 @@ def get_attachment_pages(options):
         {"rows": page_size, "fl": ["id", "docket_id"]},
         {"group": False, "facet": False, "highlight": False},
     )
-    si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode="r")
-    results = si.query().add_extra(**main_query)
-    si.conn.http_connection.close()
+    with Session() as session:
+        si = ExtraSolrInterface(
+            settings.SOLR_RECAP_URL, http_connection=session, mode="r"
+        )
+        results = si.query().add_extra(**main_query)
 
     q = options["queue"]
     recap_user = User.objects.get(username="recap")
@@ -111,9 +114,11 @@ def get_documents(options):
         {"rows": page_size, "fl": ["id", "docket_id"]},
         {"group": False, "facet": False, "highlight": False},
     )
-    si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode="r")
-    results = si.query().add_extra(**main_query).execute()
-    si.conn.http_connection.close()
+    with Session() as session:
+        si = ExtraSolrInterface(
+            settings.SOLR_RECAP_URL, http_connection=session, mode="r"
+        )
+        results = si.query().add_extra(**main_query).execute()
     logger.info("Got %s search results.", results.result.numFound)
 
     for i, result in enumerate(results):
