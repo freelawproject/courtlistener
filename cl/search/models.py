@@ -2691,7 +2691,7 @@ class ClusterStub(AbstractDateTimeModel):
         blank=True,
     )
     court_str = models.TextField(
-        help_text=("Court name as a string"),
+        help_text="Court name as a string",
         blank=True,
     )
     docket_number = models.TextField(
