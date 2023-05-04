@@ -42,12 +42,12 @@ from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
     Citation,
+    ClusterStub,
     Court,
     Docket,
     DocketEntry,
     Opinion,
     OpinionCluster,
-    OpinionStub,
     RECAPDocument,
     sort_cites,
 )
@@ -2076,14 +2076,14 @@ class DocketEntriesTimezone(TestCase):
         self.assertEqual(de_nyed_utc.datetime_filed, target_date_aware)
 
 
-class StubCases(TestCase):
+class OpinionClusterStub(TestCase):
     """Test creation of stub cases"""
 
     def test_add_stub_case(self):
         """Can we add a stub case?"""
 
         # From lexis dataset
-        stub_1 = OpinionStub.objects.create(
+        stub_1 = ClusterStub.objects.create(
             case_name_full="ANTHONY C. KENNEY, Plaintiff, v. SSA ODAR "
             "HEARING et al., Defendants.",
             date_decided=datetime.date(2015, 9, 23),
@@ -2102,7 +2102,7 @@ class StubCases(TestCase):
         self.assertEqual(len(stub_1.citations), 2)
 
         # From westlaw dataset
-        stub_2 = OpinionStub.objects.create(
+        stub_2 = ClusterStub.objects.create(
             case_name="Kordulak v. Prudential Ins. Co. of America",
             date_filed=datetime.date(1937, 2, 16),
             docket_number="245687",

@@ -13,13 +13,13 @@ from cl.search.models import (
     Citation,
     Claim,
     ClaimHistory,
+    ClusterStub,
     Court,
     Docket,
     DocketEntry,
     Opinion,
     OpinionCluster,
     OpinionsCited,
-    OpinionStub,
     OriginatingCourtInformation,
     Parenthetical,
     ParentheticalGroup,
@@ -336,8 +336,8 @@ class ParentheticalGroupAdmin(CursorPaginatorAdmin):
     )
 
 
-@admin.register(OpinionStub)
-class OpinionStubAdmin(CursorPaginatorAdmin):
+@admin.register(ClusterStub)
+class ClusterStubAdmin(CursorPaginatorAdmin):
     list_display = (
         "id",
         "case_name",
