@@ -84,7 +84,11 @@ STATIC_ROOT = INSTALL_ROOT / "cl/assets/static/"
 TEMPLATE_ROOT = INSTALL_ROOT / "cl/assets/templates/"
 
 if not any([TESTING, DEBUG]):
-    STATICFILES_STORAGE = "cl.lib.storage.SubDirectoryS3ManifestStaticStorage"
+    STORAGES = {
+        "staticfiles": {
+            "BACKEND": "cl.lib.storage.SubDirectoryS3ManifestStaticStorage",
+        },
+    }
 
 TEMPLATES = [
     {
