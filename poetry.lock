@@ -996,20 +996,6 @@ files = [
 ]
 
 [[package]]
-name = "django-redis-cache"
-version = "3.0.0"
-description = "Redis Cache Backend for Django"
-category = "main"
-optional = false
-python-versions = "*"
-files = [
-    {file = "django-redis-cache-3.0.0.tar.gz", hash = "sha256:9a2eebef421d996a82098a19d17ff6b321265cd73178fa398913019764e8394a"},
-]
-
-[package.dependencies]
-redis = "<4.0"
-
-[[package]]
 name = "django-ses"
 version = "3.3.0"
 description = "A Django email backend for Amazon's Simple Email Service"
@@ -4146,4 +4132,4 @@ h11 = ">=0.9.0,<1"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10, <3.11"
-content-hash = "90c286b50b05fe0b460d6e17933d3153d8d85071e28c46156dfa635c80fd66e3"
+content-hash = "5138a6b4e811382a53086e5c23bd1a46a88b55d27015e683fc80ad2ce291e306"
