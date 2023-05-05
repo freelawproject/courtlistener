@@ -2969,7 +2969,7 @@ class OASearchTest(IndexedSolrTestCase):
         self.assertIn("SEC", r.content.decode())
         self.assertIn("Jose", r.content.decode())
 
-        # Query by caseName advanced field
+        # Query by two advanced fields, caseName and docketNumber
         r = self.client.get(
             reverse("show_results"),
             {
@@ -2981,6 +2981,19 @@ class OASearchTest(IndexedSolrTestCase):
         expected = 1
         self.assertEqual(actual, expected)
         self.assertIn("Jose", r.content.decode())
+
+        # Query by advanced field and refine by keyword.
+        r = self.client.get(
+            reverse("show_results"),
+            {
+                "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                "q": "docket_id:3 Lorem",
+            },
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("Lorem", r.content.decode())
 
     def test_last_oral_arguments_home_page(self) -> None:
         """Test last oral arguments in home page"""
