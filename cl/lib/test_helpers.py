@@ -7,7 +7,9 @@ from django.test.testcases import SerializeMixin
 from django.test.utils import override_settings
 from lxml import etree
 
+from cl.audio.factories import AudioFactory
 from cl.audio.models import Audio
+from cl.people_db.factories import PersonFactory
 from cl.people_db.models import Person
 from cl.search.models import Court, Opinion
 from cl.search.tasks import add_items_to_solr
@@ -85,8 +87,36 @@ class SolrTestCase(SimpleUserDataMixin, EmptySolrTestCase):
         "test_court.json",
         "judge_judy.json",
         "test_objects_search.json",
-        "test_objects_audio.json",
     ]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.author = PersonFactory.create()
+        cls.audio_1 = AudioFactory.create(
+            case_name="SEC v. Frank J. Custable, Jr.",
+            docket_id=1,
+            duration=420,
+            judges="",
+        )
+        cls.audio_2 = AudioFactory.create(
+            case_name="Jose A. Dominguez v. Loretta E. Lynch",
+            docket_id=2,
+            duration=837,
+            judges="",
+        )
+        cls.audio_3 = AudioFactory.create(
+            case_name="Hong Liu Yang v. Lynch-Loretta E.",
+            docket_id=3,
+            duration=653,
+            judges="",
+        )
+        cls.audio_4 = AudioFactory.create(
+            case_name="Hong Liu Lorem v. Lynch-Loretta E.",
+            docket_id=3,
+            duration=653,
+            judges="John Smith",
+        )
+        cls.audio_4.panel.add(cls.author)
 
     def setUp(self) -> None:
         # Set up some handy variables
