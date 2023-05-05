@@ -2504,7 +2504,7 @@ class HarvardMergerTests(TestCase):
             filepath_json_harvard="/a/file/path.json",
         )
         OpinionClusterFactory(
-            docket=DocketFactory(source=Docket.COLUMBIA_AND_HARVARD),
+            docket=DocketFactory(source=Docket.HARVARD_AND_COLUMBIA),
             id=3,
             filepath_json_harvard="/some/file/path.json",
         )
@@ -2599,7 +2599,7 @@ class HarvardMergerTests(TestCase):
             Opinion.objects.filter(cluster_id=cluster.id)[0].xml_harvard, ""
         )
         # Make sure we updated our source
-        self.assertEqual(cluster.docket.source, Docket.COLUMBIA_AND_HARVARD)
+        self.assertEqual(cluster.docket.source, Docket.HARVARD_AND_COLUMBIA)
         # Check judges were added to our opinions
         self.assertEqual(authors, ["Broyles, C. J.", "Gardner, J.,"])
 
@@ -2651,7 +2651,7 @@ class HarvardMergerTests(TestCase):
             Opinion.objects.filter(cluster_id=cluster.id)[0].xml_harvard, ""
         )
         # Make sure we updated our source
-        self.assertEqual(cluster.docket.source, Docket.COLUMBIA_AND_HARVARD)
+        self.assertEqual(cluster.docket.source, Docket.HARVARD_AND_COLUMBIA)
         # Check judges were added to our opinions
         self.assertEqual(authors, ["Broyles", "Gardner"])
 
