@@ -29,6 +29,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
 
+from cl.audio.factories import AudioFactory
 from cl.lib.elasticsearch_utils import (
     build_daterange_query,
     build_es_filters,
@@ -45,6 +46,7 @@ from cl.lib.test_helpers import (
     IndexedSolrTestCase,
     SolrTestCase,
 )
+from cl.people_db.factories import PersonFactory
 from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.factories import DocketEntriesDataFactory, DocketEntryDataFactory
 from cl.recap.mergers import add_docket_entries
@@ -2524,6 +2526,35 @@ class DocketEntriesTimezone(TestCase):
 
 class OASearchTest(IndexedSolrTestCase):
     """Oral argument search tests"""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.author = PersonFactory.create()
+        cls.audio_1 = AudioFactory.create(
+            case_name="SEC v. Frank J. Custable, Jr.",
+            docket_id=1,
+            duration=420,
+            judges="",
+        )
+        cls.audio_2 = AudioFactory.create(
+            case_name="Jose A. Dominguez v. Loretta E. Lynch",
+            docket_id=2,
+            duration=837,
+            judges="",
+        )
+        cls.audio_3 = AudioFactory.create(
+            case_name="Hong Liu Yang v. Lynch-Loretta E.",
+            docket_id=3,
+            duration=653,
+            judges="",
+        )
+        cls.audio_4 = AudioFactory.create(
+            case_name="Hong Liu Lorem v. Lynch-Loretta E.",
+            docket_id=3,
+            duration=653,
+            judges="John Smith",
+        )
+        cls.audio_4.panel.add(cls.author)
 
     @staticmethod
     def get_article_count(r):

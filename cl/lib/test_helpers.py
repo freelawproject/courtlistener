@@ -89,35 +89,6 @@ class SolrTestCase(SimpleUserDataMixin, EmptySolrTestCase):
         "test_objects_search.json",
     ]
 
-    @classmethod
-    def setUpTestData(cls):
-        cls.author = PersonFactory.create()
-        cls.audio_1 = AudioFactory.create(
-            case_name="SEC v. Frank J. Custable, Jr.",
-            docket_id=1,
-            duration=420,
-            judges="",
-        )
-        cls.audio_2 = AudioFactory.create(
-            case_name="Jose A. Dominguez v. Loretta E. Lynch",
-            docket_id=2,
-            duration=837,
-            judges="",
-        )
-        cls.audio_3 = AudioFactory.create(
-            case_name="Hong Liu Yang v. Lynch-Loretta E.",
-            docket_id=3,
-            duration=653,
-            judges="",
-        )
-        cls.audio_4 = AudioFactory.create(
-            case_name="Hong Liu Lorem v. Lynch-Loretta E.",
-            docket_id=3,
-            duration=653,
-            judges="John Smith",
-        )
-        cls.audio_4.panel.add(cls.author)
-
     def setUp(self) -> None:
         # Set up some handy variables
         super(SolrTestCase, self).setUp()
