@@ -390,6 +390,26 @@ class CitationRedirectorTest(TestCase):
         self.assertEqual(volume_previous, None)
         self.assertEqual(volume_next, None)
 
+    def test_full_citation_redirect(self) -> None:
+        """Do we get redirected to the correct URL when we pass in a full
+        citation?"""
+
+        r = self.client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={
+                    "reporter": "Reference to Lissner v. Saad, 56 F.2d 9 11 (1st Cir. 2015)",
+                },
+            ),
+            follow=True,
+        )
+        self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
+        self.assertEqual(r.status_code, HTTP_200_OK)
+        print(f"{r.redirect_chain}")
+        self.assertEqual(
+            r.redirect_chain[0][0], "/opinion/2/case-name-cluster/"
+        )
+
     def test_avoid_exception_possible_matches_page_with_letter(self) -> None:
         """Can we order the possible matches when page number contains a
         letter without getting a DataError exception?"""
