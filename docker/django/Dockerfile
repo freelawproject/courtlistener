@@ -1,6 +1,6 @@
-ARG BUILD_ENV=prod
-
 FROM python:3.10-slim as build-base
+
+ARG BUILD_ENV=prod
 
 RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
     apt-get install \
@@ -38,11 +38,15 @@ ENV PYTHONUNBUFFERED=1 \
     # this is where our requirements + virtual environment will live
     PYSETUP_PATH="/opt/pysetup"
 
+
 # prepend poetry and venv to path
 ENV PATH="/opt/poetry/bin:$VENV_PATH/bin:$PATH"
 
 
 FROM build-base as build-dev
+
+ARG BUILD_ENV=prod
+ARG POETRY_HOME
 
 WORKDIR $PYSETUP_PATH
 
