@@ -18,7 +18,7 @@ from cl.corpus_importer.utils import match_lists
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_diff import get_cosine_similarity
 from cl.people_db.lookup_utils import extract_judge_last_name
-from cl.search.models import Docket, Opinion, OpinionCluster
+from cl.search.models import SOURCES, Docket, Opinion, OpinionCluster
 
 
 class AuthorException(Exception):
@@ -433,9 +433,11 @@ def update_cluster_source(cluster_id: int) -> None:
     :return: None
     """
     cluster = OpinionCluster.objects.get(id=cluster_id)
-    if cluster.source == "C":
-        # court website source updated to court website merged with Harvard
-        cluster.source = "CU"
+    source = cluster.source
+    if "U" not in source or source != "U":
+        # Cluster source is not harvard or doesn't contain harvard, merge
+        # source with harvard
+        cluster.source = source + SOURCES.HARVARD_CASELAW
         cluster.save()
 
 
