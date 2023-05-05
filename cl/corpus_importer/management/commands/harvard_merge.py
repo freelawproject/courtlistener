@@ -97,10 +97,18 @@ def fetch_non_harvard_data(harvard_data: Dict[str, Any]) -> Dict[str, Any]:
     # Some documents contain images in the HTML
     # Flag them for a later crawl by using the placeholder '[[Image]]'
     judge_list = [
-        extract_judge_last_name(x.text) for x in soup.find_all("judges")
+        extract_judge_last_name(x.text)
+        for x in soup.find_all(
+            lambda tag: (tag.name == "judges" and tag.get("data-type") is None)
+            or tag.get("data-type") == "judges"
+        )
     ]
     author_list = [
-        extract_judge_last_name(x.text) for x in soup.find_all("author")
+        extract_judge_last_name(x.text)
+        for x in soup.find_all(
+            lambda tag: (tag.name == "author" and tag.get("data-type") is None)
+            or tag.get("data-type") == "author"
+        )
     ]
     # Flatten and dedupe list of judges
     judges = ", ".join(
@@ -535,7 +543,10 @@ def map_and_merge_opinions(cluster: int, harvard_data: Dict[str, Any]) -> None:
     sub_opinions = Opinion.objects.filter(cluster__id=cluster)
 
     soup = BeautifulSoup(case_body, "lxml")
-    harvard_html = soup.find_all("opinion")
+    harvard_html = soup.find_all(
+        lambda tag: (tag.name == "opinion" and tag.get("data-type") is None)
+        or tag.get("data-type") == "opinion"
+    )
     harvard_opinions = [op for op in harvard_html]
     cl_opinions = fetch_cl_opinion_content(sub_opinions=sub_opinions)
 
