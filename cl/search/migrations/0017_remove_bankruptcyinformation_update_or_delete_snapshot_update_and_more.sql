@@ -46,19 +46,19 @@ DROP TRIGGER IF EXISTS pgtrigger_update_or_delete_snapshot_update_c9dd9 ON "sear
 --
 -- Rename unnamed index for ('volume', 'reporter') on citation to search_cita_volume_464334_idx
 --
--- (no-op)
+ALTER INDEX "search_citation_volume_251bc1d270a8abee_idx" RENAME TO "search_cita_volume_464334_idx";
 --
 -- Rename unnamed index for ('volume', 'reporter', 'page') on citation to search_cita_volume_92c344_idx
 --
--- (no-op)
+ALTER INDEX "search_citation_volume_ae340b5b02e8912_idx" RENAME TO "search_cita_volume_92c344_idx";
 --
 -- Rename unnamed index for ('recap_sequence_number', 'entry_number') on docketentry to search_dock_recap_s_306ab9_idx
 --
--- (no-op)
+ALTER INDEX "search_docketentry_recap_sequence_number_1c82e51988e2d89f_idx" RENAME TO "search_dock_recap_s_306ab9_idx";
 --
 -- Rename unnamed index for ('document_type', 'document_number', 'attachment_number') on recapdocument to search_reca_documen_cc5acd_idx
 --
--- (no-op)
+ALTER INDEX "search_recapdocument_document_type_303cccac79571217_idx" RENAME TO "recapdocument to search_reca_documen_cc5acd_idx";
 --
 -- Create trigger update_or_delete_snapshot_update on model bankruptcyinformation
 --
