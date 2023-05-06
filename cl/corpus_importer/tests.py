@@ -1214,7 +1214,7 @@ class TrollerBKTests(TestCase):
             court_id=self.court_pamd.pk,
             case_name="Dragon 1 v. State",
             docket_number="3:15-CV-01456",
-            pacer_case_id="5431",
+            pacer_case_id="54312",
             docket_entries=[
                 RssDocketEntryDataFactory(
                     date_filed=make_aware(
@@ -1229,11 +1229,12 @@ class TrollerBKTests(TestCase):
         rds_created, d_created = merge_rss_data(
             [d_rss_data_after_2018], self.court_pamd.pk, build_date
         )
-        dockets = Docket.objects.filter(pacer_case_id="5431")
         self.assertEqual(len(rds_created), 1)
         self.assertEqual(d_created, 1)
-        self.assertEqual(dockets[0].case_name, "Dragon 1 v. State")
-        self.assertEqual(dockets[0].docket_number, "3:15-CV-01456")
+
+        docket = Docket.objects.get(pacer_case_id="54312")
+        self.assertEqual(docket.case_name, "Dragon 1 v. State")
+        self.assertEqual(docket.docket_number, "3:15-CV-01456")
 
     def test_merging_district_docket_with_entries_before_2018(self):
         """3 Test merge district RSS file before 2018-4-20 into a
