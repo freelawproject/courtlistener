@@ -1,3 +1,5 @@
+ARG BUILD_ENV=prod
+
 FROM python:3.10-slim as build-base
 
 ARG BUILD_ENV=prod
