@@ -73,22 +73,23 @@ def build_fulltext_query(
                 )
         if query_type == "query_string":
             return Q("query_string", query=value, fields=fields)
-        elif query_type == "multi_match":
-            # return Q("multi_match", query=value, fields=fields, type="phrase", tie_breaker=0.3)
 
-            return Q(
-                "bool",
-                should=[
-                    Q(
-                        "multi_match",
-                        query=value,
-                        fields=fields,
-                        type="phrase",
-                        tie_breaker=0.3,
-                    ),
-                    Q("query_string", query=value),
-                ],
-            )
+        elif query_type == "multi_match":
+            q_should = [
+                Q(
+                    "multi_match",
+                    query=value,
+                    fields=fields,
+                    type="cross_fields",
+                    operator="AND",
+                    tie_breaker=0.3,
+                ),
+                Q("query_string", query=value, default_operator="AND"),
+            ]
+            for field in fields:
+                q_should.append(Q("match_phrase", **{field: {"query": value}}))
+
+            return Q("bool", should=q_should)
 
     return None
 
@@ -251,7 +252,7 @@ def build_es_main_query(
 
     elif cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
         string_query = build_fulltext_query(
-            ["caseName^5", "docketNumber^2", "text^1"],
+            ["caseName", "docketNumber", "court", "court_id", "judge", "sha1"],
             cd.get("q", ""),
             "multi_match",
         )
@@ -299,13 +300,7 @@ def add_es_highlighting(search_query, cd):
             "docketNumber",
             "text",
         ]
-        # hlfl = SEARCH_ORAL_ARGUMENT_HL_FIELDS
-        hlfl = [
-            "text",
-            "caseName",
-            "judge",
-            "docketNumber",
-        ]
+        hlfl = SEARCH_ORAL_ARGUMENT_HL_FIELDS
         search_query = search_query.source(ffl)
         for field in hlfl:
             search_query = search_query.highlight(

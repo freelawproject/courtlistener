@@ -147,6 +147,7 @@ class AudioDocument(Document):
     panel_ids = fields.ListField(
         fields.IntegerField(),
     )
+    sha1 = fields.KeywordField(attr="sha1")
     source = fields.KeywordField(attr="source")
     text = fields.TextField()
 

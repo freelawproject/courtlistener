@@ -2624,8 +2624,8 @@ class OASearchTest(IndexedElasticTestCase):
         expected = 3
         self.assertEqual(actual, expected)
         self.assertTrue(
-            r.content.decode().index("Hong Liu Yang")
-            < r.content.decode().index("Hong Liu Lorem")
+            r.content.decode().index("Hong Liu Lorem")
+            < r.content.decode().index("Hong Liu Yang")
             < r.content.decode().index("Jose"),
             msg="'Hong Liu Yang' should come BEFORE 'Hong Liu Lorem' and 'Jose' when order_by relevance.",
         )
@@ -2644,8 +2644,8 @@ class OASearchTest(IndexedElasticTestCase):
         self.assertEqual(actual, expected)
         self.assertTrue(
             r.content.decode().index("Jose")
-            < r.content.decode().index("Hong Liu Yang")
-            < r.content.decode().index("Hong Liu Lorem"),
+            < r.content.decode().index("Hong Liu Lorem")
+            < r.content.decode().index("Hong Liu Yang"),
             msg="'Jose' should come BEFORE 'Hong Liu Yang' and 'Hong Liu Lorem' when order_by relevance.",
         )
 
@@ -2662,12 +2662,13 @@ class OASearchTest(IndexedElasticTestCase):
         expected = 3
         self.assertEqual(actual, expected)
         self.assertTrue(
-            r.content.decode().index("Hong Liu Yang")
-            < r.content.decode().index("Hong Liu Lorem")
+            r.content.decode().index("Hong Liu Lorem")
+            < r.content.decode().index("Hong Liu Yang")
             < r.content.decode().index("Jose"),
             msg="'Hong Liu Yang' should come BEFORE 'Hong Liu Lorem' and 'Jose' when order_by relevance.",
         )
 
+    def test_oa_results_search_match_phrase(self) -> None:
         # Search by phrase that only matches one result.
         r = self.client.get(
             reverse("show_results"),
@@ -2695,9 +2696,9 @@ class OASearchTest(IndexedElasticTestCase):
         expected = 2
         self.assertEqual(actual, expected)
         self.assertTrue(
-            r.content.decode().index("Lorem")
-            < r.content.decode().index("Yang"),
-            msg="'Lorem' should come BEFORE 'Yang' when order_by relevance.",
+            r.content.decode().index("Yang")
+            < r.content.decode().index("Lorem"),
+            msg="'Yang' should come BEFORE 'Lorem' when order_by relevance.",
         )
 
         # Text query combine case name and docket name.
@@ -2739,6 +2740,19 @@ class OASearchTest(IndexedElasticTestCase):
         expected = 2
         self.assertEqual(actual, expected)
 
+        # Text query search by sha1 in text.
+        r = self.client.get(
+            reverse("show_results"),
+            {
+                "q": self.audio_1.sha1,
+                "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                "order_by": "score desc",
+            },
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+
     def test_oa_results_highlights(self) -> None:
         # Case name highlights
         r = self.client.get(
@@ -2767,8 +2781,8 @@ class OASearchTest(IndexedElasticTestCase):
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
-        self.assertIn("<mark>docket</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>docket</mark>"), 2)
+        self.assertIn("<mark>docket", r.content.decode())
+        self.assertEqual(r.content.decode().count("<mark>docket"), 2)
 
         # Judge highlights
         r = self.client.get(
@@ -2898,19 +2912,23 @@ class OASearchTest(IndexedElasticTestCase):
             "case name. Expected %s, but got %s." % (expected, actual),
         )
 
-    def test_oa_advanced_search(self) -> None:
+    def test_oa_advanced_search_not_query(self) -> None:
         """Test advanced search queries"""
 
         # NOT query
         r = self.client.get(
             reverse("show_results"),
-            {"type": SEARCH_TYPES.ORAL_ARGUMENT, "q": "Loretta NOT Hong Liu"},
+            {
+                "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                "q": "Loretta NOT (Hong Liu)",
+            },
         )
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
         self.assertIn("Jose A.", r.content.decode())
 
+    def test_oa_advanced_search_and_query(self) -> None:
         # AND query
         r = self.client.get(
             reverse("show_results"),
@@ -2926,6 +2944,7 @@ class OASearchTest(IndexedElasticTestCase):
         self.assertIn("Hong Liu Lorem v. Lynch", r.content.decode())
         self.assertIn("John Smith", r.content.decode())
 
+    def test_oa_advanced_search_or_and_query(self) -> None:
         # Grouped "OR" query and "AND" query
         r = self.client.get(
             reverse("show_results"),
@@ -2940,6 +2959,7 @@ class OASearchTest(IndexedElasticTestCase):
         self.assertEqual(actual, expected)
         self.assertIn("Jose", r.content.decode())
 
+    def test_oa_advanced_search_by_field(self) -> None:
         # Query by docket_id advanced field
         r = self.client.get(
             reverse("show_results"),
@@ -3001,12 +3021,13 @@ class OASearchTest(IndexedElasticTestCase):
         self.assertIn("SEC", r.content.decode())
         self.assertIn("Jose", r.content.decode())
 
+    def test_oa_advanced_search_combine_fields(self) -> None:
         # Query by two advanced fields, caseName and docketNumber
         r = self.client.get(
             reverse("show_results"),
             {
                 "type": SEARCH_TYPES.ORAL_ARGUMENT,
-                "q": "caseName:Loretta AND docketNumber:2",
+                "q": "caseName:Loretta AND docketNumber:(docket number 2)",
             },
         )
         actual = self.get_article_count(r)
@@ -3014,6 +3035,7 @@ class OASearchTest(IndexedElasticTestCase):
         self.assertEqual(actual, expected)
         self.assertIn("Jose", r.content.decode())
 
+    def test_oa_advanced_search_by_field_and_keyword(self) -> None:
         # Query by advanced field and refine by keyword.
         r = self.client.get(
             reverse("show_results"),
