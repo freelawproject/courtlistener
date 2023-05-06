@@ -916,13 +916,13 @@ python-stdnum = ">=1.6"
 
 [[package]]
 name = "django-markdown-deux"
-version = "1.0.5"
+version = "1.0.6"
 description = "a Django app that provides template tags for using Markdown (using the python-markdown2 processor)"
 category = "main"
 optional = false
 python-versions = "*"
 files = [
-    {file = "django-markdown-deux-1.0.5.zip", hash = "sha256:5b4a3cd9454af5b4cec0e19151b41d98d09400ddae0688afb81dbf62a4edafff"},
+    {file = "django-markdown-deux-1.0.6.zip", hash = "sha256:1f7b4da6b4dd1a9a84e3da90887d356f8afdd9a1e7d6468c081b8ac50a7980b1"},
 ]
 
 [package.dependencies]
@@ -4132,4 +4132,4 @@ h11 = ">=0.9.0,<1"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10, <3.11"
-content-hash = "5138a6b4e811382a53086e5c23bd1a46a88b55d27015e683fc80ad2ce291e306"
+content-hash = "d1f0b5bace0c4f611de215f41b4a4ebff781062663cc0579d24b827d95ef42ae"
