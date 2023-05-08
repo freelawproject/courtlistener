@@ -441,7 +441,7 @@ def update_cluster_source(cluster_id: int) -> None:
         cluster.save()
 
 
-def merge_opinion_clusters(cluster_id: int) -> None:
+def merge_opinion_clusters(cluster_id: int, fastcase: bool = False) -> None:
     """Merge opinion cluster, docket and opinion data from Harvard
 
     :param cluster_id: The cluster ID to merger
@@ -449,8 +449,12 @@ def merge_opinion_clusters(cluster_id: int) -> None:
     """
     harvard_data = read_json(cluster_id)
     if harvard_data:
+        source = get_data_source(harvard_data)
         try:
             with transaction.atomic():
+                if source == "Fastcase" or fastcase:
+                    # Do something special for fastcase
+                    pass
                 map_and_merge_opinions(cluster_id, harvard_data)
                 clean_dictionary = combine_non_overlapping_data(
                     cluster_id, harvard_data
@@ -471,7 +475,7 @@ def merge_opinion_clusters(cluster_id: int) -> None:
         logging.warning(msg=f"No Harvard json for cluster: {cluster_id}")
 
 
-def start_merger(cluster_id=None) -> None:
+def start_merger(cluster_id=None, fastcase=False) -> None:
     """Start the merger
 
     Query the database for a list of opinions that have not been merged yet
@@ -492,7 +496,7 @@ def start_merger(cluster_id=None) -> None:
         ).values_list("id", flat=True)
 
     for cluster_id in cluster_ids:
-        merge_opinion_clusters(cluster_id=cluster_id)
+        merge_opinion_clusters(cluster_id=cluster_id, fastcase=False)
 
 
 def fetch_cl_opinion_content(sub_opinions: list[Opinion]) -> list[str]:
@@ -608,8 +612,15 @@ class Command(VerboseCommand):
             action="store_true",
             help="Turn off debug logging",
         )
+        parser.add_argument(
+            "--fastcase",
+            action="store_true",
+            help="Fastcase flag",
+        )
 
     def handle(self, *args, **options) -> None:
         if options["no_debug"]:
             logging.disable(logging.DEBUG)
-        start_merger(cluster_id=options["cluster_id"])
+        start_merger(
+            cluster_id=options["cluster_id"], fastcase=options["fastcase"]
+        )
