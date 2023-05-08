@@ -2255,6 +2255,19 @@ class OpinionCluster(AbstractDateTimeModel):
         help_text="The attorneys that argued the case, as free text",
         blank=True,
     )
+
+    arguments = models.TextField(
+        help_text="The attorney(s) and legal arguments presented as free text. "
+        "This is primarily seen in older opinions and can contain "
+        "case law cited and arguments presented to the judges.",
+        blank=True,
+    )
+    head_matter_footnotes = models.TextField(
+        help_text="Footnotes that appear before an opinion or at the conclusion "
+        "but that are not part of the opinion.",
+        blank=True,
+    )
+
     nature_of_suit = models.TextField(
         help_text=(
             "The nature of the suit. For the moment can be codes or "

@@ -116,6 +116,7 @@ def fetch_non_harvard_data(harvard_data: Dict[str, Any]) -> Dict[str, Any]:
             list(set(itertools.chain.from_iterable(judge_list + author_list)))
         )
     )
+
     judges = titlecase(judges)
     all_data = {"judges": judges}
     short_fields = ["attorneys", "disposition", "otherdate", "seealso"]
@@ -126,6 +127,18 @@ def fetch_non_harvard_data(harvard_data: Dict[str, Any]) -> Dict[str, Any]:
         "headnotes",
         "correction",
     ]
+
+    # Find fist opinion element
+    opinion_at = soup.find("opinion")
+    # Find floating footnotes before opinion
+    floating_footnotes = opinion_at.find_all_previous("footnote")
+    if floating_footnotes:
+        # Combine floating footnotes and add them to the dict
+        combined_floating_footnotes = " ".join(
+            str(fn) for fn in floating_footnotes
+        )
+        all_data["head_matter_footnotes"] = combined_floating_footnotes
+
     short_data = parse_extra_fields(soup, short_fields, False)
     long_data = parse_extra_fields(soup, long_fields, True)
     all_data.update(short_data)
@@ -372,6 +385,7 @@ def merge_overlapping_data(cluster_id: int, clean_dictionary: dict) -> None:
     :param clean_dictionary: the dictionary of data to merge
     :return: None
     """
+
     if clean_dictionary != {}:
         logging.info(f"Merging complete for: {cluster_id}")
         return
@@ -384,6 +398,7 @@ def merge_overlapping_data(cluster_id: int, clean_dictionary: dict) -> None:
         "correction",
         "cross_reference",
         "disposition",
+        "head_matter_footnotes",
     ]
 
     for field_name in clean_dictionary.keys():
