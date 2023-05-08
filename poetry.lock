@@ -1690,13 +1690,13 @@ files = [
 
 [[package]]
 name = "internetarchive"
-version = "3.3.0"
+version = "3.4.0"
 description = "A Python interface to archive.org."
 category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "internetarchive-3.3.0.tar.gz", hash = "sha256:3cb7fe3cc21795aa0bf7be1eedca10090287e9c54160e0cf8640f16b6be14c1d"},
+    {file = "internetarchive-3.4.0.tar.gz", hash = "sha256:bebbe4b40ba28c12a8dc8b0c43352ce44c9fc050851a6bd7678902be56de1961"},
 ]
 
 [package.dependencies]
@@ -4132,4 +4132,4 @@ h11 = ">=0.9.0,<1"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10, <3.11"
-content-hash = "d1f0b5bace0c4f611de215f41b4a4ebff781062663cc0579d24b827d95ef42ae"
+content-hash = "cdb8aea1788ce1390a54c5af51c3785f90e3fd9d4f65a061311b39062c963419"
