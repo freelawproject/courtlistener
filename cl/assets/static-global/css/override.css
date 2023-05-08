@@ -188,7 +188,7 @@ a.button:active {
     margin-bottom: 2em;
   }
 
-  #main-query-box #id_q {
+  #main-query-box #id_q, #main-query-box #id_full_citation {
     width: 250px;
   }
 
@@ -278,7 +278,7 @@ a.button:active {
 }
 
 @media (min-width: 992px) {
-  #main-query-box #id_q {
+  #main-query-box #id_q, #main-query-box #id_full_citation {
     width: 600px;
   }
 
@@ -296,7 +296,7 @@ a.button:active {
 }
 
 @media (min-width: 1200px) {
-  #main-query-box #id_q {
+  #main-query-box #id_q, #main-query-box #id_full_citation {
     width: 800px;
   }
 }
@@ -591,7 +591,7 @@ body {
   border-right: 1px solid #c2c2c2;
 }
 
-#id_q, #de-filter-search{
+#id_q, #de-filter-search, #id_full_citation {
   border-color: #a6a6a6 #a6a6a6 #a6a6a6 #a6a6a6;
   border-style: solid none solid solid;
   border-width: 1px 0px 1px 1px;
