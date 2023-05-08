@@ -161,7 +161,7 @@ def get_first_missing_de_date(d):
     return date(1960, 1, 1)
 
 
-def get_blocked_status(docket, count_override=None):
+def get_blocked_status(docket: Docket, count_override: int | None = None):
     """Set the blocked status for the Docket.
 
     Dockets are public (blocked is False) when:
@@ -191,8 +191,10 @@ def get_blocked_status(docket, count_override=None):
     bankruptcy_privacy_threshold = 500
     if count_override is not None:
         count = count_override
-    else:
+    elif docket.pk:
         count = docket.docket_entries.all().count()
+    else:
+        count = 0
     small_case = count <= bankruptcy_privacy_threshold
     bankruptcy_court = (
         docket.court.jurisdiction in Court.BANKRUPTCY_JURISDICTIONS

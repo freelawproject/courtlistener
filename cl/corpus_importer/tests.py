@@ -1,7 +1,7 @@
 import json
 import os
 import time
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 from queue import Queue
 from random import randint
@@ -11,7 +11,7 @@ import eyecite
 import pytest
 from django.conf import settings
 from django.core.files.base import ContentFile
-from django.utils.timezone import make_aware, utc
+from django.utils.timezone import make_aware
 from factory import RelatedFactory
 from juriscraper.lib.string_utils import harmonize
 
@@ -1082,7 +1082,9 @@ class TrollerBKTests(TestCase):
             docket__source=Docket.HARVARD,
             docket__pacer_case_id="9038",
             entry_number=1,
-            date_filed=make_aware(datetime(year=2018, month=1, day=4), utc),
+            date_filed=make_aware(
+                datetime(year=2018, month=1, day=4), timezone.utc
+            ),
         )
 
         # Appellate factories
@@ -1108,7 +1110,9 @@ class TrollerBKTests(TestCase):
             docket__source=Docket.HARVARD,
             docket__pacer_case_id=None,
             entry_number=1,
-            date_filed=make_aware(datetime(year=2018, month=1, day=4), utc),
+            date_filed=make_aware(
+                datetime(year=2018, month=1, day=4), timezone.utc
+            ),
         )
         cls.docket_a_2018_case_id = DocketFactory(
             case_name="Young v. State",
@@ -1141,7 +1145,7 @@ class TrollerBKTests(TestCase):
             docket_entries=[
                 RssDocketEntryDataFactory(
                     date_filed=make_aware(
-                        datetime(year=2017, month=1, day=4), utc
+                        datetime(year=2017, month=1, day=4), timezone.utc
                     )
                 )
             ],
@@ -1186,7 +1190,7 @@ class TrollerBKTests(TestCase):
             docket_entries=[
                 RssDocketEntryDataFactory(
                     date_filed=make_aware(
-                        datetime(year=2018, month=4, day=21), utc
+                        datetime(year=2018, month=4, day=21), timezone.utc
                     )
                 )
             ],
@@ -1221,11 +1225,11 @@ class TrollerBKTests(TestCase):
             court_id=self.court_pamd.pk,
             case_name="Dragon 1 v. State",
             docket_number="3:15-CV-01456",
-            pacer_case_id="5431",
+            pacer_case_id="54312",
             docket_entries=[
                 RssDocketEntryDataFactory(
                     date_filed=make_aware(
-                        datetime(year=2018, month=4, day=21), utc
+                        datetime(year=2018, month=4, day=21), timezone.utc
                     )
                 )
             ],
@@ -1236,11 +1240,12 @@ class TrollerBKTests(TestCase):
         rds_created, d_created = merge_rss_data(
             [d_rss_data_after_2018], self.court_pamd.pk, build_date
         )
-        dockets = Docket.objects.filter(pacer_case_id="5431")
         self.assertEqual(len(rds_created), 1)
         self.assertEqual(d_created, 1)
-        self.assertEqual(dockets[0].case_name, "Dragon 1 v. State")
-        self.assertEqual(dockets[0].docket_number, "3:15-CV-01456")
+
+        docket = Docket.objects.get(pacer_case_id="54312")
+        self.assertEqual(docket.case_name, "Dragon 1 v. State")
+        self.assertEqual(docket.docket_number, "3:15-CV-01456")
 
     def test_merging_district_docket_with_entries_before_2018(self):
         """3 Test merge district RSS file before 2018-4-20 into a
@@ -1262,7 +1267,7 @@ class TrollerBKTests(TestCase):
                 RssDocketEntryDataFactory(
                     document_number="2",
                     date_filed=make_aware(
-                        datetime(year=2017, month=1, day=4), utc
+                        datetime(year=2017, month=1, day=4), timezone.utc
                     ),
                 )
             ],
@@ -1310,7 +1315,9 @@ class TrollerBKTests(TestCase):
             docket_entries=[],
         )
 
-        build_date = make_aware(datetime(year=2017, month=1, day=4), utc)
+        build_date = make_aware(
+            datetime(year=2017, month=1, day=4), timezone.utc
+        )
         self.assertEqual(
             len(self.de_d_before_2018.docket.docket_entries.all()), 1
         )
@@ -1339,7 +1346,7 @@ class TrollerBKTests(TestCase):
             docket_entries=[
                 RssDocketEntryDataFactory(
                     date_filed=make_aware(
-                        datetime(year=2017, month=1, day=4), utc
+                        datetime(year=2017, month=1, day=4), timezone.utc
                     )
                 )
             ],
@@ -1378,7 +1385,7 @@ class TrollerBKTests(TestCase):
                 RssDocketEntryDataFactory(
                     document_number="2",
                     date_filed=make_aware(
-                        datetime(year=2019, month=1, day=4), utc
+                        datetime(year=2019, month=1, day=4), timezone.utc
                     ),
                 )
             ],
@@ -1423,7 +1430,7 @@ class TrollerBKTests(TestCase):
             docket_entries=[
                 RssDocketEntryDataFactory(
                     date_filed=make_aware(
-                        datetime(year=2019, month=1, day=4), utc
+                        datetime(year=2019, month=1, day=4), timezone.utc
                     )
                 )
             ],
@@ -1455,7 +1462,7 @@ class TrollerBKTests(TestCase):
             docket_entries=[
                 RssDocketEntryDataFactory(
                     date_filed=make_aware(
-                        datetime(year=2017, month=1, day=4), utc
+                        datetime(year=2017, month=1, day=4), timezone.utc
                     )
                 )
             ],
@@ -1498,7 +1505,7 @@ class TrollerBKTests(TestCase):
             docket_entries=[
                 RssDocketEntryDataFactory(
                     date_filed=make_aware(
-                        datetime(year=2018, month=4, day=21), utc
+                        datetime(year=2018, month=4, day=21), timezone.utc
                     )
                 )
             ],
@@ -1539,7 +1546,7 @@ class TrollerBKTests(TestCase):
                 RssDocketEntryDataFactory(
                     document_number="2",
                     date_filed=make_aware(
-                        datetime(year=2017, month=1, day=4), utc
+                        datetime(year=2017, month=1, day=4), timezone.utc
                     ),
                 )
             ],
@@ -1584,7 +1591,7 @@ class TrollerBKTests(TestCase):
             docket_entries=[
                 RssDocketEntryDataFactory(
                     date_filed=make_aware(
-                        datetime(year=2017, month=1, day=4), utc
+                        datetime(year=2017, month=1, day=4), timezone.utc
                     )
                 )
             ],
@@ -1623,7 +1630,7 @@ class TrollerBKTests(TestCase):
                 RssDocketEntryDataFactory(
                     document_number="1",
                     date_filed=make_aware(
-                        datetime(year=2019, month=1, day=4), utc
+                        datetime(year=2019, month=1, day=4), timezone.utc
                     ),
                 )
             ],
@@ -1659,7 +1666,7 @@ class TrollerBKTests(TestCase):
                 RssDocketEntryDataFactory(
                     document_number="2",
                     date_filed=make_aware(
-                        datetime(year=2019, month=1, day=4), utc
+                        datetime(year=2019, month=1, day=4), timezone.utc
                     ),
                 )
             ],
@@ -1705,7 +1712,7 @@ class TrollerBKTests(TestCase):
             docket_entries=[
                 RssDocketEntryDataFactory(
                     date_filed=make_aware(
-                        datetime(year=2019, month=1, day=4), utc
+                        datetime(year=2019, month=1, day=4), timezone.utc
                     )
                 )
             ],
@@ -1739,7 +1746,7 @@ class TrollerBKTests(TestCase):
                 RssDocketEntryDataFactory(
                     document_number="2",
                     date_filed=make_aware(
-                        datetime(year=2019, month=1, day=4), utc
+                        datetime(year=2019, month=1, day=4), timezone.utc
                     ),
                 )
             ],
@@ -1800,7 +1807,7 @@ class TrollerBKTests(TestCase):
             docket_entries=[
                 RssDocketEntryDataFactory(
                     date_filed=make_aware(
-                        datetime(year=2017, month=1, day=4), utc
+                        datetime(year=2017, month=1, day=4), timezone.utc
                     )
                 )
             ],
@@ -1841,7 +1848,7 @@ class TrollerBKTests(TestCase):
             docket_entries=[
                 RssDocketEntryDataFactory(
                     date_filed=make_aware(
-                        datetime(year=2019, month=1, day=4), utc
+                        datetime(year=2019, month=1, day=4), timezone.utc
                     )
                 )
             ],
@@ -1873,7 +1880,9 @@ class TrollerBKTests(TestCase):
             docket__pacer_case_id=None,
             entry_number=None,
             description="Original docket entry description",
-            date_filed=make_aware(datetime(year=2018, month=1, day=5), utc),
+            date_filed=make_aware(
+                datetime(year=2018, month=1, day=5), timezone.utc
+            ),
         )
         RECAPDocumentFactory(
             docket_entry=de_a_unnumbered, description="Opinion Issued"
@@ -1890,7 +1899,7 @@ class TrollerBKTests(TestCase):
                     description="New docket entry description",
                     short_description="Opinion Issued",
                     date_filed=make_aware(
-                        datetime(year=2018, month=1, day=5), utc
+                        datetime(year=2018, month=1, day=5), timezone.utc
                     ),
                 )
             ],
@@ -1929,7 +1938,7 @@ class TrollerBKTests(TestCase):
                 RssDocketEntryDataFactory(
                     document_number=1,
                     date_filed=make_aware(
-                        datetime(year=2018, month=1, day=5), utc
+                        datetime(year=2018, month=1, day=5), timezone.utc
                     ),
                 ),
             ],
@@ -1943,7 +1952,7 @@ class TrollerBKTests(TestCase):
                 RssDocketEntryDataFactory(
                     document_number=1,
                     date_filed=make_aware(
-                        datetime(year=2018, month=1, day=5), utc
+                        datetime(year=2018, month=1, day=5), timezone.utc
                     ),
                 )
             ],
@@ -1956,7 +1965,7 @@ class TrollerBKTests(TestCase):
                 RssDocketEntryDataFactory(
                     document_number=1,
                     date_filed=make_aware(
-                        datetime(year=2018, month=1, day=5), utc
+                        datetime(year=2018, month=1, day=5), timezone.utc
                     ),
                 )
             ],
@@ -2072,7 +2081,7 @@ class TrollerBKTests(TestCase):
                 RssDocketEntryDataFactory(
                     document_number=1,
                     date_filed=make_aware(
-                        datetime(year=2018, month=1, day=5), utc
+                        datetime(year=2018, month=1, day=5), timezone.utc
                     ),
                 ),
             ],
@@ -2086,7 +2095,7 @@ class TrollerBKTests(TestCase):
                 RssDocketEntryDataFactory(
                     document_number=1,
                     date_filed=make_aware(
-                        datetime(year=2018, month=1, day=5), utc
+                        datetime(year=2018, month=1, day=5), timezone.utc
                     ),
                 )
             ],
@@ -2099,7 +2108,7 @@ class TrollerBKTests(TestCase):
                 RssDocketEntryDataFactory(
                     document_number=2,
                     date_filed=make_aware(
-                        datetime(year=2018, month=1, day=5), utc
+                        datetime(year=2018, month=1, day=5), timezone.utc
                     ),
                 )
             ],
@@ -2113,7 +2122,7 @@ class TrollerBKTests(TestCase):
                 RssDocketEntryDataFactory(
                     document_number=5,
                     date_filed=make_aware(
-                        datetime(year=2018, month=1, day=5), utc
+                        datetime(year=2018, month=1, day=5), timezone.utc
                     ),
                 )
             ],
@@ -2209,7 +2218,7 @@ class TrollerBKTests(TestCase):
                 RssDocketEntryDataFactory(
                     document_number=1,
                     date_filed=make_aware(
-                        datetime(year=2018, month=1, day=5), utc
+                        datetime(year=2018, month=1, day=5), timezone.utc
                     ),
                 ),
             ],
@@ -2223,7 +2232,7 @@ class TrollerBKTests(TestCase):
                 RssDocketEntryDataFactory(
                     document_number=1,
                     date_filed=make_aware(
-                        datetime(year=2018, month=1, day=5), utc
+                        datetime(year=2018, month=1, day=5), timezone.utc
                     ),
                 )
             ],
@@ -2275,7 +2284,9 @@ class TrollerBKTests(TestCase):
             docket__source=Docket.HARVARD,
             docket__pacer_case_id="90385",
             entry_number=None,
-            date_filed=make_aware(datetime(year=2018, month=1, day=5), utc),
+            date_filed=make_aware(
+                datetime(year=2018, month=1, day=5), timezone.utc
+            ),
         )
         RECAPDocumentFactory(docket_entry=de, description="Opinion Issued")
         a_rss_data_0 = RssDocketDataFactory(
@@ -2287,7 +2298,7 @@ class TrollerBKTests(TestCase):
                     document_number=None,
                     short_description="Opinion Issued",
                     date_filed=make_aware(
-                        datetime(year=2018, month=1, day=5), utc
+                        datetime(year=2018, month=1, day=5), timezone.utc
                     ),
                 ),
             ],

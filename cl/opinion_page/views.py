@@ -4,6 +4,7 @@ from itertools import groupby
 from typing import Dict, Tuple, Union
 from urllib.parse import urlencode
 
+import eyecite
 import natsort
 from django.contrib import messages
 from django.contrib.auth.models import AnonymousUser, User
@@ -1046,12 +1047,35 @@ def citation_redirector(
     This uses the same infrastructure as the thing that identifies citations in
     the text of opinions.
     """
+    # "reporter" can be a reporter or a full citation.  If it is a full
+    # citation then we will get the reporter, volume, and page from
+    # eyecite.
+    #
+    # By adding this extra test we can keep the rest of the logic untouched
+    #
+    if not volume and not page:
+        citations = eyecite.get_citations(reporter)
+        if citations:
+            c = citations[0]
+            # We slugify reporter so that the test further down will
+            # pass.
+            reporter = slugify(c.groups["reporter"])
+            volume = c.groups["volume"]
+            page = c.groups["page"]
+
     reporter_slug = slugify(reporter)
 
     if reporter != reporter_slug:
         # Reporter provided in non-slugified form. Redirect to slugified
         # version.
-
+        r = reverse(
+            "citation_redirector",
+            kwargs=make_citation_url_dict(
+                reporter_slug,
+                volume,
+                page,
+            ),
+        )
         return HttpResponseRedirect(
             reverse(
                 "citation_redirector",
@@ -1087,8 +1111,13 @@ def citation_homepage(request: HttpRequest) -> HttpResponse:
         if form.is_valid():
             # Redirect to the page as a GET instead of a POST
             cd = form.cleaned_data
+            kwargs = {"reporter": cd["reporter"]}
+            if cd["volume"]:
+                kwargs["volume"] = cd["volume"]
+            if cd["page"]:
+                kwargs["page"] = cd["page"]
             return HttpResponseRedirect(
-                reverse("citation_redirector", kwargs=cd)
+                reverse("citation_redirector", kwargs=kwargs)
             )
         else:
             # Error in form, somehow.
