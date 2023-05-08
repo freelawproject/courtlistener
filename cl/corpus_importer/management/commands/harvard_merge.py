@@ -452,9 +452,13 @@ def merge_opinion_clusters(cluster_id: int, fastcase: bool = False) -> None:
         source = get_data_source(harvard_data)
         try:
             with transaction.atomic():
-                if source == "Fastcase" or fastcase:
-                    # Do something special for fastcase
-                    pass
+                if not fastcase and "data-type" in str(harvard_data):
+                    # All fastcase fixes includes a data-type attribute
+                    logger.info(
+                        f"Are you trying to merge fastcase data? "
+                        f"fastcase flag required."
+                    )
+                    return
                 map_and_merge_opinions(cluster_id, harvard_data)
                 clean_dictionary = combine_non_overlapping_data(
                     cluster_id, harvard_data
@@ -496,7 +500,7 @@ def start_merger(cluster_id=None, fastcase=False) -> None:
         ).values_list("id", flat=True)
 
     for cluster_id in cluster_ids:
-        merge_opinion_clusters(cluster_id=cluster_id, fastcase=False)
+        merge_opinion_clusters(cluster_id=cluster_id, fastcase=fastcase)
 
 
 def fetch_cl_opinion_content(sub_opinions: list[Opinion]) -> list[str]:
