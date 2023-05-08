@@ -41,7 +41,7 @@ class CitationRedirectorForm(forms.Form):
         widget=forms.TextInput(
             attrs={
                 "class": "form-control input-lg",
-                "placeholder": "Full Citation",
+                "placeholder": "Paste any text containing a citation",
             }
         ),
         required=True,
