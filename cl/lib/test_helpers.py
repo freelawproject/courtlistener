@@ -188,3 +188,8 @@ class AudioTestCase(SimpleTestCase):
             sha1="f540838e606f15585e713812c67537affc0df944",
             source="CR",
         )
+
+    @classmethod
+    def tearDownClass(cls):
+        Audio.objects.all().delete()
+        super().tearDownClass()
