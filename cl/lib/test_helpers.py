@@ -10,11 +10,10 @@ from lxml import etree
 
 from cl.audio.factories import AudioFactory
 from cl.audio.models import Audio
-from cl.people_db.factories import PersonFactory
 from cl.people_db.models import Person
 from cl.search.models import Court, Opinion
 from cl.search.tasks import add_items_to_solr
-from cl.tests.cases import TestCase
+from cl.tests.cases import SimpleTestCase, TestCase
 from cl.users.factories import UserProfileWithParentsFactory
 
 
@@ -233,3 +232,46 @@ class SitemapTest(TestCase):
             f"\tCounted:\t{node_count}\n"
             f"\tExpected:\t{self.expected_item_count}",
         )
+
+
+class AudioTestCase(SimpleTestCase):
+    """Audio test case factories"""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.audio_1 = AudioFactory.create(
+            case_name="SEC v. Frank J. Custable, Jr.",
+            docket_id=1,
+            duration=420,
+            judges="",
+            local_path_original_file="test/audio/ander_v._leo.mp3",
+            local_path_mp3="test/audio/2.mp3",
+            sha1="de8cff186eb263dc06bdc5340860eb6809f898d3",
+            source="C",
+            blocked=False,
+        )
+        cls.audio_2 = AudioFactory.create(
+            case_name="Jose A. Dominguez v. Loretta E. Lynch",
+            docket_id=2,
+            duration=837,
+            judges="",
+            local_path_original_file="mp3/2014/06/09/ander_v._leo.mp3",
+            local_path_mp3="test/audio/2.mp3",
+            sha1="daadaf6cc018114259f7eba27c4c2e6bba9bd0d7",
+            source="C",
+        )
+        cls.audio_3 = AudioFactory.create(
+            case_name="Hong Liu Yang v. Lynch-Loretta E.",
+            docket_id=3,
+            duration=653,
+            judges="",
+            local_path_original_file="mp3/2015/07/08/hong_liu_yang_v._loretta_e._lynch.mp3",
+            local_path_mp3="test/audio/2.mp3",
+            sha1="f540838e606f15585e713812c67537affc0df944",
+            source="CR",
+        )
+
+    @classmethod
+    def tearDownClass(cls):
+        Audio.objects.all().delete()
+        super().tearDownClass()
