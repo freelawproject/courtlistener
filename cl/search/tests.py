@@ -2990,11 +2990,11 @@ class OASearchTestSolr(IndexedSolrTestCase, OASearchBase):
             reverse("show_results"),
             {
                 "type": SEARCH_TYPES.ORAL_ARGUMENT,
-                "q": "caseName:Loretta AND docketNumber:(docket number 2)",
+                "q": "caseName:Loretta AND docketNumber:docket number 2",
             },
         )
         actual = self.get_article_count(r)
-        expected = 3
+        expected = 1
         self.assertEqual(actual, expected)
         self.assertIn("Jose", r.content.decode())
 
