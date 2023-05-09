@@ -22,6 +22,7 @@ from cl.api.pagination import ShallowOnlyPageNumberPagination
 from cl.api.views import coverage_data
 from cl.api.webhooks import send_webhook_event
 from cl.audio.api_views import AudioViewSet
+from cl.audio.factories import AudioFactory
 from cl.lib.redis_utils import make_redis_interface
 from cl.lib.test_helpers import (
     AudioTestCase,
@@ -141,7 +142,7 @@ class CoverageTests(IndexedSolrTestCase):
         self.assertIn("total", j)
 
 
-class ApiQueryCountTests(TestCase, AudioTestCase):
+class ApiQueryCountTests(TransactionTestCase):
     """Check that the number of queries for an API doesn't explode
 
     I expect these tests to regularly need updating as new features are added
@@ -170,6 +171,7 @@ class ApiQueryCountTests(TestCase, AudioTestCase):
         )
 
         ProcessingQueueFactory.create(court_id="scotus", uploader=up.user)
+        AudioFactory.create(docket_id=1)
 
     def tearDown(self) -> None:
         UserProfile.objects.all().delete()
