@@ -133,9 +133,10 @@ def fetch_non_harvard_data(harvard_data: Dict[str, Any]) -> Dict[str, Any]:
     # Find floating footnotes before opinion
     floating_footnotes = opinion_at.find_all_previous("footnote")
     if floating_footnotes:
-        # Combine floating footnotes and add them to the dict
+        # Combine floating footnotes and add them to the dict, using
+        # find_all_previous requires to reverse the list
         combined_floating_footnotes = " ".join(
-            str(fn) for fn in floating_footnotes
+            str(fn) for fn in reversed(floating_footnotes)
         )
         all_data["head_matter_footnotes"] = combined_floating_footnotes
 
