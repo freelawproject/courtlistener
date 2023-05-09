@@ -133,11 +133,17 @@ def fetch_non_harvard_data(harvard_data: Dict[str, Any]) -> Dict[str, Any]:
     # Find floating footnotes before opinion
     head_matter_footnotes = opinion_at.find_all_previous("footnote")
     if head_matter_footnotes:
-        # Combine floating footnotes and add them to the dict
+        # Combine floating footnotes and add them to the dict,
+        # find_all_previous returns elements in reverse order
         combined_floating_footnotes = " ".join(
             str(fn) for fn in reversed(head_matter_footnotes)
         )
         all_data["head_matter_footnotes"] = combined_floating_footnotes
+
+    # Find images from books
+    book_images = soup.find_all(lambda tag: tag.get("data-type") == "picture")
+    if book_images:
+        all_data["book_images"] = " ".join(str(img) for img in book_images)
 
     # Combine attorneys and law
     find_fields = soup.find_all(
