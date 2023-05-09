@@ -7,7 +7,6 @@
 
 {% block navbar-o %}active{% endblock %}
 
-
 {% block title %}
     {% if show_homepage %}
         Citation Lookup Tool – CourtListener.com
@@ -44,40 +43,46 @@
   Use our citation look up tool to find opinions by citation or to browse reporters. Our unique database of reporters and our extensive collection of citations makes for a powerful combination.
 {% endblock %}
 
-
 {% block content %}
     {% if show_homepage %}
-        <div class="hidden-sm hidden-xs col-md-1 col-lg-2"></div>
-        <div class="col-xs-12 col-md-10 col-lg-8">
-            <h1>Citation Lookup Tool</h1>
+      <div class="col-xs-12">
+        <div id="above-main-query" >
+          <h1 class="text-center">Citation Lookup Tool</h1>
 
-            <p>If you have a citation you want to look up, put it in here, and
-                we'll look it up.</p>
-
-            {% if form.errors %}
-                <div class="alert alert-danger">
-                    <p class="bottom">Error: All fields are required.</p>
-                </div>
-            {% endif %}
-
-            <form action="" method="post">{% csrf_token %}
-                <div class="form-inline">
-                    <div class="form-group">
-                        <label class="sr-only" for="id_volume">Volume</label>
-                        {{ form.volume }}
-                    </div>
-                    <div class="form-group">
-                        <label class="sr-only" for="id_reporter">Reporter</label>
-                        {{ form.reporter }}
-                    </div>
-                    <div class="form-group">
-                        <label class="sr-only" for="id_page">Page</label>
-                        {{ form.page }}
-                    </div>
-                    <button type="submit" class="btn btn-lg btn-primary">Look It Up</button>
-                </div>
-            </form>
-
+          <p class="text-center">If you have a citation you want to look up,
+            put it in here, and we'll look it up.</p>
+          {% if form.errors %}
+            <div class="alert alert-danger">
+              <p class="text-center bottom">Error: Citation field is required.</p>
+            </div>
+          {% endif %}
+        </div>
+        <div id="main-query-box" class="row" >
+          <form action="" method="post" class="form-inline" role="form">
+            {% csrf_token %}
+            <div id="search-container" class="text-center" >
+              <label class="sr-only"  for="id_full_citation" >Look Up</label>
+              <div class="input-group" >
+                <input id="id_full_citation"
+                       class="form-control input-lg"
+                       value=""
+                       name="reporter"
+                       autocomplete="off"
+                       placeholder="{{ form.reporter.field.widget.attrs.placeholder }}"
+                       type="text" >
+                <span class="input-group-btn" >
+                  <button type="submit"
+                          class="btn btn-lg btn-primary btn-lg"
+                          name="search"
+                          id="search-button"><i class="fa fa-search"></i>&nbsp;
+                    Look It Up
+                  </button>
+                </span>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="col-xs-12" >
             <h2 class="v-offset-above-4">About this Tool</h2>
             <p>This tool generates URLs so that you can easily look up a citation that you know. If you're a person that prefers to just hack URLs, you can do that too, using a URL like <code>{% url "citation_redirector" volume="410" reporter="U.S." page="113" %}</code>, which will take you straight to <em>Roe v. Wade</em>. Or you can always just come here and type in a citation that you know.
             </p>
@@ -85,6 +90,7 @@
             </p>
             <p>You can <a href="https://free.law/2015/11/30/our-new-citation-finder/" target="_blank">read more about this tool</a> on our blog.</p>
         </div>
+
         <div class="hidden-sm hidden-xs col-md-1 col-lg-2"></div>
 
         <div class="col-xs-12">
@@ -93,7 +99,7 @@
             <div class="col-xs-12 col-md-10 col-lg-8">
               <h2>Browse Citations</h2>
               <div class="row">
-              {% cache 86400 reporters_list %}
+                {% cache 86400 reporters_list %}
                 {% for row in reporter_dict.items|rows_distributed:3 %}
                   <div class="col-xs-4">
                     {% for name, abbrevs in row %}
@@ -117,6 +123,7 @@
             <div class="hidden-sm hidden-xs col-md-1 col-lg-2"></div>
           </div>
         </div>
+      </div>
     {% else %}
         <div class="col-md-3"></div>
         <div class="col-md-6" id="citation-redirect">

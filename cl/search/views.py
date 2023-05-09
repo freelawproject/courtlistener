@@ -1,6 +1,6 @@
 import logging
 import traceback
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from urllib.parse import quote
 
 from cache_memoize import cache_memoize
@@ -15,7 +15,7 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import HttpResponseRedirect, get_object_or_404
 from django.template.response import TemplateResponse
 from django.urls import reverse
-from django.utils.timezone import make_aware, utc
+from django.utils.timezone import make_aware
 from django.views.decorators.cache import never_cache
 from requests import RequestException, Session
 from scorched.exc import SolrError
@@ -238,7 +238,9 @@ def get_homepage_stats():
     dict
     """
     r = make_redis_interface("STATS")
-    ten_days_ago = make_aware(datetime.today() - timedelta(days=10), utc)
+    ten_days_ago = make_aware(
+        datetime.today() - timedelta(days=10), timezone.utc
+    )
     last_ten_days = [
         f"api:v3.d:{(date.today() - timedelta(days=x)).isoformat()}.count"
         for x in range(0, 10)
