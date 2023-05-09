@@ -131,12 +131,11 @@ def fetch_non_harvard_data(harvard_data: Dict[str, Any]) -> Dict[str, Any]:
     # Find fist opinion element
     opinion_at = soup.find("opinion")
     # Find floating footnotes before opinion
-    floating_footnotes = opinion_at.find_all_previous("footnote")
-    if floating_footnotes:
-        # Combine floating footnotes and add them to the dict, using
-        # find_all_previous requires to reverse the list
+    head_matter_footnotes = opinion_at.find_all_previous("footnote")
+    if head_matter_footnotes:
+        # Combine floating footnotes and add them to the dict
         combined_floating_footnotes = " ".join(
-            str(fn) for fn in reversed(floating_footnotes)
+            str(fn) for fn in reversed(head_matter_footnotes)
         )
         all_data["head_matter_footnotes"] = combined_floating_footnotes
 
@@ -155,6 +154,15 @@ def fetch_non_harvard_data(harvard_data: Dict[str, Any]) -> Dict[str, Any]:
         all_data["arguments"] = arguments
 
     short_data = parse_extra_fields(soup, short_fields, False)
+
+    if "otherdate" in short_data:
+        # Rename to correct field name
+        short_data["other_dates"] = short_data.pop("otherdate")
+
+    if "seealso" in short_data:
+        # Rename to correct field name
+        short_data["cross_reference"] = short_data.pop("seealso")
+
     long_data = parse_extra_fields(soup, long_fields, True)
     all_data.update(short_data)
     all_data.update(long_data)
@@ -181,11 +189,6 @@ def combine_non_overlapping_data(
         else:
             if value != cl_value:
                 clean_dictionary[key] = (value, cl_value)
-
-    if "otherdate" in clean_dictionary.keys():
-        clean_dictionary["other_dates"] = clean_dictionary.pop("otherdate")
-    if "seealso" in clean_dictionary.keys():
-        clean_dictionary["cross_reference"] = clean_dictionary.pop("seealso")
 
     return clean_dictionary
 
