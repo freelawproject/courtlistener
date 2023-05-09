@@ -42,6 +42,7 @@ from cl.lib.elasticsearch_utils import (
 from cl.lib.search_utils import cleanup_main_query
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
+    AudioTestCase,
     EmptySolrTestCase,
     IndexedSolrTestCase,
     SolrTestCase,
@@ -1203,7 +1204,7 @@ class PagerankTest(TestCase):
             )
 
 
-class OpinionSearchFunctionalTest(BaseSeleniumTest):
+class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
     """
     Test some of the primary search functionality of CL: searching opinions.
     These tests should exercise all aspects of using the search box and SERP.
@@ -1214,7 +1215,6 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         "judge_judy.json",
         "test_objects_search.json",
         "functest_opinions.json",
-        "test_objects_audio.json",
     ]
 
     def setUp(self) -> None:
@@ -2524,30 +2524,13 @@ class DocketEntriesTimezone(TestCase):
         self.assertEqual(de_nyed_utc.datetime_filed, target_date_aware)
 
 
-class OASearchTest(IndexedSolrTestCase):
+class OASearchTest(IndexedSolrTestCase, AudioTestCase):
     """Oral argument search tests"""
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         cls.author = PersonFactory.create()
-        cls.audio_1 = AudioFactory.create(
-            case_name="SEC v. Frank J. Custable, Jr.",
-            docket_id=1,
-            duration=420,
-            judges="",
-        )
-        cls.audio_2 = AudioFactory.create(
-            case_name="Jose A. Dominguez v. Loretta E. Lynch",
-            docket_id=2,
-            duration=837,
-            judges="",
-        )
-        cls.audio_3 = AudioFactory.create(
-            case_name="Hong Liu Yang v. Lynch-Loretta E.",
-            docket_id=3,
-            duration=653,
-            judges="",
-        )
         cls.audio_4 = AudioFactory.create(
             case_name="Hong Liu Lorem v. Lynch-Loretta E.",
             docket_id=3,
@@ -3400,6 +3383,32 @@ class OASearchTest(IndexedSolrTestCase):
         expected = 1
         self.assertEqual(actual, expected)
         self.assertIn("Lorem", r.content.decode())
+
+    def test_oa_random_ordering(self) -> None:
+        """Can the Oral Arguments results be ordered randomly?
+
+        This test is difficult since we can't check that things actually get
+        ordered randomly, but we can at least make sure the query succeeds.
+        """
+
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": "*",
+            "order_by": "random_123 desc",
+        }
+        # Frontend
+        r = self.client.get(reverse("show_results"), search_params)
+        actual = self.get_article_count(r)
+        expected = 4
+        self.assertEqual(actual, expected)
+        self.assertNotIn("an error", r.content.decode())
+        # API
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v3"}), search_params
+        )
+        actual = self.get_results_count(r)
+        self.assertEqual(actual, expected)
+        self.assertNotIn("an error", r.content.decode())
 
     def test_last_oral_arguments_home_page(self) -> None:
         """Test last oral arguments in home page"""
