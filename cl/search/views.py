@@ -3,6 +3,7 @@ import traceback
 from datetime import date, datetime, timedelta
 from urllib.parse import quote
 
+import waffle
 from cache_memoize import cache_memoize
 from django.conf import settings
 from django.contrib import messages
@@ -398,20 +399,37 @@ def show_results(request: HttpRequest) -> HttpResponse:
                 )
             )
             # Get the results from the oral arguments as well
-            render_dict.update(
-                {
-                    "results_oa": do_es_search(
-                        mutable_GET,
-                        rows=5,
-                        override_params={
-                            "order_by": "dateArgued desc",
-                            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-                        },
-                        facet=False,
-                        cache_key="homepage-data-oa",
-                    )["results"]
-                }
-            )
+            # Check if waffle flag is active.
+            if waffle.flag_is_active(request, "oral-arguments-es"):
+                render_dict.update(
+                    {
+                        "results_oa": do_es_search(
+                            mutable_GET,
+                            rows=5,
+                            override_params={
+                                "order_by": "dateArgued desc",
+                                "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                            },
+                            facet=False,
+                            cache_key="homepage-data-oa",
+                        )["results"]
+                    }
+                )
+            else:
+                render_dict.update(
+                    {
+                        "results_oa": do_search(
+                            mutable_GET,
+                            rows=5,
+                            override_params={
+                                "order_by": "dateArgued desc",
+                                "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                            },
+                            facet=False,
+                            cache_key="homepage-data-oa",
+                        )["results"]
+                    }
+                )
 
             # But give it a fresh form for the advanced search section
             render_dict.update({"search_form": SearchForm(request.GET)})
@@ -461,7 +479,11 @@ def show_results(request: HttpRequest) -> HttpResponse:
                     search_results = do_es_search(request.GET.copy())
                     render_dict.update(search_results)
                 elif request.GET.get("type") == SEARCH_TYPES.ORAL_ARGUMENT:
-                    search_results = do_es_search(request.GET.copy())
+                    # Check if waffle flag is active.
+                    if waffle.flag_is_active(request, "oral-arguments-es"):
+                        search_results = do_es_search(request.GET.copy())
+                    else:
+                        search_results = do_search(request.GET.copy())
                     render_dict.update(search_results)
                     # Set the value to the query as a convenience
                     alert_form.fields["name"].widget.attrs[

@@ -5,7 +5,7 @@ import os
 from datetime import date
 from functools import reduce
 from pathlib import Path
-from unittest import mock, skipUnless
+from unittest import mock
 
 import pytz
 from dateutil.tz import tzoffset, tzutc
@@ -28,8 +28,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
+from waffle.testutils import override_flag
 
-from cl.audio.factories import AudioFactory
 from cl.lib.elasticsearch_utils import (
     build_daterange_query,
     build_es_filters,
@@ -1691,7 +1691,6 @@ def is_es_online(connection_alias="default"):
         return es.ping()
 
 
-@skipUnless(is_es_online(), "Elasticsearch is offline")
 class ElasticSearchTest(TestCase):
     fixtures = ["test_court.json"]
 
@@ -1956,7 +1955,7 @@ class ElasticSearchTest(TestCase):
     def test_build_fulltext_query(self) -> None:
         """Test build es fulltext query"""
 
-        q1 = build_fulltext_query("representative_text", "responsibility")
+        q1 = build_fulltext_query(["representative_text"], "responsibility")
         s = ParentheticalGroupDocument.search().filter(q1)
         self.assertEqual(s.count(), 1)
 
@@ -1990,7 +1989,12 @@ class ElasticSearchTest(TestCase):
 
     def test_cd_query_2(self) -> None:
         """Test build es query with cleaned data"""
-        cd = {"filed_after": "", "filed_before": "", "q": ""}
+        cd = {
+            "filed_after": "",
+            "filed_before": "",
+            "q": "",
+            "type": SEARCH_TYPES.PARENTHETICAL,
+        }
 
         filters = build_es_filters(cd)
 
@@ -2012,7 +2016,7 @@ class ElasticSearchTest(TestCase):
 
     def test_build_sort(self) -> None:
         """Test we can build sort dict and sort ES query"""
-        cd = {"order_by": "dateFiled desc"}
+        cd = {"order_by": "dateFiled desc", "type": SEARCH_TYPES.PARENTHETICAL}
         ordering = build_sort_results(cd)
         s = (
             ParentheticalGroupDocument.search()
@@ -2025,7 +2029,7 @@ class ElasticSearchTest(TestCase):
             datetime.datetime(1981, 7, 11, 0, 0),
         )
 
-        cd = {"order_by": "dateFiled asc"}
+        cd = {"order_by": "dateFiled asc", "type": SEARCH_TYPES.PARENTHETICAL}
         ordering = build_sort_results(cd)
         s = (
             ParentheticalGroupDocument.search()
@@ -2037,7 +2041,7 @@ class ElasticSearchTest(TestCase):
             datetime.datetime(1976, 8, 30, 0, 0),
         )
 
-        cd = {"order_by": "score desc"}
+        cd = {"order_by": "score desc", "type": SEARCH_TYPES.PARENTHETICAL}
         ordering = build_sort_results(cd)
         s = (
             ParentheticalGroupDocument.search()
@@ -2052,8 +2056,8 @@ class ElasticSearchTest(TestCase):
     def test_group_results(self) -> None:
         """Test retrieve results grouped by group_id"""
 
-        cd = {"type": "pa", "q": ""}
-        q1 = build_fulltext_query("representative_text", "Necessary")
+        cd = {"type": SEARCH_TYPES.PARENTHETICAL, "q": ""}
+        q1 = build_fulltext_query(["representative_text"], "Necessary")
         s = ParentheticalGroupDocument.search().query(q1)
         # Group results.
         group_search_results(s, cd, {"score": {"order": "desc"}})
@@ -2525,37 +2529,8 @@ class DocketEntriesTimezone(TestCase):
         self.assertEqual(de_nyed_utc.datetime_filed, target_date_aware)
 
 
-class OASearchTest(IndexedElasticTestCase):
+class OASearchBase:
     """Oral argument search tests"""
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.author = PersonFactory.create()
-        cls.audio_1 = AudioFactory.create(
-            case_name="SEC v. Frank J. Custable, Jr.",
-            docket_id=1,
-            duration=420,
-            judges="",
-        )
-        cls.audio_2 = AudioFactory.create(
-            case_name="Jose A. Dominguez v. Loretta E. Lynch",
-            docket_id=2,
-            duration=837,
-            judges="",
-        )
-        cls.audio_3 = AudioFactory.create(
-            case_name="Hong Liu Yang v. Lynch-Loretta E.",
-            docket_id=3,
-            duration=653,
-            judges="",
-        )
-        cls.audio_4 = AudioFactory.create(
-            case_name="Hong Liu Lorem v. Lynch-Loretta E.",
-            docket_id=3,
-            duration=653,
-            judges="John Smith",
-        )
-        cls.audio_4.panel.add(cls.author)
 
     @staticmethod
     def get_article_count(r):
@@ -2609,63 +2584,6 @@ class OASearchTest(IndexedElasticTestCase):
             r.content.decode().index("Jose")
             < r.content.decode().index("Hong Liu"),
             msg="'Jose' should come BEFORE 'Hong Liu' when order_by relevance.",
-        )
-
-        # Relevance order, two words match.
-        r = self.client.get(
-            reverse("show_results"),
-            {
-                "q": "Lynch Loretta",
-                "type": SEARCH_TYPES.ORAL_ARGUMENT,
-                "order_by": "score desc",
-            },
-        )
-        actual = self.get_article_count(r)
-        expected = 3
-        self.assertEqual(actual, expected)
-        self.assertTrue(
-            r.content.decode().index("Hong Liu Lorem")
-            < r.content.decode().index("Hong Liu Yang")
-            < r.content.decode().index("Jose"),
-            msg="'Hong Liu Yang' should come BEFORE 'Hong Liu Lorem' and 'Jose' when order_by relevance.",
-        )
-
-        # Relevance order, two words match, reverse order.
-        r = self.client.get(
-            reverse("show_results"),
-            {
-                "q": "Loretta Lynch",
-                "type": SEARCH_TYPES.ORAL_ARGUMENT,
-                "order_by": "score desc",
-            },
-        )
-        actual = self.get_article_count(r)
-        expected = 3
-        self.assertEqual(actual, expected)
-        self.assertTrue(
-            r.content.decode().index("Jose")
-            < r.content.decode().index("Hong Liu Lorem")
-            < r.content.decode().index("Hong Liu Yang"),
-            msg="'Jose' should come BEFORE 'Hong Liu Yang' and 'Hong Liu Lorem' when order_by relevance.",
-        )
-
-        # Relevance order, hyphenated compound word.
-        r = self.client.get(
-            reverse("show_results"),
-            {
-                "q": "Lynch-Loretta E.",
-                "type": SEARCH_TYPES.ORAL_ARGUMENT,
-                "order_by": "score desc",
-            },
-        )
-        actual = self.get_article_count(r)
-        expected = 3
-        self.assertEqual(actual, expected)
-        self.assertTrue(
-            r.content.decode().index("Hong Liu Lorem")
-            < r.content.decode().index("Hong Liu Yang")
-            < r.content.decode().index("Jose"),
-            msg="'Hong Liu Yang' should come BEFORE 'Hong Liu Lorem' and 'Jose' when order_by relevance.",
         )
 
     def test_oa_results_search_match_phrase(self) -> None:
@@ -3021,20 +2939,6 @@ class OASearchTest(IndexedElasticTestCase):
         self.assertIn("SEC", r.content.decode())
         self.assertIn("Jose", r.content.decode())
 
-    def test_oa_advanced_search_combine_fields(self) -> None:
-        # Query by two advanced fields, caseName and docketNumber
-        r = self.client.get(
-            reverse("show_results"),
-            {
-                "type": SEARCH_TYPES.ORAL_ARGUMENT,
-                "q": "caseName:Loretta AND docketNumber:(docket number 2)",
-            },
-        )
-        actual = self.get_article_count(r)
-        expected = 1
-        self.assertEqual(actual, expected)
-        self.assertIn("Jose", r.content.decode())
-
     def test_oa_advanced_search_by_field_and_keyword(self) -> None:
         # Query by advanced field and refine by keyword.
         r = self.client.get(
@@ -3073,4 +2977,158 @@ class OASearchTest(IndexedElasticTestCase):
             r.status_code,
             HTTP_200_OK,
             msg="Did not get good status code from oral arguments API endpoint",
+        )
+
+
+@override_flag("oral-arguments-es", active=False)
+class OASearchTestSolr(IndexedSolrTestCase, OASearchBase):
+    """Oral argument search tests for Solr"""
+
+    def test_oa_advanced_search_combine_fields(self) -> None:
+        # Query by two advanced fields, caseName and docketNumber
+        r = self.client.get(
+            reverse("show_results"),
+            {
+                "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                "q": "caseName:Loretta AND docketNumber:(docket number 2)",
+            },
+        )
+        actual = self.get_article_count(r)
+        expected = 3
+        self.assertEqual(actual, expected)
+        self.assertIn("Jose", r.content.decode())
+
+    def test_oa_results_relevance_ordering_solr(self) -> None:
+        # Relevance order, two words match.
+        r = self.client.get(
+            reverse("show_results"),
+            {
+                "q": "Lynch Loretta",
+                "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                "order_by": "score desc",
+            },
+        )
+        actual = self.get_article_count(r)
+        expected = 3
+        self.assertEqual(actual, expected)
+        self.assertTrue(
+            r.content.decode().index("Hong Liu Yang")
+            < r.content.decode().index("Hong Liu Lorem")
+            < r.content.decode().index("Jose"),
+            msg="'Hong Liu Lorem' should come BEFORE 'Hong Liu Yang' and 'Jose' when order_by relevance.",
+        )
+
+        # Relevance order, two words match, reverse order.
+        r = self.client.get(
+            reverse("show_results"),
+            {
+                "q": "Loretta Lynch",
+                "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                "order_by": "score desc",
+            },
+        )
+        actual = self.get_article_count(r)
+        expected = 3
+        self.assertEqual(actual, expected)
+        self.assertTrue(
+            r.content.decode().index("Jose")
+            < r.content.decode().index("Hong Liu Yang")
+            < r.content.decode().index("Hong Liu Lorem"),
+            msg="'Jose' should come BEFORE 'Hong Liu Yang' and 'Hong Liu Lorem' when order_by relevance.",
+        )
+
+        # Relevance order, hyphenated compound word.
+        r = self.client.get(
+            reverse("show_results"),
+            {
+                "q": "Lynch-Loretta E.",
+                "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                "order_by": "score desc",
+            },
+        )
+        actual = self.get_article_count(r)
+        expected = 3
+        self.assertEqual(actual, expected)
+        self.assertTrue(
+            r.content.decode().index("Hong Liu Yang")
+            < r.content.decode().index("Hong Liu Lorem")
+            < r.content.decode().index("Jose"),
+            msg="'Hong Liu Yang' should come BEFORE 'Hong Liu Lorem' and 'Jose' when order_by relevance.",
+        )
+
+
+@override_flag("oral-arguments-es", active=True)
+class OASearchTestElasticSearch(IndexedElasticTestCase, OASearchBase):
+    """Oral argument search tests for Elasticsearch"""
+
+    def test_oa_advanced_search_combine_fields(self) -> None:
+        # Query by two advanced fields, caseName and docketNumber
+        r = self.client.get(
+            reverse("show_results"),
+            {
+                "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                "q": "caseName:Loretta AND docketNumber:(docket number 2)",
+            },
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("Jose", r.content.decode())
+
+    def test_oa_results_relevance_ordering_elastic(self) -> None:
+        # Relevance order, two words match.
+        r = self.client.get(
+            reverse("show_results"),
+            {
+                "q": "Lynch Loretta",
+                "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                "order_by": "score desc",
+            },
+        )
+        actual = self.get_article_count(r)
+        expected = 3
+        self.assertEqual(actual, expected)
+        self.assertTrue(
+            r.content.decode().index("Hong Liu Lorem")
+            < r.content.decode().index("Hong Liu Yang")
+            < r.content.decode().index("Jose"),
+            msg="'Hong Liu Yang' should come BEFORE 'Hong Liu Lorem' and 'Jose' when order_by relevance.",
+        )
+
+        # Relevance order, two words match, reverse order.
+        r = self.client.get(
+            reverse("show_results"),
+            {
+                "q": "Loretta Lynch",
+                "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                "order_by": "score desc",
+            },
+        )
+        actual = self.get_article_count(r)
+        expected = 3
+        self.assertEqual(actual, expected)
+        self.assertTrue(
+            r.content.decode().index("Jose")
+            < r.content.decode().index("Hong Liu Lorem")
+            < r.content.decode().index("Hong Liu Yang"),
+            msg="'Jose' should come BEFORE 'Hong Liu Yang' and 'Hong Liu Lorem' when order_by relevance.",
+        )
+
+        # Relevance order, hyphenated compound word.
+        r = self.client.get(
+            reverse("show_results"),
+            {
+                "q": "Lynch-Loretta E.",
+                "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                "order_by": "score desc",
+            },
+        )
+        actual = self.get_article_count(r)
+        expected = 3
+        self.assertEqual(actual, expected)
+        self.assertTrue(
+            r.content.decode().index("Hong Liu Lorem")
+            < r.content.decode().index("Hong Liu Yang")
+            < r.content.decode().index("Jose"),
+            msg="'Hong Liu Yang' should come BEFORE 'Hong Liu Lorem' and 'Jose' when order_by relevance.",
         )

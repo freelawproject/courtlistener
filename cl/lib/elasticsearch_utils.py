@@ -45,15 +45,13 @@ def build_daterange_query(
     return []
 
 
-def build_fulltext_query(
-    fields: list[str], value: str, query_type="query_string"
-) -> QueryString | None:
+def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
     """Given the cleaned data from a form, return a Elastic Search string query or []
     https://www.elastic.co/guide/en/elasticsearch/reference/current/full-text-queries.html
 
     :param fields: A list of name fields to search in.
     :param value: The string value to search for.
-    :return: A Elasticsearch QueryString or None if the "value" param is empty.
+    :return: A Elasticsearch QueryString or [] if the "value" param is empty.
     """
 
     if value:
@@ -71,27 +69,23 @@ def build_fulltext_query(
                     f"docketNumber:{docket_number}",
                     value,
                 )
-        if query_type == "query_string":
-            return Q("query_string", query=value, fields=fields)
 
-        elif query_type == "multi_match":
-            q_should = [
-                Q(
-                    "multi_match",
-                    query=value,
-                    fields=fields,
-                    type="cross_fields",
-                    operator="AND",
-                    tie_breaker=0.3,
-                ),
-                Q("query_string", query=value, default_operator="AND"),
-            ]
-            for field in fields:
-                q_should.append(Q("match_phrase", **{field: {"query": value}}))
+        q_should = [
+            Q(
+                "multi_match",
+                query=value,
+                fields=fields,
+                type="cross_fields",
+                operator="AND",
+                tie_breaker=0.3,
+            ),
+            Q("query_string", query=value, default_operator="AND"),
+        ]
+        for field in fields:
+            q_should.append(Q("match_phrase", **{field: {"query": value}}))
+        return Q("bool", should=q_should)
 
-            return Q("bool", should=q_should)
-
-    return None
+    return []
 
 
 def build_term_query(field: str, value: str) -> List:
@@ -254,7 +248,6 @@ def build_es_main_query(
         string_query = build_fulltext_query(
             ["caseName", "docketNumber", "court", "court_id", "judge", "sha1"],
             cd.get("q", ""),
-            "multi_match",
         )
 
     if filters or string_query:

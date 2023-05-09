@@ -2,6 +2,7 @@
 {% load humanize %}
 {% load text_filters %}
 {% load static %}
+{% load waffle_tags %}
 
 {% block message %}{% endblock %}
 
@@ -278,7 +279,11 @@
             {% if type == SEARCH_TYPES.PARENTHETICAL %}
               {% include "includes/pa_search_result.html" %}
             {% else %}
-              {% include "includes/search_result.html" %}
+              {% flag "oral-arguments-es" %}
+                 {% include "includes/search_result.html" %}
+              {% else %}
+                {% include "includes/search_result_solr.html" %}
+              {% endflag %}
             {% endif %}
         {% else %}
             {% include "includes/no_results.html" %}
