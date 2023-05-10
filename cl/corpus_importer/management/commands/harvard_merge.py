@@ -72,13 +72,15 @@ def read_json(cluster_id: int) -> Dict[str, Any] | None:
     return None
 
 
-def get_data_source(harvard_data: Dict[str, Any]) -> None | str:
-    """Get json data source: Fastcase, CAP, Harvard, etc
+def get_data_source(harvard_data: Dict[str, Any]) -> str:
+    """Get json data source: Fastcase or CAP
+
+    The default is CAP/Harvard
 
     :param harvard_data: case data as dict
-    :return: data source or None
+    :return: data source
     """
-    data_source = None
+    data_source = "CAP"
     data_provenance = harvard_data.get("provenance")
     if data_provenance:
         data_source = data_provenance.get("source")
@@ -493,7 +495,9 @@ def update_cluster_source(cluster_id: int) -> None:
         cluster.save()
 
 
-def merge_opinion_clusters(cluster_id: int, fastcase: bool = False) -> None:
+def merge_opinion_clusters(
+    cluster_id: int, only_fastcase: bool = False
+) -> None:
     """Merge opinion cluster, docket and opinion data from Harvard
 
     :param cluster_id: The cluster ID to merger
@@ -501,16 +505,13 @@ def merge_opinion_clusters(cluster_id: int, fastcase: bool = False) -> None:
     """
     harvard_data = read_json(cluster_id)
     if harvard_data:
-        source = get_data_source(harvard_data)
+        if only_fastcase:
+            source = get_data_source(harvard_data)
+            if source == "Fastcase":
+                logging.info("Skipping non fastcase opinion cluster")
+                return
         try:
             with transaction.atomic():
-                if not fastcase and "data-type" in str(harvard_data):
-                    # All fastcase fixes includes a data-type attribute
-                    logger.info(
-                        f"Are you trying to merge fastcase data? "
-                        f"fastcase flag required."
-                    )
-                    return
                 map_and_merge_opinions(cluster_id, harvard_data)
                 changed_values_dictionary = combine_non_overlapping_data(
                     cluster_id, harvard_data
@@ -529,30 +530,6 @@ def merge_opinion_clusters(cluster_id: int, fastcase: bool = False) -> None:
             logging.warning(msg=f"Judge exception for: {cluster_id}")
     else:
         logging.warning(msg=f"No Harvard json for cluster: {cluster_id}")
-
-
-def start_merger(cluster_id=None, fastcase=False) -> None:
-    """Start the merger
-
-    Query the database for a list of opinions that have not been merged yet
-    :param cluster_id: Cluster ID if available
-    :return: None
-    """
-    if cluster_id:
-        cluster_ids = [cluster_id]
-    else:
-        sources_without_harvard = [
-            source[0]
-            for source in Docket.SOURCE_CHOICES
-            if "Harvard" not in source[1]
-        ]
-        cluster_ids = OpinionCluster.objects.filter(
-            docket__source__in=sources_without_harvard,
-            filepath_json_harvard__isnull=False,
-        ).values_list("id", flat=True)
-
-    for cluster_id in cluster_ids:
-        merge_opinion_clusters(cluster_id=cluster_id, fastcase=fastcase)
 
 
 def fetch_cl_opinion_content(sub_opinions: list[Opinion]) -> list[str]:
@@ -677,6 +654,22 @@ class Command(VerboseCommand):
     def handle(self, *args, **options) -> None:
         if options["no_debug"]:
             logging.disable(logging.DEBUG)
-        start_merger(
-            cluster_id=options["cluster_id"], fastcase=options["fastcase"]
-        )
+
+        if options["cluster_id"] == None:
+            sources_without_harvard = [
+                source[0]
+                for source in Docket.SOURCE_CHOICES
+                if "Harvard" not in source[1]
+            ]
+            cluster_ids = OpinionCluster.objects.filter(
+                docket__source__in=sources_without_harvard,
+                filepath_json_harvard__isnull=False,
+            ).values_list("id", flat=True)
+            logger.info(msg=f"{len(cluster_ids)} left to merge")
+        else:
+            cluster_ids = [options["cluster_id"]]
+
+        for cluster_id in cluster_ids:
+            merge_opinion_clusters(
+                cluster_id=cluster_id, only_fastcase=options["fastcase"]
+            )
