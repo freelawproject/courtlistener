@@ -129,9 +129,10 @@ def fetch_non_harvard_data(harvard_data: Dict[str, Any]) -> Dict[str, Any]:
     ]
 
     # Find fist opinion element
-    opinion_at = soup.find("opinion")
-    # Find floating footnotes before opinion
-    head_matter_footnotes = opinion_at.find_all_previous("footnote")
+    first_opinion_at = soup.find("opinion")
+
+    # Find floating footnotes before first opinion
+    head_matter_footnotes = first_opinion_at.find_all_previous("footnote")
     if head_matter_footnotes:
         # Combine floating footnotes and add them to the dict,
         # find_all_previous returns elements in reverse order
@@ -140,10 +141,15 @@ def fetch_non_harvard_data(harvard_data: Dict[str, Any]) -> Dict[str, Any]:
         )
         all_data["head_matter_footnotes"] = combined_floating_footnotes
 
-    # Find images from books
-    book_images = soup.find_all(lambda tag: tag.get("data-type") == "picture")
+    # Find images from books before first opinion
+    book_images = first_opinion_at.find_all_previous(
+        lambda tag: tag.get("data-type") == "picture"
+        or tag.get("data-type") == "img"
+    )
     if book_images:
-        all_data["book_images"] = " ".join(str(img) for img in book_images)
+        all_data["book_images"] = " ".join(
+            str(img) for img in reversed(book_images)
+        )
 
     # Combine attorneys and law
     find_fields = soup.find_all(
@@ -187,16 +193,18 @@ def combine_non_overlapping_data(
     """
     opinion_cluster = OpinionCluster.objects.get(id=cluster_id)
     all_data = fetch_non_harvard_data(harvard_data)
-    clean_dictionary: dict[str, Tuple] = {}
+    changed_values_dictionary: dict[str, Tuple] = {}
     for key, value in all_data.items():
         cl_value = getattr(opinion_cluster, key)
         if not cl_value:
+            # Value is empty for key, we can add it directly to the object
             OpinionCluster.objects.filter(id=cluster_id).update(**{key: value})
         else:
             if value != cl_value:
-                clean_dictionary[key] = (value, cl_value)
+                # We have different values, update dict
+                changed_values_dictionary[key] = (value, cl_value)
 
-    return clean_dictionary
+    return changed_values_dictionary
 
 
 def merge_long_fields(
@@ -402,14 +410,18 @@ def merge_date_filed(cluster_id: int, harvard_data: dict) -> None:
     )
 
 
-def merge_overlapping_data(cluster_id: int, clean_dictionary: dict) -> None:
+def merge_overlapping_data(
+    cluster_id: int, changed_values_dictionary: dict
+) -> None:
     """Merge overlapping data
 
     :param cluster_id: the cluster id
     :param clean_dictionary: the dictionary of data to merge
     :return: None
     """
-    if clean_dictionary != {}:
+
+    if not changed_values_dictionary:
+        # Empty dictionary means that we don't have overlapping data
         logging.info(f"Merging complete for: {cluster_id}")
         return
 
@@ -423,31 +435,32 @@ def merge_overlapping_data(cluster_id: int, clean_dictionary: dict) -> None:
         "disposition",
         "head_matter_footnotes",
         "arguments",
+        "book_images",
     ]
 
-    for field_name in clean_dictionary.keys():
+    for field_name in changed_values_dictionary.keys():
         if field_name in long_fields:
             merge_long_fields(
                 cluster_id,
                 field_name,
-                clean_dictionary.get(field_name),
+                changed_values_dictionary.get(field_name),
             )
         elif field_name in ["other_dates"]:
             merge_cluster_dates(
                 cluster_id,
                 field_name,
-                clean_dictionary.get(field_name),
+                changed_values_dictionary.get(field_name),
             )
         elif field_name == "judges":
             merge_judges(
                 cluster_id,
-                clean_dictionary.get(field_name),
+                changed_values_dictionary.get(field_name),
             )
         elif field_name == "attorneys":
             merge_strings(
                 cluster_id,
                 field_name,
-                clean_dictionary.get(field_name, ""),
+                changed_values_dictionary.get(field_name, ""),
             )
         else:
             logging.info(f"Field not considered in the process: {field_name}")
@@ -499,13 +512,13 @@ def merge_opinion_clusters(cluster_id: int, fastcase: bool = False) -> None:
                     )
                     return
                 map_and_merge_opinions(cluster_id, harvard_data)
-                clean_dictionary = combine_non_overlapping_data(
+                changed_values_dictionary = combine_non_overlapping_data(
                     cluster_id, harvard_data
                 )
                 merge_docket_numbers(cluster_id, harvard_data["docket_number"])
                 merge_case_names(cluster_id, harvard_data)
                 merge_date_filed(cluster_id, harvard_data)
-                merge_overlapping_data(cluster_id, clean_dictionary)
+                merge_overlapping_data(cluster_id, changed_values_dictionary)
                 update_docket_source(cluster_id=cluster_id)
                 update_cluster_source(cluster_id=cluster_id)
                 logging.info(msg=f"Finished merging cluster: {cluster_id}")
