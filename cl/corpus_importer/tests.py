@@ -37,7 +37,6 @@ from cl.corpus_importer.management.commands.harvard_merge import (
     merge_docket_numbers,
     merge_judges,
     merge_opinion_clusters,
-    start_merger,
 )
 from cl.corpus_importer.management.commands.harvard_opinions import (
     clean_body_content,
@@ -2555,7 +2554,7 @@ class HarvardMergerTests(TestCase):
             },
         }
         self.read_json_func.return_value = case_data
-        start_merger(cluster_id=None)
+        merge_opinion_clusters(cluster_id=None)
         cluster_ids = OpinionCluster.objects.filter(
             docket__source__in=[s[0] for s in SC if "Harvard" not in s[1]],
             filepath_json_harvard__isnull=False,
@@ -2591,7 +2590,9 @@ class HarvardMergerTests(TestCase):
         authors = list(author_query)
 
         self.assertEqual(authors, ["", ""])
-        start_merger(cluster_id=None)  # allow the system to find the cluster
+        merge_opinion_clusters(
+            cluster_id=None
+        )  # allow the system to find the cluster
         cluster.refresh_from_db()
 
         author_query = Opinion.objects.filter(
@@ -2644,7 +2645,7 @@ class HarvardMergerTests(TestCase):
 
         self.assertEqual(authors, ["Broyles", "Gardner"])
         # Import the opinion
-        start_merger(cluster_id=cluster.id)
+        merge_opinion_clusters(cluster_id=cluster.id)
 
         cluster.refresh_from_db()
         author_query = Opinion.objects.filter(
