@@ -1,5 +1,6 @@
 import operator
 import re
+import time
 from datetime import date
 from functools import reduce
 from typing import Dict, List
@@ -148,6 +149,8 @@ def build_sort_results(cd: CleanData) -> Dict:
             "score desc": {"_score": {"order": "desc"}},
             "dateArgued desc": {"dateArgued": {"order": "desc"}},
             "dateArgued asc": {"dateArgued": {"order": "asc"}},
+            "random_123 desc": {"random_123": {"order": "desc"}},
+            "random_123 asc": {"random_123": {"order": "asc"}},
         }
 
     else:
@@ -158,6 +161,23 @@ def build_sort_results(cd: CleanData) -> Dict:
         }
 
     order_by = cd.get("order_by")
+    if order_by in order_by_map and "random_123" in order_by:
+        # Return random sorting if available.
+        # Define the random seed using the current timestamp
+        seed = int(time.time())
+        order = order_by_map[order_by]["random_123"]["order"]
+        random_sort = {
+            "_script": {
+                "type": "number",
+                "script": {
+                    "source": "Math.random() * params.seed",
+                    "params": {"seed": seed},
+                },
+                "order": order,
+            }
+        }
+        return random_sort
+
     if order_by and order_by in order_by_map:
         return order_by_map[order_by]
 
