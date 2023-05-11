@@ -2389,6 +2389,22 @@ class OpinionCluster(AbstractDateTimeModel):
         blank=True,
         db_index=True,
     )
+    arguments = models.TextField(
+        help_text="The attorney(s) and legal arguments presented as HTML text. "
+        "This is primarily seen in older opinions and can contain "
+        "case law cited and arguments presented to the judges.",
+        blank=True,
+    )
+    head_matter_footnotes = models.TextField(
+        help_text="Footnotes that appear before an opinion or at the conclusion "
+        "but that are not part of the opinion",
+        blank=True,
+    )
+    book_images = models.TextField(
+        help_text="Book images containing cluster content "
+        "(for example handwritten recusals) as HTML base64 images",
+        blank=True,
+    )
 
     objects = ClusterCitationQuerySet.as_manager()
 
