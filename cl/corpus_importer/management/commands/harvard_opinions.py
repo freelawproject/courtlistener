@@ -496,6 +496,51 @@ def add_new_case(
     short_data = parse_extra_fields(soup, short_fields, False)
     long_data = parse_extra_fields(soup, long_fields, True)
 
+    # This dict contains fields where values require additional proccessing
+    # to be created
+    extra_data = {
+        "head_matter_footnotes": "",
+        "book_images": "",
+        "arguments": "",
+    }
+
+    # Find fist opinion element
+    first_opinion_at = soup.find("opinion")
+
+    # Find floating footnotes before first opinion
+    head_matter_footnotes = first_opinion_at.find_all_previous("footnote")
+    if head_matter_footnotes:
+        # Combine floating footnotes and add them to the dict,
+        # find_all_previous returns elements in reverse order
+        combined_floating_footnotes = " ".join(
+            str(fn) for fn in reversed(head_matter_footnotes)
+        )
+        extra_data["head_matter_footnotes"] = combined_floating_footnotes
+
+    # Find images from books before first opinion
+    book_images = first_opinion_at.find_all_previous(
+        lambda tag: tag.get("data-type") == "picture"
+        or tag.get("data-type") == "img"
+    )
+    if book_images:
+        extra_data["book_images"] = " ".join(
+            str(img) for img in reversed(book_images)
+        )
+
+    # Combine attorneys and law
+    find_fields = soup.find_all(
+        lambda tag: tag.get("data-type") == "legal" or tag.name == "attorneys"
+    )
+    if find_fields:
+        # Remove page-number tags to make content more readable
+        for e in find_fields:
+            if e is not None:
+                [x.extract() for x in e.find_all("page-number")]
+
+        # Combine attorneys and legal data-type field
+        arguments = " ".join(str(x) for x in find_fields)
+        extra_data["arguments"] = arguments
+
     with transaction.atomic():
         logger.info(
             f"Adding docket for {case_name}: {citation.corrected_citation()}"
@@ -544,6 +589,9 @@ def add_new_case(
             correction=long_data["correction"],
             judges=judges,
             filepath_json_harvard=file_path,
+            head_matter_footnotes=extra_data["head_matter_footnotes"],
+            book_images=extra_data["book_images"],
+            arguments=extra_data["arguments"],
         )
         cluster.save(index=False)
         logger.info("Saving cluster for: %s", cluster.id)
