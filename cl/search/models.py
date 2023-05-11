@@ -682,7 +682,7 @@ class Docket(AbstractDateTimeModel):
         else:
             return f"{self.pk}"
 
-    def save(self, *args, **kwargs):
+    def save(self, update_fields=None, *args, **kwargs):
         self.slug = slugify(trunc(best_case_name(self), 75))
         if self.docket_number and not self.docket_number_core:
             self.docket_number_core = make_docket_number_core(
@@ -702,7 +702,10 @@ class Docket(AbstractDateTimeModel):
                         f"'{field}' cannot be Null or empty in RECAP dockets."
                     )
 
-        super(Docket, self).save(*args, **kwargs)
+        if update_fields is not None:
+            update_fields = {"slug", "docket_number_core"}.union(update_fields)
+
+        super(Docket, self).save(update_fields=update_fields, *args, **kwargs)
 
     def get_absolute_url(self) -> str:
         return reverse("view_docket", args=[self.pk, self.slug])
@@ -1143,7 +1146,9 @@ class DocketEntry(AbstractDateTimeModel):
 
     class Meta:
         verbose_name_plural = "Docket Entries"
-        index_together = ("recap_sequence_number", "entry_number")
+        indexes = [
+            models.Index(fields=["recap_sequence_number", "entry_number"])
+        ]
         ordering = ("recap_sequence_number", "entry_number")
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
 
@@ -1271,10 +1276,14 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             "attachment_number",
         )
         ordering = ("document_type", "document_number", "attachment_number")
-        index_together = [
-            ["document_type", "document_number", "attachment_number"],
-        ]
         indexes = [
+            models.Index(
+                fields=[
+                    "document_type",
+                    "document_number",
+                    "attachment_number",
+                ]
+            ),
             models.Index(
                 fields=["filepath_local"],
                 name="search_recapdocument_filepath_local_7dc6b0e53ccf753_uniq",
@@ -1367,7 +1376,14 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             ]
         )
 
-    def save(self, do_extraction=False, index=False, *args, **kwargs):
+    def save(
+        self,
+        update_fields=None,
+        do_extraction=False,
+        index=False,
+        *args,
+        **kwargs,
+    ):
         if self.document_type == self.ATTACHMENT:
             if self.attachment_number is None:
                 raise ValidationError(
@@ -1417,7 +1433,12 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
                         % (self.pk, other.pk)
                     )
 
-        super(RECAPDocument, self).save(*args, **kwargs)
+        if update_fields is not None:
+            update_fields = {"pacer_doc_id"}.union(update_fields)
+
+        super(RECAPDocument, self).save(
+            update_fields=update_fields, *args, **kwargs
+        )
         tasks = []
         if do_extraction and self.needs_extraction:
             # Context extraction not done and is requested.
@@ -2505,9 +2526,20 @@ class OpinionCluster(AbstractDateTimeModel):
     def get_absolute_url(self) -> str:
         return reverse("view_case", args=[self.pk, self.slug])
 
-    def save(self, index=True, force_commit=False, *args, **kwargs):
+    def save(
+        self,
+        update_fields=None,
+        index=True,
+        force_commit=False,
+        *args,
+        **kwargs,
+    ):
         self.slug = slugify(trunc(best_case_name(self), 75))
-        super(OpinionCluster, self).save(*args, **kwargs)
+        if update_fields is not None:
+            update_fields = {"slug"}.union(update_fields)
+        super(OpinionCluster, self).save(
+            update_fields=update_fields, *args, **kwargs
+        )
         if index:
             from cl.search.tasks import add_items_to_solr
 
@@ -2799,12 +2831,12 @@ class Citation(models.Model):
         return self.cluster.get_absolute_url()
 
     class Meta:
-        index_together = (
+        indexes = [
             # To look up individual citations
-            ("volume", "reporter", "page"),
+            models.Index(fields=["volume", "reporter", "page"]),
             # To generate reporter volume lists
-            ("volume", "reporter"),
-        )
+            models.Index(fields=["volume", "reporter"]),
+        ]
         unique_together = (
             ("cluster", "volume", "reporter", "page"),
             ("cluster_stub", "volume", "reporter", "page"),

@@ -895,4 +895,4 @@ class FjcIntegratedDatabase(AbstractDateTimeModel):
 
     class Meta:
         verbose_name_plural = "FJC Integrated Database Entries"
-        index_together = (("district", "docket_number"),)
+        indexes = [models.Index(fields=["district", "docket_number"])]

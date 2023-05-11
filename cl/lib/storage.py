@@ -84,6 +84,12 @@ class IncrementingAWSMediaStorage(AWSMediaStorage):
 
 class SubDirectoryS3ManifestStaticStorage(S3ManifestStaticStorage):
     location = "static"
+    # Don't throw a ValueError if an item isn't in the manifest.json file. This
+    # is important because otherwise the site can go down if our static files
+    # are deployed before we're able to roll out our pods. If that happens ,
+    # the site throws hundreds of errors, which takes all our CPU, and it's
+    # hard to recover.
+    manifest_strict = False
 
 
 class RecapEmailSESStorage(S3Boto3Storage):

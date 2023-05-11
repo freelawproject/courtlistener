@@ -2,13 +2,13 @@ import json
 import logging
 import time
 from datetime import datetime as dt
+from datetime import timezone as tz
 from typing import Dict, Optional, Union
 
 import stripe
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
-from django.utils.timezone import utc
 from django.views.decorators.csrf import csrf_exempt
 from stripe.error import APIConnectionError
 from stripe.stripe_object import StripeObject
@@ -175,7 +175,9 @@ def update_donation_for_event(
             "<h1>200: No matching object in the "
             "database. No action needed.</h1>"
         )
-    clearing_date = dt.utcfromtimestamp(charge["created"]).replace(tzinfo=utc)
+    clearing_date = dt.utcfromtimestamp(charge["created"]).replace(
+        tzinfo=tz.utc
+    )
     if event["type"].endswith("succeeded"):
         d.clearing_date = clearing_date
         d.status = Donation.PROCESSED

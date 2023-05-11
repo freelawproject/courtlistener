@@ -1202,7 +1202,7 @@ class RecapPdfTaskTest(TestCase):
         self.pq.delete()
         try:
             self.docket.delete()  # This cascades to self.de and self.rd
-        except (Docket.DoesNotExist, AssertionError):
+        except (Docket.DoesNotExist, AssertionError, ValueError):
             pass
 
     def test_pq_has_default_status(self) -> None:
