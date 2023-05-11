@@ -1,9 +1,12 @@
+import waffle
 from django.conf import settings
 from rest_framework.exceptions import ParseError
 
 from cl.lib import search_utils
+from cl.lib.elasticsearch_utils import build_es_main_query
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import map_to_docket_entry_sorting
+from cl.search.documents import AudioDocument
 from cl.search.models import SEARCH_TYPES
 
 
@@ -22,13 +25,36 @@ def get_object_list(request, cd, paginator):
     group = False
     if cd["type"] == SEARCH_TYPES.DOCKETS:
         group = True
-    main_query = search_utils.build_main_query(
-        cd, highlight="text", facet=False, group=group
-    )
-    main_query["caller"] = "api_search"
+
+    total_query_results = 0
+    if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT and waffle.flag_is_active(
+        request, "oral-arguments-es"
+    ):
+        search_query = AudioDocument.search()
+        main_query, total_query_results, top_hits_limit = build_es_main_query(
+            search_query, cd
+        )
+    else:
+        main_query = search_utils.build_main_query(
+            cd, highlight="text", facet=False, group=group
+        )
+        main_query["caller"] = "api_search"
+
     if cd["type"] == SEARCH_TYPES.RECAP:
         main_query["sort"] = map_to_docket_entry_sorting(main_query["sort"])
-    sl = SolrList(main_query=main_query, offset=offset, type=cd["type"])
+
+    if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT and waffle.flag_is_active(
+        request, "oral-arguments-es"
+    ):
+        sl = ESList(
+            main_query=main_query,
+            count=total_query_results,
+            offset=offset,
+            page_size=page_size,
+            type=cd["type"],
+        )
+    else:
+        sl = SolrList(main_query=main_query, offset=offset, type=cd["type"])
     return sl
 
 
@@ -78,7 +104,7 @@ class SolrList(object):
                 result["snippet"] = "&hellip;".join(
                     result["solr_highlights"]["text"]
                 )
-                self._item_cache.append(SolrObject(initial=result))
+                self._item_cache.append(ResultObject(initial=result))
         else:
             # Flatten group results, and pull up the text snippet as above.
             for group in getattr(r.groups, r.group_field)["groups"]:
@@ -86,7 +112,7 @@ class SolrList(object):
                     doc["snippet"] = "&hellip;".join(
                         doc["solr_highlights"]["text"]
                     )
-                    self._item_cache.append(SolrObject(initial=doc))
+                    self._item_cache.append(ResultObject(initial=doc))
 
         # Now, assuming our _item_cache is all set, we just get the item.
         if isinstance(item, slice):
@@ -111,7 +137,78 @@ class SolrList(object):
         self._item_cache.append(p_object)
 
 
-class SolrObject(object):
+class ESList(object):
+    """This implements a yielding list object that fetches items as they are
+    queried.
+    """
+
+    def __init__(
+        self, main_query, count, offset, page_size, type, length=None
+    ):
+        super(ESList, self).__init__()
+        self.main_query = main_query
+        self.offset = offset
+        self.page_size = page_size
+        self.type = type
+        self.count = count
+        self._item_cache = []
+        self._length = length
+
+    def __len__(self):
+        if self._length is None:
+            # TODO do we need to set a "api_search_count" caller for ES?
+            self._length = self.count
+        return self._length
+
+    def __iter__(self):
+        for item in range(0, len(self)):
+            try:
+                yield self._item_cache[item]
+            except IndexError:
+                yield self.__getitem__(item)
+
+    def __getitem__(self, item):
+        self.main_query = self.main_query[
+            self.offset : self.offset + self.page_size
+        ]
+        results = self.main_query.execute()
+
+        # Pull the text snippet up a level
+        for result in results:
+            if hasattr(result.meta, "highlight") and hasattr(
+                result.meta.highlight, "text"
+            ):
+                result["snippet"] = result.meta.highlight["text"][0]
+            else:
+                result["snippet"] = result["text"]
+            self._item_cache.append(
+                ResultObject(initial=result.to_dict(skip_empty=False))
+            )
+
+        # Now, assuming our _item_cache is all set, we just get the item.
+        if isinstance(item, slice):
+            s = slice(
+                item.start - int(self.offset),
+                item.stop - int(self.offset),
+                item.step,
+            )
+            return self._item_cache[s]
+        else:
+            # Not slicing.
+            try:
+                return self._item_cache[item]
+            except IndexError:
+                # No results!
+                return []
+
+    def append(self, p_object):
+        """Lightly override the append method so we get items duplicated in
+        our cache.
+        """
+        self._item_cache.append(p_object)
+
+
+class ResultObject(object):
     def __init__(self, initial=None):
         self.__dict__["_data"] = initial or {}
 

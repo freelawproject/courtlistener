@@ -3440,3 +3440,91 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             < r.content.decode().index("Jose"),
             msg="'Hong Liu Yang' should come BEFORE 'Hong Liu Lorem' and 'Jose' when order_by relevance.",
         )
+
+    def test_oa_results_api_fields_es(self) -> None:
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": "Hong Liu Lorem v. Lynch-Loretta E.",
+        }
+
+        # API
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v3"}), search_params
+        )
+        actual = self.get_results_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+
+        keys_to_check = [
+            "absolute_url",
+            "caseName",
+            "court",
+            "court_citation_string",
+            "court_exact",
+            "court_id",
+            "dateArgued",
+            "dateReargued",
+            "dateReargumentDenied",
+            "docketNumber",
+            "docket_id",
+            "download_url",
+            "duration",
+            "file_size_mp3",
+            "id",
+            "judge",
+            "local_path",
+            "panel_ids",
+            "snippet",
+            "source",
+            "timestamp",
+        ]
+        keys_count = len(r.data["results"][0])
+        self.assertEqual(keys_count, 21)
+        for key in keys_to_check:
+            if key in r.data["results"][0]:
+                key_is_present = True
+            else:
+                key_is_present = None
+            self.assertIsNotNone(
+                key_is_present,
+                msg=f"Key {key} not found in the result object.",
+            )
+
+    def test_oa_results_api_pagination(self) -> None:
+        with transaction.atomic():
+            for i in range(20):
+                AudioFactory.create(
+                    docket_id=self.audio_3.docket.pk,
+                )
+            self.rebuild_index()
+            search_params = {
+                "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            }
+            # API
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v3"}), search_params
+            )
+            actual = self.get_results_count(r)
+            expected = 20
+            self.assertEqual(actual, expected)
+            self.assertEqual(24, r.data["count"])
+            self.assertIn("page=2", r.data["next"])
+
+            # Test next page.
+            search_params = {
+                "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                "page": 2,
+            }
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v3"}), search_params
+            )
+            actual = self.get_results_count(r)
+            expected = 4
+            self.assertEqual(actual, expected)
+            self.assertEqual(24, r.data["count"])
+            self.assertEqual(None, r.data["next"])
+
+            # Remove Audio objects to avoid affecting other concurrent tests.
+            Audio.objects.all().delete()
+        super().setUpTestData()
+        self.rebuild_index()

@@ -293,6 +293,8 @@ def build_es_main_query(
     if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
         search_query = search_query.sort(build_sort_results(cd))
 
+    # Set results max size to 2000 elements:
+    search_query = search_query.extra(size=2000)
     return search_query, total_query_results, top_hits_limit
 
 
@@ -301,17 +303,26 @@ def add_es_highlighting(search_query, cd):
         ffl = [
             "id",
             "absolute_url",
+            "court",
             "court_id",
+            "court_exact",
+            "court_citation_string",
             "local_path",
             "source",
             "download_url",
             "docket_id",
             "dateArgued",
+            "dateReargued",
+            "dateReargumentDenied",
             "duration",
+            "file_size_mp3",
+            "judge",
             "docket_slug",
             "caseName",
             "docketNumber",
+            "panel_ids",
             "text",
+            "timestamp",
         ]
         hlfl = SEARCH_ORAL_ARGUMENT_HL_FIELDS
         search_query = search_query.source(ffl)

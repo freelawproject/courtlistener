@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from django.conf import settings
 from django.template import loader
 from django_elasticsearch_dsl import Document, Index, fields
@@ -125,9 +127,14 @@ oral_arguments_index.settings(
 
 @oral_arguments_index.document
 class AudioDocument(Document):
+    absolute_url = fields.KeywordField(attr="get_absolute_url")
     caseName = fields.TextField(attr="case_name")
     court = fields.KeywordField(attr="docket.court.full_name")
+    court_exact = fields.KeywordField(attr="docket.court.pk")
     court_id = fields.KeywordField(attr="docket.court.pk")
+    court_citation_string = fields.KeywordField(
+        attr="docket.court.citation_string"
+    )
     docket_id = fields.IntegerField(attr="docket.pk")
     dateArgued = fields.DateField(attr="docket.date_argued")
     dateReargued = fields.DateField(attr="docket.date_reargued")
@@ -143,13 +150,14 @@ class AudioDocument(Document):
     judge = fields.TextField(
         attr="judges",
     )
-    local_path = fields.KeywordField(attr="local_path")
+    local_path = fields.KeywordField()
     panel_ids = fields.ListField(
         fields.IntegerField(),
     )
     sha1 = fields.KeywordField(attr="sha1")
     source = fields.KeywordField(attr="source")
     text = fields.TextField()
+    timestamp = fields.DateField()
 
     class Django:
         model = Audio
@@ -161,6 +169,13 @@ class AudioDocument(Document):
         if instance.local_path_mp3:
             return deepgetattr(instance, "local_path_mp3.size", None)
 
+    def prepare_local_path(self, instance):
+        if instance.local_path_mp3:
+            return deepgetattr(instance, "local_path_mp3.name", None)
+
     def prepare_text(self, instance):
         text_template = loader.get_template("indexes/audio_text.txt")
         return text_template.render({"item": instance}).translate(null_map)
+
+    def prepare_timestamp(self, instance):
+        return datetime.utcnow()
