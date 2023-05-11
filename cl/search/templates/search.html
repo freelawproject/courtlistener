@@ -253,10 +253,11 @@
                             {{ matches|intcomma }} Docket&nbsp;Entr{{ matches|pluralize:"y,ies" }}
                             {% endwith %}
                         {% elif type == SEARCH_TYPES.ORAL_ARGUMENT %}
-                           {% flag "oral-arguments-es" %}
-                             {{ results_details.1|intcomma }}
+                           {% flag "oa-es-deactivate" %}
+                             {{ results.paginator.count|intcomma }}
                           {% else %}
-                            {{ results.paginator.count|intcomma }}
+                            {{ results_details.1|intcomma }}
+
                           {% endflag %}
                              Oral Argument{{ results.paginator.count|pluralize }}
                         {% elif type == SEARCH_TYPES.PEOPLE %}
@@ -284,10 +285,10 @@
             {% if type == SEARCH_TYPES.PARENTHETICAL %}
               {% include "includes/pa_search_result.html" %}
             {% else %}
-              {% flag "oral-arguments-es" %}
-                 {% include "includes/search_result.html" %}
+              {% flag "oa-es-deactivate" %}
+                 {% include "includes/search_result_solr.html" %}
               {% else %}
-                {% include "includes/search_result_solr.html" %}
+                {% include "includes/search_result.html" %}
               {% endflag %}
             {% endif %}
         {% else %}

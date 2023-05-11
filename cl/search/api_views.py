@@ -181,17 +181,17 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
             sl = api_utils.get_object_list(request, cd=cd, paginator=paginator)
             result_page = paginator.paginate_queryset(sl, request)
             if (
-                search_type == SEARCH_TYPES.ORAL_ARGUMENT
-                and waffle.flag_is_active(request, "oral-arguments-es")
+                search_type != SEARCH_TYPES.ORAL_ARGUMENT
+                and waffle.flag_is_active(request, "oa-es-deactivate")
             ):
+                serializer = SearchResultSerializer(
+                    result_page, many=True, context={"schema": sl.conn.schema}
+                )
+            else:
                 serializer = SearchESResultSerializer(
                     result_page,
                     many=True,
                     context={"schema": AudioDocument._index.get_mapping()},
-                )
-            else:
-                serializer = SearchResultSerializer(
-                    result_page, many=True, context={"schema": sl.conn.schema}
                 )
 
             return paginator.get_paginated_response(serializer.data)

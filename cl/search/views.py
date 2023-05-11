@@ -400,10 +400,10 @@ def show_results(request: HttpRequest) -> HttpResponse:
             )
             # Get the results from the oral arguments as well
             # Check if waffle flag is active.
-            if waffle.flag_is_active(request, "oral-arguments-es"):
+            if waffle.flag_is_active(request, "oa-es-deactivate"):
                 render_dict.update(
                     {
-                        "results_oa": do_es_search(
+                        "results_oa": do_search(
                             mutable_GET,
                             rows=5,
                             override_params={
@@ -418,7 +418,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
             else:
                 render_dict.update(
                     {
-                        "results_oa": do_search(
+                        "results_oa": do_es_search(
                             mutable_GET,
                             rows=5,
                             override_params={
@@ -480,10 +480,11 @@ def show_results(request: HttpRequest) -> HttpResponse:
                     render_dict.update(search_results)
                 elif request.GET.get("type") == SEARCH_TYPES.ORAL_ARGUMENT:
                     # Check if waffle flag is active.
-                    if waffle.flag_is_active(request, "oral-arguments-es"):
-                        search_results = do_es_search(request.GET.copy())
-                    else:
+                    if waffle.flag_is_active(request, "oa-es-deactivate"):
                         search_results = do_search(request.GET.copy())
+                    else:
+                        search_results = do_es_search(request.GET.copy())
+
                     render_dict.update(search_results)
                     # Set the value to the query as a convenience
                     alert_form.fields["name"].widget.attrs[

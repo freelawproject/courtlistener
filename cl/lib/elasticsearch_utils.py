@@ -76,14 +76,12 @@ def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
                 "multi_match",
                 query=value,
                 fields=fields,
-                type="cross_fields",
+                type="phrase",
                 operator="AND",
                 tie_breaker=0.3,
             ),
             Q("query_string", query=value, default_operator="AND"),
         ]
-        for field in fields:
-            q_should.append(Q("match_phrase", **{field: {"query": value}}))
         return Q("bool", should=q_should)
 
     return []
