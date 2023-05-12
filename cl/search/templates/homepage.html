@@ -123,7 +123,6 @@
               {% include "includes/search_result_solr.html" with results=results_oa type_override=SEARCH_TYPES.ORAL_ARGUMENT simple=True %}
             {% else %}
               {% include "includes/search_result.html" with results=results_oa type_override=SEARCH_TYPES.ORAL_ARGUMENT simple=True %}
-
             {% endflag %}
             <p class="right">
                 <a href="/?order_by=dateArgued+desc&type=oa"

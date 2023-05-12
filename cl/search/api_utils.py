@@ -27,27 +27,25 @@ def get_object_list(request, cd, paginator):
         group = True
 
     total_query_results = 0
-    if cd["type"] != SEARCH_TYPES.ORAL_ARGUMENT and waffle.flag_is_active(
+    if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT and not waffle.flag_is_active(
         request, "oa-es-deactivate"
     ):
-        main_query = search_utils.build_main_query(
-            cd, highlight="text", facet=False, group=group
-        )
-        main_query["caller"] = "api_search"
-    else:
         search_query = AudioDocument.search()
         main_query, total_query_results, top_hits_limit = build_es_main_query(
             search_query, cd
         )
+    else:
+        main_query = search_utils.build_main_query(
+            cd, highlight="text", facet=False, group=group
+        )
+        main_query["caller"] = "api_search"
 
     if cd["type"] == SEARCH_TYPES.RECAP:
         main_query["sort"] = map_to_docket_entry_sorting(main_query["sort"])
 
-    if cd["type"] != SEARCH_TYPES.ORAL_ARGUMENT and waffle.flag_is_active(
+    if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT and not waffle.flag_is_active(
         request, "oa-es-deactivate"
     ):
-        sl = SolrList(main_query=main_query, offset=offset, type=cd["type"])
-    else:
         sl = ESList(
             main_query=main_query,
             count=total_query_results,
@@ -55,6 +53,8 @@ def get_object_list(request, cd, paginator):
             page_size=page_size,
             type=cd["type"],
         )
+    else:
+        sl = SolrList(main_query=main_query, offset=offset, type=cd["type"])
 
     return sl
 
@@ -182,6 +182,7 @@ class ESList(object):
                 result["snippet"] = result.meta.highlight["text"][0]
             else:
                 result["snippet"] = result["text"]
+            print("REsults from api:", result.to_dict(skip_empty=False))
             self._item_cache.append(
                 ResultObject(initial=result.to_dict(skip_empty=False))
             )
