@@ -1,9 +1,9 @@
+import datetime
 from typing import Sized, cast
 
 import scorched
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
-from django.core.management import call_command
 from django.test.testcases import SerializeMixin
 from django.test.utils import override_settings
 from lxml import etree
@@ -11,6 +11,7 @@ from lxml import etree
 from cl.audio.factories import AudioFactory
 from cl.audio.models import Audio
 from cl.people_db.models import Person
+from cl.search.factories import CourtFactory, DocketFactory, PersonFactory
 from cl.search.models import Court, Opinion
 from cl.search.tasks import add_items_to_solr
 from cl.tests.cases import SimpleTestCase, TestCase
@@ -98,27 +99,6 @@ class SolrTestCase(SimpleUserDataMixin, EmptySolrTestCase):
         self.expected_num_results_audio = 2
 
 
-class IndexedElasticTestCase(SimpleUserDataMixin, TestCase):
-    """A standard Solr test case with content included in the database,  but not
-    yet indexed into the database.
-    """
-
-    fixtures = [
-        "test_court.json",
-        "judge_judy.json",
-        "test_objects_search.json",
-    ]
-
-    @classmethod
-    def rebuild_index(self):
-        """
-        Create and populate the Elasticsearch index and mapping
-        """
-
-        # -f rebuilds index without prompt for confirmation
-        call_command("search_index", "--rebuild", "-f")
-
-
 class IndexedSolrTestCase(SolrTestCase):
     """Similar to the SolrTestCase, but the data is indexed in Solr"""
 
@@ -180,7 +160,6 @@ class AudioTestCase(SimpleTestCase):
     @classmethod
     def setUpTestData(cls):
         cls.audio_1 = AudioFactory.create(
-            case_name="SEC v. Frank J. Custable, Jr.",
             docket_id=1,
             duration=420,
             judges="",
@@ -191,7 +170,6 @@ class AudioTestCase(SimpleTestCase):
             blocked=False,
         )
         cls.audio_2 = AudioFactory.create(
-            case_name="Jose A. Dominguez v. Loretta E. Lynch",
             docket_id=2,
             duration=837,
             judges="",
@@ -201,7 +179,6 @@ class AudioTestCase(SimpleTestCase):
             source="C",
         )
         cls.audio_3 = AudioFactory.create(
-            case_name="Hong Liu Yang v. Lynch-Loretta E.",
             docket_id=3,
             duration=653,
             judges="",
@@ -215,3 +192,79 @@ class AudioTestCase(SimpleTestCase):
     def tearDownClass(cls):
         Audio.objects.all().delete()
         super().tearDownClass()
+
+
+class ESTestCaseMixin(SerializeMixin):
+    lockfile = __file__
+
+
+class AudioESTestCase(SimpleTestCase):
+    """Audio test case factories for ES"""
+
+    fixtures = [
+        "test_court.json",
+        "judge_judy.json",
+        "test_objects_search.json",
+    ]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.court_1 = CourtFactory(
+            id="cabc", full_name="Testing Supreme Court", jurisdiction="FB"
+        )
+        cls.court_2 = CourtFactory(
+            id="nyed",
+            full_name="Court of Appeals for the First Circuit",
+            jurisdiction="FB",
+        )
+        cls.docket_1 = DocketFactory.create(
+            docket_number="19-5733",
+            court_id=cls.court_1.pk,
+            date_argued=datetime.date(2015, 8, 16),
+        )
+        cls.docket_2 = DocketFactory.create(
+            docket_number="19-5734",
+            court_id=cls.court_1.pk,
+            date_argued=datetime.date(2015, 8, 15),
+        )
+        cls.docket_3 = DocketFactory.create(
+            docket_number="19-5735",
+            court_id=cls.court_2.pk,
+            date_argued=datetime.date(2015, 8, 14),
+        )
+        cls.audio_1 = AudioFactory.create(
+            case_name="SEC v. Frank J. Custable, Jr.",
+            docket_id=cls.docket_1.pk,
+            duration=420,
+            judges="",
+            local_path_original_file="test/audio/ander_v._leo.mp3",
+            local_path_mp3="test/audio/2.mp3",
+            source="C",
+            blocked=False,
+        )
+        cls.audio_2 = AudioFactory.create(
+            case_name="Jose A. Dominguez v. Loretta E. Lynch",
+            docket_id=cls.docket_2.pk,
+            duration=837,
+            judges="",
+            local_path_original_file="mp3/2014/06/09/ander_v._leo.mp3",
+            local_path_mp3="test/audio/2.mp3",
+            source="C",
+        )
+        cls.audio_3 = AudioFactory.create(
+            case_name="Hong Liu Yang v. Lynch-Loretta E.",
+            docket_id=cls.docket_3.pk,
+            duration=653,
+            judges="",
+            local_path_original_file="mp3/2015/07/08/hong_liu_yang_v._loretta_e._lynch.mp3",
+            local_path_mp3="test/audio/2.mp3",
+            source="CR",
+        )
+        cls.author = PersonFactory.create()
+        cls.audio_4 = AudioFactory.create(
+            case_name="Hong Liu Lorem v. Lynch-Loretta E.",
+            docket_id=cls.docket_3.pk,
+            duration=653,
+            judges="John Smith",
+        )
+        cls.audio_4.panel.add(cls.author)
