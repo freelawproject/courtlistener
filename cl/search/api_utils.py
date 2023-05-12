@@ -59,6 +59,76 @@ def get_object_list(request, cd, paginator):
     return sl
 
 
+class ESList(object):
+    """This class implements a yielding list object that fetches items from ES
+    as they are queried.
+    """
+
+    def __init__(
+        self, main_query, count, offset, page_size, type, length=None
+    ):
+        super(ESList, self).__init__()
+        self.main_query = main_query
+        self.offset = offset
+        self.page_size = page_size
+        self.type = type
+        self.count = count
+        self._item_cache = []
+        self._length = length
+
+    def __len__(self):
+        if self._length is None:
+            self._length = self.count
+        return self._length
+
+    def __iter__(self):
+        for item in range(0, len(self)):
+            try:
+                yield self._item_cache[item]
+            except IndexError:
+                yield self.__getitem__(item)
+
+    def __getitem__(self, item):
+        self.main_query = self.main_query[
+            self.offset : self.offset + self.page_size
+        ]
+        results = self.main_query.execute()
+
+        # Pull the text snippet up a level
+        for result in results:
+            if hasattr(result.meta, "highlight") and hasattr(
+                result.meta.highlight, "text"
+            ):
+                result["snippet"] = result.meta.highlight["text"][0]
+            else:
+                result["snippet"] = result["text"]
+            self._item_cache.append(
+                ResultObject(initial=result.to_dict(skip_empty=False))
+            )
+
+        # Now, assuming our _item_cache is all set, we just get the item.
+        if isinstance(item, slice):
+            s = slice(
+                item.start - int(self.offset),
+                item.stop - int(self.offset),
+                item.step,
+            )
+            return self._item_cache[s]
+        else:
+            # Not slicing.
+            try:
+                return self._item_cache[item]
+            except IndexError:
+                # No results!
+                return []
+
+    def append(self, p_object):
+        """Lightly override the append method so we get items duplicated in
+        our cache.
+        """
+        self._item_cache.append(p_object)
+
+
 class SolrList(object):
     """This implements a yielding list object that fetches items as they are
     queried.
@@ -114,78 +184,6 @@ class SolrList(object):
                         doc["solr_highlights"]["text"]
                     )
                     self._item_cache.append(ResultObject(initial=doc))
-
-        # Now, assuming our _item_cache is all set, we just get the item.
-        if isinstance(item, slice):
-            s = slice(
-                item.start - int(self.offset),
-                item.stop - int(self.offset),
-                item.step,
-            )
-            return self._item_cache[s]
-        else:
-            # Not slicing.
-            try:
-                return self._item_cache[item]
-            except IndexError:
-                # No results!
-                return []
-
-    def append(self, p_object):
-        """Lightly override the append method so we get items duplicated in
-        our cache.
-        """
-        self._item_cache.append(p_object)
-
-
-class ESList(object):
-    """This implements a yielding list object that fetches items as they are
-    queried.
-    """
-
-    def __init__(
-        self, main_query, count, offset, page_size, type, length=None
-    ):
-        super(ESList, self).__init__()
-        self.main_query = main_query
-        self.offset = offset
-        self.page_size = page_size
-        self.type = type
-        self.count = count
-        self._item_cache = []
-        self._length = length
-
-    def __len__(self):
-        if self._length is None:
-            # TODO do we need to set a "api_search_count" caller for ES?
-            self._length = self.count
-        return self._length
-
-    def __iter__(self):
-        for item in range(0, len(self)):
-            try:
-                yield self._item_cache[item]
-            except IndexError:
-                yield self.__getitem__(item)
-
-    def __getitem__(self, item):
-        self.main_query = self.main_query[
-            self.offset : self.offset + self.page_size
-        ]
-        results = self.main_query.execute()
-
-        # Pull the text snippet up a level
-        for result in results:
-            if hasattr(result.meta, "highlight") and hasattr(
-                result.meta.highlight, "text"
-            ):
-                result["snippet"] = result.meta.highlight["text"][0]
-            else:
-                result["snippet"] = result["text"]
-            print("REsults from api:", result.to_dict(skip_empty=False))
-            self._item_cache.append(
-                ResultObject(initial=result.to_dict(skip_empty=False))
-            )
 
         # Now, assuming our _item_cache is all set, we just get the item.
         if isinstance(item, slice):
