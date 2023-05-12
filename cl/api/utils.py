@@ -15,6 +15,7 @@ from django.utils.encoding import force_str
 from django.utils.timezone import now
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_headers
+from django_ratelimit.core import get_header
 from requests import Response
 from rest_framework import serializers
 from rest_framework.metadata import SimpleMetadata
@@ -243,7 +244,7 @@ class LoggingMixin(object):
     def _log_request(self, request):
         d = date.today().isoformat()
         user = request.user
-        client_ip = request.META.get("CloudFront-Viewer-Address", "").split(
+        client_ip = get_header(request, "CloudFront-Viewer-Address").split(
             ":"
         )[0]
         endpoint = resolve(request.path_info).url_name
