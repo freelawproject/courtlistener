@@ -99,7 +99,6 @@ django-ses = {extras = ["events"], version = "^3.3.0"}
 django-environ = "^0.8.1"
 judge-pics = "^2.0.1"
 django-admin-cursor-paginator = "^0.1.2"
-django-ipware = "^4.0.2"
 sentry-sdk = "^1.14.0"
 selenium = "4.0.0.a7"
 ipython = "^8.10.0"
