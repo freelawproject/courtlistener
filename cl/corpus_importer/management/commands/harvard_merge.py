@@ -35,6 +35,13 @@ class JudgeException(Exception):
         self.message = message
 
 
+class OpinionTypeException(Exception):
+    """An exception for incorrect opinion types"""
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+
 def read_json(cluster_id: int) -> Dict[str, Any] | None:
     """Helper method to read json into object
 
@@ -575,22 +582,59 @@ def map_and_merge_opinions(cluster: int, harvard_data: Dict[str, Any]) -> None:
     """
     used_combined_opinions = False
     case_body = harvard_data["casebody"]["data"]
-    sub_opinions = Opinion.objects.filter(cluster__id=cluster)
-
+    sub_opinions = Opinion.objects.filter(cluster__id=cluster).exclude(
+        type="010combined"
+    )
     soup = BeautifulSoup(case_body, "lxml")
     harvard_html = soup.find_all(
         lambda tag: (tag.name == "opinion" and tag.get("data-type") is None)
         or tag.get("data-type") == "opinion"
     )
-    harvard_opinions = [op for op in harvard_html]
-    cl_opinions = fetch_cl_opinion_content(sub_opinions=sub_opinions)
 
-    if len(harvard_opinions) != len(cl_opinions):
-        used_combined_opinions = True
+    types_mapping = {
+        "unanimous": "015unamimous",
+        "majority": "020lead",
+        "plurality": "025plurality",
+        "concurrence": "030concurrence",
+        "concurring-in-part-and-dissenting-in-part": "035concurrenceinpart",
+        "dissent": "040dissent",
+        "remittitur": "060remittitur",
+        "rehearing": "070rehearing",
+        "on-the-merits": "080onthemerits",
+        "on-motion-to-strike-cost-bill": "090onmotiontostrike",
+    }
+
+    if len(harvard_html) != len(sub_opinions):
+        if sub_opinions.count() == 0:
+            # Our only opinion is a combined opinion
+            for op in harvard_html:
+                if op.has_attr("type"):
+                    opinion_type = types_mapping.get(op.get("type"))
+                    if opinion_type:
+                        Opinion.objects.create(
+                            xml_harvard=str(op),
+                            cluster=OpinionCluster.objects.get(id=cluster),
+                            type=opinion_type,
+                        )
+                    else:
+                        raise OpinionTypeException(
+                            f"Opinion type unknown: {op.get('type')}"
+                        )
+                else:
+                    # It cannot create opinion, it has no type
+                    raise OpinionTypeException(
+                        f"Opinion from json file in cluster_id: {cluster} has no type"
+                    )
+
     else:
+        harvard_opinions = [op for op in harvard_html]
+        cl_opinions = fetch_cl_opinion_content(sub_opinions=sub_opinions)
         # crashes without a sub opinion ... that makes sense
         matches = match_lists(harvard_opinions, cl_opinions)
         if not matches:
+            # for some reason we have the same number of opinions, but we
+            # didn't have a match between the opinions, create a combined
+            # opinion
             used_combined_opinions = True
 
         if not used_combined_opinions:
@@ -624,7 +668,7 @@ def map_and_merge_opinions(cluster: int, harvard_data: Dict[str, Any]) -> None:
         # If we cant quite merge the opinions. Create combined opinion.
         # This occurs when the harvard data or CL data is slightly askew.
         Opinion.objects.create(
-            xml_harvard=case_body,
+            xml_harvard="\n".join([str(op) for op in harvard_html]),
             cluster=OpinionCluster.objects.get(id=cluster),
             type="010combined",
         )
