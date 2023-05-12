@@ -424,7 +424,7 @@ def merge_overlapping_data(
 
     if not changed_values_dictionary:
         # Empty dictionary means that we don't have overlapping data
-        logging.info(f"Merging complete for: {cluster_id}")
+        logger.info(f"Merging complete for: {cluster_id}")
         return
 
     long_fields = [
@@ -465,7 +465,7 @@ def merge_overlapping_data(
                 changed_values_dictionary.get(field_name, ""),
             )
         else:
-            logging.info(f"Field not considered in the process: {field_name}")
+            logger.info(f"Field not considered in the process: {field_name}")
 
 
 def update_docket_source(cluster_id: int) -> None:
@@ -508,7 +508,7 @@ def merge_opinion_clusters(
         if only_fastcase:
             source = get_data_source(harvard_data)
             if source == "Fastcase":
-                logging.info("Skipping non fastcase opinion cluster")
+                logger.info("Skipping non fastcase opinion cluster")
                 return
         try:
             with transaction.atomic():
@@ -522,14 +522,14 @@ def merge_opinion_clusters(
                 merge_overlapping_data(cluster_id, changed_values_dictionary)
                 update_docket_source(cluster_id=cluster_id)
                 update_cluster_source(cluster_id=cluster_id)
-                logging.info(msg=f"Finished merging cluster: {cluster_id}")
+                logger.info(msg=f"Finished merging cluster: {cluster_id}")
 
         except AuthorException:
-            logging.warning(msg=f"Author Exception for cluster {cluster_id}")
+            logger.warning(msg=f"Author Exception for cluster {cluster_id}")
         except JudgeException:
-            logging.warning(msg=f"Judge exception for: {cluster_id}")
+            logger.warning(msg=f"Judge exception for: {cluster_id}")
     else:
-        logging.warning(msg=f"No Harvard json for cluster: {cluster_id}")
+        logger.warning(msg=f"No Harvard json for cluster: {cluster_id}")
 
 
 def fetch_cl_opinion_content(sub_opinions: list[Opinion]) -> list[str]:
@@ -661,15 +661,22 @@ class Command(VerboseCommand):
                 for source in Docket.SOURCE_CHOICES
                 if "Harvard" not in source[1]
             ]
-            cluster_ids = OpinionCluster.objects.filter(
-                docket__source__in=sources_without_harvard,
-                filepath_json_harvard__isnull=False,
-            ).values_list("id", flat=True)
+            cluster_ids = (
+                OpinionCluster.objects.filter(
+                    docket__source__in=sources_without_harvard,
+                    filepath_json_harvard__isnull=False,
+                )
+                .exclude(filepath_json_harvard__exact="")
+                .values_list("id", "filepath_json_harvard", flat=False)
+            )
             logger.info(msg=f"{len(cluster_ids)} left to merge")
         else:
-            cluster_ids = [options["cluster_id"]]
+            cluster_ids = OpinionCluster.objects.filter(
+                id=options["cluster_id"]
+            ).values_list("id", "filepath_json_harvard", flat=False)
 
         for cluster_id in cluster_ids:
+            logger.info(msg=f"Merging {cluster_id[0]} at {cluster_id[1]}")
             merge_opinion_clusters(
-                cluster_id=cluster_id, only_fastcase=options["fastcase"]
+                cluster_id=cluster_id[0], only_fastcase=options["fastcase"]
             )
