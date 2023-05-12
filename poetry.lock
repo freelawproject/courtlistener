@@ -887,18 +887,6 @@ files = [
 ]
 
 [[package]]
-name = "django-ipware"
-version = "4.0.2"
-description = "A Django application to retrieve user's IP address"
-category = "main"
-optional = false
-python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*"
-files = [
-    {file = "django-ipware-4.0.2.tar.gz", hash = "sha256:602a58325a4808bd19197fef2676a0b2da2df40d0ecf21be414b2ff48c72ad05"},
-    {file = "django_ipware-4.0.2-py2.py3-none-any.whl", hash = "sha256:878dbb06a87e25550798e9ef3204ed70a200dd8b15e47dcef848cf08244f04c9"},
-]
-
-[[package]]
 name = "django-localflavor"
 version = "3.1"
 description = "Country-specific Django helpers"
@@ -4132,4 +4120,4 @@ h11 = ">=0.9.0,<1"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10, <3.11"
-content-hash = "d1f0b5bace0c4f611de215f41b4a4ebff781062663cc0579d24b827d95ef42ae"
+content-hash = "5531cb055678453747e23ddecf50b1b91003abb46294e01160c0851cb623933d"
