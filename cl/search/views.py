@@ -715,7 +715,6 @@ def paginate_cached_es_results(
     merge_courts_from_db(results, search_type)
 
     if cache_key is not None:
-        six_hours = 60 * 60 * 6
-        cache.set(cache_key, results, six_hours)
+        cache.set(cache_key, results, settings.QUERY_RESULTS_CACHE)
 
     return results

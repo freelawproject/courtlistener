@@ -37,7 +37,7 @@ from cl.lib.elasticsearch_utils import (
     build_es_main_query,
     build_fulltext_query,
     build_sort_results,
-    build_terms_query,
+    build_term_query,
     group_search_results,
 )
 from cl.lib.search_utils import cleanup_main_query
@@ -1963,7 +1963,7 @@ class ElasticSearchTest(TestCase):
     def test_build_terms_query(self) -> None:
         """Test build es terms query"""
         filters = []
-        q = build_terms_query(
+        q = build_term_query(
             "court_id",
             [self.c1.pk, self.c2.pk],
         )

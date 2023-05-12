@@ -70,69 +70,56 @@ def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
                     f"docketNumber:{docket_number}",
                     value,
                 )
-
         q_should = [
             Q(
                 "multi_match",
                 query=value,
                 fields=fields,
-                type="cross_fields",
+                type="phrase",
                 operator="AND",
                 tie_breaker=0.3,
             ),
             Q("query_string", query=value, default_operator="AND"),
         ]
-        for field in fields:
-            q_should.append(Q("match_phrase", **{field: {"query": value}}))
         return Q("bool", should=q_should)
-
     return []
 
 
-def build_term_query(field: str, value: str) -> List:
-    """Given field name and value, return Elastic Search term query or [].
+def build_term_query(field: str, value: str | list) -> list:
+    """Given field name and value or list of values, return Elasticsearch term
+    or terms query or [].
     "term" Returns documents that contain an exact term in a provided field
     NOTE: Use it only whe you want an exact match, avoid using this with text fields
-    https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-term-query.html
+    "terms" Returns documents that contain one or more exact terms in a provided field.
 
     :param field: elasticsearch index fieldname
-    :param value: term to find
+    :param value: term or terms to find
     :return: Empty list or list with DSL Match query
     """
+    if value and isinstance(value, list):
+        value = list(filter(None, value))
+        return [Q("terms", **{field: value})]
+
     if value:
         return [Q("term", **{field: value})]
     return []
 
 
 def build_text_filter(field: str, value: str) -> List:
-    """Given field name and value, return Elastic Search term query or [].
-    "term" Returns documents that contain an exact term in a provided field
-    NOTE: Use it only whe you want an exact match, avoid using this with text fields
-    https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-term-query.html
+    """Given a field and value, return Elasticsearch match_phrase query or [].
+    "match_phrase" Returns documents that contain the exact phrase in a
+    provided field, by default match_phrase has a slop of 0 that requires all
+    terms in the query to appear in the document exactly in the order specified
+    NOTE: Use it when you want to match the entire exact phrase, especially in
+    text fields where the order of the words matters.
+    https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-match-query-phrase.html
 
-    :param field: elasticsearch index fieldname
-    :param value: term to find
-    :return: Empty list or list with DSL Match query
+    :param field: elasticsearch index field name
+    :param value: the phrase to find
+    :return: Empty list or list with DSL Phrase query
     """
     if value:
         return [Q("match_phrase", **{field: value})]
-    return []
-
-
-def build_terms_query(field: str, value: List) -> List:
-    """Given field name and list of values, return Elastic Search term query or [].
-    "terms" Returns documents that contain one or more exact terms in a provided field.
-
-    https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-terms-query.html
-    :param field: elasticsearch index fieldname
-    :param value: term to find
-    :return: Empty list or list with DSL Match query
-    """
-
-    # Remove elements that evaluate to False, like ""
-    value = list(filter(None, value))
-    if value:
-        return [Q("terms", **{field: value})]
     return []
 
 
@@ -193,14 +180,13 @@ def build_es_filters(cd: CleanData) -> List:
     """
 
     queries_list = []
-
     if (
         cd["type"] == SEARCH_TYPES.PARENTHETICAL
         or cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT
     ):
         # Build court terms filter
         queries_list.extend(
-            build_terms_query(
+            build_term_query(
                 "court_id",
                 cd.get("court", "").split(),
             )
@@ -212,7 +198,6 @@ def build_es_filters(cd: CleanData) -> List:
                 cd.get("docket_number", ""),
             )
         )
-
     if cd["type"] == SEARCH_TYPES.PARENTHETICAL:
         # Build daterange query
         queries_list.extend(
@@ -222,7 +207,6 @@ def build_es_filters(cd: CleanData) -> List:
                 cd.get("filed_after", ""),
             )
         )
-
     if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
         # Build daterange query
         queries_list.extend(
@@ -232,15 +216,12 @@ def build_es_filters(cd: CleanData) -> List:
                 cd.get("argued_after", ""),
             )
         )
-
         # Build court terms filter
         queries_list.extend(
             build_text_filter("caseName", cd.get("case_name", ""))
         )
-
         # Build court terms filter
         queries_list.extend(build_text_filter("judge", cd.get("judge", "")))
-
     return queries_list
 
 
@@ -259,16 +240,23 @@ def build_es_main_query(
 
     string_query = None
     filters = build_es_filters(cd)
-    if cd["type"] == SEARCH_TYPES.PARENTHETICAL:
-        string_query = build_fulltext_query(
-            ["representative_text"], cd.get("q", "")
-        )
-
-    elif cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
-        string_query = build_fulltext_query(
-            ["caseName", "docketNumber", "court", "court_id", "judge", "sha1"],
-            cd.get("q", ""),
-        )
+    match cd["type"]:
+        case SEARCH_TYPES.PARENTHETICAL:
+            string_query = build_fulltext_query(
+                ["representative_text"], cd.get("q", "")
+            )
+        case SEARCH_TYPES.ORAL_ARGUMENT:
+            string_query = build_fulltext_query(
+                [
+                    "caseName",
+                    "docketNumber",
+                    "court",
+                    "court_id",
+                    "judge",
+                    "sha1",
+                ],
+                cd.get("q", ""),
+            )
 
     if filters or string_query:
         # Apply filters first if there is at least one set.
@@ -296,26 +284,12 @@ def build_es_main_query(
     return search_query, total_query_results, top_hits_limit
 
 
-def add_es_highlighting(search_query, cd):
+def add_es_highlighting(search_query: Search, cd: CleanData):
     if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
-        ffl = [
-            "id",
-            "absolute_url",
-            "court_id",
-            "local_path",
-            "source",
-            "download_url",
-            "docket_id",
-            "dateArgued",
-            "duration",
-            "docket_slug",
-            "caseName",
-            "docketNumber",
-            "text",
-        ]
-        hlfl = SEARCH_ORAL_ARGUMENT_HL_FIELDS
-        search_query = search_query.source(ffl)
-        for field in hlfl:
+        fields_to_exclude = ["sha1"]
+        highlighting_fields = SEARCH_ORAL_ARGUMENT_HL_FIELDS
+        search_query = search_query.source(excludes=fields_to_exclude)
+        for field in highlighting_fields:
             search_query = search_query.highlight(
                 field,
                 number_of_fragments=0,
