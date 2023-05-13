@@ -5,7 +5,7 @@ from datetime import date
 from typing import Any, Dict, Optional, Tuple
 
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from django.db import transaction
 from juriscraper.lib.string_utils import harmonize, titlecase
 
@@ -425,7 +425,7 @@ def merge_overlapping_data(
     """Merge overlapping data
 
     :param cluster_id: the cluster id
-    :param clean_dictionary: the dictionary of data to merge
+    :param changed_values_dictionary: the dictionary of data to merge
     :return: None
     """
 
@@ -508,6 +508,7 @@ def merge_opinion_clusters(
     """Merge opinion cluster, docket and opinion data from Harvard
 
     :param cluster_id: The cluster ID to merger
+    :param only_fastcase: Only process fastcase data
     :return: None
     """
     harvard_data = read_json(cluster_id)
@@ -573,6 +574,63 @@ def fetch_cl_opinion_content(sub_opinions: list[Opinion]) -> list[str]:
     return cl_opinions
 
 
+def update_matching_opinions(
+    matches: dict, cluster_sub_opinions: list, harvard_opinions: list
+) -> None:
+    """Update opinions that matched
+    :param matches: dict with matching position from queryset and harvard opinions
+    :param cluster_sub_opinions: queryset of opinions
+    :param harvard_opinions: list of harvard opinions
+    :return: None
+    """
+
+    for k, v in matches.items():
+        op = cluster_sub_opinions[int(v)]
+        author_str = ""
+        author = harvard_opinions[int(k)].find("author")
+        if author:
+            # Prettify the name a bit
+            author_str = titlecase(author.text.strip(":"))
+        if op.author_str == "":
+            # We have an empty author name
+            if author_str:
+                # Store the name extracted from the author tag
+                op.author_str = author_str
+        else:
+            if author_str:
+                if extract_judge_last_name(
+                    op.author_str
+                ) != extract_judge_last_name(author_str):
+                    # Raise an exception, check in the log for
+                    # difference between author names
+                    raise AuthorException("Authors don't match - log error")
+
+        op.xml_harvard = str(harvard_opinions[int(k)])
+        op.save()
+
+
+def create_opinion(harvard_html: Tag, opinion_type: str, cluster: int) -> None:
+    """Create a new opinion
+    :param harvard_html: BS element that contains opinion
+    :param opinion_type: opinion type from Opinion model
+    :param cluster: id from opinion cluster
+    :return: None
+    """
+
+    author_str = ""
+    author = harvard_html.find("author")
+    if author:
+        # Prettify the name a bit
+        author_str = titlecase(author.text.strip(":"))
+
+    Opinion.objects.create(
+        xml_harvard=str(harvard_html),
+        cluster=OpinionCluster.objects.get(id=cluster),
+        type=opinion_type,
+        author_str=author_str,
+    )
+
+
 def map_and_merge_opinions(cluster: int, harvard_data: Dict[str, Any]) -> None:
     """Map and merge opinion data
 
@@ -582,9 +640,7 @@ def map_and_merge_opinions(cluster: int, harvard_data: Dict[str, Any]) -> None:
     """
     used_combined_opinions = False
     case_body = harvard_data["casebody"]["data"]
-    sub_opinions = Opinion.objects.filter(cluster__id=cluster).exclude(
-        type="010combined"
-    )
+    sub_opinions = Opinion.objects.filter(cluster__id=cluster)
     soup = BeautifulSoup(case_body, "lxml")
     harvard_html = soup.find_all(
         lambda tag: (tag.name == "opinion" and tag.get("data-type") is None)
@@ -605,17 +661,14 @@ def map_and_merge_opinions(cluster: int, harvard_data: Dict[str, Any]) -> None:
     }
 
     if len(harvard_html) != len(sub_opinions):
-        if sub_opinions.count() == 0:
+        specific_sub_opinions = sub_opinions.exclude(type="010combined")
+        if specific_sub_opinions.count() == 0:
             # Our only opinion is a combined opinion
             for op in harvard_html:
                 if op.has_attr("type"):
                     opinion_type = types_mapping.get(op.get("type"))
                     if opinion_type:
-                        Opinion.objects.create(
-                            xml_harvard=str(op),
-                            cluster=OpinionCluster.objects.get(id=cluster),
-                            type=opinion_type,
-                        )
+                        create_opinion(op, opinion_type, cluster)
                     else:
                         raise OpinionTypeException(
                             f"Opinion type unknown: {op.get('type')}"
@@ -625,53 +678,76 @@ def map_and_merge_opinions(cluster: int, harvard_data: Dict[str, Any]) -> None:
                     raise OpinionTypeException(
                         f"Opinion from json file in cluster_id: {cluster} has no type"
                     )
+        else:
+            # Try to match cluster sub opinions with json opinions
+            harvard_opinions = [op for op in harvard_html]
+            specific_sub_opinions = sub_opinions.exclude(type="010combined")
+            cl_opinions = fetch_cl_opinion_content(
+                sub_opinions=specific_sub_opinions
+            )
+            matches = match_lists(harvard_opinions, cl_opinions)
+            if matches:
+                # Update matching opinions
+                update_matching_opinions(
+                    matches, specific_sub_opinions, harvard_opinions
+                )
+            else:
+                # We have opinions but for some unknown reason they don't match
+                logger.warning(
+                    msg=f"Opinions don't match with json file on cluster id: {cluster}"
+                )
 
     else:
+        # Cl opinions and harvard opinions have the same length, try to match
+        # opinions
         harvard_opinions = [op for op in harvard_html]
         cl_opinions = fetch_cl_opinion_content(sub_opinions=sub_opinions)
-        # crashes without a sub opinion ... that makes sense
         matches = match_lists(harvard_opinions, cl_opinions)
         if not matches:
-            # for some reason we have the same number of opinions, but we
-            # didn't have a match between the opinions, create a combined
-            # opinion
             used_combined_opinions = True
 
         if not used_combined_opinions:
-            for k, v in matches.items():
-                op = sub_opinions[k]
-                author_str = ""
-                author = harvard_opinions[v].find("author")
-                if author:
-                    # Prettify the name a bit
-                    author_str = titlecase(author.text.strip(":"))
-                if op.author_str == "":
-                    # We have an empty author name
-                    if author_str:
-                        # Store the name extracted from the author tag
-                        op.author_str = author_str
-                else:
-                    if author_str:
-                        if extract_judge_last_name(
-                            op.author_str
-                        ) != extract_judge_last_name(author_str):
-                            # Raise an exception, check in the log for
-                            # difference between author names
-                            raise AuthorException(
-                                "Authors don't match - log error"
-                            )
-
-                op.xml_harvard = str(harvard_opinions[v])
-                op.save()
+            # Update matching opinions
+            update_matching_opinions(matches, sub_opinions, harvard_opinions)
 
     if used_combined_opinions:
-        # If we cant quite merge the opinions. Create combined opinion.
-        # This occurs when the harvard data or CL data is slightly askew.
-        Opinion.objects.create(
-            xml_harvard="\n".join([str(op) for op in harvard_html]),
-            cluster=OpinionCluster.objects.get(id=cluster),
-            type="010combined",
-        )
+        combined_opinions = sub_opinions.filter(type="010combined")
+
+        if combined_opinions:
+            if combined_opinions.count() == 1:
+                # Try to match old and new combined opinion
+                cl_combined_opinion = fetch_cl_opinion_content(
+                    sub_opinions=combined_opinions
+                )
+                harvard_combined_opinion = [
+                    "\n".join([str(op) for op in harvard_html])
+                ]
+                matches = match_lists(
+                    harvard_combined_opinion, cl_combined_opinion
+                )
+                if matches:
+                    # Update combined opinion
+                    update_matching_opinions(
+                        matches, cl_combined_opinion, harvard_combined_opinion
+                    )
+
+            else:
+                # We have more than one combined opinion
+                logger.warning(
+                    msg=f"Cluster id: {cluster} has more than one "
+                    f"combined opinion. Can't update combined"
+                    f" opinion."
+                )
+        else:
+            # We don't have a combined opinion, create combined opinion
+            Opinion.objects.create(
+                xml_harvard="\n".join([str(op) for op in harvard_html]),
+                cluster=OpinionCluster.objects.get(id=cluster),
+                type="010combined",
+            )
+            logger.info(
+                msg=f"Combined opinion created in cluster id: {cluster}"
+            )
 
 
 class Command(VerboseCommand):
@@ -699,7 +775,7 @@ class Command(VerboseCommand):
         if options["no_debug"]:
             logging.disable(logging.DEBUG)
 
-        if options["cluster_id"] == None:
+        if options["cluster_id"] is None:
             sources_without_harvard = [
                 source[0]
                 for source in Docket.SOURCE_CHOICES
