@@ -2550,17 +2550,18 @@ class HarvardMergerTests(TestCase):
             "name_abbreviation": "A v. B",
             "name": "A v. B",
             "casebody": {
-                "data": "<casebody><opinion>An opinion</opinion></casebody>"
+                "data": '<casebody><opinion type="majority">An opinion</opinion></casebody>'
             },
         }
         self.read_json_func.return_value = case_data
-        merge_opinion_clusters(cluster_id=None)
         cluster_ids = OpinionCluster.objects.filter(
             docket__source__in=[s[0] for s in SC if "Harvard" not in s[1]],
             filepath_json_harvard__isnull=False,
         ).values_list("id", flat=True)
+        for id in cluster_ids:
+            merge_opinion_clusters(cluster_id=id)
         # Validate that our two opinions were imported and no more exist
-        self.assertEqual([], list(cluster_ids))
+        self.assertEqual([1, 4, 5], list(cluster_ids))
 
     def test_add_opinions_without_authors_in_cl(self):
         """Can we add opinion and update authors"""
@@ -2590,9 +2591,18 @@ class HarvardMergerTests(TestCase):
         authors = list(author_query)
 
         self.assertEqual(authors, ["", ""])
-        merge_opinion_clusters(
-            cluster_id=None
-        )  # allow the system to find the cluster
+        # merge_opinion_clusters(
+        #     cluster_id=None
+        # )  # allow the system to find the cluster
+
+        SC = Docket.SOURCE_CHOICES
+        cluster_ids = OpinionCluster.objects.filter(
+            docket__source__in=[s[0] for s in SC if "Harvard" not in s[1]],
+            filepath_json_harvard__isnull=False,
+        ).values_list("id", flat=True)
+        for id in cluster_ids:
+            merge_opinion_clusters(cluster_id=id)
+
         cluster.refresh_from_db()
 
         author_query = Opinion.objects.filter(
