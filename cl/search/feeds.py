@@ -4,6 +4,7 @@ from django.conf import settings
 from django.contrib.syndication.views import Feed
 from django.shortcuts import get_object_or_404
 from django.utils.feedgenerator import Atom1Feed
+from requests import Session
 
 from cl.lib import search_utils
 from cl.lib.date_time import midnight_pst
@@ -43,28 +44,36 @@ class SearchFeed(Feed):
         if search_form.is_valid():
             cd = search_form.cleaned_data
             order_by = "dateFiled"
-            if cd["type"] == SEARCH_TYPES.OPINION:
-                solr = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
-            elif cd["type"] == SEARCH_TYPES.RECAP:
-                solr = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode="r")
-            else:
-                return []
-            main_params = search_utils.build_main_query(
-                cd, highlight=False, facet=False
-            )
-            main_params.update(
-                {
-                    "sort": f"{order_by} desc",
-                    "rows": "20",
-                    "start": "0",
-                    "caller": "SearchFeed",
-                }
-            )
-            # Eliminate items that lack the ordering field.
-            main_params["fq"].append(f"{order_by}:[* TO *]")
-            items = solr.query().add_extra(**main_params).execute()
-            solr.conn.http_connection.close()
-            return items
+            with Session() as session:
+                if cd["type"] == SEARCH_TYPES.OPINION:
+                    solr = ExtraSolrInterface(
+                        settings.SOLR_OPINION_URL,
+                        http_connection=session,
+                        mode="r",
+                    )
+                elif cd["type"] == SEARCH_TYPES.RECAP:
+                    solr = ExtraSolrInterface(
+                        settings.SOLR_RECAP_URL,
+                        http_connection=session,
+                        mode="r",
+                    )
+                else:
+                    return []
+                main_params = search_utils.build_main_query(
+                    cd, highlight=False, facet=False
+                )
+                main_params.update(
+                    {
+                        "sort": f"{order_by} desc",
+                        "rows": "20",
+                        "start": "0",
+                        "caller": "SearchFeed",
+                    }
+                )
+                # Eliminate items that lack the ordering field.
+                main_params["fq"].append(f"{order_by}:[* TO *]")
+                items = solr.query().add_extra(**main_params).execute()
+                return items
         else:
             return []
 
@@ -101,18 +110,20 @@ class JurisdictionFeed(Feed):
 
     def items(self, obj):
         """Do a Solr query here. Return the first 20 results"""
-        solr = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
-        params = {
-            "q": "*",
-            "fq": f"court_exact:{obj.pk}",
-            "sort": "dateFiled desc",
-            "rows": "20",
-            "start": "0",
-            "caller": "JurisdictionFeed",
-        }
-        items = solr.query().add_extra(**params).execute()
-        solr.conn.http_connection.close()
-        return items
+        with Session() as session:
+            solr = ExtraSolrInterface(
+                settings.SOLR_OPINION_URL, http_connection=session, mode="r"
+            )
+            params = {
+                "q": "*",
+                "fq": f"court_exact:{obj.pk}",
+                "sort": "dateFiled desc",
+                "rows": "20",
+                "start": "0",
+                "caller": "JurisdictionFeed",
+            }
+            items = solr.query().add_extra(**params).execute()
+            return items
 
     def item_link(self, item):
         return get_item(item)["absolute_url"]
@@ -155,14 +166,16 @@ class AllJurisdictionsFeed(JurisdictionFeed):
 
     def items(self, obj):
         """Do a Solr query here. Return the first 20 results"""
-        solr = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
-        params = {
-            "q": "*",
-            "sort": "dateFiled desc",
-            "rows": "20",
-            "start": "0",
-            "caller": "AllJurisdictionsFeed",
-        }
-        items = solr.query().add_extra(**params).execute()
-        solr.conn.http_connection.close()
-        return items
+        with Session() as session:
+            solr = ExtraSolrInterface(
+                settings.SOLR_OPINION_URL, http_connection=session, mode="r"
+            )
+            params = {
+                "q": "*",
+                "sort": "dateFiled desc",
+                "rows": "20",
+                "start": "0",
+                "caller": "AllJurisdictionsFeed",
+            }
+            items = solr.query().add_extra(**params).execute()
+            return items

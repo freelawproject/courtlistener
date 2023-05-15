@@ -16,6 +16,7 @@ from eyecite.models import (
 )
 from eyecite.test_factories import case_citation
 from eyecite.utils import strip_punct
+from requests import Session
 from scorched.response import SolrResponse
 
 from cl.custom_filters.templatetags.text_filters import best_case_name
@@ -136,53 +137,61 @@ def search_db_for_fullcitation(
         full_citation.citing_opinion = None
 
     # TODO: Create shared solr connection for all queries
-    si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
-    main_params: SearchParam = {
-        "q": "*",
-        "fq": [
-            "status:Precedential",  # Non-precedential documents aren't cited
-        ],
-        "caller": "citation.match_citations.match_citation",
-    }
-    if full_citation.citing_opinion is not None:
-        # Eliminate self-cites.
-        main_params["fq"].append(f"-id:{full_citation.citing_opinion.pk}")
-    # Set up filter parameters
-    if full_citation.year:
-        start_year = end_year = full_citation.year
-    else:
-        start_year, end_year = get_years_from_reporter(full_citation)
-        if (
-            full_citation.citing_opinion is not None
-            and full_citation.citing_opinion.cluster.date_filed
-        ):
-            end_year = min(
-                end_year, full_citation.citing_opinion.cluster.date_filed.year
-            )
-    main_params["fq"].append(
-        f"dateFiled:{build_date_range(start_year, end_year)}"
-    )
+    with Session() as session:
+        si = ExtraSolrInterface(
+            settings.SOLR_OPINION_URL, http_connection=session, mode="r"
+        )
+        main_params: SearchParam = {
+            "q": "*",
+            "fq": [
+                "status:Precedential",  # Non-precedential documents aren't cited
+            ],
+            "caller": "citation.match_citations.match_citation",
+        }
+        if full_citation.citing_opinion is not None:
+            # Eliminate self-cites.
+            main_params["fq"].append(f"-id:{full_citation.citing_opinion.pk}")
+        # Set up filter parameters
+        if full_citation.year:
+            start_year = end_year = full_citation.year
+        else:
+            start_year, end_year = get_years_from_reporter(full_citation)
+            if (
+                full_citation.citing_opinion is not None
+                and full_citation.citing_opinion.cluster.date_filed
+            ):
+                end_year = min(
+                    end_year,
+                    full_citation.citing_opinion.cluster.date_filed.year,
+                )
+        main_params["fq"].append(
+            f"dateFiled:{build_date_range(start_year, end_year)}"
+        )
 
-    if full_citation.metadata.court:
-        main_params["fq"].append(f"court_exact:{full_citation.metadata.court}")
-
-    # Take 1: Use a phrase query to search the citation field.
-    main_params["fq"].append(
-        f'citation:("{full_citation.corrected_citation()}")'
-    )
-    results = si.query().add_extra(**main_params).execute()
-    si.conn.http_connection.close()
-    if len(results) == 1:
-        return results
-    if len(results) > 1:
-        if (
-            full_citation.citing_opinion is not None
-            and full_citation.metadata.defendant
-        ):  # Refine using defendant, if there is one
-            results = case_name_query(
-                si, main_params, full_citation, full_citation.citing_opinion
+        if full_citation.metadata.court:
+            main_params["fq"].append(
+                f"court_exact:{full_citation.metadata.court}"
             )
+
+        # Take 1: Use a phrase query to search the citation field.
+        main_params["fq"].append(
+            f'citation:("{full_citation.corrected_citation()}")'
+        )
+        results = si.query().add_extra(**main_params).execute()
+        if len(results) == 1:
             return results
+        if len(results) > 1:
+            if (
+                full_citation.citing_opinion is not None
+                and full_citation.metadata.defendant
+            ):  # Refine using defendant, if there is one
+                results = case_name_query(
+                    si,
+                    main_params,
+                    full_citation,
+                    full_citation.citing_opinion,
+                )
+                return results
 
     # Give up.
     return []
