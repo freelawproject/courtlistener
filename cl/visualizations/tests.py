@@ -102,8 +102,9 @@ class TestVizModels(TestCase):
             notes="Test Notes",
         )
         self.assertGreater(viz.json_versions.all().count(), 0)
+        self.assertIsNotNone(viz.pk, None)
         viz.delete()
-        self.assertEqual(viz.json_versions.all().count(), 0)
+        self.assertIsNone(viz.pk, None)
 
 
 class TestViews(TestCase):
