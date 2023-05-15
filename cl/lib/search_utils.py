@@ -8,6 +8,7 @@ from django.core.cache import cache, caches
 from django.http import HttpRequest, QueryDict
 from eyecite import get_citations
 from eyecite.models import FullCaseCitation
+from requests import Session
 from scorched.response import SolrResponse
 
 from cl.citations.match_citations import search_db_for_fullcitation
@@ -76,17 +77,29 @@ BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
 }
 
 
-def get_solr_interface(cd: CleanData) -> ExtraSolrInterface:
+def get_solr_interface(
+    cd: CleanData, http_connection: Session | None = None
+) -> ExtraSolrInterface:
     """Get the correct solr interface for the query"""
     search_type = cd["type"]
     if search_type == SEARCH_TYPES.OPINION:
-        si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
+        si = ExtraSolrInterface(
+            settings.SOLR_OPINION_URL,
+            http_connection=http_connection,
+            mode="r",
+        )
     elif search_type in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
-        si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode="r")
+        si = ExtraSolrInterface(
+            settings.SOLR_RECAP_URL, http_connection=http_connection, mode="r"
+        )
     elif search_type == SEARCH_TYPES.ORAL_ARGUMENT:
-        si = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode="r")
+        si = ExtraSolrInterface(
+            settings.SOLR_AUDIO_URL, http_connection=http_connection, mode="r"
+        )
     elif search_type == SEARCH_TYPES.PEOPLE:
-        si = ExtraSolrInterface(settings.SOLR_PEOPLE_URL, mode="r")
+        si = ExtraSolrInterface(
+            settings.SOLR_PEOPLE_URL, http_connection=http_connection, mode="r"
+        )
     else:
         raise NotImplementedError(f"Unknown search type: {search_type}")
 

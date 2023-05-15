@@ -2174,9 +2174,39 @@ def query_and_save_list_of_creditors(
             f"Querying report, court_id: {court_id}, pacer_case_id: "
             f"{pacer_case_id} docket_number: {docket_number}"
         )
+
+        # First get the POST param to ensure the same cost as in the browser.
+        try:
+            post_param = report.query_post_param()
+        except IndexError as exc:
+            # Sometimes this query fails, retry if there are retries available.
+            if self.request.retries == self.max_retries:
+                logger.info(
+                    f"Failed to obtain a valid POST param for {court_id}, aborting..."
+                )
+                delete_redis_semaphore(
+                    "CACHE",
+                    make_list_of_creditors_key(court_id, d_number_file_name),
+                )
+                return None
+            else:
+                logger.info(
+                    f"Failed to obtain a valid POST param for {court_id}, retrying..."
+                )
+                raise self.retry(exc=exc)
+
+        if not post_param:
+            delete_redis_semaphore(
+                "CACHE",
+                make_list_of_creditors_key(court_id, d_number_file_name),
+            )
+            logger.info(f"Invalid POST param for {court_id}, aborting...")
+            return None
+
         report.query(
             pacer_case_id=pacer_case_id,
             docket_number=docket_number,
+            post_param=post_param,
         )
         # Save report HTML in disk.
         with open(html_file, "w", encoding="utf-8") as file:

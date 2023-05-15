@@ -3,6 +3,7 @@ import os
 from celery.canvas import chain
 from django.conf import settings
 from juriscraper.pacer import PacerSession
+from requests import Session
 
 from cl.corpus_importer.tasks import add_tags, get_pacer_doc_by_rd
 from cl.lib.celery_utils import CeleryThrottle
@@ -37,9 +38,11 @@ def get_documents(options):
         {"rows": page_size, "fl": ["id", "docket_id"]},
         {"group": False, "facet": False, "highlight": False},
     )
-    si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode="r")
-    results = si.query().add_extra(**main_query).execute()
-    si.conn.http_connection.close()
+    with Session() as session:
+        si = ExtraSolrInterface(
+            settings.SOLR_RECAP_URL, http_connection=session, mode="r"
+        )
+        results = si.query().add_extra(**main_query).execute()
     logger.info("Got %s search results.", results.result.numFound)
 
     for i, result in enumerate(results):

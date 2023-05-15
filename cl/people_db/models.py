@@ -217,10 +217,12 @@ class Person(AbstractDateTimeModel):
     def get_absolute_url(self) -> str:
         return reverse("view_person", args=[self.pk, self.slug])
 
-    def save(self, *args, **kwargs):
+    def save(self, update_fields=None, *args, **kwargs):
         self.slug = slugify(trunc(self.name_full, 158))
+        if update_fields is not None:
+            update_fields = {"slug"}.union(update_fields)
         self.full_clean()
-        super(Person, self).save(*args, **kwargs)
+        super(Person, self).save(update_fields=update_fields, *args, **kwargs)
 
     def clean_fields(self, *args, **kwargs):
         validate_partial_date(self, ["dob", "dod"])

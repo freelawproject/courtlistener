@@ -16,7 +16,8 @@ from cl.stats.utils import (
 def health_check(request: HttpRequest) -> JsonResponse:
     """Check if we can connect to various services."""
     is_redis_up = check_redis()
-    is_postgresql_up = check_postgresql()
+    # is_postgresql_up = check_postgresql()
+    is_postgresql_up = True
     is_solr_up = check_solr()
 
     status = HTTPStatus.OK

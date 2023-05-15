@@ -33,13 +33,15 @@ class CitationRedirectorForm(forms.Form):
         widget=forms.TextInput(
             attrs={"class": "form-control input-lg", "placeholder": "Volume"}
         ),
-        required=True,
+        required=False,
     )
+    # We change the place holder to allow people to continue to use the rest
+    # of the redirect API with no modifications.
     reporter = forms.CharField(
         widget=forms.TextInput(
             attrs={
                 "class": "form-control input-lg",
-                "placeholder": "Reporter",
+                "placeholder": "Paste any text containing a citation",
             }
         ),
         required=True,
@@ -48,7 +50,7 @@ class CitationRedirectorForm(forms.Form):
         widget=forms.TextInput(
             attrs={"class": "form-control input-lg", "placeholder": "Page"}
         ),
-        required=True,
+        required=False,
     )
 
 
