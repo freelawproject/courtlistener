@@ -19,8 +19,8 @@ from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.redis_utils import create_redis_semaphore
 
-PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
-PACER_PASSWORD = os.environ.get("PACER_PASSWORD", settings.PACER_PASSWORD)
+CLIENT_PACER_USERNAME = os.environ.get("CLIENT_PACER_USERNAME", "")
+CLIENT_PACER_PASSWORD = os.environ.get("CLIENT_PACER_PASSWORD", "")
 
 
 class OptionsType(TypedDict):
@@ -47,6 +47,13 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
     :return: None, output files are stored in disk.
     """
 
+    if CLIENT_PACER_USERNAME == "" or CLIENT_PACER_PASSWORD == "":
+        logger.info(
+            "You must set CLIENT_PACER_USERNAME and CLIENT_PACER_PASSWORD "
+            "env vars to continue..."
+        )
+        return None
+
     q = cast(str, options["queue"])
     regex = re.compile(r"([^/]+).csv")
     base_path = options["base_path"]
@@ -63,27 +70,31 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
         else:
             raise ValueError(f"Bad file name {file}")
 
-    session = PacerSession(username=PACER_USERNAME, password=PACER_PASSWORD)
+    session = PacerSession(
+        username=CLIENT_PACER_USERNAME, password=CLIENT_PACER_PASSWORD
+    )
     session.login()
     throttle = CeleryThrottle(queue_name=q)
+    completed = 0
     for i, rows in enumerate(
         itertools.zip_longest(*(t[1] for t in csv_files), fillvalue=None)
     ):
         # Iterate over all the courts files at the same time.
-        if i < options["offset"]:
-            continue
-        if i >= options["limit"] > 0:
-            break
-
         for j, row in enumerate(rows):
             # Iterate over each court and row court.
+            completed += 1
+            if completed < options["offset"]:
+                continue
+            if completed >= options["limit"] > 0:
+                break
+
             court_id = csv_files[j][0]
             if row is None:
                 # Some courts have fewer rows than others; if a row in this
                 # court is empty, skip it.
                 continue
 
-            logger.info(f"Enqueueing {court_id} and row {i} ...")
+            logger.info(f"Doing {court_id} and row {i} ...")
             docket_number = make_bankr_docket_number(
                 row["DOCKET"], row["OFFICE"]
             )
@@ -123,6 +134,9 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
                 court_id, d_number_file_name
             )
             if newly_enqueued:
+                logger.info(
+                    f"Enqueueing case: {docket_number}, court:{court_id}..."
+                )
                 throttle.maybe_wait()
                 query_and_save_list_of_creditors.si(
                     session.cookies,
@@ -177,6 +191,7 @@ class Command(VerboseCommand):
             type=str,
             default="celery",
             help="The celery queue where the tasks should be processed.",
+            required=True,
         )
 
     def handle(self, *args, **options):
