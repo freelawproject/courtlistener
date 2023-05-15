@@ -258,14 +258,27 @@ def merge_judges(
     if overlapping_data:
         harvard_data, cl_data = overlapping_data
 
-        # Get last names from each source
-        cl_clean = set(extract_judge_last_name(cl_data))
+        # We check if any word in the string is uppercase
+        cl_data_upper = (
+            True if [s for s in cl_data.split(",") if s.isupper()] else False
+        )
+
+        # Get last names keeping case and cleaning the string (We could have
+        # the judge names in capital letters)
+        cl_clean = set(
+            extract_judge_last_name(cl_data, keep_letter_case=cl_data_upper)
+        )
+        # Get last names in lowercase and cleaned
         harvard_clean = set(extract_judge_last_name(harvard_data))
         judges = titlecase(", ".join(extract_judge_last_name(harvard_data)))
 
-        if harvard_clean.issuperset(cl_clean) and harvard_clean != cl_clean:
+        if (
+            harvard_clean.issuperset(cl_clean) or cl_data_upper
+        ) and harvard_clean != cl_clean:
             OpinionCluster.objects.filter(id=cluster_id).update(judges=judges)
-        elif not harvard_clean.intersection(cl_clean):
+        elif not harvard_clean.intersection(
+            set(extract_judge_last_name(cl_data))
+        ):
             raise JudgeException("Judges are completely different.")
 
 
@@ -299,7 +312,9 @@ def merge_cluster_dates(
                 cluster.date_filed_is_approximate
                 and not harvard_date_is_approximate
             ):
-                # For some reason docket source is different, then check if one date is approximate and the other is not if harvard date is not approximate, it should be better
+                # For some reason docket source is different, then check if
+                # one date is approximate and the other is not if harvard
+                # date is not approximate, it should be better
                 OpinionCluster.objects.filter(id=cluster_id).update(
                     **{field_name: harvard_date}
                 )

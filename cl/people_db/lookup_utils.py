@@ -18,6 +18,7 @@ NOT_JUDGE_WORDS = [
     "absent",
     "acting",
     "active",
+    "administrative",
     "adopted",
     "affirm",
     "after",
@@ -30,6 +31,7 @@ NOT_JUDGE_WORDS = [
     "appellate",
     "argument",
     "argued",
+    "article",
     "arj",
     "ass",
     "assign",
@@ -37,6 +39,7 @@ NOT_JUDGE_WORDS = [
     "assignment",
     "associate",
     "assistant",
+    "attached",
     "attorney",
     "authorized",
     "available",
@@ -72,10 +75,12 @@ NOT_JUDGE_WORDS = [
     "consisted",
     "consists",
     "constituting",
+    "constitution",
     "consultation",
     "continue",
     "court",
     "curiam",
+    "customs",
     "decided",
     "decision",
     "delivered",
@@ -84,6 +89,7 @@ NOT_JUDGE_WORDS = [
     "designation",
     "did",
     "died",
+    "directed",
     "disqualified",
     "dissent",
     "dissented",
@@ -93,6 +99,7 @@ NOT_JUDGE_WORDS = [
     "division",
     "editor",
     "emeritus",
+    "error",
     "even",
     "facts",
     "fellows",
@@ -133,12 +140,14 @@ NOT_JUDGE_WORDS = [
     "may",
     "member",
     "memorandum",
+    "military",
     "not",
     "note",
     "number",
     "october",
     "of",
     "one",
+    "only",
     "opinion",
     "oral",
     "order",
@@ -165,7 +174,6 @@ NOT_JUDGE_WORDS = [
     "recuse",
     "recused",
     "reference",
-    "referee",
     "rehearing",
     "report",
     "reported",
@@ -180,8 +188,11 @@ NOT_JUDGE_WORDS = [
     "reservation",
     "sat",
     "section",
+    "secretary",
     "senior",
     "separate",
+    "should",
+    "signing",
     "sit",
     "sitting",
     "special",
@@ -194,6 +205,7 @@ NOT_JUDGE_WORDS = [
     "surrogate",
     "superior",
     "supernumerary",
+    "supreme",
     "taking",
     "tem",
     "term",
@@ -204,7 +216,9 @@ NOT_JUDGE_WORDS = [
     "though",
     "three",
     "time",
+    "took",
     "transfer",
+    "tried",
     "two",
     "unanimous",
     "unpublished",
@@ -213,6 +227,7 @@ NOT_JUDGE_WORDS = [
     "vacancy",
     "vice",
     "votes",
+    "voting",
     "warden",
     "was",
     "which",
@@ -240,13 +255,17 @@ NAME_CUTOFF = 3
 IS_JUDGE = {"wu", "re", "du", "de"}
 
 
-def extract_judge_last_name(text: str) -> List[str]:
+def extract_judge_last_name(
+    text: str = "", keep_letter_case=False
+) -> List[str]:
     """Find judge last names in a string of text.
 
     :param text: The text you wish to extract names from.
+    :param keep_letter_case: True if you want to keep letter case from text
     :return: last names of judges in `text`.
     """
-    text = text.lower() or ""
+    if not keep_letter_case:
+        text = text.lower() or ""
     # just use the first nonempty line (there's
     # sometimes a useless second line)
     line = text
@@ -262,7 +281,10 @@ def extract_judge_last_name(text: str) -> List[str]:
     line = html.unescape(line)
 
     # normalize text and get candidate judge names
-    line = "".join([c if c.isalpha() else " " for c in line.lower()])
+    if not keep_letter_case:
+        line = "".join([c if c.isalpha() else " " for c in line.lower()])
+    else:
+        line = "".join([c if c.isalpha() else " " for c in line])
     names = []
     for word in line.split():
         word_too_short = len(word) < NAME_CUTOFF
