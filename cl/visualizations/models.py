@@ -341,7 +341,7 @@ class SCOTUSMap(AbstractDateTimeModel):
             end_year=self.cluster_end.date_filed.year,
         )
 
-    def save(self, *args, **kwargs):
+    def save(self, update_fields=None, *args, **kwargs):
         # Note that the title needs to be made first, so that the slug can be
         # generated from it.
         if not self.title:
@@ -360,7 +360,13 @@ class SCOTUSMap(AbstractDateTimeModel):
             self.slug = slugify(trunc(self.title, 75))
             # If we could, we'd add clusters and json here, but you can't do
             # that kind of thing until the first object has been saved.
-        super(SCOTUSMap, self).save(*args, **kwargs)
+
+        if update_fields is not None:
+            changeable_fields = {"title", "date_published", "date_created"}
+            update_fields = changeable_fields.union(update_fields)
+        super(SCOTUSMap, self).save(
+            update_fields=update_fields, *args, **kwargs
+        )
         self.__original_deleted = self.deleted
 
 

@@ -22,7 +22,7 @@ services:
     container_name: cl-postgres
     ports:
       - "5432:5432"
-    image: postgres:11-alpine
+    image: postgres:15.2-alpine
     environment:
       POSTGRES_USER: "postgres"
       POSTGRES_PASSWORD: "postgres"
@@ -83,7 +83,7 @@ services:
 
   cl-selenium:
     container_name: cl-selenium
-    image: seleniarm/standalone-chromium
+    image: seleniarm/standalone-chromium:111.0
     ports:
       - 4444:4444  # Selenium
       - 5900:5900  # VNC server

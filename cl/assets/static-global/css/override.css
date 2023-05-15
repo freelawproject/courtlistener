@@ -188,7 +188,7 @@ a.button:active {
     margin-bottom: 2em;
   }
 
-  #main-query-box #id_q {
+  #main-query-box #id_q, #main-query-box #id_full_citation {
     width: 250px;
   }
 
@@ -278,7 +278,7 @@ a.button:active {
 }
 
 @media (min-width: 992px) {
-  #main-query-box #id_q {
+  #main-query-box #id_q, #main-query-box #id_full_citation {
     width: 600px;
   }
 
@@ -296,7 +296,7 @@ a.button:active {
 }
 
 @media (min-width: 1200px) {
-  #main-query-box #id_q {
+  #main-query-box #id_q, #main-query-box #id_full_citation {
     width: 800px;
   }
 }
@@ -591,7 +591,7 @@ body {
   border-right: 1px solid #c2c2c2;
 }
 
-#id_q, #de-filter-search{
+#id_q, #de-filter-search, #id_full_citation {
   border-color: #a6a6a6 #a6a6a6 #a6a6a6 #a6a6a6;
   border-style: solid none solid solid;
   border-width: 1px 0px 1px 1px;
@@ -821,7 +821,7 @@ input.court-checkbox, input.status-checkbox {
 }
 
 #id_filed_after, #id_filed_before {
-  width: 120px;
+  width: 95px;
 }
 
 #docket-entry-table .row {
@@ -1427,4 +1427,28 @@ textarea {
 #opinion-content img {
   max-width: 100%;
   height: auto;
+}
+
+/* CourtListner specific grid codes to allow for extra extra small */
+.cl-form-inline {
+  vertical-align: middle;
+}
+.cl-form-group, .cl-form-group > label, .cl-form-group > input {
+  margin-bottom: 5px;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.tight-input input, .tight-input a {
+  padding: 6px 6px;
+  margin: 0px 0px;
+}
+
+@media (max-width: 768px) {
+  .xs-pull-left {
+    float: left !important;
+  }
+  .xs-pull-right {
+    float: right !important;
+  }
 }

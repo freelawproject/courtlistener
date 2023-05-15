@@ -78,6 +78,18 @@ class SOURCES:
     HARVARD_CASELAW = "U"
     COURT_M_HARVARD = "CU"
     DIRECT_COURT_INPUT = "D"
+    ANON_2020 = "Q"
+    ANON_2020_M_HARVARD = "QU"
+    COURT_M_HARVARD = "CU"
+    COURT_M_RESOURCE_M_HARVARD = "CRU"
+    DIRECT_COURT_INPUT_M_HARVARD = "DU"
+    LAWBOX_M_HARVARD = "LU"
+    LAWBOX_M_COURT_M_HARVARD = "LCU"
+    LAWBOX_M_RESOURCE_M_HARVARD = "LRU"
+    LAWBOX_M_COURT_RESOURCE_M_HARVARD = "LCRU"
+    MANUAL_INPUT_M_HARVARD = "MU"
+    PUBLIC_RESOURCE_M_HARVARD = "RU"
+    COLUMBIA_ARCHIVE_M_HARVARD = "ZU"
     NAMES = (
         (COURT_WEBSITE, "court website"),
         (PUBLIC_RESOURCE, "public.resource.org"),
@@ -112,6 +124,29 @@ class SOURCES:
         ),
         (COURT_M_HARVARD, "court website merged with Harvard"),
         (DIRECT_COURT_INPUT, "direct court input"),
+        (ANON_2020, "2020 anonymous database"),
+        (ANON_2020_M_HARVARD, "2020 anonymous database merged with Harvard"),
+        (COURT_M_HARVARD, "court website merged with Harvard"),
+        (
+            COURT_M_RESOURCE_M_HARVARD,
+            "court website merged with public.resource.org and Harvard",
+        ),
+        (
+            DIRECT_COURT_INPUT_M_HARVARD,
+            "direct court input merged with Harvard",
+        ),
+        (LAWBOX_M_HARVARD, "lawbox merged with Harvard"),
+        (
+            LAWBOX_M_COURT_M_HARVARD,
+            "Lawbox merged with court website and Harvard",
+        ),
+        (
+            LAWBOX_M_RESOURCE_M_HARVARD,
+            "Lawbox merged with public.resource.org and with Harvard",
+        ),
+        (MANUAL_INPUT_M_HARVARD, "Manual input merged with Harvard"),
+        (PUBLIC_RESOURCE_M_HARVARD, "public.resource.org merged with Harvard"),
+        (COLUMBIA_ARCHIVE_M_HARVARD, "columbia archive merged with Harvard"),
     )
 
 
@@ -249,7 +284,9 @@ class Docket(AbstractDateTimeModel):
     HARVARD = 16
     HARVARD_AND_RECAP = 17
     SCRAPER_AND_HARVARD = 18
+    HARVARD_AND_COLUMBIA = 20
     DIRECT_INPUT = 32
+    DIRECT_INPUT_AND_HARVARD = 48
     ANON_2020 = 64
     ANON_2020_AND_SCRAPER = 66
     ANON_2020_AND_HARVARD = 80
@@ -277,7 +314,9 @@ class Docket(AbstractDateTimeModel):
         (HARVARD, "Harvard"),
         (HARVARD_AND_RECAP, "Harvard and RECAP"),
         (SCRAPER_AND_HARVARD, "Scraper and Harvard"),
+        (HARVARD_AND_COLUMBIA, "Harvard and Columbia"),
         (DIRECT_INPUT, "Direct court input"),
+        (DIRECT_INPUT_AND_HARVARD, "Direct court input and Harvard"),
         (ANON_2020, "2020 anonymous database"),
         (ANON_2020_AND_SCRAPER, "2020 anonymous database and Scraper"),
         (ANON_2020_AND_HARVARD, "2020 anonymous database and Harvard"),
@@ -643,7 +682,7 @@ class Docket(AbstractDateTimeModel):
         else:
             return f"{self.pk}"
 
-    def save(self, *args, **kwargs):
+    def save(self, update_fields=None, *args, **kwargs):
         self.slug = slugify(trunc(best_case_name(self), 75))
         if self.docket_number and not self.docket_number_core:
             self.docket_number_core = make_docket_number_core(
@@ -663,7 +702,10 @@ class Docket(AbstractDateTimeModel):
                         f"'{field}' cannot be Null or empty in RECAP dockets."
                     )
 
-        super(Docket, self).save(*args, **kwargs)
+        if update_fields is not None:
+            update_fields = {"slug", "docket_number_core"}.union(update_fields)
+
+        super(Docket, self).save(update_fields=update_fields, *args, **kwargs)
 
     def get_absolute_url(self) -> str:
         return reverse("view_docket", args=[self.pk, self.slug])
@@ -1104,7 +1146,9 @@ class DocketEntry(AbstractDateTimeModel):
 
     class Meta:
         verbose_name_plural = "Docket Entries"
-        index_together = ("recap_sequence_number", "entry_number")
+        indexes = [
+            models.Index(fields=["recap_sequence_number", "entry_number"])
+        ]
         ordering = ("recap_sequence_number", "entry_number")
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
 
@@ -1232,10 +1276,14 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             "attachment_number",
         )
         ordering = ("document_type", "document_number", "attachment_number")
-        index_together = [
-            ["document_type", "document_number", "attachment_number"],
-        ]
         indexes = [
+            models.Index(
+                fields=[
+                    "document_type",
+                    "document_number",
+                    "attachment_number",
+                ]
+            ),
             models.Index(
                 fields=["filepath_local"],
                 name="search_recapdocument_filepath_local_7dc6b0e53ccf753_uniq",
@@ -1328,7 +1376,14 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             ]
         )
 
-    def save(self, do_extraction=False, index=False, *args, **kwargs):
+    def save(
+        self,
+        update_fields=None,
+        do_extraction=False,
+        index=False,
+        *args,
+        **kwargs,
+    ):
         if self.document_type == self.ATTACHMENT:
             if self.attachment_number is None:
                 raise ValidationError(
@@ -1378,7 +1433,12 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
                         % (self.pk, other.pk)
                     )
 
-        super(RECAPDocument, self).save(*args, **kwargs)
+        if update_fields is not None:
+            update_fields = {"pacer_doc_id"}.union(update_fields)
+
+        super(RECAPDocument, self).save(
+            update_fields=update_fields, *args, **kwargs
+        )
         tasks = []
         if do_extraction and self.needs_extraction:
             # Context extraction not done and is requested.
@@ -2466,9 +2526,20 @@ class OpinionCluster(AbstractDateTimeModel):
     def get_absolute_url(self) -> str:
         return reverse("view_case", args=[self.pk, self.slug])
 
-    def save(self, index=True, force_commit=False, *args, **kwargs):
+    def save(
+        self,
+        update_fields=None,
+        index=True,
+        force_commit=False,
+        *args,
+        **kwargs,
+    ):
         self.slug = slugify(trunc(best_case_name(self), 75))
-        super(OpinionCluster, self).save(*args, **kwargs)
+        if update_fields is not None:
+            update_fields = {"slug"}.union(update_fields)
+        super(OpinionCluster, self).save(
+            update_fields=update_fields, *args, **kwargs
+        )
         if index:
             from cl.search.tasks import add_items_to_solr
 
@@ -2681,12 +2752,12 @@ class Citation(models.Model):
         return self.cluster.get_absolute_url()
 
     class Meta:
-        index_together = (
+        indexes = [
             # To look up individual citations
-            ("volume", "reporter", "page"),
+            models.Index(fields=["volume", "reporter", "page"]),
             # To generate reporter volume lists
-            ("volume", "reporter"),
-        )
+            models.Index(fields=["volume", "reporter"]),
+        ]
         unique_together = (("cluster", "volume", "reporter", "page"),)
 
 

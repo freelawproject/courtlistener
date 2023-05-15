@@ -1,30 +1,42 @@
 # !/usr/bin/python
 # -*- coding: utf-8 -*-
 import csv
+import itertools
 import os
-from typing import TypedDict
+import re
+from typing import TypedDict, cast
 
-import pandas as pd
 from django.conf import settings
-from juriscraper.pacer import (
-    ListOfCreditors,
-    PacerSession,
-    PossibleCaseNumberApi,
-)
+from juriscraper.pacer import PacerSession
 
 from cl.corpus_importer.bulk_utils import make_bankr_docket_number
+from cl.corpus_importer.tasks import (
+    make_list_of_creditors_key,
+    query_and_save_list_of_creditors,
+)
+from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.pacer import map_cl_to_pacer_id
+from cl.lib.redis_utils import create_redis_semaphore
 
-PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
-PACER_PASSWORD = os.environ.get("PACER_PASSWORD", settings.PACER_PASSWORD)
+CLIENT_PACER_USERNAME = os.environ.get("CLIENT_PACER_USERNAME", "")
+CLIENT_PACER_PASSWORD = os.environ.get("CLIENT_PACER_PASSWORD", "")
 
 
 class OptionsType(TypedDict):
-    court: str
+    base_path: str
     offset: int
     limit: int
-    file: str
+    files: str
+    queue: str
+
+
+def enqueue_get_list_of_creditors(
+    court_id: str, d_number_file_name: str
+) -> bool:
+    """Get list of creditors semaphore"""
+    key = make_list_of_creditors_key(court_id, d_number_file_name)
+    return create_redis_semaphore("CACHE", key, ttl=60 * 60)
 
 
 def query_and_save_creditors_data(options: OptionsType) -> None:
@@ -35,139 +47,117 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
     :return: None, output files are stored in disk.
     """
 
-    f = open(options["file"], "r", encoding="utf-8")
-    reader = csv.DictReader(f)
-    court_id = options["court"]
-    s = PacerSession(username=PACER_USERNAME, password=PACER_PASSWORD)
-    s.login()
-    for i, row in enumerate(reader):
-        if i < options["offset"]:
-            continue
-        if i >= options["limit"] > 0:
-            break
-
-        court_id = map_cl_to_pacer_id(court_id)
-        logger.info(f"Doing {court_id} and row {i} ...")
-        docket_number = make_bankr_docket_number(row["DOCKET"], row["OFFICE"])
-        d_number_file_name = docket_number.replace(":", "-")
-
-        # Check if the reports directory already exists
-        html_path = os.path.join(
-            settings.MEDIA_ROOT, "list_of_creditors", "reports"
+    if CLIENT_PACER_USERNAME == "" or CLIENT_PACER_PASSWORD == "":
+        logger.info(
+            "You must set CLIENT_PACER_USERNAME and CLIENT_PACER_PASSWORD "
+            "env vars to continue..."
         )
-        if not os.path.exists(html_path):
-            # Create the directory if it doesn't exist
-            os.makedirs(html_path)
+        return None
 
-        html_file = os.path.join(
-            settings.MEDIA_ROOT,
-            "list_of_creditors",
-            "reports",
-            f"{court_id}-{d_number_file_name}.html",
-        )
-
-        try:
-            report = ListOfCreditors(court_id, s)
-        except AssertionError:
-            # This is not a bankruptcy court.
-            logger.warning(f"Court {court_id} is not a bankruptcy court.")
-            continue
-
-        # Check if HTML report for this docket_number already exists, if so
-        # omit it. Otherwise, query the pacer_case_id and the list of creditors
-        # report
-        if not os.path.exists(html_file):
-            report_hidden_api = PossibleCaseNumberApi(court_id, s)
-            report_hidden_api.query(docket_number)
-            result = report_hidden_api.data(
-                office_number=row["OFFICE"],
-                docket_number_letters="bk",
-            )
-            if not result:
-                logger.info(
-                    f"Skipping row: {i}, docket: {docket_number}, no "
-                    "result from hidden API"
-                )
-                continue
-
-            pacer_case_id = result.get("pacer_case_id")
-            if not pacer_case_id:
-                logger.info(
-                    f"Skipping row: {i}, docket: {docket_number}, no "
-                    "pacer_case_id found."
-                )
-                continue
-
-            logger.info(f"File {html_file} doesn't exist.")
-            logger.info(
-                f"Querying report, court_id: {court_id}, pacer_case_id: {pacer_case_id} "
-                f"docket_number: {docket_number}"
-            )
-            report.query(
-                pacer_case_id=pacer_case_id,
-                docket_number=docket_number,
-            )
-
-            # Save report HTML in disk.
-            with open(html_file, "w", encoding="utf-8") as file:
-                file.write(report.response.text)
-
+    q = cast(str, options["queue"])
+    regex = re.compile(r"([^/]+).csv")
+    base_path = options["base_path"]
+    csv_files = []
+    for file in options["files"]:
+        f = open(f"{base_path}/{file}", "r", encoding="utf-8")
+        reader = csv.DictReader(f)
+        match = regex.search(file)
+        if match:
+            court_id = match.group(1)
+            court_id = map_cl_to_pacer_id(court_id)
+            file_tuple = (court_id, reader)
+            csv_files.append(file_tuple)
         else:
-            logger.info(f"File {html_file} already exists court: {court_id}.")
+            raise ValueError(f"Bad file name {file}")
 
-        with open(html_file, "rb") as file:
-            text = file.read().decode("utf-8")
-            report._parse_text(text)
-
-        pipe_limited_file = os.path.join(
-            settings.MEDIA_ROOT,
-            "list_of_creditors",
-            "reports",
-            f"{court_id}-{d_number_file_name}-raw.txt",
-        )
-
-        raw_data = report.data
-        pipe_limited_data = raw_data["data"]
-        # Save report HTML in disk.
-        with open(pipe_limited_file, "w", encoding="utf-8") as file:
-            file.write(pipe_limited_data)
-
-        make_csv_file(pipe_limited_file, court_id, d_number_file_name)
-
-
-def make_csv_file(
-    pipe_limited_file: str, court_id: str, d_number_file_name: str
-) -> None:
-    """Generate a CSV based on the data of the txt files.
-
-    :return: None, The function saves a CSV file in disk.
-    """
-
-    csv_file = os.path.join(
-        settings.MEDIA_ROOT,
-        "list_of_creditors",
-        "reports",
-        f"{court_id}-{d_number_file_name}.csv",
+    session = PacerSession(
+        username=CLIENT_PACER_USERNAME, password=CLIENT_PACER_PASSWORD
     )
-    docket_number = d_number_file_name.replace("-", ":")
-    # Read the pipe-delimited text into a pandas DataFrame
-    data = pd.read_csv(pipe_limited_file, delimiter="|", header=None)
-    data.insert(0, "docket_number", docket_number)
-    # Drop the row number column.
-    data.drop(0, axis=1, inplace=True)
-    # Save the DataFrame as a CSV file
-    data.to_csv(csv_file, index=False, header=False)
+    session.login()
+    throttle = CeleryThrottle(queue_name=q)
+    completed = 0
+    for i, rows in enumerate(
+        itertools.zip_longest(*(t[1] for t in csv_files), fillvalue=None)
+    ):
+        # Iterate over all the courts files at the same time.
+        for j, row in enumerate(rows):
+            # Iterate over each court and row court.
+            completed += 1
+            if completed < options["offset"]:
+                continue
+            if completed >= options["limit"] > 0:
+                break
+
+            court_id = csv_files[j][0]
+            if row is None:
+                # Some courts have fewer rows than others; if a row in this
+                # court is empty, skip it.
+                continue
+
+            logger.info(f"Doing {court_id} and row {i} ...")
+            docket_number = make_bankr_docket_number(
+                row["DOCKET"], row["OFFICE"]
+            )
+            d_number_file_name = docket_number.replace(":", "-")
+
+            # Check if the reports directory already exists
+            html_path = os.path.join(
+                settings.MEDIA_ROOT, "list_of_creditors", "reports"
+            )
+            if not os.path.exists(html_path):
+                # Create the directory if it doesn't exist
+                os.makedirs(html_path)
+
+            # Check if the court_id directory already exists
+            court_id_path = os.path.join(
+                settings.MEDIA_ROOT, "list_of_creditors", "reports", court_id
+            )
+            if not os.path.exists(court_id_path):
+                # Create the court_id if it doesn't exist
+                os.makedirs(court_id_path)
+
+            html_file = os.path.join(
+                settings.MEDIA_ROOT,
+                "list_of_creditors",
+                "reports",
+                court_id,
+                f"{court_id}-{d_number_file_name}.html",
+            )
+
+            if os.path.exists(html_file):
+                logger.info(
+                    f"The report {html_file} already exist court: {court_id}"
+                )
+                continue
+
+            newly_enqueued = enqueue_get_list_of_creditors(
+                court_id, d_number_file_name
+            )
+            if newly_enqueued:
+                logger.info(
+                    f"Enqueueing case: {docket_number}, court:{court_id}..."
+                )
+                throttle.maybe_wait()
+                query_and_save_list_of_creditors.si(
+                    session.cookies,
+                    court_id,
+                    d_number_file_name,
+                    docket_number,
+                    html_file,
+                    i,
+                    row,
+                ).set(queue=q).apply_async()
+            else:
+                logger.info(
+                    f"The report {html_file} is currently being processed in "
+                    f"another task, court: {court_id}"
+                )
 
 
 class Command(VerboseCommand):
     help = "Query List of creditors and store the reports."
 
     def add_arguments(self, parser):
-        parser.add_argument(
-            "--court",
-            help="The bankruptcy court.",
-            required=True,
-        )
         parser.add_argument(
             "--offset",
             type=int,
@@ -183,10 +173,24 @@ class Command(VerboseCommand):
             "with the offset parameter. Default is to do all of them.",
         )
         parser.add_argument(
-            "--file",
+            "--base_path",
             type=str,
-            help="Where is the text file that has the CSV containing the cases "
-            "to query?",
+            help="The base path where to find the CSV files to process.",
+            default="/opt/courtlistener/cl/assets/media/list_of_creditors",
+        )
+        parser.add_argument(
+            "--files",
+            type=str,
+            help="A list of files that has the CSV containing the cases "
+            "to query. Use the format court_id.csv",
+            nargs="+",
+            required=True,
+        )
+        parser.add_argument(
+            "--queue",
+            type=str,
+            default="celery",
+            help="The celery queue where the tasks should be processed.",
             required=True,
         )
 

@@ -56,9 +56,9 @@ API_READ_DATABASES: List[str] = env("API_READ_DATABASES", default="replica")
 ####################
 CACHES = {
     "default": {
-        "BACKEND": "redis_cache.RedisCache",
-        "LOCATION": f"{REDIS_HOST}:{REDIS_PORT}",
-        "OPTIONS": {"DB": REDIS_DATABASES["CACHE"], "MAX_ENTRIES": 1e5},
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}",
+        "OPTIONS": {"db": REDIS_DATABASES["CACHE"]},
     },
     "db_cache": {
         "BACKEND": "django.core.cache.backends.db.DatabaseCache",
@@ -84,7 +84,11 @@ STATIC_ROOT = INSTALL_ROOT / "cl/assets/static/"
 TEMPLATE_ROOT = INSTALL_ROOT / "cl/assets/templates/"
 
 if not any([TESTING, DEBUG]):
-    STATICFILES_STORAGE = "cl.lib.storage.SubDirectoryS3ManifestStaticStorage"
+    STORAGES = {
+        "staticfiles": {
+            "BACKEND": "cl.lib.storage.SubDirectoryS3ManifestStaticStorage",
+        },
+    }
 
 TEMPLATES = [
     {
@@ -176,6 +180,7 @@ INSTALLED_APPS = [
 
 if DEVELOPMENT:
     INSTALLED_APPS.append("django_extensions")
+    MIDDLEWARE.append("debug_toolbar.middleware.DebugToolbarMiddleware")
 
 
 ################

@@ -1,5 +1,6 @@
 <div class="well well-sm">
   <div class="row filter-box">
+    <!-- Search -->
     <div class="col-xs-12 col-md-2">
       {% if docket_entries %}
         <div class="row" id="main-query-box">
@@ -23,68 +24,87 @@
         </div>
       {% endif %}
     </div>
-    <div class="col-xs-12 col-md-10">
-      <form action="">
-        <div class="row">
-          <div class="form-inline">
-            {% if form.errors %}
-              <div class="col-xs-12">
-                <p class="text-danger"><strong>There were errors applying your filters.</strong>
-                </p>
-              </div>
-            {% endif %}
-            <div class="col-xs-12 col-sm-6 col-md-5">
-              <div class="form-group{% if form.filed_after.errors %} has-error{% endif %}">
-                <label for="id_filed_after"
-                       class="control-label">Filed</label>
-                {{ form.filed_after }}
-              </div>
-              <div class="form-group{% if form.filed_before.errors %} has-error{% endif %}">
-                <label for="id_filed_before"
-                       class="control-label">to</label>
-                {{ form.filed_before }}
-              </div>
-            </div>
-            <div class="col-xs-8 col-sm-4">
-              <div class="form-group{% if form.entry_gte.errors %} has-error{% endif %}">
-                <label for="id_entry_gte"
-                       class="control-label">Documents</label>
-                {{ form.entry_gte }}
-              </div>
-              <div class="form-group{% if form.entry_lte.errors %} has-error{% endif %}">
-                <label for="id_entry_lte"
-                       class="control-label">to</label>
-                {{ form.entry_lte }}
-              </div>
-            </div>
-            <div class="col-xs-4 col-sm-2 col-md-3">
-              <div id="sort-buttons"
-                   class="btn-group pull-right"
-                   data-toggle="buttons"
-                   role="group"
-                   aria-label="sorting buttons">
-                  <label for="id_order_by_0"
-                         class="btn btn-default {% if sort_order_asc %}active{% endif %}">
-                    <input type="radio"
-                           id="id_order_by_0"
-                           value="asc"
-                           name="order_by"
-                           {% if sort_order_asc %}checked="checked"{% endif %}/><i class="fa fa-sort-numeric-asc"></i>&nbsp;<span
-                          class="hidden-xs hidden-sm hidden-md">Ascending</span></label>
-                  <label for="id_order_by_1"
-                         class="btn btn-default {% if not sort_order_asc %}active{% endif %}">
-                    <input type="radio"
-                           id="id_order_by_1"
-                           {% if not sort_order_asc %}checked=checked{% endif %}
-                           value="desc"
-                           name="order_by"/><i
-                          class="fa fa-sort-numeric-desc"></i>&nbsp;<span class="hidden-xs hidden-sm hidden-md">Descending</span></label>
-              </div>
-            </div>
-            <button type="submit" class="sr-only">Filter</button>
+    <form action="">
+      <div class="form-inline">
+        {% if form.errors %}
+          <div class="col-xs-12">
+            <p class="text-danger"><strong>There were errors applying your filters.</strong>
+            </p>
+          </div>
+        {% endif %}
+        <!-- date select -->
+        <div class="tight-input col-xs-6 col-sm-5 col-md-4 col-lg-3">
+          <div class="cl-form-group{% if form.filed_after.errors %} has-error{% endif %}">
+            <label for="id_filed_after"
+                   class="control-label">Filed</label>
+            {{ form.filed_after }}
+          </div>
+          <div class="cl-form-group{% if form.filed_before.errors %} has-error{% endif %}">
+            <label for="id_filed_before"
+                   class="control-label">to</label>
+            {{ form.filed_before }}
           </div>
         </div>
-      </form>
-    </div>
+        <!-- Document group -->
+        <div class="tight-input col-xs-6 col-sm-4 col-md-3">
+          <div class="cl-form-group{% if form.entry_gte.errors %} has-error{% endif %}">
+            <label for="id_entry_gte" class="control-label">Documents</label>
+            {{ form.entry_gte }}
+          </div>
+          <div class="cl-form-group{% if form.entry_lte.errors %} has-error{% endif %}">
+            <label for="id_entry_lte"
+                   class="control-label">to</label>
+            {{ form.entry_lte }}
+          </div>
+        </div>
+        <!-- sort ordering -->
+        <div class="tight-input col-xs-6 col-sm-3 col-md-2">
+          <div id="sort-buttons"
+               class="btn-group tight-input pull-right xs-pull-left cl-sm-pull-left"
+               data-toggle="buttons"
+               role="group"
+               aria-label="sorting buttons">
+            <label for="id_order_by_0"
+                   class="btn btn-default {% if sort_order_asc %}active{% endif %}">
+              <input type="radio"
+                     id="id_order_by_0"
+                     value="asc"
+                     name="order_by"
+                     {% if sort_order_asc %}checked="checked" {%endif %}/><i class="fa fa-sort-numeric-asc"></i>&nbsp;<span class="hidden-md">Asc.</span></label>
+            <label for="id_order_by_1"
+                   class="btn btn-default {% if not sort_order_asc %}active{% endif %}">
+              <input type="radio"
+                     class="btn btn-default"
+                     {% if not sort_order_asc %}checked="checked"{% endif %}
+                     value="desc"
+                     name="order_by"/><i class="fa fa-sort-numeric-desc"></i>&nbsp;<span class="hidden-md">Desc.</span></label>
+          </div>
+        </div>
+        <!-- Navigate buttons -->
+        <div class="tight-input col-xs-6 hidden-sm col-sm-6 col-md-1 col-lg-2" >
+          <div class="pull-right" >
+            {% if docket_entries.has_previous %}
+              <a class="btn btn-default" href="?{{ get_string }}page={{ docket_entries.previous_page_number }}" rel="prev" >
+                <i class="fa fa-caret-left" ></i><span class="hidden-md" >&nbsp;Prev.</span>
+              </a>
+            {% else %}
+              <a class="btn btn-default disabled" href="#" rel="prev" >
+                <i class="fa fa-caret-left" ></i><span class="hidden-md" >&nbsp;Prev.</span>
+              </a>
+            {% endif %}
+            {% if docket_entries.has_next %}
+              <a class="btn btn-default" href="?{{ get_string }}page={{ docket_entries.next_page_number }}" rel="next" >
+                <span class="hidden-md" >Next&nbsp;</span><i class="fa fa-caret-right"></i>
+              </a>
+            {% else %}
+              <a class="btn btn-default disabled" href="#" rel="next" >
+                <span class="hidden-md" >Next&nbsp;</span><i class="fa fa-caret-right"></i>
+              </a>
+            {% endif %}
+          </div>
+        </div>
+        <button type="submit" class="sr-only">Filter</button>
+      </div>
+    </form>
   </div>
 </div>

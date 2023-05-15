@@ -184,7 +184,7 @@
         <span class="meta-data-value">{{ docket.date_argued }}</span>
       </p>
     {% endif %}
-
+    {% include "includes/citation.html" with obj=docket %}
     {% if docket.date_reargued %}
       <p class="bottom">
         <span class="meta-data-header">Date Reargued:</span>

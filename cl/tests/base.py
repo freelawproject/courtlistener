@@ -8,6 +8,7 @@ from contextlib import contextmanager
 import scorched
 from django.conf import settings
 from django.test.utils import override_settings, tag
+from requests import Session
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
@@ -213,7 +214,9 @@ class BaseSeleniumTest(SerializeSolrTestMixin, StaticLiveServerTestCase):
         """Empty out the test cores that we use"""
         conns = [settings.SOLR_OPINION_TEST_URL, settings.SOLR_AUDIO_TEST_URL]
         for conn in conns:
-            si = scorched.SolrInterface(conn, mode="rw")
-            si.delete_all()
-            si.commit()
-            si.conn.http_connection.close()
+            with Session() as session:
+                si = scorched.SolrInterface(
+                    conn, http_connection=session, mode="rw"
+                )
+                si.delete_all()
+                si.commit()

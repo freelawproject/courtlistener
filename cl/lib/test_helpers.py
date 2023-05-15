@@ -6,6 +6,7 @@ from django.contrib.auth.hashers import make_password
 from django.test.testcases import SerializeMixin
 from django.test.utils import override_settings
 from lxml import etree
+from requests import Session
 
 from cl.audio.models import Audio
 from cl.people_db.models import Person
@@ -50,17 +51,19 @@ class EmptySolrTestCase(SerializeSolrTestMixin, TestCase):
         self.core_name_people = settings.SOLR_PEOPLE_TEST_CORE_NAME
         self.core_name_recap = settings.SOLR_RECAP_TEST_CORE_NAME
 
+        self.session = Session()
+
         self.si_opinion = scorched.SolrInterface(
-            settings.SOLR_OPINION_URL, mode="rw"
+            settings.SOLR_OPINION_URL, http_connection=self.session, mode="rw"
         )
         self.si_audio = scorched.SolrInterface(
-            settings.SOLR_AUDIO_URL, mode="rw"
+            settings.SOLR_AUDIO_URL, http_connection=self.session, mode="rw"
         )
         self.si_people = scorched.SolrInterface(
-            settings.SOLR_PEOPLE_URL, mode="rw"
+            settings.SOLR_PEOPLE_URL, http_connection=self.session, mode="rw"
         )
         self.si_recap = scorched.SolrInterface(
-            settings.SOLR_RECAP_URL, mode="rw"
+            settings.SOLR_RECAP_URL, http_connection=self.session, mode="rw"
         )
         self.all_sis = [
             self.si_opinion,
@@ -70,10 +73,12 @@ class EmptySolrTestCase(SerializeSolrTestMixin, TestCase):
         ]
 
     def tearDown(self) -> None:
-        for si in self.all_sis:
-            si.delete_all()
-            si.commit()
-            si.conn.http_connection.close()
+        try:
+            for si in self.all_sis:
+                si.delete_all()
+                si.commit()
+        finally:
+            self.session.close()
 
 
 class SolrTestCase(SimpleUserDataMixin, EmptySolrTestCase):

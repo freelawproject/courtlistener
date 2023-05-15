@@ -2,12 +2,14 @@ import copy
 import logging
 import os
 import shutil
+import time
 from datetime import date
 from io import BytesIO
 from tempfile import NamedTemporaryFile
 from typing import Any, Dict, List, Optional, Pattern, Tuple, Union
 
 import internetarchive as ia
+import pandas as pd
 import requests
 from celery import Task
 from celery.exceptions import SoftTimeLimitExceeded
@@ -28,6 +30,7 @@ from juriscraper.pacer import (
     DocketReport,
     DownloadConfirmationPage,
     FreeOpinionReport,
+    ListOfCreditors,
     PacerSession,
     PossibleCaseNumberApi,
     ShowCaseDocApi,
@@ -77,6 +80,7 @@ from cl.lib.recap_utils import (
     get_docket_filename,
     get_document_filename,
 )
+from cl.lib.redis_utils import delete_redis_semaphore
 from cl.lib.types import TaskData
 from cl.people_db.models import Attorney, Role
 from cl.recap.constants import CR_2017, CR_OLD, CV_2017, CV_2020, CV_OLD
@@ -376,8 +380,9 @@ def get_and_save_free_document_report(
             return PACERFreeDocumentLog.SCRAPE_FAILED
         raise self.retry(exc=exc, countdown=5)
 
+    document_rows_to_create = []
     for row in results:
-        PACERFreeDocumentRow.objects.create(
+        document_row = PACERFreeDocumentRow(
             court_id=row.court_id,
             pacer_case_id=row.pacer_case_id,
             docket_number=row.docket_number,
@@ -390,12 +395,16 @@ def get_and_save_free_document_report(
             nature_of_suit=row.nature_of_suit,
             cause=row.cause,
         )
+        document_rows_to_create.append(document_row)
+
+    # Create PACERFreeDocumentRow in bulk
+    PACERFreeDocumentRow.objects.bulk_create(document_rows_to_create)
 
     return PACERFreeDocumentLog.SCRAPE_SUCCESSFUL
 
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
-@throttle_task("2/s", key="court_id")
+@throttle_task("1/4s", key="court_id")
 def process_free_opinion_result(
     self,
     row_pk: int,
@@ -546,7 +555,7 @@ def process_free_opinion_result(
     interval_step=5,
     ignore_result=True,
 )
-@throttle_task("1/s", key="court_id")
+@throttle_task("1/6s", key="court_id")
 def get_and_process_free_pdf(
     self: Task,
     data: TaskData,
@@ -2041,3 +2050,191 @@ def get_pacer_doc_id_with_show_case_doc_url(
         rd.pacer_doc_id = pacer_doc_id
         rd.save()
         logger.info(f"Successfully saved pacer_doc_id to rd {rd_pk}")
+
+
+def make_csv_file(
+    pipe_limited_file: str, court_id: str, d_number_file_name: str
+) -> None:
+    """Generate a CSV based on the data of the txt files.
+
+    :return: None, The function saves a CSV file in disk.
+    """
+
+    csv_file = os.path.join(
+        settings.MEDIA_ROOT,
+        "list_of_creditors",
+        "reports",
+        court_id,
+        f"{court_id}-{d_number_file_name}.csv",
+    )
+    docket_number = d_number_file_name.replace("-", ":")
+    # Read the pipe-delimited text into a pandas DataFrame
+    data = pd.read_csv(pipe_limited_file, delimiter="|", header=None)
+    data.insert(0, "docket_number", docket_number)
+    # Drop the row number column.
+    data.drop(0, axis=1, inplace=True)
+    # Save the DataFrame as a CSV file
+    data.to_csv(csv_file, index=False, header=False)
+
+
+def make_list_of_creditors_key(court_id: str, d_number_file_name: str) -> str:
+    return f"list.creditors.enqueued:{court_id}-{d_number_file_name}"
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(PacerLoginException, ConnectionError, ReadTimeout),
+    max_retries=5,
+    ignore_result=True,
+)
+@throttle_task("1/s", key="court_id")
+def query_and_save_list_of_creditors(
+    self: Task,
+    cookies: RequestsCookieJar,
+    court_id: str,
+    d_number_file_name: str,
+    docket_number: str,
+    html_file: str,
+    i: int,
+    row: dict,
+) -> None:
+    """Query a list of creditors report from PACER, then save the report as
+    HTML and pipe-limited text files and convert them to CSVs.
+
+    :param self: The celery task
+    :param cookies: The cookies for the current PACER session.
+    :param court_id: The court_id for the bankruptcy court.
+    :param d_number_file_name: The docket number to use as file name.
+    :param docket_number: The docket number of the case.
+    :param html_file: The path to the HTML file where the report will be saved.
+    :param i: The row index of the case in the input CSV file.
+    :param row: The CSV row content.
+
+    :return: None
+    """
+
+    s = PacerSession(cookies=cookies)
+    try:
+        report = ListOfCreditors(court_id, s)
+    except AssertionError:
+        # This is not a bankruptcy court.
+        logger.warning(f"Court {court_id} is not a bankruptcy court.")
+        delete_redis_semaphore(
+            "CACHE", make_list_of_creditors_key(court_id, d_number_file_name)
+        )
+        return None
+
+    # Check if HTML report for this docket_number already exists, if so
+    # omit it. Otherwise, query the pacer_case_id and the list of creditors
+    # report
+    if not os.path.exists(html_file):
+        try:
+            report_hidden_api = PossibleCaseNumberApi(court_id, s)
+            report_hidden_api.query(docket_number)
+            result = report_hidden_api.data(
+                office_number=row["OFFICE"],
+                docket_number_letters="bk",
+            )
+        except ParsingException:
+            logger.info(
+                f"No valid hidden API response for {docket_number} in court: "
+                f"{court_id}, possibly a sealed case."
+            )
+            delete_redis_semaphore(
+                "CACHE",
+                make_list_of_creditors_key(court_id, d_number_file_name),
+            )
+            return None
+
+        if not result:
+            logger.info(
+                f"Skipping row: {i} in court: {court_id}, docket: "
+                f"{docket_number}, no result from hidden API"
+            )
+            delete_redis_semaphore(
+                "CACHE",
+                make_list_of_creditors_key(court_id, d_number_file_name),
+            )
+            return None
+
+        pacer_case_id = result.get("pacer_case_id")
+        if not pacer_case_id:
+            logger.info(
+                f"Skipping row: {i} in court: {court_id}, docket: "
+                f"{docket_number}, no pacer_case_id found."
+            )
+            delete_redis_semaphore(
+                "CACHE",
+                make_list_of_creditors_key(court_id, d_number_file_name),
+            )
+            return None
+
+        logger.info(f"File {html_file} doesn't exist.")
+        logger.info(
+            f"Querying report, court_id: {court_id}, pacer_case_id: "
+            f"{pacer_case_id} docket_number: {docket_number}"
+        )
+
+        # First get the POST param to ensure the same cost as in the browser.
+        try:
+            post_param = report.query_post_param()
+        except IndexError as exc:
+            # Sometimes this query fails, retry if there are retries available.
+            if self.request.retries == self.max_retries:
+                logger.info(
+                    f"Failed to obtain a valid POST param for {court_id}, aborting..."
+                )
+                delete_redis_semaphore(
+                    "CACHE",
+                    make_list_of_creditors_key(court_id, d_number_file_name),
+                )
+                return None
+            else:
+                logger.info(
+                    f"Failed to obtain a valid POST param for {court_id}, retrying..."
+                )
+                raise self.retry(exc=exc)
+
+        if not post_param:
+            delete_redis_semaphore(
+                "CACHE",
+                make_list_of_creditors_key(court_id, d_number_file_name),
+            )
+            logger.info(f"Invalid POST param for {court_id}, aborting...")
+            return None
+
+        report.query(
+            pacer_case_id=pacer_case_id,
+            docket_number=docket_number,
+            post_param=post_param,
+        )
+        # Save report HTML in disk.
+        with open(html_file, "w", encoding="utf-8") as file:
+            file.write(report.response.text)
+
+    else:
+        logger.info(f"File {html_file} already exists court: {court_id}.")
+
+    with open(html_file, "rb") as file:
+        text = file.read().decode("utf-8")
+        report._parse_text(text)
+    pipe_limited_file = os.path.join(
+        settings.MEDIA_ROOT,
+        "list_of_creditors",
+        "reports",
+        court_id,
+        f"{court_id}-{d_number_file_name}-raw.txt",
+    )
+
+    raw_data = report.data
+    pipe_limited_data = raw_data.get("data", "")
+    if pipe_limited_data:
+        # Save report HTML in disk.
+        with open(pipe_limited_file, "w", encoding="utf-8") as file:
+            file.write(pipe_limited_data)
+
+    if pipe_limited_data:
+        make_csv_file(pipe_limited_file, court_id, d_number_file_name)
+    delete_redis_semaphore(
+        "CACHE", make_list_of_creditors_key(court_id, d_number_file_name)
+    )

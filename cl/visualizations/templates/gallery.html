@@ -87,7 +87,7 @@
                 <div class="col-sm-3"></div>
             </div>
         {% endif %}
-        {% include "includes/pagination.html" %}
+        {% include "includes/pagination.html" with page_obj=results%}
         {% include "includes/random_tip.html" %}
     </div>
 {% endblock %}

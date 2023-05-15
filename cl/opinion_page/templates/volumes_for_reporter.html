@@ -79,9 +79,7 @@
         <a href="{% url "citation_redirector" reporter|slugify %}">{{ volume_names|oxford_join }}</a>&nbsp;({{ reporter|nbsp }})
       </h1>
       {% include "includes/reporter_variations.html" %}
-      {% if cases.paginator.num_pages > 1 %}
-        {% include "includes/pagination.html" with results=cases %}
-      {% endif %}
+      {% include "includes/pagination.html" with page_obj=cases%}
     </div>
     <div class="hidden-sm hidden-xs col-md-1 col-lg-2"></div>
     <div class="clearfix"></div>
@@ -114,9 +112,7 @@
       </div>
       </article>
     {% endfor %}
-    {% if cases.paginator.num_pages > 1 %}
-      {% include "includes/pagination.html" with results=cases %}
-    {% endif %}
+    {% include "includes/pagination.html" with page_obj=cases only%}
     </div>
   {% endif %}
   <div class="hidden-sm hidden-xs col-md-1 col-lg-2"></div>

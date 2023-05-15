@@ -1202,7 +1202,7 @@ class RecapPdfTaskTest(TestCase):
         self.pq.delete()
         try:
             self.docket.delete()  # This cascades to self.de and self.rd
-        except (Docket.DoesNotExist, AssertionError):
+        except (Docket.DoesNotExist, AssertionError, ValueError):
             pass
 
     def test_pq_has_default_status(self) -> None:
@@ -3413,7 +3413,10 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(len(recap_documents_webhook), 10)
         # Compare content for the main document and the first attachment
         # Main document
-        self.assertEqual(recap_documents_webhook[0]["description"], "")
+        self.assertEqual(
+            recap_documents_webhook[0]["description"],
+            "Case Management Statement",
+        )
         self.assertEqual(
             recap_documents_webhook[0]["pacer_doc_id"], "123019137279"
         )

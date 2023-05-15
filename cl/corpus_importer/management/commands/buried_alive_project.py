@@ -3,6 +3,7 @@ import os
 from celery.canvas import chain
 from django.conf import settings
 from juriscraper.pacer.http import PacerSession
+from requests import Session
 
 from cl.corpus_importer.tasks import get_docket_by_pacer_case_id
 from cl.lib.celery_utils import CeleryThrottle
@@ -27,9 +28,11 @@ def get_docket_ids(main_query):
 
     :returns: a set() of docket IDs
     """
-    si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode="r")
-    results = si.query().add_extra(**main_query).execute()
-    si.conn.http_connection.close()
+    with Session() as session:
+        si = ExtraSolrInterface(
+            settings.SOLR_RECAP_URL, http_connection=session, mode="r"
+        )
+        results = si.query().add_extra(**main_query).execute()
     docket_ids = set()
 
     for result in results:
