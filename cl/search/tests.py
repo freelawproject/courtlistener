@@ -818,6 +818,13 @@ class SearchTest(IndexedSolrTestCase):
                 msg=f"Didn't get good status code with params: {param}",
             )
 
+    def test_rendering_unicode_o_text(self) -> None:
+        """Does unicode HTML unicode is properly rendered in search results?"""
+        r = self.client.get(
+            reverse("show_results"), {"q": "*", "case_name": "honda"}
+        )
+        self.assertIn("Code, § 1-815", r.content.decode())
+
 
 @override_settings(
     # MLT results should not be cached

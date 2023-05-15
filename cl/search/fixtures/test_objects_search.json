@@ -256,7 +256,7 @@
       "cluster": 2,
       "html_with_citations": "yadda yadda <span class=\"star-pagination\">*9</span> this is page 9 <span class=\"star-pagination\">*10</span> this is content on page 10 can we link to it...",
       "local_path": "test/search/opinion_pdf_image_based.pdf",
-      "html_columbia": "",
+      "html_columbia": "<p>Code, &#167; 1-815</p>",
       "joined_by": [2],
       "date_created": "2015-08-15T14:10:56.801Z",
       "html_lawbox": "",
