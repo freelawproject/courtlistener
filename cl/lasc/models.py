@@ -237,7 +237,9 @@ class Docket(AbstractDateTimeModel):
     objects = CaseIDQuerySet.as_manager()
 
     class Meta:
-        index_together = ("docket_number", "district", "division_code")
+        indexes = [
+            models.Index(fields=["docket_number", "district", "division_code"])
+        ]
 
     @property
     def case_id(self):

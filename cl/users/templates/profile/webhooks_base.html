@@ -9,6 +9,7 @@
   <script src="{% static "js/loading-states.js" %}" defer></script>
   {% if DEBUG %}
     <script src="{% static "js/htmx.js" %}"></script>
+    <script src="{% static "js/fix-toolbar-for-htmx.js" %}"></script>
   {% else %}
     <script src="{% static "js/htmx.min.js" %}"></script>
   {% endif %}
