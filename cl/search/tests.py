@@ -25,7 +25,11 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
 
-from cl.lib.search_utils import cleanup_main_query, make_fq
+from cl.lib.search_utils import (
+    cleanup_main_query,
+    make_fq,
+    remove_stop_words_from_phrases,
+)
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
     EmptySolrTestCase,
@@ -411,6 +415,32 @@ class AdvancedTest(IndexedSolrTestCase):
             docket_entry=cls.de_1, description="Leave to File"
         )
 
+        cls.de_2 = DocketEntryWithParentsFactory(
+            docket=DocketFactory(
+                court=cls.court,
+                case_name="United States Department of Health",
+                cause="05:552 Freedom of Information Act",
+                nature_of_suit="Other Statutes: Freedom of Information Act",
+            ),
+            description="COMPLAINT filed",
+        )
+        cls.rd_2 = RECAPDocumentFactory(
+            docket_entry=cls.de_2, description="Main Document"
+        )
+
+        cls.de_3 = DocketEntryWithParentsFactory(
+            docket=DocketFactory(
+                court=cls.court,
+                case_name="Federal Bureau of Investigation",
+                cause="05:552 Freedom of Information Act",
+                nature_of_suit="Other Statutes: Freedom of Information Act",
+            ),
+            description="Motion filed",
+        )
+        cls.rd_3 = RECAPDocumentFactory(
+            docket_entry=cls.de_3, description="Main Document"
+        )
+
     def test_a_intersection_query(self) -> None:
         """Does AND queries work"""
         r = self.client.get(reverse("show_results"), {"q": "Howard AND Honda"})
@@ -627,6 +657,113 @@ class AdvancedTest(IndexedSolrTestCase):
         )
         self.assertIn("1 Case", r.content.decode())
         self.assertIn("SUBPOENAS SERVED OFF", r.content.decode())
+
+    def test_remove_stop_words_from_phrase_queries(self) -> None:
+        q = '"Freedom of information act"'
+        q = remove_stop_words_from_phrases(q)
+        self.assertEqual(q, '"Freedom information act"')
+
+        q = 'cause:"Freedom information act"'
+        q = remove_stop_words_from_phrases(q)
+        self.assertEqual(q, 'cause:"Freedom information act"')
+
+        q = 'cause:"Freedom of information act"'
+        q = remove_stop_words_from_phrases(q)
+        self.assertEqual(q, 'cause:"Freedom information act"')
+
+        q = "cause:Freedom of information act"
+        q = remove_stop_words_from_phrases(q)
+        self.assertEqual(q, "cause:Freedom of information act")
+
+        q = 'cause:("Freedom to information act")'
+        q = remove_stop_words_from_phrases(q)
+        self.assertEqual(q, 'cause:("Freedom information act")')
+
+        q = "cause:Freedom to information act"
+        q = remove_stop_words_from_phrases(q)
+        self.assertEqual(q, "cause:Freedom to information act")
+
+        q = 'cause:"Freedom to information act" AND "Department of Health"'
+        q = remove_stop_words_from_phrases(q)
+        self.assertEqual(
+            q, 'cause:"Freedom information act" AND "Department Health"'
+        )
+
+        q = 'cause:"Freedom to information act" OR docket_id:"23-32332"'
+        q = remove_stop_words_from_phrases(q)
+        self.assertEqual(
+            q, 'cause:"Freedom information act" OR docket_id:"23-32332"'
+        )
+
+        q = "(Freedom OR information) AND Howard Department of Health"
+        q = remove_stop_words_from_phrases(q)
+        self.assertEqual(
+            q, "(Freedom OR information) AND Howard Department of Health"
+        )
+
+    def test_phrase_queries_with_stop_words(self) -> None:
+        add_docket_to_solr_by_rds([self.rd_2.pk], force_commit=True)
+        add_docket_to_solr_by_rds([self.rd_3.pk], force_commit=True)
+
+        params = {
+            "q": 'cause:"Freedom Information Act"',
+            "type": SEARCH_TYPES.RECAP,
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            params,
+        )
+        self.assertIn("2 Cases", r.content.decode())
+        self.assertIn("United States Department of Health", r.content.decode())
+        self.assertIn("Federal Bureau of Investigation", r.content.decode())
+
+        params = {
+            "q": 'cause:"Freedom of Information Act"',
+            "type": SEARCH_TYPES.RECAP,
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            params,
+        )
+        self.assertIn("2 Cases", r.content.decode())
+        self.assertIn("United States Department of Health", r.content.decode())
+        self.assertIn("Federal Bureau of Investigation", r.content.decode())
+
+        params = {
+            "q": 'cause:"Freedom of Information Act" AND description:"Motion filed"',
+            "type": SEARCH_TYPES.RECAP,
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            params,
+        )
+        self.assertIn("1 Case", r.content.decode())
+        self.assertIn("Federal Bureau of Investigation", r.content.decode())
+
+        params = {
+            "q": "",
+            "cause": '"Freedom of Information Act"',
+            "type": SEARCH_TYPES.RECAP,
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            params,
+        )
+        self.assertIn("2 Cases", r.content.decode())
+        self.assertIn("United States Department of Health", r.content.decode())
+        self.assertIn("Federal Bureau of Investigation", r.content.decode())
+
+        params = {
+            "q": '"Freedom of Information Act"',
+            "type": SEARCH_TYPES.RECAP,
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            params,
+        )
+        self.assertIn("2 Cases", r.content.decode())
+        self.assertIn("United States Department of Health", r.content.decode())
+        self.assertIn("Federal Bureau of Investigation", r.content.decode())
 
 
 class SearchTest(IndexedSolrTestCase):

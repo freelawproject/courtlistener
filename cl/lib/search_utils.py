@@ -15,6 +15,7 @@ from cl.citations.match_citations import search_db_for_fullcitation
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.lib.bot_detector import is_bot
 from cl.lib.scorched_utils import ExtraSolrInterface
+from cl.lib.stop_words import SOLR_STOP_WORDS
 from cl.lib.types import CleanData, SearchParam
 from cl.search.constants import (
     SOLR_OPINION_HL_FIELDS,
@@ -311,6 +312,22 @@ def merge_form_with_courts(
     return court_tabs, court_count_human, court_count
 
 
+def remove_stop_words_from_phrases(query: str) -> str:
+    pattern = r'"([^"]*)"'
+    # Matches phrases, anything within quotes
+    phrases = re.findall(pattern, query)
+
+    for phrase in phrases:
+        phrase_tokens = phrase.split(" ")
+        filtered_phrase = [
+            w for w in phrase_tokens if not w in SOLR_STOP_WORDS
+        ]
+        cleaned_phrase = " ".join(filtered_phrase)
+        query = query.replace(phrase, cleaned_phrase)
+
+    return query
+
+
 def make_fq(
     cd: CleanData,
     field: str,
@@ -340,6 +357,7 @@ def make_fq(
 
     if (q.startswith('"') and q.endswith('"')) and q.count('"') == 2:
         # User used quotes. Just pass it through.
+        q = remove_stop_words_from_phrases(q)
         return f"{field}:({q})"
 
     if make_phrase:
@@ -367,7 +385,7 @@ def make_fq(
             needs_default_conjunction = True
 
     fq = f"{field}:({' '.join(clean_q)})"
-    return fq
+    return remove_stop_words_from_phrases(fq)
 
 
 def make_boolean_fq(cd: CleanData, field: str, key: str) -> str:
@@ -658,6 +676,7 @@ def add_filter_queries(main_params: SearchParam, cd) -> None:
             )
         if cd["nature_of_suit"]:
             main_fq.append(make_fq(cd, "suitNature", "nature_of_suit"))
+
         if cd["cause"]:
             main_fq.append(make_fq(cd, "cause", "cause"))
         if cd["document_number"]:
@@ -879,7 +898,9 @@ def cleanup_main_query(query_string: str) -> str:
         # Some sort of number, probably a docket number.
         # Wrap in quotes to do a phrase search
         cleaned_items.append(f'"{item}"')
-    return "".join(cleaned_items)
+
+    query_string = "".join(cleaned_items)
+    return remove_stop_words_from_phrases(query_string)
 
 
 def build_main_query(
