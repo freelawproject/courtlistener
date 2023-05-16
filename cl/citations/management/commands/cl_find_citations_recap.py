@@ -13,7 +13,14 @@ from cl.lib.argparse_types import valid_date_time
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand
 from cl.lib.types import OptionsType
-from cl.search.models import Opinion
+from cl.search.models import Opinion, RECAPDocument
+
+
+def _parse_args_list(args: str) -> list:
+    return [s.strip() for s in args.split(",")]
+
+
+# def get_documents():
 
 
 class Command(VerboseCommand):
@@ -21,10 +28,16 @@ class Command(VerboseCommand):
 
     def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
-            "--doc-id",
-            type=int,
+            "--doc-pks",
+            type=_parse_args_list,
             nargs="*",
-            help="ids of citing documents",
+            help="Database pks of citing document. If this is specified, will ignore all other filters.",
+        )
+        parser.add_argument(
+            "--doc-ids",
+            type=_parse_args_list,
+            nargs="*",
+            help="IDs of documents in PACER. If this is specified, will ignore all other filters.",
         )
         parser.add_argument(
             "--start-id",
@@ -47,12 +60,20 @@ class Command(VerboseCommand):
             help="ending creation date for a range of documents (inclusive) (filters based on when object entered into database)",
         )
         parser.add_argument(
-            "--start-date",
+            "--start-upload-date",
             type=int,
             help="starting upload date for a range of documents (inclusive) (filters based on date document uploaded to PACER)",
         )
         parser.add_argument(
-            "--end-date",
+            "--end-upload-date",
             type=int,
             help="ending upload date for a range of documents (inclusive) (filters based on date document uploaded to PACER)",
         )
+        parser.add_argument(
+            "--all",
+            type=bool,
+            help="Parse citations for all RECAP documents",
+        )
+
+    def handle(self, *args: List[str], **options: OptionsType) -> None:
+        super(Command, self).handle(*args, **options)
