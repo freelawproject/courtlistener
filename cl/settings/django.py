@@ -82,12 +82,19 @@ MEDIA_ROOT = env("MEDIA_ROOT", default=INSTALL_ROOT / "cl/assets/media/")
 STATIC_URL = env.str("STATIC_URL", default="static/")
 STATIC_ROOT = INSTALL_ROOT / "cl/assets/static/"
 TEMPLATE_ROOT = INSTALL_ROOT / "cl/assets/templates/"
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+}
 
 if not any([TESTING, DEBUG]):
-    STORAGES = {
-        "staticfiles": {
-            "BACKEND": "cl.lib.storage.SubDirectoryS3ManifestStaticStorage",
-        },
+    STORAGES["staticfiles"] = {
+        "BACKEND": "cl.lib.storage.SubDirectoryS3ManifestStaticStorage",
+    }
+else:
+    STORAGES["staticfiles"] = {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
     }
 
 TEMPLATES = [
