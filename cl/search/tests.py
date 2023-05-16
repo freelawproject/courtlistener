@@ -17,6 +17,7 @@ from django.db import IntegrityError, transaction
 from django.http import HttpRequest
 from django.test import RequestFactory, override_settings
 from django.urls import reverse
+from factory import RelatedFactory
 from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
 from selenium.webdriver.common.by import By
@@ -35,7 +36,12 @@ from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.factories import DocketEntriesDataFactory, DocketEntryDataFactory
 from cl.recap.mergers import add_docket_entries
 from cl.scrapers.factories import PACERFreeDocumentLogFactory
-from cl.search.factories import CourtFactory, DocketFactory
+from cl.search.factories import (
+    CourtFactory,
+    DocketFactory,
+    OpinionClusterFactoryWithChildrenAndParents,
+    OpinionWithChildrenFactory,
+)
 from cl.search.feeds import JurisdictionFeed
 from cl.search.management.commands.cl_calculate_pagerank import Command
 from cl.search.models import (
@@ -497,6 +503,21 @@ class AdvancedTest(IndexedSolrTestCase):
 
 
 class SearchTest(IndexedSolrTestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        OpinionClusterFactoryWithChildrenAndParents(
+            case_name="Strickland v. Washington.",
+            case_name_full="Strickland v. Washington.",
+            docket=DocketFactory(court=cls.court),
+            sub_opinions=RelatedFactory(
+                OpinionWithChildrenFactory,
+                factory_related_name="cluster",
+                html_columbia="<p>Code, &#167; 1-815</p>",
+            ),
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+        )
+
     @staticmethod
     def get_article_count(r):
         """Get the article count in a query response"""
@@ -817,6 +838,13 @@ class SearchTest(IndexedSolrTestCase):
                 HTTP_200_OK,
                 msg=f"Didn't get good status code with params: {param}",
             )
+
+    def test_rendering_unicode_o_text(self) -> None:
+        """Does unicode HTML unicode is properly rendered in search results?"""
+        r = self.client.get(
+            reverse("show_results"), {"q": "*", "case_name": "Washington"}
+        )
+        self.assertIn("Code, §", r.content.decode())
 
 
 @override_settings(
