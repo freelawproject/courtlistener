@@ -924,6 +924,7 @@ div.footnotes {
   border-top: 1px dotted black;
   padding-top: 1em;
 }
+
 .footnotes > .footnote > a {
   color: #000099;
   position: absolute;

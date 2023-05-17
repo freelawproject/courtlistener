@@ -519,18 +519,13 @@ def save_headmatter(cluster_id: int, harvard_data: Dict[str, Any]) -> None:
     """
     case_body = harvard_data["casebody"]["data"]
     soup = BeautifulSoup(case_body, "lxml")
-    soup = fix_pagination(soup)
-
-    content = list(soup.find("opinion").previous_siblings)[::-1]
+    for op in soup.find_all("opinion"):
+        op.decompose()
     headmatter = []
-    for item in content:
-        if item == "\n":
-            continue
-        if 'id="b' in str(item) and len(headmatter) > 0:
-            item = f"<br>{str(item)}"
-        else:
-            item = str(item)
-        headmatter.append(str(item))
+    soup = fix_footnotes(soup)
+    for element in soup.find("casebody").find_all(recursive=False):
+        element = fix_pagination(element)
+        headmatter.append(str(element))
     OpinionCluster.objects.filter(id=cluster_id).update(
         headmatter="".join(headmatter)
     )
@@ -624,7 +619,7 @@ def fix_pagination(soup: BeautifulSoup) -> BeautifulSoup:
 
 
 def fix_footnotes(soup: BeautifulSoup) -> BeautifulSoup:
-    """Fix footnotes
+    """Make Footnotes work with CL
 
     Enable footnote linking between footnotes and footnotemark
 
@@ -658,9 +653,12 @@ def fix_footnotes(soup: BeautifulSoup) -> BeautifulSoup:
     for div in footnote_divs:
         footnotes_div.append(div.extract())
 
-    # Append the footnotes_div to the main 'opinion' element
-    opinion = soup.find("opinion")
-    opinion.append(footnotes_div)
+    # Append the footnotes_div to the main 'opinion' element or headmatter
+    if not soup.find("opinion"):
+        soup.find("casebody").append(footnotes_div)
+    else:
+        opinion = soup.find("opinion")
+        opinion.append(footnotes_div)
     return soup
 
 
