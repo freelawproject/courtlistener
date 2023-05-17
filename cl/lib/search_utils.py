@@ -338,7 +338,7 @@ def make_fq(
     q = cd[key]
     q = q.replace(":", " ")
 
-    if q.startswith('"') and q.endswith('"'):
+    if (q.startswith('"') and q.endswith('"')) and q.count('"') == 2:
         # User used quotes. Just pass it through.
         return f"{field}:({q})"
 
@@ -349,18 +349,23 @@ def make_fq(
     # Iterate over the query word by word. If the word is a conjunction
     # word, detect that and use the user's request. Else, make sure there's
     # an AND everywhere there should be.
-    words = q.split()
-    clean_q = [words[0]]
+
+    # Split the query into words e.g: word1 and phrases e.g: "word2 word3"
+    words = re.findall(r'"([^"]*)"|(\S+)', q)
+    clean_q = []
     needs_default_conjunction = True
-    for word in words[1:]:
+    for group in words:
+        word = group[0] if group[0] else group[1]
         if word.lower() in ["and", "or", "not"]:
             clean_q.append(word.upper())
             needs_default_conjunction = False
         else:
-            if needs_default_conjunction:
+            if needs_default_conjunction and clean_q:
                 clean_q.append("AND")
-            clean_q.append(word)
+            # If word contains at least one " " is a phrase, append "".
+            clean_q.append(f'"{word}"' if " " in word else word)
             needs_default_conjunction = True
+
     fq = f"{field}:({' '.join(clean_q)})"
     return fq
 
