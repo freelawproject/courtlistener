@@ -25,7 +25,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
 
-from cl.lib.search_utils import cleanup_main_query
+from cl.lib.search_utils import cleanup_main_query, make_fq
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
     EmptySolrTestCase,
@@ -38,9 +38,11 @@ from cl.recap.mergers import add_docket_entries
 from cl.scrapers.factories import PACERFreeDocumentLogFactory
 from cl.search.factories import (
     CourtFactory,
+    DocketEntryWithParentsFactory,
     DocketFactory,
     OpinionClusterFactoryWithChildrenAndParents,
     OpinionWithChildrenFactory,
+    RECAPDocumentFactory,
 )
 from cl.search.feeds import JurisdictionFeed
 from cl.search.management.commands.cl_calculate_pagerank import Command
@@ -386,6 +388,29 @@ class AdvancedTest(IndexedSolrTestCase):
 
     fixtures = ["test_objects_search.json", "judge_judy.json"]
 
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.de = DocketEntryWithParentsFactory(
+            docket=DocketFactory(
+                court=cls.court, case_name="SUBPOENAS SERVED ON"
+            ),
+            description="MOTION for Leave to File Amicus Curiae august",
+        )
+        cls.rd = RECAPDocumentFactory(
+            docket_entry=cls.de, description="Leave to File"
+        )
+
+        cls.de_1 = DocketEntryWithParentsFactory(
+            docket=DocketFactory(
+                court=cls.court, case_name="SUBPOENAS SERVED OFF"
+            ),
+            description="MOTION for Leave to File Amicus Curiae september",
+        )
+        cls.rd_1 = RECAPDocumentFactory(
+            docket_entry=cls.de_1, description="Leave to File"
+        )
+
     def test_a_intersection_query(self) -> None:
         """Does AND queries work"""
         r = self.client.get(reverse("show_results"), {"q": "Howard AND Honda"})
@@ -500,6 +525,108 @@ class AdvancedTest(IndexedSolrTestCase):
         self.assertIn("docket number 2", r.content.decode())
         self.assertIn("docket number 3", r.content.decode())
         self.assertIn("2 Opinions", r.content.decode())
+
+    def test_make_fq(self) -> None:
+        """Test make_fq method, checks query formatted is correctly performed."""
+        args = (
+            {
+                "q": "",
+                "description": '"leave to file" AND amicus',
+            },
+            "description",
+            "description",
+        )
+        fq = make_fq(*args)
+        self.assertEqual(fq, 'description:("leave to file" AND amicus)')
+
+        args[0]["description"] = '"leave to file" curie'
+        fq = make_fq(*args)
+        self.assertEqual(fq, 'description:("leave to file" AND curie)')
+
+        args[0]["description"] = '"leave to file" AND "amicus curie"'
+        fq = make_fq(*args)
+        self.assertEqual(
+            fq, 'description:("leave to file" AND "amicus curie")'
+        )
+
+        args[0][
+            "description"
+        ] = '"leave to file" AND "amicus curie" "by august"'
+        fq = make_fq(*args)
+        self.assertEqual(
+            fq,
+            'description:("leave to file" AND "amicus curie" AND "by august")',
+        )
+
+        args[0][
+            "description"
+        ] = '"leave to file" AND "amicus curie" OR "by august"'
+        fq = make_fq(*args)
+        self.assertEqual(
+            fq,
+            'description:("leave to file" AND "amicus curie" OR "by august")',
+        )
+        args[0][
+            "description"
+        ] = '"leave to file" NOT "amicus curie" OR "by august"'
+        fq = make_fq(*args)
+        self.assertEqual(
+            fq,
+            'description:("leave to file" NOT "amicus curie" OR "by august")',
+        )
+
+        args[0]["description"] = '"leave to file amicus curie"'
+        fq = make_fq(*args)
+        self.assertEqual(fq, 'description:("leave to file amicus curie")')
+
+        args[0]["description"] = "leave to file AND amicus curie"
+        fq = make_fq(*args)
+        self.assertEqual(
+            fq, "description:(leave AND to AND file AND amicus AND curie)"
+        )
+
+    def test_phrase_plus_conjunction_search(self) -> None:
+        """Confirm phrase + conjunction search works properly"""
+
+        add_docket_to_solr_by_rds([self.rd.pk], force_commit=True)
+        add_docket_to_solr_by_rds([self.rd_1.pk], force_commit=True)
+        params = {
+            "q": "",
+            "description": '"leave to file" AND amicus',
+            "type": SEARCH_TYPES.RECAP,
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            params,
+        )
+        self.assertIn("2 Cases", r.content.decode())
+        self.assertIn("SUBPOENAS SERVED ON", r.content.decode())
+
+        params["description"] = '"leave to file" amicus'
+        r = self.client.get(
+            reverse("show_results"),
+            params,
+        )
+        self.assertIn("2 Cases", r.content.decode())
+        self.assertIn("SUBPOENAS SERVED ON", r.content.decode())
+
+        params["description"] = '"leave to file" AND "amicus"'
+        r = self.client.get(
+            reverse("show_results"),
+            params,
+        )
+        self.assertIn("2 Cases", r.content.decode())
+        self.assertIn("SUBPOENAS SERVED ON", r.content.decode())
+
+        params[
+            "description"
+        ] = '"leave to file" AND "amicus" "Curiae september"'
+        r = self.client.get(
+            reverse("show_results"),
+            params,
+        )
+        self.assertIn("1 Case", r.content.decode())
+        self.assertIn("SUBPOENAS SERVED OFF", r.content.decode())
 
 
 class SearchTest(IndexedSolrTestCase):
