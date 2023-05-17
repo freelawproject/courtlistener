@@ -2394,14 +2394,10 @@ class OpinionCluster(AbstractDateTimeModel):
         "case law cited and arguments presented to the judges.",
         blank=True,
     )
-    head_matter_footnotes = models.TextField(
-        help_text="Footnotes that appear before an opinion or at the conclusion "
-        "but that are not part of the opinion",
-        blank=True,
-    )
-    book_images = models.TextField(
-        help_text="Book images containing cluster content "
-        "(for example handwritten recusals) as HTML base64 images",
+    headmatter = models.TextField(
+        help_text="Headmatter is the content before an opinion in the Harvard "
+        "CaseLaw import. This consists of summaries, headnotes, "
+        "attorneys etc for the opinion.",
         blank=True,
     )
 
