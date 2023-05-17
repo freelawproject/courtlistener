@@ -483,6 +483,11 @@
                                 {% elif sub_opinion.html_lawbox %}
                                   <div class="serif-text">{{ sub_opinion.html_lawbox|safe }}</div>
                                 {% elif sub_opinion.xml_harvard %}
+                                  {% if cluster.headmatter %}
+                                    <div id="headmatter" class="serif-text">
+                                      {{ cluster.headmatter|safe }}
+                                    </div>
+                                  {% endif %}
                                   <div class="serif-text">{{ sub_opinion.xml_harvard|safe }}</div>
                                 {% elif sub_opinion.html_anon_2020 %}
                                   <div class="serif-text">{{ sub_opinion.html_anon_2020|safe }}</div>

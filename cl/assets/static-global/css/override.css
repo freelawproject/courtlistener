@@ -911,8 +911,56 @@ a.gray:hover, a.gray:focus, a.grey:hover, a.grey:focus {
   padding-top: 1em;
 }
 
-#resource-org-text div.footnote > p {
+/*Harvard CSS Changes*/
+.footnote > p {
   margin-left: 2em;
+}
+
+div.footnotes {
+  border-top: 1px dotted black;
+  padding-top: 1em;
+}
+.footnotes > .footnote > a {
+  color: #000099;
+  position: absolute;
+}
+
+a.footnote {
+  border-bottom: 0;
+  margin-bottom: 5px;
+  color: #000099;
+  vertical-align: super;
+  font-size: .85rem;
+  font-weight: bold;
+}
+
+#headmatter {
+  border: 1px black solid;
+  padding: 10px;
+  background: rgba(232, 232, 232, 0.73);
+  margin: 10px;
+}
+
+#headmatter > parties, attorneys, docketnumbers, judges, footnotes, court, decisiondate {
+  line-height: 2em;
+  font-size: 16px;
+  display: block;
+}
+
+#headmatter > parties {
+  font-style: italic;
+}
+#headmatter > footnote {
+   font-size: 12px;
+}
+
+#headmatter > * > span.star-pagination::after {
+   left: -1.5em;
+}
+
+opinion > author {
+  line-height: 2em;
+  font-size: 20px;
 }
 
 #resource-org-text div.prelims {

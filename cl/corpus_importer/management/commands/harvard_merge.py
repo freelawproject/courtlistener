@@ -137,29 +137,6 @@ def fetch_non_harvard_data(harvard_data: Dict[str, Any]) -> Dict[str, Any]:
         "correction",
     ]
 
-    # Find fist opinion element
-    first_opinion_at = soup.find("opinion")
-
-    # Find floating footnotes before first opinion
-    head_matter_footnotes = first_opinion_at.find_all_previous("footnote")
-    if head_matter_footnotes:
-        # Combine floating footnotes and add them to the dict,
-        # find_all_previous returns elements in reverse order
-        combined_floating_footnotes = " ".join(
-            str(fn) for fn in reversed(head_matter_footnotes)
-        )
-        all_data["head_matter_footnotes"] = combined_floating_footnotes
-
-    # Find images from books before first opinion
-    book_images = first_opinion_at.find_all_previous(
-        lambda tag: tag.get("data-type") == "picture"
-        or tag.get("data-type") == "img"
-    )
-    if book_images:
-        all_data["book_images"] = " ".join(
-            str(img) for img in reversed(book_images)
-        )
-
     # Combine attorneys and law
     find_fields = soup.find_all(
         lambda tag: tag.get("data-type") == "legal" or tag.name == "attorneys"
@@ -457,9 +434,7 @@ def merge_overlapping_data(
         "correction",
         "cross_reference",
         "disposition",
-        "head_matter_footnotes",
         "arguments",
-        "book_images",
     ]
 
     for field_name in changed_values_dictionary.keys():
@@ -517,6 +492,24 @@ def update_cluster_source(cluster_id: int) -> None:
         cluster.save()
 
 
+def save_headmatter(cluster_id: int, harvard_data: Dict[str, Any]) -> None:
+    """Save and update headmatter
+
+    Clean up the headmatter content - (pre opinion content) and save it
+
+    :param cluster_id: Cluster ID
+    :param harvard_data: json data from harvard case
+    :return: None
+    """
+    case_body = harvard_data["casebody"]["data"]
+    soup = BeautifulSoup(case_body, "lxml")
+    soup = fix_pagination(soup)
+
+    content = list(soup.find("opinion").previous_siblings)[::-1]
+    headmatter = "".join([str(x) for x in content])
+    OpinionCluster.objects.filter(id=cluster_id).update(headmatter=headmatter)
+
+
 def merge_opinion_clusters(
     cluster_id: int, only_fastcase: bool = False
 ) -> None:
@@ -531,7 +524,7 @@ def merge_opinion_clusters(
         if only_fastcase:
             source = get_data_source(harvard_data)
             if source == "Fastcase":
-                logger.info("Skipping non fastcase opinion cluster")
+                logger.info("Skipping non-fastcase opinion cluster")
                 return
         try:
             with transaction.atomic():
@@ -543,6 +536,7 @@ def merge_opinion_clusters(
                 merge_case_names(cluster_id, harvard_data)
                 merge_date_filed(cluster_id, harvard_data)
                 merge_overlapping_data(cluster_id, changed_values_dictionary)
+                save_headmatter(cluster_id, harvard_data)
                 update_docket_source(cluster_id=cluster_id)
                 update_cluster_source(cluster_id=cluster_id)
                 logger.info(msg=f"Finished merging cluster: {cluster_id}")
@@ -550,7 +544,7 @@ def merge_opinion_clusters(
         except AuthorException:
             logger.warning(msg=f"Author Exception for cluster {cluster_id}")
         except JudgeException:
-            logger.warning(msg=f"Judge exception for: {cluster_id}")
+            logger.warning(msg=f"Judge Exception for: {cluster_id}")
     else:
         logger.warning(msg=f"No Harvard json for cluster: {cluster_id}")
 
@@ -589,16 +583,69 @@ def fetch_cl_opinion_content(sub_opinions: list[Opinion]) -> list[str]:
     return cl_opinions
 
 
+def fix_pagination(soup: BeautifulSoup) -> BeautifulSoup:
+    """Add pagination to harvard XML
+
+    Add star pagination to page number XML/HTML
+    :param soup: The content to cleanup
+    :return: soup
+    """
+    for pgnmbr in soup.find_all("page-number"):
+        pgnmbr.name = "span"
+        pgnmbr["class"] = "star-pagination"
+        pgnmbr.string = f" {pgnmbr.string} "
+    return soup
+
+
+def fix_footnotes(soup: BeautifulSoup) -> BeautifulSoup:
+    """Fix footnotes
+
+    Enable footnote linking between footnotes and footnotemark
+
+    :param soup: Bs4 object to clean up
+    :return:Content with working footnotes
+    """
+    for fn in soup.find_all("footnotemark"):
+        fn.name = "a"
+        fn["href"] = f"#fn{fn.string}"
+        fn["id"] = f"fn{fn.string}_ref"
+        fn["class"] = "footnote"
+
+        fnl = soup.find("footnote", {"label": fn.string})
+        if fnl:
+            obj = f'<a class="footnote" href="#fn{fn.string}_ref">{fn.string}</a>'
+            fnl.name = "div"
+            fnl["class"] = "footnote"
+            fnl["id"] = f"fn{fn.string}"
+            sp2 = BeautifulSoup(obj, "html.parser")
+            fnl.insert(0, sp2)
+
+    soup = BeautifulSoup(str(soup.prettify()), "xml")
+    footnotes_div = soup.new_tag("div", attrs={"class": "footnotes"})
+
+    # Find all div elements with the class 'footnote'
+    footnote_divs = soup.find_all("div", class_="footnote")
+
+    # Wrap each footnote div with the footnotes_div
+    for div in footnote_divs:
+        footnotes_div.append(div.extract())
+
+    # Append the footnotes_div to the main 'opinion' element
+    opinion = soup.find("opinion")
+    opinion.append(footnotes_div)
+    return soup
+
+
 def update_matching_opinions(
     matches: dict, cluster_sub_opinions: list, harvard_opinions: list
 ) -> None:
-    """Update opinions that matched
+    """Update matching opinions
+
     :param matches: dict with matching position from queryset and harvard opinions
     :param cluster_sub_opinions: queryset of opinions
     :param harvard_opinions: list of harvard opinions
     :return: None
     """
-
     for k, v in matches.items():
         op = cluster_sub_opinions[int(v)]
         author_str = ""
@@ -620,7 +667,9 @@ def update_matching_opinions(
                     # difference between author names
                     raise AuthorException("Authors don't match - log error")
 
-        op.xml_harvard = str(harvard_opinions[int(k)])
+        clean_opinion = fix_footnotes(harvard_opinions[int(k)])
+        clean_opinion = fix_pagination(clean_opinion)
+        op.xml_harvard = str(clean_opinion)
         op.save()
 
 
@@ -785,6 +834,15 @@ class Command(VerboseCommand):
             action="store_true",
             help="Fastcase flag",
         )
+        parser.add_argument(
+            "--start-after", type=int, required=False, help="1261102"
+        )
+        parser.add_argument(
+            "--quantity",
+            type=int,
+            default=10000,
+            help="How many mergers to run at one time",
+        )
 
     def handle(self, *args, **options) -> None:
         if options["no_debug"]:
@@ -797,13 +855,17 @@ class Command(VerboseCommand):
                 if "Harvard" not in source[1]
             ]
             cluster_ids = (
-                OpinionCluster.objects.filter(
-                    docket__source__in=sources_without_harvard,
-                    filepath_json_harvard__isnull=False,
+                OpinionCluster.objects.exclude(filepath_json_harvard="")
+                .exclude(source__contains="U")
+                .values_list("id", "filepath_json_harvard")
+            )[: options["quantity"]]
+            if options["start_after"]:
+                index = [x[0] for x in cluster_ids].index(
+                    options["start_after"]
                 )
-                .exclude(filepath_json_harvard__exact="")
-                .values_list("id", "filepath_json_harvard", flat=False)
-            )
+                if index:
+                    cluster_ids = cluster_ids[index + 1 :]
+
             logger.info(msg=f"{len(cluster_ids)} left to merge")
         else:
             cluster_ids = OpinionCluster.objects.filter(
