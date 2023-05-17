@@ -89,10 +89,4 @@ def match_lists(list1: list, list2: list[str]) -> dict[int, Any]:
             continue
         matches[i] = j
 
-    if (
-        not list(range(0, len(list1)))
-        == sorted(list(matches.keys()))
-        == sorted(list(matches.values()))
-    ):
-        return {}
     return matches
