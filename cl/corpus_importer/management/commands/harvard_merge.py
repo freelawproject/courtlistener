@@ -137,21 +137,33 @@ def fetch_non_harvard_data(harvard_data: Dict[str, Any]) -> Dict[str, Any]:
         "correction",
     ]
 
-    # Combine attorneys and law
-    find_fields = soup.find_all(
-        lambda tag: tag.get("data-type") == "legal" or tag.name == "attorneys"
-    )
-    if find_fields:
-        # Remove page-number tags to make content more readable
-        for e in find_fields:
-            if e is not None:
-                [x.extract() for x in e.find_all("page-number")]
-
-        # Combine attorneys and legal data-type field
-        arguments = " ".join(str(x) for x in find_fields)
-        all_data["arguments"] = arguments
-
     short_data = parse_extra_fields(soup, short_fields, False)
+
+    # Find any legal field
+    find_any_legal_field = soup.find(
+        lambda tag: tag.get("data-type") == "legal"
+    )
+
+    if find_any_legal_field:
+        # We have legal field, then collect all legal and attorneys fields
+        find_fields = soup.find_all(
+            lambda tag: tag.get("data-type") == "legal"
+            or (tag.name == "attorneys" and tag.get("data-type") is None)
+            or tag.get("data-type") == "attorneys"
+        )
+        if find_fields:
+            # Combine attorneys and legal data-type fields
+            arguments = " ".join(str(x) for x in find_fields)
+            all_data["arguments"] = arguments
+    else:
+        # Only save attorneys
+        find_attorneys_fields = soup.find_all(
+            lambda tag: tag.get("data-type") == "attorneys"
+            or (tag.name == "attorneys" and tag.get("data-type") is None)
+        )
+        if find_attorneys_fields:
+            attorneys = " ".join(str(x) for x in find_attorneys_fields)
+            all_data["attorneys"] = attorneys
 
     if "otherdate" in short_data:
         # Rename to correct field name
