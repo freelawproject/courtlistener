@@ -472,9 +472,25 @@ def update_docket_source(cluster_id: int) -> None:
     :return: None
     """
     docket = OpinionCluster.objects.get(id=cluster_id).docket
-    source = docket.source
-    docket.source = Docket.HARVARD + source
-    docket.save()
+    new_docket_source = Docket.HARVARD + docket.source
+    if new_docket_source in [
+        Docket.HARVARD,
+        Docket.HARVARD_AND_RECAP,
+        Docket.SCRAPER_AND_HARVARD,
+        Docket.HARVARD_AND_COLUMBIA,
+        Docket.DIRECT_INPUT_AND_HARVARD,
+        Docket.ANON_2020_AND_HARVARD,
+        Docket.ANON_2020_AND_SCRAPER_AND_HARVARD,
+    ]:
+        # Source is limited to those options because those are the only
+        # valid options when we sum the source with harvard source
+        docket.source = new_docket_source
+        docket.save()
+    else:
+        logger.warning(
+            msg=f"New docket source unexpected: {new_docket_source} in "
+            f"merger with cluster {cluster_id}"
+        )
 
 
 def update_cluster_source(cluster_id: int) -> None:
@@ -485,8 +501,8 @@ def update_cluster_source(cluster_id: int) -> None:
     """
     cluster = OpinionCluster.objects.get(id=cluster_id)
     source = cluster.source
-    if "U" not in source or source != "U":
-        # Cluster source is not harvard or doesn't contain harvard, merge
+    if "U" not in source and source != "U":
+        # Cluster source is not harvard and doesn't contain harvard, merge
         # source with harvard
         cluster.source = source + SOURCES.HARVARD_CASELAW
         cluster.save()
