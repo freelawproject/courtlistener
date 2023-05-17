@@ -953,8 +953,9 @@ a.footnote {
 
 #headmatter > parties {
   font-style: italic;
+  line-height: 1em;
 }
-#headmatter > footnote {
+#headmatter > .footnotes > div.footnote {
    font-size: 12px;
 }
 

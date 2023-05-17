@@ -523,9 +523,14 @@ def save_headmatter(cluster_id: int, harvard_data: Dict[str, Any]) -> None:
         op.decompose()
     headmatter = []
     soup = fix_footnotes(soup)
+    index = 0
     for element in soup.find("casebody").find_all(recursive=False):
         element = fix_pagination(element)
-        headmatter.append(str(element))
+        if element.get("id", "").startswith("b") and index > 0:
+            headmatter.append(f"<br>{str(element)}")
+        else:
+            headmatter.append(str(element))
+        index += 1
     OpinionCluster.objects.filter(id=cluster_id).update(
         headmatter="".join(headmatter)
     )
