@@ -506,8 +506,18 @@ def save_headmatter(cluster_id: int, harvard_data: Dict[str, Any]) -> None:
     soup = fix_pagination(soup)
 
     content = list(soup.find("opinion").previous_siblings)[::-1]
-    headmatter = "".join([str(x) for x in content])
-    OpinionCluster.objects.filter(id=cluster_id).update(headmatter=headmatter)
+    headmatter = []
+    for item in content:
+        if item == "\n":
+            continue
+        if 'id="b' in str(item) and len(headmatter) > 0:
+            item = f"<br>{str(item)}"
+        else:
+            item = str(item)
+        headmatter.append(str(item))
+    OpinionCluster.objects.filter(id=cluster_id).update(
+        headmatter="".join(headmatter)
+    )
 
 
 def merge_opinion_clusters(
@@ -625,6 +635,8 @@ def fix_footnotes(soup: BeautifulSoup) -> BeautifulSoup:
 
     # Find all div elements with the class 'footnote'
     footnote_divs = soup.find_all("div", class_="footnote")
+    if not footnote_divs:
+        return soup
 
     # Wrap each footnote div with the footnotes_div
     for div in footnote_divs:
@@ -863,11 +875,6 @@ class Command(VerboseCommand):
             logging.disable(logging.DEBUG)
 
         if options["cluster_id"] is None:
-            sources_without_harvard = [
-                source[0]
-                for source in Docket.SOURCE_CHOICES
-                if "Harvard" not in source[1]
-            ]
             cluster_ids = (
                 OpinionCluster.objects.exclude(filepath_json_harvard="")
                 .exclude(source__contains="U")

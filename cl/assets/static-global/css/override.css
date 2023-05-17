@@ -912,6 +912,10 @@ a.gray:hover, a.gray:focus, a.grey:hover, a.grey:focus {
 }
 
 /*Harvard CSS Changes*/
+#headmatter > *[id^="A"] {
+  margin-left: 5px;
+}
+
 .footnote > p {
   margin-left: 2em;
 }
@@ -944,7 +948,6 @@ a.footnote {
 #headmatter > parties, attorneys, docketnumbers, judges, footnotes, court, decisiondate {
   line-height: 2em;
   font-size: 16px;
-  display: block;
 }
 
 #headmatter > parties {
