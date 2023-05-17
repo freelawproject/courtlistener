@@ -122,13 +122,16 @@ oral_arguments_index = Index("oral_arguments")
 oral_arguments_index.settings(
     number_of_shards=settings.ELASTICSEARCH_NUMBER_OF_SHARDS,
     number_of_replicas=settings.ELASTICSEARCH_NUMBER_OF_REPLICAS,
+    analysis=settings.ELASTICSEARCH_DSL["analysis"],
 )
 
 
 @oral_arguments_index.document
 class AudioDocument(Document):
     absolute_url = fields.KeywordField(attr="get_absolute_url")
-    caseName = fields.TextField(attr="case_name")
+    caseName = fields.TextField(
+        attr="case_name", analyzer="text_en_splitting_cl"
+    )
     court = fields.KeywordField(attr="docket.court.full_name")
     court_exact = fields.KeywordField(attr="docket.court.pk")
     court_id = fields.KeywordField(attr="docket.court.pk")
@@ -147,16 +150,14 @@ class AudioDocument(Document):
     download_url = fields.KeywordField(attr="download_url")
     file_size_mp3 = fields.IntegerField()
     id = fields.IntegerField(attr="pk")
-    judge = fields.TextField(
-        attr="judges",
-    )
+    judge = fields.TextField(attr="judges", analyzer="text_en_splitting_cl")
     local_path = fields.KeywordField()
     panel_ids = fields.ListField(
         fields.IntegerField(),
     )
     sha1 = fields.KeywordField(attr="sha1")
     source = fields.KeywordField(attr="source")
-    text = fields.TextField()
+    text = fields.TextField(analyzer="text_en_splitting_cl")
     timestamp = fields.DateField()
 
     class Django:

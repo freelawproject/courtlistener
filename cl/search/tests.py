@@ -2935,7 +2935,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             actual,
             expected,
             msg="Did not get expected number of results when filtering by "
-            "jurisdiction. Expected %s, but got %s." % (actual, expected),
+            "argued_after. Expected %s, but got %s." % (actual, expected),
         )
         self.assertIn(
             "SEC v. Frank J. Custable, Jr.",
@@ -2952,7 +2952,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             actual,
             expected,
             msg="Did not get expected number of results when filtering by "
-            "jurisdiction. Expected %s, but got %s." % (actual, expected),
+            "argued_after. Expected %s, but got %s." % (actual, expected),
         )
         self.assertIn(
             "SEC v. Frank J. Custable, Jr.",
@@ -3356,10 +3356,10 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         expected = 3
         self.assertEqual(actual, expected)
         self.assertTrue(
-            r.content.decode().index("Hong Liu Lorem")
-            < r.content.decode().index("Hong Liu Yang")
+            r.content.decode().index("Hong Liu Yang")
+            < r.content.decode().index("Hong Liu Lorem")
             < r.content.decode().index("Jose"),
-            msg="'Hong Liu Yang' should come BEFORE 'Hong Liu Lorem' and 'Jose' when order_by relevance.",
+            msg="'Hong Liu Yang' should come BEFORE 'Hong Liu Lorem' and 'Jose' when order_by relevance. 1",
         )
         # API
         r = self.client.get(
@@ -3369,10 +3369,10 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
 
         self.assertEqual(actual, expected)
         self.assertTrue(
-            r.content.decode().index("Hong Liu Lorem")
-            < r.content.decode().index("Hong Liu Yang")
+            r.content.decode().index("Hong Liu Yang")
+            < r.content.decode().index("Hong Liu Lorem")
             < r.content.decode().index("Jose"),
-            msg="'Hong Liu Yang' should come BEFORE 'Hong Liu Lorem' and 'Jose' when order_by relevance.",
+            msg="'Hong Liu Yang' should come BEFORE 'Hong Liu Lorem' and 'Jose' when order_by relevance. 2",
         )
 
         # Relevance order, two words match, reverse order.
@@ -3391,9 +3391,9 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         self.assertEqual(actual, expected)
         self.assertTrue(
             r.content.decode().index("Jose")
-            < r.content.decode().index("Hong Liu Lorem")
-            < r.content.decode().index("Hong Liu Yang"),
-            msg="'Jose' should come BEFORE 'Hong Liu Yang' and 'Hong Liu Lorem' when order_by relevance.",
+            < r.content.decode().index("Hong Liu Yang")
+            < r.content.decode().index("Hong Liu Lorem"),
+            msg="'Jose' should come BEFORE 'Hong Liu Yang' and 'Hong Liu Lorem' when order_by relevance. 3",
         )
         # API
         r = self.client.get(
@@ -3403,9 +3403,9 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         self.assertEqual(actual, expected)
         self.assertTrue(
             r.content.decode().index("Jose")
-            < r.content.decode().index("Hong Liu Lorem")
-            < r.content.decode().index("Hong Liu Yang"),
-            msg="'Jose' should come BEFORE 'Hong Liu Yang' and 'Hong Liu Lorem' when order_by relevance.",
+            < r.content.decode().index("Hong Liu Yang")
+            < r.content.decode().index("Hong Liu Lorem"),
+            msg="'Jose' should come BEFORE 'Hong Liu Yang' and 'Hong Liu Lorem' when order_by relevance. 4",
         )
 
         # Relevance order, hyphenated compound word.
@@ -3426,7 +3426,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             r.content.decode().index("Hong Liu Lorem")
             < r.content.decode().index("Hong Liu Yang")
             < r.content.decode().index("Jose"),
-            msg="'Hong Liu Yang' should come BEFORE 'Hong Liu Lorem' and 'Jose' when order_by relevance.",
+            msg="'Hong Liu Yang' should come BEFORE 'Hong Liu Lorem' and 'Jose' when order_by relevance. 5",
         )
         # API
         r = self.client.get(
@@ -3438,7 +3438,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             r.content.decode().index("Hong Liu Lorem")
             < r.content.decode().index("Hong Liu Yang")
             < r.content.decode().index("Jose"),
-            msg="'Hong Liu Yang' should come BEFORE 'Hong Liu Lorem' and 'Jose' when order_by relevance.",
+            msg="'Hong Liu Yang' should come BEFORE 'Hong Liu Lorem' and 'Jose' when order_by relevance. 6",
         )
 
     def test_oa_results_api_fields_es(self) -> None:
@@ -3507,7 +3507,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             actual = self.get_results_count(r)
             expected = 20
             self.assertEqual(actual, expected)
-            self.assertEqual(24, r.data["count"])
+            self.assertEqual(25, r.data["count"])
             self.assertIn("page=2", r.data["next"])
 
             # Test next page.
@@ -3519,12 +3519,84 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
                 reverse("search-list", kwargs={"version": "v3"}), search_params
             )
             actual = self.get_results_count(r)
-            expected = 4
+            expected = 5
             self.assertEqual(actual, expected)
-            self.assertEqual(24, r.data["count"])
+            self.assertEqual(25, r.data["count"])
             self.assertEqual(None, r.data["next"])
 
             # Remove Audio objects to avoid affecting other concurrent tests.
             Audio.objects.all().delete()
         super().setUpTestData()
         self.rebuild_index()
+
+    def test_oa_synonym_search(self) -> None:
+        # Query using a synonym
+        # Frontend
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": f"Freedom of Info",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("Freedom", r.content.decode())
+        # API
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v3"}), search_params
+        )
+        actual = self.get_results_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("Freedom", r.content.decode())
+
+    def test_oa_stopwords_search(self) -> None:
+        # Query using a stopword, indexed content doesn't contain the stop word
+        # Frontend
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": f"judge:Wallace and Friedland",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("Freedom", r.content.decode())
+        # API
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v3"}), search_params
+        )
+        actual = self.get_results_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("Freedom", r.content.decode())
+
+    def test_phrase_queries_with_stop_words(self) -> None:
+        # Does phrase queries with stop words return results properly?
+        # Frontend
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": f'caseName:"Freedom of Information"',
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("Freedom", r.content.decode())
+        # API
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v3"}), search_params
+        )
+        actual = self.get_results_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("Freedom", r.content.decode())
