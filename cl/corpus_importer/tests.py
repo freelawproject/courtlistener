@@ -2623,7 +2623,7 @@ class HarvardMergerTests(TestCase):
         # Make sure we updated our source
         self.assertEqual(cluster.docket.source, Docket.HARVARD_AND_COLUMBIA)
         # Check judges were added to our opinions
-        self.assertEqual(authors, ["Broyles, C. J.", "Gardner, J.,"])
+        self.assertEqual(authors, ["Broyles", "Gardner"])
 
     def test_add_opinions_with_authors_in_cl(self):
         """Can we update an opinion and leave author_str alone if already assigned"""
