@@ -778,7 +778,10 @@ def map_and_merge_opinions(cluster: int, harvard_data: Dict[str, Any]) -> None:
     )
 
     if len(harvard_opinions) == len(cl_opinions):
-        matches = match_lists(harvard_opinions, cl_opinions)
+        matches = match_lists(
+            [op for op in harvard_opinions],
+            fetch_cl_opinion_content(sub_opinions=cl_opinions),
+        )
         if len(matches) == len(harvard_opinions):
             update_matching_opinions(matches, cl_opinions, harvard_opinions)
         else:
