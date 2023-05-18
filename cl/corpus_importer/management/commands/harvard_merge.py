@@ -464,7 +464,6 @@ def merge_overlapping_data(
 
     if not changed_values_dictionary:
         # Empty dictionary means that we don't have overlapping data
-        logger.info(f"Merging complete for: {cluster_id}")
         return
 
     long_fields = [
