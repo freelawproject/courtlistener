@@ -18,6 +18,7 @@ from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.timezone import make_aware
 from django.views.decorators.cache import never_cache
+from elasticsearch.exceptions import RequestError, TransportError
 from requests import RequestException, Session
 from scorched.exc import SolrError
 from waffle.decorators import waffle_flag
