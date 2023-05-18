@@ -5,7 +5,7 @@ from datetime import date
 from typing import Any, Dict, Optional, Tuple
 
 import requests
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup
 from django.db import transaction
 from juriscraper.lib.string_utils import harmonize, titlecase
 
@@ -19,6 +19,21 @@ from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_diff import get_cosine_similarity
 from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.search.models import SOURCES, Docket, Opinion, OpinionCluster
+
+
+class HarvardConversionUtil:
+    types_mapping = {
+        "unanimous": "015unamimous",
+        "majority": "020lead",
+        "plurality": "025plurality",
+        "concurrence": "030concurrence",
+        "concurring-in-part-and-dissenting-in-part": "035concurrenceinpart",
+        "dissent": "040dissent",
+        "remittitur": "060remittitur",
+        "rehearing": "070rehearing",
+        "on-the-merits": "080onthemerits",
+        "on-motion-to-strike-cost-bill": "090onmotiontostrike",
+    }
 
 
 class AuthorException(Exception):
@@ -540,8 +555,7 @@ def save_headmatter(cluster_id: int, harvard_data: Dict[str, Any]) -> None:
     :param harvard_data: json data from harvard case
     :return: None
     """
-    case_body = harvard_data["casebody"]["data"]
-    soup = BeautifulSoup(case_body, "lxml")
+    soup = BeautifulSoup(harvard_data["casebody"]["data"], "lxml")
     for op in soup.find_all("opinion"):
         op.decompose()
     headmatter = []
@@ -642,7 +656,7 @@ def fix_pagination(soup: BeautifulSoup) -> BeautifulSoup:
     """Add pagination to harvard XML
 
     Add star pagination to page number XML/HTML
-    :param soup: The content to cleanup
+    :param soup: The content to clean up
     :return: soup
     """
     for pgnmbr in soup.find_all("page-number"):
@@ -747,28 +761,6 @@ def update_matching_opinions(
         op.save()
 
 
-def create_opinion(harvard_html: Tag, opinion_type: str, cluster: int) -> None:
-    """Create a new opinion
-    :param harvard_html: BS element that contains opinion
-    :param opinion_type: opinion type from Opinion model
-    :param cluster: id from opinion cluster
-    :return: None
-    """
-
-    author_str = ""
-    author = harvard_html.find("author")
-    if author:
-        # Prettify the name a bit
-        author_str = titlecase(author.text.strip(":"))
-
-    Opinion.objects.create(
-        xml_harvard=str(harvard_html),
-        cluster=OpinionCluster.objects.get(id=cluster),
-        type=opinion_type,
-        author_str=author_str,
-    )
-
-
 def map_and_merge_opinions(cluster: int, harvard_data: Dict[str, Any]) -> None:
     """Map and merge opinion data
 
@@ -776,116 +768,39 @@ def map_and_merge_opinions(cluster: int, harvard_data: Dict[str, Any]) -> None:
     :param harvard_data: json data from harvard case
     :return: None
     """
-    used_combined_opinions = False
-    case_body = harvard_data["casebody"]["data"]
-    sub_opinions = Opinion.objects.filter(cluster__id=cluster)
-    soup = BeautifulSoup(case_body, "lxml")
-    harvard_html = soup.find_all(
+
+    map_types = HarvardConversionUtil.types_mapping
+    cl_opinions = Opinion.objects.filter(cluster__id=cluster)
+    soup = BeautifulSoup(harvard_data["casebody"]["data"], "lxml")
+    harvard_opinions = soup.find_all(
         lambda tag: (tag.name == "opinion" and tag.get("data-type") is None)
         or tag.get("data-type") == "opinion"
     )
 
-    types_mapping = {
-        "unanimous": "015unamimous",
-        "majority": "020lead",
-        "plurality": "025plurality",
-        "concurrence": "030concurrence",
-        "concurring-in-part-and-dissenting-in-part": "035concurrenceinpart",
-        "dissent": "040dissent",
-        "remittitur": "060remittitur",
-        "rehearing": "070rehearing",
-        "on-the-merits": "080onthemerits",
-        "on-motion-to-strike-cost-bill": "090onmotiontostrike",
-    }
-
-    if len(harvard_html) != len(sub_opinions):
-        specific_sub_opinions = sub_opinions.exclude(type="010combined")
-        if specific_sub_opinions.count() == 0:
-            # Our only opinion is a combined opinion
-            for op in harvard_html:
-                if op.has_attr("type"):
-                    opinion_type = types_mapping.get(op.get("type"))
-                    if opinion_type:
-                        create_opinion(op, opinion_type, cluster)
-                    else:
-                        raise OpinionTypeException(
-                            f"Opinion type unknown: {op.get('type')}"
-                        )
-                else:
-                    # It cannot create opinion, it has no type
-                    raise OpinionTypeException(
-                        f"Opinion from json file in cluster_id: {cluster} has no type"
-                    )
-        else:
-            # Try to match cluster sub opinions with json opinions
-            harvard_opinions = [op for op in harvard_html]
-            specific_sub_opinions = sub_opinions.exclude(type="010combined")
-            cl_opinions = fetch_cl_opinion_content(
-                sub_opinions=specific_sub_opinions
-            )
-            matches = match_lists(harvard_opinions, cl_opinions)
-            if matches:
-                # Update matching opinions
-                update_matching_opinions(
-                    matches, specific_sub_opinions, harvard_opinions
-                )
-            else:
-                # We have opinions but for some unknown reason they don't match
-                raise OpinionMatchingException(
-                    f"Opinions don't match with json file on cluster id: {cluster}"
-                )
-
-    else:
-        # Cl opinions and harvard opinions have the same length, try to match
-        # opinions
-        harvard_opinions = [op for op in harvard_html]
-        cl_opinions = fetch_cl_opinion_content(sub_opinions=sub_opinions)
+    if len(harvard_opinions) == len(cl_opinions):
         matches = match_lists(harvard_opinions, cl_opinions)
-        if not matches:
-            used_combined_opinions = True
-
-        if not used_combined_opinions:
-            # Update matching opinions
-            update_matching_opinions(matches, sub_opinions, harvard_opinions)
-
-    if used_combined_opinions:
-        combined_opinions = sub_opinions.filter(type="010combined")
-
-        if combined_opinions:
-            if combined_opinions.count() == 1:
-                # Try to match old and new combined opinion
-                cl_combined_opinion = fetch_cl_opinion_content(
-                    sub_opinions=combined_opinions
-                )
-                harvard_combined_opinion = [
-                    "\n".join([str(op) for op in harvard_html])
-                ]
-                matches = match_lists(
-                    harvard_combined_opinion, cl_combined_opinion
-                )
-                if matches:
-                    # Update combined opinion
-                    update_matching_opinions(
-                        matches, cl_combined_opinion, harvard_combined_opinion
-                    )
-
-            else:
-                # We have more than one combined opinion
-                logger.warning(
-                    msg=f"Cluster id: {cluster} has more than one "
-                    f"combined opinion. Can't update combined"
-                    f" opinion."
-                )
+        if len(matches) == len(harvard_opinions):
+            update_matching_opinions(matches, cl_opinions, harvard_opinions)
         else:
-            # We don't have a combined opinion, create combined opinion
-            Opinion.objects.create(
-                xml_harvard="\n".join([str(op) for op in harvard_html]),
-                cluster=OpinionCluster.objects.get(id=cluster),
-                type="010combined",
-            )
-            logger.info(
-                msg=f"Combined opinion created in cluster id: {cluster}"
-            )
+            raise OpinionMatchingException("Failed to match opinions")
+
+    elif len(harvard_opinions) > len(cl_opinions) and len(cl_opinions) == 1:
+        for op in harvard_opinions:
+            if op.has_attr("type"):
+                opinion_type = map_types.get(op.get("type"))
+                if not opinion_type:
+                    raise OpinionTypeException(
+                        f"Opinion type unknown: {op.get('type')}"
+                    )
+                author = op.find("author")
+                Opinion.objects.create(
+                    xml_harvard=str(op),
+                    cluster=OpinionCluster.objects.get(id=cluster),
+                    type=opinion_type,
+                    author_str=titlecase(author.text.strip(":"))
+                    if author
+                    else "",
+                )
 
 
 class Command(VerboseCommand):
