@@ -146,7 +146,9 @@ class AudioDocument(Document):
     dateReargumentDenied = fields.DateField(
         attr="docket.date_reargument_denied"
     )
-    docketNumber = fields.KeywordField(attr="docket.docket_number")
+    docketNumber = fields.TextField(
+        attr="docket.docket_number", analyzer="text_en_splitting_cl"
+    )
     docket_slug = fields.KeywordField(attr="docket.slug")
     duration = fields.IntegerField(attr="duration")
     download_url = fields.KeywordField(attr="download_url")

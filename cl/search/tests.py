@@ -2831,7 +2831,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
-        self.assertIn("<mark>19-5734", r.content.decode())
+        self.assertIn("<mark>19", r.content.decode())
         self.assertEqual(r.content.decode().count("<mark>19"), 2)
 
         # Judge highlights
@@ -3340,6 +3340,22 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         self.assertEqual(actual, expected)
         self.assertIn("Jose", r.content.decode())
 
+    def test_oa_search_by_no_exact_docket_number(self) -> None:
+        # Query a not exact docket number: 19-5734 -> 19 5734
+        # Frontend
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": f'docketNumber:"19 5734"',
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("Jose", r.content.decode())
+
     def test_oa_results_relevance_ordering_elastic(self) -> None:
         # Relevance order, two words match.
         search_params = {
@@ -3359,7 +3375,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             r.content.decode().index("Hong Liu Yang")
             < r.content.decode().index("Hong Liu Lorem")
             < r.content.decode().index("Jose"),
-            msg="'Hong Liu Yang' should come BEFORE 'Hong Liu Lorem' and 'Jose' when order_by relevance. 1",
+            msg="'Hong Liu Yang' should come BEFORE 'Hong Liu Lorem' and 'Jose' when order_by relevance.",
         )
         # API
         r = self.client.get(
@@ -3372,7 +3388,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             r.content.decode().index("Hong Liu Yang")
             < r.content.decode().index("Hong Liu Lorem")
             < r.content.decode().index("Jose"),
-            msg="'Hong Liu Yang' should come BEFORE 'Hong Liu Lorem' and 'Jose' when order_by relevance. 2",
+            msg="'Hong Liu Yang' should come BEFORE 'Hong Liu Lorem' and 'Jose' when order_by relevance.",
         )
 
         # Relevance order, two words match, reverse order.
@@ -3393,7 +3409,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             r.content.decode().index("Jose")
             < r.content.decode().index("Hong Liu Yang")
             < r.content.decode().index("Hong Liu Lorem"),
-            msg="'Jose' should come BEFORE 'Hong Liu Yang' and 'Hong Liu Lorem' when order_by relevance. 3",
+            msg="'Jose' should come BEFORE 'Hong Liu Yang' and 'Hong Liu Lorem' when order_by relevance.",
         )
         # API
         r = self.client.get(
@@ -3405,7 +3421,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             r.content.decode().index("Jose")
             < r.content.decode().index("Hong Liu Yang")
             < r.content.decode().index("Hong Liu Lorem"),
-            msg="'Jose' should come BEFORE 'Hong Liu Yang' and 'Hong Liu Lorem' when order_by relevance. 4",
+            msg="'Jose' should come BEFORE 'Hong Liu Yang' and 'Hong Liu Lorem' when order_by relevance.",
         )
 
         # Relevance order, hyphenated compound word.
@@ -3426,7 +3442,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             r.content.decode().index("Hong Liu Lorem")
             < r.content.decode().index("Hong Liu Yang")
             < r.content.decode().index("Jose"),
-            msg="'Hong Liu Yang' should come BEFORE 'Hong Liu Lorem' and 'Jose' when order_by relevance. 5",
+            msg="'Hong Liu Yang' should come BEFORE 'Hong Liu Lorem' and 'Jose' when order_by relevance.",
         )
         # API
         r = self.client.get(
@@ -3438,7 +3454,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             r.content.decode().index("Hong Liu Lorem")
             < r.content.decode().index("Hong Liu Yang")
             < r.content.decode().index("Jose"),
-            msg="'Hong Liu Yang' should come BEFORE 'Hong Liu Lorem' and 'Jose' when order_by relevance. 6",
+            msg="'Hong Liu Yang' should come BEFORE 'Hong Liu Lorem' and 'Jose' when order_by relevance.",
         )
 
     def test_oa_results_api_fields_es(self) -> None:
