@@ -132,7 +132,9 @@ class AudioDocument(Document):
     caseName = fields.TextField(
         attr="case_name", analyzer="text_en_splitting_cl"
     )
-    court = fields.KeywordField(attr="docket.court.full_name")
+    court = fields.TextField(
+        attr="docket.court.full_name", analyzer="text_en_splitting_cl"
+    )
     court_exact = fields.KeywordField(attr="docket.court.pk")
     court_id = fields.KeywordField(attr="docket.court.pk")
     court_citation_string = fields.KeywordField(
