@@ -15,19 +15,18 @@ ELASTICSEARCH_DSL = {
                 "filter": [
                     "lowercase",
                     "synonym_filter",
-                    "word_delimiter",
+                    "custom_word_delimiter_filter",
                     "remove_leading_zeros",
                     "keyword_marker",
                     "english_stemmer",
-                    "english_stop",
                     "remove_duplicates",
                 ],
             },
         },
         "filter": {
-            "english_stop": {
-                "type": "stop",
-                "stopwords_path": "stopwords_en.txt",
+            "custom_word_delimiter_filter": {
+                "type": "word_delimiter",
+                "split_on_numerics": False,
             },
             "synonym_filter": {
                 "type": "synonym",

@@ -243,7 +243,7 @@ class AudioESTestCase(SimpleTestCase):
             date_argued=datetime.date(2013, 8, 14),
         )
         cls.audio_1 = AudioFactory.create(
-            case_name="SEC v. Frank J. Custable, Jr.",
+            case_name="SEC v. Frank J. Custable, WikiLeaks",
             docket_id=cls.docket_1.pk,
             duration=420,
             judges="",
@@ -257,7 +257,7 @@ class AudioESTestCase(SimpleTestCase):
             case_name="Jose A. Dominguez v. Loretta E. Lynch",
             docket_id=cls.docket_2.pk,
             duration=837,
-            judges="",
+            judges="Wallace and Friedland",
             local_path_original_file="mp3/2014/06/09/ander_v._leo.mp3",
             local_path_mp3="test/audio/2.mp3",
             source="C",
@@ -283,9 +283,9 @@ class AudioESTestCase(SimpleTestCase):
         )
         cls.audio_4.panel.add(cls.author)
         cls.audio_5 = AudioFactory.create(
-            case_name="Freedom of Information Act",
+            case_name="Freedom of Information Wikileaks",
             docket_id=cls.docket_4.pk,
             duration=400,
-            judges="Wallace Friedland",
+            judges="Wallace to Friedland",
             sha1="a49ada009774496ac01fb49818837e2296705c95",
         )

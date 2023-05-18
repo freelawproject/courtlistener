@@ -128,7 +128,6 @@ services:
       - "9200:9200"
     volumes:
       - ${CL_BASE_DIR:-../../../courtlistener/cl/search/elasticsearch_files/synonyms_en.txt}:/usr/share/elasticsearch/config/synonyms_en.txt
-      - ${CL_BASE_DIR:-../../../courtlistener/cl/search/elasticsearch_files/stopwords_en.txt}:/usr/share/elasticsearch/config/stopwords_en.txt
       - ${CL_BASE_DIR:-../../../courtlistener/cl/search/elasticsearch_files/protwords_en.txt}:/usr/share/elasticsearch/config/protwords_en.txt
     networks:
       - cl_net_overlay

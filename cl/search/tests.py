@@ -2938,7 +2938,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             "argued_after. Expected %s, but got %s." % (actual, expected),
         )
         self.assertIn(
-            "SEC v. Frank J. Custable, Jr.",
+            "SEC v. Frank J. Custable, WikiLeaks",
             r.content.decode(),
             msg="Did not get the expected oral argument.",
         )
@@ -2955,7 +2955,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             "argued_after. Expected %s, but got %s." % (actual, expected),
         )
         self.assertIn(
-            "SEC v. Frank J. Custable, Jr.",
+            "SEC v. Frank J. Custable, WikiLeaks",
             r.content.decode(),
             msg="Did not get the expected oral argument.",
         )
@@ -3309,7 +3309,9 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             reverse("show_results"),
         )
         self.assertIn("Latest Oral Arguments", r.content.decode())
-        self.assertIn("SEC v. Frank J. Custable, Jr.", r.content.decode())
+        self.assertIn(
+            "SEC v. Frank J. Custable, WikiLeaks", r.content.decode()
+        )
         self.assertIn(
             "Jose A. Dominguez v. Loretta E. Lynch", r.content.decode()
         )
@@ -3439,8 +3441,8 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         expected = 3
         self.assertEqual(actual, expected)
         self.assertTrue(
-            r.content.decode().index("Hong Liu Lorem")
-            < r.content.decode().index("Hong Liu Yang")
+            r.content.decode().index("Hong Liu Yang")
+            < r.content.decode().index("Hong Liu Lorem")
             < r.content.decode().index("Jose"),
             msg="'Hong Liu Yang' should come BEFORE 'Hong Liu Lorem' and 'Jose' when order_by relevance.",
         )
@@ -3451,8 +3453,8 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         actual = self.get_results_count(r)
         self.assertEqual(actual, expected)
         self.assertTrue(
-            r.content.decode().index("Hong Liu Lorem")
-            < r.content.decode().index("Hong Liu Yang")
+            r.content.decode().index("Hong Liu Yang")
+            < r.content.decode().index("Hong Liu Lorem")
             < r.content.decode().index("Jose"),
             msg="'Hong Liu Yang' should come BEFORE 'Hong Liu Lorem' and 'Jose' when order_by relevance.",
         )
@@ -3583,18 +3585,23 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
-        self.assertIn("Freedom", r.content.decode())
-        # API
+        self.assertIn("Jose", r.content.decode())
+
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": f"judge:Wallace to Friedland",
+        }
         r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}), search_params
+            reverse("show_results"),
+            search_params,
         )
-        actual = self.get_results_count(r)
+        actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
         self.assertIn("Freedom", r.content.decode())
 
     def test_phrase_queries_with_stop_words(self) -> None:
-        # Does phrase queries with stop words return results properly?
+        # Do phrase queries with stop words return results properly?
         # Frontend
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
@@ -3615,4 +3622,37 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         actual = self.get_results_count(r)
         expected = 1
         self.assertEqual(actual, expected)
+        self.assertIn("Freedom", r.content.decode())
+
+    def test_character_case_queries(self) -> None:
+        # Do character case queries works properly?
+        # Queries like WikiLeaks and wikileaks or GraphQL and GraphqL, should
+        # return the same results in both cases.
+        # Frontend
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": "WikiLeaks",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 2
+        self.assertEqual(actual, expected)
+        self.assertIn("SEC", r.content.decode())
+        self.assertIn("Freedom", r.content.decode())
+
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": "wikileaks",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 2
+        self.assertEqual(actual, expected)
+        self.assertIn("SEC", r.content.decode())
         self.assertIn("Freedom", r.content.decode())
