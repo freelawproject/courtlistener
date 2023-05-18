@@ -396,6 +396,14 @@
             {% endif %}
 
             <br>
+            {# Add headmatter, if a Harvard opinion #}
+                {% if cluster.source in "U" %}
+                  {% if cluster.headmatter %}
+                    <div id="headmatter" class="serif-text">
+                      {{ cluster.headmatter|safe }}
+                    </div>
+                  {% endif %}
+                {% endif %}
 
             {# Only display tabs and make panels if more than one sub-opinion. #}
             {% if opinion_count > 1 %}
@@ -450,17 +458,6 @@
                             {% endif %}
                         {% endif %}
 
-                        {% if sub_opinion.html_with_citations %}
-                        {% elif sub_opinion.html_columbia %}
-                        {% elif sub_opinion.html_lawbox %}
-                        {% elif sub_opinion.xml_harvard %}
-                          {% if cluster.headmatter %}
-                            <div id="headmatter" class="serif-text">
-                              {{ cluster.headmatter|safe }}
-                            </div>
-                          {% endif %}
-                        {% endif %}
-
                         {% if sub_opinion.extracted_by_ocr %}
                             <div class="col-sm-12 alert-warning alert v-offset-above-2">
                                 <p class="bottom">The text of this document was obtained by analyzing a scanned document and may have typos.
@@ -495,7 +492,7 @@
                                 {% elif sub_opinion.html_lawbox %}
                                   <div class="serif-text">{{ sub_opinion.html_lawbox|safe }}</div>
                                 {% elif sub_opinion.xml_harvard %}
-                                  <div class="serif-text">{{ sub_opinion.xml_harvard|safe }}</div>
+                                  <div class="serif-text harvard">{{ sub_opinion.xml_harvard|safe }}</div>
                                 {% elif sub_opinion.html_anon_2020 %}
                                   <div class="serif-text">{{ sub_opinion.html_anon_2020|safe }}</div>
                                 {% elif sub_opinion.html %}

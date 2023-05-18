@@ -35,6 +35,20 @@ class JudgeException(Exception):
         self.message = message
 
 
+class OpinionMatchingException(Exception):
+    """An exception for wrong judges"""
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+
+class DocketSourceException(Exception):
+    """An exception for wrong judges"""
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+
 class OpinionTypeException(Exception):
     """An exception for incorrect opinion types"""
 
@@ -499,10 +513,7 @@ def update_docket_source(cluster_id: int) -> None:
         docket.source = new_docket_source
         docket.save()
     else:
-        logger.warning(
-            msg=f"New docket source unexpected: {new_docket_source} in "
-            f"merger with cluster {cluster_id}"
-        )
+        raise DocketSourceException("Unexpected docket source")
 
 
 def update_cluster_source(cluster_id: int) -> None:
@@ -583,6 +594,12 @@ def merge_opinion_clusters(
             logger.warning(msg=f"Author Exception for cluster {cluster_id}")
         except JudgeException:
             logger.warning(msg=f"Judge Exception for: {cluster_id}")
+        except OpinionMatchingException:
+            logger.warning(
+                msg=f"Opinions don't match for on cluster id: {cluster_id}"
+            )
+        except DocketSourceException:
+            logger.warning(msg=f"Docket Source Exception for: {cluster_id}")
     else:
         logger.warning(msg=f"No Harvard json for cluster: {cluster_id}")
 
@@ -814,8 +831,8 @@ def map_and_merge_opinions(cluster: int, harvard_data: Dict[str, Any]) -> None:
                 )
             else:
                 # We have opinions but for some unknown reason they don't match
-                logger.warning(
-                    msg=f"Opinions don't match with json file on cluster id: {cluster}"
+                raise OpinionMatchingException(
+                    f"Opinions don't match with json file on cluster id: {cluster}"
                 )
 
     else:

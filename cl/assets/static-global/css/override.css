@@ -912,49 +912,68 @@ a.gray:hover, a.gray:focus, a.grey:hover, a.grey:focus {
 }
 
 /*Harvard CSS Changes*/
+/*Add custom css for displaying harvard content*/
 #headmatter > *[id^="A"] {
   margin-left: 5px;
 }
 
-.footnote > p {
+#headmatter > div.footnotes > .footnote > p {
   margin-left: 2em;
 }
 
-div.footnotes {
+.harvard > opinion > div.footnotes > .footnote > p {
+  margin-left: 2em;
+}
+
+#headmatter > div.footnotes {
   border-top: 1px dotted black;
   padding-top: 1em;
 }
 
-.footnotes > .footnote > a {
-  color: #000099;
-  position: absolute;
+.harvard > opinion > div.footnotes {
+  border-top: 1px dotted black;
+  padding-top: 1em;
 }
 
-a.footnote {
+#headmatter > .footnotes > .footnote > a {
+  color: #000099;
+  position: absolute;
+  font-size: 1em;
+}
+
+.harvard > opinion > .footnotes > .footnote > a {
+  color: #000099;
+  position: absolute;
+  font-size: 1em;
+}
+
+.harvard > opinion > p > a.footnote {
   border-bottom: 0;
   margin-bottom: 5px;
   color: #000099;
   vertical-align: super;
-  font-size: .85rem;
+  font-size: .85em;
   font-weight: bold;
 }
 
 #headmatter {
-  border: 1px black solid;
+  border: 1px rgba(210, 210, 210, 0.55) solid;
   padding: 10px;
-  background: rgba(232, 232, 232, 0.73);
+  background: rgba(232, 232, 232, 0.37);
   margin: 10px;
 }
 
-#headmatter > parties, attorneys, docketnumbers, judges, footnotes, court, decisiondate {
+#headmatter > attorneys, docketnumbers, judges, footnotes, court, decisiondate {
   line-height: 2em;
-  font-size: 16px;
+  font-size: 14px;
 }
 
 #headmatter > parties {
   font-style: italic;
   line-height: 1em;
+  font-size: 14px;
 }
+
 #headmatter > .footnotes > div.footnote {
    font-size: 12px;
 }
@@ -963,7 +982,7 @@ a.footnote {
    left: -1.5em;
 }
 
-opinion > author {
+.harvard > opinion > author {
   line-height: 2em;
   font-size: 20px;
 }
