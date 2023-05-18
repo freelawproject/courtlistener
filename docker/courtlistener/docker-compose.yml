@@ -126,11 +126,5 @@ services:
       - "http.cors.allow-credentials=true"
     ports:
       - "9200:9200"
-    deploy:
-      resources:
-        limits:
-          memory: 700M
-        reservations:
-          memory: 100M
     networks:
       - cl_net_overlay
