@@ -371,8 +371,8 @@ def merge_docket_numbers(cluster_id: int, harvard_docket_number: str) -> None:
         h_clean_docket = clean_docket_number(harvard_docket_number)
 
         if (
-            cl_docket.docket_number in harvard_docket_number
-            and cl_docket.docket_number != harvard_docket_number
+            cl_clean_docket in h_clean_docket
+            and cl_clean_docket != h_clean_docket
         ):
             cl_docket.docket_number = h_clean_docket
             cl_docket.save()
@@ -381,7 +381,7 @@ def merge_docket_numbers(cluster_id: int, harvard_docket_number: str) -> None:
             # if its longer
             similarity = get_cosine_similarity(cl_clean_docket, h_clean_docket)
             if similarity > 0.8:
-                if len(harvard_docket_number) > len(cl_docket.docket_number):
+                if len(h_clean_docket) > len(cl_clean_docket):
                     cl_docket.docket_number = h_clean_docket
                     cl_docket.save()
 
