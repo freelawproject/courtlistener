@@ -372,7 +372,7 @@ def merge_docket_numbers(cluster_id: int, harvard_docket_number: str) -> None:
 
         if (
             cl_clean_docket in h_clean_docket
-            and cl_clean_docket != h_clean_docket
+            and cl_docket.docket_number != h_clean_docket
         ):
             cl_docket.docket_number = h_clean_docket
             cl_docket.save()
