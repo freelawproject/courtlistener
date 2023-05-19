@@ -215,16 +215,12 @@ class AudioESTestCase(SimpleTestCase):
     @classmethod
     def setUpTestData(cls):
         cls.court_1 = CourtFactory(
-            id="cabc",
-            full_name="Testing Supreme Court",
-            jurisdiction="FB",
-            citation_string="Bankr. C.D. Cal.",
+            id="cabc", full_name="Testing Supreme Court", jurisdiction="FB"
         )
         cls.court_2 = CourtFactory(
             id="nyed",
             full_name="Court of Appeals for the First Circuit",
             jurisdiction="FB",
-            citation_string="Bankr. C.D. Cal.",
         )
         cls.docket_1 = DocketFactory.create(
             docket_number="19-5733",

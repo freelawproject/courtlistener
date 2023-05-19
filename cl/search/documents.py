@@ -137,8 +137,8 @@ class AudioDocument(Document):
     )
     court_exact = fields.KeywordField(attr="docket.court.pk")
     court_id = fields.KeywordField(attr="docket.court.pk")
-    court_citation_string = fields.TextField(
-        attr="docket.court.citation_string", analyzer="text_en_splitting_cl"
+    court_citation_string = fields.KeywordField(
+        attr="docket.court.citation_string"
     )
     docket_id = fields.IntegerField(attr="docket.pk")
     dateArgued = fields.DateField(attr="docket.date_argued")

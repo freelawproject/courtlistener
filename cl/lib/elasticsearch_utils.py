@@ -447,3 +447,16 @@ def merge_courts_from_db(results: Page, search_type: str) -> None:
             for hit in top_hits:
                 court_id = hit["_source"]["court_id"]
                 hit["_source"]["citation_string"] = courts_dict.get(court_id)
+
+    if search_type == SEARCH_TYPES.ORAL_ARGUMENT:
+        court_ids = [d["court_id"] for d in results]
+        courts_in_page = Court.objects.filter(pk__in=court_ids).only(
+            "pk", "citation_string"
+        )
+        courts_dict = {}
+        for court in courts_in_page:
+            courts_dict[court.pk] = court.citation_string
+
+        for result in results.object_list:
+            court_id = result["court_id"]
+            result["citation_string"] = courts_dict.get(court_id)
