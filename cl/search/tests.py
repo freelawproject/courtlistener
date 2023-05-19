@@ -2896,6 +2896,41 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             "case name. Expected %s, but got %s." % (expected, actual),
         )
 
+    def test_oa_docket_number_filtering(self) -> None:
+        """Filter by case_name"""
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "docket_number": f"{self.audio_1.docket.docket_number}",
+        }
+        # Frontend
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(
+            actual,
+            expected,
+            msg="Did not get expected number of results when filtering by "
+            "docket number. Expected %s, but got %s." % (expected, actual),
+        )
+        self.assertIn("SEC", r.content.decode())
+
+        # API
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v3"}),
+            search_params,
+        )
+        actual = self.get_results_count(r)
+        self.assertEqual(
+            actual,
+            expected,
+            msg="Did not get expected number of results when filtering by "
+            "docket number. Expected %s, but got %s." % (expected, actual),
+        )
+        self.assertIn("SEC", r.content.decode())
+
     def test_oa_jurisdiction_filtering(self) -> None:
         """Filter by court"""
         search_params = {

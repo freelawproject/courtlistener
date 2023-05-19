@@ -85,7 +85,11 @@ def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
     return []
 
 
-def build_term_query(field: str, value: str | list) -> list:
+def build_term_query(
+    field: str,
+    value: str | list,
+    make_phrase: bool = False,
+) -> list:
     """Given field name and value or list of values, return Elasticsearch term
     or terms query or [].
     "term" Returns documents that contain an exact term in a provided field
@@ -94,8 +98,14 @@ def build_term_query(field: str, value: str | list) -> list:
 
     :param field: elasticsearch index fieldname
     :param value: term or terms to find
+    :param make_phrase: Whether we should make a match_phrase query for
+    TextField filtering.
     :return: Empty list or list with DSL Match query
     """
+
+    if value and make_phrase:
+        return [Q("match_phrase", **{field: f"{value}"})]
+
     if value and isinstance(value, list):
         value = list(filter(None, value))
         return [Q("terms", **{field: value})]
@@ -196,6 +206,7 @@ def build_es_filters(cd: CleanData) -> List:
             build_term_query(
                 "docketNumber",
                 cd.get("docket_number", ""),
+                make_phrase=True,
             )
         )
     if cd["type"] == SEARCH_TYPES.PARENTHETICAL:
