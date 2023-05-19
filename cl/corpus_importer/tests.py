@@ -2499,7 +2499,7 @@ class HarvardMergerTests(TestCase):
         cluster = OpinionClusterWithParentsFactory(docket=docket)
         merge_docket_numbers(cluster.id, "Master Docket No. 17-3000L")
         docket.refresh_from_db()
-        self.assertEqual(docket.docket_number, "Master Docket No. 17-3000L")
+        self.assertEqual(docket.docket_number, "Master Docket 17-3000L")
 
     def test_sources_query(self):
         """Test query for Non Harvard Sources"""
