@@ -2849,6 +2849,21 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         self.assertIn("<mark>John</mark>", r.content.decode())
         self.assertEqual(r.content.decode().count("<mark>John</mark>"), 2)
 
+        # Court citation string highlights
+        r = self.client.get(
+            reverse("show_results"),
+            {
+                "q": "Freedom of Information Wikileaks (Bankr. C.D. Cal. 2013)",
+                "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                "order_by": "score desc",
+            },
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("<mark>Bankr</mark>", r.content.decode())
+        self.assertEqual(r.content.decode().count("<mark>Bankr</mark>"), 2)
+
     def test_oa_case_name_filtering(self) -> None:
         """Filter by case_name"""
         search_params = {
