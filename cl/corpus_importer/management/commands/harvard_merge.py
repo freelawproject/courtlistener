@@ -362,25 +362,25 @@ def merge_docket_numbers(cluster_id: int, harvard_docket_number: str) -> None:
     :param harvard_docket_number: The harvard docket number
     :return: None
     """
-    cl_docket_number = OpinionCluster.objects.get(
-        id=cluster_id
-    ).docket.docket_number
+    cl_docket = OpinionCluster.objects.get(id=cluster_id).docket
 
-    if cl_docket_number:
+    if cl_docket.docket_number:
         # Check if docket number exists
         # e.g. CL docket id #3952066 doesn't have
-        if cl_docket_number in harvard_docket_number:
-            Docket.objects.update(docket_number=harvard_docket_number)
-        else:
-            cl_clean_docket = clean_docket_number(cl_docket_number)
-            h_clean_docket = clean_docket_number(harvard_docket_number)
+        cl_clean_docket = clean_docket_number(cl_docket.docket_number)
+        h_clean_docket = clean_docket_number(harvard_docket_number)
 
+        if cl_docket.docket_number in harvard_docket_number:
+            cl_docket.docket_number = h_clean_docket
+            cl_docket.save()
+        else:
             # Check if their relatively similar and if so save the harvard one
             # if its longer
             similarity = get_cosine_similarity(cl_clean_docket, h_clean_docket)
             if similarity > 0.8:
-                if len(harvard_docket_number) > len(cl_docket_number):
-                    Docket.objects.update(docket_number=harvard_docket_number)
+                if len(harvard_docket_number) > len(cl_docket.docket_number):
+                    cl_docket.docket_number = h_clean_docket
+                    cl_docket.save()
 
 
 def merge_case_names(cluster_id: int, harvard_data: Dict[str, Any]) -> None:
