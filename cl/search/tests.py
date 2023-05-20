@@ -2698,9 +2698,9 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         expected = 2
         self.assertEqual(actual, expected)
         self.assertTrue(
-            r.content.decode().index("Yang")
-            < r.content.decode().index("Lorem"),
-            msg="'Yang' should come BEFORE 'Lorem' when order_by relevance.",
+            r.content.decode().index("Lorem")
+            < r.content.decode().index("Yang"),
+            msg="'Lorem' should come BEFORE 'Yang' when order_by relevance.",
         )
         # API
         r = self.client.get(
@@ -2710,9 +2710,9 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         actual = self.get_results_count(r)
         self.assertEqual(actual, expected)
         self.assertTrue(
-            r.content.decode().index("Yang")
-            < r.content.decode().index("Lorem"),
-            msg="'Yang' should come BEFORE 'Lorem' when order_by relevance.",
+            r.content.decode().index("Lorem")
+            < r.content.decode().index("Yang"),
+            msg="'Lorem' should come BEFORE 'Yang' when order_by relevance.",
         )
 
         # Text query combine case name and docket name.
@@ -2861,8 +2861,8 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
-        self.assertIn("<mark>Bankr</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>Bankr</mark>"), 2)
+        self.assertIn("<mark>Bankr.</mark>", r.content.decode())
+        self.assertEqual(r.content.decode().count("<mark>Bankr.</mark>"), 2)
 
     def test_oa_case_name_filtering(self) -> None:
         """Filter by case_name"""
@@ -3706,3 +3706,31 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         self.assertEqual(actual, expected)
         self.assertIn("SEC", r.content.decode())
         self.assertIn("Freedom", r.content.decode())
+
+    def test_emojis_searchable(self) -> None:
+        # Are emojis are searchable?
+        # Frontend
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": "⚖️",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("Wallace", r.content.decode())
+        # Is the emoji highlighted?
+        self.assertIn("<mark>⚖️</mark>", r.content.decode())
+        self.assertEqual(r.content.decode().count("<mark>⚖️</mark>"), 2)
+
+        # API
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v3"}), search_params
+        )
+        actual = self.get_results_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("Wallace", r.content.decode())
