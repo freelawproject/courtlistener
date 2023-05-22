@@ -27,6 +27,7 @@ ELASTICSEARCH_DSL = {
             "custom_word_delimiter_filter": {
                 "type": "word_delimiter",
                 "split_on_numerics": False,
+                "preserve_original": True,
             },
             "synonym_filter": {
                 "type": "synonym",
