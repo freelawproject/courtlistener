@@ -1237,7 +1237,10 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
         # Send string of search_query to the function and expect it
         # to be encoded properly
         q_a = (
-            ("12-9238 happy Gilmore", '"12-9238" happy Gilmore'),
+            (
+                "12-9238 happy Gilmore",
+                'docketNumber:"12-9238"~1 happy Gilmore',
+            ),
             ("1chicken NUGGET", '"1chicken" NUGGET'),
             (
                 "We can drive her home with 1headlight",
@@ -1248,7 +1251,10 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
             # No changes to regular queries?
             ("Look Ma, no numbers!", "Look Ma, no numbers!"),
             # Docket numbers hyphenated into phrases?
-            ("12cv9834 Monkey Goose", '"12-cv-9834" Monkey Goose'),
+            (
+                "12cv9834 Monkey Goose",
+                'docketNumber:"12-cv-9834"~1 Monkey Goose',
+            ),
             # Valid dates ignored?
             (
                 "2020-10-31T00:00:00Z Monkey Goose",
@@ -1265,14 +1271,17 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
             ("id:[* TO 5] Monkey Goose", 'id:[* TO "5"] Monkey Goose'),
             (
                 "(Tempura AND 12cv3392) OR sushi",
-                '(Tempura AND "12-cv-3392") OR sushi',
+                '(Tempura AND docketNumber:"12-cv-3392"~1) OR sushi',
             ),
             # Phrase search with numbers (w/and w/o § mark)?
             ('"18 USC 242"', '"18 USC 242"'),
             ('"18 USC §242"', '"18 USC §242"'),
             ('"this is a test" asdf', '"this is a test" asdf'),
             ('asdf "this is a test" asdf', 'asdf "this is a test" asdf'),
-            ('"this is a test" 22cv3332', '"this is a test" "22-cv-3332"'),
+            (
+                '"this is a test" 22cv3332',
+                '"this is a test" docketNumber:"22-cv-3332"~1',
+            ),
         )
         for q, a in q_a:
             print("Does {q} --> {a} ? ".format(**{"q": q, "a": a}))
