@@ -2401,13 +2401,7 @@ class CleanUpMisMatchedDockets(TestCase):
 
 class HarvardMergerTests(TestCase):
     def setUp(self):
-        """Setup harvard tests
-
-        This setup is a little distinct from normal ones.  Here we are actually
-        setting up our patches which are used by the majority of the tests.
-        Each one can be used or turned off.  See the teardown for more.
-        :return:
-        """
+        """Setup harvard merger tests"""
         self.read_json_patch = patch(
             "cl.corpus_importer.management.commands.harvard_merge.read_json"
         )
@@ -2419,7 +2413,8 @@ class HarvardMergerTests(TestCase):
         self.read_json_patch.stop()
 
     def test_merger(self):
-        """Can we identify opinions correctly even when they are slightly different."""
+        """Can we identify opinions correctly even when they are slightly
+        different"""
 
         case_data = {
             "name": "CANNON v. THE STATE",
@@ -2471,7 +2466,6 @@ class HarvardMergerTests(TestCase):
         cluster = OpinionClusterFactoryMultipleOpinions(
             docket=DocketFactory(),
             attorneys="B. B. Giles, Lindley W. Gamp, and John A. Boyhin",
-            # cl value
         )
         clean_dictionary = combine_non_overlapping_data(cluster.id, case_data)
         self.assertEqual(
@@ -2503,6 +2497,7 @@ class HarvardMergerTests(TestCase):
 
     def test_sources_query(self):
         """Test query for Non Harvard Sources"""
+
         OpinionClusterFactory(
             docket=DocketFactory(source=Docket.COLUMBIA),
             id=1,
@@ -2534,17 +2529,21 @@ class HarvardMergerTests(TestCase):
             filepath_json_harvard="",
         )
 
-        SC = Docket.SOURCE_CHOICES
         cluster_ids = (
             OpinionCluster.objects.filter(
-                docket__source__in=[s[0] for s in SC if "Harvard" not in s[1]],
+                docket__source__in=[
+                    s[0]
+                    for s in Docket.SOURCE_CHOICES
+                    if "Harvard" not in s[1]
+                ],
                 filepath_json_harvard__isnull=False,
             )
             .exclude(filepath_json_harvard__exact="")
             .values_list("id", flat=True)
         )
-        # Find the two opinions we want to import
+
         self.assertEqual([1, 4], list(cluster_ids))
+
         case_data = {
             "docket_number": "345",
             "name_abbreviation": "A v. B",
@@ -2553,18 +2552,24 @@ class HarvardMergerTests(TestCase):
                 "data": '<casebody><opinion type="majority">An opinion</opinion></casebody>'
             },
         }
+
         self.read_json_func.return_value = case_data
+
         cluster_ids = OpinionCluster.objects.filter(
-            docket__source__in=[s[0] for s in SC if "Harvard" not in s[1]],
+            docket__source__in=[
+                s[0] for s in Docket.SOURCE_CHOICES if "Harvard" not in s[1]
+            ],
             filepath_json_harvard__isnull=False,
         ).values_list("id", flat=True)
+
         for id in cluster_ids:
             merge_opinion_clusters(cluster_id=id)
-        # Validate that our two opinions were imported and no more exist
+
         self.assertEqual([1, 4, 5], list(cluster_ids))
 
     def test_add_opinions_without_authors_in_cl(self):
         """Can we add opinion and update authors"""
+
         cluster = OpinionClusterFactoryMultipleOpinions(
             docket=DocketFactory(source=Docket.COLUMBIA),
             sub_opinions__data=[
@@ -2585,21 +2590,22 @@ class HarvardMergerTests(TestCase):
             },
         }
         self.read_json_func.return_value = case_data
+
         author_query = Opinion.objects.filter(
             cluster_id=cluster.id
         ).values_list("author_str", flat=True)
+
         authors = list(author_query)
 
         self.assertEqual(authors, ["", ""])
-        # merge_opinion_clusters(
-        #     cluster_id=None
-        # )  # allow the system to find the cluster
 
-        SC = Docket.SOURCE_CHOICES
         cluster_ids = OpinionCluster.objects.filter(
-            docket__source__in=[s[0] for s in SC if "Harvard" not in s[1]],
+            docket__source__in=[
+                s[0] for s in Docket.SOURCE_CHOICES if "Harvard" not in s[1]
+            ],
             filepath_json_harvard__isnull=False,
         ).values_list("id", flat=True)
+
         for id in cluster_ids:
             merge_opinion_clusters(cluster_id=id)
 
@@ -2608,25 +2614,27 @@ class HarvardMergerTests(TestCase):
         author_query = Opinion.objects.filter(
             cluster_id=cluster.id
         ).values_list("author_str", flat=True)
+
         authors = list(author_query)
 
-        # Validate we didn't create a new opinion
         self.assertEqual(
             Opinion.objects.filter(cluster_id=cluster.id).count(),
             2,
             msg="Oops",
         )
-        # Check that we added xml
+
         self.assertNotEqual(
             Opinion.objects.filter(cluster_id=cluster.id)[0].xml_harvard, ""
         )
-        # Make sure we updated our source
+
         self.assertEqual(cluster.docket.source, Docket.HARVARD_AND_COLUMBIA)
-        # Check judges were added to our opinions
+
         self.assertEqual(authors, ["Broyles", "Gardner"])
 
     def test_add_opinions_with_authors_in_cl(self):
-        """Can we update an opinion and leave author_str alone if already assigned"""
+        """Can we update an opinion and leave author_str alone if already
+        assigned"""
+
         cluster = OpinionClusterFactoryMultipleOpinions(
             docket=DocketFactory(source=Docket.COLUMBIA),
             sub_opinions__data=[
@@ -2648,34 +2656,33 @@ class HarvardMergerTests(TestCase):
         }
 
         self.read_json_func.return_value = case_data
+
         author_query = Opinion.objects.filter(
             cluster_id=cluster.id
         ).values_list("author_str", flat=True)
-        authors = sorted(list(author_query))
 
-        self.assertEqual(authors, ["Broyles", "Gardner"])
-        # Import the opinion
+        self.assertEqual(sorted(list(author_query)), ["Broyles", "Gardner"])
+
         merge_opinion_clusters(cluster_id=cluster.id)
 
         cluster.refresh_from_db()
         author_query = Opinion.objects.filter(
             cluster_id=cluster.id
         ).values_list("author_str", flat=True)
-        authors = sorted(list(author_query))
-        # Validate we didn't create a new opinion
+
         self.assertEqual(
             Opinion.objects.filter(cluster_id=cluster.id).count(),
             2,
             msg="Oops",
         )
-        # Check that we added xml
+
         self.assertNotEqual(
             Opinion.objects.filter(cluster_id=cluster.id)[0].xml_harvard, ""
         )
-        # Make sure we updated our source
+
         self.assertEqual(cluster.docket.source, Docket.HARVARD_AND_COLUMBIA)
-        # Check judges were added to our opinions
-        self.assertEqual(authors, ["Broyles", "Gardner"])
+
+        self.assertEqual(sorted(list(author_query)), ["Broyles", "Gardner"])
 
     def test_merge_overlap_judges(self):
         """Can we merge overlap judge names?"""
@@ -2725,8 +2732,6 @@ class HarvardMergerTests(TestCase):
 
         for item in [
             # CL item #4571581
-            # Test that the case name is not changed,
-            # but the full case name is filled
             (
                 {
                     "name": "Vivian PEREZ, Administratrix (Estate of Andres "
@@ -2747,9 +2752,6 @@ class HarvardMergerTests(TestCase):
                 },
             ),
             # CL item #4574207
-            # Test that we can override the cluster case name when the
-            # harvard case name is better and also fill in the full case
-            # name when empty
             (
                 {
                     "name": "Randy WEYERMAN v. FREEMAN EXPOSITIONS, INC., "
@@ -2772,9 +2774,6 @@ class HarvardMergerTests(TestCase):
                 },
             ),
             # CL item #4576005
-            # Test that we can find the best case name but
-            # also swap data when the case name is longer than the full case
-            # name
             (
                 {
                     "name": "The STATE EX REL. MURRAY v. STATE EMPLOYMENT "
@@ -2796,7 +2795,6 @@ class HarvardMergerTests(TestCase):
                 },
             ),
         ]:
-            # Create cluster with case_name and case_name_full
             cluster = OpinionClusterWithParentsFactory(
                 case_name=item[1].get("cl_case_name"),
                 case_name_full=item[1].get("cl_case_name_full"),
@@ -2805,11 +2803,10 @@ class HarvardMergerTests(TestCase):
             merge_case_names(cluster.pk, item[0])
             cluster.refresh_from_db()
 
-            # Check case_name
             self.assertEqual(
                 cluster.case_name, item[2].get("expected_case_name")
             )
-            # Check case_name_full
+
             self.assertEqual(
                 cluster.case_name_full, item[2].get("expected_case_name_full")
             )
@@ -2817,8 +2814,6 @@ class HarvardMergerTests(TestCase):
     def test_merge_date_filed(self):
         """Can we merge date filed?"""
 
-        # Test that harvard date is different that cl date, if docket
-        # source is SCRAPER then use harvard data
         # Item format: (harvard_decision_date, cl date_filed, expected output)
         for item in [
             # CL item #4549197
@@ -2835,5 +2830,4 @@ class HarvardMergerTests(TestCase):
             merge_cluster_dates(cluster.pk, "date_filed", (item[0], item[1]))
             cluster.refresh_from_db()
 
-            # Check case_name_full
             self.assertEqual(cluster.date_filed, item[2])
