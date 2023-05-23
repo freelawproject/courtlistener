@@ -10,6 +10,7 @@ from django_elasticsearch_dsl.search import Search
 from elasticsearch_dsl import A, Q
 from elasticsearch_dsl.query import QueryString, Range
 
+from cl.lib.search_utils import cleanup_main_query
 from cl.lib.types import CleanData
 from cl.search.constants import SEARCH_ORAL_ARGUMENT_HL_FIELDS
 from cl.search.models import SEARCH_TYPES, Court
@@ -56,6 +57,7 @@ def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
     """
 
     if value:
+        value = cleanup_main_query(value)
         # In Elasticsearch, the colon (:) character is used to separate the
         # field name and the field value in a query.
         # To avoid parsing errors escape any colon characters in the value

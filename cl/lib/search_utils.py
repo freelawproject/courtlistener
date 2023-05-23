@@ -14,6 +14,7 @@ from scorched.response import SolrResponse
 from cl.citations.match_citations import search_db_for_fullcitation
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.lib.bot_detector import is_bot
+from cl.lib.model_helpers import is_docket_number
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.types import CleanData, SearchParam
 from cl.search.constants import (
@@ -871,9 +872,15 @@ def cleanup_main_query(query_string: str) -> str:
             # It's a docket number missing hyphens, e.g. 19cv38374
             item = "-".join(m.groups())
 
-        # Some sort of number, probably a docket number.
+        # Some sort of number, probably a docket number or other type of number
         # Wrap in quotes to do a phrase search
-        cleaned_items.append(f'"{item}"')
+        if is_docket_number(item) and "docketNumber:" not in query_string:
+            # Confirm is a docket number, adds a proximity query of ~1 to match
+            # numbers like 1:21-cv-1234 -> 21-1234
+            cleaned_items.append(f'docketNumber:"{item}"~1')
+        else:
+            cleaned_items.append(f'"{item}"')
+
     return "".join(cleaned_items)
 
 

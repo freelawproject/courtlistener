@@ -227,7 +227,7 @@ class AudioESTestCase(SimpleTestCase):
             citation_string="Bankr. C.D. Cal.",
         )
         cls.docket_1 = DocketFactory.create(
-            docket_number="19-5733",
+            docket_number="1:21-bk-1234",
             court_id=cls.court_1.pk,
             date_argued=datetime.date(2015, 8, 16),
         )
@@ -242,7 +242,7 @@ class AudioESTestCase(SimpleTestCase):
             date_argued=datetime.date(2015, 8, 14),
         )
         cls.docket_4 = DocketFactory.create(
-            docket_number="19-5736",
+            docket_number="1:21-cv-1234-ABC",
             court_id=cls.court_1.pk,
             date_argued=datetime.date(2013, 8, 14),
         )

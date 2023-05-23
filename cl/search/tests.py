@@ -40,6 +40,7 @@ from cl.lib.elasticsearch_utils import (
     build_term_query,
     group_search_results,
 )
+from cl.lib.model_helpers import is_docket_number
 from cl.lib.search_utils import cleanup_main_query
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
@@ -2832,7 +2833,6 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         expected = 1
         self.assertEqual(actual, expected)
         self.assertIn("<mark>19", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>19"), 2)
 
         # Judge highlights
         r = self.client.get(
@@ -3734,3 +3734,123 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         expected = 1
         self.assertEqual(actual, expected)
         self.assertIn("Wallace", r.content.decode())
+
+    def test_is_docket_number(self) -> None:
+        """Test is_docket_number method correctly detects a docket number."""
+
+        self.assertEqual(is_docket_number("1:21-cv-1234-ABC"), True)
+        self.assertEqual(is_docket_number("1:21-cv-1234"), True)
+        self.assertEqual(is_docket_number("1:21-bk-1234"), True)
+        self.assertEqual(is_docket_number("21-1234"), True)
+        self.assertEqual(is_docket_number("21-cv-1234"), True)
+        self.assertEqual(is_docket_number("21 1234"), False)
+        self.assertEqual(is_docket_number("14 august"), False)
+        self.assertEqual(is_docket_number("21-string"), False)
+        self.assertEqual(is_docket_number("string-2134"), False)
+        self.assertEqual(is_docket_number("21"), False)
+
+    def test_docket_number_proximity_query(self) -> None:
+        """Test docket_number proximity query, so that docket numbers like
+        1:21-cv-1234-ABC can be matched by queries like: 21-1234
+        """
+
+        # Query 1234-21, no results should be returned due to phrased search.
+        # Frontend
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": "1234-21",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 0
+        self.assertEqual(actual, expected)
+        # API
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v3"}), search_params
+        )
+        actual = self.get_results_count(r)
+        self.assertEqual(actual, expected)
+
+        # Query 21-1234, return results for 1:21-bk-1234 and 1:21-cv-1234-ABC
+        # Frontend
+        search_params["q"] = "21-1234"
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 2
+        self.assertEqual(actual, expected)
+        self.assertIn("Freedom", r.content.decode())
+        self.assertIn("SEC", r.content.decode())
+        # API
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v3"}), search_params
+        )
+        actual = self.get_results_count(r)
+        self.assertEqual(actual, expected)
+        self.assertIn("Freedom", r.content.decode())
+        self.assertIn("SEC", r.content.decode())
+
+        # Query 1:21-cv-1234
+        # Frontend
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": "1:21-cv-1234",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("Wikileaks", r.content.decode())
+        # API
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v3"}), search_params
+        )
+        actual = self.get_results_count(r)
+        self.assertEqual(actual, expected)
+        self.assertIn("Wikileaks", r.content.decode())
+
+        # Query 1:21-cv-1234-ABC
+        # Frontend
+        search_params["q"] = "1:21-cv-1234-ABC"
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("Wikileaks", r.content.decode())
+        # API
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v3"}), search_params
+        )
+        actual = self.get_results_count(r)
+        self.assertEqual(actual, expected)
+        self.assertIn("Wikileaks", r.content.decode())
+
+        # Query 1:21-bk-1234
+        # Frontend
+        search_params["q"] = "1:21-bk-1234"
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("SEC", r.content.decode())
+        # API
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v3"}), search_params
+        )
+        actual = self.get_results_count(r)
+        self.assertEqual(actual, expected)
+        self.assertIn("SEC", r.content.decode())
