@@ -741,21 +741,10 @@ def update_matching_opinions(
                 if extract_judge_last_name(
                     op.author_str
                 ) != extract_judge_last_name(author_str):
-                    # Raise an exception, check in the log for
-                    # difference between author names
                     raise AuthorException(f"Authors don't match - log error")
-                else:
-                    # The names are the same when processed, just make sure
-                    # the cl data is not all uppercase or part of it
-                    cl_author_data_upper = (
-                        True
-                        if [s for s in op.author_str.split(",") if s.isupper()]
-                        else False
-                    )
-
-                    if cl_author_data_upper:
-                        # Some names are uppercase, update with processed names
-                        op.author_str = author_str
+                elif any(s.isupper() for s in op.author_str.split(",")):
+                    # Some names are uppercase, update with processed names
+                    op.author_str = author_str
 
         clean_opinion = fix_footnotes(harvard_opinions[int(k)])
         clean_opinion = fix_pagination(clean_opinion)
