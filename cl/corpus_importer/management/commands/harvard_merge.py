@@ -861,6 +861,16 @@ class Command(VerboseCommand):
                 id=options["cluster_id"]
             ).values_list("id", "filepath_json_harvard", flat=False)
 
+            if cluster_ids:
+                if (
+                    "U"
+                    in OpinionCluster.objects.get(id=cluster_ids[0][0]).source
+                ):
+                    logger.info(
+                        f"Cluster id: {cluster_ids[0][0]} already merged."
+                    )
+                    return
+
         for cluster_id in cluster_ids:
             logger.info(msg=f"Merging {cluster_id[0]} at {cluster_id[1]}")
             merge_opinion_clusters(
