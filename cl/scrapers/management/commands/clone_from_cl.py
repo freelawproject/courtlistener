@@ -24,19 +24,22 @@ manage.py clone_from_cl --type people_db.Person --id 16212 16211
 
 This is still work in progress, some data is not cloned yet.
 """
-
+import json
 import os
+import pathlib
 
 import requests
 from django.apps import apps
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
 from django.core.management import BaseCommand
 from django.db import IntegrityError, transaction
 from django.urls import reverse
 from django.utils.dateparse import parse_date
 from requests import Session
 
+from cl.people_db.models import Person
 from cl.search.models import Citation, Opinion
 from cl.search.tasks import add_items_to_solr
 
@@ -56,7 +59,10 @@ def get_id_from_url(api_url: str) -> str:
 
 
 def clone_opinion_cluster(
-    session: Session, cluster_ids: list, object_type="search.OpinionCluster"
+    session: Session,
+    cluster_ids: list,
+    download_cluster_files,
+    object_type="search.OpinionCluster",
 ):
     """
     Download opinion cluster data from courtlistener.com and add it to
@@ -92,10 +98,14 @@ def clone_opinion_cluster(
             kwargs={"version": "v3", "pk": cluster_id},
         )
         cluster_url = f"{domain}{cluster_path}"
-        cluster_datum = session.get(cluster_url, timeout=60).json()
+        cluster_datum = session.get(cluster_url, timeout=120).json()
         docket_id = get_id_from_url(cluster_datum["docket"])
         docket = clone_docket(session, [docket_id])[0]
         citation_data = cluster_datum["citations"]
+        panel_data = cluster_datum["panel"]
+        non_participating_judges_data = cluster_datum[
+            "non_participating_judges"
+        ]
         sub_opinions_data = cluster_datum["sub_opinions"]
         # delete unneeded fields
         for f in [
@@ -112,12 +122,69 @@ def clone_opinion_cluster(
         # Assign docket pk in cluster data
         cluster_datum["docket_id"] = docket.pk
 
+        json_harvard = None
+        json_path = None
+
+        if download_cluster_files:
+            if cluster_datum.get("filepath_json_harvard"):
+                try:
+                    ia_url = cluster_datum.get(
+                        "filepath_json_harvard"
+                    ).replace(
+                        "/storage/harvard_corpus/",
+                        "https://archive.org/download/",
+                    )
+
+                    req = requests.get(
+                        ia_url, allow_redirects=True, timeout=120
+                    )
+
+                    if req.status_code == 200:
+                        print(f"Downloading {ia_url}")
+                        json_harvard = json.dumps(req.json(), indent=4)
+                        path = pathlib.PurePath(
+                            cluster_datum.get("filepath_json_harvard")
+                        )
+                        json_path = os.path.join(
+                            "harvard_corpus", path.parent.name, path.name
+                        )
+
+                except Exception:
+                    print(
+                        f"Can't download filepath_json_harvard file for "
+                        f"cluster id: {cluster_id}"
+                    )
+
+        # Clone panel data
+        panel_data_ids = [
+            get_id_from_url(person_url) for person_url in panel_data
+        ]
+        added_panel_ids = []
+
+        if panel_data_ids:
+            added_panel_ids.extend(clone_person(session, panel_data_ids))
+
+        # Clone non participating judges data
+        non_participating_judges_data_ids = [
+            get_id_from_url(person_url)
+            for person_url in non_participating_judges_data
+        ]
+        added_non_participating_judges_data_ids = []
+
+        if non_participating_judges_data_ids:
+            added_non_participating_judges_data_ids.extend(
+                clone_person(session, non_participating_judges_data_ids)
+            )
+
+        # Clone opinions
         prepared_opinion_data = []
         added_opinions_ids = []
 
         for op in sub_opinions_data:
             # Get opinion from api
-            op_data = session.get(op, timeout=60).json()
+            op_data = session.get(op, timeout=120).json()
+            author = op_data["author"]
+
             # Delete fields with fk or m2m relations or unneeded fields
             for f in [
                 "opinions_cited",
@@ -128,12 +195,40 @@ def clone_opinion_cluster(
                 "joined_by",
             ]:
                 del op_data[f]
+
+            if author:
+                cloned_person = clone_person(
+                    session, [get_id_from_url(author)]
+                )
+
+                if cloned_person:
+                    # Add id of cloned person
+                    op_data["author"] = cloned_person[0]
+
             # Append new data
             prepared_opinion_data.append(op_data)
 
         with transaction.atomic():
             # Create opinion cluster
             opinion_cluster = model.objects.create(**cluster_datum)
+
+            if added_panel_ids:
+                opinion_cluster.panel.add(
+                    *Person.objects.filter(id__in=added_panel_ids)
+                )
+
+            if added_non_participating_judges_data_ids:
+                opinion_cluster.non_participating_judges.add(
+                    *Person.objects.filter(
+                        id__in=added_non_participating_judges_data_ids
+                    )
+                )
+
+            if download_cluster_files:
+                if json_harvard and json_path:
+                    opinion_cluster.filepath_json_harvard.save(
+                        json_path, ContentFile(json_harvard)
+                    )
 
             for cite_data in citation_data:
                 # Create citations
@@ -203,7 +298,7 @@ def clone_docket(
             kwargs={"version": "v3", "pk": docket_id},
         )
         docket_url = f"{domain}{docket_path}"
-        docket_data = session.get(docket_url, timeout=60).json()
+        docket_data = session.get(docket_url, timeout=120).json()
 
         # Remove unneeded fields
         for f in [
@@ -296,7 +391,7 @@ def clone_person(
             kwargs={"version": "v3", "pk": person_id},
         )
         person_url = f"{domain}{people_path}"
-        person_data = session.get(person_url, timeout=60).json()
+        person_data = session.get(person_url, timeout=120).json()
         # delete unneeded fields
         for f in [
             "resource_uri",
@@ -365,7 +460,7 @@ def clone_court(session: Session, court_ids: list, object_type="search.Court"):
             kwargs={"version": "v3", "pk": court_id},
         )
         court_url = f"{domain}{court_path}"
-        court_data = session.get(court_url, timeout=60).json()
+        court_data = session.get(court_url, timeout=120).json()
         # delete resource_uri value generated by DRF
         del court_data["resource_uri"]
 
@@ -418,16 +513,26 @@ class Command(BaseCommand):
             required=True,
         )
 
+        parser.add_argument(
+            "--download-cluster-files",
+            action="store_true",
+            default=False,
+            help="Use this flag to download json file from filepath_json_harvard field",
+        )
+
     def handle(self, *args, **options):
         self.type = options.get("type")
         self.ids = options.get("ids")
+        self.download_cluster_files = options.get("download_cluster_files")
 
         if not settings.DEVELOPMENT:
             self.stdout.write("Command not enabled for production environment")
 
         match self.type:
             case "search.OpinionCluster":
-                clone_opinion_cluster(self.s, self.ids, self.type)
+                clone_opinion_cluster(
+                    self.s, self.ids, self.download_cluster_files, self.type
+                )
             case "search.Docket":
                 clone_docket(self.s, self.ids, self.type)
             case "people_db.Person":
