@@ -10,7 +10,7 @@ from localflavor.us.models import (
 )
 
 from cl.custom_filters.templatetags.extras import granular_date
-from cl.lib.date_time import midnight_pst
+from cl.lib.date_time import midnight_pt
 from cl.lib.model_helpers import (
     make_choices_group_lookup,
     validate_all_or_none,
@@ -301,9 +301,9 @@ class Person(AbstractDateTimeModel):
 
         # Dates
         if self.date_dob is not None:
-            out["dob"] = midnight_pst(self.date_dob)
+            out["dob"] = midnight_pt(self.date_dob)
         if self.date_dod is not None:
-            out["dod"] = midnight_pst(self.date_dod)
+            out["dod"] = midnight_pt(self.date_dod)
 
         # Joined Values. Brace yourself.
         positions = self.positions.all()
