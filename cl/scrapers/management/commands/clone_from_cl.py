@@ -40,7 +40,7 @@ from django.utils.dateparse import parse_date
 from requests import Session
 
 from cl.people_db.models import Person
-from cl.search.models import Citation, Opinion
+from cl.search.models import Citation, Opinion, RECAPDocument
 from cl.search.tasks import add_items_to_solr
 
 VALID_TYPES = (
@@ -53,6 +53,13 @@ VALID_TYPES = (
 domain = "https://www.courtlistener.com"
 
 
+class CloneException(Exception):
+    """Error found in clone process."""
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+
 def get_id_from_url(api_url: str) -> str:
     """Get the PK from an API url"""
     return api_url.split("/")[-2]
@@ -61,14 +68,16 @@ def get_id_from_url(api_url: str) -> str:
 def clone_opinion_cluster(
     session: Session,
     cluster_ids: list,
-    download_cluster_files,
+    download_cluster_files: bool,
+    add_docket_entries: bool,
     object_type="search.OpinionCluster",
 ):
-    """
-    Download opinion cluster data from courtlistener.com and add it to
+    """Download opinion cluster data from courtlistener.com and add it to
     local environment
     :param session: a Requests session
     :param cluster_ids: a list of opinion cluster ids
+    :param download_cluster_files: True if it should download cluster files
+    :param add_docket_entries: flag to clone docket entries and recap docs
     :param object_type: OpinionCluster app name with model name
     :return: list of opinion cluster objects
     """
@@ -100,7 +109,7 @@ def clone_opinion_cluster(
         cluster_url = f"{domain}{cluster_path}"
         cluster_datum = session.get(cluster_url, timeout=120).json()
         docket_id = get_id_from_url(cluster_datum["docket"])
-        docket = clone_docket(session, [docket_id])[0]
+        docket = clone_docket(session, [docket_id], add_docket_entries)[0]
         citation_data = cluster_datum["citations"]
         panel_data = cluster_datum["panel"]
         non_participating_judges_data = cluster_datum[
@@ -263,13 +272,16 @@ def clone_opinion_cluster(
 
 
 def clone_docket(
-    session: Session, docket_ids: list, object_type="search.Docket"
+    session: Session,
+    docket_ids: list,
+    add_docket_entries: bool,
+    object_type="search.Docket",
 ):
-    """
-    Download docket data from courtlistener.com and add it to local
+    """Download docket data from courtlistener.com and add it to local
     environment
     :param session: a Requests session
     :param docket_ids: a list of docket ids
+    :param add_docket_entries: flag to clone docket entries and recap docs
     :param object_type: Docket app name with model name
     :return: list of docket objects
     """
@@ -288,6 +300,10 @@ def clone_docket(
                 reverse("view_docket", args=[docket.pk, docket.slug]),
             )
             dockets.append(docket)
+
+            if add_docket_entries:
+                clone_docket_entries(session, docket.pk)
+
             continue
         except model.DoesNotExist:
             pass
@@ -341,6 +357,10 @@ def clone_docket(
             docket = model.objects.create(**docket_data)
 
             dockets.append(docket)
+
+            if add_docket_entries:
+                clone_docket_entries(session, docket.pk)
+
             print(
                 "View cloned docket here:",
                 reverse(
@@ -355,11 +375,184 @@ def clone_docket(
     return dockets
 
 
+def clone_docket_entries(
+    session: Session, docket_id: int, object_type="search.DocketEntry"
+) -> list:
+    """Download docket entries data from courtlistener.com and add it to local
+    environment
+    :param session: a Requests session
+    :param docket_id: docket id to clone docket entries
+    :param object_type: Docket app name with model name
+    :return: list of docket objects
+    """
+
+    params = {"docket__id": docket_id}
+
+    docket_entries_data = []
+    created_docket_entries = []
+
+    docket_entry_path = reverse(
+        "docketentry-list",
+        kwargs={"version": "v3"},
+    )
+
+    # Get list of docket entries using docket id
+    docket_entry_list_url = f"{domain}{docket_entry_path}"
+    docket_entry_list_request = session.get(
+        docket_entry_list_url, timeout=120, params=params
+    )
+    docket_entry_list_data = docket_entry_list_request.json()
+
+    if docket_entry_list_request.status_code == 403:
+        # You don't have the required permissions to view docket entries in api
+        raise CloneException(
+            "You don't have the required permissions to "
+            "clone Docket entries."
+        )
+
+    docket_entries_data.extend(docket_entry_list_data.get("results", []))
+    docket_entry_next_url = docket_entry_list_data.get("next")
+
+    while docket_entry_next_url:
+        docket_entry_list_request = session.get(
+            docket_entry_next_url, timeout=120
+        )
+        docket_entry_list_data = docket_entry_list_request.json()
+        docket_entry_next_url = docket_entry_list_data.get("next")
+        docket_entries_data.extend(docket_entry_list_data.get("results", []))
+
+    model = apps.get_model(object_type)
+
+    for docket_entry_data in docket_entries_data:
+        recap_documents_data = docket_entry_data.get("recap_documents")
+        tags_data = docket_entry_data.get("tags")
+
+        # Remove unneeded fields
+        for f in [
+            "resource_uri",
+            "docket",
+            "recap_documents",
+            "tags",
+        ]:
+            del docket_entry_data[f]
+
+        docket_entry_data["docket_id"] = docket_id
+
+        with transaction.atomic():
+            # Create docket entry
+            docket_entry = model.objects.create(**docket_entry_data)
+            print(f"Docket entry id: {docket_entry.pk} cloned")
+
+            # Clone recap documents
+            clone_recap_documents(
+                session, docket_entry.pk, recap_documents_data
+            )
+            # Create tags for docket entry
+            cloned_tags = clone_tag(
+                session, [get_id_from_url(tag_url) for tag_url in tags_data]
+            )
+
+            if cloned_tags:
+                docket_entry.tags.add(*cloned_tags)
+
+            created_docket_entries.append(docket_entry)
+
+    return created_docket_entries
+
+
+def clone_recap_documents(
+    session: Session, docket_entry_id: int, recap_documents_data: list
+) -> list:
+    """Download recap documents data from courtlistener.com and add it to local
+    environment
+    :param session: a Requests session
+    :param docket_entry_id: docket entry id to assign to recap document
+    :param recap_documents_data: list with recap documents data to create
+    :return: list of recap documents objects
+    """
+    created_recap_documents = []
+    for recap_document_data in recap_documents_data:
+        tags_data = recap_document_data.get("tags")
+
+        # Remove unneeded fields
+        for f in [
+            "resource_uri",
+            "tags",
+            "absolute_url",
+        ]:
+            del recap_document_data[f]
+
+        recap_document_data["docket_entry_id"] = docket_entry_id
+
+        recap_document = RECAPDocument.objects.create(**recap_document_data)
+
+        # Create and add tags
+        cloned_tags = clone_tag(
+            session, [get_id_from_url(tag_url) for tag_url in tags_data]
+        )
+
+        if cloned_tags:
+            recap_document.tags.add(*cloned_tags)
+
+        created_recap_documents.append(recap_document)
+
+    return created_recap_documents
+
+
+def clone_tag(
+    session: Session, tag_ids: list, object_type="search.Tag"
+) -> list:
+    """Clone tags from docket entries or recap documents
+    :param session: a Requests session
+    :param tag_ids: list of tag ids to clone
+    :param object_type: Tag app name with model name
+    :return:
+    """
+    created_tags = []
+    for tag_id in tag_ids:
+        print(f"Cloning tag id: {tag_id}")
+
+        model = apps.get_model(object_type)
+
+        try:
+            tag = model.objects.get(pk=tag_id)
+            print(
+                f"Tag id: {tag_id} already exists",
+            )
+            created_tags.append(tag)
+            continue
+        except model.DoesNotExist:
+            pass
+
+        # Create tag
+        tag_path = reverse(
+            "tag-detail",
+            kwargs={"version": "v3", "pk": tag_id},
+        )
+        tag_url = f"{domain}{tag_path}"
+        tag_data = session.get(tag_url, timeout=120).json()
+
+        del tag_data["resource_uri"]
+
+        try:
+            tag, created = model.objects.get_or_create(**tag_data)
+        except (IntegrityError, ValidationError):
+            tag = model.objects.filter(pk=tag_data["id"])[0]
+
+        created_tags.append(tag)
+
+        print(
+            "View cloned tag here:",
+            reverse("tag-detail", args=["v3", tag_id]),
+        )
+
+    return created_tags
+
+
 def clone_person(
     session: Session, people_ids: list, object_type="people_db.Person"
 ):
-    """
-    Download person data from courtlistener.com and add it to local
+    """Download person data from courtlistener.com and add it to local
     environment
     :param session: a Requests session
     :param people_ids: a list of person ids
@@ -427,8 +620,7 @@ def clone_person(
 
 
 def clone_court(session: Session, court_ids: list, object_type="search.Court"):
-    """
-    Download court data from courtlistener.com and add it to local
+    """Download court data from courtlistener.com and add it to local
     environment
     :param session: a Requests session
     :param court_ids: list of court ids
@@ -479,12 +671,17 @@ def clone_court(session: Session, court_ids: list, object_type="search.Court"):
 
 
 class Command(BaseCommand):
-    help = "Clone data from CourtListener.com into dev environment"
+    help = (
+        "Clone data from CourtListener.com into dev environment. It "
+        "requires to set CL_API_TOKEN varible in the env file."
+    )
 
     def __init__(self, *args, **kwargs):
         super(Command, self).__init__(*args, **kwargs)
         self.type = None
         self.ids = []
+        self.download_cluster_files = False
+        self.add_docket_entries = False
 
         self.s = requests.session()
         self.s.headers = {
@@ -517,13 +714,24 @@ class Command(BaseCommand):
             "--download-cluster-files",
             action="store_true",
             default=False,
-            help="Use this flag to download json file from filepath_json_harvard field",
+            help="Use this flag to download json file from "
+            "filepath_json_harvard field",
+        )
+
+        parser.add_argument(
+            "--add-docket-entries",
+            action="store_true",
+            default=False,
+            help="Use this flag to clone docket entries when cloning "
+            "clusters. It requires to have RECAP permissions or it will "
+            "raise 403 error.",
         )
 
     def handle(self, *args, **options):
         self.type = options.get("type")
         self.ids = options.get("ids")
         self.download_cluster_files = options.get("download_cluster_files")
+        self.add_docket_entries = options.get("add_docket_entries")
 
         if not settings.DEVELOPMENT:
             self.stdout.write("Command not enabled for production environment")
@@ -531,10 +739,16 @@ class Command(BaseCommand):
         match self.type:
             case "search.OpinionCluster":
                 clone_opinion_cluster(
-                    self.s, self.ids, self.download_cluster_files, self.type
+                    self.s,
+                    self.ids,
+                    self.download_cluster_files,
+                    self.add_docket_entries,
+                    self.type,
                 )
             case "search.Docket":
-                clone_docket(self.s, self.ids, self.type)
+                clone_docket(
+                    self.s, self.ids, self.add_docket_entries, self.type
+                )
             case "people_db.Person":
                 clone_person(self.s, self.ids, self.type)
             case "search.Court":
