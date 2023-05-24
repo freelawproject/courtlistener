@@ -14,7 +14,7 @@ from scorched.response import SolrResponse
 from cl.citations.match_citations import search_db_for_fullcitation
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.lib.bot_detector import is_bot
-from cl.lib.model_helpers import is_docket_number
+from cl.lib.model_helpers import clean_docket_number, is_docket_number
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.types import CleanData, SearchParam
 from cl.search.constants import (
@@ -875,7 +875,10 @@ def cleanup_main_query(query_string: str) -> str:
         # Some sort of number, probably a docket number or other type of number
         # Wrap in quotes to do a phrase search
         if is_docket_number(item) and "docketNumber:" not in query_string:
-            # Confirm is a docket number, adds a proximity query of ~1 to match
+            # Confirm is a docket number and clean it. So docket_numbers with
+            # suffixes can be searched: 1:21-bk-1234-ABC -> 1:21-bk-1234,
+            item = clean_docket_number(item)
+            # Adds a proximity query of ~1 to match
             # numbers like 1:21-cv-1234 -> 21-1234
             cleaned_items.append(f'docketNumber:"{item}"~1')
         else:

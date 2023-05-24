@@ -237,7 +237,7 @@ class AudioESTestCase(SimpleTestCase):
             date_argued=datetime.date(2015, 8, 15),
         )
         cls.docket_3 = DocketFactory.create(
-            docket_number="19-5735",
+            docket_number="ASBCA No. 59126",
             court_id=cls.court_2.pk,
             date_argued=datetime.date(2015, 8, 14),
         )

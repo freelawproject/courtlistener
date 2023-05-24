@@ -3406,7 +3406,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         # Frontend
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": f'docketNumber:"19 5734"',
+            "q": f'docketNumber:"19 5734" OR docketNumber:19:5734',
         }
         r = self.client.get(
             reverse("show_results"),
@@ -3863,3 +3863,42 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         actual = self.get_results_count(r)
         self.assertEqual(actual, expected)
         self.assertIn("SEC", r.content.decode())
+
+    def test_docket_number_suffixes_query(self) -> None:
+        """Test docket_number with suffixes can be found."""
+
+        # Indexed: 1:21-bk-1234 -> Search: 1:21-bk-1234-ABC
+        # Frontend
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": "1:21-bk-1234-ABC",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("SEC", r.content.decode())
+        # API
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v3"}), search_params
+        )
+        actual = self.get_results_count(r)
+        self.assertEqual(actual, expected)
+        self.assertIn("SEC", r.content.decode())
+
+        # Other kind of formats can still be searched -> ASBCA No. 59126
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": "ASBCA No. 59126",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 2
+        self.assertEqual(actual, expected)
+        self.assertIn("Hong Liu", r.content.decode())
