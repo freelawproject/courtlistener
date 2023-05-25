@@ -8,6 +8,7 @@ from django.test import override_settings
 from django.urls import reverse
 from rest_framework.status import HTTP_200_OK, HTTP_503_SERVICE_UNAVAILABLE
 
+from cl.lib.date_time import midnight_pt
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import (
@@ -941,3 +942,18 @@ class TestFactoriesClasses(TestCase):
             cluster_2.sub_opinions.all().order_by("type")[2].type,
             "070rehearing",
         )
+
+
+class TestDateTimeHelpers(SimpleTestCase):
+    def test_midnight_pt(self) -> None:
+        # Date in PSD time -8 hours UTC offset
+        pst_date = datetime.date(2023, 1, 3)
+        pst_date_time = midnight_pt(pst_date)
+        pst_utc_offset_hours = pst_date_time.utcoffset().total_seconds() / 3600  # type: ignore
+        self.assertEqual(pst_utc_offset_hours, -8.0)
+
+        # Date in PDT time -7 hours UTC offset
+        pdt_date = datetime.date(2023, 5, 3)
+        pdt_date_time = midnight_pt(pdt_date)
+        pdt_utc_offset_hours = pdt_date_time.utcoffset().total_seconds() / 3600  # type: ignore
+        self.assertEqual(pdt_utc_offset_hours, -7.0)
