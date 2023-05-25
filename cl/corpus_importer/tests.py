@@ -2414,6 +2414,8 @@ class HarvardMergerTests(TestCase):
 
     def tearDown(self) -> None:
         """Tear down patches and remove added objects"""
+        Opinion.objects.all().delete()
+        OpinionCluster.objects.all().delete()
         Docket.objects.all().delete()
         self.read_json_patch.stop()
 
