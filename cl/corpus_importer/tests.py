@@ -2414,8 +2414,6 @@ class HarvardMergerTests(TestCase):
 
     def tearDown(self) -> None:
         """Tear down patches and remove added objects"""
-        Opinion.objects.all().delete()
-        OpinionCluster.objects.all().delete()
         Docket.objects.all().delete()
         self.read_json_patch.stop()
 
@@ -2578,6 +2576,7 @@ class HarvardMergerTests(TestCase):
         """Can we add opinion and update authors"""
 
         cluster = OpinionClusterFactoryMultipleOpinions(
+            source=SOURCES.COLUMBIA_ARCHIVE,
             docket=DocketFactory(source=Docket.COLUMBIA),
             sub_opinions__data=[
                 {"author_str": "", "plain_text": "My opinion"},
@@ -2643,6 +2642,7 @@ class HarvardMergerTests(TestCase):
         assigned"""
 
         cluster = OpinionClusterFactoryMultipleOpinions(
+            source=SOURCES.COLUMBIA_ARCHIVE,
             docket=DocketFactory(source=Docket.COLUMBIA),
             sub_opinions__data=[
                 {"author_str": "Broyles", "plain_text": "My opinion"},
