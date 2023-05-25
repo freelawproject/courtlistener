@@ -13,6 +13,7 @@ from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import (
     clean_docket_number,
+    is_docket_number,
     make_docket_number_core,
     make_upload_path,
 )
@@ -295,6 +296,20 @@ class TestModelHelpers(TestCase):
         self.assertEqual(
             clean_docket_number("Nos. 12-213, Dockets 27264, 27265"), "12-213"
         )
+
+    def test_is_docket_number(self) -> None:
+        """Test is_docket_number method correctly detects a docket number."""
+
+        self.assertEqual(is_docket_number("1:21-cv-1234-ABC"), True)
+        self.assertEqual(is_docket_number("1:21-cv-1234"), True)
+        self.assertEqual(is_docket_number("1:21-bk-1234"), True)
+        self.assertEqual(is_docket_number("21-1234"), True)
+        self.assertEqual(is_docket_number("21-cv-1234"), True)
+        self.assertEqual(is_docket_number("21 1234"), False)
+        self.assertEqual(is_docket_number("14 august"), False)
+        self.assertEqual(is_docket_number("21-string"), False)
+        self.assertEqual(is_docket_number("string-2134"), False)
+        self.assertEqual(is_docket_number("21"), False)
 
 
 class S3PrivateUUIDStorageTest(TestCase):
