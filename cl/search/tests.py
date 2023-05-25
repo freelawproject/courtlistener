@@ -3312,6 +3312,29 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         self.assertIn("SEC", r.content.decode())
         self.assertIn("Jose", r.content.decode())
 
+        # Query by pacer_case_id advanced field
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": f"pacer_case_id:{self.audio_5.docket.pacer_case_id}",
+        }
+        # Frontend
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("Wikileaks", r.content.decode())
+        # API
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v3"}),
+            search_params,
+        )
+        actual = self.get_results_count(r)
+        self.assertEqual(actual, expected)
+        self.assertIn("Wikileaks", r.content.decode())
+
     def test_oa_advanced_search_by_field_and_keyword(self) -> None:
         # Query by advanced field and refine by keyword.
         search_params = {
@@ -3550,13 +3573,14 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             "id",
             "judge",
             "local_path",
+            "pacer_case_id",
             "panel_ids",
             "snippet",
             "source",
             "timestamp",
         ]
         keys_count = len(r.data["results"][0])
-        self.assertEqual(keys_count, 21)
+        self.assertEqual(keys_count, 22)
         for key in keys_to_check:
             if key in r.data["results"][0]:
                 key_is_present = True
@@ -3862,6 +3886,34 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         )
         actual = self.get_results_count(r)
         self.assertEqual(actual, expected)
+        self.assertIn("SEC", r.content.decode())
+
+        # docket_number filter: 21-1234, return results for 1:21-bk-1234
+        # and 1:21-cv-1234-ABC
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "docket_number": f"21-1234",
+        }
+        # Frontend
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 2
+        self.assertEqual(actual, expected)
+        self.assertIn("SEC", r.content.decode())
+        self.assertIn("Freedom", r.content.decode())
+        self.assertIn("SEC", r.content.decode())
+
+        # API
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v3"}),
+            search_params,
+        )
+        actual = self.get_results_count(r)
+        self.assertEqual(actual, expected)
+        self.assertIn("Freedom", r.content.decode())
         self.assertIn("SEC", r.content.decode())
 
     def test_docket_number_suffixes_query(self) -> None:

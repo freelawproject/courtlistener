@@ -85,9 +85,7 @@ def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
 
 
 def build_term_query(
-    field: str,
-    value: str | list,
-    make_phrase: bool = False,
+    field: str, value: str | list, make_phrase: bool = False, slop: int = 0
 ) -> list:
     """Given field name and value or list of values, return Elasticsearch term
     or terms query or [].
@@ -99,11 +97,13 @@ def build_term_query(
     :param value: term or terms to find
     :param make_phrase: Whether we should make a match_phrase query for
     TextField filtering.
+    :param slop: Maximum distance between terms in a phrase for a match.
+    Only applicable on make_phrase queries.
     :return: Empty list or list with DSL Match query
     """
 
     if value and make_phrase:
-        return [Q("match_phrase", **{field: f"{value}"})]
+        return [Q("match_phrase", **{field: {"query": value, "slop": slop}})]
 
     if value and isinstance(value, list):
         value = list(filter(None, value))
@@ -206,6 +206,7 @@ def build_es_filters(cd: CleanData) -> List:
                 "docketNumber",
                 cd.get("docket_number", ""),
                 make_phrase=True,
+                slop=1,
             )
         )
     if cd["type"] == SEARCH_TYPES.PARENTHETICAL:

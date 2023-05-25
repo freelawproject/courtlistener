@@ -156,6 +156,7 @@ class AudioDocument(Document):
     id = fields.IntegerField(attr="pk")
     judge = fields.TextField(attr="judges", analyzer="text_en_splitting_cl")
     local_path = fields.KeywordField()
+    pacer_case_id = fields.KeywordField(attr="docket.pacer_case_id")
     panel_ids = fields.ListField(
         fields.IntegerField(),
     )
