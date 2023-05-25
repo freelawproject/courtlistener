@@ -22,6 +22,11 @@ manage.py clone_from_cl --type search.Docket --id 14614371 5377675
 manage.py clone_from_cl --type search.Court --id mspb leechojibtr
 manage.py clone_from_cl --type people_db.Person --id 16212 16211
 
+Now you can clone docket entries and recap documents if you have the
+permissions, for example:
+
+manage.py clone_from_cl --type search.Docket --id 17090923 --add-docket-entries
+
 This is still work in progress, some data is not cloned yet.
 """
 import json
