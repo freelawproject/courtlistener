@@ -551,6 +551,7 @@ def update_cluster_source(cluster_id: int) -> None:
 
     if new_cluster_source in [
         SOURCES.COURT_M_HARVARD,
+        SOURCES.ANON_2020_M_HARVARD,
         SOURCES.COURT_M_RESOURCE_M_HARVARD,
         SOURCES.DIRECT_COURT_INPUT_M_HARVARD,
         SOURCES.LAWBOX_M_HARVARD,
