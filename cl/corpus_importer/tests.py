@@ -31,12 +31,17 @@ from cl.corpus_importer.management.commands.clean_up_mis_matched_dockets import 
     find_and_fix_mis_matched_dockets,
 )
 from cl.corpus_importer.management.commands.harvard_merge import (
+    ClusterSourceException,
+    DocketSourceException,
     combine_non_overlapping_data,
     merge_case_names,
     merge_cluster_dates,
     merge_docket_numbers,
     merge_judges,
     merge_opinion_clusters,
+    merge_strings,
+    update_cluster_source,
+    update_docket_source,
 )
 from cl.corpus_importer.management.commands.harvard_opinions import (
     clean_body_content,
@@ -46,7 +51,6 @@ from cl.corpus_importer.management.commands.harvard_opinions import (
     winnow_case_name,
 )
 from cl.corpus_importer.management.commands.normalize_judges_opinions import (
-    Command,
     normalize_authors_in_opinions,
     normalize_panel_in_opinioncluster,
 )
@@ -77,6 +81,7 @@ from cl.search.factories import (
     RECAPDocumentFactory,
 )
 from cl.search.models import (
+    SOURCES,
     BankruptcyInformation,
     Citation,
     Court,
@@ -2831,3 +2836,61 @@ class HarvardMergerTests(TestCase):
             cluster.refresh_from_db()
 
             self.assertEqual(cluster.date_filed, item[2])
+
+    def test_update_docket_source(self):
+        """Can we update docket source?"""
+
+        docket_1 = DocketFactory(source=Docket.RECAP)
+        cluster_1 = OpinionClusterWithParentsFactory(docket=docket_1)
+        update_docket_source(cluster_1.id)
+        docket_1.refresh_from_db()
+        self.assertEqual(docket_1.source, Docket.HARVARD_AND_RECAP)
+
+        with self.assertRaises(DocketSourceException):
+            docket_2 = DocketFactory(source=Docket.COLUMBIA_AND_RECAP)
+            cluster_2 = OpinionClusterWithParentsFactory(docket=docket_2)
+            update_docket_source(cluster_2.id)
+            docket_2.refresh_from_db()
+
+    def test_update_cluster_source(self):
+        """Can we update cluster source?"""
+
+        cluster_1 = OpinionClusterWithParentsFactory(
+            source=SOURCES.COURT_WEBSITE
+        )
+        update_cluster_source(cluster_1.id)
+        cluster_1.refresh_from_db()
+        self.assertEqual(cluster_1.source, SOURCES.COURT_M_HARVARD)
+
+        with self.assertRaises(ClusterSourceException):
+            cluster_2 = OpinionClusterWithParentsFactory(
+                source=SOURCES.INTERNET_ARCHIVE
+            )
+            update_cluster_source(cluster_2.id)
+            cluster_2.refresh_from_db()
+
+    def test_merge_strings(self):
+        """Can we choose the best string to fill the field?"""
+        cluster = OpinionClusterWithParentsFactory(
+            attorneys="A. G. Allen and O. N. Gibson, for appellants."
+        )
+
+        changed_values_dictionary = {
+            "attorneys": (
+                "A. G. Allen and O. N. Gibson, for appellants., H. G. Brome "
+                "and C. H. Harkins, for respondents.",
+                "A. G. Allen and O. N. Gibson, for appellants.",
+            )
+        }
+
+        merge_strings(
+            cluster.pk, "attorneys", changed_values_dictionary.get("attorneys")
+        )
+
+        cluster.refresh_from_db()
+
+        self.assertEqual(
+            cluster.attorneys,
+            "A. G. Allen and O. N. Gibson, for appellants., H. G. Brome and "
+            "C. H. Harkins, for respondents.",
+        )

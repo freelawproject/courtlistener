@@ -51,14 +51,21 @@ class JudgeException(Exception):
 
 
 class OpinionMatchingException(Exception):
-    """An exception for wrong judges"""
+    """An exception for wrong matching opinions"""
 
     def __init__(self, message: str) -> None:
         self.message = message
 
 
 class DocketSourceException(Exception):
-    """An exception for wrong judges"""
+    """An exception for wrong docket source"""
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+
+class ClusterSourceException(Exception):
+    """An exception for wrong cluster source"""
 
     def __init__(self, message: str) -> None:
         self.message = message
@@ -540,12 +547,24 @@ def update_cluster_source(cluster_id: int) -> None:
     :return: None
     """
     cluster = OpinionCluster.objects.get(id=cluster_id)
-    source = cluster.source
-    if "U" not in source and source != "U":
-        # Cluster source is not harvard and doesn't contain harvard, merge
-        # source with harvard
-        cluster.source = source + SOURCES.HARVARD_CASELAW
+    new_cluster_source = cluster.source + SOURCES.HARVARD_CASELAW
+
+    if new_cluster_source in [
+        SOURCES.COURT_M_HARVARD,
+        SOURCES.COURT_M_RESOURCE_M_HARVARD,
+        SOURCES.DIRECT_COURT_INPUT_M_HARVARD,
+        SOURCES.LAWBOX_M_HARVARD,
+        SOURCES.LAWBOX_M_COURT_M_HARVARD,
+        SOURCES.LAWBOX_M_RESOURCE_M_HARVARD,
+        SOURCES.LAWBOX_M_COURT_RESOURCE_M_HARVARD,
+        SOURCES.MANUAL_INPUT_M_HARVARD,
+        SOURCES.PUBLIC_RESOURCE_M_HARVARD,
+        SOURCES.COLUMBIA_ARCHIVE_M_HARVARD,
+    ]:
+        cluster.source = new_cluster_source
         cluster.save()
+    else:
+        raise ClusterSourceException("Unexpected cluster source")
 
 
 def save_headmatter(cluster_id: int, harvard_data: Dict[str, Any]) -> None:
@@ -607,15 +626,23 @@ def merge_opinion_clusters(
                 logger.info(msg=f"Finished merging cluster: {cluster_id}")
 
         except AuthorException:
-            logger.warning(msg=f"Author Exception for cluster {cluster_id}")
+            logger.warning(
+                msg=f"Author exception for cluster id: {cluster_id}"
+            )
         except JudgeException:
-            logger.warning(msg=f"Judge Exception for: {cluster_id}")
+            logger.warning(msg=f"Judge exception for cluster id: {cluster_id}")
         except OpinionMatchingException:
             logger.warning(
                 msg=f"Opinions don't match for on cluster id: {cluster_id}"
             )
         except DocketSourceException:
-            logger.warning(msg=f"Docket Source Exception for: {cluster_id}")
+            logger.warning(
+                msg=f"Docket source exception related to cluster id: {cluster_id}"
+            )
+        except ClusterSourceException:
+            logger.warning(
+                msg=f"Cluster source exception for cluster id: {cluster_id}"
+            )
     else:
         logger.warning(msg=f"No Harvard json for cluster: {cluster_id}")
 
