@@ -636,12 +636,19 @@ class SearchTest(IndexedSolrTestCase):
         OpinionClusterFactoryWithChildrenAndParents(
             case_name="Strickland v. Washington.",
             case_name_full="Strickland v. Washington.",
-            docket=DocketFactory(court=cls.court),
+            docket=DocketFactory(
+                court=cls.court, docket_number="1:21-cv-1234"
+            ),
             sub_opinions=RelatedFactory(
                 OpinionWithChildrenFactory,
                 factory_related_name="cluster",
                 html_columbia="<p>Code, &#167; 1-815</p>",
             ),
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+        )
+        OpinionClusterFactoryWithChildrenAndParents(
+            case_name="Strickland v. Lorem.",
+            docket=DocketFactory(court=cls.court, docket_number="123456"),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
         )
 
@@ -972,6 +979,68 @@ class SearchTest(IndexedSolrTestCase):
             reverse("show_results"), {"q": "*", "case_name": "Washington"}
         )
         self.assertIn("Code, §", r.content.decode())
+
+    def test_docket_number_proximity_query(self) -> None:
+        """Test docket_number proximity query, so that docket numbers like
+        1:21-cv-1234 can be matched by queries like: 21-1234
+        """
+
+        # Query 21-1234, return results for 1:21-bk-1234
+        search_params = {"type": SEARCH_TYPES.OPINION, "q": "21-1234"}
+        r = self.client.get(reverse("show_results"), search_params)
+        actual = self.get_article_count(r)
+        self.assertEqual(actual, 1)
+        self.assertIn("Washington", r.content.decode())
+
+        # Query 1:21-cv-1234
+        search_params["q"] = "1:21-cv-1234"
+        r = self.client.get(reverse("show_results"), search_params)
+        actual = self.get_article_count(r)
+        self.assertEqual(actual, 1)
+        self.assertIn("Washington", r.content.decode())
+
+        # docket_number box filter: 21-1234, return results for 1:21-bk-1234
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "docket_number": f"21-1234",
+        }
+        # Frontend
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("Washington", r.content.decode())
+
+    def test_docket_number_suffixes_query(self) -> None:
+        """Test docket_number with suffixes can be found."""
+
+        # Indexed: 1:21-cv-1234 -> Search: 1:21-cv-1234-ABC
+        # Frontend
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": f"1:21-cv-1234-ABC",
+        }
+        r = self.client.get(reverse("show_results"), search_params)
+        actual = self.get_article_count(r)
+        self.assertEqual(actual, 1)
+        self.assertIn("Washington", r.content.decode())
+
+        # Other kind of formats can still be searched -> 123456
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": "123456",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("Lorem", r.content.decode())
 
 
 @override_settings(
@@ -1442,7 +1511,10 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         # Send string of search_query to the function and expect it
         # to be encoded properly
         q_a = (
-            ("12-9238 happy Gilmore", '"12-9238" happy Gilmore'),
+            (
+                "12-9238 happy Gilmore",
+                'docketNumber:"12-9238"~1 happy Gilmore',
+            ),
             ("1chicken NUGGET", '"1chicken" NUGGET'),
             (
                 "We can drive her home with 1headlight",
@@ -1453,7 +1525,10 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
             # No changes to regular queries?
             ("Look Ma, no numbers!", "Look Ma, no numbers!"),
             # Docket numbers hyphenated into phrases?
-            ("12cv9834 Monkey Goose", '"12-cv-9834" Monkey Goose'),
+            (
+                "12cv9834 Monkey Goose",
+                'docketNumber:"12-cv-9834"~1 Monkey Goose',
+            ),
             # Valid dates ignored?
             (
                 "2020-10-31T00:00:00Z Monkey Goose",
@@ -1470,14 +1545,17 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
             ("id:[* TO 5] Monkey Goose", 'id:[* TO "5"] Monkey Goose'),
             (
                 "(Tempura AND 12cv3392) OR sushi",
-                '(Tempura AND "12-cv-3392") OR sushi',
+                '(Tempura AND docketNumber:"12-cv-3392"~1) OR sushi',
             ),
             # Phrase search with numbers (w/and w/o § mark)?
             ('"18 USC 242"', '"18 USC 242"'),
             ('"18 USC §242"', '"18 USC §242"'),
             ('"this is a test" asdf', '"this is a test" asdf'),
             ('asdf "this is a test" asdf', 'asdf "this is a test" asdf'),
-            ('"this is a test" 22cv3332', '"this is a test" "22-cv-3332"'),
+            (
+                '"this is a test" 22cv3332',
+                '"this is a test" docketNumber:"22-cv-3332"~1',
+            ),
         )
         for q, a in q_a:
             print("Does {q} --> {a} ? ".format(**{"q": q, "a": a}))
