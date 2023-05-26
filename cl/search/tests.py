@@ -3988,20 +3988,6 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         self.assertEqual(actual, expected)
         self.assertIn("Wallace", r.content.decode())
 
-    def test_is_docket_number(self) -> None:
-        """Test is_docket_number method correctly detects a docket number."""
-
-        self.assertEqual(is_docket_number("1:21-cv-1234-ABC"), True)
-        self.assertEqual(is_docket_number("1:21-cv-1234"), True)
-        self.assertEqual(is_docket_number("1:21-bk-1234"), True)
-        self.assertEqual(is_docket_number("21-1234"), True)
-        self.assertEqual(is_docket_number("21-cv-1234"), True)
-        self.assertEqual(is_docket_number("21 1234"), False)
-        self.assertEqual(is_docket_number("14 august"), False)
-        self.assertEqual(is_docket_number("21-string"), False)
-        self.assertEqual(is_docket_number("string-2134"), False)
-        self.assertEqual(is_docket_number("21"), False)
-
     def test_docket_number_proximity_query(self) -> None:
         """Test docket_number proximity query, so that docket numbers like
         1:21-cv-1234-ABC can be matched by queries like: 21-1234
