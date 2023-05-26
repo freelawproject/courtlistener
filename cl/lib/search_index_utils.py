@@ -1,6 +1,6 @@
 from datetime import date
 
-from cl.lib.date_time import midnight_pst
+from cl.lib.date_time import midnight_pt
 
 
 def solr_list(m2m_list, field):
@@ -10,7 +10,7 @@ def solr_list(m2m_list, field):
         if obj is None:
             continue
         if isinstance(obj, date):
-            obj = midnight_pst(obj)
+            obj = midnight_pt(obj)
         new_list.append(obj)
     return new_list
 
