@@ -1,10 +1,11 @@
 {# The body of the item (columbia > lawbox > html > plaintext) #}
+{% load text_filters %}
 {% if item.html_columbia %}
-    {{ item.html_columbia|striptags }}
+    {{ item.html_columbia|striptags|html_decode }}
 {% elif item.html_lawbox %}
-    {{ item.html_lawbox|striptags }}
+    {{ item.html_lawbox|striptags|html_decode }}
 {% elif item.html %}
-    {{ item.html|striptags }}
+    {{ item.html|striptags|html_decode }}
 {% else %}
     {{ item.plain_text }}
 {% endif %}

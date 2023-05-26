@@ -58,7 +58,6 @@ class BaseSeleniumTest(SerializeSolrTestMixin, StaticLiveServerTestCase):
         if settings.SELENIUM_HEADLESS is True:
             options.add_argument("headless")
         options.add_argument("silent")
-        options.add_experimental_option("w3c", False)
 
         # Workaround for
         # https://bugs.chromium.org/p/chromium/issues/detail?id=1033941
