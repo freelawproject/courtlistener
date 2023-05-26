@@ -2,14 +2,12 @@ import copy
 import logging
 import os
 import shutil
-import time
 from datetime import date
 from io import BytesIO
 from tempfile import NamedTemporaryFile
 from typing import Any, Dict, List, Optional, Pattern, Tuple, Union
 
 import internetarchive as ia
-import pandas as pd
 import requests
 from celery import Task
 from celery.exceptions import SoftTimeLimitExceeded
@@ -2059,6 +2057,7 @@ def make_csv_file(
 
     :return: None, The function saves a CSV file in disk.
     """
+    import pandas as pd  # Only import pandas if function is called.
 
     csv_file = os.path.join(
         settings.MEDIA_ROOT,
