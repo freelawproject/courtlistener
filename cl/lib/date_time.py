@@ -5,10 +5,13 @@ from django.conf import settings
 from django.utils.timezone import is_aware
 
 
-def midnight_pst(d: date) -> datetime:
-    """Cast a naive date object to midnight PST"""
+def midnight_pt(d: date) -> datetime:
+    """Cast a naive date object to midnight Pacific Time, PST or PDT according
+    to the date.
+    """
     pst = pytz.timezone("US/Pacific")
-    d = datetime.combine(d, time()).replace(tzinfo=pst)
+    d = datetime.combine(d, time())
+    d = pst.localize(d)
     return d
 
 
