@@ -57,12 +57,12 @@ from cl.search.factories import (
     DocketFactory,
     OpinionClusterFactory,
     OpinionClusterFactoryWithChildrenAndParents,
-    OpinionWithChildrenFactory,
     OpinionsCitedWithParentsFactory,
+    OpinionWithChildrenFactory,
     OpinionWithParentsFactory,
     ParentheticalFactory,
     ParentheticalGroupFactory,
-    RECAPDocumentFactory
+    RECAPDocumentFactory,
 )
 from cl.search.feeds import JurisdictionFeed
 from cl.search.management.commands.cl_calculate_pagerank import Command
