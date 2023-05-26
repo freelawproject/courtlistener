@@ -130,10 +130,20 @@ oral_arguments_index.settings(
 class AudioDocument(Document):
     absolute_url = fields.KeywordField(attr="get_absolute_url")
     caseName = fields.TextField(
-        attr="case_name", analyzer="text_en_splitting_cl"
+        attr="case_name",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="case_name", analyzer="english_exact"
+            ),
+        },
     )
     court = fields.TextField(
-        attr="docket.court.full_name", analyzer="text_en_splitting_cl"
+        attr="docket.court.full_name",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(attr="judges", analyzer="english_exact"),
+        },
     )
     court_exact = fields.KeywordField(attr="docket.court.pk")
     court_id = fields.KeywordField(attr="docket.court.pk")
@@ -154,7 +164,13 @@ class AudioDocument(Document):
     download_url = fields.KeywordField(attr="download_url")
     file_size_mp3 = fields.IntegerField()
     id = fields.IntegerField(attr="pk")
-    judge = fields.TextField(attr="judges", analyzer="text_en_splitting_cl")
+    judge = fields.TextField(
+        attr="judges",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(attr="judges", analyzer="english_exact"),
+        },
+    )
     local_path = fields.KeywordField()
     pacer_case_id = fields.KeywordField(attr="docket.pacer_case_id")
     panel_ids = fields.ListField(
@@ -162,7 +178,12 @@ class AudioDocument(Document):
     )
     sha1 = fields.KeywordField(attr="sha1")
     source = fields.KeywordField(attr="source")
-    text = fields.TextField(analyzer="text_en_splitting_cl")
+    text = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+    )
     timestamp = fields.DateField()
 
     class Django:

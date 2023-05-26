@@ -22,6 +22,18 @@ ELASTICSEARCH_DSL = {
                     "remove_duplicates",
                 ],
             },
+            "english_exact": {
+                "type": "custom",
+                "tokenizer": "whitespace",
+                "filter": [
+                    "lowercase",
+                    "synonym_filter",
+                    "custom_word_delimiter_filter",
+                    "remove_leading_zeros",
+                    "keyword_marker",
+                    "remove_duplicates",
+                ],
+            },
         },
         "filter": {
             "custom_word_delimiter_filter": {

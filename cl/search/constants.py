@@ -31,6 +31,16 @@ SEARCH_ORAL_ARGUMENT_HL_FIELDS = [
     "docketNumber",
     "court_citation_string",
 ]
+SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS = [
+    "text",
+    "text.exact",
+    "caseName",
+    "caseName.exact",
+    "judge",
+    "judge.exact",
+    "docketNumber",
+    "court_citation_string",
+]
 SOLR_PEOPLE_HL_FIELDS = ["name", "dob_city", "dob_state", "name_reverse"]
 
 # Search query for related items

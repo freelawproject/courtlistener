@@ -10,9 +10,9 @@ from django_elasticsearch_dsl.search import Search
 from elasticsearch_dsl import A, Q
 from elasticsearch_dsl.query import QueryString, Range
 
-from cl.lib.search_utils import cleanup_main_query
+from cl.lib.search_utils import BOOSTS, cleanup_main_query
 from cl.lib.types import CleanData
-from cl.search.constants import SEARCH_ORAL_ARGUMENT_HL_FIELDS
+from cl.search.constants import SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS
 from cl.search.models import SEARCH_TYPES, Court
 
 
@@ -47,6 +47,49 @@ def build_daterange_query(
     return []
 
 
+def make_es_boost_list(fields: Dict[str, float]) -> list[str]:
+    """Constructs a list of Elasticsearch fields with their corresponding
+    boost values.
+
+    :param fields: A dictionary where keys are field names and values are
+    the corresponding boost values.
+    :return: A list of Elasticsearch fields with boost values formatted as 'field_name^boost_value'.
+    """
+    boosted_fields = []
+    for k, v in fields.items():
+        boosted_fields.append(f"{k}^{v}")
+    return boosted_fields
+
+
+def add_fields_boosting(cd: CleanData) -> list[str]:
+    """Applies boosting to specific fields according the search type.
+
+    :param cd: The user input CleanedData
+    :return: A list of Elasticsearch fields with their respective boost values.
+    """
+    # Apply standard qf parameters
+    qf = BOOSTS["qf"][cd["type"]].copy()
+    boosted_fields = make_es_boost_list(qf)
+    if cd["type"] in [SEARCH_TYPES.ORAL_ARGUMENT]:
+        # Give a boost on the case_name field if it's obviously a case_name
+        # query.
+        vs_query = any(
+            [
+                " v " in cd.get("q", ""),
+                " v. " in cd.get("q", ""),
+                " vs. " in cd.get("q", ""),
+            ]
+        )
+        in_re_query = cd.get("q", "").lower().startswith("in re ")
+        matter_of_query = cd.get("q", "").lower().startswith("matter of ")
+        ex_parte_query = cd.get("q", "").lower().startswith("ex parte ")
+        if any([vs_query, in_re_query, matter_of_query, ex_parte_query]):
+            qf.update({"caseName": 50})
+            boosted_fields = make_es_boost_list(qf)
+
+    return boosted_fields
+
+
 def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
     """Given the cleaned data from a form, return a Elastic Search string query or []
     https://www.elastic.co/guide/en/elasticsearch/reference/current/full-text-queries.html
@@ -69,18 +112,26 @@ def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
                 value = value.replace(
                     f"docketNumber:{match}", f"docketNumber:{replacement}"
                 )
+
         q_should = [
             Q(
-                "multi_match",
-                query=value,
+                "query_string",
                 fields=fields,
-                type="phrase",
-                operator="AND",
+                query=value,
+                quote_field_suffix=".exact",
+                default_operator="AND",
                 tie_breaker=0.3,
             ),
-            Q("query_string", query=value, default_operator="AND"),
+            Q(
+                "query_string",
+                query=value,
+                quote_field_suffix=".exact",
+                default_operator="AND",
+                type="phrase",
+            ),
         ]
         return Q("bool", should=q_should)
+
     return []
 
 
@@ -251,21 +302,21 @@ def build_es_main_query(
 
     string_query = None
     filters = build_es_filters(cd)
+
     match cd["type"]:
         case SEARCH_TYPES.PARENTHETICAL:
             string_query = build_fulltext_query(
                 ["representative_text"], cd.get("q", "")
             )
         case SEARCH_TYPES.ORAL_ARGUMENT:
+            fields = [
+                "court",
+                "court_citation_string",
+                "judge",
+            ]
+            fields.extend(add_fields_boosting(cd))
             string_query = build_fulltext_query(
-                [
-                    "caseName",
-                    "docketNumber",
-                    "court",
-                    "court_id",
-                    "judge",
-                    "sha1",
-                ],
+                fields,
                 cd.get("q", ""),
             )
 
@@ -297,10 +348,16 @@ def build_es_main_query(
     return search_query, total_query_results, top_hits_limit
 
 
-def add_es_highlighting(search_query: Search, cd: CleanData):
+def add_es_highlighting(search_query: Search, cd: CleanData) -> Search:
+    """Add elasticsearch highlighting to the search query.
+
+    :param search_query: The Elasticsearch search query object.
+    :param cd: The user input CleanedData
+    :return: The modified Elasticsearch search query object with highlights set
+    """
     if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
         fields_to_exclude = ["sha1"]
-        highlighting_fields = SEARCH_ORAL_ARGUMENT_HL_FIELDS
+        highlighting_fields = SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS
         search_query = search_query.source(excludes=fields_to_exclude)
         for field in highlighting_fields:
             search_query = search_query.highlight(
@@ -334,12 +391,24 @@ def set_results_highlights(results: Page, search_type: str) -> None:
                         highlight = hit.highlight[highlighted_field][0]
                         hit["_source"][highlighted_field] = highlight
         else:
+            exact_hl_fields = []
             if hasattr(result.meta, "highlight"):
                 for (
                     field,
                     highlight_list,
                 ) in result.meta.highlight.to_dict().items():
-                    result[field] = highlight_list[0]
+                    # If a query highlight fields the "field.exact", "field" or
+                    # both versions are available.
+                    if "exact" in field:
+                        # Prioritize "field.exact" highlighted fields
+                        field = field.split(".exact")[0]
+                        result[field] = highlight_list[0]
+                        exact_hl_fields.append(field)
+
+                    if field not in exact_hl_fields:
+                        # If the "field.exact" version has not been set, set
+                        # the "field" version.
+                        result[field] = highlight_list[0]
 
 
 def group_search_results(
