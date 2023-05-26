@@ -318,6 +318,7 @@ def make_fq(
     field: str,
     key: str,
     make_phrase: bool = False,
+    slop: int = 0,
 ) -> str:
     """Does some minimal processing of the query string to get it into a
     proper field query.
@@ -335,34 +336,42 @@ def make_fq(
     :param key: The model form field to use for the query (e.g. "case_name")
     :param make_phrase: Whether we should wrap the query in quotes to make a
     phrase search.
+    :param slop: Maximum distance between terms in a phrase for a match.
+    Only applicable on make_phrase queries.
     :returns A field query string like "caseName:Roe"
     """
     q = cd[key]
     q = q.replace(":", " ")
 
-    if q.startswith('"') and q.endswith('"'):
+    if (q.startswith('"') and q.endswith('"')) and q.count('"') == 2:
         # User used quotes. Just pass it through.
         return f"{field}:({q})"
 
     if make_phrase:
         # No need to mess with conjunctions. Just wrap in quotes.
-        return f'{field}:("{q}")'
+        # Include slop for proximity queries, e.g: 1:21-bk-1234 -> 21-1234
+        return f'{field}:("{q}"~{slop})'
 
     # Iterate over the query word by word. If the word is a conjunction
     # word, detect that and use the user's request. Else, make sure there's
     # an AND everywhere there should be.
-    words = q.split()
-    clean_q = [words[0]]
+
+    # Split the query into words e.g: word1 and phrases e.g: "word2 word3"
+    words = re.findall(r'"([^"]*)"|(\S+)', q)
+    clean_q = []
     needs_default_conjunction = True
-    for word in words[1:]:
+    for group in words:
+        word = group[0] if group[0] else group[1]
         if word.lower() in ["and", "or", "not"]:
             clean_q.append(word.upper())
             needs_default_conjunction = False
         else:
-            if needs_default_conjunction:
+            if needs_default_conjunction and clean_q:
                 clean_q.append("AND")
-            clean_q.append(word)
+            # If word contains at least one " " is a phrase, append "".
+            clean_q.append(f'"{word}"' if " " in word else word)
             needs_default_conjunction = True
+
     fq = f"{field}:({' '.join(clean_q)})"
     return fq
 
@@ -630,7 +639,13 @@ def add_filter_queries(main_params: SearchParam, cd) -> None:
             main_fq.append(make_fq(cd, "judge", "judge"))
         if cd["docket_number"]:
             main_fq.append(
-                make_fq(cd, "docketNumber", "docket_number", make_phrase=True)
+                make_fq(
+                    cd,
+                    "docketNumber",
+                    "docket_number",
+                    make_phrase=True,
+                    slop=1,
+                )
             )
         if cd["citation"]:
             main_fq.append(make_fq_proximity_query(cd, "citation", "citation"))
@@ -651,7 +666,13 @@ def add_filter_queries(main_params: SearchParam, cd) -> None:
             main_fq.append(make_fq(cd, "description", "description"))
         if cd["docket_number"]:
             main_fq.append(
-                make_fq(cd, "docketNumber", "docket_number", make_phrase=True)
+                make_fq(
+                    cd,
+                    "docketNumber",
+                    "docket_number",
+                    make_phrase=True,
+                    slop=1,
+                )
             )
         if cd["nature_of_suit"]:
             main_fq.append(make_fq(cd, "suitNature", "nature_of_suit"))

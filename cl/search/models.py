@@ -18,7 +18,7 @@ from eyecite import get_citations
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
-from cl.lib.date_time import midnight_pst
+from cl.lib.date_time import midnight_pt
 from cl.lib.model_helpers import (
     make_docket_number_core,
     make_recap_path,
@@ -899,11 +899,11 @@ class Docket(AbstractDateTimeModel):
             "jurisdictionType": self.jurisdiction_type,
         }
         if self.date_argued is not None:
-            out["dateArgued"] = midnight_pst(self.date_argued)
+            out["dateArgued"] = midnight_pt(self.date_argued)
         if self.date_filed is not None:
-            out["dateFiled"] = midnight_pst(self.date_filed)
+            out["dateFiled"] = midnight_pt(self.date_filed)
         if self.date_terminated is not None:
-            out["dateTerminated"] = midnight_pst(self.date_terminated)
+            out["dateTerminated"] = midnight_pt(self.date_terminated)
         try:
             out["docket_absolute_url"] = self.get_absolute_url()
         except NoReverseMatch:
@@ -960,7 +960,7 @@ class Docket(AbstractDateTimeModel):
             if de.entry_number is not None:
                 de_out["entry_number"] = de.entry_number
             if de.date_filed is not None:
-                de_out["entry_date_filed"] = midnight_pst(de.date_filed)
+                de_out["entry_date_filed"] = midnight_pt(de.date_filed)
             rds = de.recap_documents.all()
 
             if len(rds) == 0:
@@ -1488,11 +1488,11 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             }
         )
         if docket.date_argued is not None:
-            out["dateArgued"] = midnight_pst(docket.date_argued)
+            out["dateArgued"] = midnight_pt(docket.date_argued)
         if docket.date_filed is not None:
-            out["dateFiled"] = midnight_pst(docket.date_filed)
+            out["dateFiled"] = midnight_pt(docket.date_filed)
         if docket.date_terminated is not None:
-            out["dateTerminated"] = midnight_pst(docket.date_terminated)
+            out["dateTerminated"] = midnight_pt(docket.date_terminated)
         try:
             out["docket_absolute_url"] = docket.get_absolute_url()
         except NoReverseMatch:
@@ -1586,9 +1586,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         if self.docket_entry.entry_number is not None:
             out["entry_number"] = self.docket_entry.entry_number
         if self.docket_entry.date_filed is not None:
-            out["entry_date_filed"] = midnight_pst(
-                self.docket_entry.date_filed
-            )
+            out["entry_date_filed"] = midnight_pt(self.docket_entry.date_filed)
 
         text_template = loader.get_template("indexes/dockets_text.txt")
         out["text"] = text_template.render({"item": self}).translate(null_map)
@@ -2577,11 +2575,11 @@ class OpinionCluster(AbstractDateTimeModel):
             "docketNumber": self.docket.docket_number,
         }
         if self.docket.date_argued is not None:
-            docket["dateArgued"] = midnight_pst(self.docket.date_argued)
+            docket["dateArgued"] = midnight_pt(self.docket.date_argued)
         if self.docket.date_reargued is not None:
-            docket["dateReargued"] = midnight_pst(self.docket.date_reargued)
+            docket["dateReargued"] = midnight_pt(self.docket.date_reargued)
         if self.docket.date_reargument_denied is not None:
-            docket["dateReargumentDenied"] = midnight_pst(
+            docket["dateReargumentDenied"] = midnight_pt(
                 self.docket.date_reargument_denied
             )
         out.update(docket)
@@ -2624,7 +2622,7 @@ class OpinionCluster(AbstractDateTimeModel):
             pass
 
         if self.date_filed is not None:
-            out["dateFiled"] = midnight_pst(self.date_filed)
+            out["dateFiled"] = midnight_pt(self.date_filed)
         try:
             out["absolute_url"] = self.get_absolute_url()
         except NoReverseMatch:
@@ -3050,7 +3048,7 @@ class Opinion(AbstractDateTimeModel):
             pass
 
         if self.cluster.date_filed is not None:
-            out["dateFiled"] = midnight_pst(self.cluster.date_filed)
+            out["dateFiled"] = midnight_pt(self.cluster.date_filed)
         try:
             out["absolute_url"] = self.cluster.get_absolute_url()
         except NoReverseMatch:
@@ -3063,15 +3061,13 @@ class Opinion(AbstractDateTimeModel):
         # Docket
         docket = {"docketNumber": self.cluster.docket.docket_number}
         if self.cluster.docket.date_argued is not None:
-            docket["dateArgued"] = midnight_pst(
-                self.cluster.docket.date_argued
-            )
+            docket["dateArgued"] = midnight_pt(self.cluster.docket.date_argued)
         if self.cluster.docket.date_reargued is not None:
-            docket["dateReargued"] = midnight_pst(
+            docket["dateReargued"] = midnight_pt(
                 self.cluster.docket.date_reargued
             )
         if self.cluster.docket.date_reargument_denied is not None:
-            docket["dateReargumentDenied"] = midnight_pst(
+            docket["dateReargumentDenied"] = midnight_pt(
                 self.cluster.docket.date_reargument_denied
             )
         out.update(docket)
