@@ -1925,7 +1925,10 @@ def download_pacer_pdf_and_save_to_pq(
         pacer_doc_id = ""
 
     with transaction.atomic():
-        (pq, created,) = ProcessingQueue.objects.get_or_create(
+        (
+            pq,
+            created,
+        ) = ProcessingQueue.objects.get_or_create(
             uploader_id=user_pk,
             pacer_doc_id=pacer_doc_id,
             pacer_case_id=pacer_case_id,
