@@ -959,12 +959,16 @@ def disassociate_extraneous_entities(
         terminated_parties = set()
 
     # Disassociate extraneous parties from the docket.
-    PartyType.objects.filter(docket=d,).exclude(
+    PartyType.objects.filter(
+        docket=d,
+    ).exclude(
         party_id__in=parties_to_preserve,
     ).delete()
 
     # Disassociate extraneous attorneys from the docket and parties.
-    Role.objects.filter(docket=d,).exclude(
+    Role.objects.filter(
+        docket=d,
+    ).exclude(
         # Don't delete attorney roles for attorneys we're preserving.
         attorney_id__in=attorneys_to_preserve,
     ).exclude(
