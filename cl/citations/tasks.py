@@ -263,9 +263,12 @@ def store_recap_citations(document: RECAPDocument) -> None:
     """
 
     document_text = document.plain_text
+    cleaned_document_text = get_and_clean_opinion_text(
+        document
+    )  # even though this function assumes the input is an opinion, it will work for RECAP documents.
 
     # Extract the citations from the document's text
-    citations: List[CitationBase] = get_citations(document_text)
+    citations: List[CitationBase] = get_citations(cleaned_document_text)
 
     # If no citations are found, then there is nothing else to do for now.
     if not citations:
