@@ -264,7 +264,7 @@ interdisc,interdisciplinary
 int,interest
 intro,introduction
 inv,investment,investor
-irs,"internal revenue service"
+irs,internal revenue service
 isr,israel
 jan,january
 jj,judge
@@ -437,7 +437,7 @@ ukr,ukraine
 unabr,unabridged
 unif,uniform
 univ,university
-us,usa, "united states"
+us,usa, united states
 urb,urban
 uru,uruguay
 util,utility
