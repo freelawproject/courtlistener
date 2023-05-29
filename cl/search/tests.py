@@ -4319,5 +4319,13 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. IRS")
             self.assertEqual(results[0].panel_ids, [self.author.pk])
 
-            audio_6.delete()
-            audio_7.delete()
+            # Delete parent docket.
+            docket_5.delete()
+
+            # Confirm that docket-related audio objects are removed from the
+            # index.
+            cd["q"] = "Lorem Ipsum Dolor"
+            s, total_query_results, top_hits_limit = build_es_main_query(
+                search_query, cd
+            )
+            self.assertEqual(s.count(), 0)
