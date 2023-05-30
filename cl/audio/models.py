@@ -7,7 +7,7 @@ from django.template import loader
 from django.urls import NoReverseMatch, reverse
 
 from cl.custom_filters.templatetags.text_filters import best_case_name
-from cl.lib.date_time import midnight_pst
+from cl.lib.date_time import midnight_pt
 from cl.lib.model_helpers import make_upload_path
 from cl.lib.models import AbstractDateTimeModel, s3_warning_note
 from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
@@ -220,11 +220,11 @@ class Audio(AbstractDateTimeModel):
         # Docket
         docket = {"docketNumber": self.docket.docket_number}
         if self.docket.date_argued is not None:
-            docket["dateArgued"] = midnight_pst(self.docket.date_argued)
+            docket["dateArgued"] = midnight_pt(self.docket.date_argued)
         if self.docket.date_reargued is not None:
-            docket["dateReargued"] = midnight_pst(self.docket.date_reargued)
+            docket["dateReargued"] = midnight_pt(self.docket.date_reargued)
         if self.docket.date_reargument_denied is not None:
-            docket["dateReargumentDenied"] = midnight_pst(
+            docket["dateReargumentDenied"] = midnight_pt(
                 self.docket.date_reargument_denied
             )
         out.update(docket)
