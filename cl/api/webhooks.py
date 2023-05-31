@@ -2,6 +2,7 @@ import json
 
 import requests
 from django.conf import settings
+from elasticsearch_dsl.utils import AttrDict
 from rest_framework.renderers import JSONRenderer
 from scorched.response import SolrResponse
 
@@ -20,7 +21,10 @@ from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.string_utils import trunc
 from cl.recap.api_serializers import PacerFetchQueueSerializer
 from cl.recap.models import PROCESSING_STATUS, PacerFetchQueue
-from cl.search.api_serializers import SearchResultSerializer
+from cl.search.api_serializers import (
+    SearchESResultSerializer,
+    SearchResultSerializer,
+)
 from cl.search.api_utils import ResultObject
 
 
@@ -179,6 +183,51 @@ def send_search_alert_webhook(
         solr_results,
         many=True,
         context={"schema": solr_interface.schema},
+    ).data
+
+    post_content = {
+        "webhook": generate_webhook_key_content(webhook),
+        "payload": {
+            "results": serialized_results,
+            "alert": serialized_alert,
+        },
+    }
+    renderer = JSONRenderer()
+    json_bytes = renderer.render(
+        post_content,
+        accepted_media_type="application/json;",
+    )
+    webhook_event = WebhookEvent.objects.create(
+        webhook=webhook,
+        content=post_content,
+    )
+    send_webhook_event(webhook_event, json_bytes)
+
+
+def send_es_search_alert_webhook(
+    mapping_schema: dict,
+    results: list[AttrDict],
+    webhook: Webhook,
+    alert: Alert,
+) -> None:
+    """Send a search alert webhook event containing search results from a
+    search alert object.
+
+    :param solr_interface: The ExtraSolrInterface object.
+    :param results: The search results returned by SOLR for this alert.
+    :param webhook: The webhook endpoint object to send the event to.
+    :param alert: The search alert object.
+    """
+
+    serialized_alert = SearchAlertSerializerModel(alert).data
+    es_results = []
+    for result in results:
+        es_results.append(ResultObject(initial=result.to_dict()))
+
+    serialized_results = SearchESResultSerializer(
+        es_results,
+        many=True,
+        context={"schema": mapping_schema},
     ).data
 
     post_content = {

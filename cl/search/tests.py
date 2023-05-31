@@ -2,6 +2,7 @@ import datetime
 import io
 import operator
 import os
+import time
 from datetime import date
 from functools import reduce
 from pathlib import Path
@@ -21,7 +22,8 @@ from django.http import HttpRequest
 from django.test import RequestFactory, override_settings
 from django.test.utils import captured_stderr
 from django.urls import reverse
-from elasticsearch_dsl import Q, connections
+from elasticsearch import Elasticsearch
+from elasticsearch_dsl import Q, Search, connections
 from factory import RelatedFactory
 from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
@@ -2804,6 +2806,39 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         """Get the result count in a API query response"""
         return len(r.data["results"])
 
+    @staticmethod
+    def confirm_query_matched(response, query_id) -> bool:
+        """Confirm if a percolator query matched."""
+
+        matched = False
+        for hit in response:
+            if hit.meta.id == query_id:
+                matched = True
+        return matched
+
+    @staticmethod
+    def save_percolator_query(cd):
+        search_query = AudioDocument.search()
+        query, total_query_results, top_hits_limit = build_es_main_query(
+            search_query, cd
+        )
+        query_dict = query.to_dict()["query"]
+        percolator_query = AudioDocument(percolator_query=query_dict)
+        percolator_query.save()
+
+        return percolator_query.meta.id
+
+    @staticmethod
+    def do_percolator_query(audio_obj):
+        audio_doc = AudioDocument()
+        audio_dict = audio_doc.prepare(audio_obj)
+        # create a search object
+        s = Search(index="oral_arguments")
+        s = s.query("percolate", field="percolator_query", document=audio_dict)
+        # execute the search
+        response = s.execute()
+        return response
+
     def test_oa_results_basic(self) -> None:
         # Frontend
         r = self.client.get(
@@ -4214,7 +4249,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         self.assertEqual(
             r.content.decode().count("<mark>Information</mark>"), 4
         )
-        self.assertEqual(r.content.decode().count("<mark>Deposit</mark>"), 1)
+        self.assertEqual(r.content.decode().count("<mark>Deposit</mark>"), 2)
         self.assertEqual(
             r.content.decode().count("<mark>Deposition</mark>"), 2
         )
@@ -4329,3 +4364,107 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
                 search_query, cd
             )
             self.assertEqual(s.count(), 0)
+
+    def test_percolator(self) -> None:
+        """Test if a variety of documents triggers a percolator query."""
+
+        # Add queries to percolator.
+        cd = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": "Loretta",
+            "order_by": "score desc",
+        }
+        query_id = self.save_percolator_query(cd)
+        AudioDocument._index.refresh()
+        response = self.do_percolator_query(self.audio_2)
+        expected_queries = 1
+        self.assertEqual(len(response), expected_queries)
+        self.assertEqual(self.confirm_query_matched(response, query_id), True)
+
+        cd = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "case_name": "jose",
+            "q": "",
+            "order_by": "score desc",
+        }
+
+        query_id = self.save_percolator_query(cd)
+        AudioDocument._index.refresh()
+        response = self.do_percolator_query(self.audio_2)
+        expected_queries = 2
+        self.assertEqual(len(response), expected_queries)
+        self.assertEqual(self.confirm_query_matched(response, query_id), True)
+
+        cd = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "docket_number": f"1:21-bk-1234",
+            "q": "",
+            "order_by": "score desc",
+        }
+        query_id = self.save_percolator_query(cd)
+        AudioDocument._index.refresh()
+        response = self.do_percolator_query(self.audio_1)
+        expected_queries = 1
+        self.assertEqual(len(response), expected_queries)
+        self.assertEqual(self.confirm_query_matched(response, query_id), True)
+
+        cd = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "docket_number": f"1:21-cv-1234-ABC",
+            "court": f"cabc",
+            "q": "",
+            "order_by": "score desc",
+        }
+
+        query_id = self.save_percolator_query(cd)
+        AudioDocument._index.refresh()
+        response = self.do_percolator_query(self.audio_5)
+        expected_queries = 1
+        self.assertEqual(len(response), expected_queries)
+        self.assertEqual(self.confirm_query_matched(response, query_id), True)
+
+        cd = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "docket_number": f"1:21-bk-1234",
+            "court": f"cabc",
+            "argued_after": datetime.date(2015, 8, 16),
+            "q": "",
+            "order_by": "score desc",
+        }
+
+        query_id = self.save_percolator_query(cd)
+        AudioDocument._index.refresh()
+        response = self.do_percolator_query(self.audio_1)
+        expected_queries = 2
+        self.assertEqual(len(response), expected_queries)
+        self.assertEqual(self.confirm_query_matched(response, query_id), True)
+
+        cd = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "docket_number": f"19-5734",
+            "court": f"cabc",
+            "argued_after": datetime.date(2015, 8, 15),
+            "q": "Loretta NOT (Hong Liu)",
+            "order_by": "score desc",
+        }
+        query_id = self.save_percolator_query(cd)
+        AudioDocument._index.refresh()
+        response = self.do_percolator_query(self.audio_2)
+        expected_queries = 3
+        self.assertEqual(len(response), expected_queries)
+        self.assertEqual(self.confirm_query_matched(response, query_id), True)
+
+        cd = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "court": f"nyed",
+            "argued_after": datetime.date(2015, 8, 14),
+            "q": f"caseName:Loretta AND docketNumber:(ASBCA No. 59126)",
+            "order_by": "score desc",
+        }
+
+        query_id = self.save_percolator_query(cd)
+        AudioDocument._index.refresh()
+        response = self.do_percolator_query(self.audio_4)
+        expected_queries = 2
+        self.assertEqual(len(response), expected_queries)
+        self.assertEqual(self.confirm_query_matched(response, query_id), True)

@@ -3,6 +3,7 @@ from datetime import datetime
 from django.conf import settings
 from django.template import loader
 from django_elasticsearch_dsl import Document, Index, fields
+from elasticsearch_dsl import Percolator
 
 from cl.audio.models import Audio
 from cl.lib.search_index_utils import null_map
@@ -157,7 +158,13 @@ class AudioDocument(Document):
         attr="docket.date_reargument_denied"
     )
     docketNumber = fields.TextField(
-        attr="docket.docket_number", analyzer="text_en_splitting_cl"
+        attr="docket.docket_number",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="docket.docket_number", analyzer="english_exact"
+            ),
+        },
     )
     docket_slug = fields.KeywordField(attr="docket.slug")
     duration = fields.IntegerField(attr="duration")
@@ -185,6 +192,7 @@ class AudioDocument(Document):
         },
     )
     timestamp = fields.DateField()
+    percolator_query = Percolator()
 
     class Django:
         model = Audio
@@ -206,3 +214,14 @@ class AudioDocument(Document):
 
     def prepare_timestamp(self, instance):
         return datetime.utcnow()
+
+    def _prepare_action(self, object_instance, action):
+        data = self.prepare(object_instance) if action != "delete" else None
+        # Store the data for this instance
+        self._instance_data = data
+        return {
+            "_op_type": action,
+            "_index": self._index._name,
+            "_id": self.generate_id(object_instance),
+            "_source": data,
+        }

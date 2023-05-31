@@ -28,6 +28,7 @@ def build_daterange_query(
     :param relation: Indicates how the range query matches values for range fields
     :return: Empty list or list with DSL Range query
     """
+
     params = {}
     if any([before, after]):
         if hasattr(after, "strftime"):
@@ -124,6 +125,7 @@ def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
             ),
             Q(
                 "query_string",
+                fields=fields,
                 query=value,
                 quote_field_suffix=".exact",
                 default_operator="AND",
@@ -397,12 +399,48 @@ def set_results_highlights(results: Page, search_type: str) -> None:
                     field,
                     highlight_list,
                 ) in result.meta.highlight.to_dict().items():
-                    # If a query highlight fields the "field.exact", "field" or
-                    # both versions are available.
+                    # If a query highlights fields the "field.exact", "field" or
+                    # both versions are available. Highlighted terms in each
+                    # version can differ, so the best thing to do is combine
+                    # highlighted terms from each version and set it.
                     if "exact" in field:
-                        # Prioritize "field.exact" highlighted fields
                         field = field.split(".exact")[0]
-                        result[field] = highlight_list[0]
+                        marked_strings_2 = []
+                        # Extract all unique marked strings from "field.exact"
+                        marked_strings_1 = re.findall(
+                            r"<mark>.*?</mark>", highlight_list[0]
+                        )
+                        # Extract all unique marked strings from "field" if
+                        # available
+                        if field in result.meta.highlight:
+                            marked_strings_2 = re.findall(
+                                r"<mark>.*?</mark>",
+                                result.meta.highlight[field][0],
+                            )
+
+                        unique_marked_strings = list(
+                            set(marked_strings_1 + marked_strings_2)
+                        )
+                        combined_highlights = highlight_list[0]
+                        for marked_string in unique_marked_strings:
+                            # Replace unique highlighted terms in a single
+                            # field.
+                            unmarked_string = marked_string.replace(
+                                "<mark>", ""
+                            ).replace("</mark>", "")
+                            combined_highlights = combined_highlights.replace(
+                                unmarked_string, marked_string
+                            )
+
+                        # Remove nested <mark> tags after replace.
+                        combined_highlights = re.sub(
+                            r"<mark><mark>(.*?)</mark></mark>",
+                            r"<mark>\1</mark>",
+                            combined_highlights,
+                        )
+
+                        # Set combined highlighted terms.
+                        result[field] = combined_highlights
                         exact_hl_fields.append(field)
 
                     if field not in exact_hl_fields:

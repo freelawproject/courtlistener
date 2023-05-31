@@ -39,6 +39,7 @@ SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS = [
     "judge",
     "judge.exact",
     "docketNumber",
+    "docketNumber.exact",
     "court_citation_string",
 ]
 SOLR_PEOPLE_HL_FIELDS = ["name", "dob_city", "dob_state", "name_reverse"]

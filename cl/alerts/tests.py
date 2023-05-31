@@ -40,6 +40,7 @@ from cl.donate.factories import DonationFactory
 from cl.donate.models import Donation
 from cl.favorites.factories import NoteFactory, UserTagFactory
 from cl.lib.test_helpers import EmptySolrTestCase, SimpleUserDataMixin
+from cl.search.documents import AudioDocument
 from cl.search.factories import DocketFactory, OpinionWithParentsFactory
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
@@ -1459,3 +1460,103 @@ class DocketAlertGetNotesTagsTests(TestCase):
         ) = get_docket_notes_and_tags_by_user(self.docket_3.pk, self.user_1.pk)
         self.assertEqual(notes_docket_3_user_1, None)
         self.assertEqual(tags_docket_3_user_1, [])
+
+
+class SearchAlertsOAESTests(TestCase):
+    """Test ES Search Alerts"""
+
+    @classmethod
+    def rebuild_index(self):
+        """
+        Create and populate the Elasticsearch index and mapping
+        """
+
+        # -f rebuilds index without prompt for confirmation
+        call_command("search_index", "--rebuild", "-f")
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.rebuild_index()
+        cls.user_profile = UserProfileWithParentsFactory()
+        cls.donation = DonationFactory(
+            donor=cls.user_profile.user,
+            amount=20,
+            status=Donation.PROCESSED,
+            send_annual_reminder=True,
+        )
+        cls.webhook_enabled = WebhookFactory(
+            user=cls.user_profile.user,
+            event_type=WebhookEventType.SEARCH_ALERT,
+            url="https://example.com/",
+            enabled=True,
+        )
+        cls.search_alert = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert OA",
+            query="type=oa&docket_number=19-5735",
+        )
+        cls.mock_date = now().replace(day=15, hour=0)
+
+    @classmethod
+    def tearDownClass(cls):
+        Audio.objects.all().delete()
+        Alert.objects.all().delete()
+        super().tearDownClass()
+
+    def test_send_oa_search_alert_webhooks(self):
+        """Can we send search alert webhooks for Opinions and Oral Arguments
+        independently?
+        """
+
+        with time_machine.travel(self.mock_date, tick=False):
+            with mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ):
+                # When the Audio object is created it should trigger an alert.
+                self.rt_oral_argument = AudioWithParentsFactory.create(
+                    case_name="RT Test OA",
+                    docket__date_argued=now() - timedelta(hours=5),
+                    docket__docket_number="19-5735",
+                )
+
+        webhooks_enabled = Webhook.objects.filter(enabled=True)
+        self.assertEqual(len(webhooks_enabled), 1)
+        search_alerts = Alert.objects.all()
+        self.assertEqual(len(search_alerts), 1)
+
+        # One OA search alert email should be sent.
+        self.assertEqual(len(mail.outbox), 1)
+        text_content = mail.outbox[0].body
+        self.assertIn(self.rt_oral_argument.case_name, text_content)
+
+        # One webhook event should be sent to user_profile user
+        webhook_events = WebhookEvent.objects.all()
+        self.assertEqual(len(webhook_events), 1)
+
+        # Compare webhook content.
+        content = webhook_events[0].content
+        self.assertEqual(
+            content["payload"]["alert"]["query"], self.search_alert.query
+        )
+        self.assertEqual(content["payload"]["alert"]["rate"], "rt")
+        self.assertEqual(
+            len(content["payload"]["results"]),
+            1,
+        )
+        self.assertEqual(
+            content["payload"]["results"][0]["caseName"],
+            self.rt_oral_argument.case_name,
+        )
+        self.assertEqual(
+            content["payload"]["results"][0]["court"],
+            self.rt_oral_argument.docket.court.full_name,
+        )
+        self.assertEqual(
+            content["payload"]["results"][0]["source"],
+            self.rt_oral_argument.source,
+        )
+        webhook_events.delete()

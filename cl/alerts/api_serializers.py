@@ -33,7 +33,7 @@ class SearchAlertSerializerModel(
 
     class Meta:
         model = Alert
-        fields = "__all__"
+        exclude = ["es_id"]
 
 
 class DocketAlertSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
