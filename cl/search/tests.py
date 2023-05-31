@@ -56,7 +56,7 @@ from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.factories import DocketEntriesDataFactory, DocketEntryDataFactory
 from cl.recap.mergers import add_docket_entries
 from cl.scrapers.factories import PACERFreeDocumentLogFactory
-from cl.search.documents import ParentheticalGroupDocument
+from cl.search.documents import AudioDocument, ParentheticalGroupDocument
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -3825,11 +3825,12 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
 
     def test_oa_results_api_pagination(self) -> None:
         with transaction.atomic():
+            created_audios = []
             for i in range(20):
-                AudioFactory.create(
+                audio = AudioFactory.create(
                     docket_id=self.audio_3.docket.pk,
                 )
-            self.rebuild_index()
+                created_audios.append(audio)
             search_params = {
                 "type": SEARCH_TYPES.ORAL_ARGUMENT,
             }
@@ -3858,8 +3859,8 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             self.assertEqual(None, r.data["next"])
 
             # Remove Audio objects to avoid affecting other concurrent tests.
-            Audio.objects.all().delete()
-        super().setUpTestData()
+            for created_audio in created_audios:
+                created_audio.delete()
         self.rebuild_index()
 
     def test_oa_synonym_search(self) -> None:
@@ -4258,3 +4259,73 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         expected = 1
         self.assertEqual(actual, expected)
         self.assertIn("Freedom of", r.content.decode())
+
+    def test_keep_in_sync_related_OA_objects(self) -> None:
+        """Test docket_number with suffixes can be found."""
+        with transaction.atomic():
+            docket_5 = DocketFactory.create(
+                docket_number="1:22-bk-12345",
+                court_id=self.court_1.pk,
+                date_argued=datetime.date(2015, 8, 16),
+            )
+            audio_6 = AudioFactory.create(
+                case_name="Lorem Ipsum Dolor vs. USA",
+                docket_id=docket_5.pk,
+            )
+            audio_7 = AudioFactory.create(
+                case_name="Lorem Ipsum Dolor vs. IRS",
+                docket_id=docket_5.pk,
+            )
+
+            cd = {
+                "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                "q": "Lorem Ipsum Dolor vs. United States",
+                "order_by": "score desc",
+            }
+            search_query = AudioDocument.search()
+            s, total_query_results, top_hits_limit = build_es_main_query(
+                search_query, cd
+            )
+            self.assertEqual(s.count(), 1)
+            results = s.execute()
+            self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. USA")
+            self.assertEqual(results[0].docketNumber, "1:22-bk-12345")
+            self.assertEqual(results[0].panel_ids, [])
+
+            # Update docket number.
+            docket_5.docket_number = "23-98765"
+            docket_5.save()
+
+            # Confirm docket number is updated in the index.
+            s, total_query_results, top_hits_limit = build_es_main_query(
+                search_query, cd
+            )
+            self.assertEqual(s.count(), 1)
+            results = s.execute()
+            self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. USA")
+            self.assertEqual(results[0].docketNumber, "23-98765")
+
+            # Trigger a ManyToMany insert.
+            audio_7.refresh_from_db()
+            audio_7.panel.add(self.author)
+
+            # Confirm ManyToMany field is updated in the index.
+            cd["q"] = "Lorem Ipsum Dolor vs. IRS"
+            s, total_query_results, top_hits_limit = build_es_main_query(
+                search_query, cd
+            )
+            self.assertEqual(s.count(), 1)
+            results = s.execute()
+            self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. IRS")
+            self.assertEqual(results[0].panel_ids, [self.author.pk])
+
+            # Delete parent docket.
+            docket_5.delete()
+
+            # Confirm that docket-related audio objects are removed from the
+            # index.
+            cd["q"] = "Lorem Ipsum Dolor"
+            s, total_query_results, top_hits_limit = build_es_main_query(
+                search_query, cd
+            )
+            self.assertEqual(s.count(), 0)
