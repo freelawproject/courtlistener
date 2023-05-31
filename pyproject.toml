@@ -105,7 +105,7 @@ ipython = "^8.10.0"
 time-machine = "^2.9.0"
 dateparser = "1.1.8"
 types-dateparser = "^1.1.4.6"
-juriscraper = "^2.5.48"
+juriscraper = "^2.5.49"
 
 
 [tool.poetry.group.dev.dependencies]
