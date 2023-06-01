@@ -215,12 +215,16 @@ class AudioESTestCase(SimpleTestCase):
     @classmethod
     def setUpTestData(cls):
         cls.court_1 = CourtFactory(
-            id="cabc", full_name="Testing Supreme Court", jurisdiction="FB"
+            id="cabc",
+            full_name="Testing Supreme Court",
+            jurisdiction="FB",
+            citation_string="Bankr. C.D. Cal.",
         )
         cls.court_2 = CourtFactory(
             id="nyed",
             full_name="Court of Appeals for the First Circuit",
             jurisdiction="FB",
+            citation_string="Bankr. C.D. Cal.",
         )
         cls.docket_1 = DocketFactory.create(
             docket_number="19-5733",
@@ -286,6 +290,6 @@ class AudioESTestCase(SimpleTestCase):
             case_name="Freedom of Information Wikileaks",
             docket_id=cls.docket_4.pk,
             duration=400,
-            judges="Wallace to Friedland",
+            judges="Wallace to Friedland ⚖️",
             sha1="a49ada009774496ac01fb49818837e2296705c95",
         )
