@@ -277,20 +277,31 @@ def find_all_judges(text: str):
 
 
 def find_just_name(text: str) -> str:
-    """Extract the first surname appearing in the text
+    """Extract the first surname appearing in the Harvard text
+
+    This is designed specifically for the Harvard merger and its particular
+    brand of OCR.
+
     :param text: string to analyze
     :return: surname or empty string
     """
+    # Crop the text - on the off chance the text is incorrectly long to avoid
+    # searching the text way down.
     cleaned_text = text.replace("\n", " ")[:100].strip()
+    # this is done to handle weird OCR issue
     cleaned_text = cleaned_text.replace("By the Court", "")
 
+    # First we extract out PER CURIAM
     if "PER CURIAM" in cleaned_text.upper():
         return "PER CURIAM"
 
+    # OCR typically fails on the per curiam but this was an easy way to
+    # make sure we recognized it.
     match_pc = re.search(r"(Pe. C......)", cleaned_text)
     if match_pc:
         return "PER CURIAM"
 
+    # The most common style matches here NAME_IN_ALL_CAPS.
     match0 = re.findall("[A-Z\-'']{3,},?\b", cleaned_text)
     if match0:
         match0 = [
@@ -298,6 +309,7 @@ def find_just_name(text: str) -> str:
         ]
         return " ".join(match0)
 
+    # Next up is full names followed by a comma
     match1 = re.search(
         "(((Van|De|Da)\s)?[A-Z][\w\-'']{3,}(\s(IV|I|II|III|V|Jr\.|Sr\.))?),",
         cleaned_text,
@@ -305,6 +317,7 @@ def find_just_name(text: str) -> str:
     if match1:
         return match1.group(1)
 
+    # Next the style of Justice First Last
     match2 = re.search(
         r"(Justice|Judge|Commissioner|Honorable)\s([A-Z\-'']\w+(\s[A-Z\-'']\w+)?)",
         cleaned_text,
@@ -312,10 +325,12 @@ def find_just_name(text: str) -> str:
     if match2:
         return match2.group(2)
 
+    # Match Lastname, C. J.
     match3 = re.search(r"([A-Z\-'']\w+)\s(C|J|P)\.", cleaned_text)
     if match3:
         return match3.group(1)
 
+    # Finally - default to the old style to handle stragglers
     match4 = extract_judge_last_name(
         cleaned_text, keep_letter_case=True, require_capital=True
     )

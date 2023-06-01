@@ -143,15 +143,15 @@ def fetch_non_harvard_data(harvard_data: Dict[str, Any]) -> Dict[str, Any]:
     # Some documents contain images in the HTML
     # Flag them for a later crawl by using the placeholder '[[Image]]'
     judge_list = [
-        find_all_judges(unidecode(x.text))
-        for x in soup.find_all(
+        find_all_judges(unidecode(tag.text))
+        for tag in soup.find_all(
             lambda tag: (tag.name == "judges" and tag.get("data-type") is None)
             or tag.get("data-type") == "judges"
         )
     ]
     author_list = [
-        find_just_name(unidecode(x.text))
-        for x in soup.find_all(
+        find_just_name(unidecode(tag.text))
+        for tag in soup.find_all(
             lambda tag: (tag.name == "author" and tag.get("data-type") is None)
             or tag.get("data-type") == "author"
         )
