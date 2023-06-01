@@ -255,15 +255,88 @@ NAME_CUTOFF = 3
 IS_JUDGE = {"wu", "re", "du", "de"}
 
 
+def find_all_judges(text: str):
+    cleaned_text = text.replace("\n", " ")[:100].strip()
+    cleaned_text = cleaned_text.replace("By the Court", "")
+    cleaned_text = cleaned_text.replace(" and", ", and")
+    query1 = re.findall(
+        "(((Van|De|Da)\s)?[A-Z][\w\-'']{3,}(\s(IV|I|II|III|V|Jr\.|Sr\.))?),?",
+        cleaned_text,
+    )
+    query2 = re.findall(
+        ",\sand\s(((Van|De|Da)\s)?[A-Z][\w\-'']{3,}(\s(IV|I|II|III|V|Jr\.|Sr\.))?)",
+        cleaned_text,
+    )
+    query = query1 + query2
+    if query:
+        matches = [
+            name[0] for name in query if name[0].lower() not in NOT_JUDGE_WORDS
+        ]
+        return matches
+    return []
+
+
+def find_just_name(text: str) -> str:
+    """Extract the first surname appearing in the text
+    :param text: string to analyze
+    :return: surname or empty string
+    """
+    cleaned_text = text.replace("\n", " ")[:100].strip()
+    cleaned_text = cleaned_text.replace("By the Court", "")
+
+    if "PER CURIAM" in cleaned_text.upper():
+        return "PER CURIAM"
+
+    match_pc = re.search(r"(Pe. C......)", cleaned_text)
+    if match_pc:
+        return "PER CURIAM"
+
+    match0 = re.findall("[A-Z\-'']{3,},?\b", cleaned_text)
+    if match0:
+        match0 = [
+            word for word in match0 if word.lower() not in NOT_JUDGE_WORDS
+        ]
+        return " ".join(match0)
+
+    match1 = re.search(
+        "(((Van|De|Da)\s)?[A-Z][\w\-'']{3,}(\s(IV|I|II|III|V|Jr\.|Sr\.))?),",
+        cleaned_text,
+    )
+    if match1:
+        return match1.group(1)
+
+    match2 = re.search(
+        r"(Justice|Judge|Commissioner|Honorable)\s([A-Z\-'']\w+(\s[A-Z\-'']\w+)?)",
+        cleaned_text,
+    )
+    if match2:
+        return match2.group(2)
+
+    match3 = re.search(r"([A-Z\-'']\w+)\s(C|J|P)\.", cleaned_text)
+    if match3:
+        return match3.group(1)
+
+    match4 = extract_judge_last_name(
+        cleaned_text, keep_letter_case=True, require_capital=True
+    )
+    if match4:
+        return " ".join(
+            [name for name in match4 if name.lower() not in NOT_JUDGE_WORDS]
+        )
+    return ""
+
+
 def extract_judge_last_name(
-    text: str = "", keep_letter_case=False
+    text: str = "", keep_letter_case=False, require_capital=False
 ) -> List[str]:
     """Find judge last names in a string of text.
-
     :param text: The text you wish to extract names from.
     :param keep_letter_case: True if you want to keep letter case from text
+    :param require_capital: True if you want to keep words that start with a capital letter
     :return: last names of judges in `text`.
     """
+    if require_capital:
+        text = " ".join([x for x in text.split() if x[0].isupper()])
     if not keep_letter_case:
         text = text.lower() or ""
     # just use the first nonempty line (there's
@@ -282,9 +355,16 @@ def extract_judge_last_name(
 
     # normalize text and get candidate judge names
     if not keep_letter_case:
-        line = "".join([c if c.isalpha() else " " for c in line.lower()])
+        line = "".join(
+            [
+                c if (c.isalpha() or c == "-" or c == "'") else " "
+                for c in line.lower()
+            ]
+        )
     else:
-        line = "".join([c if c.isalpha() else " " for c in line])
+        line = "".join([c if c.isalpha() or c == "-" else " " for c in line])
+    # print("\t\t", line)
+
     names = []
     for word in line.split():
         word_too_short = len(word) < NAME_CUTOFF
