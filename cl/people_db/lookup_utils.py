@@ -255,8 +255,16 @@ NAME_CUTOFF = 3
 IS_JUDGE = {"wu", "re", "du", "de"}
 
 
-def find_all_judges(text: str):
-    cleaned_text = text.replace("\n", " ")[:100].strip()
+def find_all_judges(judge_text: str) -> [str]:
+    """Find all judges
+
+    This method is used to extract out multiple judge names from a text input
+    from the harvard merger/import.
+
+    :param text: Harvard text input from judges tags
+    :return: List of judges names or empty list
+    """
+    cleaned_text = judge_text.replace("\n", " ")[:100].strip()
     cleaned_text = cleaned_text.replace("By the Court", "")
     cleaned_text = cleaned_text.replace(" and", ", and")
     query1 = re.findall(
