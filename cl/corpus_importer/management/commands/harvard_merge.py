@@ -8,6 +8,7 @@ import requests
 from bs4 import BeautifulSoup
 from django.db import transaction
 from juriscraper.lib.string_utils import harmonize, titlecase
+from unidecode import unidecode
 
 from cl.corpus_importer.management.commands.harvard_opinions import (
     clean_docket_number,
@@ -142,14 +143,14 @@ def fetch_non_harvard_data(harvard_data: Dict[str, Any]) -> Dict[str, Any]:
     # Some documents contain images in the HTML
     # Flag them for a later crawl by using the placeholder '[[Image]]'
     judge_list = [
-        find_all_judges(x.text)
+        find_all_judges(unidecode(x.text))
         for x in soup.find_all(
             lambda tag: (tag.name == "judges" and tag.get("data-type") is None)
             or tag.get("data-type") == "judges"
         )
     ]
     author_list = [
-        find_just_name(x.text)
+        find_just_name(unidecode(x.text))
         for x in soup.find_all(
             lambda tag: (tag.name == "author" and tag.get("data-type") is None)
             or tag.get("data-type") == "author"
@@ -292,8 +293,8 @@ def merge_judges(
         # the judge names in capital letters)
         cl_clean = set(find_all_judges(cl_data))
         # Get last names in lowercase and cleaned
-        harvard_clean = set(find_all_judges(harvard_data))
-        judges = titlecase(", ".join(find_all_judges(harvard_data)))
+        harvard_clean = set(find_all_judges(unidecode(harvard_data)))
+        judges = titlecase(", ".join(find_all_judges(unidecode(harvard_data))))
 
         if (
             harvard_clean.issuperset(cl_clean) or cl_data_upper
@@ -752,7 +753,9 @@ def update_matching_opinions(
         author = harvard_opinions[int(k)].find("author")
         if author:
             # Prettify the name a bit
-            author_str = titlecase(find_just_name(author.text.strip(":")))
+            author_str = titlecase(
+                find_just_name(unidecode(author.text).strip(":"))
+            )
         if op.author_str == "":
             # We have an empty author name
             if author_str:
@@ -760,7 +763,9 @@ def update_matching_opinions(
                 op.author_str = author_str
         else:
             if author_str:
-                if find_just_name(op.author_str) != find_just_name(author_str):
+                if find_just_name(op.author_str) != find_just_name(
+                    unidecode(author_str)
+                ):
                     raise AuthorException(f"Authors don't match - log error")
                 elif any(s.isupper() for s in op.author_str.split(",")):
                     # Some names are uppercase, update with processed names
@@ -813,7 +818,7 @@ def map_and_merge_opinions(cluster: int, harvard_data: Dict[str, Any]) -> None:
                     cluster=OpinionCluster.objects.get(id=cluster),
                     type=opinion_type,
                     author_str=titlecase(
-                        find_just_name(author.text.strip(":"))
+                        find_just_name(unidecode(author.text).strip(":"))
                     )
                     if author
                     else "",
