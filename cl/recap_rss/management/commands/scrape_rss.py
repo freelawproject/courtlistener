@@ -167,8 +167,9 @@ class Command(VerboseCommand):
                 trim_rss_data.delay()
                 last_trim_date = now()
 
-            # Wait, then attempt the courts again if iterations not exceeded.
+            # Wait, then attempt the courts again if iterations not exceeded or
+            # iterations == 0 (loop forever)
             iterations_completed += 1
             remaining_iterations = options["iterations"] - iterations_completed
-            if remaining_iterations > 0:
+            if options["iterations"] == 0 or remaining_iterations > 0:
                 time.sleep(self.DELAY_BETWEEN_ITERATIONS)
