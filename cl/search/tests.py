@@ -2774,16 +2774,6 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         call_command("search_index", "--rebuild", "-f")
 
     @classmethod
-    def restart_rate_limit(self):
-        """Restart the rate limiter counter to avoid getting blocked in
-        frontend after  tests
-        """
-        r = make_redis_interface("CACHE")
-        keys = r.keys(":1:rl:*")
-        if keys:
-            r.delete(*keys)
-
-    @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
         cls.rebuild_index()
@@ -2791,7 +2781,6 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
     @classmethod
     def tearDownClass(cls):
         Audio.objects.all().delete()
-        cls.restart_rate_limit()
         super().tearDownClass()
 
     @staticmethod
@@ -4329,3 +4318,48 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
                 search_query, cd
             )
             self.assertEqual(s.count(), 0)
+
+    def test_exact_and_synonyms_query(self) -> None:
+        """Test exact and synonyms in the same query."""
+
+        # Search for 'learn road' should return results for 'learn of rd' and
+        # 'learning rd'.
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": f"learn road",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 2
+        self.assertEqual(actual, expected)
+        self.assertIn("<mark>Learn</mark>", r.content.decode())
+        self.assertIn("<mark>Learning</mark>", r.content.decode())
+        self.assertIn("<mark>rd</mark>", r.content.decode())
+
+        # Search for '"learning" road' should return only a result for
+        # 'Learning rd'
+        search_params["q"] = f'"learning" road'
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("<mark>Learning</mark>", r.content.decode())
+        self.assertIn("<mark>rd</mark>", r.content.decode())
+
+        # A phrase search for '"learn road"' should execute an exact and phrase
+        # search simultaneously. It shouldn't return any results,
+        # given that the indexed string is 'Learn of rd'.
+        search_params["q"] = f'"learn road"'
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 0
+        self.assertEqual(actual, expected)

@@ -6,6 +6,8 @@ from django import test
 from django.contrib.staticfiles import testing
 from rest_framework.test import APITestCase
 
+from cl.lib.redis_utils import make_redis_interface
+
 
 class OutputBlockerTestMixin:
     """Block the output of tests so that they run a bit faster.
@@ -41,6 +43,24 @@ class OneDatabaseMixin:
     databases = {"default"}
 
 
+class RestartRateLimitMixin:
+    """Restart the rate limiter counter to avoid getting blocked in frontend
+    after tests.
+    """
+
+    @classmethod
+    def restart_rate_limit(self):
+        r = make_redis_interface("CACHE")
+        keys = r.keys(":1:rl:*")
+        if keys:
+            r.delete(*keys)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.restart_rate_limit()
+        super().tearDownClass()
+
+
 class SimpleTestCase(
     OutputBlockerTestMixin,
     OneDatabaseMixin,
@@ -52,6 +72,7 @@ class SimpleTestCase(
 class TestCase(
     OutputBlockerTestMixin,
     OneDatabaseMixin,
+    RestartRateLimitMixin,
     test.TestCase,
 ):
     pass
@@ -60,6 +81,7 @@ class TestCase(
 class TransactionTestCase(
     OutputBlockerTestMixin,
     OneDatabaseMixin,
+    RestartRateLimitMixin,
     test.TransactionTestCase,
 ):
     pass
@@ -68,6 +90,7 @@ class TransactionTestCase(
 class LiveServerTestCase(
     OutputBlockerTestMixin,
     OneDatabaseMixin,
+    RestartRateLimitMixin,
     test.LiveServerTestCase,
 ):
     pass
@@ -76,6 +99,7 @@ class LiveServerTestCase(
 class StaticLiveServerTestCase(
     OutputBlockerTestMixin,
     OneDatabaseMixin,
+    RestartRateLimitMixin,
     testing.StaticLiveServerTestCase,
 ):
     pass
@@ -84,6 +108,7 @@ class StaticLiveServerTestCase(
 class APITestCase(
     OutputBlockerTestMixin,
     OneDatabaseMixin,
+    RestartRateLimitMixin,
     APITestCase,
 ):
     pass

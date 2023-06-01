@@ -69,7 +69,6 @@ def add_fields_boosting(cd: CleanData) -> list[str]:
     """
     # Apply standard qf parameters
     qf = BOOSTS["qf"][cd["type"]].copy()
-    boosted_fields = make_es_boost_list(qf)
     if cd["type"] in [SEARCH_TYPES.ORAL_ARGUMENT]:
         # Give a boost on the case_name field if it's obviously a case_name
         # query.
@@ -78,6 +77,7 @@ def add_fields_boosting(cd: CleanData) -> list[str]:
                 " v " in cd.get("q", ""),
                 " v. " in cd.get("q", ""),
                 " vs. " in cd.get("q", ""),
+                " vs " in cd.get("q", ""),
             ]
         )
         in_re_query = cd.get("q", "").lower().startswith("in re ")
@@ -85,9 +85,8 @@ def add_fields_boosting(cd: CleanData) -> list[str]:
         ex_parte_query = cd.get("q", "").lower().startswith("ex parte ")
         if any([vs_query, in_re_query, matter_of_query, ex_parte_query]):
             qf.update({"caseName": 50})
-            boosted_fields = make_es_boost_list(qf)
 
-    return boosted_fields
+    return make_es_boost_list(qf)
 
 
 def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
