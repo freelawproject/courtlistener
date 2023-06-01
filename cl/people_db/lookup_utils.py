@@ -305,46 +305,46 @@ def find_just_name(text: str) -> str:
 
     # OCR typically fails on the per curiam but this was an easy way to
     # make sure we recognized it.
-    match_pc = re.search(r"(Pe. C......)", cleaned_text)
-    if match_pc:
+    match_per_curiam = re.search(r"(Pe. C......)", cleaned_text)
+    if match_per_curiam:
         return "PER CURIAM"
 
     # The most common style matches here NAME_IN_ALL_CAPS.
-    match0 = re.findall("[A-Z\-'']{3,},?\b", cleaned_text)
-    if match0:
+    match_caps = re.findall("[A-Z\-'']{3,},?\b", cleaned_text)
+    if match_caps:
         match0 = [
-            word for word in match0 if word.lower() not in NOT_JUDGE_WORDS
+            word for word in match_caps if word.lower() not in NOT_JUDGE_WORDS
         ]
         return " ".join(match0)
 
     # Next up is full names followed by a comma
-    match1 = re.search(
+    match_titles = re.search(
         "(((Van|De|Da)\s)?[A-Z][\w\-'']{3,}(\s(IV|I|II|III|V|Jr\.|Sr\.))?),",
         cleaned_text,
     )
-    if match1:
-        return match1.group(1)
+    if match_titles:
+        return match_titles.group(1)
 
     # Next the style of Justice First Last
-    match2 = re.search(
+    match_honorifics = re.search(
         r"(Justice|Judge|Commissioner|Honorable)\s([A-Z\-'']\w+(\s[A-Z\-'']\w+)?)",
         cleaned_text,
     )
-    if match2:
-        return match2.group(2)
+    if match_honorifics:
+        return match_honorifics.group(2)
 
     # Match Lastname, C. J.
-    match3 = re.search(r"([A-Z\-'']\w+)\s(C|J|P)\.", cleaned_text)
-    if match3:
-        return match3.group(1)
+    match_last_first = re.search(r"([A-Z\-'']\w+)\s(C|J|P)\.", cleaned_text)
+    if match_last_first:
+        return match_last_first.group(1)
 
     # Finally - default to the old style to handle stragglers
-    match4 = extract_judge_last_name(
+    default = extract_judge_last_name(
         cleaned_text, keep_letter_case=True, require_capital=True
     )
-    if match4:
+    if default:
         return " ".join(
-            [name for name in match4 if name.lower() not in NOT_JUDGE_WORDS]
+            [name for name in default if name.lower() not in NOT_JUDGE_WORDS]
         )
     return ""
 
@@ -353,6 +353,7 @@ def extract_judge_last_name(
     text: str = "", keep_letter_case=False, require_capital=False
 ) -> List[str]:
     """Find judge last names in a string of text.
+
     :param text: The text you wish to extract names from.
     :param keep_letter_case: True if you want to keep letter case from text
     :param require_capital: True if you want to keep words that start with a capital letter
