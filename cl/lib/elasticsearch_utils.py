@@ -5,6 +5,7 @@ from datetime import date
 from functools import reduce
 from typing import Dict, List
 
+from django.conf import settings
 from django.core.paginator import Page
 from django_elasticsearch_dsl.search import Search
 from elasticsearch_dsl import A, Q
@@ -281,16 +282,16 @@ def build_es_main_query(
     if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
         search_query = search_query.sort(build_sort_results(cd))
 
-    # Set results max size to 2000 elements:
-    search_query = search_query.extra(size=2000)
+    # Set results max size to MAX_SEARCH_PAGINATION_DEPTH*SEARCH_PAGE_SIZE elements:
+    search_query = search_query.extra(
+        size=settings.MAX_SEARCH_PAGINATION_DEPTH * settings.SEARCH_PAGE_SIZE
+    )
     return search_query, total_query_results, top_hits_limit
 
 
 def add_es_highlighting(search_query: Search, cd: CleanData):
     if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
-        fields_to_exclude = ["sha1"]
         highlighting_fields = SEARCH_ORAL_ARGUMENT_HL_FIELDS
-        search_query = search_query.source(excludes=fields_to_exclude)
         for field in highlighting_fields:
             search_query = search_query.highlight(
                 field,

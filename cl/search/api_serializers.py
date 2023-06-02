@@ -310,7 +310,7 @@ class SearchESResultSerializer(serializers.Serializer):
         # Numbers
         "integer": serializers.IntegerField,
     }
-    skipped_fields = ["text", "sha1", "docket_slug"]
+    skipped_fields = ["text", "docket_slug"]
 
     def get_fields(self):
         """Return a list of fields so that they don't have to be declared one
@@ -321,10 +321,8 @@ class SearchESResultSerializer(serializers.Serializer):
             "panel_ids": serializers.ListField(read_only=True),
         }
 
-        properties = self._context["schema"]["oral_arguments"]["mappings"][
-            "properties"
-        ]
-        # Map each field in the Solr schema to a DRF field
+        properties = self._context["schema"]["properties"]
+        # Map each field in the ES schema to a DRF field
         for field_name, value in properties.items():
             if field_name in fields:
                 # Exclude fields that are already set in fields.

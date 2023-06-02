@@ -61,8 +61,8 @@ logger = logging.getLogger(__name__)
 
 def check_pagination_depth(page_number):
     """Check if the pagination is too deep (indicating a crawler)"""
-    max_search_pagination_depth = 100
-    if page_number > max_search_pagination_depth:
+
+    if page_number > settings.MAX_SEARCH_PAGINATION_DEPTH:
         logger.warning(
             "Query depth of %s denied access (probably a crawler)",
             page_number,
@@ -586,7 +586,11 @@ def es_search(request: HttpRequest) -> HttpResponse:
 
 
 def do_es_search(
-    get_params, rows=20, override_params=None, facet=True, cache_key=None
+    get_params,
+    rows=settings.SEARCH_PAGE_SIZE,
+    override_params=None,
+    facet=True,
+    cache_key=None,
 ):
     """Run Elasticsearch searching and filtering and prepare data to display
 
