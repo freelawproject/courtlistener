@@ -140,8 +140,6 @@ def fetch_non_harvard_data(harvard_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     soup = BeautifulSoup(harvard_data["casebody"]["data"], "lxml")
 
-    # Some documents contain images in the HTML
-    # Flag them for a later crawl by using the placeholder '[[Image]]'
     judge_list = [
         find_all_judges(unidecode(tag.text))
         for tag in soup.find_all(
@@ -149,6 +147,11 @@ def fetch_non_harvard_data(harvard_data: Dict[str, Any]) -> Dict[str, Any]:
             or tag.get("data-type") == "judges"
         )
     ]
+
+    # Convert list of lists to list and titlecase names
+    judge_list = list(itertools.chain.from_iterable(judge_list))
+    judge_list = list(map(titlecase, judge_list))
+
     author_list = [
         find_just_name(unidecode(tag.text))
         for tag in soup.find_all(
@@ -156,14 +159,13 @@ def fetch_non_harvard_data(harvard_data: Dict[str, Any]) -> Dict[str, Any]:
             or tag.get("data-type") == "author"
         )
     ]
-    # Flatten and dedupe list of judges
-    judges = ", ".join(
-        sorted(
-            list(set(itertools.chain.from_iterable(judge_list + author_list)))
-        )
-    )
 
-    judges = titlecase(judges)
+    # titlecase names
+    author_list = list(map(titlecase, author_list))
+
+    # Flatten and dedupe list of judges
+    judges = ", ".join(sorted(list(set(judge_list + author_list))))
+
     all_data = {"judges": judges}
     short_fields = ["attorneys", "disposition", "otherdate", "seealso"]
     long_fields = [
@@ -864,7 +866,7 @@ class Command(VerboseCommand):
                 OpinionCluster.objects.exclude(filepath_json_harvard="")
                 .exclude(source__contains="U")
                 .values_list("id", "filepath_json_harvard")
-            )[: options["quantity"]]
+            )[: options["limit"]]
             if options["start_after"]:
                 index = [x[0] for x in cluster_ids].index(
                     options["start_after"]
