@@ -176,7 +176,9 @@ def clone_opinion_cluster(
         added_panel_ids = []
 
         if panel_data_ids:
-            added_panel_ids.extend(clone_person(session, panel_data_ids))
+            added_panel_ids.extend(
+                [p.pk for p in clone_person(session, panel_data_ids)]
+            )
 
         # Clone non participating judges data
         non_participating_judges_data_ids = [
@@ -187,7 +189,12 @@ def clone_opinion_cluster(
 
         if non_participating_judges_data_ids:
             added_non_participating_judges_data_ids.extend(
-                clone_person(session, non_participating_judges_data_ids)
+                [
+                    p.pk
+                    for p in clone_person(
+                        session, non_participating_judges_data_ids
+                    )
+                ]
             )
 
         # Clone opinions
