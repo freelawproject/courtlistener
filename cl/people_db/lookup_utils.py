@@ -387,7 +387,6 @@ def extract_judge_last_name(
         )
     else:
         line = "".join([c if c.isalpha() or c == "-" else " " for c in line])
-    # print("\t\t", line)
 
     names = []
     for word in line.split():
