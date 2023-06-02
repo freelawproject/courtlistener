@@ -604,47 +604,45 @@ def merge_opinion_clusters(
     :return: None
     """
     harvard_data = read_json(cluster_id)
-    if harvard_data:
-        if only_fastcase:
-            source = get_data_source(harvard_data)
-            if source == "Fastcase":
-                logger.info("Skipping non-fastcase opinion cluster")
-                return
-        try:
-            with transaction.atomic():
-                map_and_merge_opinions(cluster_id, harvard_data)
-                changed_values_dictionary = combine_non_overlapping_data(
-                    cluster_id, harvard_data
-                )
-                merge_docket_numbers(cluster_id, harvard_data["docket_number"])
-                merge_case_names(cluster_id, harvard_data)
-                merge_date_filed(cluster_id, harvard_data)
-                merge_overlapping_data(cluster_id, changed_values_dictionary)
-                save_headmatter(cluster_id, harvard_data)
-                update_docket_source(cluster_id=cluster_id)
-                update_cluster_source(cluster_id=cluster_id)
-                logger.info(msg=f"Finished merging cluster: {cluster_id}")
-
-        except AuthorException:
-            logger.warning(
-                msg=f"Author exception for cluster id: {cluster_id}"
-            )
-        except JudgeException:
-            logger.warning(msg=f"Judge exception for cluster id: {cluster_id}")
-        except OpinionMatchingException:
-            logger.warning(
-                msg=f"Opinions don't match for on cluster id: {cluster_id}"
-            )
-        except DocketSourceException:
-            logger.warning(
-                msg=f"Docket source exception related to cluster id: {cluster_id}"
-            )
-        except ClusterSourceException:
-            logger.warning(
-                msg=f"Cluster source exception for cluster id: {cluster_id}"
-            )
-    else:
+    if not harvard_data:
         logger.warning(msg=f"No Harvard json for cluster: {cluster_id}")
+        return
+
+    if only_fastcase and "Fastcase" != get_data_source(harvard_data):
+        logger.info("Skipping non-fastcase opinion cluster")
+        return
+
+    try:
+        with transaction.atomic():
+            map_and_merge_opinions(cluster_id, harvard_data)
+            changed_values_dictionary = combine_non_overlapping_data(
+                cluster_id, harvard_data
+            )
+            merge_docket_numbers(cluster_id, harvard_data["docket_number"])
+            merge_case_names(cluster_id, harvard_data)
+            merge_date_filed(cluster_id, harvard_data)
+            merge_overlapping_data(cluster_id, changed_values_dictionary)
+            save_headmatter(cluster_id, harvard_data)
+            update_docket_source(cluster_id=cluster_id)
+            update_cluster_source(cluster_id=cluster_id)
+            logger.info(msg=f"Finished merging cluster: {cluster_id}")
+
+    except AuthorException:
+        logger.warning(msg=f"Author exception for cluster id: {cluster_id}")
+    except JudgeException:
+        logger.warning(msg=f"Judge exception for cluster id: {cluster_id}")
+    except OpinionMatchingException:
+        logger.warning(
+            msg=f"Opinions don't match for on cluster id: {cluster_id}"
+        )
+    except DocketSourceException:
+        logger.warning(
+            msg=f"Docket source exception related to cluster id: {cluster_id}"
+        )
+    except ClusterSourceException:
+        logger.warning(
+            msg=f"Cluster source exception for cluster id: {cluster_id}"
+        )
 
 
 def fetch_cl_opinion_content(sub_opinions: list[Opinion]) -> list[str]:
@@ -834,7 +832,7 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--cluster-id",
             type=str,
-            help="The cluster id to merge",
+            help="An individual cluster ID to merge",
             required=False,
         )
         parser.add_argument(
@@ -845,7 +843,7 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--fastcase",
             action="store_true",
-            help="Fastcase flag",
+            help="A flag to choose to merge only fastcase opinions",
         )
         parser.add_argument(
             "--offset",
