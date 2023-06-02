@@ -921,16 +921,8 @@ a.gray:hover, a.gray:focus, a.grey:hover, a.grey:focus {
   margin-left: 2em;
 }
 
-.harvard > opinion > div.footnotes > .footnote > p {
-  margin-left: 2em;
-}
 
 #headmatter > div.footnotes {
-  border-top: 1px dotted black;
-  padding-top: 1em;
-}
-
-.harvard > opinion > div.footnotes {
   border-top: 1px dotted black;
   padding-top: 1em;
 }
@@ -939,21 +931,6 @@ a.gray:hover, a.gray:focus, a.grey:hover, a.grey:focus {
   color: #000099;
   position: absolute;
   font-size: 1em;
-}
-
-.harvard > opinion > .footnotes > .footnote > a {
-  color: #000099;
-  position: absolute;
-  font-size: 1em;
-}
-
-.harvard > opinion > p > a.footnote {
-  border-bottom: 0;
-  margin-bottom: 5px;
-  color: #000099;
-  vertical-align: super;
-  font-size: .85em;
-  font-weight: bold;
 }
 
 #headmatter {
@@ -980,6 +957,30 @@ a.gray:hover, a.gray:focus, a.grey:hover, a.grey:focus {
 
 #headmatter > * > span.star-pagination::after {
    left: -1.5em;
+}
+
+.harvard > opinion > div.footnotes > .footnote > p {
+  margin-left: 2em;
+}
+
+.harvard > opinion > div.footnotes {
+  border-top: 1px dotted black;
+  padding-top: 1em;
+}
+
+.harvard > opinion > .footnotes > .footnote > a {
+  color: #000099;
+  position: absolute;
+  font-size: 1em;
+}
+
+.harvard > opinion > p > a.footnote {
+  border-bottom: 0;
+  margin-bottom: 5px;
+  color: #000099;
+  vertical-align: super;
+  font-size: .85em;
+  font-weight: bold;
 }
 
 .harvard > opinion > author {
