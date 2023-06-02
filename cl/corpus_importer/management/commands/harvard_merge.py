@@ -849,7 +849,7 @@ class Command(VerboseCommand):
             "--start-after", type=int, required=False, help="1261102"
         )
         parser.add_argument(
-            "--quantity",
+            "--limit",
             type=int,
             default=10000,
             help="How many mergers to run at one time",
