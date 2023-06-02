@@ -848,7 +848,10 @@ class Command(VerboseCommand):
             help="Fastcase flag",
         )
         parser.add_argument(
-            "--start-after", type=int, required=False, help="1261102"
+            "--offset",
+            type=int,
+            required=False,
+            help="Offset the starting query by some ID",
         )
         parser.add_argument(
             "--limit",
@@ -862,27 +865,35 @@ class Command(VerboseCommand):
             logging.disable(logging.DEBUG)
 
         if options["cluster_id"] is None:
-            cluster_ids = (
-                OpinionCluster.objects.exclude(filepath_json_harvard="")
-                .exclude(source__contains="U")
-                .values_list("id", "filepath_json_harvard")
-            )[: options["limit"]]
-            if options["start_after"]:
-                index = [x[0] for x in cluster_ids].index(
-                    options["start_after"]
+            if options["offset"]:
+                cluster_ids = (
+                    OpinionCluster.objects.exclude(filepath_json_harvard="")
+                    .filter(id__gt=options["offset"])
+                    .order_by("id")
+                    .exclude(source__contains=SOURCES.HARVARD_CASELAW)
+                    .values_list("id", "filepath_json_harvard")
                 )
-                if index:
-                    cluster_ids = cluster_ids[index + 1 :]
+            else:
+                cluster_ids = (
+                    OpinionCluster.objects.exclude(filepath_json_harvard="")
+                    .order_by("id")
+                    .exclude(source__contains=SOURCES.HARVARD_CASELAW)
+                    .values_list("id", "filepath_json_harvard")
+                )
+            if options["limit"]:
+                cluster_ids = cluster_ids[: options["limit"]]
 
             logger.info(msg=f"{len(cluster_ids)} left to merge")
         else:
-            cluster_ids = OpinionCluster.objects.filter(
-                id=options["cluster_id"]
-            ).values_list("id", "filepath_json_harvard", flat=False)
+            cluster_ids = (
+                OpinionCluster.objects.filter(id=options["cluster_id"])
+                .order_by("id")
+                .values_list("id", "filepath_json_harvard", flat=False)
+            )
 
             if cluster_ids:
                 if (
-                    "U"
+                    SOURCES.HARVARD_CASELAW
                     in OpinionCluster.objects.get(id=cluster_ids[0][0]).source
                 ):
                     logger.info(
