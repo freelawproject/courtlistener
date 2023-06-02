@@ -111,14 +111,13 @@ CMD python /opt/courtlistener/manage.py migrate && \
 #freelawproject/courtlistener:latest-web-prod
 FROM python-base as web-prod
 
-CMD gunicorn cl_wsgi:application \
-    --chdir /opt/courtlistener/docker/django/wsgi-configs/ \
+CMD gunicorn cl.asgi:application \
+    --chdir /opt/courtlistener/ \
     --user www-data \
     --group www-data \
     # Set high number of workers. Docs recommend 2-4× core count`
     --workers ${NUM_WORKERS:-48} \
-    --worker-class gthread \
-    --threads 2 \
+    --worker-class uvicorn.workers.UvicornWorker \
     # Allow longer queries to solr.
     --limit-request-line 6000 \
     # Reset each worker once in a while
