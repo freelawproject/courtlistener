@@ -397,13 +397,13 @@
 
             <br>
             {# Add headmatter, if a Harvard opinion #}
-                {% if cluster.source in "U" %}
-                  {% if cluster.headmatter %}
-                    <div id="headmatter" class="serif-text">
-                      {{ cluster.headmatter|safe }}
-                    </div>
-                  {% endif %}
-                {% endif %}
+            {% if cluster.source in "U" %}
+              {% if cluster.headmatter %}
+                <div id="headmatter" class="serif-text">
+                  {{ cluster.headmatter|safe }}
+                </div>
+              {% endif %}
+            {% endif %}
 
             {# Only display tabs and make panels if more than one sub-opinion. #}
             {% if opinion_count > 1 %}
