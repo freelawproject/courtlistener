@@ -80,7 +80,6 @@ class SOURCES:
     DIRECT_COURT_INPUT = "D"
     ANON_2020 = "Q"
     ANON_2020_M_HARVARD = "QU"
-    COURT_M_HARVARD = "CU"
     COURT_M_RESOURCE_M_HARVARD = "CRU"
     DIRECT_COURT_INPUT_M_HARVARD = "DU"
     LAWBOX_M_HARVARD = "LU"
@@ -2386,6 +2385,18 @@ class OpinionCluster(AbstractDateTimeModel):
         max_length=1000,
         blank=True,
         db_index=True,
+    )
+    arguments = models.TextField(
+        help_text="The attorney(s) and legal arguments presented as HTML text. "
+        "This is primarily seen in older opinions and can contain "
+        "case law cited and arguments presented to the judges.",
+        blank=True,
+    )
+    headmatter = models.TextField(
+        help_text="Headmatter is the content before an opinion in the Harvard "
+        "CaseLaw import. This consists of summaries, headnotes, "
+        "attorneys etc for the opinion.",
+        blank=True,
     )
 
     objects = ClusterCitationQuerySet.as_manager()
