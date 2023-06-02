@@ -901,8 +901,8 @@ class Command(VerboseCommand):
                     )
                     return
 
-        for cluster_id in cluster_ids:
-            logger.info(msg=f"Merging {cluster_id[0]} at {cluster_id[1]}")
+        for cluster_id, filepath in cluster_ids:
+            logger.info(msg=f"Merging {cluster_id} at {filepath}")
             merge_opinion_clusters(
-                cluster_id=cluster_id[0], only_fastcase=options["fastcase"]
+                cluster_id=cluster_id, only_fastcase=options["fastcase"]
             )
