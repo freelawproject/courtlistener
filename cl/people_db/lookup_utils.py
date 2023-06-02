@@ -119,6 +119,7 @@ NOT_JUDGE_WORDS = [
     "indicated",
     "initial",
     "industrial",
+    "introduction",
     "issuance",
     "issuing",
     "italic",
@@ -309,17 +310,9 @@ def find_just_name(text: str) -> str:
     if match_per_curiam:
         return "PER CURIAM"
 
-    # The most common style matches here NAME_IN_ALL_CAPS.
-    match_caps = re.findall("[A-Z\-'']{3,},?\b", cleaned_text)
-    if match_caps:
-        match0 = [
-            word for word in match_caps if word.lower() not in NOT_JUDGE_WORDS
-        ]
-        return " ".join(match0)
-
     # Next up is full names followed by a comma
     match_titles = re.search(
-        "(((Van|De|Da)\s)?[A-Z][\w\-'']{3,}(\s(IV|I|II|III|V|Jr\.|Sr\.))?),",
+        "(((Van|VAN|De|DE|Da|DA)\s)?[A-Z][\w\-'']{3,}(\s(IV|I|II|III|V|Jr\.|JR\.|Sr\.|SR\.))?),",
         cleaned_text,
     )
     if match_titles:

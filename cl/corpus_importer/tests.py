@@ -13,7 +13,8 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.utils.timezone import make_aware
 from factory import RelatedFactory
-from juriscraper.lib.string_utils import harmonize
+from juriscraper.lib.string_utils import harmonize, titlecase
+from unidecode import unidecode
 
 from cl.corpus_importer.court_regexes import match_court_string
 from cl.corpus_importer.factories import (
@@ -65,7 +66,7 @@ from cl.lib.pacer import process_docket_data
 from cl.lib.redis_utils import make_redis_interface
 from cl.lib.timezone_helpers import localize_date_and_time
 from cl.people_db.factories import PersonWithChildrenFactory, PositionFactory
-from cl.people_db.lookup_utils import extract_judge_last_name
+from cl.people_db.lookup_utils import extract_judge_last_name, find_just_name
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
 from cl.recap.models import UPLOAD_TYPE
 from cl.recap_rss.models import RssItemCache
@@ -2896,3 +2897,77 @@ class HarvardMergerTests(TestCase):
             "A. G. Allen and O. N. Gibson, for appellants., H. G. Brome and "
             "C. H. Harkins, for respondents.",
         )
+
+    def test_judge_name_extraction(self):
+        """Can we extract out judges properly"""
+
+        test_pairs = [
+            (
+                # Test if we are tripped up by mulitple judge names in tag
+                "ARNOLD, Circuit Judge, with whom BRIGHT, Senior Circuit Judge, and McMILLIAN and MAGILL, Circuit Judges, join,:",
+                "Arnold",
+            ),
+            (
+                # Test if we have issues with accents
+                "POCHÉ, Acting P. J.",
+                "Poche",
+            ),
+            (
+                # Test Scottish name and different pattern
+                "CHIEF JUSTICE McGRATH",
+                "McGRATH",
+            ),
+            (
+                # Test a common word issue, with Common Style
+                "PAGE, J.",
+                "Page",
+            ),
+            (
+                # Test if CAPITALIZED words in long string causes issue
+                "J. Michael Seabright, Chief United States District Judge         I.           INTRODUCTION",
+                "Seabright",
+            ),
+            (
+                # Test Surnames with numerals
+                "WILLIAM H. PAULEY III, United States District Judge:",
+                "Pauley III",
+            ),
+            (
+                # Test apostrophes
+                "Joseph E. O\u2019Neill, Presiding Judge.",
+                "O'Neill",
+            ),
+            (
+                # Test Hyphenated names
+                "BAMATTRE-MANOUKIAN, Acting P. J.\u2014 2",
+                "Bamattre-Manoukian",
+            ),
+            (
+                # Test common who word name
+                "De Vane, District Judge",
+                "De Vane",
+            ),
+            (
+                # Test another common two word name, titled
+                "Van Goth, District Judge",
+                "Van Goth",
+            ),
+            (
+                # Test common two word, capitalized
+                "VAN GOGH, District Judge",
+                "Van Gogh",
+            ),
+            (
+                # Test Simple name
+                "Judge Smith",
+                "Smith",
+            ),
+            (
+                # Test honorific
+                "Hon. Gonzalo P. Curiel, United States District Judge",
+                "Curiel",
+            ),
+        ]
+        for pair in test_pairs:
+            author_str = titlecase(find_just_name(unidecode(pair[0])))
+            self.assertEqual(pair[1], author_str, msg=f"Failed: {pair[1]}")
