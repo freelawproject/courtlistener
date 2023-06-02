@@ -3649,8 +3649,19 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         # Frontend
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": f'docketNumber:"19 5734" OR docketNumber:19:5734',
+            "q": f'docketNumber:"19 5734"',
         }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("Jose", r.content.decode())
+
+        # Avoid error parsing the docket number: 19-5734 -> 19:5734.
+        search_params["q"] = "docketNumber:19:5734"
         r = self.client.get(
             reverse("show_results"),
             search_params,
