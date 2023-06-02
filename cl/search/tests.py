@@ -3127,7 +3127,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         )
 
     def test_oa_docket_number_filtering(self) -> None:
-        """Filter by case_name"""
+        """Filter by docket number"""
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
             "docket_number": f"{self.audio_1.docket.docket_number}",

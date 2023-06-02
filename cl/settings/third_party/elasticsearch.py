@@ -17,7 +17,6 @@ ELASTICSEARCH_DSL = {
                     "synonym_filter",
                     "custom_word_delimiter_filter",
                     "remove_leading_zeros",
-                    "keyword_marker",
                     "english_stemmer",
                     "remove_duplicates",
                 ],
@@ -32,10 +31,6 @@ ELASTICSEARCH_DSL = {
             "synonym_filter": {
                 "type": "synonym",
                 "synonyms_path": "synonyms_en.txt",
-            },
-            "keyword_marker": {
-                "type": "keyword_marker",
-                "keywords_path": "protwords_en.txt",
             },
             "english_stemmer": {"type": "stemmer", "language": "english"},
             "remove_duplicates": {"type": "unique"},
