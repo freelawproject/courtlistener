@@ -11,6 +11,16 @@ from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.recap_utils import get_bucket_name
 from cl.lib.string_utils import normalize_dashes, trunc
 
+dist_d_num_regex = r"(?:\d:)?(\d\d)-..-(\d+)"
+appellate_bankr_d_num_regex = r"(\d\d)-(\d+)"
+
+
+def is_docket_number(value: str) -> bool:
+    pattern = rf"{dist_d_num_regex}|{appellate_bankr_d_num_regex}"
+    if re.match(pattern, value):
+        return True
+    return False
+
 
 def clean_docket_number(docket_number: str | None) -> str:
     """Clean a docket number and returns the actual docket_number if is a
@@ -77,11 +87,11 @@ def make_docket_number_core(docket_number: Optional[str]) -> str:
 
     cleaned_docket_number = clean_docket_number(docket_number)
 
-    district_m = re.search(r"(?:\d:)?(\d\d)-..-(\d+)", cleaned_docket_number)
+    district_m = re.search(dist_d_num_regex, cleaned_docket_number)
     if district_m:
         return f"{district_m.group(1)}{int(district_m.group(2)):05d}"
 
-    bankr_m = re.search(r"(\d\d)-(\d+)", cleaned_docket_number)
+    bankr_m = re.search(appellate_bankr_d_num_regex, cleaned_docket_number)
     if bankr_m:
         # Pad to six characters because some courts have a LOT of bankruptcies
         return f"{bankr_m.group(1)}{int(bankr_m.group(2)):06d}"

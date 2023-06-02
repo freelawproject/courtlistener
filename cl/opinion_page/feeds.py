@@ -7,7 +7,7 @@ from django.http import Http404, HttpRequest
 from django.utils.feedgenerator import Atom1Feed
 from django.utils.safestring import SafeText, mark_safe
 
-from cl.lib.date_time import midnight_pst
+from cl.lib.date_time import midnight_pt
 from cl.opinion_page.views import make_docket_title
 from cl.search.models import Docket, DocketEntry, RECAPDocument
 
@@ -102,7 +102,7 @@ class DocketFeed(Feed):
         return f"{item.docket.get_absolute_url()}?order_by=desc#{anchor}"
 
     def item_pubdate(self, item: DocketEntry) -> datetime:
-        return midnight_pst(item.date_filed)
+        return midnight_pt(item.date_filed)
 
     def item_enclosure_url(self, item: DocketEntry) -> Optional[str]:
         if not item.entry_number:
