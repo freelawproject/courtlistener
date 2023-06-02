@@ -267,13 +267,13 @@ def find_all_judges(judge_text: str) -> [str]:
     """
     cleaned_text = judge_text.replace("\n", " ")[:100].strip()
     cleaned_text = cleaned_text.replace("By the Court", "")
-    cleaned_text = cleaned_text.replace(" and", ", and")
+    cleaned_text = cleaned_text.replace(" and", ", and").replace(",,", ",")
     query1 = re.findall(
-        "(((Van|De|Da)\s)?[A-Z][\w\-'']{3,}(\s(IV|I|II|III|V|Jr\.|Sr\.))?),?",
+        r"(((Van|VAN|De|DE|Da|DA)\s)?[A-Z][\w\-']{2,}\b(\s(IV|I|II|III|V|Jr\.|Sr\.))?)\b,?[\s|\b]",
         cleaned_text,
     )
     query2 = re.findall(
-        ",\sand\s(((Van|De|Da)\s)?[A-Z][\w\-'']{3,}(\s(IV|I|II|III|V|Jr\.|Sr\.))?)",
+        r",\sand\s(((Van|VAN|De|DE|Da|DA)\s)?\b[A-Z][\w\-'']{2,}\b(\s(IV|I|II|III|V|Jr\.|Sr\.)[\s|\b])?)",
         cleaned_text,
     )
     query = query1 + query2
@@ -281,7 +281,7 @@ def find_all_judges(judge_text: str) -> [str]:
         matches = [
             name[0] for name in query if name[0].lower() not in NOT_JUDGE_WORDS
         ]
-        return matches
+        return sorted(list(set(matches)))
     return []
 
 
@@ -312,7 +312,7 @@ def find_just_name(text: str) -> str:
 
     # Next up is full names followed by a comma
     match_titles = re.search(
-        "(((Van|VAN|De|DE|Da|DA)\s)?[A-Z][\w\-'']{3,}(\s(IV|I|II|III|V|Jr\.|JR\.|Sr\.|SR\.))?),",
+        "(((Van|VAN|De|DE|Da|DA)\s)?[A-Z][\w\-'']{2,}(\s(IV|I|II|III|V|Jr\.|JR\.|Sr\.|SR\.))?),",
         cleaned_text,
     )
     if match_titles:

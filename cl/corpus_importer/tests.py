@@ -66,7 +66,11 @@ from cl.lib.pacer import process_docket_data
 from cl.lib.redis_utils import make_redis_interface
 from cl.lib.timezone_helpers import localize_date_and_time
 from cl.people_db.factories import PersonWithChildrenFactory, PositionFactory
-from cl.people_db.lookup_utils import extract_judge_last_name, find_just_name
+from cl.people_db.lookup_utils import (
+    extract_judge_last_name,
+    find_all_judges,
+    find_just_name,
+)
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
 from cl.recap.models import UPLOAD_TYPE
 from cl.recap_rss.models import RssItemCache
@@ -2971,3 +2975,43 @@ class HarvardMergerTests(TestCase):
         for pair in test_pairs:
             author_str = titlecase(find_just_name(unidecode(pair[0])))
             self.assertEqual(pair[1], author_str, msg=f"Failed: {pair[1]}")
+
+    def test_panel_extraction(self):
+        """Can we extract out judges properly"""
+
+        test_pairs = [
+            (
+                # Test if we are tripped up by mulitple judge names in tag
+                "ARNOLD, Circuit Judge, with whom BRIGHT, Senior Circuit Judge, and McMILLIAN and MAGILL, Circuit Judges, join,:",
+                ["ARNOLD", "BRIGHT", "MAGILL", "McMILLIAN"],
+            ),
+            (
+                # Normal and
+                "Judge MARQUEZ and Judge VOGT concur",
+                ["MARQUEZ", "VOGT"],
+            ),
+            (
+                # Test Suffixes
+                "Judge MARQUEZ IV and Judge VOGT concur",
+                ["MARQUEZ IV", "VOGT"],
+            ),
+            (
+                "DENNIS joined by GRAVES, Circuit JUDGE",
+                ["DENNIS", "GRAVES"],
+            ),
+            (
+                "DENNIS joined by GRAVES, Circuit JUDGE",
+                ["DENNIS", "GRAVES"],
+            ),
+            (
+                "Present: Qua, C.J., Lummus, Dolan, Spalding, & Williams, JJ.",
+                ["Dolan", "Lummus", "Qua", "Spalding", "Williams"],
+            ),
+            (
+                "Argued before VAN BRUNT, P. J., and BARRETT, RUMSEY, PATTERSON, and O’BRIEN, JJ.",
+                ["BARRETT", "O'BRIEN", "PATTERSON", "RUMSEY", "VAN BRUNT"],
+            ),
+        ]
+        for pair in test_pairs:
+            judge_list = find_all_judges(unidecode(pair[0]))
+            self.assertEqual(pair[1], judge_list, msg=f"Failed: {pair[1]}")
