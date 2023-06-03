@@ -78,6 +78,18 @@ class OpinionTypeException(Exception):
         self.message = message
 
 
+def find_data_fields(soup: BeautifulSoup, field_name: str) -> list:
+    """Find field by tag name or data-type attribute
+    :param soup: parsed document
+    :param field_name: field to find
+    :return: all fields found
+    """
+    return soup.find_all(
+        lambda tag: (tag.name == field_name and tag.get("data-type") is None)
+        or tag.get("data-type") == field_name
+    )
+
+
 def read_json(cluster_id: int) -> Dict[str, Any] | None:
     """Helper method to read json into object
 
@@ -140,11 +152,7 @@ def fetch_non_harvard_data(harvard_data: Dict[str, Any]) -> Dict[str, Any]:
     soup = BeautifulSoup(harvard_data["casebody"]["data"], "lxml")
 
     judge_list = [
-        find_all_judges(tag.text)
-        for tag in soup.find_all(
-            lambda tag: (tag.name == "judges" and tag.get("data-type") is None)
-            or tag.get("data-type") == "judges"
-        )
+        find_all_judges(tag.text) for tag in find_data_fields(soup, "judges")
     ]
 
     # Convert list of lists to list and titlecase names
@@ -152,11 +160,7 @@ def fetch_non_harvard_data(harvard_data: Dict[str, Any]) -> Dict[str, Any]:
     judge_list = list(map(titlecase, judge_list))
 
     author_list = [
-        find_just_name(tag.text)
-        for tag in soup.find_all(
-            lambda tag: (tag.name == "author" and tag.get("data-type") is None)
-            or tag.get("data-type") == "author"
-        )
+        find_just_name(tag.text) for tag in find_data_fields(soup, "author")
     ]
 
     # titlecase names
@@ -195,10 +199,7 @@ def fetch_non_harvard_data(harvard_data: Dict[str, Any]) -> Dict[str, Any]:
             all_data["arguments"] = arguments
     else:
         # Only save attorneys
-        find_attorneys_fields = soup.find_all(
-            lambda tag: tag.get("data-type") == "attorneys"
-            or (tag.name == "attorneys" and tag.get("data-type") is None)
-        )
+        find_attorneys_fields = find_data_fields(soup, "attorneys")
         if find_attorneys_fields:
             attorneys = " ".join(str(x) for x in find_attorneys_fields)
             all_data["attorneys"] = attorneys
@@ -783,10 +784,7 @@ def map_and_merge_opinions(cluster: int, harvard_data: Dict[str, Any]) -> None:
     map_types = HarvardConversionUtil.types_mapping
     cl_opinions = Opinion.objects.filter(cluster__id=cluster)
     soup = BeautifulSoup(harvard_data["casebody"]["data"], "lxml")
-    harvard_opinions = soup.find_all(
-        lambda tag: (tag.name == "opinion" and tag.get("data-type") is None)
-        or tag.get("data-type") == "opinion"
-    )
+    harvard_opinions = find_data_fields(soup, "opinion")
 
     if len(harvard_opinions) == len(cl_opinions):
         matches = match_lists(
@@ -818,6 +816,11 @@ def map_and_merge_opinions(cluster: int, harvard_data: Dict[str, Any]) -> None:
                     if author
                     else "",
                 )
+
+    else:
+        raise OpinionMatchingException(
+            message=f"OpinionMatchingException >>>> Cluster id: {cluster} "
+        )
 
 
 class Command(VerboseCommand):
