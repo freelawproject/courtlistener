@@ -689,6 +689,9 @@ def fetch_and_paginate_results(
     except ValueError:
         page = 1
 
+    # Check pagination depth
+    check_pagination_depth(page)
+
     # Fetch results from ES
     hits, query_time, error = fetch_es_results(
         get_params, search_query, page, rows_per_page
