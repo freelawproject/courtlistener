@@ -3728,6 +3728,35 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
         }
+        # Frontend
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 20
+        self.assertEqual(actual, expected)
+        self.assertIn("24", r.content.decode())
+        self.assertIn("1 of 2", r.content.decode())
+
+        # Test next page.
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "page": 2,
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 4
+        self.assertEqual(actual, expected)
+        self.assertIn("24", r.content.decode())
+        self.assertIn("2 of 2", r.content.decode())
+
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+        }
         # API
         r = self.client.get(
             reverse("search-list", kwargs={"version": "v3"}), search_params
