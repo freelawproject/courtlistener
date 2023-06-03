@@ -47,26 +47,39 @@ def get_start_of_quarter(d: Optional[date] = None) -> date:
     return max([q for q in quarter_dates if q <= d])
 
 
-def similarity_scores(list1: list[str], list2: list[str]) -> list[list[float]]:
-    """Get similiarity scores between two sets of lists
+def similarity_scores(
+    texts_to_compare_1: list[str], texts_to_compare_2: list[str]
+) -> list[list[float]]:
+    """Get similarity scores between two sets of lists
 
     Using TF-IDF/Term Frequency-Inverse Document Frequency
     we use word frequency to generate a similarity score between the corpora
 
-    :param list1: List of text to compare
-    :param list2: List of text to compare
+    :param texts_to_compare_1: List of text to compare
+    :param texts_to_compare_2: List of text to compare
     :return: Return similarity scores
     """
-    X = TfidfVectorizer().fit_transform(list1 + list2)
-    scores = cosine_similarity(X[: len(list1)], X[len(list1) :])
+
+    # Weights the word counts by a measure of how often they appear in the
+    # documents, and it returns a sparse matrix
+    X = TfidfVectorizer().fit_transform(
+        texts_to_compare_1 + texts_to_compare_2
+    )
+
+    # Calculate cosine similarity between weight of words for each text in list
+    scores = cosine_similarity(
+        X[: len(texts_to_compare_1)], X[len(texts_to_compare_1) :]
+    )
     return scores
 
 
-def match_lists(list1: list, list2: list[str]) -> dict[int, Any]:
+def match_lists(
+    harvard_opinions_list: list[str], cl_opinions_list: list[str]
+) -> dict[int, Any]:
     """Generate matching lists above threshold
 
-    :param list1: Harvard Opinions
-    :param list2: CL opinions
+    :param harvard_opinions_list: Harvard Opinions
+    :param cl_opinions_list: CL opinions
     :return: Matches if found or False
     """
     # We import this here to avoid a circular import
@@ -75,16 +88,23 @@ def match_lists(list1: list, list2: list[str]) -> dict[int, Any]:
     )
 
     # Convert harvard HTML to Text to compare
-    list1 = [h.getText() for h in list1]
-    scores = similarity_scores(list1, list2)
+    harvard_opinions_list = [h.getText() for h in harvard_opinions_list]
+    scores = similarity_scores(harvard_opinions_list, cl_opinions_list)
 
     matches = {}
     for i, row in enumerate(scores):
         j = row.argmax()  # type: ignore
         # Lower threshold for small opinions.
-        if get_cosine_similarity(list1[i], list2[j]) < 0.60:
+        if (
+            get_cosine_similarity(
+                harvard_opinions_list[i], cl_opinions_list[j]
+            )
+            < 0.60
+        ):
             continue
-        percent_match = compare_documents(list1[i], list2[j])
+        percent_match = compare_documents(
+            harvard_opinions_list[i], cl_opinions_list[j]
+        )
         if percent_match < 60:
             continue
         matches[i] = j
