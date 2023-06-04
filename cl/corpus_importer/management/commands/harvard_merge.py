@@ -231,15 +231,20 @@ def combine_non_overlapping_data(
     opinion_cluster = OpinionCluster.objects.get(id=cluster_id)
     all_data = fetch_non_harvard_data(harvard_data)
     changed_values_dictionary: dict[str, Tuple] = {}
+    to_update: dict[str] = {}
     for key, value in all_data.items():
         cl_value = getattr(opinion_cluster, key)
         if not cl_value:
             # Value is empty for key, we can add it directly to the object
-            OpinionCluster.objects.filter(id=cluster_id).update(**{key: value})
+            to_update[key] = value
         else:
             if value != cl_value:
                 # We have different values, update dict
                 changed_values_dictionary[key] = (value, cl_value)
+
+    if to_update:
+        # Update all fields at once
+        OpinionCluster.objects.filter(id=cluster_id).update(**to_update)
 
     return changed_values_dictionary
 
