@@ -261,20 +261,21 @@ def merge_long_fields(
     :param overlapping_data: data to compare from harvard and courtlistener
     :return: None
     """
-    if overlapping_data:
-        if overlapping_data[0] and overlapping_data[1]:
-            harvard_data, cl_data = overlapping_data[0], overlapping_data[1]
-            # Do some text comparison
-            similarity = get_cosine_similarity(harvard_data, cl_data)
-            if similarity < 0.9:
-                # they are not too similar, choose the larger one
-                if len(harvard_data) > len(cl_data):
-                    OpinionCluster.objects.filter(id=cluster_id).update(
-                        **{field_name: harvard_data}
-                    )
-            else:
-                pass
-                # should we log long data not really being similar?
+    if not overlapping_data:
+        return
+
+    harvard_data, cl_data = overlapping_data
+    # Do some text comparison
+    similarity = get_cosine_similarity(harvard_data, cl_data)
+    if similarity < 0.9:
+        # they are not too similar, choose the larger one
+        if len(harvard_data) > len(cl_data):
+            OpinionCluster.objects.filter(id=cluster_id).update(
+                **{field_name: harvard_data}
+            )
+    else:
+        pass
+        # should we log long data not really being similar?
 
 
 def merge_judges(
@@ -288,27 +289,28 @@ def merge_judges(
     :return: None
     """
 
-    if overlapping_data:
-        harvard_data, cl_data = overlapping_data
+    if not overlapping_data:
+        return
 
-        # We check if any word in the string is uppercase
-        cl_data_upper = (
-            True if [s for s in cl_data.split(",") if s.isupper()] else False
-        )
+    harvard_data, cl_data = overlapping_data
+    # We check if any word in the string is uppercase
+    cl_data_upper = (
+        True if [s for s in cl_data.split(",") if s.isupper()] else False
+    )
 
-        # Get last names keeping case and cleaning the string (We could have
-        # the judge names in capital letters)
-        cl_clean = set(find_all_judges(cl_data))
-        # Get last names in lowercase and cleaned
-        harvard_clean = set(find_all_judges(harvard_data))
-        judges = titlecase(", ".join(find_all_judges(harvard_data)))
+    # Get last names keeping case and cleaning the string (We could have
+    # the judge names in capital letters)
+    cl_clean = set(find_all_judges(cl_data))
+    # Get last names in lowercase and cleaned
+    harvard_clean = set(find_all_judges(harvard_data))
+    judges = titlecase(", ".join(find_all_judges(harvard_data)))
 
-        if (
-            harvard_clean.issuperset(cl_clean) or cl_data_upper
-        ) and harvard_clean != cl_clean:
-            OpinionCluster.objects.filter(id=cluster_id).update(judges=judges)
-        elif not harvard_clean.intersection(set(find_all_judges(cl_data))):
-            raise JudgeException("Judges are completely different.")
+    if (
+        harvard_clean.issuperset(cl_clean) or cl_data_upper
+    ) and harvard_clean != cl_clean:
+        OpinionCluster.objects.filter(id=cluster_id).update(judges=judges)
+    elif not harvard_clean.intersection(set(find_all_judges(cl_data))):
+        raise JudgeException("Judges are completely different.")
 
 
 def merge_cluster_dates(
@@ -324,29 +326,29 @@ def merge_cluster_dates(
     :param overlapping_data: data to compare
     :return: None
     """
-    if overlapping_data:
-        harvard_data, cl_date = overlapping_data
-        cluster = OpinionCluster.objects.filter(id=cluster_id).first()
-        if harvard_data:
-            harvard_date, harvard_date_is_approximate = validate_dt(
-                harvard_data
-            )
-            if cluster.docket.source == Docket.SCRAPER:
-                # Give preference to harvard data
-                if harvard_date != cl_date:
-                    OpinionCluster.objects.filter(id=cluster_id).update(
-                        **{field_name: harvard_date}
-                    )
-            elif (
-                cluster.date_filed_is_approximate
-                and not harvard_date_is_approximate
-            ):
-                # For some reason docket source is different, then check if
-                # one date is approximate and the other is not if harvard
-                # date is not approximate, it should be better
+    if not overlapping_data:
+        return
+
+    harvard_data, cl_date = overlapping_data
+    cluster = OpinionCluster.objects.filter(id=cluster_id).first()
+    if harvard_data:
+        harvard_date, harvard_date_is_approximate = validate_dt(harvard_data)
+        if cluster.docket.source == Docket.SCRAPER:
+            # Give preference to harvard data
+            if harvard_date != cl_date:
                 OpinionCluster.objects.filter(id=cluster_id).update(
                     **{field_name: harvard_date}
                 )
+        elif (
+            cluster.date_filed_is_approximate
+            and not harvard_date_is_approximate
+        ):
+            # For some reason docket source is different, then check if
+            # one date is approximate and the other is not if harvard
+            # date is not approximate, it should be better
+            OpinionCluster.objects.filter(id=cluster_id).update(
+                **{field_name: harvard_date}
+            )
 
 
 def merge_strings(
@@ -359,7 +361,9 @@ def merge_strings(
     :param overlapping_data: data to compare from harvard and courtlistener
     :return: None
     """
-    harvard_data, cl_data = overlapping_data[0], overlapping_data[1]
+    if not overlapping_data:
+        return
+    harvard_data, cl_data = overlapping_data
     if len(harvard_data) > len(cl_data):
         OpinionCluster.objects.filter(id=cluster_id).update(
             **{field_name: harvard_data}
