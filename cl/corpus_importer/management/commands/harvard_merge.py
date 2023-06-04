@@ -374,13 +374,12 @@ def merge_docket_numbers(cluster_id: int, harvard_docket_number: str) -> None:
     :return: None
     """
     cl_docket = OpinionCluster.objects.get(id=cluster_id).docket
+    h_clean_docket = clean_docket_number(harvard_docket_number)
 
     if cl_docket.docket_number:
         # Check if docket number exists
         # e.g. CL docket id #3952066 doesn't have
         cl_clean_docket = clean_docket_number(cl_docket.docket_number)
-        h_clean_docket = clean_docket_number(harvard_docket_number)
-
         if (
             cl_clean_docket in h_clean_docket
             and cl_docket.docket_number != h_clean_docket
@@ -395,6 +394,10 @@ def merge_docket_numbers(cluster_id: int, harvard_docket_number: str) -> None:
                 if len(h_clean_docket) > len(cl_clean_docket):
                     cl_docket.docket_number = h_clean_docket
                     cl_docket.save()
+    else:
+        # CL docket doesn't have a docket number, add the one from json file
+        cl_docket.docket_number = h_clean_docket
+        cl_docket.save()
 
 
 def merge_case_names(cluster_id: int, harvard_data: Dict[str, Any]) -> None:
