@@ -322,6 +322,87 @@ class RECAPDocumentObjectTest(TestCase):
             ocr_status=RECAPDocument.OCR_UNNECESSARY,
             docket_entry=DocketEntryWithParentsFactory(),
         )
+
+        # Courts
+        court_scotus = CourtFactory(id="scotus")
+        court_ca1 = CourtFactory(id="ca1")
+
+        # Citation 1
+        cls.citation1 = CitationWithParentsFactory.create(
+            volume="1",
+            reporter="U.S.",
+            page="1",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=court_scotus),
+                case_name="Foo v. Bar",
+                date_filed=date(
+                    2000, 1, 1
+                ),  # Year must equal text in citation4
+            ),
+        )
+
+        # Citation 2
+        cls.citation2 = CitationWithParentsFactory.create(
+            volume="2",
+            reporter="F.3d",
+            page="2",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=court_ca1),
+                case_name="Qwerty v. Uiop",
+                date_filed=date(2000, 1, 1),  # F.3d must be after 1993
+            ),
+        )
+        cls.citation2a = CitationWithParentsFactory.create(  # Extra citation for same OpinionCluster as above
+            volume="9",
+            reporter="F",
+            page="1",
+            cluster=OpinionCluster.objects.get(pk=cls.citation2.cluster_id),
+        )
+
+        # Citation 3
+        cls.citation3 = CitationWithParentsFactory.create(
+            volume="1",
+            reporter="U.S.",
+            page="50",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=court_scotus),
+                case_name="Lorem v. Ipsum",
+            ),
+        )
+
+        # Citation 4
+        cls.citation4 = CitationWithParentsFactory.create(
+            volume="1",
+            reporter="U.S.",
+            page="999",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=court_scotus),
+                case_name="Abcdef v. Ipsum",
+                sub_opinions=RelatedFactory(
+                    OpinionWithChildrenFactory,
+                    factory_related_name="cluster",
+                    plain_text="Blah blah Foo v. Bar, 1 U.S. 1, 4, 2 S.Ct. 2, 5 (2000) (holding something happened that was at least five words)",
+                ),
+            ),
+        )
+
+        # Citation 5
+        cls.citation5 = CitationWithParentsFactory.create(
+            volume="123",
+            reporter="U.S.",
+            page="123",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=court_scotus),
+                case_name="Bush v. Gore",
+                date_filed=date.today(),  # Must be later than any cited opinion
+                sub_opinions=RelatedFactory(
+                    OpinionWithChildrenFactory,
+                    factory_related_name="cluster",
+                    plain_text="Blah blah Foo v. Bar 1 U.S. 1, 77 blah blah. Asdf asdf Qwerty v. Uiop 2 F.3d 2, 555. Also check out Foo, 1 U.S. at 99 (holding that crime is illegal). Then let's cite Qwerty, supra, at 666 (noting that CourtListener is a great tool and everyone should use it). See also Foo, supra, at 101 as well. Another full citation is Lorem v. Ipsum 1 U. S. 50. Quoting Qwerty, “something something”, 2 F.3d 2, at 59. This case is similar to Fake, supra, and Qwerty supra, as well. This should resolve to the foregoing. Ibid. This should also convert appropriately, see Id., at 57. This should fail to resolve because the reporter and citation is ambiguous, 1 U. S., at 51. However, this should succeed, Lorem, 1 U.S., at 52.",
+                ),
+            ),
+        )
+
         super().setUpTestData()
 
     def test_opinionscitedRECAP_creation(self):
@@ -329,30 +410,29 @@ class RECAPDocumentObjectTest(TestCase):
         Tests that OpinionsCitedByRECAPDocument objects are created in the database, with correct citation counts.
         """
         test_recap_document = self.recap_doc
-        print(test_recap_document)
 
-        # store_recap_citations(test_recap_document)
+        store_recap_citations(test_recap_document)
 
-        # opinion1 = Opinion.objects.get(cluster__pk=self.citation1.cluster_id)
-        # opinion2 = Opinion.objects.get(cluster__pk=self.citation2.cluster_id)
+        opinion1 = Opinion.objects.get(cluster__pk=self.citation1.cluster_id)
+        opinion2 = Opinion.objects.get(cluster__pk=self.citation2.cluster_id)
         # opinion3 = Opinion.objects.get(cluster__pk=self.citation3.cluster_id)
 
-        # citation_test_pairs = [
-        #     (opinion1, 3),
-        #     (opinion2, 6),
-        #     (opinion3, 2),
-        # ]
+        citation_test_pairs = [
+            (opinion1, 3),
+            (opinion2, 6),
+            # (opinion3, 2),
+        ]
 
-        # for cited_op, depth in citation_test_pairs:
-        #     with self.subTest(
-        #         f"Testing OpinionsCited creation for {cited_op}...",
-        #         cited=cited_op,
-        #         depth=depth,
-        #     ):
-        #         citation_obj = OpinionsCitedByRECAPDocument.objects.get(
-        #             citing_document=test_recap_document, cited_opinion=cited_op
-        #         )
-        #         self.assertEqual(citation_obj.depth, depth)
+        for cited_op, depth in citation_test_pairs:
+            with self.subTest(
+                f"Testing OpinionsCitedByRECAPDocument creation for {cited_op}...",
+                cited=cited_op,
+                depth=depth,
+            ):
+                citation_obj = OpinionsCitedByRECAPDocument.objects.get(
+                    citing_document=test_recap_document, cited_opinion=cited_op
+                )
+                self.assertEqual(citation_obj.depth, depth)
 
 
 class CitationObjectTest(IndexedSolrTestCase):

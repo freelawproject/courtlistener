@@ -15,7 +15,7 @@ def get_and_clean_opinion_text(opinion: Opinion) -> None:
     :param opinion: The Opinion whose text should be parsed
     """
     for attr in ["html_anon_2020", "html_columbia", "html_lawbox", "html"]:
-        text = getattr(opinion, attr)
+        text = getattr(opinion, attr, None)
         if text:
             opinion.source_text = text
             opinion.cleaned_text = clean_text(text, ["html", "all_whitespace"])
