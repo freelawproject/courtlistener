@@ -7,6 +7,7 @@ from contextlib import contextmanager
 
 import scorched
 from django.conf import settings
+from django.core.management import call_command
 from django.test.utils import override_settings, tag
 from requests import Session
 from selenium import webdriver
@@ -75,6 +76,15 @@ class BaseSeleniumTest(SerializeSolrTestMixin, StaticLiveServerTestCase):
         return webdriver.Chrome(chrome_options=options, keep_alive=True)
 
     @classmethod
+    def rebuild_index(self):
+        """
+        Create and populate the Elasticsearch index and mapping
+        """
+
+        # -f rebuilds index without prompt for confirmation
+        call_command("search_index", "--rebuild", "-f")
+
+    @classmethod
     def setUpClass(cls) -> None:
         super(BaseSeleniumTest, cls).setUpClass()
 
@@ -88,6 +98,7 @@ class BaseSeleniumTest(SerializeSolrTestMixin, StaticLiveServerTestCase):
 
         cls.browser = cls._create_browser()
         cls.browser.implicitly_wait(5)
+        cls.rebuild_index()
 
     def setUp(self) -> None:
         self.reset_browser()
