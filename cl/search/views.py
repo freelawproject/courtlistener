@@ -195,7 +195,7 @@ def do_search(
 
         # A couple special variables for particular search types
         search_form = _clean_form(
-            get_params, cd, courts, search_form.__class__
+            get_params, cd, courts
         )
         if cd["type"] in [
             SEARCH_TYPES.OPINION,
@@ -426,7 +426,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
                                 "type": SEARCH_TYPES.ORAL_ARGUMENT,
                             },
                             facet=False,
-                            cache_key="homepage-data-oa",
+                            cache_key="homepage-data-oa-es",
                         )["results"]
                     }
                 )
@@ -568,7 +568,6 @@ def es_search(request: HttpRequest) -> HttpResponse:
                 request.GET.copy(),
                 search_form.cleaned_data,
                 courts,
-                search_form.__class__,
             )
         template = "advanced.html"
 
@@ -634,15 +633,14 @@ def do_es_search(
         paged_results, query_time, error = fetch_and_paginate_results(
             get_params, s, rows_per_page=rows, cache_key=cache_key
         )
+        search_form = _clean_form(
+            get_params,
+            search_form.cleaned_data,
+            courts,
+        )
     else:
         error = True
 
-    search_form = _clean_form(
-        get_params,
-        search_form.cleaned_data,
-        courts,
-        search_form.__class__,
-    )
     courts, court_count_human, court_count = merge_form_with_courts(
         courts, search_form
     )
