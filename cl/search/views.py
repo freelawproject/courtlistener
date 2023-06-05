@@ -194,9 +194,7 @@ def do_search(
                     traceback.print_exc()
 
         # A couple special variables for particular search types
-        search_form = _clean_form(
-            get_params, cd, courts
-        )
+        search_form = _clean_form(get_params, cd, courts)
         if cd["type"] in [
             SEARCH_TYPES.OPINION,
             SEARCH_TYPES.RECAP,
