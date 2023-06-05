@@ -3584,10 +3584,11 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
 
     def test_last_oral_arguments_home_page(self) -> None:
         """Test last oral arguments in home page"""
-        cache.delete("homepage-data-oa")
+        cache.delete("homepage-data-oa-es")
         r = self.client.get(
             reverse("show_results"),
         )
+        print("HTML: ", r.content.decode())
         self.assertIn("Latest Oral Arguments", r.content.decode())
         self.assertIn(
             "SEC v. Frank J. Custable, WikiLeaks", r.content.decode()
@@ -3817,9 +3818,9 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             search_params,
         )
         actual = self.get_article_count(r)
-        expected = 4
+        expected = 5
         self.assertEqual(actual, expected)
-        self.assertIn("24", r.content.decode())
+        self.assertIn("25", r.content.decode())
         self.assertIn("2 of 2", r.content.decode())
 
         search_params = {
@@ -3832,7 +3833,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         actual = self.get_results_count(r)
         expected = 20
         self.assertEqual(actual, expected)
-        self.assertEqual(24, r.data["count"])
+        self.assertEqual(25, r.data["count"])
         self.assertIn("page=2", r.data["next"])
 
         # Test next page.
@@ -3844,38 +3845,40 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             reverse("search-list", kwargs={"version": "v3"}), search_params
         )
         actual = self.get_results_count(r)
-        expected = 4
+        expected = 5
         self.assertEqual(actual, expected)
-        self.assertEqual(24, r.data["count"])
+        self.assertEqual(25, r.data["count"])
         self.assertEqual(None, r.data["next"])
 
         # Remove Audio objects to avoid affecting other tests.
         for created_audio in created_audios:
             created_audio.delete()
 
+
 def test_oa_synonym_search(self) -> None:
-        # Query using a synonym
-        # Frontend
-        search_params = {
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": f"Freedom of Info",
-        }
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        actual = self.get_article_count(r)
-        expected = 1
-        self.assertEqual(actual, expected)
-        self.assertIn("Freedom", r.content.decode())
-        # API
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}), search_params
-        )
-        actual = self.get_results_count(r)
-        expected = 1
-        self.assertEqual(actual, expected)
-        self.assertIn("Freedom", r.content.decode())
+    # Query using a synonym
+    # Frontend
+    search_params = {
+        "type": SEARCH_TYPES.ORAL_ARGUMENT,
+        "q": f"Freedom of Info",
+    }
+    r = self.client.get(
+        reverse("show_results"),
+        search_params,
+    )
+    actual = self.get_article_count(r)
+    expected = 1
+    self.assertEqual(actual, expected)
+    self.assertIn("Freedom", r.content.decode())
+    # API
+    r = self.client.get(
+        reverse("search-list", kwargs={"version": "v3"}), search_params
+    )
+    actual = self.get_results_count(r)
+    expected = 1
+    self.assertEqual(actual, expected)
+    self.assertIn("Freedom", r.content.decode())
+
 
 def test_oa_stopwords_search(self) -> None:
     # Query using a stopword, indexed content doesn't contain the stop word
@@ -3919,6 +3922,7 @@ def test_oa_stopwords_search(self) -> None:
     expected = 0
     self.assertEqual(actual, expected)
 
+
 def test_phrase_queries_with_stop_words(self) -> None:
     # Do phrase queries with stop words return results properly?
     # Frontend
@@ -3942,6 +3946,7 @@ def test_phrase_queries_with_stop_words(self) -> None:
     expected = 1
     self.assertEqual(actual, expected)
     self.assertIn("Freedom", r.content.decode())
+
 
 def test_character_case_queries(self) -> None:
     # Do character case queries works properly?
@@ -3975,6 +3980,7 @@ def test_character_case_queries(self) -> None:
     self.assertEqual(actual, expected)
     self.assertIn("SEC", r.content.decode())
     self.assertIn("Freedom", r.content.decode())
+
 
 def test_emojis_searchable(self) -> None:
     # Are emojis are searchable?
