@@ -3880,6 +3880,19 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         self.assertEqual(actual, expected)
         self.assertIn("Freedom", r.content.decode())
 
+        # Special stopwords are not found.
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": f"xx-xxxx",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 0
+        self.assertEqual(actual, expected)
+
     def test_phrase_queries_with_stop_words(self) -> None:
         # Do phrase queries with stop words return results properly?
         # Frontend

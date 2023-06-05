@@ -290,6 +290,6 @@ class AudioESTestCase(SimpleTestCase):
             case_name="Freedom of Information Wikileaks",
             docket_id=cls.docket_4.pk,
             duration=400,
-            judges="Wallace to Friedland ⚖️",
+            judges="Wallace to Friedland ⚖️ xx-xxxx",
             sha1="a49ada009774496ac01fb49818837e2296705c95",
         )
