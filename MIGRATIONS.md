@@ -2,7 +2,7 @@
 
 1. Create a Django migration file without running it using `docker exec -it cl-django python manage.py makemigrations <app_name>`
     - Give the migration file a name of what it does.
-    - If the migration doesn't do anything (like, it just tweaks the `choices` parameter), give it a `_noop.py` suffix. 
+    - If the migration doesn't do anything (like, it just tweaks the `choices` parameter), give it a `_noop.py` suffix.
 2. Generate raw SQL for the migration you just made on the command line using `docker exec -it cl-django python sqlmigrate search <id_of_migration>`.
 3. Copy and paste that into a `.sql` file right next to to the migration file that was generated (give the SQL file the same name as the migration file).
 4. Tweak the raw SQL as needed to avoid the issues outlined below, if any.
