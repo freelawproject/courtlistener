@@ -11,7 +11,7 @@ This repository is organized in the following way:
  - scripts: logrotate, systemd, etc, and init scripts for our various configurations and daemons.
 
 
-## Getting Involved
+## Getting Involved 
 
 If you want to get involved send us an email with your contact info or take a look through the [issues list][issues]. There are innumerable things we need help with, but we especially are looking for help with:
 
