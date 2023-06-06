@@ -282,7 +282,7 @@ class AudioESTestCase(SimpleTestCase):
             case_name="Hong Liu Lorem v. Lynch-Loretta E.",
             docket_id=cls.docket_3.pk,
             duration=653,
-            judges="John Smith",
+            judges="John Smith ptsd",
             sha1="a49ada009774496ac01fb49818837e2296705c94",
         )
         cls.audio_4.panel.add(cls.author)

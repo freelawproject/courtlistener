@@ -3879,6 +3879,29 @@ def test_oa_synonym_search(self) -> None:
     self.assertEqual(actual, expected)
     self.assertIn("Freedom", r.content.decode())
 
+    # Top abbreviations in legal documents
+    # Single term posttraumatic
+    search_params["q"] = "posttraumatic stress disorder"
+    r = self.client.get(
+        reverse("show_results"),
+        search_params,
+    )
+    actual = self.get_article_count(r)
+    expected = 1
+    self.assertEqual(actual, expected)
+    self.assertIn("<mark>ptsd</mark>", r.content.decode())
+
+    # Hyphenated term post-traumatic
+    search_params["q"] = "post-traumatic stress disorder"
+    r = self.client.get(
+        reverse("show_results"),
+        search_params,
+    )
+    actual = self.get_article_count(r)
+    expected = 1
+    self.assertEqual(actual, expected)
+    self.assertIn("<mark>ptsd</mark>", r.content.decode())
+
 
 def test_oa_stopwords_search(self) -> None:
     # Query using a stopword, indexed content doesn't contain the stop word
