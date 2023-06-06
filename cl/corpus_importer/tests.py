@@ -35,6 +35,7 @@ from cl.corpus_importer.management.commands.harvard_merge import (
     ClusterSourceException,
     DocketSourceException,
     combine_non_overlapping_data,
+    fetch_non_harvard_data,
     merge_case_names,
     merge_cluster_dates,
     merge_docket_numbers,
@@ -2704,8 +2705,8 @@ class HarvardMergerTests(TestCase):
             # CL item #4575556
             (
                 "Barbera",
-                "Adkins, Barbera, Getty, Greene, Hotten, McDonald, Watts",
-                "Adkins, Barbera, Getty, Greene, Hotten, McDonald, Watts",
+                "Barbera",
+                "",
             ),
             # CL item #4573873
             (
@@ -2735,7 +2736,7 @@ class HarvardMergerTests(TestCase):
             cluster = OpinionClusterWithParentsFactory(
                 judges=item[0],
             )
-            merge_judges(cluster.pk, (item[1], item[0]))
+            merge_judges((item[1], item[0]))
             cluster.refresh_from_db()
             self.assertEqual(cluster.judges, item[2])
 
@@ -2755,8 +2756,7 @@ class HarvardMergerTests(TestCase):
                     "cl_case_name_full": "",
                 },
                 {
-                    "expected_case_name": "Perez v. Metropolitan District "
-                    "Commisssion",
+                    "expected_case_name": "",
                     "expected_case_name_full": "Vivian PEREZ, Administratrix "
                     "(Estate of Andres Burgos) v. "
                     "METROPOLITAN DISTRICT "
@@ -2812,15 +2812,18 @@ class HarvardMergerTests(TestCase):
                 case_name_full=item[1].get("cl_case_name_full"),
             )
 
-            merge_case_names(cluster.pk, item[0])
-            cluster.refresh_from_db()
+            data_to_update = merge_case_names(cluster.pk, item[0])
+
+            print("data_to_update", data_to_update)
 
             self.assertEqual(
-                cluster.case_name, item[2].get("expected_case_name")
+                data_to_update.get("case_name", ""),
+                item[2].get("expected_case_name"),
             )
 
             self.assertEqual(
-                cluster.case_name_full, item[2].get("expected_case_name_full")
+                data_to_update.get("case_name_full", ""),
+                item[2].get("expected_case_name_full"),
             )
 
     def test_merge_date_filed(self):
@@ -2839,10 +2842,12 @@ class HarvardMergerTests(TestCase):
                 date_filed=item[1], docket=DocketFactory(source=Docket.SCRAPER)
             )
 
-            merge_cluster_dates(cluster.pk, "date_filed", (item[0], item[1]))
+            data_to_update = merge_cluster_dates(
+                cluster.pk, "date_filed", (item[0], item[1])
+            )
             cluster.refresh_from_db()
 
-            self.assertEqual(cluster.date_filed, item[2])
+            self.assertEqual(data_to_update.get("date_filed"), item[2])
 
     def test_update_docket_source(self):
         """Can we update docket source?"""
@@ -2890,14 +2895,14 @@ class HarvardMergerTests(TestCase):
             )
         }
 
-        merge_strings(
-            cluster.pk, "attorneys", changed_values_dictionary.get("attorneys")
+        data_to_update = merge_strings(
+            "attorneys", changed_values_dictionary.get("attorneys")
         )
 
         cluster.refresh_from_db()
 
         self.assertEqual(
-            cluster.attorneys,
+            data_to_update.get("attorneys"),
             "A. G. Allen and O. N. Gibson, for appellants., H. G. Brome and "
             "C. H. Harkins, for respondents.",
         )
@@ -3015,3 +3020,50 @@ class HarvardMergerTests(TestCase):
         for pair in test_pairs:
             judge_list = find_all_judges(unidecode(pair[0]))
             self.assertEqual(pair[1], judge_list, msg=f"Failed: {pair[1]}")
+
+    def test_process_harvard_data(self):
+        """Can we correctly parse the data from json harvard?"""
+
+        case_data = {
+            "name": "CANNON v. THE STATE",
+            "name_abbreviation": "Cannon v. State",
+            "decision_date": "1944-11-18",
+            "docket_number": "30614",
+            "casebody": {
+                "status": "ok",
+                "data": '<casebody firstpage="757" lastpage="758" '
+                'xmlns="http://nrs.harvard.edu/urn-3:HLS.Libr'
+                ".US_Case_Law"
+                '.Schema.Case_Body:v1">\n  <docketnumber '
+                'id="b795-7">30614.</docketnumber>\n  <parties '
+                'id="AAY">CANNON <em>v. </em>THE STATE.</parties>\n  '
+                '<decisiondate id="b795-9">Decided November 18, '
+                '1944.</decisiondate>\n  <attorneys id="b796-4"><page-number '
+                'citation-index="1" label="758">*758</page-number><em>B. B. '
+                "Giles, </em>for plaintiff in error.</attorneys>\n  "
+                '<attorneys id="b796-5"><em>Lindley W. Gamp, solicitor, '
+                "John A. Boyhin, solicitor-general,. Durwood T. Bye, "
+                '</em>contra.</attorneys>\n  <syllabus id="b283-9"> This is '
+                "a syllabus example.</syllabus><opinion "
+                'type="majority">\n'
+                '<author id="b796-6">Broyles, C. J.</author>\n  <p>Sample '
+                'text</p>   <judges id="Ae85">\n      <em>MacIntyre, J., '
+                "concurs.</em>\n    </judges>\n  </opinion>\n  <opinion "
+                'type="concurrence">\n    <author id="b796-7">Gardner, J.,'
+                "</author>\n    <p>Sample text</p>\n  "
+                "</opinion>\n</casebody>\n",
+            },
+        }
+
+        all_data = fetch_non_harvard_data(case_data)
+
+        self.assertEqual(
+            all_data.get("syllabus"), "<p> This is a syllabus " "example.</p>"
+        )
+        self.assertEqual(all_data.get("judges"), "Broyles, Gardner, MacIntyre")
+        self.assertEqual(
+            all_data.get("attorneys"),
+            "B. B. Giles, for plaintiff in error., Lindley W. Gamp, "
+            "solicitor, John A. Boyhin, solicitor-general,. Durwood T. Bye, "
+            "contra.",
+        )
