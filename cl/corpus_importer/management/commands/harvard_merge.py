@@ -90,13 +90,13 @@ def find_data_fields(soup: BeautifulSoup, field_name: str) -> list:
     )
 
 
-def read_json(cluster_id: int) -> Dict[str, Any] | None:
+def read_json(cluster: OpinionCluster) -> Dict[str, Any] | None:
     """Helper method to read json into object
 
-    :param cluster_id: the cluster to fetch the filepath for
+    :param cluster: the cluster to fetch the filepath for
     :return: Harvard data as a json object or None
     """
-    cluster = OpinionCluster.objects.get(id=cluster_id)
+
     if cluster.filepath_json_harvard:
         try:
             local_data = json.load(cluster.filepath_json_harvard)
@@ -220,20 +220,19 @@ def fetch_non_harvard_data(harvard_data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def combine_non_overlapping_data(
-    cluster_id: int, harvard_data: dict
+    cluster: OpinionCluster, harvard_data: dict
 ) -> dict[str, Tuple]:
     """Combine non overlapping data and return dictionary of data for merging
 
-    :param cluster_id: Cluster id to merge
+    :param cluster: Cluster to merge
     :param harvard_data: The harvard data as json
     :return: Optional dictionary of data to continue to merge
     """
-    opinion_cluster = OpinionCluster.objects.get(id=cluster_id)
     all_data = fetch_non_harvard_data(harvard_data)
     changed_values_dictionary: dict[str, Tuple] = {}
     to_update: dict[str] = {}
     for key, value in all_data.items():
-        cl_value = getattr(opinion_cluster, key)
+        cl_value = getattr(cluster, key)
         if not cl_value:
             # Value is empty for key, we can add it directly to the object
             to_update[key] = value
@@ -244,7 +243,7 @@ def combine_non_overlapping_data(
 
     if to_update:
         # Update all fields at once
-        OpinionCluster.objects.filter(id=cluster_id).update(**to_update)
+        OpinionCluster.objects.filter(id=cluster.id).update(**to_update)
 
     return changed_values_dictionary
 
@@ -310,14 +309,14 @@ def merge_judges(
 
 
 def merge_cluster_dates(
-    cluster_id: int,
+    cluster: OpinionCluster,
     field_name: str,
     overlapping_data: Optional[Tuple[str | None, date]],
 ) -> dict[str]:
     """Compare two dates and choose the best to update the opinion cluster
     the value if one value is better than the other
 
-    :param cluster_id: Cluster id to update
+    :param cluster: Cluster to update
     :param field_name: field name to update in opinion cluster
     :param overlapping_data: data to compare
     :return: None
@@ -326,7 +325,6 @@ def merge_cluster_dates(
         return {}
 
     harvard_data, cl_date = overlapping_data
-    cluster = OpinionCluster.objects.filter(id=cluster_id).first()
     if harvard_data:
         harvard_date, harvard_date_is_approximate = validate_dt(harvard_data)
         if cluster.docket.source == Docket.SCRAPER:
@@ -364,14 +362,16 @@ def merge_strings(
     return {}
 
 
-def merge_docket_numbers(cluster_id: int, harvard_docket_number: str) -> None:
+def merge_docket_numbers(
+    cluster: OpinionCluster, harvard_docket_number: str
+) -> None:
     """Merge Docket Numbers
 
-    :param cluster_id: The cluster id of the merging item
+    :param cluster: The cluster id of the merging item
     :param harvard_docket_number: The harvard docket number
     :return: None
     """
-    cl_docket = OpinionCluster.objects.get(id=cluster_id).docket
+    cl_docket = cluster.docket
     h_clean_docket = clean_docket_number(harvard_docket_number)
 
     if cl_docket.docket_number:
@@ -399,15 +399,13 @@ def merge_docket_numbers(cluster_id: int, harvard_docket_number: str) -> None:
 
 
 def merge_case_names(
-    cluster_id: int, harvard_data: Dict[str, Any]
+    cluster: OpinionCluster, harvard_data: Dict[str, Any]
 ) -> dict[str]:
     """Merge case names
-
-    :param cluster_id: The cluster id of the merging item
+    :param cluster: The cluster of the merging item
     :param harvard_data: json data from harvard case
     :return: None
     """
-    cluster = OpinionCluster.objects.get(id=cluster_id)
     harvard_case_name = titlecase(harmonize(harvard_data["name_abbreviation"]))
     harvard_case_name_full = titlecase(harvard_data["name"])
     cluster_case_name = titlecase(harmonize(cluster.case_name))
@@ -453,27 +451,25 @@ def merge_case_names(
     return update_dict
 
 
-def merge_date_filed(cluster_id: int, harvard_data: dict) -> dict[str]:
+def merge_date_filed(cluster: OpinionCluster, harvard_data: dict) -> dict[str]:
     """Merge date filed
-
-    :param cluster_id: The cluster id of the merging item
+    :param cluster: The cluster of the merging item
     :param harvard_data: json data from harvard case
     :return: None
     """
-    cluster = OpinionCluster.objects.get(id=cluster_id)
+
     harvard_date_filed = harvard_data.get("decision_date")
     cluster_date_filed = cluster.date_filed
     return merge_cluster_dates(
-        cluster_id, "date_filed", (harvard_date_filed, cluster_date_filed)
+        cluster, "date_filed", (harvard_date_filed, cluster_date_filed)
     )
 
 
 def merge_overlapping_data(
-    cluster_id: int, changed_values_dictionary: dict
+    cluster: OpinionCluster, changed_values_dictionary: dict
 ) -> dict[str]:
     """Merge overlapping data
-
-    :param cluster_id: the cluster id
+    :param cluster: the cluster object
     :param changed_values_dictionary: the dictionary of data to merge
     :return: None
     """
@@ -506,7 +502,7 @@ def merge_overlapping_data(
         elif field_name in ["other_dates"]:
             data_to_update.update(
                 merge_cluster_dates(
-                    cluster_id,
+                    cluster,
                     field_name,
                     changed_values_dictionary.get(field_name),
                 )
@@ -530,13 +526,12 @@ def merge_overlapping_data(
     return data_to_update
 
 
-def update_docket_source(cluster_id: int) -> None:
+def update_docket_source(cluster: OpinionCluster) -> None:
     """Update docket source and complete
-
-    :param cluster_id: the cluster id
+    :param cluster: the cluster object
     :return: None
     """
-    docket = OpinionCluster.objects.get(id=cluster_id).docket
+    docket = cluster.docket
     new_docket_source = Docket.HARVARD + docket.source
     if new_docket_source in [
         Docket.HARVARD,
@@ -555,13 +550,11 @@ def update_docket_source(cluster_id: int) -> None:
         raise DocketSourceException("Unexpected docket source")
 
 
-def update_cluster_source(cluster_id: int) -> None:
+def update_cluster_source(cluster: OpinionCluster) -> None:
     """Update cluster source
-
-    :param cluster_id: cluster id to update
+    :param cluster: cluster object
     :return: None
     """
-    cluster = OpinionCluster.objects.get(id=cluster_id)
     new_cluster_source = cluster.source + SOURCES.HARVARD_CASELAW
 
     if new_cluster_source in [
@@ -615,9 +608,12 @@ def merge_opinion_clusters(
     :param only_fastcase: Only process fastcase data
     :return: None
     """
-    harvard_data = read_json(cluster_id)
+    opinion_cluster = OpinionCluster.objects.get(id=cluster_id)
+    harvard_data = read_json(opinion_cluster)
     if not harvard_data:
-        logger.warning(msg=f"No Harvard json for cluster: {cluster_id}")
+        logger.warning(
+            msg=f"No Harvard json for cluster: {opinion_cluster.id}"
+        )
         return
 
     if only_fastcase and "Fastcase" != get_data_source(harvard_data):
@@ -626,16 +622,22 @@ def merge_opinion_clusters(
 
     try:
         with transaction.atomic():
-            map_and_merge_opinions(cluster_id, harvard_data)
+            map_and_merge_opinions(opinion_cluster, harvard_data)
             changed_values_dictionary = combine_non_overlapping_data(
-                cluster_id, harvard_data
+                opinion_cluster, harvard_data
             )
-            merge_docket_numbers(cluster_id, harvard_data["docket_number"])
+            merge_docket_numbers(
+                opinion_cluster, harvard_data["docket_number"]
+            )
 
-            case_names_to_update = merge_case_names(cluster_id, harvard_data)
-            date_filed_to_update = merge_date_filed(cluster_id, harvard_data)
+            case_names_to_update = merge_case_names(
+                opinion_cluster, harvard_data
+            )
+            date_filed_to_update = merge_date_filed(
+                opinion_cluster, harvard_data
+            )
             overlapping_data_to_update = merge_overlapping_data(
-                cluster_id, changed_values_dictionary
+                opinion_cluster, changed_values_dictionary
             )
             headmatter_data = save_headmatter(harvard_data)
 
@@ -652,8 +654,8 @@ def merge_opinion_clusters(
                     **data_to_update
                 )
 
-            update_docket_source(cluster_id=cluster_id)
-            update_cluster_source(cluster_id=cluster_id)
+            update_docket_source(opinion_cluster)
+            update_cluster_source(opinion_cluster)
             logger.info(msg=f"Finished merging cluster: {cluster_id}")
 
     except AuthorException:
@@ -802,16 +804,18 @@ def update_matching_opinions(
         op.save()
 
 
-def map_and_merge_opinions(cluster: int, harvard_data: Dict[str, Any]) -> None:
+def map_and_merge_opinions(
+    cluster: OpinionCluster, harvard_data: Dict[str, Any]
+) -> None:
     """Map and merge opinion data
 
-    :param cluster: Cluster ID
+    :param cluster: Cluster object
     :param harvard_data: json data from harvard case
     :return: None
     """
 
     map_types = HarvardConversionUtil.types_mapping
-    cl_opinions = Opinion.objects.filter(cluster__id=cluster)
+    cl_opinions = Opinion.objects.filter(cluster__id=cluster.id)
     soup = BeautifulSoup(harvard_data["casebody"]["data"], "lxml")
     harvard_opinions = find_data_fields(soup, "opinion")
 
@@ -837,7 +841,7 @@ def map_and_merge_opinions(cluster: int, harvard_data: Dict[str, Any]) -> None:
 
                 Opinion.objects.create(
                     xml_harvard=str(op),
-                    cluster=OpinionCluster.objects.get(id=cluster),
+                    cluster_id=cluster.id,
                     type=opinion_type,
                     author_str=titlecase(
                         find_just_name(author.text.strip(":"))

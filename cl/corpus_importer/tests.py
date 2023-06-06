@@ -2478,7 +2478,7 @@ class HarvardMergerTests(TestCase):
             docket=DocketFactory(),
             attorneys="B. B. Giles, Lindley W. Gamp, and John A. Boyhin",
         )
-        clean_dictionary = combine_non_overlapping_data(cluster.id, case_data)
+        clean_dictionary = combine_non_overlapping_data(cluster, case_data)
         self.assertEqual(
             clean_dictionary,
             {
@@ -2495,14 +2495,14 @@ class HarvardMergerTests(TestCase):
             docket=DocketFactory(),
             attorneys="B. B. Giles, for plaintiff in error., Lindley W. Gamp, solicitor, John A. Boyhin, solicitor-general,. Durwood T. Bye, contra.",
         )
-        clean_dictionary = combine_non_overlapping_data(cluster.id, case_data)
+        clean_dictionary = combine_non_overlapping_data(cluster, case_data)
         self.assertEqual(clean_dictionary, {}, msg="Attorneys are the same")
 
     def test_docket_number_merger(self):
         """Can we choose the correct docket number"""
         docket = DocketFactory(docket_number="17-3000")
         cluster = OpinionClusterWithParentsFactory(docket=docket)
-        merge_docket_numbers(cluster.id, "Master Docket No. 17-3000L")
+        merge_docket_numbers(cluster, "Master Docket No. 17-3000L")
         docket.refresh_from_db()
         self.assertEqual(docket.docket_number, "Master Docket 17-3000L")
 
@@ -2576,7 +2576,7 @@ class HarvardMergerTests(TestCase):
         for id in cluster_ids:
             merge_opinion_clusters(cluster_id=id)
 
-        self.assertEqual([1, 4, 5], list(cluster_ids))
+        self.assertEqual([1, 4, 5], list(sorted(cluster_ids)))
 
     def test_add_opinions_without_authors_in_cl(self):
         """Can we add opinion and update authors"""
@@ -2812,7 +2812,7 @@ class HarvardMergerTests(TestCase):
                 case_name_full=item[1].get("cl_case_name_full"),
             )
 
-            data_to_update = merge_case_names(cluster.pk, item[0])
+            data_to_update = merge_case_names(cluster, item[0])
 
             print("data_to_update", data_to_update)
 
@@ -2843,7 +2843,7 @@ class HarvardMergerTests(TestCase):
             )
 
             data_to_update = merge_cluster_dates(
-                cluster.pk, "date_filed", (item[0], item[1])
+                cluster, "date_filed", (item[0], item[1])
             )
             cluster.refresh_from_db()
 
@@ -2854,14 +2854,14 @@ class HarvardMergerTests(TestCase):
 
         docket_1 = DocketFactory(source=Docket.RECAP)
         cluster_1 = OpinionClusterWithParentsFactory(docket=docket_1)
-        update_docket_source(cluster_1.id)
+        update_docket_source(cluster_1)
         docket_1.refresh_from_db()
         self.assertEqual(docket_1.source, Docket.HARVARD_AND_RECAP)
 
         with self.assertRaises(DocketSourceException):
             docket_2 = DocketFactory(source=Docket.COLUMBIA_AND_RECAP)
             cluster_2 = OpinionClusterWithParentsFactory(docket=docket_2)
-            update_docket_source(cluster_2.id)
+            update_docket_source(cluster_2)
             docket_2.refresh_from_db()
 
     def test_update_cluster_source(self):
@@ -2870,7 +2870,7 @@ class HarvardMergerTests(TestCase):
         cluster_1 = OpinionClusterWithParentsFactory(
             source=SOURCES.COURT_WEBSITE
         )
-        update_cluster_source(cluster_1.id)
+        update_cluster_source(cluster_1)
         cluster_1.refresh_from_db()
         self.assertEqual(cluster_1.source, SOURCES.COURT_M_HARVARD)
 
@@ -2878,7 +2878,7 @@ class HarvardMergerTests(TestCase):
             cluster_2 = OpinionClusterWithParentsFactory(
                 source=SOURCES.INTERNET_ARCHIVE
             )
-            update_cluster_source(cluster_2.id)
+            update_cluster_source(cluster_2)
             cluster_2.refresh_from_db()
 
     def test_merge_strings(self):
