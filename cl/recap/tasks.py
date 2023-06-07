@@ -404,74 +404,74 @@ def process_recap_zip(self, pk: int) -> dict[str, list[int] | list[Task]]:
     mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
 
     logger.info("Processing RECAP zip (debug is: %s): %s", pq.debug, pq)
-    zip_bytes = BytesIO(pq.filepath_local.read())
-    with ZipFile(zip_bytes, "r") as archive:
-        # Security: Check for zip bombs.
-        max_file_size = convert_size_to_bytes("200MB")
-        for zip_info in archive.infolist():
-            if zip_info.file_size < max_file_size:
-                continue
+    with pq.filepath_local.open("rb") as zip_bytes:
+        with ZipFile(zip_bytes, "r") as archive:
+            # Security: Check for zip bombs.
+            max_file_size = convert_size_to_bytes("200MB")
+            for zip_info in archive.infolist():
+                if zip_info.file_size < max_file_size:
+                    continue
+                mark_pq_status(
+                    pq,
+                    "Zip too large; possible zip bomb. File in zip named %s "
+                    "would be %s bytes expanded."
+                    % (zip_info.filename, zip_info.file_size),
+                    PROCESSING_STATUS.INVALID_CONTENT,
+                )
+                return {"new_pqs": [], "tasks": []}
+
+            # For each document in the zip, create a new PQ
+            new_pqs = []
+            tasks = []
+            for file_name in archive.namelist():
+                file_content = archive.read(file_name)
+                f = SimpleUploadedFile(file_name, file_content)
+
+                file_name = file_name.split(".pdf")[0]
+                if "-" in file_name:
+                    doc_num, att_num = file_name.split("-")
+                    if att_num == "main":
+                        att_num = None
+                else:
+                    doc_num = file_name
+                    att_num = None
+
+                if att_num:
+                    # An attachment, ∴ nuke the pacer_doc_id value, since it
+                    # corresponds to the main doc only.
+                    pacer_doc_id = ""
+                else:
+                    pacer_doc_id = pq.pacer_doc_id
+
+                # Create a new PQ and enqueue it for processing
+                new_pq = ProcessingQueue.objects.create(
+                    court=pq.court,
+                    uploader=pq.uploader,
+                    pacer_case_id=pq.pacer_case_id,
+                    pacer_doc_id=pacer_doc_id,
+                    document_number=doc_num,
+                    attachment_number=att_num,
+                    filepath_local=f,
+                    status=PROCESSING_STATUS.ENQUEUED,
+                    upload_type=UPLOAD_TYPE.PDF,
+                    debug=pq.debug,
+                )
+                new_pqs.append(new_pq.pk)
+                tasks.append(process_recap_pdf.delay(new_pq.pk))
+
+            # At the end, mark the pq as successful and return the PQ
             mark_pq_status(
                 pq,
-                "Zip too large; possible zip bomb. File in zip named %s "
-                "would be %s bytes expanded."
-                % (zip_info.filename, zip_info.file_size),
-                PROCESSING_STATUS.INVALID_CONTENT,
+                f"Successfully created ProcessingQueue objects: {oxford_join(new_pqs)}",
+                PROCESSING_STATUS.SUCCESSFUL,
             )
-            return {"new_pqs": [], "tasks": []}
 
-        # For each document in the zip, create a new PQ
-        new_pqs = []
-        tasks = []
-        for file_name in archive.namelist():
-            file_content = archive.read(file_name)
-            f = SimpleUploadedFile(file_name, file_content)
-
-            file_name = file_name.split(".pdf")[0]
-            if "-" in file_name:
-                doc_num, att_num = file_name.split("-")
-                if att_num == "main":
-                    att_num = None
-            else:
-                doc_num = file_name
-                att_num = None
-
-            if att_num:
-                # An attachment, ∴ nuke the pacer_doc_id value, since it
-                # corresponds to the main doc only.
-                pacer_doc_id = ""
-            else:
-                pacer_doc_id = pq.pacer_doc_id
-
-            # Create a new PQ and enqueue it for processing
-            new_pq = ProcessingQueue.objects.create(
-                court=pq.court,
-                uploader=pq.uploader,
-                pacer_case_id=pq.pacer_case_id,
-                pacer_doc_id=pacer_doc_id,
-                document_number=doc_num,
-                attachment_number=att_num,
-                filepath_local=f,
-                status=PROCESSING_STATUS.ENQUEUED,
-                upload_type=UPLOAD_TYPE.PDF,
-                debug=pq.debug,
-            )
-            new_pqs.append(new_pq.pk)
-            tasks.append(process_recap_pdf.delay(new_pq.pk))
-
-        # At the end, mark the pq as successful and return the PQ
-        mark_pq_status(
-            pq,
-            f"Successfully created ProcessingQueue objects: {oxford_join(new_pqs)}",
-            PROCESSING_STATUS.SUCCESSFUL,
-        )
-
-        # Returning the tasks allows tests to wait() for the PDFs to complete
-        # before checking assertions.
-        return {
-            "new_pqs": new_pqs,
-            "tasks": tasks,
-        }
+            # Returning the tasks allows tests to wait() for the PDFs to complete
+            # before checking assertions.
+            return {
+                "new_pqs": new_pqs,
+                "tasks": tasks,
+            }
 
 
 @app.task(
