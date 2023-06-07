@@ -1,7 +1,7 @@
+import hashlib
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from io import BytesIO
 from typing import List, Optional, Tuple
 from zipfile import ZipFile
 
@@ -12,7 +12,7 @@ from celery.canvas import chain
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from django.core.files.base import ContentFile
+from django.core.files.base import ContentFile, File
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
 from django.utils.timezone import now
@@ -53,7 +53,6 @@ from cl.corpus_importer.tasks import (
 )
 from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.custom_filters.templatetags.text_filters import oxford_join
-from cl.lib.crypto import sha1
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.microservice_utils import microservice
 from cl.lib.pacer import is_pacer_court_accessible, map_cl_to_pacer_id
@@ -316,7 +315,8 @@ def process_recap_pdf(self, pk):
 
     # Do the file, finally.
     try:
-        file_contents = pq.filepath_local.read()
+        with pq.filepath_local.open("rb") as f:
+            new_sha1 = hashlib.file_digest(f, "sha1").hexdigest()
     except IOError as exc:
         msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         if (self.request.retries == self.max_retries) or pq.debug:
@@ -326,10 +326,6 @@ def process_recap_pdf(self, pk):
             mark_pq_status(pq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
             raise self.retry(exc=exc)
 
-    if not file_contents:
-        return None
-
-    new_sha1 = sha1(file_contents)
     existing_document = all(
         [
             rd.sha1 == new_sha1,
@@ -340,7 +336,6 @@ def process_recap_pdf(self, pk):
     if not existing_document:
         # Different sha1, it wasn't available, or it's missing from disk. Move
         # the new file over from the processing queue storage.
-        cf = ContentFile(file_contents)
         file_name = get_document_filename(
             rd.docket_entry.docket.court_id,
             rd.docket_entry.docket.pacer_case_id,
@@ -348,7 +343,8 @@ def process_recap_pdf(self, pk):
             rd.attachment_number,
         )
         if not pq.debug:
-            rd.filepath_local.save(file_name, cf, save=False)
+            with pq.filepath_local.open("rb") as f:
+                rd.filepath_local.save(file_name, File(f), save=False)
 
             # Do page count and extraction
             response = microservice(
