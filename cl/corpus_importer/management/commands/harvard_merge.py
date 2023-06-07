@@ -251,10 +251,12 @@ def combine_non_overlapping_data(
 def merge_long_fields(
     field_name: str,
     overlapping_data: Optional[Tuple[str, str]],
+    cluster_id: int,
 ) -> dict[str]:
     """Merge two long text fields
     :param field_name: field name to update in opinion cluster
     :param overlapping_data: data to compare from harvard and courtlistener
+    :param cluster_id: cluster id
     :return: None
     """
     if not overlapping_data:
@@ -269,8 +271,10 @@ def merge_long_fields(
             return {field_name: harvard_data}
 
     else:
-        pass
-        # should we log long data not really being similar?
+        if similarity <= 0.5:
+            logger.info(
+                f"The content compared is very different. Cluster id: {cluster_id}"
+            )
     return {}
 
 
@@ -497,6 +501,7 @@ def merge_overlapping_data(
                 merge_long_fields(
                     field_name,
                     changed_values_dictionary.get(field_name),
+                    cluster.id,
                 )
             )
         elif field_name in ["other_dates"]:
