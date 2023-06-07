@@ -30,7 +30,8 @@ ELASTICSEARCH_DSL = {
                 "preserve_original": True,
             },
             "synonym_filter": {
-                "type": "synonym",
+                "type": "synonym_graph",
+                "expand": True,
                 "synonyms_path": "synonyms_en.txt",
             },
             "english_stemmer": {"type": "stemmer", "language": "english"},

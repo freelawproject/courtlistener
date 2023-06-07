@@ -3588,7 +3588,6 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         r = self.client.get(
             reverse("show_results"),
         )
-        print("HTML: ", r.content.decode())
         self.assertIn("Latest Oral Arguments", r.content.decode())
         self.assertIn(
             "SEC v. Frank J. Custable, WikiLeaks", r.content.decode()
@@ -3854,53 +3853,92 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         for created_audio in created_audios:
             created_audio.delete()
 
+    def test_oa_synonym_search(self) -> None:
+        # Query using a synonym
+        # Frontend
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": f"Freedom of Info",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("Freedom", r.content.decode())
+        # API
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v3"}), search_params
+        )
+        actual = self.get_results_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("Freedom", r.content.decode())
 
-def test_oa_synonym_search(self) -> None:
-    # Query using a synonym
-    # Frontend
-    search_params = {
-        "type": SEARCH_TYPES.ORAL_ARGUMENT,
-        "q": f"Freedom of Info",
-    }
-    r = self.client.get(
-        reverse("show_results"),
-        search_params,
-    )
-    actual = self.get_article_count(r)
-    expected = 1
-    self.assertEqual(actual, expected)
-    self.assertIn("Freedom", r.content.decode())
-    # API
-    r = self.client.get(
-        reverse("search-list", kwargs={"version": "v3"}), search_params
-    )
-    actual = self.get_results_count(r)
-    expected = 1
-    self.assertEqual(actual, expected)
-    self.assertIn("Freedom", r.content.decode())
+        # Top abbreviations in legal documents
+        # Single term posttraumatic
+        search_params["q"] = "posttraumatic stress disorder"
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 2
+        self.assertEqual(actual, expected)
+        self.assertIn("<mark>ptsd</mark>", r.content.decode())
 
-    # Top abbreviations in legal documents
-    # Single term posttraumatic
-    search_params["q"] = "posttraumatic stress disorder"
-    r = self.client.get(
-        reverse("show_results"),
-        search_params,
-    )
-    actual = self.get_article_count(r)
-    expected = 1
-    self.assertEqual(actual, expected)
-    self.assertIn("<mark>ptsd</mark>", r.content.decode())
+        # Hyphenated term post-traumatic
+        search_params["q"] = "post-traumatic stress disorder"
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 2
+        self.assertEqual(actual, expected)
+        self.assertIn("<mark>ptsd</mark>", r.content.decode())
 
-    # Hyphenated term post-traumatic
-    search_params["q"] = "post-traumatic stress disorder"
-    r = self.client.get(
-        reverse("show_results"),
-        search_params,
-    )
-    actual = self.get_article_count(r)
-    expected = 1
-    self.assertEqual(actual, expected)
-    self.assertIn("<mark>ptsd</mark>", r.content.decode())
+        # Search acronym "apa"
+        search_params["q"] = "apa"
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 2
+        self.assertEqual(actual, expected)
+        self.assertIn("<mark>apa</mark>", r.content.decode())
+        self.assertIn(
+            "<mark>Administrative procedures act</mark>", r.content.decode()
+        )
+
+        # Search by "Administrative procedures act"
+        search_params["q"] = "Administrative procedures act"
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 2
+        self.assertEqual(actual, expected)
+        self.assertIn("<mark>apa</mark>", r.content.decode())
+        self.assertIn(
+            "<mark>Administrative procedures act</mark>", r.content.decode()
+        )
+
+        # Search by "Administrative" shouldn't return results for "apa" neither
+        # "Administrative procedures act"
+        search_params["q"] = "Administrative"
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("Hong Liu Yang", r.content.decode())
 
 
 def test_oa_stopwords_search(self) -> None:
