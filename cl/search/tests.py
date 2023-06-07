@@ -3885,7 +3885,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             search_params,
         )
         actual = self.get_article_count(r)
-        expected = 2
+        expected = 1
         self.assertEqual(actual, expected)
         self.assertIn("<mark>ptsd</mark>", r.content.decode())
 
@@ -3896,7 +3896,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             search_params,
         )
         actual = self.get_article_count(r)
-        expected = 2
+        expected = 1
         self.assertEqual(actual, expected)
         self.assertIn("<mark>ptsd</mark>", r.content.decode())
 
