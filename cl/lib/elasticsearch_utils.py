@@ -382,32 +382,34 @@ def set_results_highlights(results: Page, search_type: str) -> None:
         if search_type == SEARCH_TYPES.PARENTHETICAL:
             top_hits = result.grouped_by_opinion_cluster_id.hits.hits
             for hit in top_hits:
-                if hasattr(hit, "highlight"):
-                    highlighted_fields = [
-                        k for k in dir(hit.highlight) if not k.startswith("_")
-                    ]
-                    for highlighted_field in highlighted_fields:
-                        highlight = hit.highlight[highlighted_field][0]
-                        hit["_source"][highlighted_field] = highlight
+                if not hasattr(hit, "highlight"):
+                    continue
+                highlighted_fields = [
+                    k for k in dir(hit.highlight) if not k.startswith("_")
+                ]
+                for highlighted_field in highlighted_fields:
+                    highlight = hit.highlight[highlighted_field][0]
+                    hit["_source"][highlighted_field] = highlight
         else:
+            if not hasattr(result.meta, "highlight"):
+                return
             exact_hl_fields = []
-            if hasattr(result.meta, "highlight"):
-                for (
-                    field,
-                    highlight_list,
-                ) in result.meta.highlight.to_dict().items():
-                    # If a query highlight fields the "field.exact", "field" or
-                    # both versions are available.
-                    if "exact" in field:
-                        # Prioritize "field.exact" highlighted fields
-                        field = field.split(".exact")[0]
-                        result[field] = highlight_list[0]
-                        exact_hl_fields.append(field)
+            for (
+                field,
+                highlight_list,
+            ) in result.meta.highlight.to_dict().items():
+                # If a query highlight fields the "field.exact", "field" or
+                # both versions are available.
+                if "exact" in field:
+                    # Prioritize "field.exact" highlighted fields
+                    field = field.split(".exact")[0]
+                    result[field] = highlight_list[0]
+                    exact_hl_fields.append(field)
 
-                    if field not in exact_hl_fields:
-                        # If the "field.exact" version has not been set, set
-                        # the "field" version.
-                        result[field] = highlight_list[0]
+                if field not in exact_hl_fields:
+                    # If the "field.exact" version has not been set, set
+                    # the "field" version.
+                    result[field] = highlight_list[0]
 
 
 def group_search_results(
