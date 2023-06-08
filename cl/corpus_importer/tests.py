@@ -2746,19 +2746,19 @@ class HarvardMergerTests(TestCase):
             (
                 "Barbera",
                 "Barbera",
-                "",
+                "",  # No need to update value, expected output is empty
             ),
             # CL item #4573873
             (
                 "Simpson, J. ~ Concurring Opinion by Pellegrini, Senior Judge",
                 "Simpson",
-                "Simpson, J. ~ Concurring Opinion by Pellegrini, Senior Judge",
+                "",  # No need to update, cl data is better than harvard data
             ),
             (
                 "January 1st 2020",  # CL  #bad data example
                 "Simpson, J. ~ Concurring Opinion by Pellegrini, Senior Judge",
                 # Harvard
-                "Simpson, Pellegrini",  # Expected result
+                "Pellegrini, Simpson",  # harvard data is good, save it
             ),
             # CL item #4576003
             (
@@ -2770,15 +2770,14 @@ class HarvardMergerTests(TestCase):
             (
                 "Leavitt, President Judge",
                 "Leavitt",
-                "Leavitt, President Judge",
+                "",  # extracted data is the same, no need to update
             ),
         ]:
             cluster = OpinionClusterWithParentsFactory(
                 judges=item[0],
             )
-            merge_judges((item[1], item[0]))
-            cluster.refresh_from_db()
-            self.assertEqual(cluster.judges, item[2])
+            data_to_update = merge_judges((item[1], item[0]))
+            self.assertEqual(data_to_update.get("judges", ""), item[2])
 
     def test_merge_overlap_casenames(self):
         """Can we merge overlap case names?"""
