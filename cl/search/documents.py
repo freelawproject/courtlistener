@@ -130,15 +130,21 @@ oral_arguments_index.settings(
 class AudioDocument(Document):
     absolute_url = fields.KeywordField(attr="get_absolute_url")
     caseName = fields.TextField(
-        attr="case_name", analyzer="text_en_splitting_cl"
+        attr="case_name",
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
     )
     court = fields.TextField(
-        attr="docket.court.full_name", analyzer="text_en_splitting_cl"
+        attr="docket.court.full_name",
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
     )
     court_exact = fields.KeywordField(attr="docket.court.pk")
     court_id = fields.KeywordField(attr="docket.court.pk")
     court_citation_string = fields.TextField(
-        attr="docket.court.citation_string", analyzer="text_en_splitting_cl"
+        attr="docket.court.citation_string",
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
     )
     docket_id = fields.IntegerField(attr="docket.pk")
     dateArgued = fields.DateField(attr="docket.date_argued")
@@ -147,21 +153,29 @@ class AudioDocument(Document):
         attr="docket.date_reargument_denied"
     )
     docketNumber = fields.TextField(
-        attr="docket.docket_number", analyzer="text_en_splitting_cl"
+        attr="docket.docket_number",
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
     )
     docket_slug = fields.KeywordField(attr="docket.slug")
     duration = fields.IntegerField(attr="duration")
     download_url = fields.KeywordField(attr="download_url")
     file_size_mp3 = fields.IntegerField()
     id = fields.IntegerField(attr="pk")
-    judge = fields.TextField(attr="judges", analyzer="text_en_splitting_cl")
+    judge = fields.TextField(
+        attr="judges",
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
+    )
     local_path = fields.KeywordField()
     panel_ids = fields.ListField(
         fields.IntegerField(),
     )
     sha1 = fields.KeywordField(attr="sha1")
     source = fields.KeywordField(attr="source")
-    text = fields.TextField(analyzer="text_en_splitting_cl")
+    text = fields.TextField(
+        analyzer="text_en_splitting_cl", search_analyzer="search_analyzer"
+    )
     timestamp = fields.DateField()
 
     class Django:

@@ -14,6 +14,18 @@ ELASTICSEARCH_DSL = {
                 "tokenizer": "whitespace",
                 "filter": [
                     "lowercase",
+                    "custom_word_delimiter_filter",
+                    "remove_leading_zeros",
+                    "english_stop",
+                    "english_stemmer",
+                    "remove_duplicates",
+                ],
+            },
+            "search_analyzer": {
+                "type": "custom",
+                "tokenizer": "whitespace",
+                "filter": [
+                    "lowercase",
                     "synonym_filter",
                     "custom_word_delimiter_filter",
                     "remove_leading_zeros",

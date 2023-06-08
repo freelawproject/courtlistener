@@ -3889,8 +3889,8 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         self.assertEqual(actual, expected)
         self.assertIn("<mark>ptsd</mark>", r.content.decode())
 
-        # Hyphenated term post-traumatic
-        search_params["q"] = "post-traumatic stress disorder"
+        # Split terms post traumatic
+        search_params["q"] = "post traumatic stress disorder"
         r = self.client.get(
             reverse("show_results"),
             search_params,
@@ -3910,9 +3910,9 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         expected = 2
         self.assertEqual(actual, expected)
         self.assertIn("<mark>apa</mark>", r.content.decode())
-        self.assertIn(
-            "<mark>Administrative procedures act</mark>", r.content.decode()
-        )
+        self.assertIn("<mark>Administrative</mark>", r.content.decode())
+        self.assertIn("<mark>procedures</mark>", r.content.decode())
+        self.assertIn("<mark>act</mark>", r.content.decode())
 
         # Search by "Administrative procedures act"
         search_params["q"] = "Administrative procedures act"
@@ -3924,13 +3924,39 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         expected = 2
         self.assertEqual(actual, expected)
         self.assertIn("<mark>apa</mark>", r.content.decode())
-        self.assertIn(
-            "<mark>Administrative procedures act</mark>", r.content.decode()
-        )
+        self.assertIn("<mark>Administrative</mark>", r.content.decode())
+        self.assertIn("<mark>procedures</mark>", r.content.decode())
+        self.assertIn("<mark>act</mark>", r.content.decode())
 
-        # Search by "Administrative" shouldn't return results for "apa" neither
-        # "Administrative procedures act"
+        # Search by "Administrative" shouldn't return results for "apa" but for
+        # "Administrative" and "Administrative procedures act".
         search_params["q"] = "Administrative"
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 2
+        self.assertEqual(actual, expected)
+        self.assertIn("Hong Liu Yang", r.content.decode())
+        self.assertIn("procedures act", r.content.decode())
+
+        # Single word one-way synonyms.
+        # mag => mag,magazine,magistrate
+        search_params["q"] = "mag"
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 3
+        self.assertEqual(actual, expected)
+        self.assertIn("<mark>mag</mark>", r.content.decode())
+        self.assertIn("<mark>magazine</mark>", r.content.decode())
+        self.assertIn("<mark>magistrate</mark>", r.content.decode())
+
+        # Searching "magazine" only returns results containing "magazine"
+        search_params["q"] = "magazine"
         r = self.client.get(
             reverse("show_results"),
             search_params,
@@ -3938,7 +3964,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
-        self.assertIn("Hong Liu Yang", r.content.decode())
+        self.assertIn("<mark>magazine</mark>", r.content.decode())
 
 
 def test_oa_stopwords_search(self) -> None:

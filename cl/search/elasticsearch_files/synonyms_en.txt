@@ -1,38 +1,38 @@
-ann => annotated,annual
-app => appellate,appendix,appendicies
-comm => committee,communications
-comp => compensation,compilation,compiled
-dec => decision,december
-def => defense,defender
-del => delaware,delegate
-elec => electrical,electricity,electronic
-eng => english,england
-est => estonia,estate,estimate
-fin => finland,finance,financial
-hosp => hospital,hospitality
-hous => housing,houston
-lab => labor,laboritory
-mag => magazine,magistrate
-mar => maritime,march
-med => medical,mediator
-merch => merchant,merchandise
-pers => person,personnel
-phil => philippines,philosophical
-pol => poland,political
-prac => practical,practice,practitioner
-prob => probate,problem
-proc => proceedings,procedure
-prod => production,product
-pub => publication,public,publishing
-ref => referee,reference,refining
-reg => registrar,regular
-rep => representative,reporter,report
-res => research,reserve,resolution
-sec => section,securities
-sen => senator,senegal
-st => state,street
-tel => telephone,telegraph
-tr => trustee,trust
+ann => ann,annotated,annual
+app => app,appellate,appendix,appendicies
+comm => comm,committee,communications
+comp => comp,compensation,compilation,compiled
+dec => dec,decision,december
+def => def,defense,defender
+del => del,delaware,delegate
+elec => elec,electrical,electricity,electronic
+eng => eng,english,england
+est => est,estonia,estate,estimate
+fin => fin,finland,finance,financial
+hosp => hosp,hospital,hospitality
+hous => hous,housing,houston
+lab => lab,labor,laboritory
+mag => mag,magazine,magistrate
+mar => mar,maritime,march
+med => med,medical,mediator
+merch => merch,merchant,merchandise
+pers => pers,person,personnel
+phil => phil,philippines,philosophical
+pol => pol,poland,political
+prac => prac,practical,practice,practitioner
+prob => prob,probate,problem
+proc => proc,proceedings,procedure
+prod => prod,production,product
+pub => pub,publication,public,publishing
+ref => ref,referee,reference,refining
+reg => reg,registrar,regular
+rep => rep,representative,reporter,report
+res => res,research,reserve,resolution
+sec => sec,section,securities
+sen => sen,senator,senegal
+st => st,state,street
+tel => tel,telephone,telegraph
+tr => tr,trustee,trust
 
 // "trans" is used much more to mean transgender than the other words, and we've
 // gotten a complaint from a user about this synonym. Removing it, but adding a
@@ -457,314 +457,306 @@ zam,zambia
 zim,zimbabwe
 
 # Top abbreviations in legal documents since 1975
-american arbitration association => aaa
-american bar association => aba
-american broadcasting company => abc
-armed career criminal act => acca
-arkansas crime information center => acic
-americans with disabilities act => ada
-age discrimination in employment act => adea
-attention deficit hyperactivity disorder => adhd
-antiterrorism and effective death penalty act => aedpa
-aid to families with dependent children => afdc
-air force office of special investigations => afosi
-american institute of architects => aia
-acquired immune deficiency syndrome => aids
-administrative law court => alc
-administrative law judge => alj
-american national standards institute => ansi
-agency of original jurisdiction => aoj
-administrative procedure act, administrative procedures act => apa
-albuquerque police department => apd
-armed services board of contract appeals => asbca
-alcohol tobacco and firearms => atf
-all terrain vehicle => atv
-assistant united states attorney => ausa
-blood alcohol concentration => bac
-bankruptcy appellate panel => bap
-bureau of criminal apprehension => bca
-bureau of criminal identification => bci
-board of immigration appeal, bureau of indian affairs => bia
-bureau of land management => blm
-bureau of prisons => bop
-benefits review board => brb
-child advocacy center, children advocacy center => cac
-coronavirus aid relief and economic security => cares
-convention against torture => cat
-collective bargaining agreement => cba
-continuing criminal enterprise => cce
-california department of corrections and rehabilitation => cdcr
-controlled dangerous substance => cds
-chief executive officer, code enforcement officer => ceo
-california environmental quality act => ceqa
-commercial general liability => cgl
-california highway patrol => chp
-criminal investigation division => cid
-court improvement program => cip
-certificate of appealability => coa
-consolidated omnibus budget reconciliation act => cobra
-consumer protection act => cpa
-chicago police department => cpd
-child protective services, children protective services => cps
-california rehabilitation center => crc
-citizens for responsibility and ethics in washington => crew
-controlled substances act => csa
-child sexual abuse accommodation syndrome => csaas
-child support recovery act, civil service reform act, civil service retirement act => csra
-conditional use permit => cup
-connecticut unfair trade practices act => cutpa
-clean water act => cwa
-children and youth services => cys
-department of children and families => dcf
-department of children and family services, division of child and family services => dcfs
-department of child services => dcs
-drug enforcement administration => dea
-department of environmental conservation => dec
-department of environmental protection => dep
-department of environmental quality => deq
-department of environmental resources => der
-department of family and children services => dfacs
-division of family services => dfs
-division of housing and community renewal => dhcr
-department of health and human services => dhhs
-department of human resources => dhr
-department of homeland security, department of human services => dhs
-disability insurance benefits => dib
-department of juvenile justice => djj
-department of local government finance => dlgf
-department of motor vehicles => dmv
-deoxyribonucleic acid => dna
-department of natural resources => dnr
-department of correction => doc
-department of correctional services => docs
-department of defense => dod
-department of education => doe
-department of health => doh
-department of labor => dol
-department of revenue => dor
-department of transportation => dot
-department of transportation and development => dotd
-department of public safety => dps
-department of public welfare => dpw
-development review board => drb
-department of social and health services => dshs
-department of social services => dss
-deceptive trade practices act, deceptive trade practices consumer protection act => dtpa
-driving under the influence => dui
-domestic violence restraining order => dvro
-driving while intoxicated => dwi
-division of youth and family services => dyfs
-equal access to justice act => eaja
-equal employment opportunity commission => eeoc
-environmental impact statement => eis
-emergency medical services => ems
-environmental protection agency => epa
-employee retirement income security act => erisa
-federal arbitration act, federal aviation administration => faa
-first amended complaint => fac
-federal bureau of investigation => fbi
-false claims act, federal communications act => fca
-federal communications commission => fcc
-fair credit reporting act => fcra
-food and drug administration => fda
-fair debt collection practices act => fdcpa
-federal deposit insurance corporation => fdic
-federal energy administration => fea
-federal election campaign act => feca
-fair employment and housing act => feha
-federal employers liability act => fela
-federal emergency management agency => fema
-federal energy regulatory commission => ferc
-fair housing act => fha
-federal insurance contribution act => fica
-financial industry regulatory authority => finra
-fair labor standards act => flsa
-family and medical leave act => fmla
-freedom of information act => foia
-freedom of information law => foil
-federal rules of civil procedure => frcp
-fair sentencing act => fsa
-foreign sovereign immunities act => fsia
-federal savings and loan insurance corporation => fslic
-federal trade commission => ftc
-federal tort claims act => ftca
-guardian ad litem => gal
-georgia bureau of investigation => gbi
-government employees insurance company => geico
-global positioning system => gps
-general services administration => gsa
-horizontal gaze nystagmus => hgn
-health and human services => hhs
-health insurance portability and accountability act => hipaa
-human immunodeficiency virus => hiv
-health maintenance organization => hmo
-housing preservation and development => hpd
-hawaii revised statutes => hrs
-harmonized tariff schedule of the united states => htsus
-housing and urban development => hud
-interstate agreement on detainers => iad
-initial appeal file => iaf
-interstate commerce commission => icc
-immigration and customs enforcement => ice
-intensive care unit => icu
-indian child welfare act => icwa
-individuals with disabilities education act => idea
-illinois department of corrections => idoc
-individualized education plan => iep
-in forma pauperis => ifp
-independent medical examination => ime
-immigration and nationality act, insurance company of north america => ina
-immigration and naturalization service => ins
-illinois pattern jury instruction => ipi
-individual retirement account => ira
-internal revenue service => irs
-international trade administration => ita
-intrauterine device => iud
-judge of compensation claims => jcc
-kentucky bar association => kba
-kansas offender registration act, kansas open records act => kora
-kentucky revised statutes => krs
-kansas sentencing guidelines act => ksga
-longshore and harbor workers compensation act => lhwca
-louisiana insurance guaranty association => liga
-life insurance company of north america => lina
-limited liability company => llc
-labor management relations act => lmra
-massachusetts bay transportation authority => mbta
-metropolitan correctional center => mcc
-mississippi department of corrections => mdoc
-mortgage electronic registration systems => mers
-memorandum of understanding => mou
-municipalities planning code => mpc
-metropolitan police department => mpd
-magnetic resonance imaging => mri
-marital settlement agreement => msa
-merit systems protection board => mspb
-mississippi tort claims act => mtca
-mandatory victims restitution act => mvra
-national association of securities dealers => nasd
-national crime information center => ncic
-national environmental policy act => nepa
-no early release act => nera
-national highway traffic safety administration => nhtsa
-national labor relations act => nlra
-national labor relations board => nlrb
-notice of appeal => noa
-notice of disagreement => nod
-new york city police department, new york police department => nypd
-office of administrative hearings => oah
-oklahoma bar association => oba
-ohio bureau of employment services => obes
-office of consumer advocate => oca
-office of disciplinary counsel => odc
-ohio department of transportation => odot
-ohio department of rehabilitation and correction => odrc
-office of lawyer regulation => olr
-open meetings act => oma
-office of mental health => omh
-omaha police department => opd
-office of personnel management => opm
-occupational safety and health act, occupational safety and health administration => osha
-office of workers compensation => owc
-office of workers compensation programs => owcp
-operating while intoxicated => owi
-public access to court electronic records => pacer
-post conviction relief => pcr
-post conviction relief act => pcra
-public employee relations act => pera
-public employment relations commission => perc
-public employees retirement system => pers
-pennsylvania human relations act => phra
-personal injury protection => pip
-prison litigation reform act => plra
-public records act => pra
-personal restraint petition => prp
-public service commission => psc
-presentence investigation => psi
-presentence report => psr
-political subdivisions tort claims act => pstca
-permanent total disability => ptd
-patent and trademark office => pto
-post-traumatic stress disorder, post traumatic stress disorder, posttraumatic stress disorder => ptsd
-public utilities commission => puc
-planned unit development => pud
-public utility regulatory act => pura
-qualified domestic relations order => qdro
-rules of the united states court of federal claims => rcfc
-request for proposal => rfp
-religious freedom restoration act => rfra
-rules governing disciplinary proceedings => rgdp
-racketeer influenced and corrupt organization act => rico
-revised judicature act => rja
-railway labor act => rla
-rules on lawyers professional responsibility => rlpr
-resolution trust corporation => rtc
-second amended complaint => sac
-sexual assault nurse examiner => sane
-small business administration => sba
-securities and exchange commission => sec
-southeastern pennsylvania transportation authority => septa
-staff judge advocate => sja
-supreme judicial court => sjc
-securities litigation uniform standards act => slusa
-seattle municipal code => smc
-special processing unit => spu
-sentence reform act => sra
-social and rehabilitation services => srs
-social security act, social security administration => ssa
-supplemental security income => ssi
-sport utility vehicle => suv
-sexually violent predator => svp
-tennessee bureau of investigation => tbi
-trial court opinion => tco
-telephone consumer protection act => tcpa
-texas department of criminal justice => tdcj
-truth in lending act => tila
-temporary restraining order => tro
-texas tort claims act => ttca
-temporary total disability => ttd
-texas youth commission => tyc
-uniform administrative procedure act => uapa
-uniform commercial code => ucc
-uniform child custody jurisdiction act => uccja
-uniform code of military justice => ucmj
-underinsured motorist => uim
-united parcel service => ups
-uniform reciprocal enforcement of support act => uresa
-united services automobile association => usaa
-united states citizenship and immigration services => uscis
-united states department of agriculture => usda
-united states postal service => usps
-united states trustee => ust
-veterans employment opportunities act => veoa
-vehicle identification number => vin
-violation of probation => vop
-verbatim report of proceedings => vrp
-victim and witness protection act => vwpa
-workers compensation appeal board => wcab
-workers compensation judge => wcj
-women in crisis => wic
-zoning board of adjustment => zba
-zoning hearing board => zhb
-comprehensive environmental response compensation and liability act => cercla
-illegal immigration reform and immigrant responsibility act => iirira
-financial institutions reform, recovery and enforcement act => firrea
-bankruptcy abuse prevention and consumer protection act of 2005 => bapcpa
-uniform child custody jurisdiction and enforcement act => uccjea
-religious land use and institutionalized persons act => rluipa
-uniformed services employment and reemployment rights act => userra
-federal employee group life insurance act => feglia
-new york city employees retirement system => nycers
-uniform division of income for tax purposes act => uditpa
-california jury instruction criminal => caljic
-florida deceptive and unfair trade practices act => fdutpa
-alaska national interest lands conservation act => anilca
+american bar association, aba
+american broadcasting company, abc
+armed career criminal act, acca
+arkansas crime information center, acic
+americans with disabilities act, ada
+age discrimination in employment act, adea
+attention deficit hyperactivity disorder, adhd
+antiterrorism and effective death penalty act, aedpa
+aid to families with dependent children, afdc
+air force office of special investigations, afosi
+american institute of architects, aia
+acquired immune deficiency syndrome, aids
+administrative law court, alc
+administrative law judge, alj
+american national standards institute, ansi
+agency of original jurisdiction, aoj
+administrative procedure act, administrative procedures act, apa
+albuquerque police department, apd
+armed services board of contract appeals, asbca
+alcohol tobacco and firearms, atf
+all terrain vehicle, atv
+assistant united states attorney, ausa
+blood alcohol concentration, bac
+bankruptcy appellate panel, bap
+bureau of criminal apprehension, bca
+bureau of criminal identification, bci
+board of immigration appeal, bureau of indian affairs, bia
+bureau of land management, blm
+bureau of prisons, bop
+benefits review board, brb
+child advocacy center, children advocacy center, cac
+coronavirus aid relief and economic security, cares
+collective bargaining agreement, cba
+continuing criminal enterprise, cce
+california department of corrections and rehabilitation, cdcr
+controlled dangerous substance, cds
+chief executive officer, code enforcement officer, ceo
+california environmental quality act, ceqa
+commercial general liability, cgl
+california highway patrol, chp
+criminal investigation division, cid
+court improvement program, cip
+certificate of appealability, coa
+consolidated omnibus budget reconciliation act, cobra
+consumer protection act, cpa
+chicago police department, cpd
+child protective services, children protective services, cps
+california rehabilitation center, crc
+controlled substances act, csa
+child sexual abuse accommodation syndrome, csaas
+child support recovery act, civil service reform act, civil service retirement act, csra
+connecticut unfair trade practices act, cutpa
+clean water act, cwa
+children and youth services, cys
+department of children and families, dcf
+department of children and family services, division of child and family services, dcfs
+department of child services, dcs
+drug enforcement administration, dea
+department of environmental conservation, dec
+department of environmental protection, dep
+department of environmental quality, deq
+department of environmental resources, der
+department of family and children services, dfacs
+division of family services, dfs
+division of housing and community renewal, dhcr
+department of health and human services, dhhs
+department of human resources, dhr
+department of homeland security, department of human services, dhs
+disability insurance benefits, dib
+department of juvenile justice, djj
+department of local government finance, dlgf
+department of motor vehicles, dmv
+deoxyribonucleic acid, dna
+department of natural resources, dnr
+department of correction, doc
+department of correctional services, docs
+department of defense, dod
+department of education, doe
+department of health, doh
+department of labor, dol
+department of revenue, dor
+department of transportation and development, dotd
+department of public safety, dps
+department of public welfare, dpw
+development review board, drb
+department of social and health services, dshs
+department of social services, dss
+deceptive trade practices act, deceptive trade practices consumer protection act, dtpa
+driving under the influence, dui
+domestic violence restraining order, dvro
+driving while intoxicated, dwi
+division of youth and family services, dyfs
+equal access to justice act, eaja
+equal employment opportunity commission, eeoc
+environmental impact statement, eis
+emergency medical services, ems
+environmental protection agency, epa
+employee retirement income security act, erisa
+federal arbitration act, federal aviation administration, faa
+first amended complaint, fac
+federal bureau of investigation, fbi
+false claims act, federal communications act, fca
+federal communications commission, fcc
+fair credit reporting act, fcra
+food and drug administration, fda
+fair debt collection practices act, fdcpa
+federal deposit insurance corporation, fdic
+federal energy administration, fea
+federal election campaign act, feca
+fair employment and housing act, feha
+federal employers liability act, fela
+federal emergency management agency, fema
+federal energy regulatory commission, ferc
+fair housing act, fha
+federal insurance contribution act, fica
+financial industry regulatory authority, finra
+fair labor standards act, flsa
+family and medical leave act, fmla
+freedom of information act, foia
+federal rules of civil procedure, frcp
+fair sentencing act, fsa
+foreign sovereign immunities act, fsia
+federal savings and loan insurance corporation, fslic
+federal trade commission, ftc
+federal tort claims act, ftca
+guardian ad litem, gal
+georgia bureau of investigation, gbi
+government employees insurance company, geico
+global positioning system, gps
+general services administration, gsa
+horizontal gaze nystagmus, hgn
+health and human services, hhs
+health insurance portability and accountability act, hipaa
+human immunodeficiency virus, hiv
+health maintenance organization, hmo
+housing preservation and development, hpd
+hawaii revised statutes, hrs
+harmonized tariff schedule of the united states, htsus
+housing and urban development, hud
+interstate agreement on detainers, iad
+initial appeal file, iaf
+interstate commerce commission, icc
+immigration and customs enforcement, ice
+intensive care unit, icu
+indian child welfare act, icwa
+illinois department of corrections, idoc
+individualized education plan, iep
+in forma pauperis, ifp
+independent medical examination, ime
+immigration and nationality act, insurance company of north america, ina
+immigration and naturalization service, ins
+illinois pattern jury instruction, ipi
+individual retirement account, ira
+internal revenue service, irs
+international trade administration, ita
+intrauterine device, iud
+judge of compensation claims, jcc
+kentucky bar association, kba
+kansas offender registration act, kansas open records act, kora
+kentucky revised statutes, krs
+kansas sentencing guidelines act, ksga
+longshore and harbor workers compensation act, lhwca
+louisiana insurance guaranty association, liga
+life insurance company of north america, lina
+limited liability company, llc
+labor management relations act, lmra
+massachusetts bay transportation authority, mbta
+metropolitan correctional center, mcc
+mississippi department of corrections, mdoc
+mortgage electronic registration systems, mers
+memorandum of understanding, mou
+municipalities planning code, mpc
+metropolitan police department, mpd
+magnetic resonance imaging, mri
+marital settlement agreement, msa
+merit systems protection board, mspb
+mississippi tort claims act, mtca
+mandatory victims restitution act, mvra
+national association of securities dealers, nasd
+national crime information center, ncic
+national environmental policy act, nepa
+no early release act, nera
+national highway traffic safety administration, nhtsa
+national labor relations act, nlra
+national labor relations board, nlrb
+notice of appeal, noa
+notice of disagreement, nod
+new york city police department, new york police department, nypd
+office of administrative hearings, oah
+oklahoma bar association, oba
+ohio bureau of employment services, obes
+office of consumer advocate, oca
+office of disciplinary counsel, odc
+ohio department of transportation, odot
+ohio department of rehabilitation and correction, odrc
+office of lawyer regulation, olr
+open meetings act, oma
+office of mental health, omh
+omaha police department, opd
+office of personnel management, opm
+occupational safety and health act, occupational safety and health administration, osha
+office of workers compensation, owc
+office of workers compensation programs, owcp
+operating while intoxicated, owi
+public access to court electronic records, pacer
+post conviction relief, pcr
+post conviction relief act, pcra
+public employee relations act, pera
+public employment relations commission, perc
+public employees retirement system, pers
+pennsylvania human relations act, phra
+personal injury protection, pip
+prison litigation reform act, plra
+public records act, pra
+personal restraint petition, prp
+public service commission, psc
+presentence investigation, psi
+presentence report, psr
+political subdivisions tort claims act, pstca
+permanent total disability, ptd
+patent and trademark office, pto
+post traumatic stress disorder, posttraumatic stress disorder, ptsd
+public utilities commission, puc
+planned unit development, pud
+public utility regulatory act, pura
+qualified domestic relations order, qdro
+rules of the united states court of federal claims, rcfc
+request for proposal, rfp
+religious freedom restoration act, rfra
+rules governing disciplinary proceedings, rgdp
+racketeer influenced and corrupt organization act, rico
+revised judicature act, rja
+railway labor act, rla
+rules on lawyers professional responsibility, rlpr
+resolution trust corporation, rtc
+second amended complaint, sac
+small business administration, sba
+securities and exchange commission, sec
+southeastern pennsylvania transportation authority, septa
+staff judge advocate, sja
+supreme judicial court, sjc
+securities litigation uniform standards act, slusa
+seattle municipal code, smc
+special processing unit, spu
+sentence reform act, sra
+social and rehabilitation services, srs
+social security act, social security administration, ssa
+supplemental security income, ssi
+sport utility vehicle, suv
+sexually violent predator, svp
+tennessee bureau of investigation, tbi
+trial court opinion, tco
+telephone consumer protection act, tcpa
+texas department of criminal justice, tdcj
+truth in lending act, tila
+temporary restraining order, tro
+texas tort claims act, ttca
+temporary total disability, ttd
+texas youth commission, tyc
+uniform administrative procedure act, uapa
+uniform commercial code, ucc
+uniform child custody jurisdiction act, uccja
+uniform code of military justice, ucmj
+underinsured motorist, uim
+united parcel service, ups
+uniform reciprocal enforcement of support act, uresa
+united services automobile association, usaa
+united states citizenship and immigration services, uscis
+united states department of agriculture, usda
+united states postal service, usps
+united states trustee, ust
+veterans employment opportunities act, veoa
+vehicle identification number, vin
+violation of probation, vop
+verbatim report of proceedings, vrp
+victim and witness protection act, vwpa
+workers compensation appeal board, wcab
+workers compensation judge, wcj
+women in crisis, wic
+zoning board of adjustment, zba
+zoning hearing board, zhb
+comprehensive environmental response compensation and liability act, cercla
+illegal immigration reform and immigrant responsibility act, iirira
+financial institutions reform, recovery and enforcement act, firrea
+bankruptcy abuse prevention and consumer protection act of 2005, bapcpa
+uniform child custody jurisdiction and enforcement act, uccjea
+religious land use and institutionalized persons act, rluipa
+uniformed services employment and reemployment rights act, userra
+federal employee group life insurance act, feglia
+new york city employees retirement system, nycers
+uniform division of income for tax purposes act, uditpa
+california jury instruction criminal, caljic
+florida deceptive and unfair trade practices act, fdutpa
+alaska national interest lands conservation act, anilca
 
 # Corporate synonyms from #923
 corp,corporation
 
 
 # Special ones for fun
-free law project => flp
-court listener => cl
-courthouse ethics and transparency act => ceta
+free law project, flp
+court listener, cl
+courthouse ethics and transparency act, ceta
