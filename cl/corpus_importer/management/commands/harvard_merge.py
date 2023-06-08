@@ -628,9 +628,15 @@ def merge_opinion_clusters(
     try:
         with transaction.atomic():
             map_and_merge_opinions(opinion_cluster, harvard_data)
+
             changed_values_dictionary = combine_non_overlapping_data(
                 opinion_cluster, harvard_data
             )
+
+            # We need to reload the object because it was previously updated
+            # in combine_non_overlapping_data
+            opinion_cluster.refresh_from_db()
+
             merge_docket_numbers(
                 opinion_cluster, harvard_data["docket_number"]
             )
@@ -658,6 +664,10 @@ def merge_opinion_clusters(
                 OpinionCluster.objects.filter(id=cluster_id).update(
                     **data_to_update
                 )
+
+            # We need to refresh the object before trying to use it to
+            # update the cluster source
+            opinion_cluster.refresh_from_db()
 
             update_docket_source(opinion_cluster)
             update_cluster_source(opinion_cluster)

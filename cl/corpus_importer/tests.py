@@ -2449,20 +2449,55 @@ class HarvardMergerTests(TestCase):
             (<cross_reference><span class="citation no-link">99 S.E. 622</span></cross_reference>). I concur in the reversal for this additional reason.</p>"""
 
         cluster = OpinionClusterFactoryMultipleOpinions(
+            source=SOURCES.COLUMBIA_ARCHIVE,
             docket=DocketFactory(source=Docket.COLUMBIA),
             sub_opinions__data=[
-                {"type": "020lead", "html_with_citations": lead},
-                {"type": "030concurrence", "html_with_citations": concurrence},
+                {
+                    "type": "020lead",
+                    "html_with_citations": lead,
+                    "author_str": "Broyles",
+                },
+                {
+                    "type": "030concurrence",
+                    "html_with_citations": concurrence,
+                    "author_str": "Gardner",
+                },
             ],
         )
 
         self.assertEqual(
-            OpinionCluster.objects.get(id=cluster.id).attorneys, "", msg="WHAT"
+            cluster.attorneys,
+            "",
+            msg="This value should be empty unless you have specified it in "
+            "the factory.",
         )
 
-        self.assertEqual(Opinion.objects.all().count(), 2)
+        self.assertEqual(
+            cluster.judges,
+            "",
+            msg="This value should be empty unless you have specified it in "
+            "the factory.",
+        )
+
+        self.assertEqual(cluster.sub_opinions.all().count(), 2)
+
         merge_opinion_clusters(cluster_id=cluster.id)
-        self.assertEqual(Opinion.objects.all().count(), 2)
+
+        cluster.refresh_from_db()
+
+        self.assertEqual(cluster.sub_opinions.all().count(), 2)
+
+        self.assertEqual(
+            cluster.attorneys,
+            "B. B. Giles, for plaintiff in error., Lindley W. Gamp, "
+            "solicitor, John A. Boyhin, solicitor-general,. Durwood T. Bye, "
+            "contra.",
+        )
+
+        self.assertEqual(
+            cluster.judges,
+            "Broyles, Gardner, MacIntyre",
+        )
 
     def test_non_overlapping(self):
         """Can we find fields that need merging"""
@@ -2501,7 +2536,7 @@ class HarvardMergerTests(TestCase):
     def test_docket_number_merger(self):
         """Can we choose the correct docket number"""
         docket = DocketFactory(docket_number="17-3000")
-        cluster = OpinionClusterWithParentsFactory(docket=docket)
+        cluster = OpinionClusterWithParentsFactory(id=4, docket=docket)
         merge_docket_numbers(cluster, "Master Docket No. 17-3000L")
         docket.refresh_from_db()
         self.assertEqual(docket.docket_number, "Master Docket 17-3000L")
@@ -2510,26 +2545,31 @@ class HarvardMergerTests(TestCase):
         """Test query for Non Harvard Sources"""
 
         OpinionClusterFactory(
+            source=SOURCES.COLUMBIA_ARCHIVE,
             docket=DocketFactory(source=Docket.COLUMBIA),
             id=1,
             filepath_json_harvard="/the/file/path.json",
         )
         OpinionClusterFactory(
+            source=SOURCES.HARVARD_CASELAW,
             docket=DocketFactory(source=Docket.HARVARD),
             id=2,
             filepath_json_harvard="/a/file/path.json",
         )
         OpinionClusterFactory(
+            source=SOURCES.COLUMBIA_ARCHIVE_M_HARVARD,
             docket=DocketFactory(source=Docket.HARVARD_AND_COLUMBIA),
             id=3,
             filepath_json_harvard="/some/file/path.json",
         )
         OpinionClusterFactory(
+            source=SOURCES.COURT_WEBSITE,
             docket=DocketFactory(source=Docket.SCRAPER),
             id=4,
             filepath_json_harvard="/my/file/path.json",
         )
         OpinionClusterFactory(
+            source=SOURCES.COURT_WEBSITE,
             docket=DocketFactory(source=Docket.SCRAPER),
             id=5,
             filepath_json_harvard=None,
@@ -2814,8 +2854,6 @@ class HarvardMergerTests(TestCase):
 
             data_to_update = merge_case_names(cluster, item[0])
 
-            print("data_to_update", data_to_update)
-
             self.assertEqual(
                 data_to_update.get("case_name", ""),
                 item[2].get("expected_case_name"),
@@ -2839,7 +2877,8 @@ class HarvardMergerTests(TestCase):
             ("2018-10-30", date(2018, 11, 6), date(2018, 10, 30)),
         ]:
             cluster = OpinionClusterWithParentsFactory(
-                date_filed=item[1], docket=DocketFactory(source=Docket.SCRAPER)
+                date_filed=item[1],
+                docket=DocketFactory(source=Docket.SCRAPER),
             )
 
             data_to_update = merge_cluster_dates(
