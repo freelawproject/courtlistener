@@ -268,6 +268,11 @@ def find_all_judges(judge_text: str) -> [str]:
     cleaned_text = judge_text.replace("\n", " ")[:100].strip()
     cleaned_text = cleaned_text.replace("By the Court", "")
     cleaned_text = cleaned_text.replace(" and", ", and").replace(",,", ",")
+
+    if len(cleaned_text.split()) == 1:
+        # You have only one name
+        return [cleaned_text]
+
     query1 = re.findall(
         r"(((Van|VAN|De|DE|Da|DA)\s)?[A-Z][\w\-']{2,}\b(\s(IV|I|II|III|V|Jr\.|Sr\.))?)\b,?[\s|\b]",
         cleaned_text,
