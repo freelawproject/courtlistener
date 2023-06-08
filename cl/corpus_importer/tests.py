@@ -2773,9 +2773,6 @@ class HarvardMergerTests(TestCase):
                 "",  # extracted data is the same, no need to update
             ),
         ]:
-            cluster = OpinionClusterWithParentsFactory(
-                judges=item[0],
-            )
             data_to_update = merge_judges((item[1], item[0]))
             self.assertEqual(data_to_update.get("judges", ""), item[2])
 
