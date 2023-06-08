@@ -2,8 +2,6 @@ from datetime import date
 from typing import Any, Optional
 
 from django.utils.timezone import now
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 
 from cl.lib.string_diff import get_cosine_similarity
 from cl.search.models import Docket
@@ -59,6 +57,11 @@ def similarity_scores(
     :param texts_to_compare_2: List of text to compare
     :return: Return similarity scores
     """
+
+    # We import the library inside the function to avoid loading it if it is
+    # not required
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.metrics.pairwise import cosine_similarity
 
     # Weights the word counts by a measure of how often they appear in the
     # documents, and it returns a sparse matrix
