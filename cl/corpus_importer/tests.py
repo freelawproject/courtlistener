@@ -14,7 +14,6 @@ from django.core.files.base import ContentFile
 from django.utils.timezone import make_aware
 from factory import RelatedFactory
 from juriscraper.lib.string_utils import harmonize, titlecase
-from unidecode import unidecode
 
 from cl.corpus_importer.court_regexes import match_court_string
 from cl.corpus_importer.factories import (
@@ -3011,9 +3010,14 @@ class HarvardMergerTests(TestCase):
                 "Hon. Gonzalo P. Curiel, United States District Judge",
                 "Curiel",
             ),
+            (
+                # Test abbreviated middle name
+                "Terrence L. O'Brien, Circuit Judge",
+                "O'Brien",
+            ),
         ]
         for pair in test_pairs:
-            author_str = titlecase(find_just_name(unidecode(pair[0])))
+            author_str = titlecase(find_just_name(pair[0]))
             self.assertEqual(pair[1], author_str, msg=f"Failed: {pair[1]}")
 
     def test_panel_extraction(self):
@@ -3053,7 +3057,7 @@ class HarvardMergerTests(TestCase):
             ),
         ]
         for pair in test_pairs:
-            judge_list = find_all_judges(unidecode(pair[0]))
+            judge_list = find_all_judges(pair[0])
             self.assertEqual(pair[1], judge_list, msg=f"Failed: {pair[1]}")
 
     def test_process_harvard_data(self):

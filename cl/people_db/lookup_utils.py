@@ -9,7 +9,9 @@ from dateutil.relativedelta import relativedelta
 from django.db.models import Q, QuerySet
 from django.utils.html import strip_tags
 from nameparser import HumanName
+from unidecode import unidecode
 
+from cl.corpus_importer.utils import wrap_text
 from cl.people_db.models import SUFFIX_LOOKUP, Person
 
 # list of words that aren't judge names
@@ -26,9 +28,11 @@ NOT_JUDGE_WORDS = [
     "all",
     "although",
     "and",
+    "amicus",
     "affirmed",
     "appeals",
     "appellate",
+    "appellant",
     "argument",
     "argued",
     "article",
@@ -80,6 +84,7 @@ NOT_JUDGE_WORDS = [
     "continue",
     "court",
     "curiam",
+    "curiae",
     "customs",
     "decided",
     "decision",
@@ -175,6 +180,7 @@ NOT_JUDGE_WORDS = [
     "recuse",
     "recused",
     "reference",
+    "referee",
     "rehearing",
     "report",
     "reported",
@@ -258,14 +264,13 @@ IS_JUDGE = {"wu", "re", "du", "de"}
 
 def find_all_judges(judge_text: str) -> [str]:
     """Find all judges
-
     This method is used to extract out multiple judge names from a text input
     from the harvard merger/import.
-
-    :param text: Harvard text input from judges tags
+    :param judge_text: Harvard text input from judges tags
     :return: List of judges names or empty list
     """
-    cleaned_text = judge_text.replace("\n", " ")[:100].strip()
+    cleaned_text = unidecode(judge_text).replace("\n", " ")
+    cleaned_text = wrap_text(100, cleaned_text).strip()
     cleaned_text = cleaned_text.replace("By the Court", "")
     cleaned_text = cleaned_text.replace(" and", ", and").replace(",,", ",")
 
@@ -274,7 +279,7 @@ def find_all_judges(judge_text: str) -> [str]:
         return [cleaned_text]
 
     query1 = re.findall(
-        r"(((Van|VAN|De|DE|Da|DA)\s)?[A-Z][\w\-']{2,}\b(\s(IV|I|II|III|V|Jr\.|Sr\.))?)\b,?[\s|\b]",
+        r"(((Van|VAN|De|DE|Da|DA)\s)?[A-Z][\w\-']{2,}\b(\s(IV|I|II|III|V|Jr\.|Sr\.))?)\b,?[\s|\b]?",
         cleaned_text,
     )
     query2 = re.findall(
@@ -301,7 +306,9 @@ def find_just_name(text: str) -> str:
     """
     # Crop the text - on the off chance the text is incorrectly long to avoid
     # searching the text way down.
-    cleaned_text = text.replace("\n", " ")[:100].strip()
+    cleaned_text = unidecode(text).replace("\n", " ")
+    cleaned_text = wrap_text(100, cleaned_text).strip()
+
     # this is done to handle weird OCR issue
     cleaned_text = cleaned_text.replace("By the Court", "")
 
@@ -550,10 +557,10 @@ def lookup_judge_by_full_name_and_set_attr(
     """Lookup a judge by the attribute of an object
 
     :param item: The object containing the attribute you want to look up
-    :param target_field: The field on the attribute you want to look up.
-    :param full_name: The full name of the judge to look up.
-    :param court_id: The court where the judge did something.
-    :param event_date: The date the judge did something.
+    :param target_field: The field on the attribute you want to look up
+    :param full_name: The full name of the judge to look up
+    :param court_id: The court where the judge did something
+    :param event_date: The date the judge did something
     :return None
     """
     if not full_name:

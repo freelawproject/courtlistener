@@ -113,3 +113,22 @@ def match_lists(
         matches[i] = j
 
     return matches
+
+
+def wrap_text(length, text):
+    """Wrap text to specified length without cutting words
+    :param length: max length to wrap
+    :param text: text to wrap
+    :return: text wrapped
+    """
+    words = text.split(" ")
+    if words:
+        lines = [words[0]]
+        for word in words[1:]:
+            if len(lines[-1]) + len(word) < length:
+                lines[-1] += f" {word}"
+            else:
+                lines.append(word)
+                break
+        return " ".join(lines)
+    return ""
