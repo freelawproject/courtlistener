@@ -4484,7 +4484,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
                 search_query, cd
             )
             self.assertEqual(s.count(), 0)
-        
+
     def test_exact_and_synonyms_query(self) -> None:
         """Test exact and synonyms in the same query."""
 

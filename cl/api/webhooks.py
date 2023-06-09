@@ -26,6 +26,7 @@ from cl.search.api_serializers import (
     SearchResultSerializer,
 )
 from cl.search.api_utils import ResultObject
+from cl.search.documents import AudioDocument
 
 
 def send_webhook_event(
@@ -227,7 +228,11 @@ def send_es_search_alert_webhook(
     serialized_results = SearchESResultSerializer(
         es_results,
         many=True,
-        context={"schema": mapping_schema},
+        context={
+            "schema": AudioDocument._index.get_mapping()["oral_arguments"][
+                "mappings"
+            ]
+        },
     ).data
 
     post_content = {
