@@ -22,8 +22,7 @@ from django.http import HttpRequest
 from django.test import RequestFactory, override_settings
 from django.test.utils import captured_stderr
 from django.urls import reverse
-from elasticsearch import Elasticsearch
-from elasticsearch_dsl import Q, Search, connections
+from elasticsearch_dsl import Q, connections
 from factory import RelatedFactory
 from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
@@ -32,6 +31,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
 
+from cl.alerts.send_alerts import percolate_document
 from cl.audio.factories import AudioFactory
 from cl.audio.models import Audio
 from cl.lib.elasticsearch_utils import (
@@ -2829,15 +2829,9 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         return percolator_query.meta.id
 
     @staticmethod
-    def do_percolator_query(audio_obj):
+    def prepare_document(document):
         audio_doc = AudioDocument()
-        audio_dict = audio_doc.prepare(audio_obj)
-        # create a search object
-        s = Search(index="oral_arguments")
-        s = s.query("percolate", field="percolator_query", document=audio_dict)
-        # execute the search
-        response = s.execute()
-        return response
+        return audio_doc.prepare(document)
 
     def test_oa_results_basic(self) -> None:
         # Frontend
@@ -4376,7 +4370,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         }
         query_id = self.save_percolator_query(cd)
         AudioDocument._index.refresh()
-        response = self.do_percolator_query(self.audio_2)
+        response = percolate_document(self.prepare_document(self.audio_2))
         expected_queries = 1
         self.assertEqual(len(response), expected_queries)
         self.assertEqual(self.confirm_query_matched(response, query_id), True)
@@ -4390,7 +4384,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
 
         query_id = self.save_percolator_query(cd)
         AudioDocument._index.refresh()
-        response = self.do_percolator_query(self.audio_2)
+        response = percolate_document(self.prepare_document(self.audio_2))
         expected_queries = 2
         self.assertEqual(len(response), expected_queries)
         self.assertEqual(self.confirm_query_matched(response, query_id), True)
@@ -4403,7 +4397,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         }
         query_id = self.save_percolator_query(cd)
         AudioDocument._index.refresh()
-        response = self.do_percolator_query(self.audio_1)
+        response = percolate_document(self.prepare_document(self.audio_1))
         expected_queries = 1
         self.assertEqual(len(response), expected_queries)
         self.assertEqual(self.confirm_query_matched(response, query_id), True)
@@ -4418,7 +4412,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
 
         query_id = self.save_percolator_query(cd)
         AudioDocument._index.refresh()
-        response = self.do_percolator_query(self.audio_5)
+        response = percolate_document(self.prepare_document(self.audio_5))
         expected_queries = 1
         self.assertEqual(len(response), expected_queries)
         self.assertEqual(self.confirm_query_matched(response, query_id), True)
@@ -4434,7 +4428,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
 
         query_id = self.save_percolator_query(cd)
         AudioDocument._index.refresh()
-        response = self.do_percolator_query(self.audio_1)
+        response = percolate_document(self.prepare_document(self.audio_1))
         expected_queries = 2
         self.assertEqual(len(response), expected_queries)
         self.assertEqual(self.confirm_query_matched(response, query_id), True)
@@ -4449,7 +4443,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         }
         query_id = self.save_percolator_query(cd)
         AudioDocument._index.refresh()
-        response = self.do_percolator_query(self.audio_2)
+        response = percolate_document(self.prepare_document(self.audio_2))
         expected_queries = 3
         self.assertEqual(len(response), expected_queries)
         self.assertEqual(self.confirm_query_matched(response, query_id), True)
@@ -4464,7 +4458,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
 
         query_id = self.save_percolator_query(cd)
         AudioDocument._index.refresh()
-        response = self.do_percolator_query(self.audio_4)
+        response = percolate_document(self.prepare_document(self.audio_4))
         expected_queries = 2
         self.assertEqual(len(response), expected_queries)
         self.assertEqual(self.confirm_query_matched(response, query_id), True)

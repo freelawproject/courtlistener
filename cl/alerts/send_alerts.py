@@ -1,6 +1,8 @@
 import traceback
+from typing import Any
 
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives
 from django.http import QueryDict
 from django.template import loader
@@ -16,10 +18,11 @@ from cl.api.webhooks import send_es_search_alert_webhook
 from cl.lib.command_utils import logger
 from cl.search.documents import AudioDocument
 from cl.search.models import SEARCH_TYPES
+from cl.users.models import UserProfile
 
 
 def send_alert_email(
-    user_email: str, hits: list[list[Alert, str, dict, int]]
+    user_email: str, hits: list[list[Alert | str | list[dict[str, Any]] | int]]
 ) -> None:
     """Send an alert email to a specified user when there are new hits.
 
@@ -80,19 +83,25 @@ def send_rt_alerts(response: Response, document_data: AttrDict) -> None:
 
     for hit in response:
         es_id = hit.meta.id
-        print("ID ES: ", es_id)
-        alert_triggered = Alert.objects.filter(es_id=es_id).select_related(
-            "user",
-        )[0]
-        user = alert_triggered.user
+        alert_triggered = (
+            Alert.objects.filter(es_id=es_id)
+            .select_related(
+                "user",
+            )
+            .first()
+        )
+        if not alert_triggered:
+            continue
+
+        alert_user: UserProfile.user = alert_triggered.user
         not_donated_enough = (
-            user.profile.total_donated_last_year
+            alert_user.profile.total_donated_last_year
             < settings.MIN_DONATION["rt_alerts"]
         )
         if not_donated_enough and alert_triggered.rate == Alert.REAL_TIME:
             logger.info(
                 "User: %s has not donated enough for their "
-                "RT alerts to be sent.\n" % user
+                "RT alerts to be sent.\n" % alert_user
             )
             continue
         qd = QueryDict(alert_triggered.query.encode(), mutable=True)
@@ -110,7 +119,7 @@ def send_rt_alerts(response: Response, document_data: AttrDict) -> None:
             alert_triggered.date_last_hit = now()
             alert_triggered.save()
 
-            user_webhooks = user.webhooks.filter(
+            user_webhooks = alert_user.webhooks.filter(
                 event_type=WebhookEventType.SEARCH_ALERT, enabled=True
             )
             for user_webhook in user_webhooks:
@@ -121,4 +130,4 @@ def send_rt_alerts(response: Response, document_data: AttrDict) -> None:
                     alert_triggered,
                 )
             if len(hits) > 0:
-                send_alert_email(user.email, hits)
+                send_alert_email(alert_user.email, hits)
