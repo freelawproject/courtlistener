@@ -1,6 +1,6 @@
 ARG BUILD_ENV=prod
 
-FROM python:3.10-slim as build-base
+FROM python:3.11-slim as build-base
 
 RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
     apt-get install \
@@ -111,14 +111,13 @@ CMD python /opt/courtlistener/manage.py migrate && \
 #freelawproject/courtlistener:latest-web-prod
 FROM python-base as web-prod
 
-CMD gunicorn cl_wsgi:application \
-    --chdir /opt/courtlistener/docker/django/wsgi-configs/ \
+CMD gunicorn cl.asgi:application \
+    --chdir /opt/courtlistener/ \
     --user www-data \
     --group www-data \
     # Set high number of workers. Docs recommend 2-4× core count`
     --workers ${NUM_WORKERS:-48} \
-    --worker-class gthread \
-    --threads 2 \
+    --worker-class cl.workers.UvicornWorker \
     # Allow longer queries to solr.
     --limit-request-line 6000 \
     # Reset each worker once in a while

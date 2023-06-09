@@ -139,6 +139,7 @@ MIDDLEWARE = [
 ROOT_URLCONF = "cl.urls"
 
 INSTALLED_APPS = [
+    "daphne",
     "django.contrib.admin",
     "django.contrib.admindocs",
     "django.contrib.contenttypes",
@@ -188,6 +189,8 @@ INSTALLED_APPS = [
 if DEVELOPMENT:
     INSTALLED_APPS.append("django_extensions")
     MIDDLEWARE.append("debug_toolbar.middleware.DebugToolbarMiddleware")
+
+ASGI_APPLICATION = "cl.asgi.application"
 
 
 ################
