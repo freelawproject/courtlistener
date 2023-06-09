@@ -230,7 +230,7 @@ def combine_non_overlapping_data(
     """
     all_data = fetch_non_harvard_data(harvard_data)
     changed_values_dictionary: dict[str, Tuple] = {}
-    to_update: dict[str] = {}
+    to_update: dict[str, Any] = {}
     for key, value in all_data.items():
         cl_value = getattr(cluster, key)
         if not cl_value:
@@ -252,7 +252,7 @@ def merge_long_fields(
     field_name: str,
     overlapping_data: Optional[Tuple[str, str]],
     cluster_id: int,
-) -> dict[str]:
+) -> dict[str, Any]:
     """Merge two long text fields
     :param field_name: field name to update in opinion cluster
     :param overlapping_data: data to compare from harvard and courtlistener
@@ -280,7 +280,7 @@ def merge_long_fields(
 
 def merge_judges(
     overlapping_data: Optional[Tuple[str, str]],
-) -> dict[str]:
+) -> dict[str, Any]:
     """Merge overlapping judge values
 
     :param overlapping_data: data to compare from harvard and courtlistener
@@ -316,7 +316,7 @@ def merge_cluster_dates(
     cluster: OpinionCluster,
     field_name: str,
     overlapping_data: Optional[Tuple[str | None, date]],
-) -> dict[str]:
+) -> dict[str, Any]:
     """Compare two dates and choose the best to update the opinion cluster
     the value if one value is better than the other
 
@@ -349,7 +349,7 @@ def merge_cluster_dates(
 
 def merge_strings(
     field_name: str, overlapping_data: Tuple[str, str]
-) -> dict[str]:
+) -> dict[str, Any]:
     """Compare two strings and choose the largest
 
     :param field_name: field name to update in opinion cluster
@@ -404,7 +404,7 @@ def merge_docket_numbers(
 
 def merge_case_names(
     cluster: OpinionCluster, harvard_data: Dict[str, Any]
-) -> dict[str]:
+) -> dict[str, Any]:
     """Merge case names
     :param cluster: The cluster of the merging item
     :param harvard_data: json data from harvard case
@@ -455,7 +455,9 @@ def merge_case_names(
     return update_dict
 
 
-def merge_date_filed(cluster: OpinionCluster, harvard_data: dict) -> dict[str]:
+def merge_date_filed(
+    cluster: OpinionCluster, harvard_data: dict
+) -> dict[str, Any]:
     """Merge date filed
     :param cluster: The cluster of the merging item
     :param harvard_data: json data from harvard case
@@ -471,7 +473,7 @@ def merge_date_filed(cluster: OpinionCluster, harvard_data: dict) -> dict[str]:
 
 def merge_overlapping_data(
     cluster: OpinionCluster, changed_values_dictionary: dict
-) -> dict[str]:
+) -> dict[str, Any]:
     """Merge overlapping data
     :param cluster: the cluster object
     :param changed_values_dictionary: the dictionary of data to merge
@@ -581,7 +583,7 @@ def update_cluster_source(cluster: OpinionCluster) -> None:
         raise ClusterSourceException("Unexpected cluster source")
 
 
-def save_headmatter(harvard_data: Dict[str, Any]) -> dict[str]:
+def save_headmatter(harvard_data: Dict[str, Any]) -> dict[str, Any]:
     """Save and update headmatter
     Clean up the headmatter content - (pre opinion content) and save it
     :param harvard_data: json data from harvard case

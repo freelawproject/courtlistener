@@ -1,6 +1,7 @@
 from datetime import date
 from typing import Any, Optional
 
+import bs4
 from django.utils.timezone import now
 
 from cl.lib.string_diff import get_cosine_similarity
@@ -77,7 +78,7 @@ def similarity_scores(
 
 
 def match_lists(
-    harvard_opinions_list: list[str], cl_opinions_list: list[str]
+    harvard_opinions_list: list[bs4.element.Tag], cl_opinions_list: list[str]
 ) -> dict[int, Any]:
     """Generate matching lists above threshold
 
