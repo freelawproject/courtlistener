@@ -14,10 +14,22 @@ ELASTICSEARCH_DSL = {
                 "tokenizer": "whitespace",
                 "filter": [
                     "lowercase",
+                    "custom_word_delimiter_filter",
+                    "remove_leading_zeros",
+                    "english_stop",
+                    "english_stemmer",
+                    "remove_duplicates",
+                ],
+            },
+            "search_analyzer": {
+                "type": "custom",
+                "tokenizer": "whitespace",
+                "filter": [
+                    "lowercase",
                     "synonym_filter",
                     "custom_word_delimiter_filter",
                     "remove_leading_zeros",
-                    "keyword_marker",
+                    "english_stop",
                     "english_stemmer",
                     "remove_duplicates",
                 ],
@@ -27,10 +39,9 @@ ELASTICSEARCH_DSL = {
                 "tokenizer": "whitespace",
                 "filter": [
                     "lowercase",
-                    "synonym_filter",
                     "custom_word_delimiter_filter",
                     "remove_leading_zeros",
-                    "keyword_marker",
+                    "english_stop",
                     "remove_duplicates",
                 ],
             },
@@ -42,14 +53,15 @@ ELASTICSEARCH_DSL = {
                 "preserve_original": True,
             },
             "synonym_filter": {
-                "type": "synonym",
+                "type": "synonym_graph",
+                "expand": True,
                 "synonyms_path": "synonyms_en.txt",
             },
-            "keyword_marker": {
-                "type": "keyword_marker",
-                "keywords_path": "protwords_en.txt",
-            },
             "english_stemmer": {"type": "stemmer", "language": "english"},
+            "english_stop": {
+                "type": "stop",
+                "stopwords_path": "stopwords_en.txt",
+            },
             "remove_duplicates": {"type": "unique"},
             "remove_leading_zeros": {
                 "type": "pattern_replace",

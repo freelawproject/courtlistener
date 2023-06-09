@@ -187,7 +187,11 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
                 serializer = SearchESResultSerializer(
                     result_page,
                     many=True,
-                    context={"schema": AudioDocument._index.get_mapping()},
+                    context={
+                        "schema": AudioDocument._index.get_mapping()[
+                            "oral_arguments"
+                        ]["mappings"]
+                    },
                 )
             else:
                 serializer = SearchResultSerializer(

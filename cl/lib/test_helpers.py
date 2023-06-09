@@ -250,7 +250,7 @@ class AudioESTestCase(SimpleTestCase):
             case_name="SEC v. Frank J. Information, WikiLeaks",
             docket_id=cls.docket_1.pk,
             duration=420,
-            judges="Mary Deposit",
+            judges="Mary Deposit Learning rd Administrative procedures act",
             local_path_original_file="test/audio/ander_v._leo.mp3",
             local_path_mp3="test/audio/2.mp3",
             source="C",
@@ -261,7 +261,7 @@ class AudioESTestCase(SimpleTestCase):
             case_name="Jose A. Dominguez v. Loretta E. Lynch",
             docket_id=cls.docket_2.pk,
             duration=837,
-            judges="Wallace and Friedland",
+            judges="Wallace and Friedland Learn of rd",
             local_path_original_file="mp3/2014/06/09/ander_v._leo.mp3",
             local_path_mp3="test/audio/2.mp3",
             source="C",
@@ -271,7 +271,7 @@ class AudioESTestCase(SimpleTestCase):
             case_name="Hong Liu Yang v. Lynch-Loretta E.",
             docket_id=cls.docket_3.pk,
             duration=653,
-            judges="Joseph Information Deposition",
+            judges="Joseph Information Deposition H Administrative magazine",
             local_path_original_file="mp3/2015/07/08/hong_liu_yang_v._loretta_e._lynch.mp3",
             local_path_mp3="test/audio/2.mp3",
             source="CR",
@@ -282,7 +282,7 @@ class AudioESTestCase(SimpleTestCase):
             case_name="Hong Liu Lorem v. Lynch-Loretta E.",
             docket_id=cls.docket_3.pk,
             duration=653,
-            judges="John Smith",
+            judges="John Smith ptsd mag",
             sha1="a49ada009774496ac01fb49818837e2296705c94",
         )
         cls.audio_4.panel.add(cls.author)
@@ -290,6 +290,6 @@ class AudioESTestCase(SimpleTestCase):
             case_name="Freedom of Inform Wikileaks",
             docket_id=cls.docket_4.pk,
             duration=400,
-            judges="Wallace to Friedland ⚖️ Deposit",
+            judges="Wallace to Friedland ⚖️ Deposit xx-xxxx apa magistrate",
             sha1="a49ada009774496ac01fb49818837e2296705c95",
         )

@@ -1,19 +1,27 @@
+import logging
 import operator
 import re
 import time
+import traceback
 from datetime import date
 from functools import reduce
 from typing import Dict, List
 
+from django.conf import settings
 from django.core.paginator import Page
+from django.http.request import QueryDict
 from django_elasticsearch_dsl.search import Search
+from elasticsearch.exceptions import RequestError, TransportError
 from elasticsearch_dsl import A, Q
 from elasticsearch_dsl.query import QueryString, Range
+from elasticsearch_dsl.response import Response
 
 from cl.lib.search_utils import BOOSTS, cleanup_main_query
 from cl.lib.types import CleanData
 from cl.search.constants import SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS
 from cl.search.models import SEARCH_TYPES, Court
+
+logger = logging.getLogger(__name__)
 
 
 def build_daterange_query(
@@ -70,7 +78,6 @@ def add_fields_boosting(cd: CleanData) -> list[str]:
     """
     # Apply standard qf parameters
     qf = BOOSTS["qf"][cd["type"]].copy()
-    boosted_fields = make_es_boost_list(qf)
     if cd["type"] in [SEARCH_TYPES.ORAL_ARGUMENT]:
         # Give a boost on the case_name field if it's obviously a case_name
         # query.
@@ -79,6 +86,7 @@ def add_fields_boosting(cd: CleanData) -> list[str]:
                 " v " in cd.get("q", ""),
                 " v. " in cd.get("q", ""),
                 " vs. " in cd.get("q", ""),
+                " vs " in cd.get("q", ""),
             ]
         )
         in_re_query = cd.get("q", "").lower().startswith("in re ")
@@ -86,9 +94,8 @@ def add_fields_boosting(cd: CleanData) -> list[str]:
         ex_parte_query = cd.get("q", "").lower().startswith("ex parte ")
         if any([vs_query, in_re_query, matter_of_query, ex_parte_query]):
             qf.update({"caseName": 50})
-            boosted_fields = make_es_boost_list(qf)
 
-    return boosted_fields
+    return make_es_boost_list(qf)
 
 
 def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
@@ -345,8 +352,6 @@ def build_es_main_query(
     if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
         search_query = search_query.sort(build_sort_results(cd))
 
-    # Set results max size to 2000 elements:
-    search_query = search_query.extra(size=2000)
     return search_query, total_query_results, top_hits_limit
 
 
@@ -385,68 +390,70 @@ def set_results_highlights(results: Page, search_type: str) -> None:
         if search_type == SEARCH_TYPES.PARENTHETICAL:
             top_hits = result.grouped_by_opinion_cluster_id.hits.hits
             for hit in top_hits:
-                if hasattr(hit, "highlight"):
-                    highlighted_fields = [
-                        k for k in dir(hit.highlight) if not k.startswith("_")
-                    ]
-                    for highlighted_field in highlighted_fields:
-                        highlight = hit.highlight[highlighted_field][0]
-                        hit["_source"][highlighted_field] = highlight
+                if not hasattr(hit, "highlight"):
+                    continue
+                highlighted_fields = [
+                    k for k in dir(hit.highlight) if not k.startswith("_")
+                ]
+                for highlighted_field in highlighted_fields:
+                    highlight = hit.highlight[highlighted_field][0]
+                    hit["_source"][highlighted_field] = highlight
         else:
+            if not hasattr(result.meta, "highlight"):
+                return
             exact_hl_fields = []
-            if hasattr(result.meta, "highlight"):
-                for (
-                    field,
-                    highlight_list,
-                ) in result.meta.highlight.to_dict().items():
-                    # If a query highlights fields the "field.exact", "field" or
-                    # both versions are available. Highlighted terms in each
-                    # version can differ, so the best thing to do is combine
-                    # highlighted terms from each version and set it.
-                    if "exact" in field:
-                        field = field.split(".exact")[0]
-                        marked_strings_2 = []
-                        # Extract all unique marked strings from "field.exact"
-                        marked_strings_1 = re.findall(
-                            r"<mark>.*?</mark>", highlight_list[0]
-                        )
-                        # Extract all unique marked strings from "field" if
-                        # available
-                        if field in result.meta.highlight:
-                            marked_strings_2 = re.findall(
-                                r"<mark>.*?</mark>",
-                                result.meta.highlight[field][0],
-                            )
-
-                        unique_marked_strings = list(
-                            set(marked_strings_1 + marked_strings_2)
-                        )
-                        combined_highlights = highlight_list[0]
-                        for marked_string in unique_marked_strings:
-                            # Replace unique highlighted terms in a single
-                            # field.
-                            unmarked_string = marked_string.replace(
-                                "<mark>", ""
-                            ).replace("</mark>", "")
-                            combined_highlights = combined_highlights.replace(
-                                unmarked_string, marked_string
-                            )
-
-                        # Remove nested <mark> tags after replace.
-                        combined_highlights = re.sub(
-                            r"<mark><mark>(.*?)</mark></mark>",
-                            r"<mark>\1</mark>",
-                            combined_highlights,
+            for (
+                field,
+                highlight_list,
+            ) in result.meta.highlight.to_dict().items():
+                # If a query highlights fields the "field.exact", "field" or
+                # both versions are available. Highlighted terms in each
+                # version can differ, so the best thing to do is combine
+                # highlighted terms from each version and set it.
+                if "exact" in field:
+                    field = field.split(".exact")[0]
+                    marked_strings_2 = []
+                    # Extract all unique marked strings from "field.exact"
+                    marked_strings_1 = re.findall(
+                        r"<mark>.*?</mark>", highlight_list[0]
+                    )
+                    # Extract all unique marked strings from "field" if
+                    # available
+                    if field in result.meta.highlight:
+                        marked_strings_2 = re.findall(
+                            r"<mark>.*?</mark>",
+                            result.meta.highlight[field][0],
                         )
 
-                        # Set combined highlighted terms.
-                        result[field] = combined_highlights
-                        exact_hl_fields.append(field)
+                    unique_marked_strings = list(
+                        set(marked_strings_1 + marked_strings_2)
+                    )
+                    combined_highlights = highlight_list[0]
+                    for marked_string in unique_marked_strings:
+                        # Replace unique highlighted terms in a single
+                        # field.
+                        unmarked_string = marked_string.replace(
+                            "<mark>", ""
+                        ).replace("</mark>", "")
+                        combined_highlights = combined_highlights.replace(
+                            unmarked_string, marked_string
+                        )
 
-                    if field not in exact_hl_fields:
-                        # If the "field.exact" version has not been set, set
-                        # the "field" version.
-                        result[field] = highlight_list[0]
+                    # Remove nested <mark> tags after replace.
+                    combined_highlights = re.sub(
+                        r"<mark><mark>(.*?)</mark></mark>",
+                        r"<mark>\1</mark>",
+                        combined_highlights,
+                    )
+
+                    # Set combined highlighted terms.
+                    result[field] = combined_highlights
+                    exact_hl_fields.append(field)
+
+                if field not in exact_hl_fields:
+                    # If the "field.exact" version has not been set, set
+                    # the "field" version.
+                    result[field] = highlight_list[0]
 
 
 def group_search_results(
@@ -565,3 +572,38 @@ def merge_courts_from_db(results: Page, search_type: str) -> None:
             for hit in top_hits:
                 court_id = hit["_source"]["court_id"]
                 hit["_source"]["citation_string"] = courts_dict.get(court_id)
+
+
+def fetch_es_results(
+    get_params: QueryDict,
+    search_query: Search,
+    page: int = 1,
+    rows_per_page: int = settings.SEARCH_PAGE_SIZE,
+) -> tuple[Response | list, int, bool]:
+    """Fetch elasticsearch results with pagination.
+
+    :param get_params: The user get params.
+    :param search_query: Elasticsearch DSL Search object
+    :param page: Current page number
+    :param rows_per_page: Number of records wanted per page
+    :return: A three tuple, the ES response, the ES query time and if
+    there was an error.
+    """
+
+    # Compute "from" parameter for Elasticsearch
+    es_from = (page - 1) * rows_per_page
+    error = True
+    try:
+        # Execute the Elasticsearch search with "size" and "from" parameters
+        response = search_query.extra(
+            from_=es_from, size=rows_per_page
+        ).execute()
+        query_time = response.took
+        error = False
+        return response, query_time, error
+    except (TransportError, ConnectionError, RequestError) as e:
+        logger.warning(f"Error loading search page with request: {get_params}")
+        logger.warning(f"Error was: {e}")
+        if settings.DEBUG is True:
+            traceback.print_exc()
+    return [], 0, error
