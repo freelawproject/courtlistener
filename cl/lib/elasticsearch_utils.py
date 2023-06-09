@@ -1,19 +1,27 @@
+import logging
 import operator
 import re
 import time
+import traceback
 from datetime import date
 from functools import reduce
 from typing import Dict, List
 
+from django.conf import settings
 from django.core.paginator import Page
+from django.http.request import QueryDict
 from django_elasticsearch_dsl.search import Search
+from elasticsearch.exceptions import RequestError, TransportError
 from elasticsearch_dsl import A, Q
 from elasticsearch_dsl.query import QueryString, Range
+from elasticsearch_dsl.response import Response
 
 from cl.lib.search_utils import cleanup_main_query
 from cl.lib.types import CleanData
 from cl.search.constants import SEARCH_ORAL_ARGUMENT_HL_FIELDS
 from cl.search.models import SEARCH_TYPES, Court
+
+logger = logging.getLogger(__name__)
 
 
 def build_daterange_query(
@@ -292,16 +300,12 @@ def build_es_main_query(
     if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
         search_query = search_query.sort(build_sort_results(cd))
 
-    # Set results max size to 2000 elements:
-    search_query = search_query.extra(size=2000)
     return search_query, total_query_results, top_hits_limit
 
 
 def add_es_highlighting(search_query: Search, cd: CleanData):
     if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
-        fields_to_exclude = ["sha1"]
         highlighting_fields = SEARCH_ORAL_ARGUMENT_HL_FIELDS
-        search_query = search_query.source(excludes=fields_to_exclude)
         for field in highlighting_fields:
             search_query = search_query.highlight(
                 field,
@@ -458,3 +462,38 @@ def merge_courts_from_db(results: Page, search_type: str) -> None:
             for hit in top_hits:
                 court_id = hit["_source"]["court_id"]
                 hit["_source"]["citation_string"] = courts_dict.get(court_id)
+
+
+def fetch_es_results(
+    get_params: QueryDict,
+    search_query: Search,
+    page: int = 1,
+    rows_per_page: int = settings.SEARCH_PAGE_SIZE,
+) -> tuple[Response | list, int, bool]:
+    """Fetch elasticsearch results with pagination.
+
+    :param get_params: The user get params.
+    :param search_query: Elasticsearch DSL Search object
+    :param page: Current page number
+    :param rows_per_page: Number of records wanted per page
+    :return: A three tuple, the ES response, the ES query time and if
+    there was an error.
+    """
+
+    # Compute "from" parameter for Elasticsearch
+    es_from = (page - 1) * rows_per_page
+    error = True
+    try:
+        # Execute the Elasticsearch search with "size" and "from" parameters
+        response = search_query.extra(
+            from_=es_from, size=rows_per_page
+        ).execute()
+        query_time = response.took
+        error = False
+        return response, query_time, error
+    except (TransportError, ConnectionError, RequestError) as e:
+        logger.warning(f"Error loading search page with request: {get_params}")
+        logger.warning(f"Error was: {e}")
+        if settings.DEBUG is True:
+            traceback.print_exc()
+    return [], 0, error

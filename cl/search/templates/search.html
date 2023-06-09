@@ -253,12 +253,12 @@
                             {{ matches|intcomma }} Docket&nbsp;Entr{{ matches|pluralize:"y,ies" }}
                             {% endwith %}
                         {% elif type == SEARCH_TYPES.ORAL_ARGUMENT %}
-                           {% flag "oa-es-deactivate" %}
+                            {% flag "oa-es-deactivate" %}
                              {{ results.paginator.count|intcomma }}
-                          {% else %}
-                            {{ results_details.1|intcomma }}
-                          {% endflag %}
-                             Oral Argument{{ results.paginator.count|pluralize }}
+                            {% else %}
+                              {{ results_details.1|intcomma }}
+                            {% endflag %}
+                              Oral Argument{{ results.paginator.count|pluralize }}
                         {% elif type == SEARCH_TYPES.PEOPLE %}
                             {{ results.paginator.count|intcomma }} Judge{{ results.paginator.count|pluralize }}
                         {% endif %}
