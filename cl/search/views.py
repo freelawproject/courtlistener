@@ -10,15 +10,16 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
-from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+from django.core.paginator import EmptyPage, Page, PageNotAnInteger, Paginator
 from django.db.models import Count, Sum
 from django.http import HttpRequest, HttpResponse
+from django.http.request import QueryDict
 from django.shortcuts import HttpResponseRedirect, get_object_or_404, render
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.timezone import make_aware
 from django.views.decorators.cache import never_cache
-from elasticsearch.exceptions import RequestError, TransportError
+from django_elasticsearch_dsl.search import Search
 from requests import RequestException, Session
 from scorched.exc import SolrError
 from waffle.decorators import waffle_flag
@@ -31,6 +32,7 @@ from cl.lib.bot_detector import is_bot
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
     convert_str_date_fields_to_date_objects,
+    fetch_es_results,
     merge_courts_from_db,
     set_results_highlights,
 )
@@ -61,8 +63,8 @@ logger = logging.getLogger(__name__)
 
 def check_pagination_depth(page_number):
     """Check if the pagination is too deep (indicating a crawler)"""
-    max_search_pagination_depth = 100
-    if page_number > max_search_pagination_depth:
+
+    if page_number > settings.MAX_SEARCH_PAGINATION_DEPTH:
         logger.warning(
             "Query depth of %s denied access (probably a crawler)",
             page_number,
@@ -192,9 +194,7 @@ def do_search(
                     traceback.print_exc()
 
         # A couple special variables for particular search types
-        search_form = _clean_form(
-            get_params, cd, courts, search_form.__class__
-        )
+        search_form = _clean_form(get_params, cd, courts)
         if cd["type"] in [
             SEARCH_TYPES.OPINION,
             SEARCH_TYPES.RECAP,
@@ -424,7 +424,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
                                 "type": SEARCH_TYPES.ORAL_ARGUMENT,
                             },
                             facet=False,
-                            cache_key="homepage-data-oa",
+                            cache_key="homepage-data-oa-es",
                         )["results"]
                     }
                 )
@@ -566,7 +566,6 @@ def es_search(request: HttpRequest) -> HttpResponse:
                 request.GET.copy(),
                 search_form.cleaned_data,
                 courts,
-                search_form.__class__,
             )
         template = "advanced.html"
 
@@ -586,7 +585,11 @@ def es_search(request: HttpRequest) -> HttpResponse:
 
 
 def do_es_search(
-    get_params, rows=20, override_params=None, facet=True, cache_key=None
+    get_params: QueryDict,
+    rows: int = settings.SEARCH_PAGE_SIZE,
+    override_params: dict = None,
+    facet: bool = True,
+    cache_key: str = None,
 ):
     """Run Elasticsearch searching and filtering and prepare data to display
 
@@ -602,11 +605,9 @@ def do_es_search(
     :return: A big dict of variables for use in the search results, homepage, or
     other location.
     """
-
     paged_results = None
-    error = False
     courts = Court.objects.filter(in_use=True)
-    query_time = total_pa_groups = 0
+    query_time = total_query_results = 0
     top_hits_limit = 5
     document_type = None
 
@@ -624,43 +625,26 @@ def do_es_search(
         cd = search_form.cleaned_data
         # Create necessary filters to execute ES query
         search_query = document_type.search()
-
-        try:
-            s, total_pa_groups, top_hits_limit = build_es_main_query(
-                search_query, cd
-            )
-            hits = s.execute()
-
-            query_time = hits.took
-            if get_params.get("type") == SEARCH_TYPES.PARENTHETICAL:
-                hits = hits.aggregations.groups.buckets
-
-            paged_results = paginate_cached_es_results(
-                get_params, hits, rows, cache_key
-            )
-        except (TransportError, ConnectionError, RequestError) as e:
-            error = True
-            logger.warning(
-                f"Error loading search page with request: {get_params}"
-            )
-            logger.warning(f"Error was: {e}")
-            if settings.DEBUG is True:
-                traceback.print_exc()
+        s, total_query_results, top_hits_limit = build_es_main_query(
+            search_query, cd
+        )
+        paged_results, query_time, error = fetch_and_paginate_results(
+            get_params, s, rows_per_page=rows, cache_key=cache_key
+        )
+        search_form = _clean_form(
+            get_params,
+            search_form.cleaned_data,
+            courts,
+        )
     else:
         error = True
 
-    search_form = _clean_form(
-        get_params,
-        search_form.cleaned_data,
-        courts,
-        search_form.__class__,
-    )
     courts, court_count_human, court_count = merge_form_with_courts(
         courts, search_form
     )
     search_summary_str = search_form.as_text(court_count_human)
     search_summary_dict = search_form.as_display_dict(court_count_human)
-    results_details = [query_time, total_pa_groups, top_hits_limit]
+    results_details = [query_time, total_query_results, top_hits_limit]
     return {
         "results": paged_results,
         "results_details": results_details,
@@ -674,22 +658,27 @@ def do_es_search(
     }
 
 
-def paginate_cached_es_results(
-    get_params, hits, rows_per_page=5, cache_key=str
-):
-    """Paginate elasticsearch results
-    :param get_params: url get params
-    :param hits: elasticsearch results
-    :param rows_per_page: number of records per page
+def fetch_and_paginate_results(
+    get_params: QueryDict,
+    search_query: Search,
+    rows_per_page: int = settings.SEARCH_PAGE_SIZE,
+    cache_key: str = None,
+) -> tuple[Page | list, int, bool]:
+    """Fetch and paginate elasticsearch results.
+
+    :param get_params: The user get params.
+    :param search_query: Elasticsearch DSL Search object
+    :param rows_per_page: Number of records wanted per page
     :param cache_key: The cache key to use.
-    :return: paginated results
+    :return: A three tuple, the paginated results, the ES query time and if
+    there was an error.
     """
 
     # Run the query and set up pagination
     if cache_key is not None:
         results = cache.get(cache_key)
         if results is not None:
-            return results
+            return results, 0, False
 
     try:
         page = int(get_params.get("page", 1))
@@ -699,6 +688,14 @@ def paginate_cached_es_results(
     # Check pagination depth
     check_pagination_depth(page)
 
+    # Fetch results from ES
+    hits, query_time, error = fetch_es_results(
+        get_params, search_query, page, rows_per_page
+    )
+    if error:
+        return [], query_time, error
+    if get_params.get("type") == SEARCH_TYPES.PARENTHETICAL:
+        hits = hits.aggregations.groups.buckets
     paginator = ESPaginator(hits, rows_per_page)
     try:
         results = paginator.page(page)
@@ -715,5 +712,4 @@ def paginate_cached_es_results(
 
     if cache_key is not None:
         cache.set(cache_key, results, settings.QUERY_RESULTS_CACHE)
-
-    return results
+    return results, query_time, error

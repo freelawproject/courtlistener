@@ -89,6 +89,7 @@ class ESList(object):
                 yield self.__getitem__(item)
 
     def __getitem__(self, item):
+        # Offset is handled by Elasticsearch DSL based on this slicing.
         self.main_query = self.main_query[
             self.offset : self.offset + self.page_size
         ]

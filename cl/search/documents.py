@@ -137,6 +137,7 @@ class AudioDocument(Document):
                 attr="case_name", analyzer="english_exact"
             ),
         },
+        search_analyzer="search_analyzer",
     )
     court = fields.TextField(
         attr="docket.court.full_name",
@@ -144,11 +145,14 @@ class AudioDocument(Document):
         fields={
             "exact": fields.TextField(attr="judges", analyzer="english_exact"),
         },
+        search_analyzer="search_analyzer",
     )
     court_exact = fields.KeywordField(attr="docket.court.pk")
     court_id = fields.KeywordField(attr="docket.court.pk")
     court_citation_string = fields.TextField(
-        attr="docket.court.citation_string", analyzer="text_en_splitting_cl"
+        attr="docket.court.citation_string",
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
     )
     docket_id = fields.IntegerField(attr="docket.pk")
     dateArgued = fields.DateField(attr="docket.date_argued")
@@ -157,7 +161,9 @@ class AudioDocument(Document):
         attr="docket.date_reargument_denied"
     )
     docketNumber = fields.TextField(
-        attr="docket.docket_number", analyzer="text_en_splitting_cl"
+        attr="docket.docket_number",
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
     )
     docket_slug = fields.KeywordField(attr="docket.slug")
     duration = fields.IntegerField(attr="duration")
@@ -170,6 +176,7 @@ class AudioDocument(Document):
         fields={
             "exact": fields.TextField(attr="judges", analyzer="english_exact"),
         },
+        search_analyzer="search_analyzer",
     )
     local_path = fields.KeywordField()
     pacer_case_id = fields.KeywordField(attr="docket.pacer_case_id")
@@ -183,6 +190,7 @@ class AudioDocument(Document):
         fields={
             "exact": fields.TextField(analyzer="english_exact"),
         },
+        analyzer="text_en_splitting_cl", search_analyzer="search_analyzer"
     )
     timestamp = fields.DateField()
 
