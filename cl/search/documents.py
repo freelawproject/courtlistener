@@ -190,7 +190,7 @@ class AudioDocument(Document):
         fields={
             "exact": fields.TextField(analyzer="english_exact"),
         },
-        analyzer="text_en_splitting_cl", search_analyzer="search_analyzer"
+        search_analyzer="search_analyzer",
     )
     timestamp = fields.DateField()
 

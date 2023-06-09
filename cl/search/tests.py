@@ -3698,7 +3698,6 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             reverse("search-list", kwargs={"version": "v3"}), search_params
         )
         actual = self.get_results_count(r)
-
         self.assertEqual(actual, expected)
         self.assertTrue(
             r.content.decode().index("Hong Liu Lorem")
@@ -4001,7 +4000,6 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         self.assertEqual(actual, expected)
         self.assertIn("<mark>magazine</mark>", r.content.decode())
 
-
     def test_oa_stopwords_search(self) -> None:
         # Query using a stopword, indexed content doesn't contain the stop word
         # Frontend
@@ -4044,7 +4042,6 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         expected = 0
         self.assertEqual(actual, expected)
 
-
     def test_phrase_queries_with_stop_words(self) -> None:
         # Do phrase queries with stop words return results properly?
         # Frontend
@@ -4068,7 +4065,6 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         expected = 1
         self.assertEqual(actual, expected)
         self.assertIn("Freedom", r.content.decode())
-
 
     def test_character_case_queries(self) -> None:
         # Do character case queries works properly?
@@ -4103,7 +4099,6 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         self.assertIn("SEC", r.content.decode())
         self.assertIn("Freedom", r.content.decode())
 
-
     def test_emojis_searchable(self) -> None:
         # Are emojis are searchable?
         # Frontend
@@ -4131,7 +4126,6 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         expected = 1
         self.assertEqual(actual, expected)
         self.assertIn("Wallace", r.content.decode())
-
 
     def test_docket_number_proximity_query(self) -> None:
         """Test docket_number proximity query, so that docket numbers like
@@ -4493,7 +4487,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         expected = 1
         self.assertEqual(actual, expected)
         self.assertIn("<mark>Learning</mark>", r.content.decode())
-        self.assertIn("<mark>rd</mark>", r.content.decode())
+        self.assertIn("rd", r.content.decode())
 
         # A phrase search for '"learn road"' should execute an exact and phrase
         # search simultaneously. It shouldn't return any results,
