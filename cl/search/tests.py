@@ -3812,7 +3812,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             "timestamp",
         ]
         keys_count = len(r.data["results"][0])
-        self.assertEqual(keys_count, 22)
+        self.assertEqual(keys_count, 23)
         for key in keys_to_check:
             self.assertTrue(
                 key in r.data["results"][0],
@@ -4000,6 +4000,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         self.assertEqual(actual, expected)
         self.assertIn("<mark>magazine</mark>", r.content.decode())
 
+
 def test_oa_stopwords_search(self) -> None:
     # Query using a stopword, indexed content doesn't contain the stop word
     # Frontend
@@ -4129,6 +4130,7 @@ def test_emojis_searchable(self) -> None:
     expected = 1
     self.assertEqual(actual, expected)
     self.assertIn("Wallace", r.content.decode())
+
 
 def test_docket_number_proximity_query(self) -> None:
     """Test docket_number proximity query, so that docket numbers like
@@ -4263,6 +4265,7 @@ def test_docket_number_proximity_query(self) -> None:
     self.assertEqual(actual, expected)
     self.assertIn("Freedom", r.content.decode())
     self.assertIn("SEC", r.content.decode())
+
 
 def test_docket_number_suffixes_query(self) -> None:
     """Test docket_number with suffixes can be found."""
