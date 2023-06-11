@@ -203,7 +203,7 @@ class OptInConsentForm(forms.Form):
         },
         required=True,
     )
-    hcaptcha = hCaptchaField(size="invisible")
+    hcaptcha = hCaptchaField()
 
 
 class AccountDeleteForm(forms.Form):
