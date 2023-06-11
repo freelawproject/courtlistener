@@ -106,7 +106,6 @@
                 </label>
                 {{ consent_form.hcaptcha }}
                 <div class="form-group">
-                  {{ consent_form.hcaptcha }}
                   {% if consent_form.hcaptcha.errors %}
                     <p class="help-block">
                       {% for error in consent_form.hcaptcha.errors %}
