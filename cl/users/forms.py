@@ -12,6 +12,7 @@ from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.forms import ModelForm
 from django.urls import reverse
+from hcaptcha.fields import hCaptchaField
 from localflavor.us.forms import USStateField, USZipCodeField
 from localflavor.us.us_states import STATE_CHOICES
 
@@ -202,6 +203,7 @@ class OptInConsentForm(forms.Form):
         },
         required=True,
     )
+    hcaptcha = hCaptchaField(size="invisible")
 
 
 class AccountDeleteForm(forms.Form):
