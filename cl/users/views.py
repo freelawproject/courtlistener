@@ -10,6 +10,7 @@ from django.contrib import messages
 from django.contrib.auth import logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
+from django.contrib.auth.views import PasswordResetView
 from django.core.mail import send_mail
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Count, F
@@ -23,6 +24,7 @@ from django.shortcuts import get_object_or_404
 from django.template.defaultfilters import urlencode
 from django.template.response import TemplateResponse
 from django.urls import reverse
+from django.utils.decorators import method_decorator
 from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
@@ -49,6 +51,7 @@ from cl.stats.utils import tally_stat
 from cl.users.forms import (
     AccountDeleteForm,
     CustomPasswordChangeForm,
+    CustomPasswordResetForm,
     EmailConfirmationForm,
     OptInConsentForm,
     ProfileForm,
@@ -862,3 +865,15 @@ def view_recap_email(request: AuthenticatedHttpRequest) -> HttpResponse:
             "auto_subscribe": auto_subscribe,
         },
     )
+
+
+@method_decorator(ratelimiter_unsafe_10_per_m, name="post")
+@method_decorator(ratelimiter_unsafe_2000_per_h, name="post")
+class RateLimitedPasswordResetView(PasswordResetView):
+    """
+    Custom Password reset view with rate limiting
+    """
+
+    template_name = "register/password_reset_form.html"
+    email_template_name = "register/password_reset_email.html"
+    form_class = CustomPasswordResetForm
