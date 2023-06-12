@@ -53,7 +53,7 @@ def percolate_document(document_data: AttrDict) -> Response | list:
     """
 
     try:
-        s = Search(index="oral_arguments")
+        s = Search(index="oral_arguments_percolator")
         s = s.query(
             "percolate", field="percolator_query", document=document_data
         )

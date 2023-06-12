@@ -39,8 +39,12 @@ from cl.audio.models import Audio
 from cl.donate.factories import DonationFactory
 from cl.donate.models import Donation
 from cl.favorites.factories import NoteFactory, UserTagFactory
-from cl.lib.test_helpers import EmptySolrTestCase, SimpleUserDataMixin
-from cl.search.documents import AudioDocument
+from cl.lib.test_helpers import (
+    EmptySolrTestCase,
+    ESTestCaseMixin,
+    SimpleUserDataMixin,
+)
+from cl.search.documents import AudioPercolator
 from cl.search.factories import DocketFactory, OpinionWithParentsFactory
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
@@ -1462,7 +1466,7 @@ class DocketAlertGetNotesTagsTests(TestCase):
         self.assertEqual(tags_docket_3_user_1, [])
 
 
-class SearchAlertsOAESTests(TestCase):
+class SearchAlertsOAESTests(ESTestCaseMixin, TestCase):
     """Test ES Search Alerts"""
 
     @classmethod
@@ -1496,12 +1500,12 @@ class SearchAlertsOAESTests(TestCase):
             name="Test Alert OA",
             query="type=oa&docket_number=19-5735",
         )
+        AudioPercolator._index.refresh()
         cls.mock_date = now().replace(day=15, hour=0)
 
     @classmethod
     def tearDownClass(cls):
-        Audio.objects.all().delete()
-        Alert.objects.all().delete()
+        cls.search_alert.delete()
         super().tearDownClass()
 
     def test_send_oa_search_alert_webhooks(self):
@@ -1560,3 +1564,4 @@ class SearchAlertsOAESTests(TestCase):
             self.rt_oral_argument.source,
         )
         webhook_events.delete()
+        Audio.objects.all().delete()

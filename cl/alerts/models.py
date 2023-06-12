@@ -14,7 +14,7 @@ from cl.lib.command_utils import logger
 from cl.lib.elasticsearch_utils import build_es_main_query
 from cl.lib.models import AbstractDateTimeModel
 from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
-from cl.search.documents import AudioDocument
+from cl.search.documents import AudioDocument, AudioPercolator
 from cl.search.forms import SearchForm
 from cl.search.models import SEARCH_TYPES, Docket
 
@@ -97,7 +97,7 @@ class Alert(AbstractDateTimeModel):
                 ) = build_es_main_query(search_query, cd)
                 query_dict = query.to_dict()["query"]
                 try:
-                    percolator_query = AudioDocument(
+                    percolator_query = AudioPercolator(
                         percolator_query=query_dict
                     )
                     percolator_query.save()
@@ -123,7 +123,7 @@ class Alert(AbstractDateTimeModel):
             es = Elasticsearch(
                 f"{settings.ELASTICSEARCH_DSL_HOST}:{settings.ELASTICSEARCH_DSL_PORT}"
             )
-            index_name = "oral_arguments"
+            index_name = "oral_arguments_percolator"
             try:
                 # Check if the document exists before deleting it
                 if es.exists(index=index_name, id=self.es_id):

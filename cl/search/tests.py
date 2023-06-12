@@ -58,7 +58,11 @@ from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.factories import DocketEntriesDataFactory, DocketEntryDataFactory
 from cl.recap.mergers import add_docket_entries
 from cl.scrapers.factories import PACERFreeDocumentLogFactory
-from cl.search.documents import AudioDocument, ParentheticalGroupDocument
+from cl.search.documents import (
+    AudioDocument,
+    AudioPercolator,
+    ParentheticalGroupDocument,
+)
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -2812,7 +2816,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             search_query, cd
         )
         query_dict = query.to_dict()["query"]
-        percolator_query = AudioDocument(percolator_query=query_dict)
+        percolator_query = AudioPercolator(percolator_query=query_dict)
         percolator_query.save()
 
         return percolator_query.meta.id
@@ -4540,7 +4544,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             "order_by": "score desc",
         }
         query_id = self.save_percolator_query(cd)
-        AudioDocument._index.refresh()
+        AudioPercolator._index.refresh()
         response = percolate_document(self.prepare_document(self.audio_2))
         expected_queries = 1
         self.assertEqual(len(response), expected_queries)
@@ -4554,7 +4558,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         }
 
         query_id = self.save_percolator_query(cd)
-        AudioDocument._index.refresh()
+        AudioPercolator._index.refresh()
         response = percolate_document(self.prepare_document(self.audio_2))
         expected_queries = 2
         self.assertEqual(len(response), expected_queries)
@@ -4567,7 +4571,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             "order_by": "score desc",
         }
         query_id = self.save_percolator_query(cd)
-        AudioDocument._index.refresh()
+        AudioPercolator._index.refresh()
         response = percolate_document(self.prepare_document(self.audio_1))
         expected_queries = 1
         self.assertEqual(len(response), expected_queries)
@@ -4582,7 +4586,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         }
 
         query_id = self.save_percolator_query(cd)
-        AudioDocument._index.refresh()
+        AudioPercolator._index.refresh()
         response = percolate_document(self.prepare_document(self.audio_5))
         expected_queries = 1
         self.assertEqual(len(response), expected_queries)
@@ -4598,7 +4602,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         }
 
         query_id = self.save_percolator_query(cd)
-        AudioDocument._index.refresh()
+        AudioPercolator._index.refresh()
         response = percolate_document(self.prepare_document(self.audio_1))
         expected_queries = 2
         self.assertEqual(len(response), expected_queries)
@@ -4613,7 +4617,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             "order_by": "score desc",
         }
         query_id = self.save_percolator_query(cd)
-        AudioDocument._index.refresh()
+        AudioPercolator._index.refresh()
         response = percolate_document(self.prepare_document(self.audio_2))
         expected_queries = 3
         self.assertEqual(len(response), expected_queries)
@@ -4628,7 +4632,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         }
 
         query_id = self.save_percolator_query(cd)
-        AudioDocument._index.refresh()
+        AudioPercolator._index.refresh()
         response = percolate_document(self.prepare_document(self.audio_4))
         expected_queries = 2
         self.assertEqual(len(response), expected_queries)

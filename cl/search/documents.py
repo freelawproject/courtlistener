@@ -118,17 +118,7 @@ class ParentheticalGroupDocument(Document):
         return instance.opinion.cluster.get_precedential_status_display()
 
 
-# Define oral arguments elasticsearch index
-oral_arguments_index = Index("oral_arguments")
-oral_arguments_index.settings(
-    number_of_shards=settings.ELASTICSEARCH_NUMBER_OF_SHARDS,
-    number_of_replicas=settings.ELASTICSEARCH_NUMBER_OF_REPLICAS,
-    analysis=settings.ELASTICSEARCH_DSL["analysis"],
-)
-
-
-@oral_arguments_index.document
-class AudioDocument(Document):
+class AudioDocumentBase(Document):
     absolute_url = fields.KeywordField(attr="get_absolute_url")
     caseName = fields.TextField(
         attr="case_name",
@@ -199,8 +189,19 @@ class AudioDocument(Document):
         search_analyzer="search_analyzer",
     )
     timestamp = fields.DateField()
-    percolator_query = Percolator()
 
+
+# Define oral arguments elasticsearch index
+oral_arguments_index = Index("oral_arguments")
+oral_arguments_index.settings(
+    number_of_shards=settings.ELASTICSEARCH_NUMBER_OF_SHARDS,
+    number_of_replicas=settings.ELASTICSEARCH_NUMBER_OF_REPLICAS,
+    analysis=settings.ELASTICSEARCH_DSL["analysis"],
+)
+
+
+@oral_arguments_index.document
+class AudioDocument(AudioDocumentBase):
     class Django:
         model = Audio
 
@@ -232,3 +233,20 @@ class AudioDocument(Document):
             "_id": self.generate_id(object_instance),
             "_source": data,
         }
+
+
+# Define oral arguments elasticsearch index
+oral_arguments_percolator_index = Index("oral_arguments_percolator")
+oral_arguments_percolator_index.settings(
+    number_of_shards=settings.ELASTICSEARCH_NUMBER_OF_SHARDS,
+    number_of_replicas=settings.ELASTICSEARCH_NUMBER_OF_REPLICAS,
+    analysis=settings.ELASTICSEARCH_DSL["analysis"],
+)
+
+
+@oral_arguments_percolator_index.document
+class AudioPercolator(AudioDocumentBase):
+    percolator_query = Percolator()
+
+    class Django:
+        model = Audio
