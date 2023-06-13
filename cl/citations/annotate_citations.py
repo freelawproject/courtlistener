@@ -4,10 +4,10 @@ from eyecite import annotate_citations, clean_text
 
 from cl.citations.match_citations import NO_MATCH_RESOURCE
 from cl.lib.types import MatchedResourceType, SupportedCitationType
-from cl.search.models import Opinion
+from cl.search.models import Opinion, RECAPDocument
 
 
-def get_and_clean_opinion_text(opinion: Opinion) -> None:
+def get_and_clean_opinion_text(document: Opinion | RECAPDocument) -> None:
     """Memoize useful versions of an opinion's text as additional properties
     on the Opinion object. This should be done before performing citation
     extraction and annotation on an opinion.
@@ -15,18 +15,20 @@ def get_and_clean_opinion_text(opinion: Opinion) -> None:
     :param opinion: The Opinion whose text should be parsed
     """
     for attr in ["html_anon_2020", "html_columbia", "html_lawbox", "html"]:
-        text = getattr(opinion, attr, None)
+        text = getattr(document, attr, None)
         if text:
-            opinion.source_text = text
-            opinion.cleaned_text = clean_text(text, ["html", "all_whitespace"])
-            opinion.source_is_html = True
+            document.source_text = text
+            document.cleaned_text = clean_text(
+                text, ["html", "all_whitespace"]
+            )
+            document.source_is_html = True
             break
     else:
         # Didn't hit the break; use plain text
-        text = getattr(opinion, "plain_text")
-        opinion.source_text = text
-        opinion.cleaned_text = clean_text(text, ["all_whitespace"])
-        opinion.source_is_html = False
+        text = getattr(document, "plain_text")
+        document.source_text = text
+        document.cleaned_text = clean_text(text, ["all_whitespace"])
+        document.source_is_html = False
 
 
 def generate_annotations(
