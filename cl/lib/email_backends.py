@@ -8,6 +8,10 @@ from django.core.mail import (
 )
 from django.core.mail.backends.base import BaseEmailBackend
 
+from cl.lib.redis_utils import (
+    check_or_create_email_sending_quota,
+    make_redis_interface,
+)
 from cl.users.email_handlers import (
     add_bcc_random,
     enqueue_email,
@@ -45,6 +49,8 @@ class EmailBackend(BaseEmailBackend):
         base_backend = settings.BASE_BACKEND
         connection = get_connection(base_backend)
         connection.open()
+        r = make_redis_interface("CACHE")
+        check_or_create_email_sending_quota(r)
         msg_count = 0
         for email_message in email_messages:
             message = email_message.message()
@@ -101,4 +107,5 @@ class EmailBackend(BaseEmailBackend):
 
         # Close base backend connection
         connection.close()
+        r.incrby("email:delivery_attempts", msg_count)
         return msg_count
