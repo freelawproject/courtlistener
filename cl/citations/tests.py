@@ -49,15 +49,14 @@ from cl.citations.tasks import (
     store_recap_citations,
 )
 from cl.lib.test_helpers import IndexedSolrTestCase, TestCase
-from cl.search.factories import (
+from cl.search.factories import (  # RECAPDocumentWithParentsFactory,
     CitationWithParentsFactory,
     CourtFactory,
+    DocketEntryWithParentsFactory,
     DocketFactory,
     OpinionClusterFactoryWithChildrenAndParents,
     OpinionWithChildrenFactory,
     RECAPDocumentFactory,
-    # RECAPDocumentWithParentsFactory,
-    DocketEntryWithParentsFactory,
 )
 from cl.search.models import (
     Citation,
