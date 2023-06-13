@@ -1,21 +1,10 @@
-import traceback
-
 import pghistory
-from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models
-from django.http import QueryDict
 from django.utils.crypto import get_random_string
-from elasticsearch import Elasticsearch
-from elasticsearch.exceptions import RequestError, TransportError
-from elasticsearch_dsl.connections import connections
 
-from cl.lib.command_utils import logger
-from cl.lib.elasticsearch_utils import build_es_main_query
 from cl.lib.models import AbstractDateTimeModel
 from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
-from cl.search.documents import AudioDocument, AudioPercolator
-from cl.search.forms import SearchForm
 from cl.search.models import SEARCH_TYPES, Docket
 
 
@@ -58,84 +47,12 @@ class Alert(AbstractDateTimeModel):
         "purposes.",
         max_length=40,
     )
-    es_id = models.CharField(
-        verbose_name="The percolator query ID in Elasticsearch.",
-        max_length=128,
-        blank=True,
-    )
 
     def __str__(self) -> str:
         return f"{self.pk}: {self.name}"
 
     class Meta:
         ordering = ["rate", "query"]
-        indexes = [
-            models.Index(fields=["es_id"]),
-        ]
-
-    def save(self, *args, **kwargs):
-        """Ensure we get a token when we save the first time.
-        Store the query in Elasticsearch percolator.
-        """
-        if self.pk is None:
-            self.secret_key = get_random_string(length=40)
-            if (
-                f"type={SEARCH_TYPES.ORAL_ARGUMENT}" in self.query
-                and self.rate == self.REAL_TIME
-            ):
-                # Make a dict from the query string.
-                qd = QueryDict(self.query.encode(), mutable=True)
-                cd = {}
-                search_form = SearchForm(qd)
-                if search_form.is_valid():
-                    cd = search_form.cleaned_data
-                search_query = AudioDocument.search()
-                (
-                    query,
-                    total_query_results,
-                    top_hits_limit,
-                ) = build_es_main_query(search_query, cd)
-                query_dict = query.to_dict()["query"]
-                try:
-                    percolator_query = AudioPercolator(
-                        percolator_query=query_dict
-                    )
-                    percolator_query.save()
-                    self.es_id = percolator_query.meta.id
-                except (TransportError, ConnectionError, RequestError) as e:
-                    logger.warning(
-                        f"Error storing the query in percolator: {query_dict}"
-                    )
-                    logger.warning(f"Error was: {e}")
-                    if settings.DEBUG is True:
-                        traceback.print_exc()
-        super(Alert, self).save(*args, **kwargs)
-
-    def delete(self, *args, **kwargs):
-        # Remove the query from Elasticsearch index before deleting the alert.
-        if self.es_id:
-            connections.create_connection(
-                hosts=[
-                    f"{settings.ELASTICSEARCH_DSL_HOST}:{settings.ELASTICSEARCH_DSL_PORT}"
-                ],
-                timeout=50,
-            )
-            es = Elasticsearch(
-                f"{settings.ELASTICSEARCH_DSL_HOST}:{settings.ELASTICSEARCH_DSL_PORT}"
-            )
-            index_name = "oral_arguments_percolator"
-            try:
-                # Check if the document exists before deleting it
-                if es.exists(index=index_name, id=self.es_id):
-                    es.delete(index=index_name, id=self.es_id)
-            except (TransportError, ConnectionError, RequestError) as e:
-                logger.warning(
-                    f"Error deleting the percolator query:{self.es_id}"
-                )
-                logger.warning(f"Error was: {e}")
-                if settings.DEBUG is True:
-                    traceback.print_exc()
-        super().delete(*args, **kwargs)
 
 
 class DocketAlertManager(models.Manager):

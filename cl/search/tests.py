@@ -2,7 +2,6 @@ import datetime
 import io
 import operator
 import os
-import time
 from datetime import date
 from functools import reduce
 from pathlib import Path
@@ -31,6 +30,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
 
+from cl.alerts.models import Alert
 from cl.alerts.send_alerts import percolate_document
 from cl.audio.factories import AudioFactory
 from cl.audio.models import Audio
@@ -43,7 +43,6 @@ from cl.lib.elasticsearch_utils import (
     build_term_query,
     group_search_results,
 )
-from cl.lib.redis_utils import make_redis_interface
 from cl.lib.search_utils import cleanup_main_query, make_fq
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
@@ -2816,7 +2815,9 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             search_query, cd
         )
         query_dict = query.to_dict()["query"]
-        percolator_query = AudioPercolator(percolator_query=query_dict)
+        percolator_query = AudioPercolator(
+            percolator_query=query_dict, rate=Alert.REAL_TIME
+        )
         percolator_query.save()
 
         return percolator_query.meta.id

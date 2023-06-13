@@ -491,7 +491,7 @@ class AlertAPITests(APITestCase):
         self.assertEqual(response.json()["id"], alert_1.json()["id"])
 
 
-class SearchAlertsWebhooksTest(EmptySolrTestCase):
+class SearchAlertsWebhooksTest(ESTestCaseMixin, EmptySolrTestCase):
     """Test Search Alerts Webhooks"""
 
     @classmethod
@@ -1565,3 +1565,43 @@ class SearchAlertsOAESTests(ESTestCaseMixin, TestCase):
         )
         webhook_events.delete()
         Audio.objects.all().delete()
+
+    def test_es_alert_update_and_delete(self):
+        """Can we update and delete an alert, and expect these changes to be
+        properly reflected in Elasticsearch?"""
+
+        # Create a new alert.
+        search_alert_1 = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert OA",
+            query="type=oa&docket_number=19-1010",
+        )
+
+        # Confirm it was properly indexed in ES.
+        search_alert_1_id = search_alert_1.pk
+        doc = AudioPercolator.get(id=search_alert_1_id)
+        response_str = str(doc.to_dict())
+        self.assertIn("'query': '19-1010'", response_str)
+        self.assertIn("'rate': 'rt'", response_str)
+
+        # Update Alert
+        search_alert_1.query = "type=oa&docket_number=19-1020"
+        search_alert_1.rate = "dly"
+        search_alert_1.save()
+
+        doc = AudioPercolator.get(id=search_alert_1_id)
+        response_str = str(doc.to_dict())
+
+        # Confirm changes in ES.
+        self.assertIn("'query': '19-1020'", response_str)
+        self.assertIn("'rate': 'dly'", response_str)
+
+        # Delete Alert
+        search_alert_1.delete()
+
+        s = AudioPercolator.search().query("match_all")
+        response = s.execute()
+        response_str = str(response.to_dict())
+        # Confirm whether the alert was also deleted in Elasticsearch.
+        self.assertNotIn(f"'_id': '{search_alert_1_id}'", response_str)

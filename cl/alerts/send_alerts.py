@@ -2,13 +2,12 @@ import traceback
 from typing import Any
 
 from django.conf import settings
-from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives
 from django.http import QueryDict
 from django.template import loader
 from django.utils.timezone import now
 from elasticsearch.exceptions import RequestError, TransportError
-from elasticsearch_dsl import Search
+from elasticsearch_dsl import Q, Search
 from elasticsearch_dsl.response import Response
 from elasticsearch_dsl.utils import AttrDict
 
@@ -54,9 +53,11 @@ def percolate_document(document_data: AttrDict) -> Response | list:
 
     try:
         s = Search(index="oral_arguments_percolator")
-        s = s.query(
+        percolate_query = Q(
             "percolate", field="percolator_query", document=document_data
         )
+        match_query = Q("match", rate=Alert.REAL_TIME)
+        s = s.query("bool", must=[percolate_query, match_query])
         # execute the search
         return s.execute()
     except (TransportError, ConnectionError, RequestError) as e:
@@ -82,9 +83,8 @@ def send_rt_alerts(response: Response, document_data: AttrDict) -> None:
     """
 
     for hit in response:
-        es_id = hit.meta.id
         alert_triggered = (
-            Alert.objects.filter(es_id=es_id)
+            Alert.objects.filter(pk=hit.meta.id)
             .select_related(
                 "user",
             )
