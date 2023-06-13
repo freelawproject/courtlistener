@@ -6,6 +6,8 @@ from django import test
 from django.contrib.staticfiles import testing
 from rest_framework.test import APITestCase
 
+from cl.lib.redis_utils import make_redis_interface
+
 
 class OutputBlockerTestMixin:
     """Block the output of tests so that they run a bit faster.
@@ -39,6 +41,21 @@ class OneDatabaseMixin:
     """
 
     databases = {"default"}
+
+
+class RestartSentEmailQuotaMixin:
+    """Restart sent email quota in redis."""
+
+    @classmethod
+    def restart_sent_email_quota(self):
+        r = make_redis_interface("CACHE")
+        keys = r.keys("email:delivery_attempts")
+        if keys:
+            r.delete(*keys)
+
+    def tearDown(self):
+        self.restart_sent_email_quota()
+        super().tearDown()
 
 
 class SimpleTestCase(

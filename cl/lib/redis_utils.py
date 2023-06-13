@@ -95,6 +95,5 @@ def check_or_create_email_sending_quota(r: Redis) -> None:
             raise ValueError("Emergency brake engaged")
     else:
         pipe = r.pipeline()
-        pipe.incr("email:delivery_attempts")
         pipe.expire("email:delivery_attempts", 60 * 60 * 24)  # 24 hours period
         pipe.execute()
