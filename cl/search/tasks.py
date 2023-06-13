@@ -5,6 +5,7 @@ import scorched
 from django.apps import apps
 from django.conf import settings
 from django.utils.timezone import now
+from requests import Session
 from scorched.exc import SolrError
 
 from cl.celery_init import app
@@ -38,19 +39,20 @@ def add_items_to_solr(item_pks, app_label, force_commit=False):
         except InvalidDocumentError:
             print(f"Unable to parse: {item}")
 
-    si = scorched.SolrInterface(settings.SOLR_URLS[app_label], mode="w")
-    try:
-        si.add(search_dicts)
-        if force_commit:
-            si.commit()
-        si.conn.http_connection.close()
-    except (socket.error, SolrError) as exc:
-        add_items_to_solr.retry(exc=exc, countdown=30)
-    else:
-        # Mark dockets as updated if needed
-        if model == Docket:
-            items.update(date_modified=now(), date_last_index=now())
-        si.conn.http_connection.close()
+    with Session() as session:
+        si = scorched.SolrInterface(
+            settings.SOLR_URLS[app_label], http_connection=session, mode="w"
+        )
+        try:
+            si.add(search_dicts)
+            if force_commit:
+                si.commit()
+        except (socket.error, SolrError) as exc:
+            add_items_to_solr.retry(exc=exc, countdown=30)
+        else:
+            # Mark dockets as updated if needed
+            if model == Docket:
+                items.update(date_modified=now(), date_last_index=now())
 
 
 @app.task(ignore_resutls=True)
@@ -83,26 +85,28 @@ def add_or_update_recap_docket(
     if data is None:
         return
 
-    si = scorched.SolrInterface(settings.SOLR_RECAP_URL, mode="w")
-    some_time_ago = now() - timedelta(seconds=update_threshold)
-    d = Docket.objects.get(pk=data["docket_pk"])
-    too_fresh = d.date_last_index is not None and (
-        d.date_last_index > some_time_ago
-    )
-    update_not_required = not data.get("content_updated", False)
-    if all([too_fresh, update_not_required]):
-        return
-    else:
-        try:
-            si.add(d.as_search_list())
-            if force_commit:
-                si.commit()
-            si.conn.http_connection.close()
-        except SolrError as exc:
-            add_or_update_recap_docket.retry(exc=exc, countdown=30)
+    with Session() as session:
+        si = scorched.SolrInterface(
+            settings.SOLR_RECAP_URL, http_connection=session, mode="w"
+        )
+        some_time_ago = now() - timedelta(seconds=update_threshold)
+        d = Docket.objects.get(pk=data["docket_pk"])
+        too_fresh = d.date_last_index is not None and (
+            d.date_last_index > some_time_ago
+        )
+        update_not_required = not data.get("content_updated", False)
+        if all([too_fresh, update_not_required]):
+            return
         else:
-            d.date_last_index = now()
-            d.save()
+            try:
+                si.add(d.as_search_list())
+                if force_commit:
+                    si.commit()
+            except SolrError as exc:
+                add_or_update_recap_docket.retry(exc=exc, countdown=30)
+            else:
+                d.date_last_index = now()
+                d.save()
 
 
 @app.task
@@ -120,29 +124,35 @@ def add_docket_to_solr_by_rds(item_pks, force_commit=False):
     needed).
     :return: None
     """
-    si = scorched.SolrInterface(settings.SOLR_RECAP_URL, mode="w")
-    rds = RECAPDocument.objects.filter(pk__in=item_pks).order_by()
-    try:
-        metadata = rds[0].get_docket_metadata()
-    except IndexError:
-        metadata = None
+    with Session() as session:
+        si = scorched.SolrInterface(
+            settings.SOLR_RECAP_URL, http_connection=session, mode="w"
+        )
+        rds = RECAPDocument.objects.filter(pk__in=item_pks).order_by()
+        try:
+            metadata = rds[0].get_docket_metadata()
+        except IndexError:
+            metadata = None
 
-    try:
-        si.add([item.as_search_dict(docket_metadata=metadata) for item in rds])
-        if force_commit:
-            si.commit()
-        si.conn.http_connection.close()
-    except SolrError as exc:
-        add_docket_to_solr_by_rds.retry(exc=exc, countdown=30)
+        try:
+            si.add(
+                [item.as_search_dict(docket_metadata=metadata) for item in rds]
+            )
+            if force_commit:
+                si.commit()
+        except SolrError as exc:
+            add_docket_to_solr_by_rds.retry(exc=exc, countdown=30)
 
 
 @app.task
 def delete_items(items, app_label, force_commit=False):
-    si = scorched.SolrInterface(settings.SOLR_URLS[app_label], mode="w")
-    try:
-        si.delete_by_ids(list(items))
-        if force_commit:
-            si.commit()
-        si.conn.http_connection.close()
-    except SolrError as exc:
-        delete_items.retry(exc=exc, countdown=30)
+    with Session() as session:
+        si = scorched.SolrInterface(
+            settings.SOLR_URLS[app_label], http_connection=session, mode="w"
+        )
+        try:
+            si.delete_by_ids(list(items))
+            if force_commit:
+                si.commit()
+        except SolrError as exc:
+            delete_items.retry(exc=exc, countdown=30)

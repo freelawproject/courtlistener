@@ -3,6 +3,7 @@ import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 from unittest import mock
+from unittest.mock import MagicMock, patch
 
 import time_machine
 from django.conf import settings
@@ -99,7 +100,8 @@ class UserTest(LiveServerTestCase):
                 "Status Code: {code}".format(path=path, code=r.status_code),
             )
 
-    def test_creating_a_new_user(self) -> None:
+    @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
+    def test_creating_a_new_user(self, mock: MagicMock) -> None:
         """Can we register a new user in the front end?"""
         params = {
             "username": "pan",
