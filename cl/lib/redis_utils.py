@@ -76,3 +76,25 @@ def delete_redis_semaphore(r: Union[str, Redis], key: str) -> None:
     if isinstance(r, str):
         r = make_redis_interface(r)
     r.delete(key)
+
+
+def check_or_create_email_sending_quota(r: Redis) -> None:
+    """Checks the value of the delivery_attempts key or creates it
+    if it's expired.
+
+    Args:
+        r (Redis): The Redis DB to connect to as a connection interface
+
+    Raises:
+        ValueError: if the counter is bigger than the threshold from the settings.
+    """
+
+    email_counter = r.get("email:delivery_attempts")
+    if email_counter:
+        if int(email_counter) >= settings.SENT_EMAILS_THRESHOLD:
+            raise ValueError("Emergency brake engaged")
+    else:
+        pipe = r.pipeline()
+        pipe.incr("email:delivery_attempts")
+        pipe.expire("email:delivery_attempts", 60 * 60 * 24)  # 24 hours period
+        pipe.execute()
