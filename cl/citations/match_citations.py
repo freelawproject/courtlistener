@@ -289,15 +289,15 @@ def resolve_supra_citation(
 
 @no_type_check
 def do_resolve_citations(
-    citations: List[CitationBase], citing_document: Opinion | RECAPDocument
+    citations: List[CitationBase], citing_object: Opinion | RECAPDocument
 ) -> Dict[MatchedResourceType, List[SupportedCitationType]]:
     # Set the citing opinion on FullCaseCitation objects for later matching
     for c in citations:
         if type(c) is FullCaseCitation:
-            if isinstance(citing_document, Opinion):
-                c.citing_opinion = citing_document
-            elif isinstance(citing_document, RECAPDocument):
-                c.citing_document = citing_document  # if the writing doing the citing is a RECAPDocument, then refer to it as a citing document.
+            if isinstance(citing_object, Opinion):
+                c.citing_opinion = citing_object
+            elif isinstance(citing_object, RECAPDocument):
+                c.citing_document = citing_object  # if the writing doing the citing is a RECAPDocument, then refer to it as a citing document.
             else:
                 raise "Unknown citing type."
 
