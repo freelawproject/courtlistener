@@ -17,6 +17,7 @@ jobs:
         ports:
           - 5000:5000
     strategy:
+      fail-fast: false
       matrix:
         tag_flags: ["--exclude-tag selenium", "--tag selenium"]
     steps:

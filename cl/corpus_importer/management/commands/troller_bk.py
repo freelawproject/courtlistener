@@ -7,7 +7,7 @@ import re
 import sys
 import threading
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from queue import Queue
 from typing import Any, DefaultDict, Mapping, TypedDict
 from urllib.parse import unquote
@@ -16,7 +16,7 @@ from dateutil.parser import ParserError
 from django.db import DataError, IntegrityError, transaction
 from django.db.models import Q
 from django.utils.text import slugify
-from django.utils.timezone import make_aware, utc
+from django.utils.timezone import make_aware
 from juriscraper.pacer import PacerRssFeed
 
 from cl.custom_filters.templatetags.text_filters import best_case_name
@@ -253,7 +253,8 @@ def merge_rss_data(
     courts_exceptions_no_rss = ["miwb", "nceb", "pamd", "cit"]
     if (
         build_date
-        and build_date > make_aware(datetime(year=2018, month=4, day=20), utc)
+        and build_date
+        > make_aware(datetime(year=2018, month=4, day=20), timezone.utc)
         and court_id in district_court_ids
         and court_id not in courts_exceptions_no_rss
     ):
@@ -283,6 +284,7 @@ def merge_rss_data(
         document_number = docket["docket_entries"][0]["document_number"]
         if (
             document_number
+            and d.pk
             and d.docket_entries.filter(entry_number=document_number).exists()
         ):
             # It's an existing docket entry; let's not add it.
@@ -297,11 +299,14 @@ def merge_rss_data(
                         "short_description"
                     ]
                 )
-            if d.docket_entries.filter(
-                query,
-                date_filed=docket_entry["date_filed"],
-                entry_number=docket_entry["document_number"],
-            ).exists():
+            if (
+                d.pk
+                and d.docket_entries.filter(
+                    query,
+                    date_filed=docket_entry["date_filed"],
+                    entry_number=docket_entry["document_number"],
+                ).exists()
+            ):
                 # It's an existing docket entry; let's not add it.
                 continue
 

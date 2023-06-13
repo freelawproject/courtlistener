@@ -1,3 +1,4 @@
+import html
 import re
 
 from django.template import Library
@@ -218,3 +219,9 @@ def read_more(s, show_words, autoescape=True):
     words.insert(show_words, insertion)
     words.append("</span>")
     return mark_safe(" ".join(words))
+
+
+@register.filter(is_safe=True)
+def html_decode(value):
+    """Decode unicode HTML entities."""
+    return html.unescape(value)

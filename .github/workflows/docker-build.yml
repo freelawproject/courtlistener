@@ -1,9 +1,7 @@
 name: Automate build and deploy
 on:
-  pull_request:
+  push:
     branches: [ "main" ]
-    types:
-     - closed
 
 env:
   AWS_REGION: us-west-2
@@ -13,7 +11,6 @@ env:
 jobs:
   build:
     # Build only merged PRs
-    if: (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3

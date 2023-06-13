@@ -10,7 +10,7 @@ from localflavor.us.models import (
 )
 
 from cl.custom_filters.templatetags.extras import granular_date
-from cl.lib.date_time import midnight_pst
+from cl.lib.date_time import midnight_pt
 from cl.lib.model_helpers import (
     make_choices_group_lookup,
     validate_all_or_none,
@@ -217,10 +217,12 @@ class Person(AbstractDateTimeModel):
     def get_absolute_url(self) -> str:
         return reverse("view_person", args=[self.pk, self.slug])
 
-    def save(self, *args, **kwargs):
+    def save(self, update_fields=None, *args, **kwargs):
         self.slug = slugify(trunc(self.name_full, 158))
+        if update_fields is not None:
+            update_fields = {"slug"}.union(update_fields)
         self.full_clean()
-        super(Person, self).save(*args, **kwargs)
+        super(Person, self).save(update_fields=update_fields, *args, **kwargs)
 
     def clean_fields(self, *args, **kwargs):
         validate_partial_date(self, ["dob", "dod"])
@@ -299,9 +301,9 @@ class Person(AbstractDateTimeModel):
 
         # Dates
         if self.date_dob is not None:
-            out["dob"] = midnight_pst(self.date_dob)
+            out["dob"] = midnight_pt(self.date_dob)
         if self.date_dod is not None:
-            out["dod"] = midnight_pst(self.date_dod)
+            out["dod"] = midnight_pt(self.date_dod)
 
         # Joined Values. Brace yourself.
         positions = self.positions.all()

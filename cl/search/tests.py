@@ -17,6 +17,7 @@ from django.db import IntegrityError, transaction
 from django.http import HttpRequest
 from django.test import RequestFactory, override_settings
 from django.urls import reverse
+from factory import RelatedFactory
 from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
 from selenium.webdriver.common.by import By
@@ -24,7 +25,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
 
-from cl.lib.search_utils import cleanup_main_query
+from cl.lib.search_utils import cleanup_main_query, make_fq
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
     EmptySolrTestCase,
@@ -35,7 +36,14 @@ from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.factories import DocketEntriesDataFactory, DocketEntryDataFactory
 from cl.recap.mergers import add_docket_entries
 from cl.scrapers.factories import PACERFreeDocumentLogFactory
-from cl.search.factories import CourtFactory, DocketFactory
+from cl.search.factories import (
+    CourtFactory,
+    DocketEntryWithParentsFactory,
+    DocketFactory,
+    OpinionClusterFactoryWithChildrenAndParents,
+    OpinionWithChildrenFactory,
+    RECAPDocumentFactory,
+)
 from cl.search.feeds import JurisdictionFeed
 from cl.search.management.commands.cl_calculate_pagerank import Command
 from cl.search.models import (
@@ -380,6 +388,29 @@ class AdvancedTest(IndexedSolrTestCase):
 
     fixtures = ["test_objects_search.json", "judge_judy.json"]
 
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.de = DocketEntryWithParentsFactory(
+            docket=DocketFactory(
+                court=cls.court, case_name="SUBPOENAS SERVED ON"
+            ),
+            description="MOTION for Leave to File Amicus Curiae august",
+        )
+        cls.rd = RECAPDocumentFactory(
+            docket_entry=cls.de, description="Leave to File"
+        )
+
+        cls.de_1 = DocketEntryWithParentsFactory(
+            docket=DocketFactory(
+                court=cls.court, case_name="SUBPOENAS SERVED OFF"
+            ),
+            description="MOTION for Leave to File Amicus Curiae september",
+        )
+        cls.rd_1 = RECAPDocumentFactory(
+            docket_entry=cls.de_1, description="Leave to File"
+        )
+
     def test_a_intersection_query(self) -> None:
         """Does AND queries work"""
         r = self.client.get(reverse("show_results"), {"q": "Howard AND Honda"})
@@ -495,8 +526,132 @@ class AdvancedTest(IndexedSolrTestCase):
         self.assertIn("docket number 3", r.content.decode())
         self.assertIn("2 Opinions", r.content.decode())
 
+    def test_make_fq(self) -> None:
+        """Test make_fq method, checks query formatted is correctly performed."""
+        args = (
+            {
+                "q": "",
+                "description": '"leave to file" AND amicus',
+            },
+            "description",
+            "description",
+        )
+        fq = make_fq(*args)
+        self.assertEqual(fq, 'description:("leave to file" AND amicus)')
+
+        args[0]["description"] = '"leave to file" curie'
+        fq = make_fq(*args)
+        self.assertEqual(fq, 'description:("leave to file" AND curie)')
+
+        args[0]["description"] = '"leave to file" AND "amicus curie"'
+        fq = make_fq(*args)
+        self.assertEqual(
+            fq, 'description:("leave to file" AND "amicus curie")'
+        )
+
+        args[0][
+            "description"
+        ] = '"leave to file" AND "amicus curie" "by august"'
+        fq = make_fq(*args)
+        self.assertEqual(
+            fq,
+            'description:("leave to file" AND "amicus curie" AND "by august")',
+        )
+
+        args[0][
+            "description"
+        ] = '"leave to file" AND "amicus curie" OR "by august"'
+        fq = make_fq(*args)
+        self.assertEqual(
+            fq,
+            'description:("leave to file" AND "amicus curie" OR "by august")',
+        )
+        args[0][
+            "description"
+        ] = '"leave to file" NOT "amicus curie" OR "by august"'
+        fq = make_fq(*args)
+        self.assertEqual(
+            fq,
+            'description:("leave to file" NOT "amicus curie" OR "by august")',
+        )
+
+        args[0]["description"] = '"leave to file amicus curie"'
+        fq = make_fq(*args)
+        self.assertEqual(fq, 'description:("leave to file amicus curie")')
+
+        args[0]["description"] = "leave to file AND amicus curie"
+        fq = make_fq(*args)
+        self.assertEqual(
+            fq, "description:(leave AND to AND file AND amicus AND curie)"
+        )
+
+    def test_phrase_plus_conjunction_search(self) -> None:
+        """Confirm phrase + conjunction search works properly"""
+
+        add_docket_to_solr_by_rds([self.rd.pk], force_commit=True)
+        add_docket_to_solr_by_rds([self.rd_1.pk], force_commit=True)
+        params = {
+            "q": "",
+            "description": '"leave to file" AND amicus',
+            "type": SEARCH_TYPES.RECAP,
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            params,
+        )
+        self.assertIn("2 Cases", r.content.decode())
+        self.assertIn("SUBPOENAS SERVED ON", r.content.decode())
+
+        params["description"] = '"leave to file" amicus'
+        r = self.client.get(
+            reverse("show_results"),
+            params,
+        )
+        self.assertIn("2 Cases", r.content.decode())
+        self.assertIn("SUBPOENAS SERVED ON", r.content.decode())
+
+        params["description"] = '"leave to file" AND "amicus"'
+        r = self.client.get(
+            reverse("show_results"),
+            params,
+        )
+        self.assertIn("2 Cases", r.content.decode())
+        self.assertIn("SUBPOENAS SERVED ON", r.content.decode())
+
+        params[
+            "description"
+        ] = '"leave to file" AND "amicus" "Curiae september"'
+        r = self.client.get(
+            reverse("show_results"),
+            params,
+        )
+        self.assertIn("1 Case", r.content.decode())
+        self.assertIn("SUBPOENAS SERVED OFF", r.content.decode())
+
 
 class SearchTest(IndexedSolrTestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        OpinionClusterFactoryWithChildrenAndParents(
+            case_name="Strickland v. Washington.",
+            case_name_full="Strickland v. Washington.",
+            docket=DocketFactory(
+                court=cls.court, docket_number="1:21-cv-1234"
+            ),
+            sub_opinions=RelatedFactory(
+                OpinionWithChildrenFactory,
+                factory_related_name="cluster",
+                html_columbia="<p>Code, &#167; 1-815</p>",
+            ),
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+        )
+        OpinionClusterFactoryWithChildrenAndParents(
+            case_name="Strickland v. Lorem.",
+            docket=DocketFactory(court=cls.court, docket_number="123456"),
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+        )
+
     @staticmethod
     def get_article_count(r):
         """Get the article count in a query response"""
@@ -817,6 +972,75 @@ class SearchTest(IndexedSolrTestCase):
                 HTTP_200_OK,
                 msg=f"Didn't get good status code with params: {param}",
             )
+
+    def test_rendering_unicode_o_text(self) -> None:
+        """Does unicode HTML unicode is properly rendered in search results?"""
+        r = self.client.get(
+            reverse("show_results"), {"q": "*", "case_name": "Washington"}
+        )
+        self.assertIn("Code, §", r.content.decode())
+
+    def test_docket_number_proximity_query(self) -> None:
+        """Test docket_number proximity query, so that docket numbers like
+        1:21-cv-1234 can be matched by queries like: 21-1234
+        """
+
+        # Query 21-1234, return results for 1:21-bk-1234
+        search_params = {"type": SEARCH_TYPES.OPINION, "q": "21-1234"}
+        r = self.client.get(reverse("show_results"), search_params)
+        actual = self.get_article_count(r)
+        self.assertEqual(actual, 1)
+        self.assertIn("Washington", r.content.decode())
+
+        # Query 1:21-cv-1234
+        search_params["q"] = "1:21-cv-1234"
+        r = self.client.get(reverse("show_results"), search_params)
+        actual = self.get_article_count(r)
+        self.assertEqual(actual, 1)
+        self.assertIn("Washington", r.content.decode())
+
+        # docket_number box filter: 21-1234, return results for 1:21-bk-1234
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "docket_number": f"21-1234",
+        }
+        # Frontend
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("Washington", r.content.decode())
+
+    def test_docket_number_suffixes_query(self) -> None:
+        """Test docket_number with suffixes can be found."""
+
+        # Indexed: 1:21-cv-1234 -> Search: 1:21-cv-1234-ABC
+        # Frontend
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": f"1:21-cv-1234-ABC",
+        }
+        r = self.client.get(reverse("show_results"), search_params)
+        actual = self.get_article_count(r)
+        self.assertEqual(actual, 1)
+        self.assertIn("Washington", r.content.decode())
+
+        # Other kind of formats can still be searched -> 123456
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": "123456",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("Lorem", r.content.decode())
 
 
 @override_settings(
@@ -1287,7 +1511,10 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         # Send string of search_query to the function and expect it
         # to be encoded properly
         q_a = (
-            ("12-9238 happy Gilmore", '"12-9238" happy Gilmore'),
+            (
+                "12-9238 happy Gilmore",
+                'docketNumber:"12-9238"~1 happy Gilmore',
+            ),
             ("1chicken NUGGET", '"1chicken" NUGGET'),
             (
                 "We can drive her home with 1headlight",
@@ -1298,7 +1525,10 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
             # No changes to regular queries?
             ("Look Ma, no numbers!", "Look Ma, no numbers!"),
             # Docket numbers hyphenated into phrases?
-            ("12cv9834 Monkey Goose", '"12-cv-9834" Monkey Goose'),
+            (
+                "12cv9834 Monkey Goose",
+                'docketNumber:"12-cv-9834"~1 Monkey Goose',
+            ),
             # Valid dates ignored?
             (
                 "2020-10-31T00:00:00Z Monkey Goose",
@@ -1315,14 +1545,17 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
             ("id:[* TO 5] Monkey Goose", 'id:[* TO "5"] Monkey Goose'),
             (
                 "(Tempura AND 12cv3392) OR sushi",
-                '(Tempura AND "12-cv-3392") OR sushi',
+                '(Tempura AND docketNumber:"12-cv-3392"~1) OR sushi',
             ),
             # Phrase search with numbers (w/and w/o § mark)?
             ('"18 USC 242"', '"18 USC 242"'),
             ('"18 USC §242"', '"18 USC §242"'),
             ('"this is a test" asdf', '"this is a test" asdf'),
             ('asdf "this is a test" asdf', 'asdf "this is a test" asdf'),
-            ('"this is a test" 22cv3332', '"this is a test" "22-cv-3332"'),
+            (
+                '"this is a test" 22cv3332',
+                '"this is a test" docketNumber:"22-cv-3332"~1',
+            ),
         )
         for q, a in q_a:
             print("Does {q} --> {a} ? ".format(**{"q": q, "a": a}))

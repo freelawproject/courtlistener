@@ -18,7 +18,7 @@ from eyecite import get_citations
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
-from cl.lib.date_time import midnight_pst
+from cl.lib.date_time import midnight_pt
 from cl.lib.model_helpers import (
     make_docket_number_core,
     make_recap_path,
@@ -78,6 +78,17 @@ class SOURCES:
     HARVARD_CASELAW = "U"
     COURT_M_HARVARD = "CU"
     DIRECT_COURT_INPUT = "D"
+    ANON_2020 = "Q"
+    ANON_2020_M_HARVARD = "QU"
+    COURT_M_RESOURCE_M_HARVARD = "CRU"
+    DIRECT_COURT_INPUT_M_HARVARD = "DU"
+    LAWBOX_M_HARVARD = "LU"
+    LAWBOX_M_COURT_M_HARVARD = "LCU"
+    LAWBOX_M_RESOURCE_M_HARVARD = "LRU"
+    LAWBOX_M_COURT_RESOURCE_M_HARVARD = "LCRU"
+    MANUAL_INPUT_M_HARVARD = "MU"
+    PUBLIC_RESOURCE_M_HARVARD = "RU"
+    COLUMBIA_ARCHIVE_M_HARVARD = "ZU"
     NAMES = (
         (COURT_WEBSITE, "court website"),
         (PUBLIC_RESOURCE, "public.resource.org"),
@@ -112,6 +123,29 @@ class SOURCES:
         ),
         (COURT_M_HARVARD, "court website merged with Harvard"),
         (DIRECT_COURT_INPUT, "direct court input"),
+        (ANON_2020, "2020 anonymous database"),
+        (ANON_2020_M_HARVARD, "2020 anonymous database merged with Harvard"),
+        (COURT_M_HARVARD, "court website merged with Harvard"),
+        (
+            COURT_M_RESOURCE_M_HARVARD,
+            "court website merged with public.resource.org and Harvard",
+        ),
+        (
+            DIRECT_COURT_INPUT_M_HARVARD,
+            "direct court input merged with Harvard",
+        ),
+        (LAWBOX_M_HARVARD, "lawbox merged with Harvard"),
+        (
+            LAWBOX_M_COURT_M_HARVARD,
+            "Lawbox merged with court website and Harvard",
+        ),
+        (
+            LAWBOX_M_RESOURCE_M_HARVARD,
+            "Lawbox merged with public.resource.org and with Harvard",
+        ),
+        (MANUAL_INPUT_M_HARVARD, "Manual input merged with Harvard"),
+        (PUBLIC_RESOURCE_M_HARVARD, "public.resource.org merged with Harvard"),
+        (COLUMBIA_ARCHIVE_M_HARVARD, "columbia archive merged with Harvard"),
     )
 
 
@@ -249,7 +283,9 @@ class Docket(AbstractDateTimeModel):
     HARVARD = 16
     HARVARD_AND_RECAP = 17
     SCRAPER_AND_HARVARD = 18
+    HARVARD_AND_COLUMBIA = 20
     DIRECT_INPUT = 32
+    DIRECT_INPUT_AND_HARVARD = 48
     ANON_2020 = 64
     ANON_2020_AND_SCRAPER = 66
     ANON_2020_AND_HARVARD = 80
@@ -277,7 +313,9 @@ class Docket(AbstractDateTimeModel):
         (HARVARD, "Harvard"),
         (HARVARD_AND_RECAP, "Harvard and RECAP"),
         (SCRAPER_AND_HARVARD, "Scraper and Harvard"),
+        (HARVARD_AND_COLUMBIA, "Harvard and Columbia"),
         (DIRECT_INPUT, "Direct court input"),
+        (DIRECT_INPUT_AND_HARVARD, "Direct court input and Harvard"),
         (ANON_2020, "2020 anonymous database"),
         (ANON_2020_AND_SCRAPER, "2020 anonymous database and Scraper"),
         (ANON_2020_AND_HARVARD, "2020 anonymous database and Harvard"),
@@ -643,7 +681,7 @@ class Docket(AbstractDateTimeModel):
         else:
             return f"{self.pk}"
 
-    def save(self, *args, **kwargs):
+    def save(self, update_fields=None, *args, **kwargs):
         self.slug = slugify(trunc(best_case_name(self), 75))
         if self.docket_number and not self.docket_number_core:
             self.docket_number_core = make_docket_number_core(
@@ -663,7 +701,10 @@ class Docket(AbstractDateTimeModel):
                         f"'{field}' cannot be Null or empty in RECAP dockets."
                     )
 
-        super(Docket, self).save(*args, **kwargs)
+        if update_fields is not None:
+            update_fields = {"slug", "docket_number_core"}.union(update_fields)
+
+        super(Docket, self).save(update_fields=update_fields, *args, **kwargs)
 
     def get_absolute_url(self) -> str:
         return reverse("view_docket", args=[self.pk, self.slug])
@@ -857,11 +898,11 @@ class Docket(AbstractDateTimeModel):
             "jurisdictionType": self.jurisdiction_type,
         }
         if self.date_argued is not None:
-            out["dateArgued"] = midnight_pst(self.date_argued)
+            out["dateArgued"] = midnight_pt(self.date_argued)
         if self.date_filed is not None:
-            out["dateFiled"] = midnight_pst(self.date_filed)
+            out["dateFiled"] = midnight_pt(self.date_filed)
         if self.date_terminated is not None:
-            out["dateTerminated"] = midnight_pst(self.date_terminated)
+            out["dateTerminated"] = midnight_pt(self.date_terminated)
         try:
             out["docket_absolute_url"] = self.get_absolute_url()
         except NoReverseMatch:
@@ -918,7 +959,7 @@ class Docket(AbstractDateTimeModel):
             if de.entry_number is not None:
                 de_out["entry_number"] = de.entry_number
             if de.date_filed is not None:
-                de_out["entry_date_filed"] = midnight_pst(de.date_filed)
+                de_out["entry_date_filed"] = midnight_pt(de.date_filed)
             rds = de.recap_documents.all()
 
             if len(rds) == 0:
@@ -1104,7 +1145,9 @@ class DocketEntry(AbstractDateTimeModel):
 
     class Meta:
         verbose_name_plural = "Docket Entries"
-        index_together = ("recap_sequence_number", "entry_number")
+        indexes = [
+            models.Index(fields=["recap_sequence_number", "entry_number"])
+        ]
         ordering = ("recap_sequence_number", "entry_number")
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
 
@@ -1232,10 +1275,14 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             "attachment_number",
         )
         ordering = ("document_type", "document_number", "attachment_number")
-        index_together = [
-            ["document_type", "document_number", "attachment_number"],
-        ]
         indexes = [
+            models.Index(
+                fields=[
+                    "document_type",
+                    "document_number",
+                    "attachment_number",
+                ]
+            ),
             models.Index(
                 fields=["filepath_local"],
                 name="search_recapdocument_filepath_local_7dc6b0e53ccf753_uniq",
@@ -1328,7 +1375,14 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             ]
         )
 
-    def save(self, do_extraction=False, index=False, *args, **kwargs):
+    def save(
+        self,
+        update_fields=None,
+        do_extraction=False,
+        index=False,
+        *args,
+        **kwargs,
+    ):
         if self.document_type == self.ATTACHMENT:
             if self.attachment_number is None:
                 raise ValidationError(
@@ -1378,7 +1432,12 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
                         % (self.pk, other.pk)
                     )
 
-        super(RECAPDocument, self).save(*args, **kwargs)
+        if update_fields is not None:
+            update_fields = {"pacer_doc_id"}.union(update_fields)
+
+        super(RECAPDocument, self).save(
+            update_fields=update_fields, *args, **kwargs
+        )
         tasks = []
         if do_extraction and self.needs_extraction:
             # Context extraction not done and is requested.
@@ -1428,11 +1487,11 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             }
         )
         if docket.date_argued is not None:
-            out["dateArgued"] = midnight_pst(docket.date_argued)
+            out["dateArgued"] = midnight_pt(docket.date_argued)
         if docket.date_filed is not None:
-            out["dateFiled"] = midnight_pst(docket.date_filed)
+            out["dateFiled"] = midnight_pt(docket.date_filed)
         if docket.date_terminated is not None:
-            out["dateTerminated"] = midnight_pst(docket.date_terminated)
+            out["dateTerminated"] = midnight_pt(docket.date_terminated)
         try:
             out["docket_absolute_url"] = docket.get_absolute_url()
         except NoReverseMatch:
@@ -1526,9 +1585,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         if self.docket_entry.entry_number is not None:
             out["entry_number"] = self.docket_entry.entry_number
         if self.docket_entry.date_filed is not None:
-            out["entry_date_filed"] = midnight_pst(
-                self.docket_entry.date_filed
-            )
+            out["entry_date_filed"] = midnight_pt(self.docket_entry.date_filed)
 
         text_template = loader.get_template("indexes/dockets_text.txt")
         out["text"] = text_template.render({"item": self}).translate(null_map)
@@ -2329,6 +2386,18 @@ class OpinionCluster(AbstractDateTimeModel):
         blank=True,
         db_index=True,
     )
+    arguments = models.TextField(
+        help_text="The attorney(s) and legal arguments presented as HTML text. "
+        "This is primarily seen in older opinions and can contain "
+        "case law cited and arguments presented to the judges.",
+        blank=True,
+    )
+    headmatter = models.TextField(
+        help_text="Headmatter is the content before an opinion in the Harvard "
+        "CaseLaw import. This consists of summaries, headnotes, "
+        "attorneys etc for the opinion.",
+        blank=True,
+    )
 
     objects = ClusterCitationQuerySet.as_manager()
 
@@ -2466,9 +2535,20 @@ class OpinionCluster(AbstractDateTimeModel):
     def get_absolute_url(self) -> str:
         return reverse("view_case", args=[self.pk, self.slug])
 
-    def save(self, index=True, force_commit=False, *args, **kwargs):
+    def save(
+        self,
+        update_fields=None,
+        index=True,
+        force_commit=False,
+        *args,
+        **kwargs,
+    ):
         self.slug = slugify(trunc(best_case_name(self), 75))
-        super(OpinionCluster, self).save(*args, **kwargs)
+        if update_fields is not None:
+            update_fields = {"slug"}.union(update_fields)
+        super(OpinionCluster, self).save(
+            update_fields=update_fields, *args, **kwargs
+        )
         if index:
             from cl.search.tasks import add_items_to_solr
 
@@ -2506,11 +2586,11 @@ class OpinionCluster(AbstractDateTimeModel):
             "docketNumber": self.docket.docket_number,
         }
         if self.docket.date_argued is not None:
-            docket["dateArgued"] = midnight_pst(self.docket.date_argued)
+            docket["dateArgued"] = midnight_pt(self.docket.date_argued)
         if self.docket.date_reargued is not None:
-            docket["dateReargued"] = midnight_pst(self.docket.date_reargued)
+            docket["dateReargued"] = midnight_pt(self.docket.date_reargued)
         if self.docket.date_reargument_denied is not None:
-            docket["dateReargumentDenied"] = midnight_pst(
+            docket["dateReargumentDenied"] = midnight_pt(
                 self.docket.date_reargument_denied
             )
         out.update(docket)
@@ -2553,7 +2633,7 @@ class OpinionCluster(AbstractDateTimeModel):
             pass
 
         if self.date_filed is not None:
-            out["dateFiled"] = midnight_pst(self.date_filed)
+            out["dateFiled"] = midnight_pt(self.date_filed)
         try:
             out["absolute_url"] = self.get_absolute_url()
         except NoReverseMatch:
@@ -2681,12 +2761,12 @@ class Citation(models.Model):
         return self.cluster.get_absolute_url()
 
     class Meta:
-        index_together = (
+        indexes = [
             # To look up individual citations
-            ("volume", "reporter", "page"),
+            models.Index(fields=["volume", "reporter", "page"]),
             # To generate reporter volume lists
-            ("volume", "reporter"),
-        )
+            models.Index(fields=["volume", "reporter"]),
+        ]
         unique_together = (("cluster", "volume", "reporter", "page"),)
 
 
@@ -2979,7 +3059,7 @@ class Opinion(AbstractDateTimeModel):
             pass
 
         if self.cluster.date_filed is not None:
-            out["dateFiled"] = midnight_pst(self.cluster.date_filed)
+            out["dateFiled"] = midnight_pt(self.cluster.date_filed)
         try:
             out["absolute_url"] = self.cluster.get_absolute_url()
         except NoReverseMatch:
@@ -2992,15 +3072,13 @@ class Opinion(AbstractDateTimeModel):
         # Docket
         docket = {"docketNumber": self.cluster.docket.docket_number}
         if self.cluster.docket.date_argued is not None:
-            docket["dateArgued"] = midnight_pst(
-                self.cluster.docket.date_argued
-            )
+            docket["dateArgued"] = midnight_pt(self.cluster.docket.date_argued)
         if self.cluster.docket.date_reargued is not None:
-            docket["dateReargued"] = midnight_pst(
+            docket["dateReargued"] = midnight_pt(
                 self.cluster.docket.date_reargued
             )
         if self.cluster.docket.date_reargument_denied is not None:
-            docket["dateReargumentDenied"] = midnight_pst(
+            docket["dateReargumentDenied"] = midnight_pt(
                 self.cluster.docket.date_reargument_denied
             )
         out.update(docket)

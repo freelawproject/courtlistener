@@ -8,11 +8,13 @@ from django.core.cache import cache, caches
 from django.http import HttpRequest, QueryDict
 from eyecite import get_citations
 from eyecite.models import FullCaseCitation
+from requests import Session
 from scorched.response import SolrResponse
 
 from cl.citations.match_citations import search_db_for_fullcitation
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.lib.bot_detector import is_bot
+from cl.lib.model_helpers import clean_docket_number, is_docket_number
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.types import CleanData, SearchParam
 from cl.search.constants import (
@@ -76,17 +78,29 @@ BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
 }
 
 
-def get_solr_interface(cd: CleanData) -> ExtraSolrInterface:
+def get_solr_interface(
+    cd: CleanData, http_connection: Session | None = None
+) -> ExtraSolrInterface:
     """Get the correct solr interface for the query"""
     search_type = cd["type"]
     if search_type == SEARCH_TYPES.OPINION:
-        si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
+        si = ExtraSolrInterface(
+            settings.SOLR_OPINION_URL,
+            http_connection=http_connection,
+            mode="r",
+        )
     elif search_type in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
-        si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode="r")
+        si = ExtraSolrInterface(
+            settings.SOLR_RECAP_URL, http_connection=http_connection, mode="r"
+        )
     elif search_type == SEARCH_TYPES.ORAL_ARGUMENT:
-        si = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode="r")
+        si = ExtraSolrInterface(
+            settings.SOLR_AUDIO_URL, http_connection=http_connection, mode="r"
+        )
     elif search_type == SEARCH_TYPES.PEOPLE:
-        si = ExtraSolrInterface(settings.SOLR_PEOPLE_URL, mode="r")
+        si = ExtraSolrInterface(
+            settings.SOLR_PEOPLE_URL, http_connection=http_connection, mode="r"
+        )
     else:
         raise NotImplementedError(f"Unknown search type: {search_type}")
 
@@ -303,6 +317,7 @@ def make_fq(
     field: str,
     key: str,
     make_phrase: bool = False,
+    slop: int = 0,
 ) -> str:
     """Does some minimal processing of the query string to get it into a
     proper field query.
@@ -320,34 +335,42 @@ def make_fq(
     :param key: The model form field to use for the query (e.g. "case_name")
     :param make_phrase: Whether we should wrap the query in quotes to make a
     phrase search.
+    :param slop: Maximum distance between terms in a phrase for a match.
+    Only applicable on make_phrase queries.
     :returns A field query string like "caseName:Roe"
     """
     q = cd[key]
     q = q.replace(":", " ")
 
-    if q.startswith('"') and q.endswith('"'):
+    if (q.startswith('"') and q.endswith('"')) and q.count('"') == 2:
         # User used quotes. Just pass it through.
         return f"{field}:({q})"
 
     if make_phrase:
         # No need to mess with conjunctions. Just wrap in quotes.
-        return f'{field}:("{q}")'
+        # Include slop for proximity queries, e.g: 1:21-bk-1234 -> 21-1234
+        return f'{field}:("{q}"~{slop})'
 
     # Iterate over the query word by word. If the word is a conjunction
     # word, detect that and use the user's request. Else, make sure there's
     # an AND everywhere there should be.
-    words = q.split()
-    clean_q = [words[0]]
+
+    # Split the query into words e.g: word1 and phrases e.g: "word2 word3"
+    words = re.findall(r'"([^"]*)"|(\S+)', q)
+    clean_q = []
     needs_default_conjunction = True
-    for word in words[1:]:
+    for group in words:
+        word = group[0] if group[0] else group[1]
         if word.lower() in ["and", "or", "not"]:
             clean_q.append(word.upper())
             needs_default_conjunction = False
         else:
-            if needs_default_conjunction:
+            if needs_default_conjunction and clean_q:
                 clean_q.append("AND")
-            clean_q.append(word)
+            # If word contains at least one " " is a phrase, append "".
+            clean_q.append(f'"{word}"' if " " in word else word)
             needs_default_conjunction = True
+
     fq = f"{field}:({' '.join(clean_q)})"
     return fq
 
@@ -615,7 +638,13 @@ def add_filter_queries(main_params: SearchParam, cd) -> None:
             main_fq.append(make_fq(cd, "judge", "judge"))
         if cd["docket_number"]:
             main_fq.append(
-                make_fq(cd, "docketNumber", "docket_number", make_phrase=True)
+                make_fq(
+                    cd,
+                    "docketNumber",
+                    "docket_number",
+                    make_phrase=True,
+                    slop=1,
+                )
             )
         if cd["citation"]:
             main_fq.append(make_fq_proximity_query(cd, "citation", "citation"))
@@ -636,7 +665,13 @@ def add_filter_queries(main_params: SearchParam, cd) -> None:
             main_fq.append(make_fq(cd, "description", "description"))
         if cd["docket_number"]:
             main_fq.append(
-                make_fq(cd, "docketNumber", "docket_number", make_phrase=True)
+                make_fq(
+                    cd,
+                    "docketNumber",
+                    "docket_number",
+                    make_phrase=True,
+                    slop=1,
+                )
             )
         if cd["nature_of_suit"]:
             main_fq.append(make_fq(cd, "suitNature", "nature_of_suit"))
@@ -858,9 +893,18 @@ def cleanup_main_query(query_string: str) -> str:
             # It's a docket number missing hyphens, e.g. 19cv38374
             item = "-".join(m.groups())
 
-        # Some sort of number, probably a docket number.
+        # Some sort of number, probably a docket number or other type of number
         # Wrap in quotes to do a phrase search
-        cleaned_items.append(f'"{item}"')
+        if is_docket_number(item) and "docketNumber:" not in query_string:
+            # Confirm is a docket number and clean it. So docket_numbers with
+            # suffixes can be searched: 1:21-bk-1234-ABC -> 1:21-bk-1234,
+            item = clean_docket_number(item)
+            # Adds a proximity query of ~1 to match
+            # numbers like 1:21-cv-1234 -> 21-1234
+            cleaned_items.append(f'docketNumber:"{item}"~1')
+        else:
+            cleaned_items.append(f'"{item}"')
+
     return "".join(cleaned_items)
 
 
