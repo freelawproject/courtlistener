@@ -172,7 +172,7 @@ def parse_file(file_path):
     # text in the byline or in any of its associated opinion texts indicate this
     for opinion in info["opinions"]:
         # if there's already an identified author, it's not per curiam
-        if opinion["author"] > 0:
+        if opinion["author"]:
             opinion["per_curiam"] = False
             continue
         # otherwise, search through chunks of text for the phrase 'per curiam'
@@ -301,6 +301,7 @@ def get_text(file_path):
                 "opinion": direct_descendant_text or "",
             }
         ]
+
     return raw_info
 
 
@@ -309,10 +310,18 @@ def get_xml_string(e):
 
     :param e: An XML element.
     """
+    # inner_string = re.sub(
+    #     r"(^<%s\b.*?>|</%s\b.*?>$)" % (e.tag, e.tag), "", ET.tostring(e)
+    # )
+    # return inner_string.decode().strip()
+
     inner_string = re.sub(
-        r"(^<%s\b.*?>|</%s\b.*?>$)" % (e.tag, e.tag), "", ET.tostring(e)
+        r"(^<%s\b.*?>|</%s\b.*?>$)" % (e.tag, e.tag),
+        "",
+        str(ET.tostring(e, encoding="unicode")),
     )
-    return inner_string.decode().strip()
+
+    return inner_string.strip()
 
 
 def parse_dates(raw_dates):

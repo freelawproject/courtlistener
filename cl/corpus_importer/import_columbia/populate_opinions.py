@@ -5,13 +5,14 @@ from collections import OrderedDict
 from datetime import date
 
 from django.conf import settings
+from eyecite import clean_text
 from eyecite.find import get_citations
-from eyecite.utils import clean_text
 
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.solr_core_admin import get_term_frequency
-from cl.search.models import SOURCES, Docket, Opinion, OpinionCluster
+from cl.search.models import SOURCES, Citation, Docket, Opinion, OpinionCluster
 
+from ...citations.utils import map_reporter_db_cite_type
 from ...people_db.lookup_utils import (
     lookup_judge_by_last_name,
     lookup_judges_by_last_name_list,
@@ -360,7 +361,7 @@ def make_and_save(
             for trivial in TRIVIAL_CITE_WORDS:
                 non_trivial = non_trivial.replace(trivial, "")
             num_letters = sum(
-                non_trivial.count(letter) for letter in string.lowercase
+                non_trivial.count(letter) for letter in string.ascii_lowercase
             )
             if num_letters < 3:
                 continue
@@ -376,7 +377,20 @@ def make_and_save(
                 % (c, item["court_id"], item["docket"])
             )
         else:
-            found_citations.extend(found.to_model())
+            if found:
+                if not found[0].corrected_reporter():
+                    reporter_type = Citation.STATE
+                else:
+                    cite_type_str = found[0].all_editions[0].reporter.cite_type
+                    reporter_type = map_reporter_db_cite_type(cite_type_str)
+
+                citation_object = Citation(
+                    volume=found[0].groups["volume"],
+                    reporter=found[0].corrected_reporter(),
+                    page=found[0].groups["page"],
+                    type=reporter_type,
+                )
+                found_citations.append(citation_object)
 
     cluster = OpinionCluster(
         judges=item.get("judges", "") or "",
@@ -420,9 +434,11 @@ def make_and_save(
             # reading this, you'll need to update this code.
             local_path=opinion_info["local_path"],
         )
+
         joined_by = lookup_judges_by_last_name_list(
-            item["joining"], item["court_id"], panel_date
+            item.get("joining", ""), item.get("court_id", ""), panel_date
         )
+
         opinions.append((opinion, joined_by))
 
     if min_dates is None:
@@ -470,16 +486,17 @@ def find_dups(docket, cluster):
     :param docket: A `Docket` instance.
     :param cluster: An `OpinionCluster` instance.
     """
-    if not cluster.citations.exists():
-        # if there aren't any citations, assume
-        # for now that there's no duplicate
-        return []
+    # You can't use relation before saving
+    # if not cluster.citations.exists():
+    #     # if there aren't any citations, assume
+    #     # for now that there's no duplicate
+    #     return []
 
+    # TODO you can't access to related objects of an unsaved object, why this is here?
     params = {
         "fq": [
             f"court_id:{docket.court_id}",
-            "citation:(%s)"
-            % " OR ".join('"%s"~5' % c for c in cluster.citations.all() if c),
+            # "citation:(%s)" % " OR ".join('"%s"~5' % c for c in cluster.citations.all() if c),
         ],
         "rows": 100,
         "caller": "corpus_importer.import_columbia.populate_opinions",
