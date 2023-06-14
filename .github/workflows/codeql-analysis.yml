@@ -23,6 +23,12 @@ jobs:
     - run: git checkout HEAD^2
       if: ${{ github.event_name == 'pull_request' }}
 
+    # Install a Python compatible with pyproject (necessary later for
+    # `github/codeql-action/init`)
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v2
