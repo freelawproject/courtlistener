@@ -120,4 +120,4 @@ jobs:
           python-version: "3.9"
 
       - name: isort Import Sorter
-        uses: isort/isort-action@v0.1.0
+        uses: isort/isort-action@v1
