@@ -1,18 +1,14 @@
 from datetime import datetime
 
 from django.conf import settings
-from django.http import QueryDict
 from django.template import loader
 from django_elasticsearch_dsl import Document, Index, fields
 from elasticsearch_dsl import Percolator
-from six import iteritems
 
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
-from cl.lib.elasticsearch_utils import build_es_main_query
 from cl.lib.search_index_utils import null_map
 from cl.lib.utils import deepgetattr
-from cl.search.forms import SearchForm
 from cl.search.models import Citation, ParentheticalGroup
 
 # Define parenthetical elasticsearch index
@@ -256,35 +252,4 @@ class AudioPercolator(AudioDocumentBase):
 
     class Django:
         model = Alert
-
-    def prepare_rate(self, instance):
-        return instance.rate
-
-    def prepare_percolator_query(self, instance):
-        # Make a dict from the query string.
-        qd = QueryDict(instance.query.encode(), mutable=True)
-        cd = {}
-        search_form = SearchForm(qd)
-        if search_form.is_valid():
-            cd = search_form.cleaned_data
-        search_query = AudioDocument.search()
-        (
-            query,
-            total_query_results,
-            top_hits_limit,
-        ) = build_es_main_query(search_query, cd)
-        query_dict = query.to_dict()["query"]
-        return query_dict
-
-    def init_prepare(self):
-        """Custom prepare method to achieve indexing a non-DEDField and only
-        populate alert fields."""
-
-        fields_to_index = ["percolator_query", "rate"]
-        index_fields = getattr(self, "_fields", {})
-        fields = []
-        for name, field in iteritems(index_fields):
-            prep_func = getattr(self, f"prepare_{name}", None)
-            if name in fields_to_index:
-                fields.append((name, field, prep_func))
-        return fields
+        ignore_signals = True

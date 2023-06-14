@@ -54,6 +54,12 @@ class Alert(AbstractDateTimeModel):
     class Meta:
         ordering = ["rate", "query"]
 
+    def save(self, *args, **kwargs):
+        """Ensure we get a token when we save the first time."""
+        if self.pk is None:
+            self.secret_key = get_random_string(length=40)
+        super(Alert, self).save(*args, **kwargs)
+
 
 class DocketAlertManager(models.Manager):
     def subscriptions(self):

@@ -21,6 +21,7 @@ from django.http import HttpRequest
 from django.test import RequestFactory, override_settings
 from django.test.utils import captured_stderr
 from django.urls import reverse
+from elasticsearch import Elasticsearch
 from elasticsearch_dsl import Q, connections
 from factory import RelatedFactory
 from lxml import etree, html
@@ -4538,6 +4539,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
     def test_percolator(self) -> None:
         """Test if a variety of documents triggers a percolator query."""
 
+        created_queries_ids = []
         # Add queries to percolator.
         cd = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
@@ -4545,6 +4547,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             "order_by": "score desc",
         }
         query_id = self.save_percolator_query(cd)
+        created_queries_ids.append(query_id)
         AudioPercolator._index.refresh()
         response = percolate_document(self.prepare_document(self.audio_2))
         expected_queries = 1
@@ -4559,6 +4562,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         }
 
         query_id = self.save_percolator_query(cd)
+        created_queries_ids.append(query_id)
         AudioPercolator._index.refresh()
         response = percolate_document(self.prepare_document(self.audio_2))
         expected_queries = 2
@@ -4572,6 +4576,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             "order_by": "score desc",
         }
         query_id = self.save_percolator_query(cd)
+        created_queries_ids.append(query_id)
         AudioPercolator._index.refresh()
         response = percolate_document(self.prepare_document(self.audio_1))
         expected_queries = 1
@@ -4587,6 +4592,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         }
 
         query_id = self.save_percolator_query(cd)
+        created_queries_ids.append(query_id)
         AudioPercolator._index.refresh()
         response = percolate_document(self.prepare_document(self.audio_5))
         expected_queries = 1
@@ -4603,6 +4609,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         }
 
         query_id = self.save_percolator_query(cd)
+        created_queries_ids.append(query_id)
         AudioPercolator._index.refresh()
         response = percolate_document(self.prepare_document(self.audio_1))
         expected_queries = 2
@@ -4618,6 +4625,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             "order_by": "score desc",
         }
         query_id = self.save_percolator_query(cd)
+        created_queries_ids.append(query_id)
         AudioPercolator._index.refresh()
         response = percolate_document(self.prepare_document(self.audio_2))
         expected_queries = 3
@@ -4633,8 +4641,22 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         }
 
         query_id = self.save_percolator_query(cd)
+        created_queries_ids.append(query_id)
         AudioPercolator._index.refresh()
         response = percolate_document(self.prepare_document(self.audio_4))
         expected_queries = 2
         self.assertEqual(len(response), expected_queries)
         self.assertEqual(self.confirm_query_matched(response, query_id), True)
+
+        # Remove queries from percolator
+        connections.create_connection(
+            hosts=[
+                f"{settings.ELASTICSEARCH_DSL_HOST}:{settings.ELASTICSEARCH_DSL_PORT}"
+            ],
+            timeout=50,
+        )
+        es = Elasticsearch(
+            f"{settings.ELASTICSEARCH_DSL_HOST}:{settings.ELASTICSEARCH_DSL_PORT}"
+        )
+        for query_id in created_queries_ids:
+            es.delete(index="oral_arguments_percolator", id=query_id)

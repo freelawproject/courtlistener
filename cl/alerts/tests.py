@@ -1577,6 +1577,7 @@ class SearchAlertsOAESTests(ESTestCaseMixin, TestCase):
             name="Test Alert OA",
             query="type=oa&docket_number=19-1010",
         )
+        AudioPercolator._index.refresh()
 
         # Confirm it was properly indexed in ES.
         search_alert_1_id = search_alert_1.pk
@@ -1599,9 +1600,11 @@ class SearchAlertsOAESTests(ESTestCaseMixin, TestCase):
 
         # Delete Alert
         search_alert_1.delete()
+        AudioPercolator._index.refresh()
 
         s = AudioPercolator.search().query("match_all")
         response = s.execute()
         response_str = str(response.to_dict())
+
         # Confirm whether the alert was also deleted in Elasticsearch.
         self.assertNotIn(f"'_id': '{search_alert_1_id}'", response_str)
