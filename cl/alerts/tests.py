@@ -1498,7 +1498,7 @@ class SearchAlertsOAESTests(ESTestCaseMixin, TestCase):
             user=cls.user_profile.user,
             rate=Alert.REAL_TIME,
             name="Test Alert OA",
-            query="type=oa&docket_number=19-5735",
+            query="q=RT+Test+OA&type=oa",
         )
         AudioPercolator._index.refresh()
         cls.mock_date = now().replace(day=15, hour=0)
@@ -1536,6 +1536,20 @@ class SearchAlertsOAESTests(ESTestCaseMixin, TestCase):
         self.assertEqual(len(mail.outbox), 1)
         text_content = mail.outbox[0].body
         self.assertIn(self.rt_oral_argument.case_name, text_content)
+        # Highlighting tags are not set in text version
+        self.assertNotIn("<strong>", text_content)
+
+        # Extract HTML version.
+        html_content = None
+        for content, content_type in mail.outbox[0].alternatives:
+            if content_type == "text/html":
+                html_content = content
+                break
+
+        # Case name is not highlighted in email alert.
+        self.assertIn(self.rt_oral_argument.case_name, html_content)
+        # Highlighting tags are set only for text field.
+        self.assertIn("<strong>RT</strong>", html_content)
 
         # One webhook event should be sent to user_profile user
         webhook_events = WebhookEvent.objects.all()

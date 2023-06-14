@@ -206,7 +206,6 @@ def send_search_alert_webhook(
 
 
 def send_es_search_alert_webhook(
-    mapping_schema: dict,
     results: list[AttrDict],
     webhook: Webhook,
     alert: Alert,
@@ -214,7 +213,6 @@ def send_es_search_alert_webhook(
     """Send a search alert webhook event containing search results from a
     search alert object.
 
-    :param solr_interface: The ExtraSolrInterface object.
     :param results: The search results returned by SOLR for this alert.
     :param webhook: The webhook endpoint object to send the event to.
     :param alert: The search alert object.
@@ -223,8 +221,8 @@ def send_es_search_alert_webhook(
     serialized_alert = SearchAlertSerializerModel(alert).data
     es_results = []
     for result in results:
+        result["snippet"] = result["text"]
         es_results.append(ResultObject(initial=result.to_dict()))
-
     serialized_results = SearchESResultSerializer(
         es_results,
         many=True,

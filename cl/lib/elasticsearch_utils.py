@@ -15,10 +15,16 @@ from elasticsearch.exceptions import RequestError, TransportError
 from elasticsearch_dsl import A, Q
 from elasticsearch_dsl.query import QueryString, Range
 from elasticsearch_dsl.response import Response
+from elasticsearch_dsl.utils import AttrDict
 
 from cl.lib.search_utils import BOOSTS, cleanup_main_query
 from cl.lib.types import CleanData
-from cl.search.constants import SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS
+from cl.search.constants import (
+    ALERTS_HL_TAG,
+    SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS,
+    SEARCH_HL_TAG,
+    SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS,
+)
 from cl.search.models import SEARCH_TYPES, Court
 
 logger = logging.getLogger(__name__)
@@ -355,26 +361,104 @@ def build_es_main_query(
     return search_query, total_query_results, top_hits_limit
 
 
-def add_es_highlighting(search_query: Search, cd: CleanData) -> Search:
+def add_es_highlighting(
+    search_query: Search, cd: CleanData, alerts: bool = False
+) -> Search:
     """Add elasticsearch highlighting to the search query.
 
     :param search_query: The Elasticsearch search query object.
     :param cd: The user input CleanedData
+    :param alerts: If highlighting is being applied to search Alerts hits.
     :return: The modified Elasticsearch search query object with highlights set
     """
+
     if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
-        fields_to_exclude = ["sha1"]
         highlighting_fields = SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS
+        hl_tag = SEARCH_HL_TAG
+        if alerts:
+            highlighting_fields = SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS
+            hl_tag = ALERTS_HL_TAG
+        fields_to_exclude = ["sha1"]
         search_query = search_query.source(excludes=fields_to_exclude)
         for field in highlighting_fields:
             search_query = search_query.highlight(
                 field,
                 number_of_fragments=0,
-                pre_tags=["<mark>"],
-                post_tags=["</mark>"],
+                pre_tags=[f"<{hl_tag}>"],
+                post_tags=[f"</{hl_tag}>"],
             )
 
     return search_query
+
+
+def merge_highlights_into_result(
+    highlights: AttrDict, result: AttrDict, tag: str
+) -> None:
+    """Merges the highlight terms into the search result.
+    This function processes highlighted fields in the `highlights` attribute
+    dictionary, then updates the `result` attribute dictionary with the
+    combined highlighted terms.
+
+    :param highlights: The AttrDict object containing highlighted fields and
+    their highlighted terms.
+    :param result: The AttrDict object containing search results.
+    :param tag: The HTML tag used to mark highlighted terms.
+    :return: None, the function updates the results in place.
+    """
+
+    exact_hl_fields = []
+    for (
+        field,
+        highlight_list,
+    ) in highlights.to_dict().items():
+        # If a query highlights fields the "field.exact", "field" or
+        # both versions are available. Highlighted terms in each
+        # version can differ, so the best thing to do is combine
+        # highlighted terms from each version and set it.
+        if "exact" in field:
+            field = field.split(".exact")[0]
+            marked_strings_2 = []
+            # Extract all unique marked strings from "field.exact"
+            marked_strings_1 = re.findall(
+                rf"<{tag}>.*?</{tag}>", highlight_list[0]
+            )
+            # Extract all unique marked strings from "field" if
+            # available
+            if field in result.meta.highlight:
+                marked_strings_2 = re.findall(
+                    rf"<{tag}>.*?</{tag}>",
+                    result.meta.highlight[field][0],
+                )
+
+            unique_marked_strings = list(
+                set(marked_strings_1 + marked_strings_2)
+            )
+            combined_highlights = highlight_list[0]
+            for marked_string in unique_marked_strings:
+                # Replace unique highlighted terms in a single
+                # field.
+                unmarked_string = marked_string.replace(
+                    f"<{tag}>", ""
+                ).replace(f"</{tag}>", "")
+                combined_highlights = combined_highlights.replace(
+                    unmarked_string, marked_string
+                )
+
+            # Remove nested <mark> tags after replace.
+            combined_highlights = re.sub(
+                rf"<{tag}><{tag}>(.*?)</{tag}></{tag}>",
+                rf"<{tag}>\1</{tag}>",
+                combined_highlights,
+            )
+
+            # Set combined highlighted terms.
+            result[field] = combined_highlights
+            exact_hl_fields.append(field)
+
+        if field not in exact_hl_fields:
+            # If the "field.exact" version has not been set, set
+            # the "field" version.
+            result[field] = highlight_list[0]
 
 
 def set_results_highlights(results: Page, search_type: str) -> None:
@@ -401,59 +485,9 @@ def set_results_highlights(results: Page, search_type: str) -> None:
         else:
             if not hasattr(result.meta, "highlight"):
                 return
-            exact_hl_fields = []
-            for (
-                field,
-                highlight_list,
-            ) in result.meta.highlight.to_dict().items():
-                # If a query highlights fields the "field.exact", "field" or
-                # both versions are available. Highlighted terms in each
-                # version can differ, so the best thing to do is combine
-                # highlighted terms from each version and set it.
-                if "exact" in field:
-                    field = field.split(".exact")[0]
-                    marked_strings_2 = []
-                    # Extract all unique marked strings from "field.exact"
-                    marked_strings_1 = re.findall(
-                        r"<mark>.*?</mark>", highlight_list[0]
-                    )
-                    # Extract all unique marked strings from "field" if
-                    # available
-                    if field in result.meta.highlight:
-                        marked_strings_2 = re.findall(
-                            r"<mark>.*?</mark>",
-                            result.meta.highlight[field][0],
-                        )
-
-                    unique_marked_strings = list(
-                        set(marked_strings_1 + marked_strings_2)
-                    )
-                    combined_highlights = highlight_list[0]
-                    for marked_string in unique_marked_strings:
-                        # Replace unique highlighted terms in a single
-                        # field.
-                        unmarked_string = marked_string.replace(
-                            "<mark>", ""
-                        ).replace("</mark>", "")
-                        combined_highlights = combined_highlights.replace(
-                            unmarked_string, marked_string
-                        )
-
-                    # Remove nested <mark> tags after replace.
-                    combined_highlights = re.sub(
-                        r"<mark><mark>(.*?)</mark></mark>",
-                        r"<mark>\1</mark>",
-                        combined_highlights,
-                    )
-
-                    # Set combined highlighted terms.
-                    result[field] = combined_highlights
-                    exact_hl_fields.append(field)
-
-                if field not in exact_hl_fields:
-                    # If the "field.exact" version has not been set, set
-                    # the "field" version.
-                    result[field] = highlight_list[0]
+            merge_highlights_into_result(
+                result.meta.highlight, result, SEARCH_HL_TAG
+            )
 
 
 def group_search_results(

@@ -42,7 +42,14 @@ SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS = [
     "docketNumber.exact",
     "court_citation_string",
 ]
+SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS = [
+    "text",
+    "text.exact",
+]
 SOLR_PEOPLE_HL_FIELDS = ["name", "dob_city", "dob_state", "name_reverse"]
+SEARCH_HL_TAG = "mark"
+ALERTS_HL_TAG = "strong"
+
 
 # Search query for related items
 RELATED_PATTERN = re.compile(

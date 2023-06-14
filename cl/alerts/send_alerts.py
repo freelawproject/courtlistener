@@ -15,7 +15,11 @@ from cl.alerts.models import Alert
 from cl.api.models import WebhookEventType
 from cl.api.webhooks import send_es_search_alert_webhook
 from cl.lib.command_utils import logger
-from cl.search.documents import AudioDocument
+from cl.lib.elasticsearch_utils import (
+    add_es_highlighting,
+    merge_highlights_into_result,
+)
+from cl.search.constants import ALERTS_HL_TAG
 from cl.search.models import SEARCH_TYPES
 from cl.users.models import UserProfile
 
@@ -58,6 +62,9 @@ def percolate_document(document_data: AttrDict) -> Response | list:
         )
         match_query = Q("match", rate=Alert.REAL_TIME)
         s = s.query("bool", must=[percolate_query, match_query])
+        s = add_es_highlighting(
+            s, {"type": SEARCH_TYPES.ORAL_ARGUMENT}, alerts=True
+        )
         # execute the search
         return s.execute()
     except (TransportError, ConnectionError, RequestError) as e:
@@ -105,6 +112,12 @@ def send_rt_alerts(response: Response, document_data: AttrDict) -> None:
             )
             continue
         qd = QueryDict(alert_triggered.query.encode(), mutable=True)
+
+        # Set highlight if available in response.
+        if hasattr(hit.meta, "highlight"):
+            merge_highlights_into_result(
+                hit.meta["highlight"], document_data, ALERTS_HL_TAG
+            )
         if alert_triggered.rate == Alert.REAL_TIME:
             hits = []
             search_type = qd.get("type", SEARCH_TYPES.OPINION)
@@ -124,7 +137,6 @@ def send_rt_alerts(response: Response, document_data: AttrDict) -> None:
             )
             for user_webhook in user_webhooks:
                 send_es_search_alert_webhook(
-                    AudioDocument._index.get_mapping(),
                     [document_data],
                     user_webhook,
                     alert_triggered,

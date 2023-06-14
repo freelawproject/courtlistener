@@ -1,11 +1,7 @@
-import traceback
-
-from django.conf import settings
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from django.http import QueryDict
 from django_elasticsearch_dsl.signals import post_index
-from elasticsearch.exceptions import RequestError, TransportError
 
 from cl.alerts.models import Alert
 from cl.alerts.send_alerts import percolate_document, send_rt_alerts
@@ -56,20 +52,12 @@ def create_or_update_alert_in_es_index(sender, instance=None, **kwargs):
             top_hits_limit,
         ) = build_es_main_query(search_query, cd)
         query_dict = query.to_dict()["query"]
-        try:
-            percolator_query = AudioPercolator(
-                meta={"id": instance.pk},
-                rate=instance.rate,
-                percolator_query=query_dict,
-            )
-            percolator_query.save()
-        except (TransportError, ConnectionError, RequestError) as e:
-            logger.warning(
-                f"Error storing the query in percolator: {query_dict}"
-            )
-            logger.warning(f"Error was: {e}")
-            if settings.DEBUG is True:
-                traceback.print_exc()
+        percolator_query = AudioPercolator(
+            meta={"id": instance.pk},
+            rate=instance.rate,
+            percolator_query=query_dict,
+        )
+        percolator_query.save()
 
 
 @receiver(
@@ -81,13 +69,9 @@ def remove_alert_from_es_index(sender, instance=None, **kwargs):
     """Receiver function that gets called after an Alert instance is deleted.
     This function removes Alert from the AudioPercolator index.
     """
-    try:
-        # Check if the document exists before deleting it
-        if AudioPercolator.exists(id=instance.pk):
-            doc = AudioPercolator.get(id=instance.pk)
-            doc.delete()
-    except (TransportError, ConnectionError, RequestError) as e:
+    # Check if the document exists before deleting it
+    if AudioPercolator.exists(id=instance.pk):
+        doc = AudioPercolator.get(id=instance.pk)
+        doc.delete()
+    else:
         logger.warning(f"Error deleting Alert with ID:{instance.pk} from ES")
-        logger.warning(f"Error was: {e}")
-        if settings.DEBUG is True:
-            traceback.print_exc()
