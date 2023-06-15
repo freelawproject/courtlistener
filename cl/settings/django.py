@@ -162,6 +162,7 @@ INSTALLED_APPS = [
     "admin_cursor_paginator",
     "pghistory",
     "pgtrigger",
+    "ordered_model",
     # CourtListener Apps
     "cl.alerts",
     "cl.audio",
