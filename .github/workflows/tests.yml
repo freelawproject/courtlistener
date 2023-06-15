@@ -3,10 +3,10 @@ name: docker build and test
 on:
   push:
     branches:
-      - '**'
+      - "**"
   pull_request:
     branches:
-      - 'main'
+      - "main"
 
 jobs:
   build:
@@ -130,9 +130,8 @@ jobs:
           # https://stackoverflow.com/q/35806102/
           # https://github.com/moby/moby/issues/7710
           mkdir selenium-screenshots
-          # docker exec cl-django bash -c 'mkdir /extract && mv /tmp/*-selenium.png /extract'
-          docker cp 'cl-django:/tmp/*-selenium.png selenium-screenshots/'
-          # docker cp 'cl-django:/extract' selenium-screenshots/
+          docker exec cl-django bash -c "mkdir /extract && mv /tmp/*-selenium.png /extract"
+          docker cp 'cl-django:/extract' selenium-screenshots/
       - name: Save selenium screenshot as Github artifacts
         uses: actions/upload-artifact@master
         if: failure()
