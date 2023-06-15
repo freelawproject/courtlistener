@@ -76,7 +76,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-buildx-celery-
       - name: Build latest docker django image
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v4
         with:
           file: docker/django/Dockerfile
           push: true
@@ -87,7 +87,7 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new
       - name: Build latest docker celery image
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v4
         with:
           file: docker/django/Dockerfile
           push: true
