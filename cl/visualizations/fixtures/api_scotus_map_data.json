@@ -121,7 +121,8 @@
       "date_created": "2015-08-15T14:10:56.801Z",
       "html_lawbox": "",
       "per_curiam": false,
-      "type": "020lead"
+      "type": "020lead",
+      "order": 1
     },
     "model": "search.opinion",
     "pk": 1
@@ -143,7 +144,8 @@
       "date_created": "2015-08-15T14:10:56.801Z",
       "html_lawbox": "",
       "per_curiam": false,
-      "type": "010combined"
+      "type": "010combined",
+      "order": 1
     },
     "model": "search.opinion",
     "pk": 2

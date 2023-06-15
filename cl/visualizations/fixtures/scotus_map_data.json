@@ -902,7 +902,8 @@
     "date_created": "2016-02-16T19:49:54.525Z",
     "html_lawbox": "",
     "per_curiam": false,
-    "type": "010combined"
+    "type": "010combined",
+    "order": 1
   },
   "model": "search.opinion",
   "pk": 111014
@@ -924,7 +925,8 @@
     "date_created": "2016-02-16T19:49:54.545Z",
     "html_lawbox": "",
     "per_curiam": false,
-    "type": "010combined"
+    "type": "010combined",
+    "order": 1
   },
   "model": "search.opinion",
   "pk": 111113
@@ -946,7 +948,8 @@
     "date_created": "2016-02-16T19:49:54.565Z",
     "html_lawbox": "",
     "per_curiam": false,
-    "type": "010combined"
+    "type": "010combined",
+    "order": 1
   },
   "model": "search.opinion",
   "pk": 111464
@@ -968,7 +971,8 @@
     "date_created": "2016-02-16T19:49:54.610Z",
     "html_lawbox": "",
     "per_curiam": false,
-    "type": "010combined"
+    "type": "010combined",
+    "order": 1
   },
   "model": "search.opinion",
   "pk": 111505
@@ -990,7 +994,8 @@
     "date_created": "2016-02-16T19:49:54.629Z",
     "html_lawbox": "",
     "per_curiam": false,
-    "type": "010combined"
+    "type": "010combined",
+    "order": 1
   },
   "model": "search.opinion",
   "pk": 111924
@@ -1012,7 +1017,8 @@
     "date_created": "2016-02-16T19:49:54.575Z",
     "html_lawbox": "",
     "per_curiam": false,
-    "type": "010combined"
+    "type": "010combined",
+    "order": 1
   },
   "model": "search.opinion",
   "pk": 112331
@@ -1034,7 +1040,8 @@
     "date_created": "2016-02-16T19:49:54.537Z",
     "html_lawbox": "",
     "per_curiam": false,
-    "type": "010combined"
+    "type": "010combined",
+    "order": 1
   },
   "model": "search.opinion",
   "pk": 112646
@@ -1056,7 +1063,8 @@
     "date_created": "2016-02-16T19:49:54.583Z",
     "html_lawbox": "",
     "per_curiam": false,
-    "type": "010combined"
+    "type": "010combined",
+    "order": 1
   },
   "model": "search.opinion",
   "pk": 112779
@@ -1078,7 +1086,8 @@
     "date_created": "2016-02-16T19:49:54.592Z",
     "html_lawbox": "",
     "per_curiam": false,
-    "type": "010combined"
+    "type": "010combined",
+    "order": 1
   },
   "model": "search.opinion",
   "pk": 112874
@@ -1100,7 +1109,8 @@
     "date_created": "2016-02-16T19:49:54.602Z",
     "html_lawbox": "",
     "per_curiam": false,
-    "type": "010combined"
+    "type": "010combined",
+    "order": 1
   },
   "model": "search.opinion",
   "pk": 117967
@@ -1122,7 +1132,8 @@
     "date_created": "2016-02-16T19:49:54.553Z",
     "html_lawbox": "",
     "per_curiam": false,
-    "type": "010combined"
+    "type": "010combined",
+    "order": 1
   },
   "model": "search.opinion",
   "pk": 118377
@@ -1144,7 +1155,8 @@
     "date_created": "2016-02-16T19:49:54.621Z",
     "html_lawbox": "",
     "per_curiam": false,
-    "type": "010combined"
+    "type": "010combined",
+    "order": 1
   },
   "model": "search.opinion",
   "pk": 121168
@@ -1166,7 +1178,8 @@
     "date_created": "2016-02-16T19:49:54.658Z",
     "html_lawbox": "",
     "per_curiam": false,
-    "type": "010combined"
+    "type": "010combined",
+    "order": 1
   },
   "model": "search.opinion",
   "pk": 136984
@@ -1188,7 +1201,8 @@
     "date_created": "2016-02-16T19:49:54.647Z",
     "html_lawbox": "",
     "per_curiam": false,
-    "type": "010combined"
+    "type": "010combined",
+    "order": 1
   },
   "model": "search.opinion",
   "pk": 142900
@@ -1210,7 +1224,8 @@
     "date_created": "2016-02-16T19:49:54.666Z",
     "html_lawbox": "",
     "per_curiam": false,
-    "type": "010combined"
+    "type": "010combined",
+    "order": 1
   },
   "model": "search.opinion",
   "pk": 799990
@@ -1232,7 +1247,8 @@
     "date_created": "2016-02-16T19:49:54.636Z",
     "html_lawbox": "",
     "per_curiam": false,
-    "type": "010combined"
+    "type": "010combined",
+    "order": 1
   },
   "model": "search.opinion",
   "pk": 799993
@@ -1254,7 +1270,8 @@
     "date_created": "2016-02-16T19:49:54.513Z",
     "html_lawbox": "",
     "per_curiam": false,
-    "type": "010combined"
+    "type": "010combined",
+    "order": 1
   },
   "model": "search.opinion",
   "pk": 2674862
