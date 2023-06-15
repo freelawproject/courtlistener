@@ -58,7 +58,7 @@ jobs:
       # Build and cache docker images so tests are always run on the latest
       # dependencies
       - name: Set up docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
         with:
           driver-opts: network=host
       - name: Cache Docker layers
