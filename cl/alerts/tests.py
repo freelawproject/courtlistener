@@ -1488,6 +1488,14 @@ class SearchAlertsOAESTests(ESTestCaseMixin, TestCase):
             status=Donation.PROCESSED,
             send_annual_reminder=True,
         )
+        cls.user_profile_2 = UserProfileWithParentsFactory()
+        cls.donation = DonationFactory(
+            donor=cls.user_profile_2.user,
+            amount=20,
+            status=Donation.PROCESSED,
+            send_annual_reminder=True,
+        )
+
         cls.webhook_enabled = WebhookFactory(
             user=cls.user_profile.user,
             event_type=WebhookEventType.SEARCH_ALERT,
@@ -1500,6 +1508,12 @@ class SearchAlertsOAESTests(ESTestCaseMixin, TestCase):
             name="Test Alert OA",
             query="q=RT+Test+OA&type=oa",
         )
+        cls.search_alert_2 = AlertFactory(
+            user=cls.user_profile_2.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert OA 2",
+            query="q=RT+Test+OA&type=oa",
+        )
         AudioPercolator._index.refresh()
         cls.mock_date = now().replace(day=15, hour=0)
 
@@ -1509,9 +1523,7 @@ class SearchAlertsOAESTests(ESTestCaseMixin, TestCase):
         super().tearDownClass()
 
     def test_send_oa_search_alert_webhooks(self):
-        """Can we send search alert webhooks for Opinions and Oral Arguments
-        independently?
-        """
+        """Can we send RT OA search alerts?"""
 
         with time_machine.travel(self.mock_date, tick=False):
             with mock.patch(
@@ -1526,14 +1538,14 @@ class SearchAlertsOAESTests(ESTestCaseMixin, TestCase):
                     docket__date_argued=now() - timedelta(hours=5),
                     docket__docket_number="19-5735",
                 )
-
+        self.rebuild_index()
         webhooks_enabled = Webhook.objects.filter(enabled=True)
         self.assertEqual(len(webhooks_enabled), 1)
         search_alerts = Alert.objects.all()
-        self.assertEqual(len(search_alerts), 1)
-
-        # One OA search alert email should be sent.
-        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(len(search_alerts), 2)
+        # Two OA search alert emails should be sent, one for user_profile and
+        # one for user_profile_2
+        self.assertEqual(len(mail.outbox), 2)
         text_content = mail.outbox[0].body
         self.assertIn(self.rt_oral_argument.case_name, text_content)
         # Highlighting tags are not set in text version
@@ -1551,7 +1563,7 @@ class SearchAlertsOAESTests(ESTestCaseMixin, TestCase):
         # Highlighting tags are set only for text field.
         self.assertIn("<strong>RT</strong>", html_content)
 
-        # One webhook event should be sent to user_profile user
+        # One webhook event should be sent to user_profile
         webhook_events = WebhookEvent.objects.all()
         self.assertEqual(len(webhook_events), 1)
 
@@ -1578,6 +1590,53 @@ class SearchAlertsOAESTests(ESTestCaseMixin, TestCase):
             self.rt_oral_argument.source,
         )
         webhook_events.delete()
+        Audio.objects.all().delete()
+
+    def test_send_alert_on_document_creation(self):
+        """Avoid sending Search Alerts on document updates."""
+        with time_machine.travel(self.mock_date, tick=True):
+            with mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ):
+                # When the Audio object is created it should trigger an alert.
+                self.rt_oral_argument = AudioWithParentsFactory.create(
+                    case_name="RT Test OA",
+                    docket__date_argued=now() - timedelta(hours=5),
+                    docket__docket_number="19-5735",
+                )
+
+        # Two OA search alert emails should be sent, one for user_profile and
+        # one for user_profile_2
+        self.assertEqual(len(mail.outbox), 2)
+        text_content = mail.outbox[0].body
+        self.assertIn(self.rt_oral_argument.case_name, text_content)
+
+        # One webhook event should be sent to user_profile
+        webhook_events = WebhookEvent.objects.all()
+        self.assertEqual(len(webhook_events), 1)
+
+        with time_machine.travel(self.mock_date, tick=True):
+            with mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ):
+                # Audio object is updated.
+                self.rt_oral_argument.sha1 = "12345"
+                self.rt_oral_argument.save()
+
+        # New alerts shouldn't be sent. Since document was just updated.
+        self.assertEqual(len(mail.outbox), 2)
+        text_content = mail.outbox[0].body
+        self.assertIn(self.rt_oral_argument.case_name, text_content)
+
+        # One webhook event should be sent to user_profile user
+        webhook_events = WebhookEvent.objects.all()
+        self.assertEqual(len(webhook_events), 1)
         Audio.objects.all().delete()
 
     def test_es_alert_update_and_delete(self):

@@ -203,8 +203,14 @@ oral_arguments_index.settings(
 
 @oral_arguments_index.document
 class AudioDocument(AudioDocumentBase):
+    is_new = fields.BooleanField()
+
     class Django:
         model = Audio
+
+    def prepare_is_new(self, instance):
+        # Indicates whether the document was created or updated.
+        return instance.is_new
 
     def prepare_panel_ids(self, instance):
         return [judge.pk for judge in instance.panel.all()]

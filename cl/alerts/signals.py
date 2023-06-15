@@ -21,9 +21,10 @@ def post_index_audio(sender, **kwargs):
     """After the document has been indexed, percolate it to see if it triggers
     a query and send search alerts.
     """
+
     document = kwargs["instance"]
     instance_data = getattr(document, "_instance_data", None)
-    if instance_data is not None:
+    if instance_data is not None and instance_data.is_new:
         response = percolate_document(instance_data)
         send_rt_alerts(response, instance_data)
 
