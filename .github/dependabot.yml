@@ -17,3 +17,9 @@ updates:
   # Ignore all patch updates.
   - dependency-name: '*'
     update-types: ["version-update:semver-patch"]
+
+- package-ecosystem: "github-actions"
+  directory: "/"
+  schedule:
+    # Check for updates to GitHub Actions every week
+    interval: "monthly"
