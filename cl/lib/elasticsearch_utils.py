@@ -5,7 +5,7 @@ import time
 import traceback
 from datetime import date
 from functools import reduce
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from django.conf import settings
 from django.core.paginator import Page
@@ -392,7 +392,7 @@ def add_es_highlighting(
 
 
 def merge_highlights_into_result(
-    highlights: AttrDict, result: AttrDict, tag: str
+    highlights: AttrDict, result: AttrDict | dict[str, Any], tag: str
 ) -> None:
     """Merges the highlight terms into the search result.
     This function processes highlighted fields in the `highlights` attribute
@@ -424,10 +424,10 @@ def merge_highlights_into_result(
             )
             # Extract all unique marked strings from "field" if
             # available
-            if field in result.meta.highlight:
+            if field in highlights:
                 marked_strings_2 = re.findall(
                     rf"<{tag}>.*?</{tag}>",
-                    result.meta.highlight[field][0],
+                    highlights[field][0],
                 )
 
             unique_marked_strings = list(

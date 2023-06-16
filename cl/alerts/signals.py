@@ -1,32 +1,13 @@
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from django.http import QueryDict
-from django_elasticsearch_dsl.signals import post_index
 
 from cl.alerts.models import Alert
-from cl.alerts.send_alerts import percolate_document, send_rt_alerts
 from cl.lib.command_utils import logger
 from cl.lib.elasticsearch_utils import build_es_main_query
 from cl.search.documents import AudioDocument, AudioPercolator
 from cl.search.forms import SearchForm
 from cl.search.models import SEARCH_TYPES
-
-
-@receiver(
-    post_index,
-    sender=AudioDocument,
-    dispatch_uid="post_index_audio",
-)
-def post_index_audio(sender, **kwargs):
-    """After the document has been indexed, percolate it to see if it triggers
-    a query and send search alerts.
-    """
-
-    document = kwargs["instance"]
-    instance_data = getattr(document, "_instance_data", None)
-    if instance_data is not None and instance_data.is_new:
-        response = percolate_document(instance_data)
-        send_rt_alerts(response, instance_data)
 
 
 @receiver(
@@ -36,7 +17,7 @@ def post_index_audio(sender, **kwargs):
 )
 def create_or_update_alert_in_es_index(sender, instance=None, **kwargs):
     """Receiver function that gets called after an Alert instance is saved.
-    This function updates the Elasticsearch the AudioPercolator with the Alert.
+    This method creates or updates an Alert object in the AudioPercolator index
     """
 
     if f"type={SEARCH_TYPES.ORAL_ARGUMENT}" in instance.query:

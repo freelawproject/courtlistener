@@ -1,8 +1,8 @@
 import json
+from typing import Any
 
 import requests
 from django.conf import settings
-from elasticsearch_dsl.utils import AttrDict
 from rest_framework.renderers import JSONRenderer
 from scorched.response import SolrResponse
 
@@ -206,7 +206,7 @@ def send_search_alert_webhook(
 
 
 def send_es_search_alert_webhook(
-    results: list[AttrDict],
+    results: list[dict[str, Any]],
     webhook: Webhook,
     alert: Alert,
 ) -> None:
@@ -222,7 +222,7 @@ def send_es_search_alert_webhook(
     es_results = []
     for result in results:
         result["snippet"] = result["text"]
-        es_results.append(ResultObject(initial=result.to_dict()))
+        es_results.append(ResultObject(initial=result))
     serialized_results = SearchESResultSerializer(
         es_results,
         many=True,

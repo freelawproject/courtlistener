@@ -3861,7 +3861,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
                 docket_id=self.audio_3.docket.pk,
             )
             created_audios.append(audio)
-
+        AudioDocument._index.refresh()
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
         }
@@ -3921,6 +3921,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         # Remove Audio objects to avoid affecting other tests.
         for created_audio in created_audios:
             created_audio.delete()
+        AudioDocument._index.refresh()
 
     def test_oa_synonym_search(self) -> None:
         # Query using a synonym
@@ -4422,7 +4423,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         self.assertIn("Freedom of", r.content.decode())
 
     def test_keep_in_sync_related_OA_objects(self) -> None:
-        """Test docket_number with suffixes can be found."""
+        """Test Audio documents are updated when related objects change."""
         with transaction.atomic():
             docket_5 = DocketFactory.create(
                 docket_number="1:22-bk-12345",
@@ -4437,7 +4438,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
                 case_name="Lorem Ipsum Dolor vs. IRS",
                 docket_id=docket_5.pk,
             )
-
+            AudioDocument._index.refresh()
             cd = {
                 "type": SEARCH_TYPES.ORAL_ARGUMENT,
                 "q": "Lorem Ipsum Dolor vs. United States",
@@ -4456,7 +4457,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             # Update docket number.
             docket_5.docket_number = "23-98765"
             docket_5.save()
-
+            AudioDocument._index.refresh()
             # Confirm docket number is updated in the index.
             s, total_query_results, top_hits_limit = build_es_main_query(
                 search_query, cd
@@ -4469,7 +4470,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             # Trigger a ManyToMany insert.
             audio_7.refresh_from_db()
             audio_7.panel.add(self.author)
-
+            AudioDocument._index.refresh()
             # Confirm ManyToMany field is updated in the index.
             cd["q"] = "Lorem Ipsum Dolor vs. IRS"
             s, total_query_results, top_hits_limit = build_es_main_query(
@@ -4482,7 +4483,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
 
             # Delete parent docket.
             docket_5.delete()
-
+            AudioDocument._index.refresh()
             # Confirm that docket-related audio objects are removed from the
             # index.
             cd["q"] = "Lorem Ipsum Dolor"
@@ -4549,7 +4550,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
         AudioPercolator._index.refresh()
-        response = percolate_document(self.prepare_document(self.audio_2))
+        response = percolate_document(str(self.audio_2.pk), "oral_arguments")
         expected_queries = 1
         self.assertEqual(len(response), expected_queries)
         self.assertEqual(self.confirm_query_matched(response, query_id), True)
@@ -4564,7 +4565,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
         AudioPercolator._index.refresh()
-        response = percolate_document(self.prepare_document(self.audio_2))
+        response = percolate_document(str(self.audio_2.pk), "oral_arguments")
         expected_queries = 2
         self.assertEqual(len(response), expected_queries)
         self.assertEqual(self.confirm_query_matched(response, query_id), True)
@@ -4578,7 +4579,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
         AudioPercolator._index.refresh()
-        response = percolate_document(self.prepare_document(self.audio_1))
+        response = percolate_document(str(self.audio_1.pk), "oral_arguments")
         expected_queries = 1
         self.assertEqual(len(response), expected_queries)
         self.assertEqual(self.confirm_query_matched(response, query_id), True)
@@ -4594,7 +4595,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
         AudioPercolator._index.refresh()
-        response = percolate_document(self.prepare_document(self.audio_5))
+        response = percolate_document(str(self.audio_5.pk), "oral_arguments")
         expected_queries = 1
         self.assertEqual(len(response), expected_queries)
         self.assertEqual(self.confirm_query_matched(response, query_id), True)
@@ -4611,7 +4612,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
         AudioPercolator._index.refresh()
-        response = percolate_document(self.prepare_document(self.audio_1))
+        response = percolate_document(str(self.audio_1.pk), "oral_arguments")
         expected_queries = 2
         self.assertEqual(len(response), expected_queries)
         self.assertEqual(self.confirm_query_matched(response, query_id), True)
@@ -4627,7 +4628,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
         AudioPercolator._index.refresh()
-        response = percolate_document(self.prepare_document(self.audio_2))
+        response = percolate_document(str(self.audio_2.pk), "oral_arguments")
         expected_queries = 3
         self.assertEqual(len(response), expected_queries)
         self.assertEqual(self.confirm_query_matched(response, query_id), True)
@@ -4643,7 +4644,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
         AudioPercolator._index.refresh()
-        response = percolate_document(self.prepare_document(self.audio_4))
+        response = percolate_document(str(self.audio_4.pk), "oral_arguments")
         expected_queries = 2
         self.assertEqual(len(response), expected_queries)
         self.assertEqual(self.confirm_query_matched(response, query_id), True)

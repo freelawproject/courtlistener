@@ -9,7 +9,6 @@ from django.utils.timezone import now
 from elasticsearch.exceptions import RequestError, TransportError
 from elasticsearch_dsl import Q, Search
 from elasticsearch_dsl.response import Response
-from elasticsearch_dsl.utils import AttrDict
 
 from cl.alerts.models import Alert
 from cl.api.models import WebhookEventType
@@ -47,10 +46,13 @@ def send_alert_email(
     msg.send(fail_silently=False)
 
 
-def percolate_document(document_data: AttrDict) -> Response | list:
+def percolate_document(
+    document_id: str, document_index: str
+) -> Response | list:
     """Percolate a document against a defined Elasticsearch Percolator query.
 
-    :param document_data: The document data to be used for the percolate query.
+    :param document_id: The document ID in ES index to be percolated.
+    :param document_index: The ES document index where the document lives.
     :return: The response from the Elasticsearch query or an empty list if an
     error occurred.
     """
@@ -58,18 +60,20 @@ def percolate_document(document_data: AttrDict) -> Response | list:
     try:
         s = Search(index="oral_arguments_percolator")
         percolate_query = Q(
-            "percolate", field="percolator_query", document=document_data
+            "percolate",
+            field="percolator_query",
+            index=document_index,
+            id=document_id,
         )
-        match_query = Q("match", rate=Alert.REAL_TIME)
-        s = s.query("bool", must=[percolate_query, match_query])
+        s = s.query(percolate_query)
         s = add_es_highlighting(
             s, {"type": SEARCH_TYPES.ORAL_ARGUMENT}, alerts=True
         )
-        # execute the search
+        # execute the percolator query.
         return s.execute()
     except (TransportError, ConnectionError, RequestError) as e:
         logger.warning(
-            f"Error percolating a document: {document_data.to_dict()}"
+            f"Error percolating a document id {document_id} from index {document_index}"
         )
         logger.warning(f"Error was: {e}")
         if settings.DEBUG is True:
@@ -77,7 +81,7 @@ def percolate_document(document_data: AttrDict) -> Response | list:
         return []
 
 
-def send_rt_alerts(response: Response, document_data: AttrDict) -> None:
+def send_rt_alerts(response: Response, document_data: dict[str, Any]) -> None:
     """Send real-time alerts based on the Elasticsearch search response.
 
     Iterates through each hit in the search response, checks if the alert rate
@@ -125,8 +129,8 @@ def send_rt_alerts(response: Response, document_data: AttrDict) -> None:
                 [
                     alert_triggered,
                     search_type,
-                    [document_data.to_dict()],
-                    len([document_data.to_dict()]),
+                    [document_data],
+                    len([document_data]),
                 ]
             )
             alert_triggered.date_last_hit = now()

@@ -188,13 +188,6 @@ class Audio(AbstractDateTimeModel):
         :param force_commit: Should a commit be performed in solr after
         indexing it?
         """
-
-        # Temporary `is_new` attribute is set to True if the instance it's a
-        # new object, otherwise`is_new` is set to False. This attribute is used
-        # for ES indexing.
-        self.is_new = False
-        if self.id is None:
-            self.is_new = True
         super(Audio, self).save(*args, **kwargs)  # type: ignore
         if index:
             from cl.search.tasks import add_items_to_solr

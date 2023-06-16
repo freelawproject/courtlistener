@@ -1520,6 +1520,7 @@ class SearchAlertsOAESTests(ESTestCaseMixin, TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.search_alert.delete()
+        cls.search_alert_2.delete()
         super().tearDownClass()
 
     def test_send_oa_search_alert_webhooks(self):
@@ -1538,7 +1539,7 @@ class SearchAlertsOAESTests(ESTestCaseMixin, TestCase):
                     docket__date_argued=now() - timedelta(hours=5),
                     docket__docket_number="19-5735",
                 )
-        self.rebuild_index()
+
         webhooks_enabled = Webhook.objects.filter(enabled=True)
         self.assertEqual(len(webhooks_enabled), 1)
         search_alerts = Alert.objects.all()

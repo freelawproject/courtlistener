@@ -203,14 +203,9 @@ oral_arguments_index.settings(
 
 @oral_arguments_index.document
 class AudioDocument(AudioDocumentBase):
-    is_new = fields.BooleanField()
-
     class Django:
         model = Audio
-
-    def prepare_is_new(self, instance):
-        # Indicates whether the document was created or updated.
-        return instance.is_new
+        ignore_signals = True
 
     def prepare_panel_ids(self, instance):
         return [judge.pk for judge in instance.panel.all()]
@@ -229,17 +224,6 @@ class AudioDocument(AudioDocumentBase):
 
     def prepare_timestamp(self, instance):
         return datetime.utcnow()
-
-    def _prepare_action(self, object_instance, action):
-        data = self.prepare(object_instance) if action != "delete" else None
-        # Store the data for this instance
-        self._instance_data = data
-        return {
-            "_op_type": action,
-            "_index": self._index._name,
-            "_id": self.generate_id(object_instance),
-            "_source": data,
-        }
 
 
 # Define oral arguments elasticsearch index
