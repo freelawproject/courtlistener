@@ -392,7 +392,7 @@ def add_es_highlighting(
 
 
 def merge_highlights_into_result(
-    highlights: AttrDict, result: AttrDict | dict[str, Any], tag: str
+    highlights: dict[str, Any], result: AttrDict | dict[str, Any], tag: str
 ) -> None:
     """Merges the highlight terms into the search result.
     This function processes highlighted fields in the `highlights` attribute
@@ -410,7 +410,7 @@ def merge_highlights_into_result(
     for (
         field,
         highlight_list,
-    ) in highlights.to_dict().items():
+    ) in highlights.items():
         # If a query highlights fields the "field.exact", "field" or
         # both versions are available. Highlighted terms in each
         # version can differ, so the best thing to do is combine
@@ -485,8 +485,11 @@ def set_results_highlights(results: Page, search_type: str) -> None:
         else:
             if not hasattr(result.meta, "highlight"):
                 return
+
             merge_highlights_into_result(
-                result.meta.highlight, result, SEARCH_HL_TAG
+                result.meta.highlight.to_dict(),
+                result,
+                SEARCH_HL_TAG,
             )
 
 

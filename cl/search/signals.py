@@ -1,7 +1,7 @@
 from django.db.models.signals import m2m_changed, post_delete, post_save
 from django.dispatch import receiver
 
-from cl.alerts.send_alerts import percolate_document, send_rt_alerts
+from cl.alerts.send_alerts import percolate_document, send_or_schedule_alerts
 from cl.audio.models import Audio
 from cl.lib.command_utils import logger
 from cl.search.documents import AudioDocument
@@ -66,7 +66,7 @@ def create_or_update_audio_in_es_index(sender, instance=None, **kwargs):
     )
     if response["_version"] == 1:
         response = percolate_document(response["_id"], "oral_arguments")
-        send_rt_alerts(response, doc)
+        send_or_schedule_alerts(response, doc)
 
 
 @receiver(

@@ -1,0 +1,95 @@
+# !/usr/bin/python
+# -*- coding: utf-8 -*-
+import datetime
+
+from django.http import QueryDict
+from django.utils.timezone import now
+
+from cl.alerts.models import Alert, UserRateAlert
+from cl.alerts.send_alerts import (
+    merge_highlights_into_result,
+    send_search_alert_and_webhooks,
+)
+from cl.lib.command_utils import VerboseCommand, logger
+from cl.search.constants import ALERTS_HL_TAG
+from cl.search.models import SEARCH_TYPES
+from cl.stats.utils import tally_stat
+
+
+def json_date_parser(dct):
+    for key, value in dct.items():
+        if isinstance(value, str):
+            try:
+                dct[key] = datetime.datetime.fromisoformat(value)
+            except ValueError:
+                pass
+    return dct
+
+
+def query_and_send_alerts_by_rate(rate: str) -> None:
+    """Query and send alerts per user.
+
+    :param rate: The alert rate to send Alerts.
+    :return: None
+    """
+
+    alerts_sent_count = 0
+    rate_users = UserRateAlert.objects.filter(rate=rate).select_related("user")
+    for rate_user in rate_users.iterator():
+        parent_alerts = rate_user.parent_alerts.all()
+        hits = []
+        for parent_alert in parent_alerts:
+            results = parent_alert.scheduled_alerts.all()
+            qd = QueryDict(parent_alert.alert.query.encode(), mutable=True)
+            search_type = qd.get("type", SEARCH_TYPES.OPINION)
+            documents = []
+            for result in results:
+                document_content = json_date_parser(result.document_content)
+                if result.highlighted_fields:
+                    merge_highlights_into_result(
+                        result.highlighted_fields,
+                        document_content,
+                        ALERTS_HL_TAG,
+                    )
+                documents.append(document_content)
+            parent_alert.alert.date_last_hit = now()
+            parent_alert.alert.save()
+            hits.append(
+                [
+                    parent_alert.alert,
+                    search_type,
+                    documents,
+                    len(documents),
+                ]
+            )
+        send_search_alert_and_webhooks(rate_user.user, hits)
+        if parent_alerts:
+            alerts_sent_count += 1
+
+    tally_stat(f"alerts.sent.{rate}", inc=alerts_sent_count)
+    logger.info(f"Sent {alerts_sent_count} {rate} email alerts.")
+
+
+def send_scheduled_alerts(rate: str) -> None:
+    if rate == Alert.DAILY:
+        query_and_send_alerts_by_rate(Alert.DAILY)
+    if rate == Alert.WEEKLY:
+        query_and_send_alerts_by_rate(Alert.WEEKLY)
+    if rate == Alert.MONTHLY:
+        query_and_send_alerts_by_rate(Alert.MONTHLY)
+
+
+class Command(VerboseCommand):
+    help = "Send scheduled Search Alerts."
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--rate",
+            required=True,
+            choices=Alert.ALL_FREQUENCIES,
+            help=f"The rate to send emails ({', '.join(Alert.ALL_FREQUENCIES)})",
+        )
+
+    def handle(self, *args, **options):
+        super(Command, self).handle(*args, **options)
+        send_scheduled_alerts(options["rate"])
