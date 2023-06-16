@@ -10,7 +10,6 @@ env:
 
 jobs:
   build:
-    # Build only merged PRs
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
