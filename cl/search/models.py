@@ -14,7 +14,7 @@ from django.urls import NoReverseMatch, reverse
 from django.utils.encoding import force_str
 from django.utils.text import slugify
 from eyecite import get_citations
-from ordered_model.models import OrderedModel
+from ordered_model.models import OrderedModel, OrderedModelManager
 
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.custom_filters.templatetags.text_filters import best_case_name
@@ -2815,6 +2815,13 @@ def sort_cites(c):
         return 8
 
 
+class CustomOrderedManager(OrderedModelManager):
+    """Override the django ordered model default ordering"""
+
+    def get_queryset(self):
+        return super().get_queryset().order_by()
+
+
 @pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Opinion(OrderedModel, AbstractDateTimeModel):
     COMBINED = "010combined"
@@ -2967,6 +2974,8 @@ class Opinion(OrderedModel, AbstractDateTimeModel):
         db_index=True,
     )
     order_with_respect_to = "cluster"
+
+    objects = CustomOrderedManager()
 
     @property
     def siblings(self) -> QuerySet:
