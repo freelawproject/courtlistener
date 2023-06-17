@@ -118,8 +118,6 @@ def parse_file(file_path):
             info["per_curiam"] = True
             break
 
-    # condense opinion texts if there isn't an associated byline
-    # print a warning whenever we're appending multiple texts together
     info["opinions"] = []
     judges = []
 
