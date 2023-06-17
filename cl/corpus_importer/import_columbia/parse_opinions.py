@@ -1,16 +1,17 @@
-# Functions to parse court data in XML format into a list of dictionaries.
+"""
+Functions to parse court data in XML format into a list of dictionaries.
+"""
 import os
 import re
-import xml.etree.cElementTree as ET
 
 import dateutil.parser as dparser
+from bs4 import BeautifulSoup, NavigableString
 from juriscraper.lib.string_utils import (
     CaseNameTweaker,
     clean_string,
     harmonize,
     titlecase,
 )
-from lxml import etree
 
 from cl.corpus_importer.court_regexes import state_pairs
 from cl.lib.crypto import sha1_of_file
@@ -23,16 +24,17 @@ CASE_NAME_TWEAKER = CaseNameTweaker()
 
 # tags for which content will be condensed into plain text
 SIMPLE_TAGS = [
-    "reporter_caption",
-    "citation",
+    "attorneys",
     "caption",
+    "citation",
     "court",
-    "docket",
-    "posture",
     "date",
+    "docket",
     "hearing_date",
     "panel",
-    "attorneys",
+    "posture",
+    "reporter_caption",
+    "syllabus",
 ]
 
 # regex that will be applied when condensing SIMPLE_TAGS content
@@ -48,7 +50,6 @@ def parse_file(file_path):
     be used by a populate script.
 
     :param file_path: A path the file to be parsed.
-    :param court_fallback: A string used as a fallback in getting the court
     object. The regexes associated to its value in special_regexes will be used.
     """
     raw_info = get_text(file_path)
@@ -120,53 +121,32 @@ def parse_file(file_path):
     # condense opinion texts if there isn't an associated byline
     # print a warning whenever we're appending multiple texts together
     info["opinions"] = []
-    for current_type in OPINION_TYPES:
-        last_texts = []
-        for opinion in raw_info.get("opinions", []):
-            if opinion["type"] != current_type:
-                continue
-            last_texts.append(opinion["opinion"])
-            if opinion["byline"]:
-                # judge_info.append((
-                #    '%s Byline\n%s' % (current_type.title(), '-' * (len(current_type) + 7)),
-                #    opinion['byline']
-                # ))
-                # add the opinion and all of the previous texts
-                judges = extract_judge_last_name(opinion["byline"])
-                info["opinions"].append(
-                    {
-                        "opinion": "\n".join(last_texts),
-                        "opinion_texts": last_texts,
-                        "type": current_type,
-                        "author": judges[0] if judges else None,
-                        "joining": judges[1:] if len(judges) > 0 else [],
-                        "byline": opinion["byline"],
-                    }
-                )
-                last_texts = []
-                if current_type == "opinion":
-                    info["judges"] = opinion["byline"]
+    judges = []
 
-        if last_texts:
-            relevant_opinions = [
-                o for o in info["opinions"] if o["type"] == current_type
-            ]
-            if relevant_opinions:
-                relevant_opinions[-1]["opinion"] += "\n%s" % "\n".join(
-                    last_texts
-                )
-                relevant_opinions[-1]["opinion_texts"].extend(last_texts)
-            else:
-                info["opinions"].append(
-                    {
-                        "opinion": "\n".join(last_texts),
-                        "opinion_texts": last_texts,
-                        "type": current_type,
-                        "author": None,
-                        "joining": [],
-                        "byline": "",
-                    }
-                )
+    for opinion in raw_info.get("opinions", []):
+        opinion_author = ""
+        if opinion.get("byline"):
+            opinion_author = extract_judge_last_name(opinion.get("byline"))
+            if opinion_author:
+                judges.append(titlecase(opinion_author[0]))
+
+        info["opinions"].append(
+            {
+                "opinion": opinion.get("opinion"),
+                # "opinion_texts": last_texts,
+                "type": opinion.get("type"),
+                "author": titlecase(opinion_author[0])
+                if opinion_author
+                else None,
+                # "joining": judges[1:] if len(judges) > 0 else [],
+                "byline": opinion_author,
+            }
+        )
+
+        if judges:
+            info["judges"] = ", ".join(judges)
+        else:
+            info["judges"] = ""
 
     # check if opinions were heard per curiam by checking if the first chunk of
     # text in the byline or in any of its associated opinion texts indicate this
@@ -180,11 +160,6 @@ def parse_file(file_path):
         first_chunk = 1000
         if "per curiam" in opinion["byline"][:first_chunk].lower():
             per_curiam = True
-        else:
-            for text in opinion["opinion_texts"]:
-                if "per curiam" in text[:first_chunk].lower():
-                    per_curiam = True
-                    break
         opinion["per_curiam"] = per_curiam
 
     # construct the plain text info['judges'] from collected judge data
@@ -200,128 +175,78 @@ def parse_file(file_path):
     return info
 
 
-def get_text(file_path):
-    """Reads a file and returns a dictionary of grabbed text.
-
-    :param file_path: A path the file to be parsed.
+def get_text(xml_filepath: str):
+    """Convert xml data into dict
+    :param xml_filepath: path of xml file
+    :return: dict with data
     """
-    with open(file_path, "r") as f:
-        file_string = f.read()
-    raw_info = {}
 
-    # used when associating a byline of an opinion with the opinion's text
-    current_byline = {"type": None, "name": None}
+    with open(xml_filepath, "r") as f:
+        content = f.read()
 
-    # if this is an unpublished opinion, note this down and remove all
-    # <unpublished> tags
-    raw_info["unpublished"] = False
-    if "<opinion unpublished=true>" in file_string:
-        file_string = file_string.replace(
-            "<opinion unpublished=true>", "<opinion>"
-        )
-        file_string = file_string.replace("<unpublished>", "").replace(
-            "</unpublished>", ""
-        )
-        raw_info["unpublished"] = True
+    data = {}
+    opinions = []
 
-    # turn the file into a readable tree
-    attempts = [
-        {"recover": False, "replace": False},
-        {"recover": False, "replace": True},
-        {"recover": True, "replace": False},
-        {"recover": True, "replace": True},
-    ]
-    replaced_string = file_string.replace(
-        "</footnote_body></block_quote>", "</block_quote></footnote_body>"
-    )
-    for attempt in attempts:
-        try:
-            s = replaced_string if attempt["replace"] else file_string
-            if attempt["recover"]:
-                # This recovery mechanism is sometimes crude, but it can be very
-                # effective in re-arranging mismatched tags.
-                parser = etree.XMLParser(recover=True)
-                root = etree.fromstring(s, parser=parser)
-            else:
-                # Normal case
-                root = etree.fromstring(s)
-            break
-        except etree.ParseError as e:
-            if attempt == attempts[-1]:
-                # Last attempt. Re-raise the exception.
-                raise e
+    soup = BeautifulSoup(content, "lxml")
+    data["unpublished"] = False
 
-    for child in root.iter():
-        # if this child is one of the ones identified by SIMPLE_TAGS, just grab
-        # its text
-        if child.tag in SIMPLE_TAGS:
-            # strip unwanted tags and xml formatting
-            text = get_xml_string(child)
-            for r in STRIP_REGEX:
-                text = re.sub(r, "", text)
-            text = re.sub(r"<.*?>", " ", text).strip()
-            # put into a list associated with its tag
-            raw_info.setdefault(child.tag, []).append(text)
-            continue
+    # Prepare opinions
 
-        # Set aside any text in the root of the file. Sometimes this is the only
-        # text we get.
-        if child.tag == "opinion":
-            direct_descendant_text = " ".join(child.xpath("./text()"))
+    opinion = soup.find("opinion")
+    if opinion:
+        # Outer tag is <opinion>
+        data["unpublished"] = bool(opinion.get("unpublished"))
 
-        for opinion_type in OPINION_TYPES:
-            # if this child is a byline, note it down and use it later
-            if child.tag == f"{opinion_type}_byline":
-                current_byline["type"] = opinion_type
-                current_byline["name"] = get_xml_string(child)
-                break
-            # if this child is an opinion text blob, add it to an incomplete
-            # opinion and move into the info dict
-            if child.tag == f"{opinion_type}_text":
-                # add the full opinion info, possibly associating it to a byline
-                raw_info.setdefault("opinions", []).append(
-                    {
-                        "type": opinion_type,
-                        "byline": current_byline["name"]
-                        if current_byline["type"] == opinion_type
-                        else None,
-                        "opinion": get_xml_string(child),
-                    }
-                )
-                current_byline["type"] = current_byline["name"] = None
-                break
+    find_opinions = soup.findAll(re.compile("[A-Za-z]+_text"))
+    order = 0
+    for op in find_opinions:
+        opinion_author = ""
+        byline = op.find_previous_sibling()
 
-    # Some opinions do not have an opinion node. Create an empty node here. This
-    # will at least ensure that an opinion object is created.
-    if raw_info.get("opinions") is None:
-        raw_info["opinions"] = [
-            {
-                "type": "opinion",
-                "byline": None,
-                "opinion": direct_descendant_text or "",
-            }
+        if byline:
+            opinion_author = byline.get_text()
+
+        opinion_type = op.name.replace("_text", "")
+
+        new_opinion = {
+            "byline": opinion_author,
+            "type": opinion_type,
+            "raw_opinion": op,
+            "opinion": op.decode_contents(),
+            "order": order,
+        }
+
+        opinions.append(new_opinion)
+        order = order + 1
+
+    for tag in SIMPLE_TAGS:
+        found_tags = soup.findAll(tag)
+        for found_tag in found_tags:
+            # remove inner <citation> and <page-number> tags and content
+            extra_tags_to_remove = found_tag.findAll(
+                re.compile("citation|page-number")
+            )
+            if extra_tags_to_remove:
+                for r in extra_tags_to_remove:
+                    if r.next_sibling:
+                        if type(r.next_sibling) == NavigableString:
+                            # raw string
+                            r.next_sibling.extract()
+                        else:
+                            print(">>> not navigable string", r.next_sibling)
+                    r.extract()
+
+        # We use space as a separator to add a space when we have one tag
+        # next to other without a space, ee try to remove double spaces
+        data[tag] = [
+            re.sub(" +", " ", found_tag.get_text(separator=" ").strip())
+            for found_tag in found_tags
         ]
 
-    return raw_info
+    # Add opinions to dict
+    data["opinions"] = opinions
 
-
-def get_xml_string(e):
-    """Returns a normalized string of the text in <element>.
-
-    :param e: An XML element.
-    """
-    # inner_string = re.sub(
-    #     r"(^<%s\b.*?>|</%s\b.*?>$)" % (e.tag, e.tag), "", ET.tostring(e)
-    # )
-    # return inner_string.decode().strip()
-
-    inner_string = re.sub(
-        r"(^<%s\b.*?>|</%s\b.*?>$)" % (e.tag, e.tag),
-        "",
-        str(ET.tostring(e, encoding="unicode")),
-    )
-
-    return inner_string.strip()
+    return data
 
 
 def parse_dates(raw_dates):
@@ -388,7 +313,7 @@ def get_state_court_object(raw_court, file_path):
     """Get the court object from a string. Searches through `state_pairs`.
 
     :param raw_court: A raw court string, parsed from an XML file.
-    :param fallback: If fail to find one, will apply the regexes associated to
+    :param file_path: xml filepath
     this key in `SPECIAL_REGEXES`.
     """
     if "[" in raw_court and "]" in raw_court:
@@ -432,10 +357,3 @@ def get_state_court_object(raw_court, file_path):
                 return value
     if folder in FOLDER_DICT:
         return FOLDER_DICT[folder]
-
-
-if __name__ == "__main__":
-    parsed = parse_file(
-        "/vagrant/flp/columbia_data/opinions/01910ad13eb152b3.xml"
-    )
-    pass

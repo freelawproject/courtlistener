@@ -5,8 +5,10 @@ from collections import OrderedDict
 from datetime import date
 
 from django.conf import settings
+from django.db import transaction
 from eyecite import clean_text
 from eyecite.find import get_citations
+from juriscraper.lib.string_utils import titlecase
 
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.solr_core_admin import get_term_frequency
@@ -413,18 +415,22 @@ def make_and_save(
     for i, opinion_info in enumerate(item["opinions"]):
         if opinion_info["author"] is None:
             author = None
+            author_str = ""
         else:
             author = lookup_judge_by_last_name(
                 opinion_info["author"], item["court_id"], panel_date
             )
+            author_str = opinion_info["author"]
 
         converted_text = convert_columbia_html(opinion_info["opinion"])
         opinion_type = OPINION_TYPE_MAPPING[opinion_info["type"]]
         if opinion_type == Opinion.LEAD and i > 0:
             opinion_type = Opinion.ADDENDUM
 
+        # TODO add order field when changes get merged in main
         opinion = Opinion(
             author=author,
+            author_str=titlecase(author_str),
             per_curiam=opinion_info["per_curiam"],
             type=opinion_type,
             # type=OPINION_TYPE_MAPPING[opinion_info['type']],
@@ -452,7 +458,8 @@ def make_and_save(
 
     # save all the objects
     if not testing:
-        try:
+        # TODO atomic transaction
+        with transaction.atomic():
             docket.save()
             cluster.docket = docket
             cluster.save(index=False)
@@ -471,13 +478,13 @@ def make_and_save(
             else:
                 domain = "https://www.courtlistener.com"
             print(f"Created item at: {domain}{cluster.get_absolute_url()}")
-        except:
-            # if anything goes wrong, try to delete everything
-            try:
-                docket.delete()
-            except:
-                pass
-            raise
+        # except:
+        #     # if anything goes wrong, try to delete everything
+        #     try:
+        #         docket.delete()
+        #     except:
+        #         pass
+        #     raise
 
 
 def find_dups(docket, cluster):
@@ -491,6 +498,9 @@ def find_dups(docket, cluster):
     #     # if there aren't any citations, assume
     #     # for now that there's no duplicate
     #     return []
+
+    # TODO find a way to find duplicates
+    return []
 
     # TODO you can't access to related objects of an unsaved object, why this is here?
     params = {
