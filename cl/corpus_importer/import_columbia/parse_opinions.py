@@ -124,11 +124,16 @@ def parse_file(file_path):
     judges = []
 
     for opinion in raw_info.get("opinions", []):
+        per_curiam = False
         opinion_author = ""
         if opinion.get("byline"):
-            opinion_author = extract_judge_last_name(opinion.get("byline"))
-            if opinion_author:
-                judges.append(titlecase(opinion_author[0]))
+            if "per curiam" in opinion["byline"][:first_chunk].lower():
+                per_curiam = True
+            else:
+                opinion_author = extract_judge_last_name(opinion.get("byline"))
+
+                if opinion_author:
+                    judges.append(titlecase(opinion_author[0]))
 
         info["opinions"].append(
             {
@@ -138,8 +143,9 @@ def parse_file(file_path):
                 "author": titlecase(opinion_author[0])
                 if opinion_author
                 else None,
-                # "joining": judges[1:] if len(judges) > 0 else [],
+                "joining": judges[1:] if len(judges) > 1 else [],
                 "byline": opinion_author,
+                "per_curiam": per_curiam,
             }
         )
 
@@ -147,23 +153,6 @@ def parse_file(file_path):
             info["judges"] = ", ".join(judges)
         else:
             info["judges"] = ""
-
-    # check if opinions were heard per curiam by checking if the first chunk of
-    # text in the byline or in any of its associated opinion texts indicate this
-    for opinion in info["opinions"]:
-        # if there's already an identified author, it's not per curiam
-        if opinion["author"]:
-            opinion["per_curiam"] = False
-            continue
-        # otherwise, search through chunks of text for the phrase 'per curiam'
-        per_curiam = False
-        first_chunk = 1000
-        if "per curiam" in opinion["byline"][:first_chunk].lower():
-            per_curiam = True
-        opinion["per_curiam"] = per_curiam
-
-    # construct the plain text info['judges'] from collected judge data
-    # info['judges'] = '\n\n'.join('%s\n%s' % i for i in judge_info)
 
     # Add the same sha1 and path values to every opinion (multiple opinions
     # can come from a single XML file).
