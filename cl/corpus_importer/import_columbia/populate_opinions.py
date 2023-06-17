@@ -15,6 +15,7 @@ from cl.lib.solr_core_admin import get_term_frequency
 from cl.search.models import SOURCES, Citation, Docket, Opinion, OpinionCluster
 
 from ...citations.utils import map_reporter_db_cite_type
+from ...lib.command_utils import logger
 from ...people_db.lookup_utils import (
     lookup_judge_by_last_name,
     lookup_judges_by_last_name_list,
@@ -272,9 +273,8 @@ def make_and_save(
             else:
                 unknown_date = date_info[1]
                 if date_info[0] not in UNKNOWN_TAGS:
-                    print(
-                        "\nFound unknown date tag '%s' with date '%s'.\n"
-                        % date_info
+                    logger.info(
+                        f"Found unknown date tag {date_info[0]} with date {date_info[1]} in file {item['file']}.xml"
                     )
 
     # the main date (used for date_filed in OpinionCluster) and panel dates
@@ -305,21 +305,15 @@ def make_and_save(
     if min_dates is not None:
         if min_dates.get(item["court_id"]) is not None:
             if main_date >= min_dates[item["court_id"]]:
-                print(
-                    main_date,
-                    "after",
-                    min_dates[item["court_id"]],
-                    " -- skipping.",
+                logger.info(
+                    f"{main_date} after {min_dates[item['court_id']]} -- skipping."
                 )
                 return
     if start_dates is not None:
         if start_dates.get(item["court_id"]) is not None:
             if main_date <= start_dates[item["court_id"]]:
-                print(
-                    main_date,
-                    "before court founding:",
-                    start_dates[item["court_id"]],
-                    " -- skipping.",
+                logger.info(
+                    f"{main_date} before court founding: {start_dates[item['court_id']]} -- skipping."
                 )
                 return
 
@@ -428,6 +422,7 @@ def make_and_save(
             opinion_type = Opinion.ADDENDUM
 
         # TODO add order field when changes get merged in main
+        # TODO local_path save file, not only path?
         opinion = Opinion(
             author=author,
             author_str=titlecase(author_str),
@@ -452,6 +447,7 @@ def make_and_save(
         dups = find_dups(docket, cluster)
         if dups:
             if skipdupes:
+                logger.info(f"Duplicate data found for file: {item['file']}")
                 print("Duplicate. skipping.")
             else:
                 raise Exception(f"Found {len(dups)} duplicate(s).")
@@ -477,14 +473,9 @@ def make_and_save(
                 domain = "http://127.0.0.1:8000"
             else:
                 domain = "https://www.courtlistener.com"
-            print(f"Created item at: {domain}{cluster.get_absolute_url()}")
-        # except:
-        #     # if anything goes wrong, try to delete everything
-        #     try:
-        #         docket.delete()
-        #     except:
-        #         pass
-        #     raise
+            logger.info(
+                f"Created item at: {domain}{cluster.get_absolute_url()}"
+            )
 
 
 def find_dups(docket, cluster):
