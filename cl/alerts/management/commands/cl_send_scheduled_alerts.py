@@ -2,10 +2,11 @@
 # -*- coding: utf-8 -*-
 import datetime
 
+from django.db.models import Prefetch
 from django.http import QueryDict
 from django.utils.timezone import now
 
-from cl.alerts.models import Alert, UserRateAlert
+from cl.alerts.models import Alert, ParentAlert, UserRateAlert
 from cl.alerts.send_alerts import (
     merge_highlights_into_result,
     send_search_alert_and_webhooks,
@@ -32,17 +33,31 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
     :param rate: The alert rate to send Alerts.
     :return: None
     """
-
     alerts_sent_count = 0
-    rate_users = UserRateAlert.objects.filter(rate=rate).select_related("user")
+    now_time = now()
+    alerts_to_update = []
+
+    rate_users = (
+        UserRateAlert.objects.filter(rate=rate)
+        .select_related("user")
+        .prefetch_related(
+            Prefetch(
+                "parent_alerts",
+                queryset=ParentAlert.objects.select_related(
+                    "alert"
+                ).prefetch_related("scheduled_alerts"),
+            )
+        )
+    )
+
     for rate_user in rate_users.iterator():
-        parent_alerts = rate_user.parent_alerts.all()
         hits = []
-        for parent_alert in parent_alerts:
+        for parent_alert in rate_user.parent_alerts.all():
             results = parent_alert.scheduled_alerts.all()
             qd = QueryDict(parent_alert.alert.query.encode(), mutable=True)
             search_type = qd.get("type", SEARCH_TYPES.OPINION)
             documents = []
+
             for result in results:
                 document_content = json_date_parser(result.document_content)
                 if result.highlighted_fields:
@@ -52,8 +67,7 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
                         ALERTS_HL_TAG,
                     )
                 documents.append(document_content)
-            parent_alert.alert.date_last_hit = now()
-            parent_alert.alert.save()
+            alerts_to_update.append(parent_alert.alert)
             hits.append(
                 [
                     parent_alert.alert,
@@ -63,8 +77,13 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
                 ]
             )
         send_search_alert_and_webhooks(rate_user.user, hits)
-        if parent_alerts:
+        if rate_user.parent_alerts.exists():
             alerts_sent_count += 1
+
+    # Update Alert's date_last_hit in bulk.
+    Alert.objects.filter(
+        id__in=[alert.id for alert in alerts_to_update]
+    ).update(date_last_hit=now_time)
 
     tally_stat(f"alerts.sent.{rate}", inc=alerts_sent_count)
     logger.info(f"Sent {alerts_sent_count} {rate} email alerts.")
