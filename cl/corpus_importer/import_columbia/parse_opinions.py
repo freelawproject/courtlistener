@@ -53,18 +53,21 @@ def parse_file(file_path):
     object. The regexes associated to its value in special_regexes will be used.
     """
     raw_info = get_text(file_path)
-    info = {}
+    info = {
+        "unpublished": raw_info["unpublished"],
+        "file": os.path.splitext(os.path.basename(file_path))[0],
+        "docket": "".join(raw_info.get("docket", [])) or None,
+        "citations": raw_info.get("citation", []),
+        "attorneys": "".join(raw_info.get("attorneys", [])) or None,
+        "posture": "".join(raw_info.get("posture", [])) or None,
+        "court_id": (
+            get_state_court_object(
+                "".join(raw_info.get("court", [])), file_path
+            )
+            or None
+        ),
+    }
     # get basic info
-    info["unpublished"] = raw_info["unpublished"]
-    info["file"] = os.path.splitext(os.path.basename(file_path))[0]
-    info["docket"] = "".join(raw_info.get("docket", [])) or None
-    info["citations"] = raw_info.get("citation", [])
-    info["attorneys"] = "".join(raw_info.get("attorneys", [])) or None
-    info["posture"] = "".join(raw_info.get("posture", [])) or None
-    info["court_id"] = (
-        get_state_court_object("".join(raw_info.get("court", [])), file_path)
-        or None
-    )
     if not info["court_id"]:
         raise Exception(
             f"Failed to find a court ID for \"{''.join(raw_info.get('court', []))}\"."
@@ -72,8 +75,7 @@ def parse_file(file_path):
 
     # get the full panel text and extract judges from it
     panel_text = "".join(raw_info.get("panel", []))
-    # if panel_text:
-    #    judge_info.append(('Panel\n-----', panel_text))
+
     info["panel"] = extract_judge_last_name(panel_text) or []
 
     # get case names
@@ -83,6 +85,7 @@ def parse_file(file_path):
     case_name = (
         format_case_name("".join(raw_info.get("reporter_caption", []))) or ""
     )
+
     if case_name:
         info["case_name"] = case_name
     else:
@@ -103,23 +106,9 @@ def parse_file(file_path):
     dates = raw_info.get("date", []) + raw_info.get("hearing_date", [])
     info["dates"] = parse_dates(dates)
 
-    # figure out if this case was heard per curiam by checking the first chunk
-    # of text in fields in which this is usually indicated
-    info["per_curiam"] = False
-    first_chunk = 1000
-    for opinion in raw_info.get("opinions", []):
-        if "per curiam" in opinion["opinion"][:first_chunk].lower():
-            info["per_curiam"] = True
-            break
-        if (
-            opinion["byline"]
-            and "per curiam" in opinion["byline"][:first_chunk].lower()
-        ):
-            info["per_curiam"] = True
-            break
-
     info["opinions"] = []
     judges = []
+    first_chunk = 1000
 
     for opinion in raw_info.get("opinions", []):
         per_curiam = False
@@ -162,7 +151,7 @@ def parse_file(file_path):
     return info
 
 
-def get_text(xml_filepath: str):
+def get_text(xml_filepath: str) -> dict:
     """Convert xml data into dict
     :param xml_filepath: path of xml file
     :return: dict with data
@@ -178,7 +167,6 @@ def get_text(xml_filepath: str):
     data["unpublished"] = False
 
     # Prepare opinions
-
     opinion = soup.find("opinion")
     if opinion:
         # Outer tag is <opinion>

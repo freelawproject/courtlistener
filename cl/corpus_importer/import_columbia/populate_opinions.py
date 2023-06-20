@@ -1,17 +1,15 @@
 import calendar
-import re
 import string
-from collections import OrderedDict
 from datetime import date
+from typing import Optional
 
+from bs4 import BeautifulSoup
 from django.conf import settings
 from django.db import transaction
 from eyecite import clean_text
 from eyecite.find import get_citations
 from juriscraper.lib.string_utils import titlecase
 
-from cl.lib.scorched_utils import ExtraSolrInterface
-from cl.lib.solr_core_admin import get_term_frequency
 from cl.search.models import SOURCES, Citation, Docket, Opinion, OpinionCluster
 
 from ...citations.utils import map_reporter_db_cite_type
@@ -20,11 +18,8 @@ from ...people_db.lookup_utils import (
     lookup_judge_by_last_name,
     lookup_judges_by_last_name_list,
 )
+from ..management.commands.harvard_opinions import match_based_text
 from .convert_columbia_html import convert_columbia_html
-
-# only make a solr connection once
-SOLR_CONN = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
-
 
 # used to identify dates
 # the order of these dates matters, as if there are multiple matches in an
@@ -444,17 +439,18 @@ def make_and_save(
 
     if min_dates is None:
         # check to see if this is a duplicate
-        dups = find_dups(docket, cluster)
-        if dups:
+        previously_imported_case = find_duplicates(
+            docket, cluster, opinions, found_citations
+        )
+        if previously_imported_case:
             if skipdupes:
                 logger.info(f"Duplicate data found for file: {item['file']}")
                 print("Duplicate. skipping.")
             else:
-                raise Exception(f"Found {len(dups)} duplicate(s).")
+                raise Exception(f"Found duplicate(s).")
 
     # save all the objects
     if not testing:
-        # TODO atomic transaction
         with transaction.atomic():
             docket.save()
             cluster.docket = docket
@@ -478,124 +474,45 @@ def make_and_save(
             )
 
 
-def find_dups(docket, cluster):
-    """Finds the duplicate cases associated to a collection of objects.
-
-    :param docket: A `Docket` instance.
-    :param cluster: An `OpinionCluster` instance.
+def find_duplicates(
+    docket, cluster, opinions, citation_list
+) -> Optional[OpinionCluster]:
+    """Check if there is a duplicate cluster using the unsaved objects data
+    :param docket: docket to be created
+    :param cluster: cluster to be created
+    :param opinions: list of opinions to be created
+    :param citation_list: list of citations to be created
+    :return: cluster match or None
     """
-    # You can't use relation before saving
-    # if not cluster.citations.exists():
-    #     # if there aren't any citations, assume
-    #     # for now that there's no duplicate
-    #     return []
+    for citation in citation_list:
+        cites = get_citations(str(citation))
 
-    # TODO find a way to find duplicates
-    return []
+        if cites:
+            xml_opinions_content = []
+            for op in opinions:
+                xml_opinions_content.append(op[0].html_columbia)
 
-    # TODO you can't access to related objects of an unsaved object, why this is here?
-    params = {
-        "fq": [
-            f"court_id:{docket.court_id}",
-            # "citation:(%s)" % " OR ".join('"%s"~5' % c for c in cluster.citations.all() if c),
-        ],
-        "rows": 100,
-        "caller": "corpus_importer.import_columbia.populate_opinions",
-    }
-    results = SOLR_CONN.query().add_extra(**params).execute()
-    if len(results) == 1:
-        # found the duplicate
-        return results
-    elif len(results) > 1:
-        # narrow down the cases that match citations
-        remaining = []
-        base_words = get_case_name_words(docket.case_name)
-        for r in results:
-            # if the important words in case names don't match up, these aren't
-            # duplicates
-            if not r.get("caseName"):
-                continue
-            if get_case_name_words(r["caseName"]) == base_words:
-                remaining.append(r)
-        if remaining:
-            # we successfully narrowed down the results
-            return remaining
-        # failed to narrow down results, so we just return the cases that match
-        # citations
-        return results
-    return []
+            all_opinions_content = " ".join(xml_opinions_content)
+            all_opinions_soup = BeautifulSoup(
+                all_opinions_content, features="html.parser"
+            )
 
+            possible_clusters = OpinionCluster.objects.filter(
+                citations__reporter=citation.reporter,
+                citations__volume=citation.volume,
+                citations__page=citation.page,
+            ).order_by("id")
 
-def get_case_name_words(case_name):
-    """Gets all the important words in a case name. Returns them as a set."""
-    case_name = case_name.lower()
-    filtered_words = []
-    all_words = case_name.split()
-    if " v. " in case_name:
-        v_index = all_words.index("v.")
-        # The first word of the defendant and the last word in the plaintiff
-        # that's not a bad word.
-        plaintiff_a = get_good_words(all_words[:v_index])
-        defendant_a = get_good_words(all_words[v_index + 1 :])
-        if plaintiff_a:
-            filtered_words.append(plaintiff_a[-1])
-        if defendant_a:
-            # append the first good word that's not already in the array
-            try:
-                filtered_words.append(
-                    [
-                        word
-                        for word in defendant_a
-                        if word not in filtered_words
-                    ][0]
-                )
-            except IndexError:
-                # When no good words left in defendant_a
-                pass
-    elif (
-        "in re " in case_name
-        or "matter of " in case_name
-        or "ex parte" in case_name
-    ):
-        try:
-            subject = re.search(
-                "(?:(?:in re)|(?:matter of)|(?:ex parte)) (.*)", case_name
-            ).group(1)
-        except TypeError:
-            subject = ""
-        good_words = get_good_words(subject.split())
-        if good_words:
-            filtered_words.append(good_words[0])
-    else:
-        filtered_words = get_good_words(all_words)
-    return set(filtered_words)
+            match = match_based_text(
+                all_opinions_soup.text,
+                docket.docket_number,
+                cluster.case_name,
+                possible_clusters,
+                cluster.case_name_short,
+                cites[0],
+            )
 
+            if match:
+                return match
 
-def get_good_words(word_list, stop_words_size=500):
-    """Cleans out stop words, abbreviations, etc. from a list of words"""
-    stopwords = StopWords().stop_words
-    good_words = []
-    for word in word_list:
-        # Clean things up
-        word = re.sub(r"'s", "", word)
-        word = word.strip('*,();"')
-
-        # Boolean conditions
-        stop = word in stopwords[:stop_words_size]
-        bad_stuff = re.search("[0-9./()!:&']", word)
-        too_short = len(word) <= 1
-        is_acronym = word.isupper() and len(word) <= 3
-        if any([stop, bad_stuff, too_short, is_acronym]):
-            continue
-        else:
-            good_words.append(word)
-    # Eliminate dups, but keep order.
-    return list(OrderedDict.fromkeys(good_words))
-
-
-class StopWords(object):
-    """A very simple object that can hold stopwords, but that is only
-    initialized once.
-    """
-
-    stop_words = get_term_frequency(result_type="list")
+    return None
