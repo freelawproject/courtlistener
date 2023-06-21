@@ -111,6 +111,12 @@ jobs:
         run: docker image ls -a --no-trunc
       - name: List docker container statuses
         run: docker ps -a --no-trunc
+      - name: Wait for PostgreSQL to be ready
+        run: |
+          until docker exec cl-postgres psql "postgresql://postgres:postgres@cl-postgres/courtlistener?sslmode=require" -c 'SELECT 1' > /dev/null 2>&1; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
       - name: Show the docker startup logs
         working-directory: courtlistener/docker/courtlistener
         run: docker-compose logs
