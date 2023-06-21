@@ -103,7 +103,7 @@ jobs:
         run: docker network create -d bridge --attachable cl_net_overlay
       - name: Start docker compose
         working-directory: courtlistener/docker/courtlistener
-        run: docker-compose -f docker-compose.yml -f docker-compose.tmpfs.yml up -d
+        run: docker-compose -f docker-compose.yml up -d
         env:
           CELERY_DOCKER_IMAGE: "localhost:5000/freelawproject/courtlistener:latest-celery-${{ github.sha }}"
           DJANGO_DOCKER_IMAGE: "localhost:5000/freelawproject/courtlistener:latest-web-dev-${{ github.sha }}"
@@ -111,12 +111,6 @@ jobs:
         run: docker image ls -a --no-trunc
       - name: List docker container statuses
         run: docker ps -a --no-trunc
-      - name: Wait for PostgreSQL to be ready
-        run: |
-          until docker exec cl-postgres psql "postgresql://postgres:postgres@cl-postgres/courtlistener?sslmode=require" -c 'SELECT 1' > /dev/null 2>&1; do
-            echo "Waiting for PostgreSQL..."
-            sleep 2
-          done
       - name: Show the docker startup logs
         working-directory: courtlistener/docker/courtlistener
         run: docker-compose logs
