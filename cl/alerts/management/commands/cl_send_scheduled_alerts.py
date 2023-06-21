@@ -11,6 +11,7 @@ from cl.alerts.send_alerts import (
     merge_highlights_into_result,
     send_search_alert_and_webhooks,
 )
+from cl.alerts.utils import InvalidDateError
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.search.constants import ALERTS_HL_TAG
 from cl.search.models import SEARCH_TYPES
@@ -37,7 +38,6 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
     alerts_sent_count = 0
     now_time = now()
     alerts_to_update = []
-
     rate_users = (
         UserRateAlert.objects.filter(rate=rate)
         .select_related("user")
@@ -86,6 +86,10 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
         id__in=[alert.id for alert in alerts_to_update]
     ).update(date_last_hit=now_time)
 
+    # Remove stored alerts sent, all the related objects will be deleted
+    # in cascade.
+    rate_users.delete()
+
     tally_stat(f"alerts.sent.{rate}", inc=alerts_sent_count)
     logger.info(f"Sent {alerts_sent_count} {rate} email alerts.")
 
@@ -93,9 +97,13 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
 def send_scheduled_alerts(rate: str) -> None:
     if rate == Alert.DAILY:
         query_and_send_alerts_by_rate(Alert.DAILY)
-    if rate == Alert.WEEKLY:
+    elif rate == Alert.WEEKLY:
         query_and_send_alerts_by_rate(Alert.WEEKLY)
-    if rate == Alert.MONTHLY:
+    elif rate == Alert.MONTHLY:
+        if datetime.date.today().day > 28:
+            raise InvalidDateError(
+                "Monthly alerts cannot be run on the 29th, 30th or 31st."
+            )
         query_and_send_alerts_by_rate(Alert.MONTHLY)
 
 
