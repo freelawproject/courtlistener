@@ -25,8 +25,6 @@ services:
       dockerfile: ../../../courtlistener/docker/postgresql/Dockerfile
       args:
         POSTGRES_VERSION: 15.2-alpine
-    volumes:
-      - /var/lib/postgresql/ssl
     ports:
       - "5432:5432"
     environment:
