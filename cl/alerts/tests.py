@@ -22,7 +22,13 @@ from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
 from cl.alerts.management.commands.handle_old_docket_alerts import (
     build_user_report,
 )
-from cl.alerts.models import SEARCH_TYPES, Alert, DocketAlert, RealTimeQueue
+from cl.alerts.models import (
+    SEARCH_TYPES,
+    Alert,
+    DocketAlert,
+    RealTimeQueue,
+    UserRateAlert,
+)
 from cl.alerts.tasks import (
     get_docket_notes_and_tags_by_user,
     send_alert_and_webhook,
@@ -1505,7 +1511,6 @@ class SearchAlertsOAESTests(ESTestCaseMixin, TestCase):
             status=Donation.PROCESSED,
             send_annual_reminder=True,
         )
-
         cls.webhook_enabled = WebhookFactory(
             user=cls.user_profile.user,
             event_type=WebhookEventType.SEARCH_ALERT,
@@ -1750,8 +1755,14 @@ class SearchAlertsOAESTests(ESTestCaseMixin, TestCase):
         webhook_events = WebhookEvent.objects.all()
         self.assertEqual(len(webhook_events), 0)
 
-        # Call dly command
-        call_command("cl_send_scheduled_alerts", rate="dly")
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            # Call dly command
+            call_command("cl_send_scheduled_alerts", rate="dly")
 
         # Two OA search alert emails should be sent, one for user_profile and
         # one for user_profile_2
@@ -1763,8 +1774,14 @@ class SearchAlertsOAESTests(ESTestCaseMixin, TestCase):
         webhook_events = WebhookEvent.objects.all()
         self.assertEqual(len(webhook_events), 1)
 
-        # Call wly command
-        call_command("cl_send_scheduled_alerts", rate="wly")
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            # Call wly command
+            call_command("cl_send_scheduled_alerts", rate="wly")
 
         # The wly alert should be triggered
         self.assertEqual(len(mail.outbox), 2)
@@ -1775,8 +1792,14 @@ class SearchAlertsOAESTests(ESTestCaseMixin, TestCase):
         webhook_events = WebhookEvent.objects.all()
         self.assertEqual(len(webhook_events), 2)
 
-        # Call mly command
-        call_command("cl_send_scheduled_alerts", rate="mly")
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            # Call mly command
+            call_command("cl_send_scheduled_alerts", rate="mly")
 
         # The wly alert should be triggered
         self.assertEqual(len(mail.outbox), 3)
@@ -1786,7 +1809,6 @@ class SearchAlertsOAESTests(ESTestCaseMixin, TestCase):
         # One more webhook event should be sent to user_profile
         webhook_events = WebhookEvent.objects.all()
         self.assertEqual(len(webhook_events), 3)
-
         Audio.objects.all().delete()
 
     def test_group_alerts_and_hits(self):
@@ -1828,11 +1850,18 @@ class SearchAlertsOAESTests(ESTestCaseMixin, TestCase):
         webhook_events = WebhookEvent.objects.all()
         self.assertEqual(len(webhook_events), 0)
 
-        # Call command dly
-        call_command("cl_send_scheduled_alerts", rate="dly")
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            # Call command dly
+            call_command("cl_send_scheduled_alerts", rate="dly")
 
         # Two OA search alert emails should be sent, one for user_profile and
         # one for user_profile_2
+
         self.assertEqual(len(mail.outbox), 1)
         text_content = mail.outbox[0].body
 
@@ -1858,3 +1887,156 @@ class SearchAlertsOAESTests(ESTestCaseMixin, TestCase):
             else:
                 self.assertTrue(False, "Search Alert webhooks failed.")
         Audio.objects.all().delete()
+
+    @override_settings(PERCOLATOR_PAGE_SIZE=5)
+    def test_send_multiple_rt_alerts(self):
+        """Confirm all RT alerts are properly sent if the percolator response
+        contains more than PERCOLATOR_PAGE_SIZE results. So additional
+        requests are performed in order to retrieve all the available results.
+        """
+
+        donations = Donation.objects.all()
+        self.assertEqual(donations.count(), 2)
+        self.assertEqual(len(mail.outbox), 0)
+        webhook_events = WebhookEvent.objects.all()
+        self.assertEqual(len(webhook_events), 0)
+
+        # Create 10 additional Alerts for different users.
+        created_alerts = []
+        for i in range(10):
+            user_profile = UserProfileWithParentsFactory.create()
+
+            if i != 1:
+                DonationFactory.create(
+                    amount=20,
+                    donor=user_profile.user,
+                    status=Donation.PROCESSED,
+                    send_annual_reminder=True,
+                )
+            WebhookFactory(
+                user=user_profile.user,
+                event_type=WebhookEventType.SEARCH_ALERT,
+                url="https://example.com/",
+                enabled=True,
+            )
+            alert = AlertFactory.create(
+                user=user_profile.user,
+                rate=Alert.REAL_TIME,
+                name=f"Test Alert RT {i}",
+                query=f"q=RT+Test+OA&type=oa",
+            )
+            created_alerts.append(alert)
+        AudioPercolator._index.refresh()
+
+        donations = Donation.objects.all()
+        self.assertEqual(len(donations), 11)
+        alerts_created = Alert.objects.filter(rate=Alert.REAL_TIME)
+        # 2 created in setUpTestData + 10
+        self.assertEqual(alerts_created.count(), 12)
+
+        # Clear the outbox
+        mail.outbox = []
+
+        # Trigger RT alerts adding a document that matches the alerts.
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            rt_oral_argument = AudioWithParentsFactory.create(
+                case_name=f"RT Test OA",
+                docket__court=self.court_1,
+                docket__date_argued=now() - timedelta(hours=5),
+                docket__docket_number=f"19-5730",
+            )
+
+        # 11 OA search alert emails should be sent, one for each user that
+        # had donated enough.
+        self.assertEqual(len(mail.outbox), 11)
+        text_content = mail.outbox[0].body
+        self.assertIn(rt_oral_argument.case_name, text_content)
+
+        # 11 webhook events should be sent to users with a Webhook active.
+        webhook_events = WebhookEvent.objects.all()
+        self.assertEqual(len(webhook_events), 10)
+        content = webhook_events[0].content["payload"]
+        self.assertEqual(len(content["results"]), 1)
+        Audio.objects.all().delete()
+        for alert in created_alerts:
+            alert.delete()
+
+    @override_settings(PERCOLATOR_PAGE_SIZE=5)
+    def test_batched_alerts_match_documents_ingestion(self):
+        """Confirm that batched alerts are properly stored according to
+        document ingestion when percolated in real time.
+        """
+
+        # Create a set of 11 users, webhooks and Alerts.
+        created_alerts = []
+        for i in range(10):
+            user_profile = UserProfileWithParentsFactory.create()
+            WebhookFactory(
+                user=user_profile.user,
+                event_type=WebhookEventType.SEARCH_ALERT,
+                url="https://example.com/",
+                enabled=True,
+            )
+            alert = AlertFactory.create(
+                user=user_profile.user,
+                rate=Alert.DAILY,
+                name=f"Test Alert OA {i}",
+                query=f"q=DLY+Test+OA&type=oa",
+            )
+            created_alerts.append(alert)
+            AudioPercolator._index.refresh()
+            # Create a new document that triggers each existing alert created
+            # at this stage.
+            with mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ):
+                AudioWithParentsFactory.create(
+                    case_name=f"DLY Test OA",
+                    docket__court=self.court_1,
+                    docket__date_argued=now() - timedelta(hours=5),
+                    docket__docket_number=f"19-5735",
+                )
+
+        # Clear the outbox
+        mail.outbox = []
+        self.assertEqual(len(mail.outbox), 0)
+        webhook_events = WebhookEvent.objects.all()
+        self.assertEqual(len(webhook_events), 0)
+
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            # Call dly command
+            call_command("cl_send_scheduled_alerts", rate="dly")
+
+        # 11 email Alerts should be sent.
+        self.assertEqual(len(mail.outbox), 11)
+        webhook_events = WebhookEvent.objects.all().order_by("pk")
+
+        # 10 related webhook events should be sent.
+        self.assertEqual(len(webhook_events), 11)
+
+        # Confirm that the number of hits contained in alerts match the
+        # documents ingested in real time.
+        expected_webhooks = [10, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
+        # The last alert created should contain 10 hits, and this number is
+        # reduced by 1 in each subsequent iteration. The first alert should
+        # only contain one document since it was the only document that
+        # triggered the alert at that stage.
+        for event, expected in zip(webhook_events, expected_webhooks):
+            content = event.content["payload"]
+            self.assertEqual(len(content["results"]), expected)
+        Audio.objects.all().delete()
+        for alert in created_alerts:
+            alert.delete()

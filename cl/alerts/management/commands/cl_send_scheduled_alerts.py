@@ -33,6 +33,7 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
     :param rate: The alert rate to send Alerts.
     :return: None
     """
+
     alerts_sent_count = 0
     now_time = now()
     alerts_to_update = []

@@ -78,3 +78,9 @@ ELASTICSEARCH_NUMBER_OF_SHARDS = env(
 ELASTICSEARCH_NUMBER_OF_REPLICAS = env(
     "ELASTICSEARCH_NUMBER_OF_REPLICAS", default=0
 )
+
+
+####################################
+# Percolator batch size for Alerts #
+####################################
+PERCOLATOR_PAGE_SIZE = 100
