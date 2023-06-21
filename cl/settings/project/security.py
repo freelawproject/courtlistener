@@ -3,6 +3,7 @@ import socket
 import environ
 
 from ..django import DATABASES, INSTALLED_APPS, TESTING
+from ..third_party.aws import AWS_S3_CUSTOM_DOMAIN
 
 env = environ.FileAwareEnv()
 DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
@@ -73,3 +74,62 @@ CORS_ALLOW_METHODS = (
     "OPTIONS",
 )
 CORS_ALLOW_CREDENTIALS = True
+
+# CSP
+# Components:
+# - hCaptcha: https://docs.hcaptcha.com/#content-security-policy-settings
+# - Plausible: https://github.com/plausible/docs/issues/20
+# - Stripe: https://stripe.com/docs/security/guide#content-security-policy
+CSP_CONNECT_SRC = (
+    "'self'",
+    "https://hcaptcha.com/",
+    "https://*.hcaptcha.com",
+    "https://plausible.io/",
+    "https://api.stripe.com",
+)
+CSP_FONT_SRC = (
+    "'self'",
+    f"https://{AWS_S3_CUSTOM_DOMAIN}/",
+    "data:",  # Some browser extensions like this.
+)
+CSP_FRAME_SRC = (
+    "'self'",
+    "https://hcaptcha.com/",
+    "https://*.hcaptcha.com",
+    "https://js.stripe.com",
+    "https://hooks.stripe.com",
+)
+CSP_IMG_SRC = (
+    "'self'",
+    f"https://{AWS_S3_CUSTOM_DOMAIN}/",
+    "data:",  # @tailwindcss/forms uses data URIs for images.
+)
+CSP_OBJECT_SRC = "'none'"
+CSP_SCRIPT_SRC = (
+    "'self'",
+    "'report-sample'",
+    f"https://{AWS_S3_CUSTOM_DOMAIN}/",
+    "https://hcaptcha.com/",
+    "https://*.hcaptcha.com",
+    "https://plausible.io/",
+    "https://js.stripe.com",
+    "'unsafe-inline'",
+)
+CSP_STYLE_SRC = (
+    "'self'",
+    "'report-sample'",
+    f"https://{AWS_S3_CUSTOM_DOMAIN}/",
+    "https://hcaptcha.com/",
+    "https://*.hcaptcha.com",
+    "'unsafe-inline'",
+)
+CSP_DEFAULT_SRC = (
+    "'self'",
+    f"https://{AWS_S3_CUSTOM_DOMAIN}/",
+)
+CSP_BASE_URI = "'none'"
+if not any(
+    (DEVELOPMENT, TESTING)
+):  # Development and test aren’t used over HTTPS (yet)
+    CSP_UPGRADE_INSECURE_REQUESTS = True
+CSP_REPORT_ONLY = True
