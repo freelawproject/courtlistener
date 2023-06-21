@@ -58,7 +58,7 @@ def percolate_document(
     document_id: str,
     document_index: str,
     from_index: int = 0,
-) -> Response | list:
+) -> Response | None:
     """Percolate a document against a defined Elasticsearch Percolator query.
 
     :param document_id: The document ID in ES index to be percolated.
@@ -90,7 +90,7 @@ def percolate_document(
         logger.warning(f"Error was: {e}")
         if settings.DEBUG is True:
             traceback.print_exc()
-        return []
+        return None
 
 
 def send_search_alert_and_webhooks(
@@ -220,8 +220,9 @@ def send_or_schedule_alerts(
 
     # Perform an initial percolator query and process its response.
     percolator_response = percolate_document(document_id, document_index)
+    if not percolator_response:
+        return
     process_percolator_response(percolator_response, document_content)
-
     # Check if the query contains more documents than PERCOLATOR_PAGE_SIZE.
     # If so, return additional results until there are not more.
     batch_size = settings.PERCOLATOR_PAGE_SIZE

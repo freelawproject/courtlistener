@@ -70,12 +70,12 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
                 documents.append(document_content)
             alerts_to_update.append(parent_alert.alert)
             hits.append(
-                [
+                (
                     parent_alert.alert,
                     search_type,
                     documents,
                     len(documents),
-                ]
+                )
             )
         send_search_alert_and_webhooks(rate_user.user, hits)
         if rate_user.parent_alerts.exists():
