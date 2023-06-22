@@ -9,7 +9,7 @@
 {% block navbar-donate %}active{% endblock %}
 
 {% block extra_js %}
-  <script type="text/javascript">
+  <script type="text/javascript" nonce="{{ request.csp_nonce }}">
     // Make the buttons happen
     let donor_info = $("#donor-info");
     let check_info = $("#check-info");

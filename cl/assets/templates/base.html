@@ -465,7 +465,7 @@
   <script type="text/javascript" src="{% static "js/bootstrap.min.js" %}"></script>
 {% endif %}
 <script type="text/javascript" src="{% static "js/base.js" %}"></script>
-<script type="text/javascript">
+<script type="text/javascript" nonce="{{ request.csp_nonce }}">
   {# Default values are to ensure JS parsing even if 500 error thrown #}
   var totalDonatedLastYear = parseFloat({{ user.profile.total_donated_last_year|safe|default:0}}),
       userAlertCount = {{ user.docket_alerts.subscriptions.count|default:"0" }},

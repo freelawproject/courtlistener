@@ -38,7 +38,7 @@
 
 {% block footer-scripts %}
   {% include "includes/date_picker.html" %}
-  <script type="text/javascript">
+  <script type="text/javascript" nonce="{{ request.csp_nonce }}">
     $(document).ready(function () {
       $('#start-scroll').on("click", function () {
         $('html, body').animate({

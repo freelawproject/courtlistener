@@ -114,7 +114,6 @@ CSP_SCRIPT_SRC = (
     "https://*.hcaptcha.com",
     "https://plausible.io/",
     "https://js.stripe.com",
-    "'unsafe-inline'",
 )
 CSP_STYLE_SRC = (
     "'self'",
@@ -129,6 +128,7 @@ CSP_DEFAULT_SRC = (
     f"https://{AWS_S3_CUSTOM_DOMAIN}/",
 )
 CSP_BASE_URI = "'none'"
+CSP_INCLUDE_NONCE_IN = ["script-src"]
 if not any(
     (DEVELOPMENT, TESTING)
 ):  # Development and test aren’t used over HTTPS (yet)

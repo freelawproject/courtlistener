@@ -16,7 +16,7 @@
         <script src="{% static "js/plottable.min.js" %}"></script>
     {% endif %}
 
-    <script type="text/javascript">
+    <script type="text/javascript" nonce="{{ request.csp_nonce }}">
         var precedentTypes = [
             {% for status in precedential_statuses %}
                 '{{ status }}'{% if not forloop.last %},{% endif %}
