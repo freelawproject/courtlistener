@@ -4,7 +4,7 @@ from typing import Any
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.http import QueryDict
 from django.template import loader
 from django.utils.timezone import now
@@ -27,6 +27,7 @@ from cl.lib.elasticsearch_utils import (
 )
 from cl.search.constants import ALERTS_HL_TAG
 from cl.search.models import SEARCH_TYPES
+from cl.stats.utils import tally_stat
 from cl.users.models import UserProfile
 
 
@@ -80,6 +81,7 @@ def percolate_document(
         s = add_es_highlighting(
             s, {"type": SEARCH_TYPES.ORAL_ARGUMENT}, alerts=True
         )
+        s = s.source(excludes=["percolator_query"])
         s = s.extra(from_=from_index, size=settings.PERCOLATOR_PAGE_SIZE)
         # execute the percolator query.
         return s.execute()
@@ -148,13 +150,18 @@ def process_percolator_response(
         # Schedule no RT Alerts.
         scheduled_rates = [Alert.DAILY, Alert.WEEKLY, Alert.MONTHLY]
         if alert_triggered.rate in scheduled_rates:
-            with transaction.atomic():
-                (
-                    user_rate,
-                    created,
-                ) = UserRateAlert.objects.select_for_update().get_or_create(
-                    user=alert_triggered.user, rate=alert_triggered.rate
-                )
+            with transaction.atomic(savepoint=True):
+                try:
+                    (
+                        user_rate,
+                        created,
+                    ) = UserRateAlert.objects.select_for_update().get_or_create(
+                        user=alert_triggered.user, rate=alert_triggered.rate
+                    )
+                except IntegrityError:
+                    user_rate = UserRateAlert.objects.get(
+                        user=alert_triggered.user, rate=alert_triggered.rate
+                    )
                 parent_alert, created = ParentAlert.objects.get_or_create(
                     alert=alert_triggered, user_rate=user_rate
                 )
@@ -199,6 +206,9 @@ def process_percolator_response(
             alert_triggered.date_last_hit = now()
             alert_triggered.save()
             send_search_alert_and_webhooks(alert_user, hits)
+
+            tally_stat(f"alerts.sent.{Alert.REAL_TIME}", inc=1)
+            logger.info(f"Sent {1} {Alert.REAL_TIME} email alerts.")
 
 
 def send_or_schedule_alerts(

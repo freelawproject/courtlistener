@@ -1,6 +1,13 @@
 from django.contrib import admin
 
-from cl.alerts.models import Alert, DocketAlert, RealTimeQueue
+from cl.alerts.models import (
+    Alert,
+    DocketAlert,
+    ParentAlert,
+    RealTimeQueue,
+    ScheduledAlertHit,
+    UserRateAlert,
+)
 
 
 @admin.register(Alert)
@@ -54,3 +61,48 @@ class RealTimeQueueAdmin(admin.ModelAdmin):
         "item_pk",
     )
     readonly_fields = ("date_modified",)
+
+
+class ParentAlertInline(admin.TabularInline):
+    model = ParentAlert
+    extra = 0
+
+
+@admin.register(UserRateAlert)
+class UserRateAlertAdmin(admin.ModelAdmin):
+    inlines = (ParentAlertInline,)
+    list_filter = ("rate",)
+    list_display = (
+        "id",
+        "user",
+        "rate",
+        "date_created",
+    )
+    raw_id_fields = ("user",)
+
+
+class ScheduledAlertHitInline(admin.TabularInline):
+    model = ScheduledAlertHit
+    extra = 0
+
+
+@admin.register(ParentAlert)
+class ParentAlertAdmin(admin.ModelAdmin):
+    inlines = (ScheduledAlertHitInline,)
+    list_display = (
+        "id",
+        "alert",
+        "user_rate",
+        "date_created",
+    )
+    raw_id_fields = ("alert", "user_rate")
+
+
+@admin.register(ScheduledAlertHit)
+class ScheduledAlertHitAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "parent_alert",
+        "date_created",
+    )
+    raw_id_fields = ("parent_alert",)
