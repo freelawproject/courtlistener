@@ -7,5 +7,3 @@ services:
       # Set this to tmpfs for a speed boost
       - type: tmpfs
         target: /var/lib/postgresql/data/
-      - type: tmpfs
-        target: /var/lib/postgresql/ssl

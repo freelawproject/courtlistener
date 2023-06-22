@@ -8,4 +8,7 @@ RUN apk --update add openssl
 ADD docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
+ADD init-config.sh /docker-entrypoint-initdb.d/init-config.sh
+RUN chmod +x /docker-entrypoint-initdb.d/init-config.sh
+
 ENTRYPOINT ["sh", "/docker-entrypoint.sh"]
