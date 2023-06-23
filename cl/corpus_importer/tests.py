@@ -24,9 +24,6 @@ from cl.corpus_importer.factories import (
     RssDocketDataFactory,
     RssDocketEntryDataFactory,
 )
-from cl.corpus_importer.import_columbia.parse_opinions import (
-    get_state_court_object,
-)
 from cl.corpus_importer.management.commands.clean_up_mis_matched_dockets import (
     find_and_fix_mis_matched_dockets,
 )
@@ -36,6 +33,9 @@ from cl.corpus_importer.management.commands.harvard_opinions import (
     parse_harvard_opinions,
     validate_dt,
     winnow_case_name,
+)
+from cl.corpus_importer.management.commands.import_columbia import (
+    get_state_court_object,
 )
 from cl.corpus_importer.management.commands.normalize_judges_opinions import (
     Command,

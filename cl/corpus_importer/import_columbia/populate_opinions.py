@@ -1,4 +1,5 @@
 import calendar
+import re
 import string
 from datetime import date
 from typing import Optional
@@ -18,8 +19,10 @@ from ...people_db.lookup_utils import (
     lookup_judge_by_last_name,
     lookup_judges_by_last_name_list,
 )
-from ..management.commands.harvard_opinions import match_based_text
-from .convert_columbia_html import convert_columbia_html
+from ..management.commands.harvard_opinions import (
+    clean_body_content,
+    match_based_text,
+)
 
 # used to identify dates
 # the order of these dates matters, as if there are multiple matches in an
@@ -226,13 +229,85 @@ OPINION_TYPE_MAPPING = {
 }
 
 
-def make_and_save(
-    item, skipdupes=False, min_dates=None, start_dates=None, testing=True
+def convert_columbia_html(text: str) -> str:
+    """Convert xml tags to html tags
+    :param text: Text to convert to html
+    :return: converted text
+    """
+    conversions = [
+        ("italic", "em"),
+        ("block_quote", "blockquote"),
+        ("bold", "strong"),
+        ("underline", "u"),
+        ("strikethrough", "strike"),
+        ("superscript", "sup"),
+        ("subscript", "sub"),
+        ("heading", "h3"),
+        ("table", "pre"),
+    ]
+
+    for pattern, replacement in conversions:
+        text = re.sub(f"<{pattern}>", f"<{replacement}>", text)
+        text = re.sub(f"</{pattern}>", f"</{replacement}>", text)
+
+    # grayed-out page numbers
+    text = re.sub("<page_number>", ' <span class="star-pagination">*', text)
+    text = re.sub("</page_number>", "</span> ", text)
+
+    # footnotes
+    foot_references = re.findall(
+        "<footnote_reference>.*?</footnote_reference>", text
+    )
+
+    for ref in foot_references:
+        try:
+            fnum = re.search(r"[\*\d]+", ref).group()
+        except AttributeError:
+            fnum = re.search(r"\[fn(.+)\]", ref).group(1)
+        rep = f'<sup id="ref-fn{fnum}"><a href="#fn{fnum}">{fnum}</a></sup>'
+        text = text.replace(ref, rep)
+
+    foot_numbers = re.findall("<footnote_number>.*?</footnote_number>", text)
+
+    for ref in foot_numbers:
+        try:
+            fnum = re.search(r"[\*\d]+", ref).group()
+        except:
+            fnum = re.search(r"\[fn(.+)\]", ref).group(1)
+        rep = r'<sup id="fn%s"><a href="#ref-fn%s">%s</a></sup>' % (
+            fnum,
+            fnum,
+            fnum,
+        )
+        text = text.replace(ref, rep)
+
+    # Make nice paragraphs. This replaces double newlines with paragraphs, then
+    # nests paragraphs inside blockquotes, rather than vice versa. The former
+    # looks good. The latter is bad.
+    text = f"<p>{text}</p>"
+    text = re.sub(r"</blockquote>\s*<blockquote>", "\n\n", text)
+    text = re.sub("\n\n", "</p>\n<p>", text)
+    text = re.sub(r"<p>\s*<blockquote>", "<blockquote><p>", text, re.M)
+    text = re.sub("</blockquote></p>", "</p></blockquote>", text, re.M)
+
+    return text
+
+
+def add_new_case(
+    item: dict,
+    skip_dupes: bool = False,
+    min_dates: bool = None,
+    start_dates: Optional[dict] = None,
+    testing: bool = True,
 ):
     """Associates case data from `parse_opinions` with objects. Saves these
     objects.
-
-    min_date: if not none, will skip cases after min_date
+    item: dict containing case data
+    skip_dupes: if set, will skip duplicates.
+    min_dates: if not none, will skip cases after min_dates
+    start_dates: if set, will throw exception for cases before court was
+    founded.
+    testing: don't save the data if true
     """
     date_filed = (
         date_argued
@@ -240,10 +315,11 @@ def make_and_save(
         date_reargued
     ) = date_reargument_denied = date_cert_granted = date_cert_denied = None
     unknown_date = None
+    current_year = date.today().year
     for date_cluster in item["dates"]:
         for date_info in date_cluster:
             # check for any dates that clearly aren't dates
-            if date_info[1].year < 1600 or date_info[1].year > 2020:
+            if date_info[1].year < 1600 or date_info[1].year > current_year:
                 continue
             # check for untagged dates that will be assigned to date_filed
             if date_info[0] is None:
@@ -443,9 +519,10 @@ def make_and_save(
             docket, cluster, opinions, found_citations
         )
         if previously_imported_case:
-            if skipdupes:
-                logger.info(f"Duplicate data found for file: {item['file']}")
-                print("Duplicate. skipping.")
+            if skip_dupes:
+                logger.info(
+                    f"Duplicate data found for file: {item['file']}. Skipping."
+                )
             else:
                 raise Exception(f"Found duplicate(s).")
 
@@ -496,7 +573,6 @@ def find_duplicates(
             all_opinions_soup = BeautifulSoup(
                 all_opinions_content, features="html.parser"
             )
-
             possible_clusters = OpinionCluster.objects.filter(
                 citations__reporter=citation.reporter,
                 citations__volume=citation.volume,
@@ -504,7 +580,7 @@ def find_duplicates(
             ).order_by("id")
 
             match = match_based_text(
-                all_opinions_soup.text,
+                clean_body_content(all_opinions_soup.text),
                 docket.docket_number,
                 cluster.case_name,
                 possible_clusters,
