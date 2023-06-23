@@ -11,6 +11,8 @@ RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
         build-essential gcc python3-dev\
         # So postgres can compile and users can use dbshell
         libpq-dev postgresql-client \
+        # So we can use webpack to compile assets
+        nodejs npm \
         # For installing poetry and git-based deps
         curl git \
         # Other dependencies
@@ -75,6 +77,12 @@ RUN tar xvfz courtlistener.tar.gz && \
 
 # `python-base` sets up all our shared environment variables
 FROM build-${BUILD_ENV} as python-base
+
+# Collect compiled assets from webpack-build stage.
+# Note: Always produce production code (run the devMiddleware for legible output)
+WORKDIR /opt/courtlistener/cl
+RUN npm install
+RUN npx webpack --mode=production
 
 WORKDIR /opt
 

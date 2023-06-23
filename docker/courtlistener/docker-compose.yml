@@ -53,6 +53,16 @@ services:
     networks:
       - cl_net_overlay
 
+  cl-webpack:
+    container_name: cl-webpack
+    image: node:16
+    volumes:
+      - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
+    env_file:
+      - ../../.env.dev
+    working_dir: /opt/courtlistener/cl
+    command: sh -c 'npm install && npx webpack --progress --watch --mode=production'
+
   # Task Server
   cl-celery:
     container_name: cl-celery

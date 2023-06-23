@@ -2,11 +2,9 @@ const path = require('path');
 const webpack = require('webpack');
 const TerserPlugin = require("terser-webpack-plugin");
 
-const isDevelopment = process.env.NODE_ENV !== 'production';
-
 module.exports = {
   context: __dirname,
-  mode: isDevelopment ? 'development' : 'production',
+  mode: 'none',
 
   entry: [
     './assets/react/index', // entry point of our app. assets/js/index.js should require other js modules and dependencies it needs
@@ -49,18 +47,5 @@ module.exports = {
   resolve: {
     modules: ['node_modules'],
     extensions: ['.ts', '.tsx', '.js', '.jsx'],
-  },
-  devServer: {
-    devMiddleware: {
-      writeToDisk: true,
-    },
-    compress: true,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
-      'Access-Control-Allow-Headers': 'X-Requested-With, content-type, Authorization',
-      'Accept-Encoding': 'gzip',
-    },
-    port: 3000,
   },
 };
