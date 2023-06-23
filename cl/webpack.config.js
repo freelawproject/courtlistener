@@ -44,7 +44,9 @@ module.exports = {
     extensions: ['.ts', '.tsx', '.js', '.jsx'],
   },
   devServer: {
-    writeToDisk: true,
+    devMiddleware: {
+      writeToDisk: true,
+    },
     compress: true,
     headers: {
       'Access-Control-Allow-Origin': '*',
