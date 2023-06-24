@@ -7,11 +7,9 @@ from django.core.mail import (
     get_connection,
 )
 from django.core.mail.backends.base import BaseEmailBackend
+from redis import Redis
 
-from cl.lib.redis_utils import (
-    check_or_create_email_sending_quota,
-    make_redis_interface,
-)
+from cl.lib.redis_utils import make_redis_interface
 from cl.users.email_handlers import (
     add_bcc_random,
     enqueue_email,
@@ -20,6 +18,29 @@ from cl.users.email_handlers import (
     store_message,
     under_backoff_waiting_period,
 )
+
+
+def inc_email_emergency_brake_or_raise(r: Redis) -> None:
+    """Checks the value of the delivery_attempts key or creates it
+    if it's expired.
+
+    Args:
+        r (Redis): The Redis DB to connect to as a connection interface
+
+    Raises:
+        ValueError: if the counter is bigger than the threshold from the settings.
+    """
+
+    email_counter = r.get("email:delivery_attempts")
+    if email_counter:
+        if int(email_counter) >= settings.SENT_EMAILS_THRESHOLD:
+            raise ValueError(
+                "Emergency brake engaged to prevent email quota exhaustion"
+            )
+    else:
+        pipe = r.pipeline()
+        pipe.expire("email:delivery_attempts", 60 * 60 * 24)  # 24 hours period
+        pipe.execute()
 
 
 class EmailBackend(BaseEmailBackend):
@@ -50,7 +71,7 @@ class EmailBackend(BaseEmailBackend):
         connection = get_connection(base_backend)
         connection.open()
         r = make_redis_interface("CACHE")
-        check_or_create_email_sending_quota(r)
+        inc_email_emergency_brake_or_raise(r)
         msg_count = 0
         for email_message in email_messages:
             message = email_message.message()
