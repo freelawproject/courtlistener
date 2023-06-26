@@ -18,6 +18,7 @@ repos:
      - id: check-yaml
      - id: debug-statements
      - id: detect-private-key
+       exclude: '^docker/postgresql/cl-postgres.req$'
      - id: fix-byte-order-marker
      - id: fix-encoding-pragma
        args: [--remove]
