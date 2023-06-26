@@ -16,6 +16,9 @@ RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
         # Other dependencies
         libffi-dev libxml2-dev libxslt-dev procps vim cmake
 
+# Set PGSSLCERT at a dummy location ro avoid a SSL error connection.
+ENV PGSSLCERT=/tmp/postgresql.crt
+
 # poetry
 # https://python-poetry.org/docs/configuration/#using-environment-variables
 ENV POETRY_VERSION=1.5.0 \

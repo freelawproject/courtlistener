@@ -1,14 +1,15 @@
 ARG POSTGRES_VERSION
 FROM postgres:${POSTGRES_VERSION}
 
-# Install openssl
-RUN apk --update add openssl
+# Create the 'etc/ssl/private' directory
+RUN mkdir -p /etc/ssl/private
 
-# Script that generates SSL certificate and run PostgreSQL
-ADD docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
+# Set permissions to the folder
+RUN chown -R postgres:postgres /etc/ssl/private && chmod -R 0700 /etc/ssl/private
 
-ADD init-config.sh /docker-entrypoint-initdb.d/init-config.sh
-RUN chmod +x /docker-entrypoint-initdb.d/init-config.sh
+# Copy the certificate and private key to the directory container
+COPY ./cl-postgres.crt /etc/ssl/private/cl-postgres.crt
+COPY ./cl-postgres.key /etc/ssl/private/cl-postgres.key
 
-ENTRYPOINT ["sh", "/docker-entrypoint.sh"]
+# Set access rights to the certificate and private key
+RUN chown postgres:postgres /etc/ssl/private/cl-postgres.* && chmod 0600 /etc/ssl/private/cl-postgres.*

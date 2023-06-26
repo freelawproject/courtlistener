@@ -31,6 +31,14 @@ services:
       POSTGRES_USER: "postgres"
       POSTGRES_PASSWORD: "postgres"
       POSTGRES_DB: "courtlistener"
+    command:
+      - "postgres"
+      - "-c"
+      - "ssl=on"
+      - "-c"
+      - "ssl_cert_file=/etc/ssl/private/cl-postgres.crt"
+      - "-c"
+      - "ssl_key_file=/etc/ssl/private/cl-postgres.key"
     networks:
       - cl_net_overlay
 
@@ -85,8 +93,6 @@ services:
       - cl_net_overlay
     env_file:
       - ../../.env.dev
-    environment:
-      - PGSSLCERT=/tmp/postgresql.crt
 
   cl-selenium:
     container_name: cl-selenium
