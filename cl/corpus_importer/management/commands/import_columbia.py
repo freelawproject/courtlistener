@@ -141,11 +141,19 @@ def get_text(xml_filepath: str) -> dict:
     find_opinions = soup.findAll(re.compile("[A-Za-z]+_text"))
     order = 0
     for op in find_opinions:
+        # Find author before opinion text tag
         opinion_author = ""
         byline = op.find_previous_sibling()
-
         if byline:
             opinion_author = byline.get_text()
+
+        # Find all footnotes after opinion text tag until the end of xml or
+        # find other tag
+        footnote = op.find_next_sibling()
+        raw_footnotes = []
+        while footnote and footnote.name == "footnote_body":
+            raw_footnotes.append(str(footnote))
+            footnote = footnote.find_next_sibling()
 
         opinion_type = op.name.replace("_text", "")
 
@@ -155,6 +163,7 @@ def get_text(xml_filepath: str) -> dict:
             "raw_opinion": op,
             "opinion": op.decode_contents(),
             "order": order,
+            "raw_footnotes": raw_footnotes,
         }
 
         opinions.append(new_opinion)
@@ -287,6 +296,7 @@ def parse_file(file_path: str) -> dict:
                 "joining": judges[1:] if len(judges) > 1 else [],
                 "byline": opinion_author,
                 "per_curiam": per_curiam,
+                "footnotes": " ".join(opinion.get("raw_footnotes", [])),
             }
         )
 
