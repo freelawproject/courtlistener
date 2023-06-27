@@ -234,6 +234,7 @@ def convert_columbia_html(text: str) -> str:
     :param text: Text to convert to html
     :return: converted text
     """
+
     conversions = [
         ("italic", "em"),
         ("block_quote", "blockquote"),
@@ -267,8 +268,15 @@ def convert_columbia_html(text: str) -> str:
         rep = f'<sup id="ref-fn{fnum}"><a href="#fn{fnum}">{fnum}</a></sup>'
         text = text.replace(ref, rep)
 
-    foot_numbers = re.findall("<footnote_number>.*?</footnote_number>", text)
+    # Add footnotes to opinion
+    footnotes = re.findall("<footnote_body>.[\s\S]*?</footnote_body>", text)
+    for fn in footnotes:
+        content = re.search("<footnote_body>(.[\s\S]*?)</footnote_body>", fn)
+        rep = r'<div class="footnote">%s</div>' % content.group(1)
+        text = text.replace(fn, rep)
 
+    # Replace footnote numbers
+    foot_numbers = re.findall("<footnote_number>.*?</footnote_number>", text)
     for ref in foot_numbers:
         try:
             fnum = re.search(r"[\*\d]+", ref).group()
@@ -487,7 +495,15 @@ def add_new_case(
             )
             author_str = opinion_info["author"]
 
-        converted_text = convert_columbia_html(opinion_info["opinion"])
+        footnotes = ""
+        if opinion_info["footnotes"]:
+            footnotes = (
+                f'<div class="footnotes">{opinion_info["footnotes"]}</div>'
+            )
+
+        converted_text = convert_columbia_html(
+            opinion_info["opinion"] + footnotes
+        )
         opinion_type = OPINION_TYPE_MAPPING[opinion_info["type"]]
         if opinion_type == Opinion.LEAD and i > 0:
             opinion_type = Opinion.ADDENDUM
