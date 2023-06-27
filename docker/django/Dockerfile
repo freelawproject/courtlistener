@@ -17,6 +17,7 @@ RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
         libffi-dev libxml2-dev libxslt-dev procps vim cmake
 
 # Set PGSSLCERT at a dummy location ro avoid a SSL error connection.
+# https://github.com/freelawproject/courtlistener/issues/2827
 ENV PGSSLCERT=/tmp/postgresql.crt
 
 # poetry
