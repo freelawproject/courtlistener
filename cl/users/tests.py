@@ -49,6 +49,7 @@ from cl.favorites.models import (
     UserTag,
     UserTagEvent,
 )
+from cl.lib.email_backends import get_email_count
 from cl.lib.redis_utils import make_redis_interface
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.search.factories import DocketFactory
@@ -2078,8 +2079,26 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
             stored_email[1].bcc, ["bcc@example.com", "bcc@example.com"]
         )
 
+    @override_settings(EMAIL_MAX_TEMP_COUNTER=5)
+    def test_redis_email_counter(self) -> None:
+        """Test logic to count the number of emails sent by the app"""
+        for i in range(23):
+            email = EmailMessage(
+                f"This is the subject {i}",
+                "Body goes here",
+                "testing@courtlistener.com",
+                ["bounce@simulator.amazonses.com"],
+            )
+            email.send()
+
+        r = make_redis_interface("CACHE")
+        self.assertEqual(int(r.get("email:temp_counter")), 3)
+        self.assertEqual(r.zcard("email:delivery_attempts"), 4)
+        email_counter = get_email_count(r)
+        self.assertEqual(email_counter, 23)
+
     @override_settings(
-        SENT_EMAILS_THRESHOLD=5,
+        EMAIL_EMERGENCY_THRESHOLD=5,
     )
     def test_daily_quota_emergency_brake(self) -> None:
         """Test email daily quota emergency brake"""
@@ -2100,8 +2119,8 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertEqual(stored_email.count(), 5)
 
         r = make_redis_interface("CACHE")
-        email_counter = r.get("email:delivery_attempts")
-        self.assertEqual(email_counter, "5")
+        email_counter = get_email_count(r)
+        self.assertEqual(email_counter, 5)
 
         # Send an additional email that exceeds the quota.
         email = EmailMessage(
@@ -2117,7 +2136,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertEqual(stored_email.count(), 5)
 
     @override_settings(
-        SENT_EMAILS_THRESHOLD=5,
+        EMAIL_EMERGENCY_THRESHOLD=5,
     )
     def test_daily_quota_emergency_brake_mass_mail(self) -> None:
         """Test email daily quota emergency brake sending mass email."""
@@ -2139,10 +2158,9 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertEqual(len(mail.outbox), 5)
         stored_email = EmailSent.objects.all()
         self.assertEqual(stored_email.count(), 5)
-
         r = make_redis_interface("CACHE")
-        email_counter = r.get("email:delivery_attempts")
-        self.assertEqual(email_counter, "5")
+        email_counter = get_email_count(r)
+        self.assertEqual(email_counter, 5)
 
         # Send an additional email that exceeds the quota.
         email = EmailMessage(
@@ -2152,7 +2170,10 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
             ["bounce@simulator.amazonses.com"],
         )
         # The Emergency brake error should be triggered.
-        with self.assertRaisesMessage(ValueError, "Emergency brake engaged"):
+        with self.assertRaisesMessage(
+            ValueError,
+            "Emergency brake engaged to prevent email quota exhaustion",
+        ):
             email.send()
         # No additional messsage should be stored.
         self.assertEqual(stored_email.count(), 5)
