@@ -817,8 +817,6 @@ class CitationCommandTest(IndexedSolrTestCase):
             cluster__pk=cls.citation3.cluster_id
         ).pk
 
-        super().setUpTestData()
-
     def call_command_and_test_it(self, args):
         call_command("cl_find_citations", *args)
         cited = Opinion.objects.get(cluster__pk=self.citation1.cluster_id)
