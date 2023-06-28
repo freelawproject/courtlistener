@@ -743,7 +743,8 @@ class CitationFeedTest(IndexedSolrTestCase):
     def test_basic_cited_by_feed(self) -> None:
         """Can we load the cited-by feed and does it have content?"""
         r = self.client.get(
-            reverse("search_feed", args=["search"]), {"q": "cites:1"}
+            reverse("search_feed", args=["search"]),
+            {"q": f"cites:{self.opinion_1.pk}"},
         )
         self.assertEqual(r.status_code, 200)
 
@@ -757,10 +758,13 @@ class CitationFeedTest(IndexedSolrTestCase):
         new_case_name = (
             "MAC ARTHUR KAMMUELLER, \u2014 v. LOOMIS, FARGO & " "CO., \u2014"
         )
-        OpinionCluster.objects.filter(pk=1).update(case_name=new_case_name)
+        OpinionCluster.objects.filter(pk=self.opinion_cluster_1.pk).update(
+            case_name=new_case_name
+        )
 
         r = self.client.get(
-            reverse("search_feed", args=["search"]), {"q": "cites:1"}
+            reverse("search_feed", args=["search"]),
+            {"q": f"cites:{self.opinion_1.pk}"},
         )
         self.assertEqual(r.status_code, 200)
 
