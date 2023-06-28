@@ -27,7 +27,10 @@ BACKOFF_THRESHOLD = 36
 DELIVERABILITY_THRESHOLD = 2
 
 # Number of emails that can be sent per 24-hour period
-SENT_EMAILS_THRESHOLD = env.int("SENT_EMAILS_THRESHOLD", default=50_000)
+EMAIL_EMERGENCY_THRESHOLD = env.int(
+    "EMAIL_EMERGENCY_THRESHOLD", default=50_000
+)
+EMAIL_MAX_TEMP_COUNTER = env.int("EMAIL_MAX_TEMP_COUNTER", default=10)
 
 SERVER_EMAIL = "CourtListener <noreply@courtlistener.com>"
 DEFAULT_FROM_EMAIL = "CourtListener <noreply@courtlistener.com>"
