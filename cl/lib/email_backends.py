@@ -35,7 +35,9 @@ def incr_email_temp_counter(r: Redis) -> None:
         if int(temp_counter) + 1 >= settings.EMAIL_MAX_TEMP_COUNTER:
             current_time = time.time_ns()
             pipe = r.pipeline()
-            pipe.zadd("email:delivery_attempts", {current_time: current_time})
+            pipe.zadd(
+                "email:delivery_attempts", {str(current_time): current_time}
+            )
             pipe.set("email:temp_counter", 0)
             pipe.execute()
             return
