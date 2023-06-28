@@ -38,7 +38,7 @@ services:
       - "-c"
       - "ssl_cert_file=/etc/ssl/private/cl-postgres.crt"
       - "-c"
-      - "ssl_key_file=/etc/ssl/private/cl-postgres.req"
+      - "ssl_key_file=/etc/ssl/private/cl-postgres.key"
     networks:
       - cl_net_overlay
 
