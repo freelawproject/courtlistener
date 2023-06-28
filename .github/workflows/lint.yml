@@ -54,7 +54,7 @@ jobs:
 
       # Add modules here as they're ready (remove them from the file-by-file
       # checker below as you do so).
-      - name: mypy Static Type Cheker (packages)
+      - name: mypy Static Type Checker (packages)
         run: |
           mypy \
           --follow-imports=skip \

@@ -2,7 +2,7 @@ name: "CodeQL"
 
 on:
   schedule:
-    # Execute every dat at 2:00
+    # Execute every day at 2:00
     - cron: '0 2 * * *'
 
 jobs:
