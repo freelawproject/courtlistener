@@ -24,7 +24,9 @@ header {
 
 .navbar {
   margin-bottom: 0;
-  border-bottom: 1px solid #e7e7e7;
+  border-right: none;
+  border-bottom-color: #e7e7e7;
+  border-left: none;
 }
 
 .navbar-toggle {
