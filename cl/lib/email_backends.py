@@ -1,3 +1,4 @@
+import time
 from collections.abc import Sequence
 
 from django.conf import settings
@@ -20,9 +21,77 @@ from cl.users.email_handlers import (
 )
 
 
-def inc_email_emergency_brake_or_raise(r: Redis) -> None:
-    """Checks the value of the delivery_attempts key or creates it
-    if it's expired.
+def incr_email_temp_counter(r: Redis) -> None:
+    """increments the temporary counter and adds a new
+    element to the sorted set once it reaches the value of
+    the EMAILS_TEMP_COUNTER setting.
+
+    Args:
+        r (Redis): The Redis DB connection interface.
+    """
+    temp_counter = r.get("email:temp_counter")
+
+    if temp_counter:
+        if int(temp_counter) + 1 >= settings.EMAIL_MAX_TEMP_COUNTER:
+            current_time = time.time_ns()
+            pipe = r.pipeline()
+            pipe.zadd("email:delivery_attempts", {current_time: current_time})
+            pipe.set("email:temp_counter", 0)
+            pipe.execute()
+            return
+
+    pipe = r.pipeline()
+    pipe.incr("email:temp_counter")
+    pipe.execute()
+    return
+
+
+def get_attempts_in_window(r: Redis) -> int:
+    """
+    Returns the number of elements stored in the set. This method
+    check the current time, and shave off any attempts in the sorted set
+    that are outside of our window, then check the cardinality of the
+    sorted set
+
+    Args:
+        r (Redis): The Redis DB connection interface.
+
+    Returns:
+        int: number of elements stored in the set
+    """
+    current_time = time.time_ns()
+    trim_time = current_time - (24 * 60 * 60 * 1_000_000_000)
+    pipe = r.pipeline()
+    # Removes attempts outside the current window
+    pipe.zremrangebyscore("email:delivery_attempts", 0, trim_time)
+    # Get number of elements in the set
+    pipe.zcard("email:delivery_attempts")
+    _, size = pipe.execute()
+    return int(size)
+
+
+def get_email_count(r: Redis) -> int:
+    """Returns the number of email sent in the last 24 hours.
+
+    Args:
+        r (Redis): The Redis DB connection interface.
+
+    Returns:
+        int: number of emails sent in the last 24 hours
+    """
+    temp_counter = r.get("email:temp_counter")
+    previous_attempts = get_attempts_in_window(r)
+    if not temp_counter:
+        return previous_attempts * settings.EMAIL_MAX_TEMP_COUNTER
+    return (
+        int(temp_counter) + previous_attempts * settings.EMAIL_MAX_TEMP_COUNTER
+    )
+
+
+def check_emergency_brake(r: Redis) -> None:
+    """
+    Checks the number of emails sent in the last 24 hours, raises an
+    exception if we've reached the threshold.
 
     Args:
         r (Redis): The Redis DB to connect to as a connection interface
@@ -30,17 +99,11 @@ def inc_email_emergency_brake_or_raise(r: Redis) -> None:
     Raises:
         ValueError: if the counter is bigger than the threshold from the settings.
     """
-
-    email_counter = r.get("email:delivery_attempts")
-    if email_counter:
-        if int(email_counter) >= settings.SENT_EMAILS_THRESHOLD:
-            raise ValueError(
-                "Emergency brake engaged to prevent email quota exhaustion"
-            )
-    else:
-        pipe = r.pipeline()
-        pipe.expire("email:delivery_attempts", 60 * 60 * 24)  # 24 hours period
-        pipe.execute()
+    current_email_count = get_email_count(r)
+    if current_email_count >= settings.EMAIL_EMERGENCY_THRESHOLD:
+        raise ValueError(
+            "Emergency brake engaged to prevent email quota exhaustion"
+        )
 
 
 class EmailBackend(BaseEmailBackend):
@@ -71,7 +134,8 @@ class EmailBackend(BaseEmailBackend):
         connection = get_connection(base_backend)
         connection.open()
         r = make_redis_interface("CACHE")
-        inc_email_emergency_brake_or_raise(r)
+        # check the emergency brake before entering the loop
+        check_emergency_brake(r)
         msg_count = 0
         for email_message in email_messages:
             message = email_message.message()
@@ -123,10 +187,13 @@ class EmailBackend(BaseEmailBackend):
             if final_recipient_list:
                 # Update message with the final recipient list
                 email.to = final_recipient_list
+                # check the emergency brake before sending an email
+                check_emergency_brake(r)
                 email.send()
+                # update the counters
+                incr_email_temp_counter(r)
                 msg_count += 1
 
         # Close base backend connection
         connection.close()
-        r.incrby("email:delivery_attempts", msg_count)
         return msg_count
