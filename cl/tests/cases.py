@@ -49,7 +49,8 @@ class RestartSentEmailQuotaMixin:
     @classmethod
     def restart_sent_email_quota(self):
         r = make_redis_interface("CACHE")
-        keys = r.keys("email:delivery_attempts")
+        keys = r.keys("email:*")
+
         if keys:
             r.delete(*keys)
 
