@@ -29,7 +29,7 @@ DATABASES = {
             # See: https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-PROTECTION
             # "prefer" is fine in dev, but poor in prod, where it should be
             # "require" or above.
-            "sslmode": env("DB_SSL_MODE", default="prefer"),
+            "sslmode": env("DB_SSL_MODE", default="require"),
         },
     },
 }
