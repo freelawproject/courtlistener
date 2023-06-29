@@ -29,6 +29,11 @@ header {
   border-left: none;
 }
 
+.navbar-brand > img {
+  display: block;
+  margin: 0 0 0 -1px; /* visually compensate for leading edge 'C' */
+}
+
 .navbar-toggle {
   margin-bottom: 0;
 }
