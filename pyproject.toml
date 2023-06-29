@@ -106,8 +106,8 @@ dateparser = "1.1.8"
 types-dateparser = "^1.1.4.6"
 uvicorn = {extras = ["standard"], version = "^0.22.0"}
 daphne = "^4.0.0"
-juriscraper = "^2.5.50"
 psycopg2 = "^2.9.6"
+juriscraper = "^2.5.51"
 
 
 [tool.poetry.group.dev.dependencies]

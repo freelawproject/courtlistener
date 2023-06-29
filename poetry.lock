@@ -2022,13 +2022,13 @@ requests = ">=2.0,<3.0"
 
 [[package]]
 name = "juriscraper"
-version = "2.5.50"
+version = "2.5.51"
 description = "An API to scrape American court websites for metadata."
 optional = false
 python-versions = "*"
 files = [
-    {file = "juriscraper-2.5.50-py27-none-any.whl", hash = "sha256:f669e8266ccd65fa82caa5741f35119844a2b7ff16e4271efb3c29c42a63f0e2"},
-    {file = "juriscraper-2.5.50.tar.gz", hash = "sha256:99af8f0cd9da7eed9f543df0f4500f5d53dbf2c4df0bc0e16296f1d779b9f212"},
+    {file = "juriscraper-2.5.51-py27-none-any.whl", hash = "sha256:43b3d44c4e24fa11da681ea9e66beb26b1ebeb05b6b2fb5330c4a11d461acae0"},
+    {file = "juriscraper-2.5.51.tar.gz", hash = "sha256:5a1e995cb41c498f7b436e51d73219ffa925c81c7c19f8e97cce3dc03de7c5eb"},
 ]
 
 [package.dependencies]
@@ -4576,4 +4576,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11, <3.12"
-content-hash = "98440546f9d23c9fdef06c9b34b227b0820eb28f4d6e88ffb68e48ba9f26c7a7"
+content-hash = "9880d998d33bf5950635ac9a2884e7b14e516a7dee056e7f82de2eb31e298dc4"
