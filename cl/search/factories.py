@@ -306,7 +306,7 @@ class OpinionClusterFactoryMultipleOpinions(
 
 
 class OpinionsCitedWithParentsFactory(DjangoModelFactory):
-    """Make a DocketEntry with Docket parents"""
+    """Make a OpinionCited with Opinion parents"""
 
     class Meta:
         model = OpinionsCited
