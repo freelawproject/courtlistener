@@ -68,7 +68,7 @@ def get_attempts_in_window(r: Redis) -> int:
     pipe.zremrangebyscore("email:delivery_attempts", 0, trim_time)
     # Get number of elements in the set
     pipe.zcard("email:delivery_attempts")
-    _, size = pipe.execute()
+    _removed, size = pipe.execute()
     return int(size)
 
 
