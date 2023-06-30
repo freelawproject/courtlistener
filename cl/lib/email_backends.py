@@ -85,8 +85,8 @@ def get_email_count(r: Redis) -> int:
     previous_attempts = get_attempts_in_window(r)
     if not temp_counter:
         return previous_attempts * settings.EMAIL_MAX_TEMP_COUNTER
-    return (
-        previous_attempts * settings.EMAIL_MAX_TEMP_COUNTER + int(temp_counter)
+    return previous_attempts * settings.EMAIL_MAX_TEMP_COUNTER + int(
+        temp_counter
     )
 
 
