@@ -136,8 +136,6 @@ class EmailBackend(BaseEmailBackend):
         connection = get_connection(base_backend)
         connection.open()
         r = make_redis_interface("CACHE")
-        # check the emergency brake before entering the loop
-        check_emergency_brake(r)
         msg_count = 0
         for email_message in email_messages:
             message = email_message.message()
@@ -170,6 +168,7 @@ class EmailBackend(BaseEmailBackend):
 
             # Store message in DB and obtain the unique
             # message_id to add in headers to identify the message
+            check_emergency_brake(r)
             stored_id = store_message(email_message)
 
             if backoff_recipient_list:
@@ -190,7 +189,6 @@ class EmailBackend(BaseEmailBackend):
                 # Update message with the final recipient list
                 email.to = final_recipient_list
                 # check the emergency brake before sending an email
-                check_emergency_brake(r)
                 email.send()
                 # update the counters
                 incr_email_temp_counter(r)
