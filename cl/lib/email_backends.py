@@ -67,6 +67,11 @@ def get_attempts_in_window(r: Redis) -> int:
 def get_email_count(r: Redis) -> int:
     """Returns the number of email sent in the last 24 hours.
 
+    This method multiplies the number of previous attempts by the
+    MAX_TEMP_COUNTER setting because our approach only adds one entry
+    to the email:delivery_attempts key after MAX_TEMP_COUNTER emails
+    are sent.
+
     Args:
         r (Redis): The Redis DB connection interface.
 
@@ -84,8 +89,34 @@ def get_email_count(r: Redis) -> int:
 
 def check_emergency_brake(r: Redis) -> None:
     """
-    Checks the number of emails sent in the last 24 hours, raises an
-    exception if we've reached the threshold.
+    Checks the emails sent in the last 24 hours. Raises ValueError
+    if our threshold is exceeded.
+
+    AWS SES uses a sliding window to calculate our email sending quota.
+    When it runs out, we cannot recover without waiting ~24 hours, so
+    this ensures that we always stay below a configured quota.
+
+    Details: https://docs.aws.amazon.com/ses/latest/dg/manage-sending-quotas.html
+
+    To do this, we implement the "sliding logs" algorithm, roughly as
+    described here, but with one modification to minimize memory usage:
+
+    https://medium.com/@SaiRahulAkarapu/rate-limiting-algorithms-using-redis-eb4427b47e33
+
+    Sliding logs is a simple algorithm that logs a timestamp for every
+    event that happens. Then, when an event request comes in, it checks
+    how many events are in the log during the last period (in our case,
+    24 hours), and either rejects or allows the event.
+
+    Our tweak to this algorithm is to lose a small amount of accuracy
+    (precisely EMAIL_MAX_TEMP_COUNTER - 1) in exchange for reducing
+    the memory by EMAIL_MAX_TEMP_COUNTER×.
+
+    For example, if EMAIL_MAX_TEMP_COUNTER is set to 10, then we log
+    one entry to redis for every 10 events (great memory savings). but
+    we may reject events at EMAIL_EMERGENCY_THRESHOLD - EMAIL_MAX_TEMP_COUNTER + 1
+    instead of precisely when the threshold is exceeded. (E.g., if the
+    threshold is 1_000 and temp counter is 10, we might trigger at 991).
 
     Args:
         r (Redis): The Redis DB to connect to as a connection interface
