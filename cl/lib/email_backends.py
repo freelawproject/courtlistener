@@ -21,7 +21,7 @@ from cl.users.email_handlers import (
 )
 
 
-def incr_email_temp_counter(r: Redis) -> None:
+def incr_email_counters(r: Redis) -> None:
     """increments the temporary counter and adds a new
     element to the sorted set once it reaches the value of
     the EMAILS_TEMP_COUNTER setting.
@@ -189,7 +189,7 @@ class EmailBackend(BaseEmailBackend):
                 # check the emergency brake before sending an email
                 email.send()
                 # update the counters
-                incr_email_temp_counter(r)
+                incr_email_counters(r)
                 msg_count += 1
 
         # Close base backend connection
