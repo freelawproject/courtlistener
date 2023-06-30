@@ -189,9 +189,10 @@ class EmailBackend(BaseEmailBackend):
                     # add to the final recipients list
                     final_recipient_list.append(email_address)
 
+            # check the emergency brake before sending an email
+            check_emergency_brake(r)
             # Store message in DB and obtain the unique
             # message_id to add in headers to identify the message
-            check_emergency_brake(r)
             stored_id = store_message(email_message)
 
             if backoff_recipient_list:
@@ -211,7 +212,6 @@ class EmailBackend(BaseEmailBackend):
             if final_recipient_list:
                 # Update message with the final recipient list
                 email.to = final_recipient_list
-                # check the emergency brake before sending an email
                 email.send()
                 # update the counters
                 r.transaction(incr_email_counters, "email:temp_counter")
