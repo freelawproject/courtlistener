@@ -42,9 +42,7 @@ def incr_email_temp_counter(r: Redis) -> None:
             pipe.execute()
             return
 
-    pipe = r.pipeline()
-    pipe.incr("email:temp_counter")
-    pipe.execute()
+    r.incr("email:temp_counter")
     return
 
 
