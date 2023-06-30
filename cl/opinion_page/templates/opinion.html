@@ -188,12 +188,11 @@
                 {% url 'show_results' as show_results_url %}
 
                 {% with sub_opinion_ids_list=sub_opinion_ids|join:',' pk_str=cluster.pk|stringformat:"s" %}
-                {% with event_category='clickRelated' event_action='clickRelated_'|add:related_algorithm|add:'_seed'|add:pk_str %}
                 {% with opinions=related_clusters full_list_url=show_results_url|add:"?q=related:"|add:sub_opinion_ids_list|add:related_search_params %}
 
                   {% include 'includes/opinions_sidebar.html' %}
 
-                {% endwith %}{% endwith %}{% endwith %}
+                {% endwith %}{% endwith %}
             </div>
         {% endif %}
 

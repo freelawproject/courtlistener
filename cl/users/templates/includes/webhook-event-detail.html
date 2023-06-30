@@ -23,7 +23,7 @@
       <div class="col-xs-12">
         <label for="content">Content:</label>
         <div class="dummy-area">
-          <div class="copy-text-icon" onclick="copy_text('content')"><i class="fa fa-copy"></i></div>
+          <div class="copy-text-icon" data-clipboard-copy-target="content"><i class="fa fa-copy"></i></div>
           <textarea readonly class="form-control" id="content" rows="8">{{ json_content }}</textarea>
         </div>
       </div>
@@ -32,7 +32,7 @@
       <div class="col-xs-12">
         <label for="response">Response:</label>
         <div class="dummy-area">
-          <div class="copy-text-icon" onclick="copy_text('response')"><i class="fa fa-copy"></i></div>
+          <div class="copy-text-icon" data-clipboard-copy-target="response"><i class="fa fa-copy"></i></div>
           <textarea readonly class="form-control" id="response" rows="8">{{ webhook_event.response }}</textarea>
         </div>
       </div>
@@ -41,7 +41,7 @@
         <div class="col-xs-12">
           <label for="error_message">Error message:</label>
           <div class="dummy-area">
-            <div class="copy-text-icon" onclick="copy_text('error_message')"><i class="fa fa-copy"></i></div>
+            <div class="copy-text-icon" data-clipboard-copy-target="error_message"><i class="fa fa-copy"></i></div>
             <textarea readonly class="form-control" id="error_message" rows="4">{{ webhook_event.error_message }}</textarea>
           </div>
         </div>
