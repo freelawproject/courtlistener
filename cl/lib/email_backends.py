@@ -9,6 +9,7 @@ from django.core.mail import (
 )
 from django.core.mail.backends.base import BaseEmailBackend
 from redis import Redis
+from redis.client import Pipeline
 
 from cl.lib.redis_utils import make_redis_interface
 from cl.users.email_handlers import (
@@ -21,29 +22,22 @@ from cl.users.email_handlers import (
 )
 
 
-def incr_email_counters(r: Redis) -> None:
+def incr_email_counters(pipe: Pipeline) -> None:
     """increments the temporary counter and adds a new
     element to the sorted set once it reaches the value of
     the EMAILS_TEMP_COUNTER setting.
 
     Args:
-        r (Redis): The Redis DB connection interface.
+        pipe (Pipeline): A pipeline object.
     """
-    temp_counter = r.get("email:temp_counter")
-
-    if temp_counter:
-        if int(temp_counter) + 1 >= settings.EMAIL_MAX_TEMP_COUNTER:
-            current_time = time.time_ns()
-            pipe = r.pipeline()
-            pipe.zadd(
-                "email:delivery_attempts", {str(current_time): current_time}
-            )
-            pipe.set("email:temp_counter", 0)
-            pipe.execute()
-            return
-
-    r.incr("email:temp_counter")
-    return
+    temp_counter = int(pipe.get("email:temp_counter") or 0)  # type: ignore
+    pipe.multi()
+    if int(temp_counter) + 1 >= settings.EMAIL_MAX_TEMP_COUNTER:
+        current_time = time.time_ns()
+        pipe.zadd("email:delivery_attempts", {str(current_time): current_time})
+        pipe.set("email:temp_counter", 0)
+    else:
+        pipe.incr("email:temp_counter")
 
 
 def get_attempts_in_window(r: Redis) -> int:
@@ -189,7 +183,7 @@ class EmailBackend(BaseEmailBackend):
                 # check the emergency brake before sending an email
                 email.send()
                 # update the counters
-                incr_email_counters(r)
+                r.transaction(incr_email_counters, "email:temp_counter")
                 msg_count += 1
 
         # Close base backend connection
