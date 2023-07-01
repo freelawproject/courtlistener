@@ -49,19 +49,29 @@ from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
     AudioESTestCase,
     AudioTestCase,
+    CourtTestCase,
     EmptySolrTestCase,
     ESTestCaseMixin,
     IndexedSolrTestCase,
     SolrTestCase,
+)
+from cl.people_db.factories import (
+    EducationFactory,
+    PersonFactory,
+    PoliticalAffiliationFactory,
+    PositionFactory,
+    SchoolFactory,
 )
 from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.factories import DocketEntriesDataFactory, DocketEntryDataFactory
 from cl.recap.mergers import add_docket_entries
 from cl.scrapers.factories import PACERFreeDocumentLogFactory
 from cl.search.documents import (
+    PEOPLE_DOCS_TYPE_ID,
     AudioDocument,
     AudioPercolator,
     ParentheticalGroupDocument,
+    PersonBaseDocument,
 )
 from cl.search.factories import (
     CitationWithParentsFactory,
@@ -4803,3 +4813,99 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         )
         for query_id in created_queries_ids:
             es.delete(index="oral_arguments_percolator", id=query_id)
+
+
+class PeopleSearchTestElasticSearch(CourtTestCase, ESTestCaseMixin, TestCase):
+    """People search tests for Elasticsearch"""
+
+    @classmethod
+    def rebuild_index(self):
+        """
+        Create and populate the Elasticsearch index and mapping
+        """
+        # -f rebuilds index without prompt for confirmation
+        call_command(
+            "search_index", "--rebuild", "-f", "--models", "audio.Audio"
+        )
+
+    @classmethod
+    def create_index(self):
+        """
+        Create and populate the Elasticsearch index and mapping
+        """
+        # -f rebuilds index without prompt for confirmation
+        call_command(
+            "search_index", "--create", "-f", "--models", "people_db.Person"
+        )
+
+    @classmethod
+    def delete_index(self):
+        """
+        Create and populate the Elasticsearch index and mapping
+        """
+        # -f rebuilds index without prompt for confirmation
+        call_command(
+            "search_index", "--delete", "-f", "--models", "people_db.Person"
+        )
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.rebuild_index()
+        cls.delete_index()
+        cls.create_index()
+        cls.person = PersonFactory.create(name_first="John Deer")
+        cls.pos_1 = PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            date_start=datetime.date(2015, 12, 14),
+            organization_name="Pants, Inc.",
+            job_title="Corporate Lawyer",
+            position_type=None,
+            person=cls.person,
+        )
+        cls.pos_2 = PositionFactory.create(
+            court=cls.court_1,
+            person=cls.person,
+            date_granularity_start="%Y-%m-%d",
+            date_start=datetime.date(1993, 1, 20),
+            date_retirement=datetime.date(2001, 1, 20),
+            termination_reason="retire_mand",
+            position_type="c-jud",
+            how_selected="e_part",
+            nomination_process="fed_senate",
+        )
+        PoliticalAffiliationFactory.create(person=cls.person)
+        school = SchoolFactory.create(name="Harvard University")
+        cls.education = EducationFactory.create(
+            person=cls.person,
+            school=school,
+            degree_level="ma",
+            degree_year="1990",
+        )
+
+    def test_index_parent_and_child_objects(self) -> None:
+        """Confirm Parent object and child objects are properly indexed."""
+
+        # Judge is indexed.
+        self.assertTrue(PersonBaseDocument.exists(id=self.person.pk))
+
+        # Position 1 is indexed.
+        self.assertTrue(
+            PersonBaseDocument.exists(
+                id=PEOPLE_DOCS_TYPE_ID(self.pos_1.pk).POSITION
+            )
+        )
+
+        # Position 2 is indexed.
+        self.assertTrue(
+            PersonBaseDocument.exists(
+                id=PEOPLE_DOCS_TYPE_ID(self.pos_2.pk).POSITION
+            )
+        )
+
+        # Education is indexed.
+        self.assertTrue(
+            PersonBaseDocument.exists(
+                id=PEOPLE_DOCS_TYPE_ID(self.education.pk).EDUCATION
+            )
+        )

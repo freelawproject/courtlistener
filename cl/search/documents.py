@@ -3,12 +3,13 @@ from datetime import datetime
 from django.conf import settings
 from django.template import loader
 from django_elasticsearch_dsl import Document, Index, fields
-from elasticsearch_dsl import Percolator
+from elasticsearch_dsl import Join, Percolator
 
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
 from cl.lib.search_index_utils import null_map
 from cl.lib.utils import deepgetattr
+from cl.people_db.models import Education, Person, Position
 from cl.search.models import Citation, ParentheticalGroup
 
 # Define parenthetical elasticsearch index
@@ -135,7 +136,9 @@ class AudioDocumentBase(Document):
         attr="docket.court.full_name",
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(attr="judges", analyzer="english_exact"),
+            "exact": fields.TextField(
+                attr="docket.court.full_name", analyzer="english_exact"
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -243,3 +246,254 @@ class AudioPercolator(AudioDocumentBase):
     class Django:
         model = Alert
         ignore_signals = True
+
+
+# Define people elasticsearch index
+people_db_index = Index("people_db_index")
+people_db_index.settings(
+    number_of_shards=settings.ELASTICSEARCH_NUMBER_OF_SHARDS,
+    number_of_replicas=settings.ELASTICSEARCH_NUMBER_OF_REPLICAS,
+    analysis=settings.ELASTICSEARCH_DSL["analysis"],
+)
+
+
+class PEOPLE_DOCS_TYPE_ID:
+    """Returns an ID for its use in people_db_index child documents"""
+
+    def __init__(self, instance_id: int):
+        self.instance_id = instance_id
+
+    @property
+    def POSITION(self) -> str:
+        return f"po_{self.instance_id}"
+
+    @property
+    def EDUCATION(self) -> str:
+        return f"ed_{self.instance_id}"
+
+
+@people_db_index.document
+class PersonBaseDocument(Document):
+    person_child = Join(relations={"person": ["position", "education"]})
+    timestamp = fields.DateField()
+
+    class Django:
+        model = Person
+        ignore_signals = True
+
+    def prepare_timestamp(self, instance):
+        return datetime.utcnow()
+
+
+class EducationDocument(PersonBaseDocument):
+    school = fields.TextField(
+        attr="school.name",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="school.name", analyzer="english_exact"
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    degree_level = fields.KeywordField(attr="degree_level")
+    degree_detail = fields.TextField(
+        attr="degree_detail",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="degree_detail", analyzer="english_exact"
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    degree_year = fields.IntegerField(attr="degree_year")
+
+    class Django:
+        model = Education
+        ignore_signals = True
+
+
+class PositionDocument(PersonBaseDocument):
+    court = fields.TextField(
+        attr="court.short_name",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="court.short_name", analyzer="english_exact"
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    court_exact = fields.KeywordField(attr="court.pk")
+    position_type = fields.KeywordField()
+    appointer = fields.TextField(
+        attr="appointer.person.name_full_reverse",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="appointer.person.name_full_reverse",
+                analyzer="english_exact",
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    supervisor = fields.TextField(
+        attr="supervisor.name_full_reverse",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="supervisor.name_full_reverse", analyzer="english_exact"
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    predecessor = fields.TextField(
+        attr="predecessor.name_full_reverse",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="predecessor.name_full_reverse", analyzer="english_exact"
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    date_nominated = fields.DateField(attr="date_nominated")
+    date_elected = fields.DateField(attr="date_elected")
+    date_recess_appointment = fields.DateField(attr="date_recess_appointment")
+    date_referred_to_judicial_committee = fields.DateField(
+        attr="date_referred_to_judicial_committee"
+    )
+    date_judicial_committee_action = fields.DateField(
+        attr="date_judicial_committee_action"
+    )
+    date_hearing = fields.DateField(attr="date_hearing")
+    date_confirmation = fields.DateField(attr="date_confirmation")
+    date_start = fields.DateField(attr="date_start")
+    date_granularity_start = fields.KeywordField(attr="date_granularity_start")
+    date_retirement = fields.DateField(attr="date_retirement")
+    date_termination = fields.DateField(attr="date_termination")
+    date_granularity_termination = fields.KeywordField(
+        attr="date_granularity_termination"
+    )
+    judicial_committee_action = fields.KeywordField()
+    nomination_process = fields.KeywordField()
+    selection_method = fields.KeywordField()
+    selection_method_id = fields.KeywordField(attr="how_selected")
+    termination_reason = fields.KeywordField()
+    text = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+
+    class Django:
+        model = Position
+        ignore_signals = True
+
+    def prepare_position_type(self, instance):
+        return instance.get_position_type_display()
+
+    def prepare_judicial_committee_action(self, instance):
+        return instance.get_judicial_committee_action_display()
+
+    def prepare_nomination_process(self, instance):
+        return instance.get_nomination_process_display()
+
+    def prepare_selection_method(self, instance):
+        return instance.get_how_selected_display()
+
+    def prepare_termination_reason(self, instance):
+        return instance.get_termination_reason_display()
+
+    def prepare_text(self, instance):
+        text_template = loader.get_template("indexes/person_text.txt")
+        return text_template.render({"item": instance}).translate(null_map)
+
+
+class PersonDocument(PersonBaseDocument):
+    id = fields.IntegerField(attr="pk")
+    fjc_id = fields.IntegerField(attr="fjc_id")
+    alias_ids = fields.ListField(
+        fields.KeywordField(),
+    )
+    races = fields.ListField(
+        fields.KeywordField(),
+    )
+    gender = fields.KeywordField()
+    religion = fields.KeywordField(attr="religion")
+    name = fields.TextField(
+        attr="name_full",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="name_full", analyzer="english_exact"
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    name_reverse = fields.TextField(
+        attr="name_reverse",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="name_reverse", analyzer="english_exact"
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+
+    date_granularity_dob = fields.KeywordField(attr="date_granularity_dob")
+    date_granularity_dod = fields.KeywordField(attr="date_granularity_dod")
+    dob_city = fields.KeywordField(attr="dob_city")
+    dob_state = fields.KeywordField()
+    dob_state_id = fields.KeywordField(attr="dob_state")
+    absolute_url = fields.KeywordField(attr="get_absolute_url")
+    dob = fields.DateField(attr="date_dob")
+    dod = fields.DateField(attr="date_dod")
+    political_affiliation = fields.ListField(
+        fields.KeywordField(),
+    )
+    political_affiliation_id = fields.ListField(
+        fields.KeywordField(),
+    )
+    aba_rating = fields.ListField(
+        fields.KeywordField(),
+    )
+
+    def save(self, **kwargs):
+        self.person_child = "person"
+        return super().save(**kwargs)
+
+    def prepare_races(self, instance):
+        return [r.get_race_display() for r in instance.race.all()]
+
+    def prepare_alias_ids(self, instance):
+        return [alias.pk for alias in instance.aliases.all()]
+
+    def prepare_gender(self, instance):
+        return instance.get_gender_display()
+
+    def prepare_dob_state(self, instance):
+        return instance.get_dob_state_display()
+
+    def prepare_political_affiliation(self, instance):
+        return [
+            pa.get_political_party_display()
+            for pa in instance.political_affiliations.all()
+            if pa
+        ]
+
+    def prepare_political_affiliation_id(self, instance):
+        return [
+            pa.political_party
+            for pa in instance.political_affiliations.all()
+            if pa
+        ]
+
+    def prepare_aba_rating(self, instance):
+        return [
+            r.get_rating_display() for r in instance.aba_ratings.all() if r
+        ]

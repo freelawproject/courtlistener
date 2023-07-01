@@ -4,7 +4,14 @@ from django.dispatch import receiver
 from cl.alerts.send_alerts import send_or_schedule_alerts
 from cl.audio.models import Audio
 from cl.lib.command_utils import logger
-from cl.search.documents import AudioDocument
+from cl.people_db.models import Education, Person, Position
+from cl.search.documents import (
+    PEOPLE_DOCS_TYPE_ID,
+    AudioDocument,
+    EducationDocument,
+    PersonDocument,
+    PositionDocument,
+)
 from cl.search.models import Docket
 
 
@@ -86,3 +93,65 @@ def remove_audio_from_es_index(sender, instance=None, **kwargs):
             f"The Audio with ID:{instance.pk} can't be deleted from "
             f"the ES index, it doesn't exists."
         )
+
+
+@receiver(
+    post_save,
+    sender=Person,
+    dispatch_uid=" create_or_update_person_in_es_index",
+)
+def create_or_update_person_in_es_index(sender, instance=None, **kwargs):
+    """Receiver function that gets called after a Person instance is saved.
+    This method creates or updates a Person object in the PersonDocument index.
+    """
+    person_doc = PersonDocument()
+    doc = person_doc.prepare(instance)
+    PersonDocument(meta={"id": instance.pk}, **doc).save(
+        skip_empty=False, return_doc_meta=True
+    )
+
+
+@receiver(
+    post_save,
+    sender=Position,
+    dispatch_uid="create_or_update_position_in_es_index",
+)
+def create_or_update_position_in_es_index(sender, instance=None, **kwargs):
+    """Receiver function that gets called after a Position instance is saved.
+    This method creates or updates a Position object in the PositionDocument index.
+    """
+    parent_id = getattr(instance.person, "pk", None)
+    if parent_id and PersonDocument.exists(id=parent_id):
+        position_doc = PositionDocument()
+        doc = position_doc.prepare(instance)
+        doc_id = PEOPLE_DOCS_TYPE_ID(instance.pk).POSITION
+        PositionDocument(
+            meta={"id": doc_id},
+            _routing=parent_id,
+            person_child={"name": "position", "parent": parent_id},
+            **doc,
+        ).save(skip_empty=False)
+
+
+@receiver(
+    post_save,
+    sender=Education,
+    dispatch_uid=" create_or_update_education_in_es_index",
+)
+def create_or_update_education_in_es_index(sender, instance=None, **kwargs):
+    """Receiver function that gets called after an Education instance is saved.
+    This method creates or updates an Education object in the EducationDocument
+    index.
+    """
+
+    parent_id = getattr(instance.person, "pk", None)
+    if parent_id and PersonDocument.exists(id=parent_id):
+        education_doc = EducationDocument()
+        doc = education_doc.prepare(instance)
+        doc_id = PEOPLE_DOCS_TYPE_ID(instance.pk).EDUCATION
+        EducationDocument(
+            meta={"id": doc_id},
+            _routing=parent_id,
+            person_child={"name": "education", "parent": parent_id},
+            **doc,
+        ).save(skip_empty=False)
