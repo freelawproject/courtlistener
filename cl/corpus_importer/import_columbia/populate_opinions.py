@@ -5,13 +5,21 @@ from datetime import date
 from typing import Optional
 
 from bs4 import BeautifulSoup
+from courts_db import find_court_by_id
 from django.conf import settings
 from django.db import transaction
 from eyecite import clean_text
 from eyecite.find import get_citations
 from juriscraper.lib.string_utils import titlecase
 
-from cl.search.models import SOURCES, Citation, Docket, Opinion, OpinionCluster
+from cl.search.models import (
+    SOURCES,
+    Citation,
+    Court,
+    Docket,
+    Opinion,
+    OpinionCluster,
+)
 
 from ...citations.utils import map_reporter_db_cite_type
 from ...lib.command_utils import logger
@@ -376,6 +384,11 @@ def add_new_case(
 
     if main_date is None:
         raise Exception(f"Failed to get a date for {item['file']}")
+
+    if not Court.objects.filter(id=item["court_id"]).exists():
+        raise Exception(
+            f"Court doesn't exist in CourtListener with id: {item['court_id']}"
+        )
 
     # special rule for Kentucky
     if item["court_id"] == "kycourtapp" and main_date <= date(1975, 12, 31):

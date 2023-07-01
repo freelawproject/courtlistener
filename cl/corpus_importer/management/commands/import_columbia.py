@@ -97,24 +97,30 @@ def parse_dates(
     return dates
 
 
-def get_court_id(raw_court: str) -> Optional[str]:
+def get_court_id(raw_court: str) -> list[str]:
     """Get court id using courts-db
     :param raw_court: Court text
     return: court id or None
     """
+
+    # Replace double spaces,
+    court_text = re.sub(" +", " ", raw_court)
+    # Replace \n and remove dot at end
+    court_text = court_text.replace("\n", "").strip(".")
+
     for bankruptcy in [False, True]:
         # Remove dot at end, try to get a partial string match, try with and
         # without bankruptcy flag
         found_court = find_court(
-            raw_court.strip("."),
+            court_text,
             bankruptcy=bankruptcy,
             location=None,
             allow_partial_matches=True,
         )
         if found_court:
-            return found_court[0]
+            return found_court
 
-    return None
+    return []
 
 
 def get_text(xml_filepath: str) -> dict:
@@ -228,12 +234,21 @@ def parse_file(file_path: str) -> dict:
         "citations": raw_info.get("citation", []),
         "attorneys": "".join(raw_info.get("attorneys", [])) or None,
         "posture": "".join(raw_info.get("posture", [])) or None,
-        "court_id": get_court_id(" ".join(raw_info.get("court", []))),
+        "courts": get_court_id(" ".join(raw_info.get("court", []))),
+        "court_id": "",
     }
+
     # get basic info
-    if not info["court_id"]:
+    if not info["courts"]:
         raise Exception(
             f"Failed to find a court ID for \"{''.join(raw_info.get('court', []))}\"."
+        )
+
+    if len(info["courts"]) == 1:
+        info["court_id"] = info["courts"][0]
+    else:
+        raise Exception(
+            f"Multiple matches found for court: \"{', '.join(info['courts'])}\""
         )
 
     # get the full panel text and extract judges from it
@@ -253,8 +268,9 @@ def parse_file(file_path: str) -> dict:
         info["case_name"] = case_name
     else:
         if info["case_name_full"]:
-            # Sometimes the <caption> node has values and the <reporter_caption>
-            # node does not. Fall back to <caption> in this case.
+            # Sometimes the <caption> node has values and the
+            # <reporter_caption> node does not. Fall back to <caption> in
+            # this case.
             info["case_name"] = info["case_name_full"]
     if not info["case_name"]:
         raise Exception(
@@ -425,7 +441,9 @@ def parse_opinions(options):
                     "Failed to get a citation",
                     "Failed to find a court ID",
                     'null value in column "date_filed"',
-                    "duplicate(s)",
+                    "Multiple matches found for court",
+                    "Found duplicate(s)",
+                    "Court doesn't exist in CourtListener",
                 ]
                 if any(k in str(e) for k in known):
                     logger.info(f"Known exception in file '{path}': {str(e)}")
