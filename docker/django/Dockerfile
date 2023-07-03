@@ -22,7 +22,7 @@ ENV PGSSLCERT=/tmp/postgresql.crt
 
 # poetry
 # https://python-poetry.org/docs/configuration/#using-environment-variables
-ENV POETRY_VERSION=1.5.0 \
+ENV POETRY_VERSION=1.5.1 \
     # make poetry install to this location
     POETRY_HOME="/opt/poetry" \
     # Don't build a virtualenv to save space
