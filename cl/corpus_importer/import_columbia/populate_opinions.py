@@ -28,6 +28,7 @@ from ...people_db.lookup_utils import (
 )
 from ..management.commands.harvard_opinions import (
     clean_body_content,
+    clean_docket_number,
     match_based_text,
 )
 
@@ -417,7 +418,7 @@ def add_new_case(
         case_name_short=item["case_name_short"] or "",
         case_name=item["case_name"] or "",
         case_name_full=item["case_name_full"] or "",
-        docket_number=item["docket"] or "",
+        docket_number=clean_docket_number(item["docket"]) or "",
     )
 
     # get citation objects in a list for addition to the cluster
