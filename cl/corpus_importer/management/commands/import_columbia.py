@@ -155,7 +155,8 @@ def get_text(xml_filepath: str) -> dict:
         # Find author before opinion text tag
         opinion_author = ""
         byline = op.find_previous_sibling()
-        if byline:
+        # Check that tag name contains _byline
+        if byline and "_byline" in byline.name:
             opinion_author = byline.get_text()
 
         # Find all footnotes after opinion text tag until the end of xml or
@@ -353,7 +354,6 @@ def parse_opinions(options):
     random_order = options["random"]
     status_interval = options["status"]
     new_cases = options["new_cases"]
-    skip_dupes = options["skip_dupes"]
     skip_new_cases = options["skip_new_cases"]
     avoid_no_cites = options["avoid_no_cites"]
     court_dates = options["court_dates"]
@@ -443,7 +443,7 @@ def parse_opinions(options):
             try:
                 logger.info(f"Processing opinion at {path}")
                 parsed = parse_file(path)
-                add_new_case(parsed, skip_dupes, min_dates, start_dates, debug)
+                add_new_case(parsed, min_dates, start_dates, debug)
             except Exception as e:
                 # show simple exception summaries for known problems
                 known = [
@@ -540,12 +540,6 @@ class Command(VerboseCommand):
             action="store_true",
             default=False,
             help="If set, will skip court-years that already have data.",
-        )
-        parser.add_argument(
-            "--skip_dupes",
-            action="store_true",
-            default=False,
-            help="If set, will skip duplicates.",
         )
         parser.add_argument(
             "--skip_new_cases",

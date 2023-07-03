@@ -5,7 +5,6 @@ from datetime import date
 from typing import Optional
 
 from bs4 import BeautifulSoup
-from courts_db import find_court_by_id
 from django.conf import settings
 from django.db import transaction
 from eyecite import clean_text
@@ -311,7 +310,6 @@ def convert_columbia_html(text: str) -> str:
 
 def add_new_case(
     item: dict,
-    skip_dupes: bool = False,
     min_dates: bool = None,
     start_dates: Optional[dict] = None,
     testing: bool = True,
@@ -319,7 +317,6 @@ def add_new_case(
     """Associates case data from `parse_opinions` with objects. Saves these
     objects.
     item: dict containing case data
-    skip_dupes: if set, will skip duplicates.
     min_dates: if not none, will skip cases after min_dates
     start_dates: if set, will throw exception for cases before court was
     founded.
@@ -472,10 +469,12 @@ def add_new_case(
                     cite_type_str = found[0].all_editions[0].reporter.cite_type
                     reporter_type = map_reporter_db_cite_type(cite_type_str)
 
+                # Volume defaults to 1 because it can be a single volume
+                # nominative reporter, e.g. Miller's Notebook
                 citation_object = Citation(
-                    volume=found[0].groups["volume"],
+                    volume=found[0].groups.get("volume", 1),
                     reporter=found[0].corrected_reporter(),
-                    page=found[0].groups["page"],
+                    page=found[0].groups.get("page"),
                     type=reporter_type,
                 )
                 found_citations.append(citation_object)
@@ -548,12 +547,7 @@ def add_new_case(
             docket, cluster, opinions, found_citations
         )
         if previously_imported_case:
-            if skip_dupes:
-                logger.info(
-                    f"Duplicate data found for file: {item['file']}. Skipping."
-                )
-            else:
-                raise Exception(f"Found duplicate(s).")
+            raise Exception(f"Found duplicate(s).")
 
     # save all the objects
     if not testing:
@@ -578,6 +572,10 @@ def add_new_case(
             logger.info(
                 f"Created item at: {domain}{cluster.get_absolute_url()}"
             )
+            if not found_citations:
+                logger.info(
+                    f"No citations for: {domain}{cluster.get_absolute_url()}"
+                )
 
 
 def find_duplicates(
