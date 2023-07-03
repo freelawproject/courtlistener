@@ -135,6 +135,11 @@ def get_text(xml_filepath: str) -> dict:
     data = {}
     opinions = []
 
+    # Sometimes opening and ending tag mismatch (e.g. c6b39dcb29c9c.xml)
+    content = content.replace(
+        "</footnote_body></block_quote>", "</block_quote></footnote_body>"
+    )
+
     soup = BeautifulSoup(content, "lxml")
     data["unpublished"] = False
 
@@ -212,6 +217,11 @@ def get_text(xml_filepath: str) -> dict:
             re.sub(" +", " ", found_tag.get_text(separator=" ").strip())
             for found_tag in found_tags
         ]
+
+        if tag == "citation":
+            # Sometimes we have multiple citation tags with same citation,
+            # we need to remove duplicates (e.g. ebbde4042b7a019c.xml)
+            data[tag] = list(set(data[tag]))
 
     # Add opinions to dict
     data["opinions"] = opinions
