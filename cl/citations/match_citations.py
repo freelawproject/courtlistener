@@ -297,7 +297,7 @@ def do_resolve_citations(
             if isinstance(citing_object, Opinion):
                 c.citing_opinion = citing_object
             elif isinstance(citing_object, RECAPDocument):
-                # if the object doing the citing is a RECAPDocument, 
+                # if the object doing the citing is a RECAPDocument,
                 # refer to it as a citing document.
                 c.citing_document = citing_object
             else:
