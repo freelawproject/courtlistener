@@ -352,7 +352,8 @@ class RECAPDocumentObjectTest(IndexedSolrTestCase):
 
     def test_opinionscited_recap_creation(self):
         """
-        Tests that OpinionsCitedByRECAPDocument objects are created in the database, with correct citation counts.
+        Tests that OpinionsCitedByRECAPDocument objects are created in the database, 
+        with correct citation counts.
         """
         test_recap_document = self.recap_doc
 
