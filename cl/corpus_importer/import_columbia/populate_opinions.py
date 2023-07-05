@@ -418,7 +418,9 @@ def add_new_case(
         case_name_short=item["case_name_short"] or "",
         case_name=item["case_name"] or "",
         case_name_full=item["case_name_full"] or "",
-        docket_number=clean_docket_number(item["docket"]) or "",
+        docket_number=clean_docket_number(item["docket"])
+        if item["docket"]
+        else "",
     )
 
     # get citation objects in a list for addition to the cluster
