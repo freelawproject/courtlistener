@@ -26,6 +26,12 @@ BACKOFF_THRESHOLD = 36
 # Hours after a backoff event expired to check if there was a new bounce event.
 DELIVERABILITY_THRESHOLD = 2
 
+# Number of emails that can be sent per 24-hour period
+EMAIL_EMERGENCY_THRESHOLD = env.int(
+    "EMAIL_EMERGENCY_THRESHOLD", default=50_000
+)
+EMAIL_MAX_TEMP_COUNTER = env.int("EMAIL_MAX_TEMP_COUNTER", default=10)
+
 SERVER_EMAIL = "CourtListener <noreply@courtlistener.com>"
 DEFAULT_FROM_EMAIL = "CourtListener <noreply@courtlistener.com>"
 DEFAULT_ALERTS_EMAIL = "CourtListener Alerts <alerts@courtlistener.com>"

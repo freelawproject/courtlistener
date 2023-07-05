@@ -20,13 +20,25 @@ services:
   # use, you will have ot migrate it yourself. See DEVELOPING.md
   cl-postgresql:
     container_name: cl-postgres
+    build:
+      context: ../../../courtlistener/docker/postgresql/
+      dockerfile: ../../../courtlistener/docker/postgresql/Dockerfile
+      args:
+        POSTGRES_VERSION: 15.2-alpine
     ports:
       - "5432:5432"
-    image: postgres:15.2-alpine
     environment:
       POSTGRES_USER: "postgres"
       POSTGRES_PASSWORD: "postgres"
       POSTGRES_DB: "courtlistener"
+    command:
+      - "postgres"
+      - "-c"
+      - "ssl=on"
+      - "-c"
+      - "ssl_cert_file=/etc/ssl/private/cl-postgres.crt"
+      - "-c"
+      - "ssl_key_file=/etc/ssl/private/cl-postgres.key"
     networks:
       - cl_net_overlay
 
@@ -77,6 +89,7 @@ services:
     volumes:
       - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
       - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
+      - ${CL_BASE_DIR:-../../../courtlistener/.postgresql}:/root/.postgresql
     networks:
       - cl_net_overlay
     env_file:
