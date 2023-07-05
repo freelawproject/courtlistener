@@ -1119,7 +1119,6 @@ class RelatedSearchTest(IndexedSolrTestCase):
     def test_more_like_this_opinion_detail_detail(self) -> None:
         """MoreLikeThis query on opinion detail page with status filter"""
         seed_pk = 3  # case name cluster 3
-        expected_first_pk = 2  # Howard v. Honda
 
         # Login as staff user (related items are by default disabled for guests)
         self.assertTrue(
@@ -1129,22 +1128,34 @@ class RelatedSearchTest(IndexedSolrTestCase):
         r = self.client.get("/opinion/%i/asdf/" % seed_pk)
         self.assertEqual(r.status_code, 200)
 
-        # Test if related opinion exist
-        self.assertGreater(
-            r.content.decode().index(
-                "'clickRelated_mlt_seed%i', %i," % (seed_pk, expected_first_pk)
-            ),
-            0,
-            msg="Related opinion not found.",
+        tree = html.fromstring(r.content.decode())
+
+        recomendations_actual = [
+            (a.get("href"), a.text_content().strip())
+            for a in tree.xpath("//*[@id='recommendations']/ul/li/a")
+        ]
+
+        recommendations_expected = [
+            ("/opinion/2/case-name-cluster/?", "Howard v. Honda"),
+            ("/opinion/1/case-name-cluster/?", "Debbas v. Franklin"),
+            ("/opinion/1/case-name-cluster/?", "Debbas v. Franklin"),
+            ("/opinion/1/case-name-cluster/?", "Debbas v. Franklin"),
+            ("/opinion/1/case-name-cluster/?", "Debbas v. Franklin"),
+        ]
+
+        # Test if related opinion exist in expected order
+        self.assertEqual(
+            recommendations_expected,
+            recomendations_actual,
+            msg="Unexpected opinion recommendations.",
         )
+
         self.client.logout()
 
     @override_settings(RELATED_FILTER_BY_STATUS=None)
     def test_more_like_this_opinion_detail_no_filter(self) -> None:
         """MoreLikeThis query on opinion detail page (without filter)"""
         seed_pk = 1  # Paul Debbas v. Franklin
-        expected_first_pk = 2  # Howard v. Honda
-        expected_second_pk = 3  # case name cluster 3
 
         # Login as staff user (related items are by default disabled for guests)
         self.assertTrue(
@@ -1154,17 +1165,28 @@ class RelatedSearchTest(IndexedSolrTestCase):
         r = self.client.get("/opinion/%i/asdf/" % seed_pk)
         self.assertEqual(r.status_code, 200)
 
-        # Test for click tracking order
-        self.assertTrue(
-            r.content.decode().index(
-                "'clickRelated_mlt_seed%i', %i," % (seed_pk, expected_first_pk)
-            )
-            < r.content.decode().index(
-                "'clickRelated_mlt_seed%i', %i,"
-                % (seed_pk, expected_second_pk)
-            ),
-            msg="Related opinions are in wrong order.",
+        tree = html.fromstring(r.content.decode())
+
+        recomendations_actual = [
+            (a.get("href"), a.text_content().strip())
+            for a in tree.xpath("//*[@id='recommendations']/ul/li/a")
+        ]
+
+        recommendations_expected = [
+            ("/opinion/2/case-name-cluster/?", "Howard v. Honda"),
+            ("/opinion/2/case-name-cluster/?", "Howard v. Honda"),
+            ("/opinion/2/case-name-cluster/?", "Howard v. Honda"),
+            ("/opinion/2/case-name-cluster/?", "Howard v. Honda"),
+            ("/opinion/3/case-name-cluster/?", "case name cluster 3"),
+        ]
+
+        # Test if related opinion exist in expected order
+        self.assertEqual(
+            recommendations_expected,
+            recomendations_actual,
+            msg="Unexpected opinion recommendations.",
         )
+
         self.client.logout()
 
 

@@ -10,6 +10,7 @@ from django.contrib import messages
 from django.contrib.auth import logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
+from django.contrib.auth.views import PasswordResetView
 from django.core.mail import send_mail
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Count, F
@@ -23,6 +24,7 @@ from django.shortcuts import get_object_or_404
 from django.template.defaultfilters import urlencode
 from django.template.response import TemplateResponse
 from django.urls import reverse
+from django.utils.decorators import method_decorator
 from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
@@ -38,7 +40,10 @@ from cl.api.models import WEBHOOK_EVENT_STATUS, WebhookEvent, WebhookEventType
 from cl.custom_filters.decorators import check_honeypot
 from cl.favorites.forms import NoteForm
 from cl.lib.crypto import sha1_activation_key
-from cl.lib.ratelimiter import ratelimiter_unsafe_10_per_m
+from cl.lib.ratelimiter import (
+    ratelimiter_unsafe_10_per_m,
+    ratelimiter_unsafe_2000_per_h,
+)
 from cl.lib.types import AuthenticatedHttpRequest, EmailType
 from cl.lib.url_utils import get_redirect_or_login_url
 from cl.search.models import SEARCH_TYPES
@@ -46,6 +51,7 @@ from cl.stats.utils import tally_stat
 from cl.users.forms import (
     AccountDeleteForm,
     CustomPasswordChangeForm,
+    CustomPasswordResetForm,
     EmailConfirmationForm,
     OptInConsentForm,
     ProfileForm,
@@ -381,6 +387,7 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
 @sensitive_post_parameters("password")
 @login_required
 @ratelimiter_unsafe_10_per_m
+@ratelimiter_unsafe_2000_per_h
 def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
     non_deleted_map_count = request.user.scotus_maps.filter(
         deleted=False
@@ -450,6 +457,8 @@ def take_out_done(request: HttpRequest) -> HttpResponse:
     )
 
 
+@ratelimiter_unsafe_10_per_m
+@ratelimiter_unsafe_2000_per_h
 @sensitive_post_parameters("password1", "password2")
 @sensitive_variables(
     # Contains password info
@@ -619,6 +628,8 @@ def confirm_email(request, activation_key):
     )
 
 
+@ratelimiter_unsafe_10_per_m
+@ratelimiter_unsafe_2000_per_h
 @sensitive_variables(
     "activation_key",
     # Contains activation key
@@ -690,6 +701,7 @@ def email_confirm_success(request: HttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 @ratelimiter_unsafe_10_per_m
+@ratelimiter_unsafe_2000_per_h
 def password_change(request: AuthenticatedHttpRequest) -> HttpResponse:
     if request.method == "POST":
         form = CustomPasswordChangeForm(user=request.user, data=request.POST)
@@ -853,3 +865,15 @@ def view_recap_email(request: AuthenticatedHttpRequest) -> HttpResponse:
             "auto_subscribe": auto_subscribe,
         },
     )
+
+
+@method_decorator(ratelimiter_unsafe_10_per_m, name="post")
+@method_decorator(ratelimiter_unsafe_2000_per_h, name="post")
+class RateLimitedPasswordResetView(PasswordResetView):
+    """
+    Custom Password reset view with rate limiting
+    """
+
+    template_name = "register/password_reset_form.html"
+    email_template_name = "register/password_reset_email.html"
+    form_class = CustomPasswordResetForm

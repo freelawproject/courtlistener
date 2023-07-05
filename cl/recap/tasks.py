@@ -1,7 +1,7 @@
+import hashlib
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from io import BytesIO
 from typing import List, Optional, Tuple
 from zipfile import ZipFile
 
@@ -12,7 +12,7 @@ from celery.canvas import chain
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from django.core.files.base import ContentFile
+from django.core.files.base import ContentFile, File
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
 from django.utils.timezone import now
@@ -53,7 +53,6 @@ from cl.corpus_importer.tasks import (
 )
 from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.custom_filters.templatetags.text_filters import oxford_join
-from cl.lib.crypto import sha1
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.microservice_utils import microservice
 from cl.lib.pacer import is_pacer_court_accessible, map_cl_to_pacer_id
@@ -316,7 +315,8 @@ def process_recap_pdf(self, pk):
 
     # Do the file, finally.
     try:
-        file_contents = pq.filepath_local.read()
+        with pq.filepath_local.open("rb") as f:
+            new_sha1 = hashlib.file_digest(f, "sha1").hexdigest()
     except IOError as exc:
         msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         if (self.request.retries == self.max_retries) or pq.debug:
@@ -326,10 +326,6 @@ def process_recap_pdf(self, pk):
             mark_pq_status(pq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
             raise self.retry(exc=exc)
 
-    if not file_contents:
-        return None
-
-    new_sha1 = sha1(file_contents)
     existing_document = all(
         [
             rd.sha1 == new_sha1,
@@ -340,7 +336,6 @@ def process_recap_pdf(self, pk):
     if not existing_document:
         # Different sha1, it wasn't available, or it's missing from disk. Move
         # the new file over from the processing queue storage.
-        cf = ContentFile(file_contents)
         file_name = get_document_filename(
             rd.docket_entry.docket.court_id,
             rd.docket_entry.docket.pacer_case_id,
@@ -348,7 +343,8 @@ def process_recap_pdf(self, pk):
             rd.attachment_number,
         )
         if not pq.debug:
-            rd.filepath_local.save(file_name, cf, save=False)
+            with pq.filepath_local.open("rb") as f:
+                rd.filepath_local.save(file_name, File(f), save=False)
 
             # Do page count and extraction
             response = microservice(
@@ -404,74 +400,74 @@ def process_recap_zip(self, pk: int) -> dict[str, list[int] | list[Task]]:
     mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
 
     logger.info("Processing RECAP zip (debug is: %s): %s", pq.debug, pq)
-    zip_bytes = BytesIO(pq.filepath_local.read())
-    with ZipFile(zip_bytes, "r") as archive:
-        # Security: Check for zip bombs.
-        max_file_size = convert_size_to_bytes("200MB")
-        for zip_info in archive.infolist():
-            if zip_info.file_size < max_file_size:
-                continue
+    with pq.filepath_local.open("rb") as zip_bytes:
+        with ZipFile(zip_bytes, "r") as archive:
+            # Security: Check for zip bombs.
+            max_file_size = convert_size_to_bytes("200MB")
+            for zip_info in archive.infolist():
+                if zip_info.file_size < max_file_size:
+                    continue
+                mark_pq_status(
+                    pq,
+                    "Zip too large; possible zip bomb. File in zip named %s "
+                    "would be %s bytes expanded."
+                    % (zip_info.filename, zip_info.file_size),
+                    PROCESSING_STATUS.INVALID_CONTENT,
+                )
+                return {"new_pqs": [], "tasks": []}
+
+            # For each document in the zip, create a new PQ
+            new_pqs = []
+            tasks = []
+            for file_name in archive.namelist():
+                file_content = archive.read(file_name)
+                f = SimpleUploadedFile(file_name, file_content)
+
+                file_name = file_name.split(".pdf")[0]
+                if "-" in file_name:
+                    doc_num, att_num = file_name.split("-")
+                    if att_num == "main":
+                        att_num = None
+                else:
+                    doc_num = file_name
+                    att_num = None
+
+                if att_num:
+                    # An attachment, ∴ nuke the pacer_doc_id value, since it
+                    # corresponds to the main doc only.
+                    pacer_doc_id = ""
+                else:
+                    pacer_doc_id = pq.pacer_doc_id
+
+                # Create a new PQ and enqueue it for processing
+                new_pq = ProcessingQueue.objects.create(
+                    court=pq.court,
+                    uploader=pq.uploader,
+                    pacer_case_id=pq.pacer_case_id,
+                    pacer_doc_id=pacer_doc_id,
+                    document_number=doc_num,
+                    attachment_number=att_num,
+                    filepath_local=f,
+                    status=PROCESSING_STATUS.ENQUEUED,
+                    upload_type=UPLOAD_TYPE.PDF,
+                    debug=pq.debug,
+                )
+                new_pqs.append(new_pq.pk)
+                tasks.append(process_recap_pdf.delay(new_pq.pk))
+
+            # At the end, mark the pq as successful and return the PQ
             mark_pq_status(
                 pq,
-                "Zip too large; possible zip bomb. File in zip named %s "
-                "would be %s bytes expanded."
-                % (zip_info.filename, zip_info.file_size),
-                PROCESSING_STATUS.INVALID_CONTENT,
+                f"Successfully created ProcessingQueue objects: {oxford_join(new_pqs)}",
+                PROCESSING_STATUS.SUCCESSFUL,
             )
-            return {"new_pqs": [], "tasks": []}
 
-        # For each document in the zip, create a new PQ
-        new_pqs = []
-        tasks = []
-        for file_name in archive.namelist():
-            file_content = archive.read(file_name)
-            f = SimpleUploadedFile(file_name, file_content)
-
-            file_name = file_name.split(".pdf")[0]
-            if "-" in file_name:
-                doc_num, att_num = file_name.split("-")
-                if att_num == "main":
-                    att_num = None
-            else:
-                doc_num = file_name
-                att_num = None
-
-            if att_num:
-                # An attachment, ∴ nuke the pacer_doc_id value, since it
-                # corresponds to the main doc only.
-                pacer_doc_id = ""
-            else:
-                pacer_doc_id = pq.pacer_doc_id
-
-            # Create a new PQ and enqueue it for processing
-            new_pq = ProcessingQueue.objects.create(
-                court=pq.court,
-                uploader=pq.uploader,
-                pacer_case_id=pq.pacer_case_id,
-                pacer_doc_id=pacer_doc_id,
-                document_number=doc_num,
-                attachment_number=att_num,
-                filepath_local=f,
-                status=PROCESSING_STATUS.ENQUEUED,
-                upload_type=UPLOAD_TYPE.PDF,
-                debug=pq.debug,
-            )
-            new_pqs.append(new_pq.pk)
-            tasks.append(process_recap_pdf.delay(new_pq.pk))
-
-        # At the end, mark the pq as successful and return the PQ
-        mark_pq_status(
-            pq,
-            f"Successfully created ProcessingQueue objects: {oxford_join(new_pqs)}",
-            PROCESSING_STATUS.SUCCESSFUL,
-        )
-
-        # Returning the tasks allows tests to wait() for the PDFs to complete
-        # before checking assertions.
-        return {
-            "new_pqs": new_pqs,
-            "tasks": tasks,
-        }
+            # Returning the tasks allows tests to wait() for the PDFs to complete
+            # before checking assertions.
+            return {
+                "new_pqs": new_pqs,
+                "tasks": tasks,
+            }
 
 
 @app.task(
