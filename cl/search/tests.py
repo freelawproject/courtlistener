@@ -2027,13 +2027,19 @@ class ElasticSearchTest(TestCase):
     # fixed by implementing the service in Github actions or using external library to
     # Mock elasticsearch like: ElasticMock
 
+    @classmethod
     def rebuild_index(self):
         """
         Create and populate the Elasticsearch index and mapping
         """
-
         # -f rebuilds index without prompt for confirmation
-        call_command("search_index", "--rebuild", "-f")
+        call_command(
+            "search_index",
+            "--rebuild",
+            "-f",
+            "--models",
+            "search.ParentheticalGroup",
+        )
 
     @classmethod
     def setUpTestData(cls):
@@ -2158,9 +2164,7 @@ class ElasticSearchTest(TestCase):
         cls.p3.save()
         cls.p4.group = cls.pg4
         cls.p4.save()
-
-    def setUp(self) -> None:
-        self.rebuild_index()
+        cls.rebuild_index()
 
     # Notes:
     # "term" Returns documents that contain an exact term in a provided field.
