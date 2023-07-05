@@ -12,7 +12,7 @@
     <div class="row form-group">
       <div class="col-xs-12">
         <div class="dummy-area v-offset-above-2">
-          <div class="copy-text-icon" onclick="copy_text('dummy_data')"><i class="fa fa-copy"></i></div>
+          <div class="copy-text-icon" data-clipboard-copy-target="dummy_data"><i class="fa fa-copy"></i></div>
           <textarea readonly class="form-control" id="dummy_data" rows="6">{{ dummy_content }}</textarea>
         </div>
       </div>
@@ -40,12 +40,12 @@
     <div class="row form-group">
       <div class="col-xs-12">
         <div class="dummy-area v-offset-above-2">
-          <div class="copy-text-icon" onclick="copy_text('dummy_curl')"><i class="fa fa-copy"></i></div>
+          <div class="copy-text-icon" data-clipboard-copy-target="dummy_curl"><i class="fa fa-copy"></i></div>
           <textarea readonly class="form-control v-offset-below-1" id="dummy_curl" rows="6">{{ dummy_curl }}</textarea>
           <label for="dummy_curl">Use this command locally to replicate this event from our servers.</label>
         </div>
         {% if webhook.event_type in event_types %}
-          <button id="webhook-curl" class="btn btn-primary" onclick="copy_text('dummy_curl')">Copy Command</button>
+          <button id="webhook-curl" class="btn btn-primary" data-clipboard-copy-target="dummy_curl">Copy Command</button>
         {% endif %}
       </div>
     </div>
