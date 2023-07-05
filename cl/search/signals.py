@@ -4,6 +4,7 @@ from django.dispatch import receiver
 from cl.alerts.send_alerts import send_or_schedule_alerts
 from cl.audio.models import Audio
 from cl.lib.command_utils import logger
+from cl.lib.elasticsearch_utils import es_index_exists
 from cl.people_db.models import Education, Person, Position
 from cl.search.documents import (
     PEOPLE_DOCS_TYPE_ID,
@@ -104,11 +105,13 @@ def create_or_update_person_in_es_index(sender, instance=None, **kwargs):
     """Receiver function that gets called after a Person instance is saved.
     This method creates or updates a Person object in the PersonDocument index.
     """
-    person_doc = PersonDocument()
-    doc = person_doc.prepare(instance)
-    PersonDocument(meta={"id": instance.pk}, **doc).save(
-        skip_empty=False, return_doc_meta=True
-    )
+
+    if es_index_exists("people_db_index"):
+        person_doc = PersonDocument()
+        doc = person_doc.prepare(instance)
+        PersonDocument(meta={"id": instance.pk}, **doc).save(
+            skip_empty=False, return_doc_meta=True
+        )
 
 
 @receiver(
@@ -121,7 +124,11 @@ def create_or_update_position_in_es_index(sender, instance=None, **kwargs):
     This method creates or updates a Position object in the PositionDocument index.
     """
     parent_id = getattr(instance.person, "pk", None)
-    if parent_id and PersonDocument.exists(id=parent_id):
+    if (
+        es_index_exists("people_db_index")
+        and parent_id
+        and PersonDocument.exists(id=parent_id)
+    ):
         position_doc = PositionDocument()
         doc = position_doc.prepare(instance)
         doc_id = PEOPLE_DOCS_TYPE_ID(instance.pk).POSITION
@@ -145,7 +152,11 @@ def create_or_update_education_in_es_index(sender, instance=None, **kwargs):
     """
 
     parent_id = getattr(instance.person, "pk", None)
-    if parent_id and PersonDocument.exists(id=parent_id):
+    if (
+        es_index_exists("people_db_index")
+        and parent_id
+        and PersonDocument.exists(id=parent_id)
+    ):
         education_doc = EducationDocument()
         doc = education_doc.prepare(instance)
         doc_id = PEOPLE_DOCS_TYPE_ID(instance.pk).EDUCATION

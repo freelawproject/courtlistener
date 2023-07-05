@@ -12,7 +12,7 @@ from django.core.paginator import Page
 from django.http.request import QueryDict
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.exceptions import RequestError, TransportError
-from elasticsearch_dsl import A, Q
+from elasticsearch_dsl import A, Q, connections
 from elasticsearch_dsl.query import QueryString, Range
 from elasticsearch_dsl.response import Response
 from elasticsearch_dsl.utils import AttrDict
@@ -644,3 +644,12 @@ def fetch_es_results(
         if settings.DEBUG is True:
             traceback.print_exc()
     return [], 0, error
+
+
+def es_index_exists(index_name: str) -> bool:
+    """Confirm if the Elasticsearch index exists in the default instance.
+    :param index_name: The index name to check.
+    :return: True if the index exists, otherwise False.
+    """
+    es = connections.get_connection("default")
+    return es.indices.exists(index=index_name)

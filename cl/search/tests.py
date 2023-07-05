@@ -4883,6 +4883,11 @@ class PeopleSearchTestElasticSearch(CourtTestCase, ESTestCaseMixin, TestCase):
             degree_year="1990",
         )
 
+    @classmethod
+    def tearDownClass(cls):
+        cls.delete_index()
+        super().tearDownClass()
+
     def test_index_parent_and_child_objects(self) -> None:
         """Confirm Parent object and child objects are properly indexed."""
 
