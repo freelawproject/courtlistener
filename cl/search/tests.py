@@ -2796,7 +2796,13 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         """
 
         # -f rebuilds index without prompt for confirmation
-        call_command("search_index", "--rebuild", "-f")
+        call_command(
+            "search_index",
+            "--rebuild",
+            "-f",
+            "--models",
+            "audio.Audio",
+        )
 
     @classmethod
     def setUpTestData(cls):
