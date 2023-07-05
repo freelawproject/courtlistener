@@ -28,7 +28,7 @@ DATABASES = {
             # See: https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-PROTECTION
             # "prefer" is fine in dev, but poor in prod, where it should be
             # "require" or above.
-            "sslmode": env("DB_SSL_MODE", default="prefer"),
+            "sslmode": env("DB_SSL_MODE", default="require"),
         },
     },
 }
@@ -136,6 +136,7 @@ MIDDLEWARE = [
 ROOT_URLCONF = "cl.urls"
 
 INSTALLED_APPS = [
+    "daphne",
     "django.contrib.admin",
     "django.contrib.admindocs",
     "django.contrib.contenttypes",
@@ -186,6 +187,9 @@ INSTALLED_APPS = [
 if DEVELOPMENT:
     INSTALLED_APPS.append("django_extensions")
     MIDDLEWARE.append("debug_toolbar.middleware.DebugToolbarMiddleware")
+
+ASGI_APPLICATION = "cl.asgi.application"
+
 
 ################
 # Misc. Django #

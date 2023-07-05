@@ -188,12 +188,11 @@
                 {% url 'show_results' as show_results_url %}
 
                 {% with sub_opinion_ids_list=sub_opinion_ids|join:',' pk_str=cluster.pk|stringformat:"s" %}
-                {% with event_category='clickRelated' event_action='clickRelated_'|add:related_algorithm|add:'_seed'|add:pk_str %}
                 {% with opinions=related_clusters full_list_url=show_results_url|add:"?q=related:"|add:sub_opinion_ids_list|add:related_search_params %}
 
                   {% include 'includes/opinions_sidebar.html' %}
 
-                {% endwith %}{% endwith %}{% endwith %}
+                {% endwith %}{% endwith %}
             </div>
         {% endif %}
 
@@ -201,11 +200,22 @@
         {% if cluster.top_visualizations %}
             <div id="visualizations" class="sidebar-section">
                 <h3><span>Visualizations</span></h3>
-                {% url "cluster_visualizations" pk=cluster.pk slug=cluster.slug as cluster_visualizations_url %}
 
-                {% with opinions=cluster.top_visualizations|slice:":5" full_list_url=cluster_visualizations_url|add:"?q"|add:request.META.QUERY_STRING %}
-                    {% include 'includes/opinions_sidebar.html' %}
-                {% endwith %}
+                <ul>
+                    {% for viz in cluster.top_visualizations|slice:":5" %}
+                        <li>
+                            <a href="{{ viz.get_absolute_url }}">
+                                {{ viz.title|default_if_none:"N/A"|safe|truncatewords:10|v_wrapper }}
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+                <p>
+                    <a href="{% url "cluster_visualizations" pk=cluster.pk slug=cluster.slug %}"
+                       class="btn btn-default">
+                        View All Visualizations
+                    </a>
+                </p>
             </div>
         {% endif %}
 
