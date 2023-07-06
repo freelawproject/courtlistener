@@ -129,7 +129,7 @@ def get_text(xml_filepath: str) -> dict:
     :return: dict with data
     """
 
-    with open(xml_filepath, "r") as f:
+    with open(xml_filepath, "r", encoding="utf-8") as f:
         content = f.read()
 
     data = {}  # type: dict
