@@ -1484,17 +1484,24 @@ class SearchAlertsOAESTests(ESTestCaseMixin, TestCase):
     """Test ES Search Alerts"""
 
     @classmethod
-    def rebuild_index(self):
+    def rebuild_index(self, model):
         """
         Create and populate the Elasticsearch index and mapping
         """
 
         # -f rebuilds index without prompt for confirmation
-        call_command("search_index", "--rebuild", "-f")
+        call_command(
+            "search_index",
+            "--rebuild",
+            "-f",
+            "--models",
+            model,
+        )
 
     @classmethod
     def setUpTestData(cls):
-        cls.rebuild_index()
+        cls.rebuild_index("audio.Audio")
+        cls.rebuild_index("alerts.Alert")
         cls.court_1 = CourtFactory(
             id="cabc",
             full_name="Testing Supreme Court",
@@ -2048,9 +2055,9 @@ class SearchAlertsOAESTests(ESTestCaseMixin, TestCase):
 
         donations = Donation.objects.all()
         self.assertEqual(len(donations), 11)
-        alerts_created = Alert.objects.filter(rate=Alert.REAL_TIME)
+        total_rt_alerts = Alert.objects.filter(rate=Alert.REAL_TIME)
         # 2 created in setUpTestData + 10
-        self.assertEqual(alerts_created.count(), 12)
+        self.assertEqual(total_rt_alerts.count(), 12)
 
         # Clear the outbox
         mail.outbox = []
