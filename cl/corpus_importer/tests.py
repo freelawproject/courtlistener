@@ -34,11 +34,8 @@ from cl.corpus_importer.management.commands.harvard_opinions import (
     validate_dt,
     winnow_case_name,
 )
-from cl.corpus_importer.management.commands.import_columbia import (
-    get_state_court_object,
-)
+from cl.corpus_importer.management.commands.import_columbia import get_court_id
 from cl.corpus_importer.management.commands.normalize_judges_opinions import (
-    Command,
     normalize_authors_in_opinions,
     normalize_panel_in_opinioncluster,
 )
@@ -106,213 +103,137 @@ class CourtMatchingTest(SimpleTestCase):
         """
         pairs = (
             {
-                "args": (
-                    "California Superior Court  "
-                    "Appellate Division, Kern County.",
-                    "california/supreme_court_opinions/documents"
-                    "/0dc538c63bd07a28.xml",
-                    # noqa
-                ),
-                "answer": "calappdeptsuperct",
+                "name": "California Superior Court Appellate Division, Kern County",
+                "answer": "calappdeptsuper",
+                # noqa
             },
             {
-                "args": (
-                    "California Superior Court  "
-                    "Appellate Department, Sacramento.",
-                    "california/supreme_court_opinions/documents"
-                    "/0dc538c63bd07a28.xml",
-                    # noqa
-                ),
-                "answer": "calappdeptsuperct",
+                "name": "California Superior Court Appellate Department, Sacramento",
+                "answer": "calappdeptsuper",
+                # noqa
             },
             {
-                "args": (
-                    "Appellate Session of the Superior Court",
-                    "connecticut/appellate_court_opinions/documents"
-                    "/0412a06c60a7c2a2.xml",
-                    # noqa
-                ),
+                "name": "Appellate Session of the Superior Court",
                 "answer": "connsuperct",
+                # noqa
             },
             {
-                "args": (
-                    "Court of Errors and Appeals.",
-                    "new_jersey/supreme_court_opinions/documents"
-                    "/0032e55e607f4525.xml",
-                    # noqa
-                ),
+                "name": "Court of Errors and Appeals.",
                 "answer": "nj",
+                # noqa
             },
             {
-                "args": (
-                    "Court of Chancery",
-                    "new_jersey/supreme_court_opinions/documents"
-                    "/0032e55e607f4525.xml",
-                    # noqa
-                ),
+                "name": "Court of Chancery",
                 "answer": "njch",
+                # "answer": "njch",
+                # noqa
             },
             {
-                "args": (
-                    "Workers' Compensation Commission",
-                    "connecticut/workers_compensation_commission/documents"
-                    "/0902142af68ef9df.xml",
-                    # noqa
-                ),
+                "name": "Workers' Compensation Commission",
                 "answer": "connworkcompcom",
+                # noqa
             },
             {
-                "args": (
-                    "Appellate Session of the Superior Court",
-                    "connecticut/appellate_court_opinions/documents"
-                    "/00ea30ce0e26a5fd.xml",
-                    # noqa
-                ),
+                "name": "Appellate Session of the Superior Court",
                 "answer": "connsuperct",
+                # noqa
             },
             {
-                "args": (
-                    "Superior Court  New Haven County",
-                    "connecticut/superior_court_opinions/documents"
-                    "/0218655b78d2135b.xml",
-                    # noqa
-                ),
+                "name": "Superior Court  New Haven County",
                 "answer": "connsuperct",
+                # noqa
             },
             {
-                "args": (
-                    "Superior Court, Hartford County",
-                    "connecticut/superior_court_opinions/documents"
-                    "/0218655b78d2135b.xml",
-                    # noqa
-                ),
+                "name": "Superior Court, Hartford County",
                 "answer": "connsuperct",
+                # noqa
             },
             {
-                "args": (
-                    "Compensation Review Board  "
-                    "WORKERS' COMPENSATION COMMISSION",
-                    "connecticut/workers_compensation_commission/documents"
-                    "/00397336451f6659.xml",
-                    # noqa
-                ),
+                "name": "Compensation Review Board WORKERS' COMPENSATION COMMISSION",
                 "answer": "connworkcompcom",
+                # noqa
             },
             {
-                "args": (
-                    "Appellate Division Of The Circuit Court",
-                    "connecticut/superior_court_opinions/documents"
-                    "/03dd9ec415bf5bf4.xml",
-                    # noqa
-                ),
+                "name": "Appellate Division Of The Circuit Court",
                 "answer": "connsuperct",
+                # noqa
             },
             {
-                "args": (
-                    "Superior Court for Law and Equity",
-                    "tennessee/court_opinions/documents/01236c757d1128fd.xml",
-                ),
-                "answer": "tennsuperct",
+                "name": "Superior Court for Law and Equity",
+                "answer": "tenn",
+                # noqa
             },
             {
-                "args": (
-                    "Courts of General Sessions and Oyer and Terminer "
-                    "of Delaware",
-                    "delaware/court_opinions/documents/108da18f9278da90.xml",
-                ),
-                "answer": "delsuperct",
+                "name": "Courts of General Sessions and Oyer and Terminer of Delaware",
+                "answer": "delgensess",
+                # noqa
             },
             {
-                "args": (
-                    "Circuit Court of the United States of Delaware",
-                    "delaware/court_opinions/documents/108da18f9278da90.xml",
-                ),
+                "name": "Circuit Court of the United States of Delaware",
                 "answer": "circtdel",
+                # noqa
             },
             {
-                "args": (
-                    "Circuit Court of Delaware",
-                    "delaware/court_opinions/documents/108da18f9278da90.xml",
-                ),
+                "name": "Circuit Court of Delaware",
                 "answer": "circtdel",
+                # noqa
             },
             {
-                "args": (
-                    "Court of Quarter Sessions "
-                    "Court of Delaware,  Kent County.",
-                    "delaware/court_opinions/documents/f01f1724cc350bb9.xml",
-                ),
-                "answer": "delsuperct",
+                "name": "Court of Quarter Sessions Court of Delaware, Kent County.",
+                "answer": "delgensess",
+                # noqa
             },
             {
-                "args": (
-                    "District Court of Appeal.",
-                    "florida/court_opinions/documents/25ce1e2a128df7ff.xml",
-                ),
+                "name": "District Court of Appeal.",
                 "answer": "fladistctapp",
+                # noqa
             },
             {
-                "args": (
-                    "District Court of Appeal, Lakeland, Florida.",
-                    "florida/court_opinions/documents/25ce1e2a128df7ff.xml",
-                ),
+                "name": "District Court of Appeal, Lakeland, Florida.",
                 "answer": "fladistctapp",
+                # noqa
             },
             {
-                "args": (
-                    "District Court of Appeal Florida.",
-                    "florida/court_opinions/documents/25ce1e2a128df7ff.xml",
-                ),
+                "name": "District Court of Appeal Florida.",
                 "answer": "fladistctapp",
+                # noqa
             },
             {
-                "args": (
-                    "District Court of Appeal, Florida.",
-                    "florida/court_opinions/documents/25ce1e2a128df7ff.xml",
-                ),
+                "name": "District Court of Appeal, Florida.",
                 "answer": "fladistctapp",
+                # noqa
             },
             {
-                "args": (
-                    "District Court of Appeal of Florida, Second District.",
-                    "florida/court_opinions/documents/25ce1e2a128df7ff.xml",
-                ),
-                "answer": "fladistctapp",
+                "name": "District Court of Appeal of Florida, Second District.",
+                "answer": "fladistctapp2",
+                # noqa
             },
             {
-                "args": (
-                    "District Court of Appeal of Florida, Second District.",
-                    "/data/dumps/florida/court_opinions/documents"
-                    "/25ce1e2a128df7ff.xml",
-                    # noqa
-                ),
-                "answer": "fladistctapp",
+                "name": "District Court of Appeal of Florida, Second District.",
+                "answer": "fladistctapp2",
+                # noqa
             },
             {
-                "args": (
-                    "U.S. Circuit Court",
-                    "north_carolina/court_opinions/documents"
-                    "/fa5b96d590ae8d48.xml",
-                    # noqa
-                ),
-                "answer": "circtnc",
+                "name": "U.S. Circuit Court",
+                "answer": "uscirct",
+                # noqa
             },
             {
-                "args": (
-                    "United States Circuit Court,  Delaware District.",
-                    "delaware/court_opinions/documents/6abba852db7c12a1.xml",
-                ),
+                "name": "United States Circuit Court,  Delaware District.",
                 "answer": "circtdel",
+                # noqa
             },
             {
-                "args": ("Court of Common Pleas  Hartford County", "asdf"),
+                "name": "Court of Common Pleas Hartford County",
                 "answer": "connsuperct",
+                # noqa
             },
         )
         for d in pairs:
-            got = get_state_court_object(*d["args"])
+            got = get_court_id(d["name"])
+            print("got", got)
             self.assertEqual(
-                got,
+                got[0],
                 d["answer"],
                 msg="\nDid not get court we expected: '%s'.\n"
                 "               Instead we got: '%s'" % (d["answer"], got),
