@@ -1070,11 +1070,26 @@ class RelatedSearchTest(IndexedSolrTestCase):
         ]
 
         recommendations_expected = [
-            ("/opinion/2/case-name-cluster/?", "Howard v. Honda"),
-            ("/opinion/1/case-name-cluster/?", "Debbas v. Franklin"),
-            ("/opinion/1/case-name-cluster/?", "Debbas v. Franklin"),
-            ("/opinion/1/case-name-cluster/?", "Debbas v. Franklin"),
-            ("/opinion/1/case-name-cluster/?", "Debbas v. Franklin"),
+            (
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
+                "Debbas v. Franklin",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
+                "Debbas v. Franklin",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
+                "Debbas v. Franklin",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
+                "Debbas v. Franklin",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                "Howard v. Honda",
+            ),
         ]
 
         # Test if related opinion exist in expected order
@@ -1107,11 +1122,26 @@ class RelatedSearchTest(IndexedSolrTestCase):
         ]
 
         recommendations_expected = [
-            ("/opinion/2/case-name-cluster/?", "Howard v. Honda"),
-            ("/opinion/2/case-name-cluster/?", "Howard v. Honda"),
-            ("/opinion/2/case-name-cluster/?", "Howard v. Honda"),
-            ("/opinion/2/case-name-cluster/?", "Howard v. Honda"),
-            ("/opinion/3/case-name-cluster/?", "case name cluster 3"),
+            (
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                "Howard v. Honda",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                "Howard v. Honda",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                "Howard v. Honda",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                "Howard v. Honda",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_3.pk}/{self.opinion_cluster_3.slug}/?",
+                "case name cluster 3",
+            ),
         ]
 
         # Test if related opinion exist in expected order
