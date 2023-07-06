@@ -4,6 +4,7 @@ import environ
 
 from ..django import DATABASES, INSTALLED_APPS, TESTING
 from ..third_party.aws import AWS_S3_CUSTOM_DOMAIN
+from ..third_party.sentry import SENTRY_REPORT_URI
 
 env = environ.FileAwareEnv()
 DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
@@ -132,4 +133,6 @@ if not any(
     (DEVELOPMENT, TESTING)
 ):  # Development and test aren’t used over HTTPS (yet)
     CSP_UPGRADE_INSECURE_REQUESTS = True
+if SENTRY_REPORT_URI:
+    CSP_REPORT_URI = SENTRY_REPORT_URI
 CSP_REPORT_ONLY = True
