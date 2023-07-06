@@ -14,7 +14,7 @@ apt install -y awscli gnupg
 echo "deb http://apt.postgresql.org/pub/repos/apt bullseye-pgdg main" > /etc/apt/sources.list.d/pgdg.list
 curl --silent 'https://www.postgresql.org/media/keys/ACCC4CF8.asc' |  apt-key add -
 apt-get update
-apt-get install -y postgresql-client-14
+apt-get install -y postgresql-client
 
 # Stream to S3
 

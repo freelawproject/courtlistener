@@ -8,7 +8,7 @@ from cl.lib.AuthenticationBackend import ConfirmedEmailAuthenticationForm
 from cl.lib.ratelimiter import ratelimiter_unsafe_10_per_m
 from cl.users import api_views as user_views
 from cl.users import views
-from cl.users.forms import CustomPasswordResetForm, CustomSetPasswordForm
+from cl.users.forms import CustomSetPasswordForm
 
 router = DefaultRouter()
 
@@ -46,15 +46,8 @@ urlpatterns = [
     ),
     path(
         "reset-password/",
-        ratelimiter_unsafe_10_per_m(
-            auth_views.PasswordResetView.as_view(
-                **{
-                    "template_name": "register/password_reset_form.html",
-                    "email_template_name": "register/password_reset_email.html",
-                    "extra_context": {"private": False},
-                    "form_class": CustomPasswordResetForm,
-                }
-            )
+        views.RateLimitedPasswordResetView.as_view(
+            extra_context={"private": False}
         ),
         name="password_reset",
     ),
@@ -153,7 +146,7 @@ urlpatterns = [
     path("profile/take-out/done/", views.take_out_done, name="take_out_done"),
     path(
         "register/",
-        ratelimiter_unsafe_10_per_m(views.register),
+        views.register,
         name="register",
     ),
     path(
@@ -169,7 +162,7 @@ urlpatterns = [
     ),
     path(
         "email-confirmation/request/",
-        ratelimiter_unsafe_10_per_m(views.request_email_confirmation),
+        views.request_email_confirmation,
         name="email_confirmation_request",
     ),
     path(

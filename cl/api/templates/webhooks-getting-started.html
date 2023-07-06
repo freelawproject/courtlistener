@@ -74,7 +74,7 @@
   <p>Below are examples of endpoints configured in Flask and Django</p>
   <p><strong>Flask</strong></p>
   <div class="dummy-area">
-    <div class="copy-text-icon" onclick="copy_text('dummy_curl')"><i class="fa fa-copy"></i></div>
+    <div class="copy-text-icon" data-clipboard-copy-target="dummy_curl"><i class="fa fa-copy"></i></div>
     <textarea readonly class="form-control v-offset-below-1" id="dummy_curl" rows="8">from flask import Flask, request, Response
 app = Flask(__name__)
 
@@ -86,7 +86,7 @@ def respond():
   </div>
   <p><strong>Django</strong></p>
   <div class="dummy-area">
-    <div class="copy-text-icon" onclick="copy_text('dummy_curl')"><i class="fa fa-copy"></i></div>
+    <div class="copy-text-icon" data-clipboard-copy-target="dummy_curl"><i class="fa fa-copy"></i></div>
     <textarea readonly class="form-control v-offset-below-1" id="dummy_curl" rows="11">from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpRequest, HttpResponse
 
