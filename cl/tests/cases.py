@@ -60,7 +60,7 @@ class RestartRateLimitMixin:
         cls.restart_rate_limit()
         super().tearDownClass()
 
-        
+
 class RestartSentEmailQuotaMixin:
     """Restart sent email quota in redis."""
 
