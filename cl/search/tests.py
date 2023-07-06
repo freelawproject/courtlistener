@@ -2797,7 +2797,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
     """Oral argument search tests for Elasticsearch"""
 
     @classmethod
-    def rebuild_index(self):
+    def rebuild_index(self, model):
         """
         Create and populate the Elasticsearch index and mapping
         """
@@ -2808,13 +2808,15 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             "--rebuild",
             "-f",
             "--models",
-            "audio.Audio",
+            model,
         )
 
     @classmethod
     def setUpTestData(cls):
+        cls.rebuild_index("alerts.Alert")
         super().setUpTestData()
-        cls.rebuild_index()
+        cls.rebuild_index("audio.Audio")
+        cls.rebuild_index("alerts.Alert")
 
     @classmethod
     def tearDownClass(cls):

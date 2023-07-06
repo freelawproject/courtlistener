@@ -159,7 +159,11 @@ class SitemapTest(TestCase):
         )
 
 
-class AudioTestCase(SimpleTestCase):
+class ESTestCaseMixin(SerializeMixin):
+    lockfile = __file__
+
+
+class AudioTestCase(ESTestCaseMixin, SimpleTestCase):
     """Audio test case factories"""
 
     @classmethod
@@ -197,10 +201,6 @@ class AudioTestCase(SimpleTestCase):
     def tearDownClass(cls):
         Audio.objects.all().delete()
         super().tearDownClass()
-
-
-class ESTestCaseMixin(SerializeMixin):
-    lockfile = __file__
 
 
 class AudioESTestCase(SimpleTestCase):
