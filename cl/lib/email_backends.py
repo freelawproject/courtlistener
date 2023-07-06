@@ -1,3 +1,4 @@
+import time
 from collections.abc import Sequence
 
 from django.conf import settings
@@ -7,7 +8,10 @@ from django.core.mail import (
     get_connection,
 )
 from django.core.mail.backends.base import BaseEmailBackend
+from redis import Redis
+from redis.client import Pipeline
 
+from cl.lib.redis_utils import make_redis_interface
 from cl.users.email_handlers import (
     add_bcc_random,
     enqueue_email,
@@ -16,6 +20,115 @@ from cl.users.email_handlers import (
     store_message,
     under_backoff_waiting_period,
 )
+
+
+def incr_email_counters(pipe: Pipeline) -> None:
+    """increments the temporary counter and adds a new
+    element to the sorted set once it reaches the value of
+    the EMAILS_TEMP_COUNTER setting.
+
+    Args:
+        pipe (Pipeline): A pipeline object.
+    """
+    temp_counter = int(pipe.get("email:temp_counter") or 0)  # type: ignore
+    pipe.multi()
+    if int(temp_counter) + 1 >= settings.EMAIL_MAX_TEMP_COUNTER:
+        current_time = time.time_ns()
+        pipe.zadd("email:delivery_attempts", {str(current_time): current_time})
+        pipe.set("email:temp_counter", 0)
+    else:
+        pipe.incr("email:temp_counter")
+
+
+def get_attempts_in_window(r: Redis) -> int:
+    """
+    Returns the number of elements stored in the set. This method
+    check the current time, and shave off any attempts in the sorted set
+    that are outside of our window, then check the cardinality of the
+    sorted set
+
+    Args:
+        r (Redis): The Redis DB connection interface.
+
+    Returns:
+        int: number of elements stored in the set
+    """
+    current_time = time.time_ns()
+    trim_time = current_time - (24 * 60 * 60 * 1_000_000_000)
+    pipe = r.pipeline()
+    # Removes attempts outside the current window
+    pipe.zremrangebyscore("email:delivery_attempts", 0, trim_time)
+    # Get number of elements in the set
+    pipe.zcard("email:delivery_attempts")
+    _removed, size = pipe.execute()
+    return int(size)
+
+
+def get_email_count(r: Redis) -> int:
+    """Returns the number of email sent in the last 24 hours.
+
+    This method multiplies the number of previous attempts by the
+    MAX_TEMP_COUNTER setting because our approach only adds one entry
+    to the email:delivery_attempts key after MAX_TEMP_COUNTER emails
+    are sent.
+
+    Args:
+        r (Redis): The Redis DB connection interface.
+
+    Returns:
+        int: number of emails sent in the last 24 hours
+    """
+    temp_counter = r.get("email:temp_counter")
+    previous_attempts = get_attempts_in_window(r)
+    if not temp_counter:
+        return previous_attempts * settings.EMAIL_MAX_TEMP_COUNTER
+    return previous_attempts * settings.EMAIL_MAX_TEMP_COUNTER + int(
+        temp_counter
+    )
+
+
+def check_emergency_brake(r: Redis) -> None:
+    """
+    Checks the emails sent in the last 24 hours. Raises ValueError
+    if our threshold is exceeded.
+
+    AWS SES uses a sliding window to calculate our email sending quota.
+    When it runs out, we cannot recover without waiting ~24 hours, so
+    this ensures that we always stay below a configured quota.
+
+    Details: https://docs.aws.amazon.com/ses/latest/dg/manage-sending-quotas.html
+
+    To do this, we implement the "sliding logs" algorithm, roughly as
+    described here, but with one modification to minimize memory usage:
+
+    https://medium.com/@SaiRahulAkarapu/rate-limiting-algorithms-using-redis-eb4427b47e33
+
+    Sliding logs is a simple algorithm that logs a timestamp for every
+    event that happens. Then, when an event request comes in, it checks
+    how many events are in the log during the last period (in our case,
+    24 hours), and either rejects or allows the event.
+
+    Our tweak to this algorithm is to lose a small amount of accuracy
+    (precisely EMAIL_MAX_TEMP_COUNTER - 1) in exchange for reducing
+    the memory by EMAIL_MAX_TEMP_COUNTER×.
+
+    For example, if EMAIL_MAX_TEMP_COUNTER is set to 10, then we log
+    one entry to redis for every 10 events (great memory savings). but
+    we may reject events at EMAIL_EMERGENCY_THRESHOLD - EMAIL_MAX_TEMP_COUNTER + 1
+    instead of precisely when the threshold is exceeded. (E.g., if the
+    threshold is 1_000 and temp counter is 10, we might trigger at 991).
+
+    Args:
+        r (Redis): The Redis DB to connect to as a connection interface
+
+    Raises:
+        ValueError: if the counter is bigger than the threshold from the settings.
+    """
+    current_email_count = get_email_count(r)
+    if current_email_count >= settings.EMAIL_EMERGENCY_THRESHOLD:
+        raise ValueError(
+            "Emergency brake engaged to prevent email quota exhaustion"
+        )
 
 
 class EmailBackend(BaseEmailBackend):
@@ -45,6 +158,7 @@ class EmailBackend(BaseEmailBackend):
         base_backend = settings.BASE_BACKEND
         connection = get_connection(base_backend)
         connection.open()
+        r = make_redis_interface("CACHE")
         msg_count = 0
         for email_message in email_messages:
             message = email_message.message()
@@ -75,6 +189,8 @@ class EmailBackend(BaseEmailBackend):
                     # add to the final recipients list
                     final_recipient_list.append(email_address)
 
+            # check the emergency brake before sending an email
+            check_emergency_brake(r)
             # Store message in DB and obtain the unique
             # message_id to add in headers to identify the message
             stored_id = store_message(email_message)
@@ -97,6 +213,8 @@ class EmailBackend(BaseEmailBackend):
                 # Update message with the final recipient list
                 email.to = final_recipient_list
                 email.send()
+                # update the counters
+                r.transaction(incr_email_counters, "email:temp_counter")
                 msg_count += 1
 
         # Close base backend connection
