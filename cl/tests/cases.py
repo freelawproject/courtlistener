@@ -60,6 +60,22 @@ class RestartRateLimitMixin:
         cls.restart_rate_limit()
         super().tearDownClass()
 
+        
+class RestartSentEmailQuotaMixin:
+    """Restart sent email quota in redis."""
+
+    @classmethod
+    def restart_sent_email_quota(self):
+        r = make_redis_interface("CACHE")
+        keys = r.keys("email:*")
+
+        if keys:
+            r.delete(*keys)
+
+    def tearDown(self):
+        self.restart_sent_email_quota()
+        super().tearDown()
+
 
 class SimpleTestCase(
     OutputBlockerTestMixin,
