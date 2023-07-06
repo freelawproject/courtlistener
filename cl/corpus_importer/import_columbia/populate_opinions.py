@@ -269,33 +269,40 @@ def convert_columbia_html(text: str) -> str:
     )
 
     for ref in foot_references:
-        try:
-            fnum = re.search(r"[\*\d]+", ref).group()
-        except AttributeError:
-            fnum = re.search(r"\[fn(.+)\]", ref).group(1)
-        rep = f'<sup id="ref-fn{fnum}"><a href="#fn{fnum}">{fnum}</a></sup>'
-        text = text.replace(ref, rep)
+        if (match := re.search(r"[\*\d]+", ref)) is not None:
+            f_num = match.group()
+        elif (match := re.search(r"\[fn(.+)\]", ref)) is not None:
+            f_num = match.group(1)
+        else:
+            f_num = None
+        if f_num:
+            rep = f'<sup id="ref-fn{f_num}"><a href="#fn{f_num}">{f_num}</a></sup>'
+            text = text.replace(ref, rep)
 
     # Add footnotes to opinion
     footnotes = re.findall("<footnote_body>.[\s\S]*?</footnote_body>", text)
     for fn in footnotes:
         content = re.search("<footnote_body>(.[\s\S]*?)</footnote_body>", fn)
-        rep = r'<div class="footnote">%s</div>' % content.group(1)
-        text = text.replace(fn, rep)
+        if content:
+            rep = r'<div class="footnote">%s</div>' % content.group(1)
+            text = text.replace(fn, rep)
 
     # Replace footnote numbers
     foot_numbers = re.findall("<footnote_number>.*?</footnote_number>", text)
     for ref in foot_numbers:
-        try:
-            fnum = re.search(r"[\*\d]+", ref).group()
-        except:
-            fnum = re.search(r"\[fn(.+)\]", ref).group(1)
-        rep = r'<sup id="fn%s"><a href="#ref-fn%s">%s</a></sup>' % (
-            fnum,
-            fnum,
-            fnum,
-        )
-        text = text.replace(ref, rep)
+        if (match := re.search(r"[\*\d]+", ref)) is not None:
+            f_num = match.group()
+        elif (match := re.search(r"\[fn(.+)\]", ref)) is not None:
+            f_num = match.group(1)
+        else:
+            f_num = None
+        if f_num:
+            rep = r'<sup id="fn%s"><a href="#ref-fn%s">%s</a></sup>' % (
+                f_num,
+                f_num,
+                f_num,
+            )
+            text = text.replace(ref, rep)
 
     # Make nice paragraphs. This replaces double newlines with paragraphs, then
     # nests paragraphs inside blockquotes, rather than vice versa. The former
@@ -311,7 +318,7 @@ def convert_columbia_html(text: str) -> str:
 
 def add_new_case(
     item: dict,
-    min_dates: bool = None,
+    min_dates: Optional[dict] = None,
     start_dates: Optional[dict] = None,
     testing: bool = True,
 ):
@@ -579,6 +586,10 @@ def add_new_case(
                 logger.info(
                     f"No citations for: {domain}{cluster.get_absolute_url()}"
                 )
+    else:
+        logger.info(
+            f"No problems found creating opinion: \"{item.get('case_name')}\" from {item.get('file')}.xml"
+        )
 
 
 def find_duplicates(

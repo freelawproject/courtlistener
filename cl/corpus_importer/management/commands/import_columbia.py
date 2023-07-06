@@ -2,10 +2,10 @@ import fnmatch
 import os
 import re
 import traceback
-from datetime import datetime
+from datetime import date
 from glob import glob
 from random import shuffle
-from typing import Optional
+from typing import Any
 
 import dateutil.parser as dparser
 from bs4 import BeautifulSoup, NavigableString
@@ -42,7 +42,7 @@ def format_case_name(case_name: str) -> str:
 
 def parse_dates(
     raw_dates: list[str],
-) -> list[list[tuple[Optional[str], datetime]]]:
+) -> list[list[tuple[Any, date] | tuple[None, date]]]:
     """Parses the dates from a list of string.
 
     Returns a list of lists of (string, datetime) tuples if there is a string
@@ -132,7 +132,7 @@ def get_text(xml_filepath: str) -> dict:
     with open(xml_filepath, "r") as f:
         content = f.read()
 
-    data = {}
+    data = {}  # type: dict
     opinions = []
 
     # Sometimes opening and ending tag mismatch (e.g. c6b39dcb29c9c.xml)
@@ -460,13 +460,14 @@ def parse_opinions(options):
                 else:
                     logger.info(f"Unknown exception in file '{path}':")
                     logger.info(traceback.format_exc())
-        # status update
-        count += 1
-        if count % status_interval == 0:
-            if total:
-                logger.info(f"Finished {count} out of {total} files.")
-            else:
-                logger.info(f"Finished {count} files.")
+
+            # status update
+            count += 1
+            if count % status_interval == 0:
+                if total:
+                    logger.info(f"Finished {count} out of {total} files.")
+                else:
+                    logger.info(f"Finished {count} files.")
 
 
 def file_generator(dir_path: str, random_order: bool = False, limit=None):
@@ -493,8 +494,8 @@ def file_generator(dir_path: str, random_order: bool = False, limit=None):
             names = fnmatch.filter(file_names, "*.xml")
             if names:
                 shuffle(names)
-                yield os.path.join(root, names[0]).replace("\\", "/")
-                break
+                for file_name in names:
+                    yield os.path.join(root, file_name).replace("\\", "/")
         count += 1
         if count == limit:
             return
@@ -569,7 +570,7 @@ class Command(VerboseCommand):
             "--start_file",
             type=str,
             default=None,
-            help="The file name to start on (if resuming).",
+            help="The file name with extension to start on (if resuming).",
         )
         parser.add_argument(
             "--debug",
