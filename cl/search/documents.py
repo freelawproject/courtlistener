@@ -161,7 +161,6 @@ class AudioDocument(Document):
 
     class Django:
         model = Audio
-        ignore_signals = True
 
     def prepare_panel_ids(self, instance):
         return [judge.pk for judge in instance.panel.all()]
