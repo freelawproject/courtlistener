@@ -98,3 +98,21 @@ class RECAPEmailNotificationDataFactory(DictFactory):
     court_id = FuzzyText(length=4, chars=string.ascii_lowercase, suffix="d")
     dockets = List([SubFactory(RECAPEmailDocketDataFactory)])
     email_recipients = List([SubFactory(RECAPEmailRecipientsDataFactory)])
+
+
+class MinuteDocketEntryDataFactory(DictFactory):
+    date_entered = Faker("date_object")
+    date_filed = Faker("date_object")
+    description = Faker("text", max_nb_chars=75)
+    document_number = None
+    pacer_doc_id = None
+    pacer_seq_no = None
+    short_description = Faker("text", max_nb_chars=30)
+
+
+class DocketDataFactory(DictFactory):
+    court_id = FuzzyText(length=4, chars=string.ascii_lowercase, suffix="d")
+    case_name = Faker("case_name")
+    docket_entries = List([SubFactory(MinuteDocketEntryDataFactory)])
+    docket_number = Faker("federal_district_docket_number")
+    ordered_by = "date_filed"

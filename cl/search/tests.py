@@ -1063,7 +1063,6 @@ class RelatedSearchTest(IndexedSolrTestCase):
     def test_more_like_this_opinion_detail_detail(self) -> None:
         """MoreLikeThis query on opinion detail page with status filter"""
         seed_pk = self.opinion_cluster_3.pk  # case name cluster 3
-        expected_first_pk = self.opinion_2.pk  # Howard v. Honda
 
         # Login as staff user (related items are by default disabled for guests)
         self.assertTrue(
@@ -1073,22 +1072,49 @@ class RelatedSearchTest(IndexedSolrTestCase):
         r = self.client.get("/opinion/%i/asdf/" % seed_pk)
         self.assertEqual(r.status_code, 200)
 
-        # Test if related opinion exist
-        self.assertGreater(
-            r.content.decode().index(
-                "'clickRelated_mlt_seed%i', %i," % (seed_pk, expected_first_pk)
+        tree = html.fromstring(r.content.decode())
+
+        recomendations_actual = [
+            (a.get("href"), a.text_content().strip())
+            for a in tree.xpath("//*[@id='recommendations']/ul/li/a")
+        ]
+
+        recommendations_expected = [
+            (
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
+                "Debbas v. Franklin",
             ),
-            0,
-            msg="Related opinion not found.",
+            (
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
+                "Debbas v. Franklin",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
+                "Debbas v. Franklin",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
+                "Debbas v. Franklin",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                "Howard v. Honda",
+            ),
+        ]
+
+        # Test if related opinion exist in expected order
+        self.assertEqual(
+            recommendations_expected,
+            recomendations_actual,
+            msg="Unexpected opinion recommendations.",
         )
+
         self.client.logout()
 
     @override_settings(RELATED_FILTER_BY_STATUS=None)
     def test_more_like_this_opinion_detail_no_filter(self) -> None:
         """MoreLikeThis query on opinion detail page (without filter)"""
         seed_pk = self.opinion_cluster_1.pk  # Paul Debbas v. Franklin
-        expected_first_pk = self.opinion_2.pk  # Howard v. Honda
-        expected_second_pk = self.opinion_3.pk  # case name cluster 3
 
         # Login as staff user (related items are by default disabled for guests)
         self.assertTrue(
@@ -1098,17 +1124,43 @@ class RelatedSearchTest(IndexedSolrTestCase):
         r = self.client.get("/opinion/%i/asdf/" % seed_pk)
         self.assertEqual(r.status_code, 200)
 
-        # Test for click tracking order
-        self.assertTrue(
-            r.content.decode().index(
-                "'clickRelated_mlt_seed%i', %i," % (seed_pk, expected_first_pk)
-            )
-            < r.content.decode().index(
-                "'clickRelated_mlt_seed%i', %i,"
-                % (seed_pk, expected_second_pk)
+        tree = html.fromstring(r.content.decode())
+
+        recomendations_actual = [
+            (a.get("href"), a.text_content().strip())
+            for a in tree.xpath("//*[@id='recommendations']/ul/li/a")
+        ]
+
+        recommendations_expected = [
+            (
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                "Howard v. Honda",
             ),
-            msg="Related opinions are in wrong order.",
+            (
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                "Howard v. Honda",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                "Howard v. Honda",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                "Howard v. Honda",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_3.pk}/{self.opinion_cluster_3.slug}/?",
+                "case name cluster 3",
+            ),
+        ]
+
+        # Test if related opinion exist in expected order
+        self.assertEqual(
+            recommendations_expected,
+            recomendations_actual,
+            msg="Unexpected opinion recommendations.",
         )
+
         self.client.logout()
 
 
@@ -2094,9 +2146,14 @@ class ElasticSearchTest(TestCase):
         """
         Create and populate the Elasticsearch index and mapping
         """
-
         # -f rebuilds index without prompt for confirmation
-        call_command("search_index", "--rebuild", "-f")
+        call_command(
+            "search_index",
+            "--rebuild",
+            "-f",
+            "--models",
+            "search.ParentheticalGroup",
+        )
 
     @classmethod
     def setUpTestData(cls):
@@ -2221,7 +2278,6 @@ class ElasticSearchTest(TestCase):
         cls.p3.save()
         cls.p4.group = cls.pg4
         cls.p4.save()
-
         cls.rebuild_index()
 
     # Notes:
@@ -2923,18 +2979,26 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
     """Oral argument search tests for Elasticsearch"""
 
     @classmethod
-    def rebuild_index(self):
+    def rebuild_index(self, model):
         """
         Create and populate the Elasticsearch index and mapping
         """
 
         # -f rebuilds index without prompt for confirmation
-        call_command("search_index", "--rebuild", "-f")
+        call_command(
+            "search_index",
+            "--rebuild",
+            "-f",
+            "--models",
+            model,
+        )
 
     @classmethod
     def setUpTestData(cls):
+        cls.rebuild_index("alerts.Alert")
         super().setUpTestData()
-        cls.rebuild_index()
+        cls.rebuild_index("audio.Audio")
+        cls.rebuild_index("alerts.Alert")
 
     @classmethod
     def tearDownClass(cls):
