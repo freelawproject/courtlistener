@@ -50,7 +50,7 @@
 
 
     <h2 id="browsing">Browsing the Data Files</h2>
-    <p>As they are generated, files are streamed to an AWS S3 bucket. Dates are added to the filenames indicating when their generation began (in the UTC timezone).
+    <p>As they are generated, files are streamed to an AWS S3 bucket. Files are named with their generation time (UTC) and object type. Files are snapshots, not deltas.
     </p>
     <p>
       <a href="https://com-courtlistener-storage.s3-us-west-2.amazonaws.com/list.html?prefix=bulk-data/" class="btn btn-primary btn-lg">Browse Bulk Data</a>

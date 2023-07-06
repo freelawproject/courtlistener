@@ -555,7 +555,9 @@ def normalize_long_description(docket_entry):
     docket_entry["description"] = desc
 
 
-def merge_unnumbered_docket_entries(des):
+def merge_unnumbered_docket_entries(
+    des: QuerySet, docket_entry: dict[str, any]
+) -> DocketEntry:
     """Unnumbered docket entries come from many sources, with different data.
     This sometimes results in two docket entries when there should be one. The
     docket history report is the one source that sometimes has the long and
@@ -563,15 +565,36 @@ def merge_unnumbered_docket_entries(des):
     them back together again, deleting the duplicate items.
 
     :param des: A QuerySet of DocketEntries that we believe are the same.
+    :param docket_entry: The scraped dict from Juriscraper for the docket
+    entry.
     :return The winning DocketEntry
     """
-    # Choose the earliest as the winner; delete the rest
+
+    # Look for docket entries that match by equal long description or if the
+    # long description is not set.
+    matched_entries = [
+        de.pk
+        for de in des
+        if de.description == docket_entry["description"] or not de.description
+    ]
+    if matched_entries:
+        # Return the entry that matches the long description and remove the
+        # rest if there are any duplicates.
+        matched_entries_queryset = des.filter(pk__in=matched_entries)
+        winner = matched_entries_queryset.earliest("date_created")
+        matched_entries_queryset.exclude(pk=winner.pk).delete()
+        return winner
+
+    # No duplicates found by long description, choose the earliest as the
+    # winner; delete the rest
     winner = des.earliest("date_created")
     des.exclude(pk=winner.pk).delete()
     return winner
 
 
-def get_or_make_docket_entry(d, docket_entry):
+def get_or_make_docket_entry(
+    d: Docket, docket_entry: dict[str, any]
+) -> tuple[DocketEntry, bool]:
     """Lookup or create a docket entry to match the one that was scraped.
 
     :param d: The docket we expect to find it in.
@@ -641,7 +664,7 @@ def get_or_make_docket_entry(d, docket_entry):
             )
             # There's so little metadata with unnumbered des that if there's
             # more than one match, we can just select the oldest as canonical.
-            de = merge_unnumbered_docket_entries(des)
+            de = merge_unnumbered_docket_entries(des, docket_entry)
             de_created = False
     return de, de_created
 

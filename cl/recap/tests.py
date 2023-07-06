@@ -1,5 +1,6 @@
 import json
 import os
+from copy import deepcopy
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
@@ -58,9 +59,11 @@ from cl.recap.api_serializers import PacerFetchQueueSerializer
 from cl.recap.factories import (
     AppellateAttachmentFactory,
     AppellateAttachmentPageFactory,
+    DocketDataFactory,
     DocketEntriesDataFactory,
     DocketEntryDataFactory,
     FjcIntegratedDatabaseFactory,
+    MinuteDocketEntryDataFactory,
     PacerFetchQueueFactory,
     ProcessingQueueFactory,
     RECAPEmailDocketDataFactory,
@@ -6570,3 +6573,159 @@ class CleanUpDuplicateAppellateEntries(TestCase):
         )
         docket_entries = DocketEntry.objects.all()
         self.assertEqual(docket_entries.count(), 1)
+
+
+class RemoveDuplicatedMinuteEntries(TestCase):
+    """Test remove duplicated minute entries while avoid deleting those who
+    are not duplicates in the same day.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.cand = CourtFactory(id="cand", jurisdiction="FD")
+        cls.d = DocketFactory(
+            source=Docket.RECAP,
+            court=cls.cand,
+        )
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_avoid_deleting_non_duplicated_minute_entries(
+        self,
+        mock_webhook_post,
+    ):
+        """Confirm non duplicated entries are not deleted when merging the
+        docket history report.
+        """
+        docket_entries = DocketEntry.objects.all()
+        self.assertEqual(docket_entries.count(), 0)
+
+        docket_data = DocketDataFactory(
+            docket_entries=[
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2020, 10, 15),
+                    date_entered=date(2020, 10, 15),
+                    description="The corrected publicly accessible audio line for today's conference is available",
+                    short_description=None,
+                    document_number=210,
+                ),
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2020, 10, 15),
+                    date_entered=date(2020, 10, 15),
+                    description="Set/Reset Deadlines: Expert Discovery due by 6/11/2021. (cf) (Entered: 10/15/2020)",
+                    short_description=None,
+                ),
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2020, 10, 15),
+                    date_entered=date(2020, 10, 15),
+                    description="Set/Reset Deadlines: Fact Discovery due by 2/12/2021. (cf) (Entered: 10/15/2020)",
+                    short_description=None,
+                ),
+            ],
+        )
+
+        # Add initial docket entries with only long descriptions.
+        data = deepcopy(docket_data)
+        add_docket_entries(self.d, data["docket_entries"])
+        # 3 entries should be created.
+        self.assertEqual(docket_entries.count(), 3)
+
+        data_history = deepcopy(docket_data)
+        # Add short descriptions to entries, simulating a docket history report.
+        data_history["docket_entries"][0][
+            "short_description"
+        ] = "Order on Motion for Extension of Time to Complete Discovery"
+        data_history["docket_entries"][1][
+            "short_description"
+        ] = "Set/Reset Deadlines"
+        data_history["docket_entries"][2][
+            "short_description"
+        ] = "Set/Reset Deadlines"
+        # Merge docket history report entries.
+        add_docket_entries(self.d, data_history["docket_entries"])
+        # Entries are properly merged without removing non duplicated entries.
+        self.assertEqual(docket_entries.count(), 3)
+        # Confirm entries were properly merged.
+        for entry_db, entry in zip(
+            docket_entries, data_history["docket_entries"]
+        ):
+            self.assertEqual(entry_db.description, entry["description"])
+            self.assertEqual(
+                entry_db.recap_documents.all()[0].description,
+                entry["short_description"],
+            )
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_remove_duplicated_minute_entries(
+        self,
+        mock_webhook_post,
+    ):
+        """Confirm that we can remove minute entries that are in fact
+        duplicated.
+        """
+        docket_entries = DocketEntry.objects.all()
+        self.assertEqual(docket_entries.count(), 0)
+
+        docket_data = DocketDataFactory(
+            docket_entries=[
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2020, 10, 15),
+                    date_entered=date(2020, 10, 15),
+                    description="The corrected publicly accessible audio line for today's conference is available",
+                    short_description=None,
+                    document_number=210,
+                ),
+                MinuteDocketEntryDataFactory(  # Duplicated entry
+                    date_filed=date(2020, 10, 15),
+                    date_entered=date(2020, 10, 15),
+                    short_description="Set/Reset Deadlines",
+                    description=None,
+                ),
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2020, 10, 15),
+                    date_entered=date(2020, 10, 15),
+                    description="Set/Reset Deadlines: Fact Discovery due by 2/12/2021. (cf) (Entered: 10/15/2020)",
+                    short_description=None,
+                ),
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2020, 10, 15),
+                    date_entered=date(2020, 10, 15),
+                    description="Set/Reset Deadlines: Expert Discovery due by 6/11/2021. (cf) (Entered: 10/15/2020)",
+                    short_description=None,
+                ),
+            ],
+        )
+
+        # Add initial docket entries.
+        data = deepcopy(docket_data)
+        add_docket_entries(self.d, data["docket_entries"])
+        # 4 entries should be created.
+        self.assertEqual(docket_entries.count(), 4)
+
+        # Adapt docket entries to simulate docket history report entries
+        # without duplicates.
+        data_history = deepcopy(docket_data)
+        docket_entries_history = data_history["docket_entries"][0:3]
+        docket_entries_history[0][
+            "short_description"
+        ] = "Order on Motion for Extension of Time to Complete Discovery"
+        docket_entries_history[1][
+            "description"
+        ] = "Set/Reset Deadlines: Expert Discovery due by 6/11/2021. (cf) (Entered: 10/15/2020)"
+        docket_entries_history[2]["short_description"] = "Set/Reset Deadlines"
+        # Merge docket history report entries.
+        add_docket_entries(self.d, docket_entries_history)
+        # Entries are properly merged removing the duplicated one.
+        self.assertEqual(docket_entries.count(), 3)
+        # Confirm entries were properly merged.
+        for entry_db, entry in zip(docket_entries, docket_entries_history):
+            self.assertEqual(entry_db.description, entry["description"])
+            self.assertEqual(
+                entry_db.recap_documents.all()[0].description,
+                entry["short_description"],
+            )
