@@ -36,6 +36,17 @@ def strip_port_to_make_ip_key(group: str, request: HttpRequest) -> str:
     return header.split(":")[0]
 
 
+def get_path_to_make_key(group: str, request: HttpRequest) -> str:
+    """Return a string representing the full path to the requested page. This
+    helper makes a good key to create a global limit to throttle requests.
+
+    :param group: Unused: The group key from the ratelimiter
+    :param request: The HTTP request from the user
+    :return: A key that can be used to throttle request to a single URL if needed.
+    """
+    return request.path
+
+
 ratelimiter_all_250_per_h = ratelimit(
     key=strip_port_to_make_ip_key,
     rate="250/h",
@@ -47,6 +58,7 @@ if "test" in sys.argv:
     ratelimiter_all_2_per_m = lambda func: func
     ratelimiter_unsafe_3_per_m = lambda func: func
     ratelimiter_unsafe_10_per_m = lambda func: func
+    ratelimiter_unsafe_2000_per_h = lambda func: func
 else:
     ratelimiter_all_2_per_m = ratelimit(
         key=strip_port_to_make_ip_key,
@@ -60,6 +72,11 @@ else:
     ratelimiter_unsafe_10_per_m = ratelimit(
         key=strip_port_to_make_ip_key,
         rate="10/m",
+        method=UNSAFE,
+    )
+    ratelimiter_unsafe_2000_per_h = ratelimit(
+        key=get_path_to_make_key,
+        rate="2000/h",
         method=UNSAFE,
     )
 
