@@ -252,8 +252,13 @@
               </a>
               <ul class="dropdown-menu" role="menu">
                 <li>
-                  <a href="{% url "advanced_o" %}" tabindex="101">Advanced Search</a>
+                  <a href="{% url "advanced_o" %}" tabindex="101">Opinions Search</a>
                 </li>
+                {% flag "parenthetical-search" %}
+                  <li>
+                    <a href="{% url "advanced_pa" %}" tabindex="101">Parentheticals Search</a>
+                  </li>
+                {% endflag %}
                 <li>
                   <a href="{% url "citation_homepage" %}"
                      tabindex="102">Citation Look Up</a>

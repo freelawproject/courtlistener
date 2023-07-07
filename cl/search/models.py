@@ -3335,11 +3335,13 @@ class SEARCH_TYPES:
     DOCKETS = "d"
     ORAL_ARGUMENT = "oa"
     PEOPLE = "p"
+    PARENTHETICAL = "pa"
     NAMES = (
         (OPINION, "Opinions"),
         (RECAP, "RECAP"),
         (DOCKETS, "RECAP Dockets"),
         (ORAL_ARGUMENT, "Oral Arguments"),
         (PEOPLE, "People"),
+        (PARENTHETICAL, "Parenthetical"),
     )
     ALL_TYPES = [OPINION, RECAP, ORAL_ARGUMENT, PEOPLE]

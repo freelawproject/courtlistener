@@ -378,8 +378,14 @@ def contact_thanks(request: HttpRequest) -> HttpResponse:
 
 
 def advanced_search(request: HttpRequest) -> HttpResponse:
+    types = ["opinions", "parentheticals", "recap_archive", "oral_arguments"]
+    json_template = loader.get_template("includes/available_fields.json")
+    json_content = json_template.render()
+    data = json.loads(json_content)
     return TemplateResponse(
-        request, "help/advanced_search.html", {"private": False}
+        request,
+        "help/advanced_search.html",
+        {"private": False, "data": data, "types": types},
     )
 
 

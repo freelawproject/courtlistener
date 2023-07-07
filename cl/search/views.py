@@ -12,19 +12,28 @@ from django.core.exceptions import PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Count, Sum
 from django.http import HttpRequest, HttpResponse
-from django.shortcuts import HttpResponseRedirect, get_object_or_404
+from django.shortcuts import HttpResponseRedirect, get_object_or_404, render
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.timezone import make_aware
 from django.views.decorators.cache import never_cache
+from elasticsearch.exceptions import RequestError, TransportError
 from requests import RequestException, Session
 from scorched.exc import SolrError
+from waffle.decorators import waffle_flag
 
 from cl.alerts.forms import CreateAlertForm
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.bot_detector import is_bot
+from cl.lib.elasticsearch_utils import (
+    build_es_main_query,
+    convert_str_date_fields_to_date_objects,
+    merge_courts_from_db,
+    set_results_highlights,
+)
+from cl.lib.paginators import ESPaginator
 from cl.lib.ratelimiter import ratelimit_deny_list
 from cl.lib.redis_utils import make_redis_interface
 from cl.lib.search_utils import (
@@ -39,6 +48,7 @@ from cl.lib.search_utils import (
     regroup_snippets,
 )
 from cl.search.constants import RELATED_PATTERN
+from cl.search.documents import ParentheticalGroupDocument
 from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import SEARCH_TYPES, Court, Opinion, OpinionCluster
 from cl.stats.models import Stat
@@ -181,7 +191,9 @@ def do_search(
                     traceback.print_exc()
 
         # A couple special variables for particular search types
-        search_form = _clean_form(get_params, cd, courts)
+        search_form = _clean_form(
+            get_params, cd, courts, search_form.__class__
+        )
         if cd["type"] in [
             SEARCH_TYPES.OPINION,
             SEARCH_TYPES.RECAP,
@@ -309,6 +321,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
     All of these paths have tests.
     """
     # Create a search string that does not contain the page numbers
+
     get_string = make_get_string(request)
     get_string_sans_alert = make_get_string(
         request, ["page", "edit_alert", "show_alert_modal"]
@@ -442,12 +455,17 @@ def show_results(request: HttpRequest) -> HttpResponse:
                     user=request.user,
                 )
 
-            render_dict.update(do_search(request.GET.copy()))
-            # Set the value to the query as a convenience
-            alert_form.fields["name"].widget.attrs["value"] = render_dict[
-                "search_summary_str"
-            ]
-            render_dict.update({"alert_form": alert_form})
+                if request.GET.get("type") == SEARCH_TYPES.PARENTHETICAL:
+                    search_results = do_es_search(request.GET.copy())
+                    render_dict.update(search_results)
+
+                else:
+                    render_dict.update(do_search(request.GET.copy()))
+                    # Set the value to the query as a convenience
+                    alert_form.fields["name"].widget.attrs[
+                        "value"
+                    ] = render_dict["search_summary_str"]
+                    render_dict.update({"alert_form": alert_form})
             return TemplateResponse(request, "search.html", render_dict)
 
 
@@ -495,4 +513,139 @@ def advanced(request: HttpRequest) -> HttpResponse:
                 "court_count": court_count,
             }
         )
-        return TemplateResponse(request, "advanced.html", render_dict)
+        return render(request, "advanced.html", render_dict)
+
+
+@waffle_flag("parenthetical-search")
+def es_search(request: HttpRequest) -> HttpResponse:
+    """Display elasticsearch search page based on type passed as url param
+    :param request: HttpRequest object
+    :return: HttpResponse
+    """
+    render_dict = {"private": False}
+    courts = Court.objects.filter(in_use=True)
+    render_dict.update({"search_type": "parenthetical"})
+    obj_type = SEARCH_TYPES.PARENTHETICAL
+    search_form = SearchForm({"type": obj_type})
+    if search_form.is_valid():
+        search_form = _clean_form(
+            request.GET.copy(),
+            search_form.cleaned_data,
+            courts,
+            search_form.__class__,
+        )
+    template = "advanced.html"
+
+    courts, court_count_human, court_count = merge_form_with_courts(
+        courts, search_form
+    )
+    render_dict.update(
+        {
+            "search_form": search_form,
+            "courts": courts,
+            "court_count_human": court_count_human,
+            "court_count": court_count,
+        }
+    )
+
+    return render(request, template, render_dict)
+
+
+def do_es_search(get_params):
+    """Run Elasticsearch searching and filtering and prepare data to display
+    :param get_params: The request.GET params sent by user.
+    :param search_type: indicates search type by name
+    :return: dict
+    """
+
+    paged_results = None
+    error = False
+    courts = Court.objects.filter(in_use=True)
+    query_time = total_pa_groups = 0
+    top_hits_limit = 5
+
+    search_form = SearchForm(get_params)
+    document_type = ParentheticalGroupDocument
+
+    if search_form.is_valid():
+        cd = search_form.cleaned_data
+        # Create necessary filters to execute ES query
+        search_query = document_type.search()
+
+        try:
+            s, total_pa_groups, top_hits_limit = build_es_main_query(
+                search_query, cd
+            )
+            hits = s.execute()
+            query_time = hits.took
+            groups = hits.aggregations.groups.buckets
+            paged_results = do_es_pagination(
+                get_params, groups, rows_per_page=10
+            )
+        except (TransportError, ConnectionError, RequestError) as e:
+            error = True
+            logger.warning(
+                f"Error loading search page with request: {get_params}"
+            )
+            logger.warning(f"Error was: {e}")
+            if settings.DEBUG is True:
+                traceback.print_exc()
+    else:
+        error = True
+
+    search_form = _clean_form(
+        get_params,
+        search_form.cleaned_data,
+        courts,
+        search_form.__class__,
+    )
+    courts, court_count_human, court_count = merge_form_with_courts(
+        courts, search_form
+    )
+    search_summary_str = search_form.as_text(court_count_human)
+    search_summary_dict = search_form.as_display_dict(court_count_human)
+    results_details = [query_time, total_pa_groups, top_hits_limit]
+    return {
+        "results": paged_results,
+        "results_details": results_details,
+        "search_form": search_form,
+        "search_summary_str": search_summary_str,
+        "search_summary_dict": search_summary_dict,
+        "error": error,
+        "courts": courts,
+        "court_count_human": court_count_human,
+        "court_count": court_count,
+    }
+
+
+def do_es_pagination(get_params, hits, rows_per_page=5):
+    """Paginate elasticsearch results
+    :param get_params: url get params
+    :param hits: elasticsearch results
+    :param rows_per_page: number of records per page
+    :return: paginated results
+    """
+
+    try:
+        page = int(get_params.get("page", 1))
+    except ValueError:
+        page = 1
+
+    # Check pagination depth
+    check_pagination_depth(page)
+
+    paginator = ESPaginator(hits, rows_per_page)
+    try:
+        results = paginator.page(page)
+    except PageNotAnInteger:
+        results = paginator.page(1)
+    except EmptyPage:
+        results = paginator.page(paginator.num_pages)
+
+    search_type = get_params.get("type")
+    # Set highlights in results.
+    set_results_highlights(results, search_type)
+    convert_str_date_fields_to_date_objects(results, "dateFiled", search_type)
+    merge_courts_from_db(results, search_type)
+
+    return results
