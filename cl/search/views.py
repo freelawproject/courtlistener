@@ -523,33 +523,30 @@ def es_search(request: HttpRequest) -> HttpResponse:
     :return: HttpResponse
     """
     render_dict = {"private": False}
-    template = None
-
-    if request.path == reverse("advanced_pa"):
-        courts = Court.objects.filter(in_use=True)
-        render_dict.update({"search_type": "parenthetical"})
-        obj_type = SEARCH_TYPES.PARENTHETICAL
-        search_form = SearchForm({"type": obj_type})
-        if search_form.is_valid():
-            search_form = _clean_form(
-                request.GET.copy(),
-                search_form.cleaned_data,
-                courts,
-                search_form.__class__,
-            )
-        template = "advanced.html"
-
-        courts, court_count_human, court_count = merge_form_with_courts(
-            courts, search_form
+    courts = Court.objects.filter(in_use=True)
+    render_dict.update({"search_type": "parenthetical"})
+    obj_type = SEARCH_TYPES.PARENTHETICAL
+    search_form = SearchForm({"type": obj_type})
+    if search_form.is_valid():
+        search_form = _clean_form(
+            request.GET.copy(),
+            search_form.cleaned_data,
+            courts,
+            search_form.__class__,
         )
-        render_dict.update(
-            {
-                "search_form": search_form,
-                "courts": courts,
-                "court_count_human": court_count_human,
-                "court_count": court_count,
-            }
-        )
+    template = "advanced.html"
+
+    courts, court_count_human, court_count = merge_form_with_courts(
+        courts, search_form
+    )
+    render_dict.update(
+        {
+            "search_form": search_form,
+            "courts": courts,
+            "court_count_human": court_count_human,
+            "court_count": court_count,
+        }
+    )
 
     return render(request, template, render_dict)
 
