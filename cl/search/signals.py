@@ -166,3 +166,84 @@ def create_or_update_education_in_es_index(sender, instance=None, **kwargs):
             person_child={"name": "education", "parent": parent_id},
             **doc,
         ).save(skip_empty=False)
+
+
+@receiver(
+    post_delete,
+    sender=Person,
+    dispatch_uid="remove_person_from_es_index",
+)
+def remove_person_from_es_index(sender, instance=None, **kwargs):
+    """Receiver function that gets called after a Person instance is deleted.
+    This function removes a Person document and their related child documents
+    from the ES index.
+    """
+    # Check if the document exists before deleting it
+    if PersonDocument.exists(id=instance.pk):
+        doc = PersonDocument.get(id=instance.pk)
+        doc.delete()
+
+        position_objects = instance.positions.all()
+        education_objects = instance.educations.all()
+        for position in position_objects:
+            doc_id = PEOPLE_DOCS_TYPE_ID(position.pk).POSITION
+            if PositionDocument.exists(id=doc_id):
+                doc = PositionDocument.get(id=doc_id)
+                doc.delete()
+
+        for education in education_objects:
+            doc_id = PEOPLE_DOCS_TYPE_ID(education.pk).EDUCATION
+            if EducationDocument.exists(id=doc_id):
+                doc = EducationDocument.get(id=doc_id)
+                doc.delete()
+
+    else:
+        logger.error(
+            f"The Person with ID:{instance.pk} can't be deleted from "
+            f"the ES index, it doesn't exists."
+        )
+
+
+@receiver(
+    post_delete,
+    sender=Position,
+    dispatch_uid="remove_position_from_es_index",
+)
+def remove_position_from_es_index(sender, instance=None, **kwargs):
+    """Receiver function that gets called after a Position instance is deleted.
+    This function removes a Position document from the ES index.
+    """
+    # Check if the document exists before deleting it
+
+    doc_id = PEOPLE_DOCS_TYPE_ID(instance.pk).POSITION
+    if PositionDocument.exists(id=doc_id):
+        doc = PositionDocument.get(id=doc_id)
+        doc.delete()
+
+    else:
+        logger.error(
+            f"The Position instance with ID:{instance.pk} can't be deleted from "
+            f"the ES index, it doesn't exists."
+        )
+
+
+@receiver(
+    post_delete,
+    sender=Education,
+    dispatch_uid="remove_education_from_es_index",
+)
+def remove_education_from_es_index(sender, instance=None, **kwargs):
+    """Receiver function that gets called after an Education instance is deleted.
+    This function removes an Education document from the ES index.
+    """
+    # Check if the document exists before deleting it
+    doc_id = PEOPLE_DOCS_TYPE_ID(instance.pk).EDUCATION
+    if EducationDocument.exists(id=doc_id):
+        doc = EducationDocument.get(id=doc_id)
+        doc.delete()
+
+    else:
+        logger.error(
+            f"The Education instance with ID:{instance.pk} can't be deleted from "
+            f"the ES index, it doesn't exists."
+        )

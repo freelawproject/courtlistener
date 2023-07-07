@@ -43,6 +43,7 @@ from cl.lib.elasticsearch_utils import (
     build_sort_results,
     build_term_query,
     group_search_results,
+    es_index_exists
 )
 from cl.lib.search_utils import cleanup_main_query, make_fq
 from cl.lib.storage import clobbering_get_name
@@ -54,6 +55,7 @@ from cl.lib.test_helpers import (
     ESTestCaseMixin,
     IndexedSolrTestCase,
     SolrTestCase,
+    PeopleTestCase,
 )
 from cl.people_db.factories import (
     EducationFactory,
@@ -72,6 +74,7 @@ from cl.search.documents import (
     AudioPercolator,
     ParentheticalGroupDocument,
     PersonBaseDocument,
+    PersonDocument
 )
 from cl.search.factories import (
     CitationWithParentsFactory,
@@ -3002,7 +3005,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        Audio.objects.all().delete()
+        #Audio.objects.all().delete()
         super().tearDownClass()
 
     @staticmethod
@@ -4878,8 +4881,8 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         for query_id in created_queries_ids:
             es.delete(index="oral_arguments_percolator", id=query_id)
 
-
-class PeopleSearchTestElasticSearch(CourtTestCase, ESTestCaseMixin, TestCase):
+from elasticsearch_dsl import Search
+class PeopleSearchTestElasticSearch(CourtTestCase, PeopleTestCase, ESTestCaseMixin, TestCase):
     """People search tests for Elasticsearch"""
 
     @classmethod
@@ -4914,22 +4917,103 @@ class PeopleSearchTestElasticSearch(CourtTestCase, ESTestCaseMixin, TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        super().setUpTestData()
         cls.rebuild_index()
         cls.delete_index()
         cls.create_index()
-        cls.person = PersonFactory.create(name_first="John Deer")
-        cls.pos_1 = PositionFactory.create(
+        super().setUpTestData()
+
+
+    @classmethod
+    def tearDownClass(cls):
+        #cls.delete_index()
+        super().tearDownClass()
+
+    def _test_article_count(self, params, expected_count, field_name):
+        r = self.client.get("/", params)
+        tree = html.fromstring(r.content.decode())
+        got = len(tree.xpath("//article"))
+        self.assertEqual(
+            got,
+            expected_count,
+            msg="Did not get the right number of search results with %s "
+            "filter applied.\n"
+            "Expected: %s\n"
+            "     Got: %s\n\n"
+            "Params were: %s" % (field_name, expected_count, got, params),
+        )
+        return r
+
+    def _test_api_results_count(self, params, expected_count, field_name):
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v3"}), params
+        )
+        got = len(r.data["results"])
+        self.assertEqual(
+            got,
+            expected_count,
+            msg="Did not get the right number of search results with %s "
+            "filter applied.\n"
+            "Expected: %s\n"
+            "     Got: %s\n\n"
+            "Params were: %s" % (field_name, expected_count, got, params),
+        )
+        return r
+
+    def test_index_parent_and_child_objects(self) -> None:
+        """Confirm Parent object and child objects are properly indexed."""
+
+        # Judge is indexed.
+        self.assertTrue(PersonBaseDocument.exists(id=self.person_1.pk))
+        self.assertTrue(PersonBaseDocument.exists(id=self.person_2.pk))
+        self.assertTrue(PersonBaseDocument.exists(id=self.person_3.pk))
+        # Position 1 is indexed.
+        self.assertTrue(
+            PersonBaseDocument.exists(
+                id=PEOPLE_DOCS_TYPE_ID(self.position_1.pk).POSITION
+            )
+        )
+        self.assertTrue(
+            PersonBaseDocument.exists(
+                id=PEOPLE_DOCS_TYPE_ID(self.position_2.pk).POSITION
+            )
+        )
+        self.assertTrue(
+            PersonBaseDocument.exists(
+                id=PEOPLE_DOCS_TYPE_ID(self.position_3.pk).POSITION
+            )
+        )
+        self.assertTrue(
+            PersonBaseDocument.exists(
+                id=PEOPLE_DOCS_TYPE_ID(self.position_4.pk).POSITION
+            )
+        )
+
+        # Education is indexed.
+        self.assertTrue(
+            PersonBaseDocument.exists(
+                id=PEOPLE_DOCS_TYPE_ID(self.education_1.pk).EDUCATION
+            )
+        )
+        self.assertTrue(
+            PersonBaseDocument.exists(
+                id=PEOPLE_DOCS_TYPE_ID(self.education_2.pk).EDUCATION
+            )
+        )
+
+    def test_remove_parent_child_objects_from_index(self) -> None:
+
+        person = PersonFactory.create(name_first="John Deer")
+        pos_1 = PositionFactory.create(
             date_granularity_start="%Y-%m-%d",
             date_start=datetime.date(2015, 12, 14),
             organization_name="Pants, Inc.",
             job_title="Corporate Lawyer",
             position_type=None,
-            person=cls.person,
+            person=person,
         )
-        cls.pos_2 = PositionFactory.create(
-            court=cls.court_1,
-            person=cls.person,
+        pos_2 = PositionFactory.create(
+            court=self.court_1,
+            person=person,
             date_granularity_start="%Y-%m-%d",
             date_start=datetime.date(1993, 1, 20),
             date_retirement=datetime.date(2001, 1, 20),
@@ -4938,43 +5022,152 @@ class PeopleSearchTestElasticSearch(CourtTestCase, ESTestCaseMixin, TestCase):
             how_selected="e_part",
             nomination_process="fed_senate",
         )
-        PoliticalAffiliationFactory.create(person=cls.person)
+        PoliticalAffiliationFactory.create(person=person)
         school = SchoolFactory.create(name="Harvard University")
-        cls.education = EducationFactory.create(
-            person=cls.person,
+        education = EducationFactory.create(
+            person=person,
             school=school,
             degree_level="ma",
             degree_year="1990",
         )
 
-    @classmethod
-    def tearDownClass(cls):
-        cls.delete_index()
-        super().tearDownClass()
+        PersonBaseDocument._index.refresh()
 
-    def test_index_parent_and_child_objects(self) -> None:
-        """Confirm Parent object and child objects are properly indexed."""
+        s =  PersonBaseDocument.search()
+        s = s.query(Q("match", person_child="person"))
+        self.assertEqual(s.count(), 4)
 
-        # Judge is indexed.
-        self.assertTrue(PersonBaseDocument.exists(id=self.person.pk))
-
-        # Position 1 is indexed.
         self.assertTrue(
             PersonBaseDocument.exists(
-                id=PEOPLE_DOCS_TYPE_ID(self.pos_1.pk).POSITION
+                id=PEOPLE_DOCS_TYPE_ID(pos_1.pk).POSITION
             )
         )
-
-        # Position 2 is indexed.
         self.assertTrue(
             PersonBaseDocument.exists(
-                id=PEOPLE_DOCS_TYPE_ID(self.pos_2.pk).POSITION
+                id=PEOPLE_DOCS_TYPE_ID(pos_2.pk).POSITION
             )
         )
-
         # Education is indexed.
         self.assertTrue(
             PersonBaseDocument.exists(
-                id=PEOPLE_DOCS_TYPE_ID(self.education.pk).EDUCATION
+                id=PEOPLE_DOCS_TYPE_ID(education.pk).EDUCATION
             )
         )
+
+        # Remove person document from index and all their child documents.
+        person.delete()
+        PersonBaseDocument._index.refresh()
+
+        s = PersonBaseDocument.search()
+        s = s.query(Q("match", person_child="person"))
+        self.assertEqual(s.count(), 3)
+
+        # Positions objects are removed
+        self.assertFalse(
+            PersonBaseDocument.exists(
+                id=PEOPLE_DOCS_TYPE_ID(pos_1.pk).POSITION
+            )
+        )
+        self.assertFalse(
+            PersonBaseDocument.exists(
+                id=PEOPLE_DOCS_TYPE_ID(pos_2.pk).POSITION
+            )
+        )
+        # Education is removed.
+        self.assertFalse(
+            PersonBaseDocument.exists(
+                id=PEOPLE_DOCS_TYPE_ID(education.pk).EDUCATION
+            )
+        )
+
+    def test_remove_nested_objects_from_index(self) -> None:
+        person = PersonFactory.create(name_first="John Deer")
+
+        print("Person pk: ", person.pk)
+        pos_1 = PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            date_start=datetime.date(2015, 12, 14),
+            organization_name="Pants, Inc.",
+            job_title="Corporate Lawyer",
+            position_type=None,
+            person=person,
+        )
+        pos_2 = PositionFactory.create(
+            court=self.court_1,
+            person=person,
+            date_granularity_start="%Y-%m-%d",
+            date_start=datetime.date(1993, 1, 20),
+            date_retirement=datetime.date(2001, 1, 20),
+            termination_reason="retire_mand",
+            position_type="c-jud",
+            how_selected="e_part",
+            nomination_process="fed_senate",
+        )
+        PoliticalAffiliationFactory.create(person=person)
+        school = SchoolFactory.create(name="Harvard University 2")
+        education = EducationFactory.create(
+            person=person,
+            school=school,
+            degree_level="ma",
+            degree_year="1990",
+        )
+
+        PersonBaseDocument._index.refresh()
+
+        s = PersonBaseDocument.search()
+        s = s.query(Q("match", person_child="person"))
+        self.assertEqual(s.count(), 4)
+
+        self.assertTrue(
+            PersonBaseDocument.exists(
+                id=PEOPLE_DOCS_TYPE_ID(pos_1.pk).POSITION
+            )
+        )
+        self.assertTrue(
+            PersonBaseDocument.exists(
+                id=PEOPLE_DOCS_TYPE_ID(pos_2.pk).POSITION
+            )
+        )
+        # Education is indexed.
+        self.assertTrue(
+            PersonBaseDocument.exists(
+                id=PEOPLE_DOCS_TYPE_ID(education.pk).EDUCATION
+            )
+        )
+
+        pos_1_pk = pos_1.pk
+        pos_2_pk = pos_2.pk
+        education_pk = education.pk
+
+
+        pos_1.delete()
+        education.delete()
+        PersonBaseDocument._index.refresh()
+
+        s = PersonBaseDocument.search()
+        s = s.query(Q("match", person_child="person"))
+        self.assertEqual(s.count(), 4)
+
+        # Position objects are removed
+        self.assertFalse(
+            PersonBaseDocument.exists(
+                id=PEOPLE_DOCS_TYPE_ID(pos_1_pk).POSITION
+            )
+        )
+        self.assertTrue(
+            PersonBaseDocument.exists(
+                id=PEOPLE_DOCS_TYPE_ID(pos_2_pk).POSITION
+            )
+        )
+
+        # Education is removed.
+        self.assertFalse(
+            PersonBaseDocument.exists(
+                id=PEOPLE_DOCS_TYPE_ID(education_pk).EDUCATION
+            )
+        )
+
+        person.delete()
+        pos_2.delete()
+
+
