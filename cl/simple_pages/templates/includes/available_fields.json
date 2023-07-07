@@ -27,7 +27,7 @@
       "field":"scdb_id",
       "description":"The ID of an opinion in the <a href='http://scdb.wustl.edu/'>Supreme Court Database</a>.",
       "opinions":true,
-      "parentheticals":true,
+      "parentheticals":false,
       "recap_archive":false,
       "oral_arguments":false
    },
@@ -107,7 +107,7 @@
       "field":"joined_by_ids",
       "description":"The IDs of the judges joining an author in an opinion.",
       "opinions":true,
-      "parentheticals":true,
+      "parentheticals":false,
       "recap_archive":false,
       "oral_arguments":false
    },
@@ -179,7 +179,7 @@
       "field":"dateArgued",
       "description":"The date that a case was first argued.",
       "opinions":true,
-      "parentheticals":true,
+      "parentheticals":false,
       "recap_archive":true,
       "oral_arguments":true
    },
@@ -187,7 +187,7 @@
       "field":"dateReargued",
       "description":"The date that a case was reargued.",
       "opinions":true,
-      "parentheticals":true,
+      "parentheticals":false,
       "recap_archive":false,
       "oral_arguments":true
    },
@@ -195,7 +195,7 @@
       "field":"dateReargumentDenied",
       "description":"The date a that a motion for reargument was denied.",
       "opinions":true,
-      "parentheticals":true,
+      "parentheticals":false,
       "recap_archive":false,
       "oral_arguments":true
    },

@@ -2008,20 +2008,7 @@ class CaptionTest(TestCase):
         self.assertEqual(cs, cs_sorted)
 
 
-def is_es_online(connection_alias="default"):
-    """Validate that ES instance is online
-    :param connection_alias: Name of connection to use
-    :return: True or False
-    """
-    with captured_stderr():
-        es = connections.get_connection(connection_alias)
-        return es.ping()
-
-
-@skipUnless(is_es_online(), "Elasticsearch is offline")
 class ElasticSearchTest(TestCase):
-    fixtures = ["test_court.json"]
-
     # Mock ElasticSearch search and responses are difficult due to its implementation,
     # that's why we skip testing if Elasticsearch instance is offline, this can be
     # fixed by implementing the service in Github actions or using external library to
@@ -2330,7 +2317,7 @@ class ElasticSearchTest(TestCase):
             s = ParentheticalGroupDocument.search().query("match_all")
             self.assertEqual(s.count(), 4)
 
-    def test_docker_number_filter(self) -> None:
+    def test_docket_number_filter(self) -> None:
         """Test filter by docker_number"""
         filters = []
 
@@ -2423,20 +2410,13 @@ class ElasticSearchTest(TestCase):
         self.assertEqual(type(results[0].citation[0]), str)
         self.assertEqual(type(results[0].cites[0]), int)
         self.assertEqual(type(results[0].court_id), str)
-        self.assertEqual(type(results[0].dateArgued), datetime.datetime)
         self.assertEqual(type(results[0].dateFiled), datetime.datetime)
-        self.assertEqual(type(results[0].dateReargued), datetime.datetime)
-        self.assertEqual(
-            type(results[0].dateReargumentDenied), datetime.datetime
-        )
         self.assertEqual(type(results[0].docket_id), int)
         self.assertEqual(type(results[0].docketNumber), str)
-        self.assertEqual(type(results[0].joined_by_ids[0]), int)
         self.assertEqual(type(results[0].judge), str)
         self.assertEqual(type(results[0].lexisCite), str)
         self.assertEqual(type(results[0].neutralCite), str)
         self.assertEqual(type(results[0].panel_ids[0]), int)
-        self.assertEqual(type(results[0].scdb_id), str)
         self.assertEqual(type(results[0].status), str)
         self.assertEqual(type(results[0].suitNature), str)
 

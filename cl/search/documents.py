@@ -26,14 +26,7 @@ class ParentheticalGroupDocument(Document):
     )
     cluster_id = fields.IntegerField(attr="opinion.cluster_id")
     court_id = fields.KeywordField(attr="opinion.cluster.docket.court.pk")
-    dateArgued = fields.DateField(attr="opinion.cluster.docket.date_argued")
     dateFiled = fields.DateField(attr="opinion.cluster.date_filed")
-    dateReargued = fields.DateField(
-        attr="opinion.cluster.docket.date_reargued"
-    )
-    dateReargumentDenied = fields.DateField(
-        attr="opinion.cluster.docket.date_reargument_denied"
-    )
     describing_opinion_cluster_id = fields.KeywordField(
         attr="representative.describing_opinion.cluster.id"
     )
@@ -43,9 +36,6 @@ class ParentheticalGroupDocument(Document):
     docket_id = fields.IntegerField(attr="opinion.cluster.docket_id")
     docketNumber = fields.KeywordField(
         attr="opinion.cluster.docket.docket_number"
-    )
-    joined_by_ids = fields.ListField(
-        fields.IntegerField(),
     )
     judge = fields.TextField(
         attr="opinion.cluster.judges",
@@ -67,7 +57,6 @@ class ParentheticalGroupDocument(Document):
     representative_text = fields.TextField(
         attr="representative.text",
     )
-    scdb_id = fields.KeywordField(attr="opinion.cluster.scdb_id")
     status = fields.KeywordField()
     suitNature = fields.TextField(
         attr="opinion.cluster.nature_of_suit",
@@ -82,9 +71,6 @@ class ParentheticalGroupDocument(Document):
 
     def prepare_cites(self, instance):
         return [o.pk for o in instance.opinion.opinions_cited.all()]
-
-    def prepare_joined_by_ids(self, instance):
-        return [judge.pk for judge in instance.opinion.joined_by.all()]
 
     def prepare_lexisCite(self, instance):
         try:
