@@ -40,10 +40,11 @@ from cl.lib.elasticsearch_utils import (
     build_es_filters,
     build_es_main_query,
     build_fulltext_query,
+    build_join_es_filters,
+    build_join_fulltext_queries,
     build_sort_results,
     build_term_query,
     group_search_results,
-    es_index_exists
 )
 from cl.lib.search_utils import cleanup_main_query, make_fq
 from cl.lib.storage import clobbering_get_name
@@ -54,8 +55,8 @@ from cl.lib.test_helpers import (
     EmptySolrTestCase,
     ESTestCaseMixin,
     IndexedSolrTestCase,
-    SolrTestCase,
     PeopleTestCase,
+    SolrTestCase,
 )
 from cl.people_db.factories import (
     EducationFactory,
@@ -74,7 +75,6 @@ from cl.search.documents import (
     AudioPercolator,
     ParentheticalGroupDocument,
     PersonBaseDocument,
-    PersonDocument
 )
 from cl.search.factories import (
     CitationWithParentsFactory,
@@ -107,7 +107,7 @@ from cl.search.models import (
 from cl.search.tasks import add_docket_to_solr_by_rds
 from cl.search.views import do_search
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
-from cl.tests.cases import TestCase
+from cl.tests.cases import ESIndexMixin, TestCase
 from cl.tests.utils import get_with_wait
 from cl.users.factories import UserProfileWithParentsFactory
 
@@ -2978,23 +2978,10 @@ class DocketEntriesTimezone(TestCase):
         self.assertEqual(de_nyed_utc.datetime_filed, target_date_aware)
 
 
-class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
+class OASearchTestElasticSearch(
+    ESTestCaseMixin, ESIndexMixin, AudioESTestCase, TestCase
+):
     """Oral argument search tests for Elasticsearch"""
-
-    @classmethod
-    def rebuild_index(self, model):
-        """
-        Create and populate the Elasticsearch index and mapping
-        """
-
-        # -f rebuilds index without prompt for confirmation
-        call_command(
-            "search_index",
-            "--rebuild",
-            "-f",
-            "--models",
-            model,
-        )
 
     @classmethod
     def setUpTestData(cls):
@@ -3005,7 +2992,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        #Audio.objects.all().delete()
+        Audio.objects.all().delete()
         super().tearDownClass()
 
     @staticmethod
@@ -4881,51 +4868,23 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         for query_id in created_queries_ids:
             es.delete(index="oral_arguments_percolator", id=query_id)
 
-from elasticsearch_dsl import Search
-class PeopleSearchTestElasticSearch(CourtTestCase, PeopleTestCase, ESTestCaseMixin, TestCase):
+
+class PeopleSearchTestElasticSearch(
+    CourtTestCase, PeopleTestCase, ESIndexMixin, ESTestCaseMixin, TestCase
+):
     """People search tests for Elasticsearch"""
 
     @classmethod
-    def rebuild_index(self):
-        """
-        Create and populate the Elasticsearch index and mapping
-        """
-        # -f rebuilds index without prompt for confirmation
-        call_command(
-            "search_index", "--rebuild", "-f", "--models", "audio.Audio"
-        )
-
-    @classmethod
-    def create_index(self):
-        """
-        Create and populate the Elasticsearch index and mapping
-        """
-        # -f rebuilds index without prompt for confirmation
-        call_command(
-            "search_index", "--create", "-f", "--models", "people_db.Person"
-        )
-
-    @classmethod
-    def delete_index(self):
-        """
-        Create and populate the Elasticsearch index and mapping
-        """
-        # -f rebuilds index without prompt for confirmation
-        call_command(
-            "search_index", "--delete", "-f", "--models", "people_db.Person"
-        )
-
-    @classmethod
     def setUpTestData(cls):
-        cls.rebuild_index()
-        cls.delete_index()
-        cls.create_index()
+        cls.rebuild_index("audio.Audio")
+        cls.delete_index("people_db.Person")
+        cls.create_index("people_db.Person")
         super().setUpTestData()
-
+        PersonBaseDocument._index.refresh()
 
     @classmethod
     def tearDownClass(cls):
-        #cls.delete_index()
+        cls.delete_index("people_db.Person")
         super().tearDownClass()
 
     def _test_article_count(self, params, expected_count, field_name):
@@ -4962,56 +4921,40 @@ class PeopleSearchTestElasticSearch(CourtTestCase, PeopleTestCase, ESTestCaseMix
     def test_index_parent_and_child_objects(self) -> None:
         """Confirm Parent object and child objects are properly indexed."""
 
-        # Judge is indexed.
-        self.assertTrue(PersonBaseDocument.exists(id=self.person_1.pk))
-        self.assertTrue(PersonBaseDocument.exists(id=self.person_2.pk))
-        self.assertTrue(PersonBaseDocument.exists(id=self.person_3.pk))
-        # Position 1 is indexed.
-        self.assertTrue(
-            PersonBaseDocument.exists(
-                id=PEOPLE_DOCS_TYPE_ID(self.position_1.pk).POSITION
-            )
-        )
-        self.assertTrue(
-            PersonBaseDocument.exists(
-                id=PEOPLE_DOCS_TYPE_ID(self.position_2.pk).POSITION
-            )
-        )
-        self.assertTrue(
-            PersonBaseDocument.exists(
-                id=PEOPLE_DOCS_TYPE_ID(self.position_3.pk).POSITION
-            )
-        )
-        self.assertTrue(
-            PersonBaseDocument.exists(
-                id=PEOPLE_DOCS_TYPE_ID(self.position_4.pk).POSITION
-            )
-        )
+        # Judges are indexed.
+        s = PersonBaseDocument.search()
+        s = s.query(Q("match", person_child="person"))
+        self.assertEqual(s.count(), 3)
 
-        # Education is indexed.
-        self.assertTrue(
-            PersonBaseDocument.exists(
-                id=PEOPLE_DOCS_TYPE_ID(self.education_1.pk).EDUCATION
+        # Positions are indexed.
+        position_pks = [
+            self.position_1.pk,
+            self.position_2.pk,
+            self.position_3.pk,
+            self.position_4.pk,
+        ]
+        for position_pk in position_pks:
+            self.assertTrue(
+                PersonBaseDocument.exists(
+                    id=PEOPLE_DOCS_TYPE_ID(position_pk).POSITION
+                )
             )
-        )
-        self.assertTrue(
-            PersonBaseDocument.exists(
-                id=PEOPLE_DOCS_TYPE_ID(self.education_2.pk).EDUCATION
+
+        # Educations are indexed.
+        education_pks = [self.education_1.pk, self.education_2.pk]
+        for education_pk in education_pks:
+            self.assertTrue(
+                PersonBaseDocument.exists(
+                    id=PEOPLE_DOCS_TYPE_ID(education_pk).EDUCATION
+                )
             )
-        )
 
     def test_remove_parent_child_objects_from_index(self) -> None:
-
+        """Confirm join child objects are removed from the index when the
+        parent objects is deleted.
+        """
         person = PersonFactory.create(name_first="John Deer")
         pos_1 = PositionFactory.create(
-            date_granularity_start="%Y-%m-%d",
-            date_start=datetime.date(2015, 12, 14),
-            organization_name="Pants, Inc.",
-            job_title="Corporate Lawyer",
-            position_type=None,
-            person=person,
-        )
-        pos_2 = PositionFactory.create(
             court=self.court_1,
             person=person,
             date_granularity_start="%Y-%m-%d",
@@ -5030,69 +4973,76 @@ class PeopleSearchTestElasticSearch(CourtTestCase, PeopleTestCase, ESTestCaseMix
             degree_level="ma",
             degree_year="1990",
         )
-
         PersonBaseDocument._index.refresh()
 
-        s =  PersonBaseDocument.search()
-        s = s.query(Q("match", person_child="person"))
-        self.assertEqual(s.count(), 4)
-
+        person_pk = person.pk
+        pos_1_pk = pos_1.pk
+        education_pk = education.pk
+        # Person instance is indexed.
+        self.assertTrue(PersonBaseDocument.exists(id=person_pk))
+        # Position instance is indexed.
         self.assertTrue(
             PersonBaseDocument.exists(
-                id=PEOPLE_DOCS_TYPE_ID(pos_1.pk).POSITION
+                id=PEOPLE_DOCS_TYPE_ID(pos_1_pk).POSITION
             )
         )
+        # Education instance is indexed.
         self.assertTrue(
             PersonBaseDocument.exists(
-                id=PEOPLE_DOCS_TYPE_ID(pos_2.pk).POSITION
-            )
-        )
-        # Education is indexed.
-        self.assertTrue(
-            PersonBaseDocument.exists(
-                id=PEOPLE_DOCS_TYPE_ID(education.pk).EDUCATION
+                id=PEOPLE_DOCS_TYPE_ID(education_pk).EDUCATION
             )
         )
 
-        # Remove person document from index and all their child documents.
+        # Confirm documents can be updated in the ES index.
+        person.name_first = "John Debbas"
+        person.save()
+
+        pos_1.court = self.court_2
+        pos_1.save()
+
+        education.degree_year = "1995"
+        education.save()
+
+        person_doc = PersonBaseDocument.get(id=person.pk)
+        self.assertIn("Debbas", person_doc.name)
+
+        position_doc = PersonBaseDocument.get(
+            id=PEOPLE_DOCS_TYPE_ID(pos_1_pk).POSITION
+        )
+        self.assertEqual(self.court_2.pk, position_doc.court_exact)
+
+        education_doc = PersonBaseDocument.get(
+            id=PEOPLE_DOCS_TYPE_ID(education.pk).EDUCATION
+        )
+        self.assertEqual("1995", str(education_doc.degree_year))
+
+        # Delete person instance; it should be removed from the index along
+        # with its child documents.
         person.delete()
         PersonBaseDocument._index.refresh()
 
-        s = PersonBaseDocument.search()
-        s = s.query(Q("match", person_child="person"))
-        self.assertEqual(s.count(), 3)
-
-        # Positions objects are removed
+        # Person document should be removed.
+        self.assertFalse(PersonBaseDocument.exists(id=person_pk))
+        # Position document is removed.
         self.assertFalse(
             PersonBaseDocument.exists(
-                id=PEOPLE_DOCS_TYPE_ID(pos_1.pk).POSITION
+                id=PEOPLE_DOCS_TYPE_ID(pos_1_pk).POSITION
             )
         )
+        # Education document is removed.
         self.assertFalse(
             PersonBaseDocument.exists(
-                id=PEOPLE_DOCS_TYPE_ID(pos_2.pk).POSITION
-            )
-        )
-        # Education is removed.
-        self.assertFalse(
-            PersonBaseDocument.exists(
-                id=PEOPLE_DOCS_TYPE_ID(education.pk).EDUCATION
+                id=PEOPLE_DOCS_TYPE_ID(education_pk).EDUCATION
             )
         )
 
     def test_remove_nested_objects_from_index(self) -> None:
-        person = PersonFactory.create(name_first="John Deer")
+        """Confirm that child objects are removed from the index when they are
+        deleted independently of their parent object
+        """
 
-        print("Person pk: ", person.pk)
+        person = PersonFactory.create(name_first="John Deer")
         pos_1 = PositionFactory.create(
-            date_granularity_start="%Y-%m-%d",
-            date_start=datetime.date(2015, 12, 14),
-            organization_name="Pants, Inc.",
-            job_title="Corporate Lawyer",
-            position_type=None,
-            person=person,
-        )
-        pos_2 = PositionFactory.create(
             court=self.court_1,
             person=person,
             date_granularity_start="%Y-%m-%d",
@@ -5114,60 +5064,131 @@ class PeopleSearchTestElasticSearch(CourtTestCase, PeopleTestCase, ESTestCaseMix
 
         PersonBaseDocument._index.refresh()
 
-        s = PersonBaseDocument.search()
-        s = s.query(Q("match", person_child="person"))
-        self.assertEqual(s.count(), 4)
-
-        self.assertTrue(
-            PersonBaseDocument.exists(
-                id=PEOPLE_DOCS_TYPE_ID(pos_1.pk).POSITION
-            )
-        )
-        self.assertTrue(
-            PersonBaseDocument.exists(
-                id=PEOPLE_DOCS_TYPE_ID(pos_2.pk).POSITION
-            )
-        )
-        # Education is indexed.
-        self.assertTrue(
-            PersonBaseDocument.exists(
-                id=PEOPLE_DOCS_TYPE_ID(education.pk).EDUCATION
-            )
-        )
-
+        person_pk = person.pk
         pos_1_pk = pos_1.pk
-        pos_2_pk = pos_2.pk
         education_pk = education.pk
+        # Person instance is indexed.
+        self.assertTrue(PersonBaseDocument.exists(id=person_pk))
+        # Position instance is indexed.
+        self.assertTrue(
+            PersonBaseDocument.exists(
+                id=PEOPLE_DOCS_TYPE_ID(pos_1_pk).POSITION
+            )
+        )
+        # Education instance is indexed.
+        self.assertTrue(
+            PersonBaseDocument.exists(
+                id=PEOPLE_DOCS_TYPE_ID(education_pk).EDUCATION
+            )
+        )
 
-
+        # Delete pos_1 and education, keep the parent person instance.
         pos_1.delete()
         education.delete()
         PersonBaseDocument._index.refresh()
 
-        s = PersonBaseDocument.search()
-        s = s.query(Q("match", person_child="person"))
-        self.assertEqual(s.count(), 4)
+        # Person instance still exists.
+        self.assertTrue(PersonBaseDocument.exists(id=person_pk))
 
-        # Position objects are removed
+        # Position object is removed
         self.assertFalse(
             PersonBaseDocument.exists(
                 id=PEOPLE_DOCS_TYPE_ID(pos_1_pk).POSITION
             )
         )
-        self.assertTrue(
-            PersonBaseDocument.exists(
-                id=PEOPLE_DOCS_TYPE_ID(pos_2_pk).POSITION
-            )
-        )
-
         # Education is removed.
         self.assertFalse(
             PersonBaseDocument.exists(
                 id=PEOPLE_DOCS_TYPE_ID(education_pk).EDUCATION
             )
         )
+        person.delete()
+        PersonBaseDocument._index.refresh()
+
+    def test_has_child_queries(self) -> None:
+        """Test the build_join_fulltext_queries has child query, it returns a
+        list of parent documents where their child's documents or the parent
+        document itself match the query.
+        """
+
+        person = PersonFactory.create(name_first="John American")
+        PersonBaseDocument._index.refresh()
+
+        # Query only over child objects, match position appointer.
+        query_values = {"position": ["appointer"], "education": ["school"]}
+        s = PersonBaseDocument.search()
+        has_child_queries = build_join_fulltext_queries(
+            query_values, [], "Bill"
+        )
+        s = s.query(has_child_queries)
+        response = s.execute().to_dict()
+        self.assertEqual(s.count(), 2)
+
+        for hit in response["hits"]["hits"]:
+            self.assertIn("Bill", hit["inner_hits"]["position"][0].appointer)
+
+        # Query only over child objects, match education school.
+        query_values = {"position": ["appointer"], "education": ["school"]}
+        s = PersonBaseDocument.search()
+        has_child_queries = build_join_fulltext_queries(
+            query_values, [], "American University"
+        )
+        s = s.query(has_child_queries)
+        response = s.execute().to_dict()
+        self.assertEqual(s.count(), 1)
+
+        for hit in response["hits"]["hits"]:
+            self.assertEqual(
+                "American University", hit["inner_hits"]["education"][0].school
+            )
+
+        # Query over the parent object and child objects, match education
+        # school and person name.
+        query_values = {"position": ["appointer"], "education": ["school"]}
+        s = PersonBaseDocument.search()
+        has_child_queries = build_join_fulltext_queries(
+            query_values, ["name"], "American"
+        )
+        s = s.query(has_child_queries)
+
+        response = s.execute().to_dict()
+        self.assertEqual(s.count(), 2)
+
+        self.assertIn(
+            "American", response["hits"]["hits"][0]["_source"]["name"]
+        )
+
+        self.assertEqual(
+            "American University",
+            response["hits"]["hits"][1]["inner_hits"]["education"][0].school,
+        )
 
         person.delete()
-        pos_2.delete()
+        PersonBaseDocument._index.refresh()
 
+    def test_has_child_filters(self) -> None:
+        """Test the build_join_es_filters has child filter, it returns a
+        list of parent documents where their child's documents or the parent
+        document itself match the filter.
+        """
 
+        # Query by parent field dob_state.
+        cd = {
+            "dob_state": "NY",
+            "type": SEARCH_TYPES.PEOPLE,
+        }
+        s = PersonBaseDocument.search()
+        has_child_filters = build_join_es_filters(cd)
+        s = s.filter(reduce(operator.iand, has_child_filters))
+        self.assertEqual(s.count(), 2)
+
+        # Query by parent field dob_state and child field selection_method.
+        cd = {
+            "dob_state": "NY",
+            "selection_method": "e_part",
+            "type": SEARCH_TYPES.PEOPLE,
+        }
+        s = PersonBaseDocument.search()
+        has_child_filters = build_join_es_filters(cd)
+        s = s.filter(reduce(operator.iand, has_child_filters))
+        self.assertEqual(s.count(), 1)

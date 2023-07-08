@@ -653,3 +653,112 @@ def es_index_exists(index_name: str) -> bool:
     """
     es = connections.get_connection("default")
     return es.indices.exists(index=index_name)
+
+
+def build_join_fulltext_queries(
+    query_values: dict[str, list[str]], parent_fields: list[str], value: str
+) -> QueryString | List:
+    """Creates a full text query string for join parent-child documents.
+
+    :param query_values: A list of name fields to search in.
+    :param parent_fields: The parent fields to search in.
+    :param value: The string value to search for.
+    :return: A Elasticsearch QueryString or [] if the "value" param is empty.
+    """
+
+    q_should = []
+    for child_type, fields in query_values.items():
+        query = Q(
+            "has_child",
+            type=child_type,
+            query=build_fulltext_query(fields, value),
+            inner_hits={},
+            max_children=10,
+            min_children=0,
+        )
+        q_should.append(query)
+
+    if parent_fields:
+        q_should.append(build_fulltext_query(parent_fields, value))
+
+    if q_should:
+        return Q("bool", should=q_should)
+    return []
+
+
+def build_has_child_filter(
+    filter_type: str, field: str, value: str | list, child_type: str
+) -> list:
+    """Builds a has_child filter query based on the given parameters.
+
+    :param filter_type: The type of filter to build. Accepts 'term' or 'text'.
+    :param field: The name of the field to apply the filter on.
+    :param value: The value to match in the filter. For 'term' filter,
+    this can be a single string or a list of strings.
+    :param child_type: The type of the child documents.
+    :return: Empty list or list with DSL Match query
+    """
+
+    if filter_type == "term":
+        return [
+            Q(
+                "has_child",
+                type=child_type,
+                query=build_term_query(
+                    field,
+                    value,
+                )[0],
+                inner_hits={},
+                max_children=10,
+                min_children=0,
+            )
+        ]
+
+    elif filter_type == "text" and isinstance(value, str):
+        return [
+            Q(
+                "has_child",
+                type=child_type,
+                query=build_text_filter(
+                    field,
+                    value,
+                ),
+                inner_hits={},
+                max_children=10,
+                min_children=0,
+            )[0]
+        ]
+    return []
+
+
+def build_join_es_filters(cd: CleanData) -> List:
+    """Builds join elasticsearch filters based on the CleanData object.
+
+    :param cd: An object containing cleaned user data.
+    :return: The list of Elasticsearch queries built.
+    """
+
+    queries_list = []
+
+    if cd["type"] == SEARCH_TYPES.PEOPLE:
+        queries_list.extend(
+            build_term_query(
+                "dob_state_id",
+                cd.get("dob_state", ""),
+            )
+        )
+
+        selection_method = cd.get("selection_method", "")
+        if selection_method:
+            queries_list.extend(
+                build_has_child_filter(
+                    "term", "selection_method_id", selection_method, "position"
+                )
+            )
+        school = cd.get("school", "")
+        if school:
+            queries_list.extend(
+                build_has_child_filter("text", "school", school, "education")
+            )
+
+    return queries_list
