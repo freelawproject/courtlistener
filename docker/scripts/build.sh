@@ -21,7 +21,7 @@ docker-compose logs
 docker exec cl-django python /opt/courtlistener/manage.py makemigrations --check --dry-run
 if [ $? != 0 ] ; then
 	echo "makemigrations failed on --check"
-	exit 
+	exit
 fi
 docker exec -it cl-doctor pip install x-ray
 
