@@ -3,7 +3,7 @@
 # Take any running versions down
 docker-compose -f  ../courtlistener/docker-compose.yml  down
 #
-# Now we need to get rid of any images in docker that are related to 
+# Now we need to get rid of any images in docker that are related to
 # courtlistener
 flp_images=`docker image ls | awk '/^freelawproject/{print $3}'`
 
