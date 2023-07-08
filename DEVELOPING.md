@@ -72,8 +72,8 @@ To set up a development machine, do the following:
 
 1.  Create a personal settings file. To do that, copy-paste the `.env.example` file to `.env.dev`, and then minimally uncomment these settings:
 
-    - `ALLOWED_HOSTS`: This is needed so tests can pass. You can set it to `localhost` for more security, or set it to `*` if you're on a safe LAN.
-    - `SECRET_KEY`: This is a django setting that salts encryption algorithms, among other things. Just set it to something random, if you like.
+    -   `ALLOWED_HOSTS`: This is needed so tests can pass. You can set it to `localhost` for more security, or set it to `*` if you're on a safe LAN.
+    -   `SECRET_KEY`: This is a django setting that salts encryption algorithms, among other things. Just set it to something random, if you like.
 
     That will get you pretty far, but CourtListener does rely on a number of cloud services, as you'll see in the `env.example` file. To make all features work, you'll need to get tokens for these services.
 
@@ -89,11 +89,39 @@ To set up a development machine, do the following:
 
     `docker-compose up`
 
+    _Using Docker with VSCode on Linux:_ If this is your first project leveraging the Docker extension for VSCode, you may find that VSCode doesn't have permissions
+    to access Docker images and containers. This can be fixed by enabling Rootless Mode. The Docker docs are bad on this point; on Ubuntu (and probably other Debian distros),
+    this is what you need to do:
+
+    1. Run `curl -fsSL https://get.docker.com/rootless | sh`
+    2. Append the following line to the bottom of your `.bashrc`: `export DOCKER_HOST=unix:///run/user/1000/docker.sock`
+
+    Note that your user id might not be 1000, which is the most common and what is used above. You can verify your id with `id -u`.
+
+    You will have to run the command to create the bridge network again.
+
     _Docker Desktop for Mac users:_ By default, Docker runs with very little memory (2GB), so to run everything properly you will need to change the default values:
 
-    - Go to docker Settings/Resources/Advanced
-    - Increase Memory to at least 4GB and Swap to 2GB
-    - Apply changes and Restart.
+    -   Go to docker Settings/Resources/Advanced
+    -   Increase Memory to at least 4GB and Swap to 2GB
+    -   Apply changes and Restart.
+
+    _WSL enjoyers:_ When developing using WSL, the opposite problem arises; Docker will start consuming 98% of CPU. You will have to create a config for WSL here:
+    `C:\Users\<UserName>\.wslconfig`. The content of the file should be along the lines of:
+
+    ```
+    # Settings apply across all Linux distros running on WSL 2
+    [wsl2]
+
+    # Limits VM memory to use no more than 4 GB, this can be set as whole numbers using GB or MB
+    memory=4GB
+
+    # Sets the VM to use two virtual processors
+    processors=2
+    ```
+
+    Of course, those values are fungible, but the point is that the WSL VMs are limited in their max memory consumption. Unfortunately, this is currently the only fix to this
+    problem known to the Courtlistener team.
 
 1.  Generate some dummy data for your database:
 
