@@ -41,5 +41,4 @@ cl/settings/google_auth.json
 /.env
 
 .vscode/*
-docker/scripts
 
