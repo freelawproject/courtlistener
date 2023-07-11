@@ -4,7 +4,6 @@
 BUILD_ENV=dev
 SHA=`git rev-parse HEAD`
 make -e VERSION=${SHA} -f ../django/Makefile development
-docker network create -d bridge --attachable cl_net_overlay
 docker-compose \
 	-f ../courtlistener/docker-compose.yml \
        	up -d
