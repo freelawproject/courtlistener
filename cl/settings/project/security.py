@@ -103,7 +103,9 @@ CSP_FRAME_SRC = (
 CSP_IMG_SRC = (
     "'self'",
     f"https://{AWS_S3_CUSTOM_DOMAIN}/",
+    "https://portraits.free.law",
     "data:",  # @tailwindcss/forms uses data URIs for images.
+    "https://*.stripe.com",
 )
 CSP_OBJECT_SRC = "'none'"
 CSP_SCRIPT_SRC = (
