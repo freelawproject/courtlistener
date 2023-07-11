@@ -23,7 +23,7 @@
 {% endblock %}
 
 {% block footer-scripts %}
-    <script type="text/javascript">
+    <script type="text/javascript" nonce="{{ request.csp_nonce }}">
         {# Gets the most recent version, by default ordering #}
         var opinions = {{ viz.json|safe }},
             embedUrl = '{% get_full_host %}{% url "view_embedded_visualization" viz.pk %}';
