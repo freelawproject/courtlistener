@@ -83,6 +83,7 @@ CORS_ALLOW_CREDENTIALS = True
 # - Stripe: https://stripe.com/docs/security/guide#content-security-policy
 CSP_CONNECT_SRC = (
     "'self'",
+    f"https://{AWS_S3_CUSTOM_DOMAIN}/",  # for embedded PDFs
     "https://hcaptcha.com/",
     "https://*.hcaptcha.com",
     "https://plausible.io/",
@@ -95,6 +96,7 @@ CSP_FONT_SRC = (
 )
 CSP_FRAME_SRC = (
     "'self'",
+    f"https://{AWS_S3_CUSTOM_DOMAIN}/",  # for embedded PDFs
     "https://hcaptcha.com/",
     "https://*.hcaptcha.com",
     "https://js.stripe.com",
@@ -103,9 +105,14 @@ CSP_FRAME_SRC = (
 CSP_IMG_SRC = (
     "'self'",
     f"https://{AWS_S3_CUSTOM_DOMAIN}/",
+    "https://portraits.free.law",
     "data:",  # @tailwindcss/forms uses data URIs for images.
+    "https://*.stripe.com",
 )
-CSP_OBJECT_SRC = "'none'"
+CSP_OBJECT_SRC = (
+    "'self'",
+    f"https://{AWS_S3_CUSTOM_DOMAIN}/",  # for embedded PDFs
+)
 CSP_SCRIPT_SRC = (
     "'self'",
     "'report-sample'",
