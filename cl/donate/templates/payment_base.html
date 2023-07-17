@@ -3,7 +3,7 @@
 
 {% block footer-scripts %}
   <script type="text/javascript" src="https://js.stripe.com/v2/"></script>
-  <script type="text/javascript">
+  <script type="text/javascript" nonce="{{ request.csp_nonce }}">
     // This identifies your website in the createToken call below
     Stripe.setPublishableKey('{{ stripe_public_key }}');
 

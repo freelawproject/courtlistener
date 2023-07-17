@@ -25,7 +25,9 @@ from cl.search.models import (
     DocketEntry,
     Opinion,
     OpinionCluster,
+    OpinionsCited,
     Parenthetical,
+    ParentheticalGroup,
     RECAPDocument,
 )
 from cl.tests.providers import LegalProvider
@@ -75,6 +77,14 @@ class ParentheticalFactory(DjangoModelFactory):
     describing_opinion = SelfAttribute("described_opinion")
     text = Faker("sentence")
     score = Faker("pyfloat", min_value=0, max_value=1, right_digits=4)
+
+
+class ParentheticalGroupFactory(DjangoModelFactory):
+    class Meta:
+        model = ParentheticalGroup
+
+    score = Faker("pyfloat", min_value=0, max_value=1, right_digits=4)
+    size = Faker("random_int", min=1, max=100)
 
 
 class ParentheticalWithParentsFactory(ParentheticalFactory):
@@ -293,3 +303,17 @@ class OpinionClusterFactoryMultipleOpinions(
         size=3,  # by default create 3 opinions
     )
     precedential_status = ("Published", "Precedential")
+
+
+class OpinionsCitedWithParentsFactory(DjangoModelFactory):
+    """Make a DocketEntry with Docket parents"""
+
+    class Meta:
+        model = OpinionsCited
+
+    citing_opinion = SubFactory(
+        "cl.search.factories.OpinionFactory",
+    )
+    cited_opinion = SubFactory(
+        "cl.search.factories.OpinionFactory",
+    )

@@ -43,4 +43,13 @@
              name="type"
              value="{{ SEARCH_TYPES.DOCKETS }}"
              type="radio">RECAP Dockets</label>
+
+    <label for="id_type_5"
+           class="{% if search_form.type.value == SEARCH_TYPES.PARENTHETICAL %}selected{% endif %}">
+      <input {% if search_form.type.value == SEARCH_TYPES.PARENTHETICAL %}checked="checked"{% endif %}
+             class="external-input hidden"
+             id="id_type_5"
+             name="type"
+             value="{{ SEARCH_TYPES.PARENTHETICAL }}"
+             type="radio">Parentheticals</label>
 </div>

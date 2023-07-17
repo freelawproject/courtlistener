@@ -231,6 +231,7 @@ def merge_form_with_courts(
     requires manual adjustment here.
     """
     # Are any of the checkboxes checked?
+
     checked_statuses = [
         field.value()
         for field in search_form
@@ -849,7 +850,6 @@ def print_params(params: SearchParam) -> None:
             "Params sent to search are:\n%s"
             % " &\n".join(["  %s = %s" % (k, v) for k, v in params.items()])
         )
-        # print results_si.execute()
 
 
 def cleanup_main_query(query_string: str) -> str:

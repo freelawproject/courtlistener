@@ -22,7 +22,7 @@ jobs:
         tag_flags: ["--exclude-tag selenium", "--tag selenium"]
     steps:
       - name: Check out solr
-        uses: actions/checkout@v2-beta
+        uses: actions/checkout@v3
         with:
           repository: freelawproject/courtlistener-solr-server
           ref: main
@@ -39,7 +39,7 @@ jobs:
           sudo find data -type f -exec chmod 664 {} \;
           sudo find solr -type f -exec chmod 664 {} \;
       - name: Check out CourtListener
-        uses: actions/checkout@v2-beta
+        uses: actions/checkout@v3
         with:
           path: courtlistener
 
@@ -58,25 +58,25 @@ jobs:
       # Build and cache docker images so tests are always run on the latest
       # dependencies
       - name: Set up docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
         with:
           driver-opts: network=host
       - name: Cache Docker layers
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: /tmp/.buildx-cache
           key: ${{ runner.os }}-buildx-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-buildx-
       - name: Cache Docker celery layers
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: /tmp/.buildx-cache-celery
           key: ${{ runner.os }}-buildx-celery-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-buildx-celery-
       - name: Build latest docker django image
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v4
         with:
           file: docker/django/Dockerfile
           push: true
@@ -87,7 +87,7 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new
       - name: Build latest docker celery image
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v4
         with:
           file: docker/django/Dockerfile
           push: true
