@@ -109,6 +109,11 @@ CSP_IMG_SRC = (
     "data:",  # @tailwindcss/forms uses data URIs for images.
     "https://*.stripe.com",
 )
+CSP_MEDIA_SRC = (
+    "'self'",
+    f"https://{AWS_S3_CUSTOM_DOMAIN}/",
+    "data:",  # Some browser extensions like this.
+)
 CSP_OBJECT_SRC = (
     "'self'",
     f"https://{AWS_S3_CUSTOM_DOMAIN}/",  # for embedded PDFs
