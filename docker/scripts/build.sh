@@ -9,7 +9,7 @@ docker-compose \
        	up -d
 
 # just leaving this in for ease of flipping it on if needed during development
-# docker-compose -f ../courtlistener/docker-compose.yml logs 
+# docker-compose -f ../courtlistener/docker-compose.yml logs
 
 docker exec cl-django python /opt/courtlistener/manage.py makemigrations --check --dry-run
 if [ $? != 0 ] ; then
