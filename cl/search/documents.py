@@ -63,6 +63,7 @@ class ParentheticalGroupDocument(Document):
     class Django:
         model = ParentheticalGroup
         fields = ["score"]
+        ignore_signals = settings.ELASTICSEARCH_DISABLED
 
     def prepare_citation(self, instance):
         return [str(cite) for cite in instance.opinion.cluster.citations.all()]
