@@ -32,8 +32,6 @@ ELASTICSEARCH_DSL = {
         "use_ssl": True,
         "verify_certs": True,
         "ca_certs": ELASTICSEARCH_CA_CERT,
-        "request_timeout": 60,
-        "max_retries": 5,
     },
 }
 
