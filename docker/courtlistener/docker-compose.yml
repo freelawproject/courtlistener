@@ -128,15 +128,25 @@ services:
 
   cl-es:
     container_name: cl-es
-    image: elasticsearch:7.8.1
+    image: elasticsearch:8.8.1
     environment:
       - discovery.type=single-node
       - cluster.name=courtlistener-cluster
-      - xpack.security.enabled=false
-      - "http.cors.allow-origin=*"
-      - "http.cors.enabled=true"
-      - "http.cors.allow-headers=X-Requested-With,X-Auth-Token,Content-Type,Content-Length,Authorization"
-      - "http.cors.allow-credentials=true"
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=true
+      - xpack.security.http.ssl.key=certs/cl-es.key
+      - xpack.security.http.ssl.certificate=certs/cl-es.crt
+      - xpack.security.http.ssl.certificate_authorities=certs/ca.crt
+      - xpack.security.transport.ssl.enabled=true
+      - xpack.security.transport.ssl.key=certs/cl-es.key
+      - xpack.security.transport.ssl.certificate=certs/cl-es.crt
+      - xpack.security.transport.ssl.certificate_authorities=certs/ca.crt
+      - xpack.security.transport.ssl.verification_mode=certificate
+      - ELASTIC_PASSWORD=password
+    volumes:
+      - ${CL_BASE_DIR:-../../../courtlistener/docker/elastic/cl-es.crt}:/usr/share/elasticsearch/config/certs/cl-es.crt
+      - ${CL_BASE_DIR:-../../../courtlistener/docker/elastic/cl-es.key}:/usr/share/elasticsearch/config/certs/cl-es.key
+      - ${CL_BASE_DIR:-../../../courtlistener/docker/elastic/ca.crt}:/usr/share/elasticsearch/config/certs/ca.crt
     ports:
       - "9200:9200"
     networks:
