@@ -128,7 +128,7 @@ services:
 
   cl-es:
     container_name: cl-es
-    image: elasticsearch:8.8.1
+    image: elasticsearch:7.8.1
     environment:
       - discovery.type=single-node
       - cluster.name=courtlistener-cluster
