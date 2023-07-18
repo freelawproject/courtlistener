@@ -2,6 +2,14 @@ import environ
 
 env = environ.FileAwareEnv()
 
+ELASTICSEARCH_DISABLED = env(
+    "ELASTICSEARCH_DISABLED",
+    default=True,
+)
+
+#
+# Connection settings
+#
 ELASTICSEARCH_DSL_HOST = env(
     "ELASTICSEARCH_DSL_HOST",
     default=[
@@ -20,11 +28,6 @@ ELASTICSEARCH_CA_CERT = env(
     "ELASTICSEARCH_CA_CERT",
     default="/opt/courtlistener/docker/elastic/ca.crt",
 )
-ELASTICSEARCH_DISABLED = env(
-    "ELASTICSEARCH_DISABLED",
-    default=True,
-)
-
 ELASTICSEARCH_DSL = {
     "default": {
         "hosts": ELASTICSEARCH_DSL_HOST,
@@ -35,6 +38,9 @@ ELASTICSEARCH_DSL = {
     },
 }
 
+#
+# Scaling/availability settings
+#
 ELASTICSEARCH_NUMBER_OF_SHARDS = env(
     "ELASTICSEARCH_NUMBER_OF_SHARDS", default=1
 )
