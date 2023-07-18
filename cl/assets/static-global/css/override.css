@@ -215,7 +215,12 @@ a.button:active {
   }
 
   #donate-image {
-    text-align: start;
+    text-align: center;
+    margin: 1em auto;
+  }
+
+  #by-line {
+    text-align: center;
   }
 
   .dl-horizontal dd {
