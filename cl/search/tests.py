@@ -2015,6 +2015,20 @@ class ElasticSearchTest(TestCase):
     # Mock elasticsearch like: ElasticMock
 
     @classmethod
+    def delete_index(self):
+        """
+        Delete the Elasticsearch index.
+        """
+        # -f delete index without prompt for confirmation
+        call_command(
+            "search_index",
+            "--delete",
+            "-f",
+            "--models",
+            "search.ParentheticalGroup",
+        )
+
+    @classmethod
     def rebuild_index(self):
         """
         Create and populate the Elasticsearch index and mapping
@@ -2030,6 +2044,7 @@ class ElasticSearchTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        cls.delete_index()
         cls.c1 = CourtFactory(id="canb", jurisdiction="I")
         cls.c2 = CourtFactory(id="ca1", jurisdiction="F")
         cls.c3 = CourtFactory(id="cacd", jurisdiction="FB")

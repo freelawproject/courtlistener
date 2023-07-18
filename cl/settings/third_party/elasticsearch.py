@@ -20,6 +20,10 @@ ELASTICSEARCH_CA_CERT = env(
     "ELASTICSEARCH_CA_CERT",
     default="/opt/courtlistener/docker/elastic/ca.crt",
 )
+ELASTICSEARCH_DISABLED = env(
+    "ELASTICSEARCH_DISABLED",
+    default=True,
+)
 
 ELASTICSEARCH_DSL = {
     "default": {
@@ -28,8 +32,7 @@ ELASTICSEARCH_DSL = {
         "use_ssl": True,
         "verify_certs": True,
         "ca_certs": ELASTICSEARCH_CA_CERT,
-        "request_timeout": 30,
-        "retry_on_timeout": True,
+        "request_timeout": 60,
         "max_retries": 5,
     },
 }
