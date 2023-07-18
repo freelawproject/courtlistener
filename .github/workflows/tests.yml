@@ -114,7 +114,9 @@ jobs:
       - name: Show the docker startup logs
         working-directory: courtlistener/docker/courtlistener
         run: docker-compose logs
-
+      - name: Waiting for Elasticsearch availability
+        working-directory: courtlistener/docker/elastic
+        run: until curl -s --cacert ca.crt https://localhost:9200 | grep -q "missing authentication credentials"; do sleep 30; done;
       # Run the checks and tests
       - name: Check if migrations are missing
         run: docker exec cl-django python /opt/courtlistener/manage.py makemigrations --check --dry-run
