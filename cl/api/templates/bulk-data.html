@@ -161,7 +161,7 @@
 
     <h3 id="old">Release Notes</h3>
     <p>
-      2023-07-07: We added the FORCE_QUOTE * option to the exports so that null values could be distinguished from blank values. In the past both were in the CSVs as commas with nothing in them (,,). Now nulls will remain that way while blanks will use quotes: (,"",).
+      <strong>2023-07-07</strong>: We added the <code>FORCE_QUOTE *</code> option to our export script so that null can be distinguished from blank values. In the past, both appeared in the CSVs as commas with nothing between them (<code>,,</code>). With this change, blanks will use quotes: (<code>,"",</code>), while nulls will remain as before. This should make the <code>COPY TO</code> commands work better. In addition, several missing columns are added to the bulk data to align our exports more closely with our database.
     </p>
     <p>This is the third version of our bulk data system. Previous versions were available by jurisdiction, by day, month, or year, and in JSON format corresponding to our REST API. We also previously provided our CiteGeist data file. Each of these features has been removed in an effort to simply the feature. For more information, see <a href="https://github.com/freelawproject/courtlistener/issues/285">here (removing day/month/year files)</a> and <a href="https://github.com/freelawproject/courtlistener/issues/1983">here (removing the JSON format and switching to PostgreSQL dumps)</a>.
     </p>
