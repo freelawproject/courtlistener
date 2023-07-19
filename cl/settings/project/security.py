@@ -145,5 +145,3 @@ if not any(
     (DEVELOPMENT, TESTING)
 ):  # Development and test aren’t used over HTTPS (yet)
     CSP_UPGRADE_INSECURE_REQUESTS = True
-if SENTRY_REPORT_URI:
-    CSP_REPORT_URI = SENTRY_REPORT_URI
