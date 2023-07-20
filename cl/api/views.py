@@ -1,7 +1,7 @@
 import logging
 
+from asgiref.sync import sync_to_async
 from django.conf import settings
-from django.contrib import messages
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.template import TemplateDoesNotExist
@@ -171,7 +171,7 @@ async def get_result_count(request, version, day_count):
     :return: A JSON object with the number of hits during the last day_range
     period.
     """
-    search_form = SearchForm(request.GET.copy())
+    search_form = await sync_to_async(SearchForm)(request.GET.copy())
     if not search_form.is_valid():
         return JsonResponse(
             {"error": "Invalid SearchForm"},
