@@ -207,6 +207,15 @@ class OpinionClusterWithParentsFactory(
     pass
 
 
+class RECAPDocumentFactory(DjangoModelFactory):
+    class Meta:
+        model = RECAPDocument
+
+    description = Faker("text", max_nb_chars=750)
+    document_type = RECAPDocument.PACER_DOCUMENT
+    pacer_doc_id = Faker("pyint", min_value=100_000, max_value=400_000)
+
+
 class DocketEntryFactory(DjangoModelFactory):
     class Meta:
         model = DocketEntry
@@ -251,15 +260,6 @@ class DocketEntryReuseParentsFactory(
     """Make a DocketEntry using existing Dockets as parents"""
 
     pass
-
-
-class RECAPDocumentFactory(DjangoModelFactory):
-    class Meta:
-        model = RECAPDocument
-
-    description = Faker("text", max_nb_chars=750)
-    document_type = RECAPDocument.PACER_DOCUMENT
-    pacer_doc_id = Faker("pyint", min_value=100_000, max_value=400_000)
 
 
 class DocketFactory(DjangoModelFactory):

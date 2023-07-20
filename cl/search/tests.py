@@ -17,7 +17,7 @@ from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db import IntegrityError, transaction
 from django.http import HttpRequest
-from django.test import RequestFactory, override_settings
+from django.test import AsyncRequestFactory, override_settings
 from django.test.utils import captured_stderr
 from django.urls import reverse
 from elasticsearch_dsl import Q, connections
@@ -1207,7 +1207,7 @@ class GroupedSearchTest(EmptySolrTestCase):
             "--noinput",
         ]
         call_command("cl_update_index", *args)
-        self.factory = RequestFactory()
+        self.factory = AsyncRequestFactory()
 
     def test_grouped_queries(self) -> None:
         """When we have a cluster with multiple opinions, do results get
