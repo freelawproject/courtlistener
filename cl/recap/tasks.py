@@ -857,7 +857,7 @@ async def process_case_query_page(pk):
     # docket entries
     content_updated = False
     if current_case_name != d.case_name and d.pk:
-        if d.docket_entries.exists():
+        if await d.docket_entries.aexists():
             content_updated = True
 
     if pq.debug:
