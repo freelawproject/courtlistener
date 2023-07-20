@@ -378,13 +378,14 @@ async def process_recap_pdf(pk):
         await extract_recap_pdf_base(rd.pk),
         await sync_to_async(add_items_to_solr)([rd.pk], "search.RECAPDocument")
 
+    de = await DocketEntry.objects.aget(recap_documents=rd)
     await mark_pq_successful(
         pq,
-        d_id=rd.docket_entry.docket_id,
+        d_id=de.docket_id,
         de_id=rd.docket_entry_id,
         rd_id=rd.pk,
     )
-    docket = await Docket.objects.aget(id=rd.docket_entry.docket_id)
+    docket = await Docket.objects.aget(id=de.docket_id)
     await sync_to_async(mark_ia_upload_needed)(docket, save_docket=True)
     return rd
 
