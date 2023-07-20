@@ -257,7 +257,6 @@ def core_docket_data(
     )
 
 
-@ratelimit_deny_list
 async def view_docket(
     request: HttpRequest, pk: int, slug: str
 ) -> HttpResponse:
