@@ -54,7 +54,7 @@ urlpatterns = [
     ),
     path(
         "recap/gov.uscourts.<str:court>.<str:pacer_case_id>/",
-        redirect_docket_recap,
+        redirect_docket_recap,  # type: ignore[arg-type]
         name="redirect_docket_recap",
     ),
     path(
