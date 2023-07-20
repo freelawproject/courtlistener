@@ -181,7 +181,7 @@ def redirect_og_lookup(request: HttpRequest) -> HttpResponse:
         )
 
 
-def redirect_docket_recap(
+async def redirect_docket_recap(
     request: HttpRequest,
     court: Court,
     pacer_case_id: str,
@@ -258,7 +258,9 @@ def core_docket_data(
 
 
 @ratelimit_deny_list
-def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
+async def view_docket(
+    request: HttpRequest, pk: int, slug: str
+) -> HttpResponse:
     docket, context = core_docket_data(request, pk)
     increment_view_count(docket, request)
     sort_order_asc = True
