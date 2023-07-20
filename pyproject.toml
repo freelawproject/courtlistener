@@ -109,6 +109,7 @@ uvicorn = {extras = ["standard"], version = "^0.22.0"}
 daphne = "^4.0.0"
 psycopg2 = "^2.9.6"
 juriscraper = "^2.5.51"
+httpx = {extras = ["http2"], version = "^0.24.1"}
 
 
 [tool.poetry.group.dev.dependencies]
