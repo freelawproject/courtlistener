@@ -1,5 +1,6 @@
 const path = require('path');
 const webpack = require('webpack');
+const TerserPlugin = require("terser-webpack-plugin");
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
@@ -23,6 +24,13 @@ module.exports = {
       name: 'vendor',
       filename: '[name].js',
     },
+    minimize: true,
+    minimizer: [new TerserPlugin({
+        extractComments: false,
+        terserOptions: {
+          compress: true,
+        },
+      })],
   },
   plugins: [].filter(Boolean),
   module: {
@@ -55,5 +63,4 @@ module.exports = {
     },
     port: 3000,
   },
-  devtool: 'cheap-module-source-map',
 };
