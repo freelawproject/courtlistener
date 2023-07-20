@@ -258,10 +258,10 @@ def core_docket_data(
     )
 
 
-async def view_docket(
+def view_docket(
     request: HttpRequest, pk: int, slug: str
 ) -> HttpResponse:
-    docket, context = await sync_to_async(core_docket_data)(request, pk)
+    docket, context = core_docket_data(request, pk)
     increment_view_count(docket, request)
     sort_order_asc = True
 
