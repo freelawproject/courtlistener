@@ -6,6 +6,7 @@ from urllib.parse import urlencode
 
 import eyecite
 import natsort
+from asgiref.sync import sync_to_async
 from django.contrib import messages
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
@@ -186,7 +187,7 @@ async def redirect_docket_recap(
     court: Court,
     pacer_case_id: str,
 ) -> HttpResponseRedirect:
-    docket = get_object_or_404(
+    docket = await sync_to_async(get_object_or_404)(
         Docket, pacer_case_id=pacer_case_id, court=court
     )
     return HttpResponseRedirect(
