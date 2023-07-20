@@ -128,7 +128,7 @@ services:
 
   cl-es:
     container_name: cl-es
-    image: elasticsearch:7.8.1
+    image: elasticsearch:8.8.1
     environment:
       - discovery.type=single-node
       - cluster.name=courtlistener-cluster
@@ -143,6 +143,11 @@ services:
       - xpack.security.transport.ssl.certificate_authorities=certs/ca.crt
       - xpack.security.transport.ssl.verification_mode=certificate
       - ELASTIC_PASSWORD=password
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: 500
+        hard: 600
     volumes:
       - ${CL_BASE_DIR:-../../../courtlistener/docker/elastic/cl-es.crt}:/usr/share/elasticsearch/config/certs/cl-es.crt
       - ${CL_BASE_DIR:-../../../courtlistener/docker/elastic/cl-es.key}:/usr/share/elasticsearch/config/certs/cl-es.key
