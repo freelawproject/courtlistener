@@ -798,9 +798,9 @@ async def process_recap_docket_history_report(pk):
         ContentFile(text.encode()),
     )
 
-    des_returned, rds_created, content_updated = add_docket_entries(
-        d, data["docket_entries"]
-    )
+    des_returned, rds_created, content_updated = await sync_to_async(
+        add_docket_entries
+    )(d, data["docket_entries"])
     await sync_to_async(process_orphan_documents)(
         rds_created, pq.court_id, d.date_filed
     )
