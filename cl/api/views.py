@@ -85,7 +85,7 @@ def api_index(request: HttpRequest) -> HttpResponse:
     )
 
 
-async def replication_docs(request: HttpRequest) -> HttpResponse:
+def replication_docs(request: HttpRequest) -> HttpResponse:
     return render(request, "replication.html", {"private": False})
 
 
@@ -213,12 +213,12 @@ async def deprecated_api(request, v):
     )
 
 
-async def webhooks_getting_started(request):
+def webhooks_getting_started(request):
     context = {"private": False}
     return render(request, "webhooks-getting-started.html", context)
 
 
-async def webhooks_docs(request, version=None):
+def webhooks_docs(request, version=None):
     """Show the correct version of the webhooks docs"""
 
     context = {"private": False}
