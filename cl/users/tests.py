@@ -11,7 +11,12 @@ from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
-from django.core.mail import EmailMessage, EmailMultiAlternatives, send_mail
+from django.core.mail import (
+    EmailMessage,
+    EmailMultiAlternatives,
+    get_connection,
+    send_mail,
+)
 from django.test import Client
 from django.test.utils import override_settings
 from django.urls import reverse
@@ -44,10 +49,17 @@ from cl.favorites.models import (
     UserTag,
     UserTagEvent,
 )
+from cl.lib.email_backends import get_email_count
+from cl.lib.redis_utils import make_redis_interface
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.search.factories import DocketFactory
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
-from cl.tests.cases import APITestCase, LiveServerTestCase, TestCase
+from cl.tests.cases import (
+    APITestCase,
+    LiveServerTestCase,
+    RestartSentEmailQuotaMixin,
+    TestCase,
+)
 from cl.tests.utils import MockResponse as MockPostResponse
 from cl.tests.utils import make_client
 from cl.users.email_handlers import (
@@ -1148,7 +1160,7 @@ class SNSWebhookTest(TestCase):
     BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
     EMAIL_BCC_COPY_RATE=0,
 )
-class CustomBackendEmailTest(TestCase):
+class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = UserFactory()
@@ -1176,6 +1188,7 @@ class CustomBackendEmailTest(TestCase):
 
         cls.attachment_150 = test_dir / "file_sample_150kB.pdf"
         cls.attachment_500 = test_dir / "file_example_500kB.pdf"
+        cls.restart_sent_email_quota()
 
     def send_signal(self, test_asset, event_name, signal) -> None:
         """Function to dispatch signal that mocks a SNS notification event
@@ -2066,6 +2079,105 @@ class CustomBackendEmailTest(TestCase):
             stored_email[1].bcc, ["bcc@example.com", "bcc@example.com"]
         )
 
+    @override_settings(EMAIL_MAX_TEMP_COUNTER=5)
+    def test_redis_email_counter(self) -> None:
+        """Test logic to count the number of emails sent by the app"""
+        for i in range(23):
+            email = EmailMessage(
+                f"This is the subject {i}",
+                "Body goes here",
+                "testing@courtlistener.com",
+                ["bounce@simulator.amazonses.com"],
+            )
+            email.send()
+
+        r = make_redis_interface("CACHE")
+        self.assertEqual(int(r.get("email:temp_counter")), 3)
+        self.assertEqual(r.zcard("email:delivery_attempts"), 4)
+        email_counter = get_email_count(r)
+        self.assertEqual(email_counter, 23)
+
+    @override_settings(
+        EMAIL_EMERGENCY_THRESHOLD=5,
+    )
+    def test_daily_quota_emergency_brake(self) -> None:
+        """Test email daily quota emergency brake"""
+
+        # Send 5 emails independently.
+        for i in range(5):
+            email = EmailMessage(
+                f"This is the subject {i}",
+                "Body goes here",
+                "testing@courtlistener.com",
+                ["bounce@simulator.amazonses.com"],
+            )
+            email.send()
+
+        # Confirm emails went out and were stored.
+        self.assertEqual(len(mail.outbox), 5)
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 5)
+
+        r = make_redis_interface("CACHE")
+        email_counter = get_email_count(r)
+        self.assertEqual(email_counter, 5)
+
+        # Send an additional email that exceeds the quota.
+        email = EmailMessage(
+            f"This is the subject 6",
+            "Body goes here",
+            "testing@courtlistener.com",
+            ["bounce@simulator.amazonses.com"],
+        )
+        # The Emergency brake error should be triggered.
+        with self.assertRaisesMessage(ValueError, "Emergency brake engaged"):
+            email.send()
+        # No additional messsage should be stored.
+        self.assertEqual(stored_email.count(), 5)
+
+    @override_settings(
+        EMAIL_EMERGENCY_THRESHOLD=5,
+    )
+    def test_daily_quota_emergency_brake_mass_mail(self) -> None:
+        """Test email daily quota emergency brake sending mass email."""
+
+        # Send 5 emails at once.
+        messages = []
+        for i in range(5):
+            email = EmailMessage(
+                f"This is the subject {i}",
+                "Body goes here",
+                "testing@courtlistener.com",
+                ["bounce@simulator.amazonses.com"],
+            )
+            messages.append(email)
+        connection = get_connection()
+        connection.send_messages(messages)
+
+        # Confirm emails went out and were stored.
+        self.assertEqual(len(mail.outbox), 5)
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 5)
+        r = make_redis_interface("CACHE")
+        email_counter = get_email_count(r)
+        self.assertEqual(email_counter, 5)
+
+        # Send an additional email that exceeds the quota.
+        email = EmailMessage(
+            f"This is the subject 6",
+            "Body goes here",
+            "testing@courtlistener.com",
+            ["bounce@simulator.amazonses.com"],
+        )
+        # The Emergency brake error should be triggered.
+        with self.assertRaisesMessage(
+            ValueError,
+            "Emergency brake engaged to prevent email quota exhaustion",
+        ):
+            email.send()
+        # No additional messsage should be stored.
+        self.assertEqual(stored_email.count(), 5)
+
 
 class DeleteOldEmailsTest(TestCase):
     @classmethod
@@ -2102,7 +2214,7 @@ class DeleteOldEmailsTest(TestCase):
     BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
     EMAIL_BCC_COPY_RATE=0,
 )
-class RetryFailedEmailTest(TestCase):
+class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = UserFactory()
@@ -2117,6 +2229,7 @@ class RetryFailedEmailTest(TestCase):
         ):
             cls.soft_bounce_asset = json.load(soft_bounce)
             cls.soft_bounce_with_id_asset = json.load(soft_bounce_with_id)
+        cls.restart_sent_email_quota()
 
     def send_signal(self, test_asset, event_name, signal) -> None:
         """Function to dispatch signal that mocks a SNS notification event

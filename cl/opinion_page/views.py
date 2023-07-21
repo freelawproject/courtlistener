@@ -6,6 +6,7 @@ from urllib.parse import urlencode
 
 import eyecite
 import natsort
+from asgiref.sync import sync_to_async
 from django.contrib import messages
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
@@ -181,12 +182,12 @@ def redirect_og_lookup(request: HttpRequest) -> HttpResponse:
         )
 
 
-def redirect_docket_recap(
+async def redirect_docket_recap(
     request: HttpRequest,
     court: Court,
     pacer_case_id: str,
 ) -> HttpResponseRedirect:
-    docket = get_object_or_404(
+    docket = await sync_to_async(get_object_or_404)(
         Docket, pacer_case_id=pacer_case_id, court=court
     )
     return HttpResponseRedirect(
@@ -257,7 +258,6 @@ def core_docket_data(
     )
 
 
-@ratelimit_deny_list
 def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     docket, context = core_docket_data(request, pk)
     increment_view_count(docket, request)

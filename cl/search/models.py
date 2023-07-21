@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Tuple, TypeVar
 
 import pghistory
 import pytz
+from asgiref.sync import sync_to_async
 from celery.canvas import chain
 from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
@@ -1453,6 +1454,22 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             )
         if len(tasks) > 0:
             chain(*tasks)()
+
+    async def asave(
+        self,
+        update_fields=None,
+        do_extraction=False,
+        index=False,
+        *args,
+        **kwargs,
+    ):
+        return await sync_to_async(self.save)(
+            update_fields=update_fields,
+            do_extraction=do_extraction,
+            index=index,
+            *args,
+            **kwargs,
+        )
 
     def delete(self, *args, **kwargs):
         """
@@ -3340,11 +3357,13 @@ class SEARCH_TYPES:
     DOCKETS = "d"
     ORAL_ARGUMENT = "oa"
     PEOPLE = "p"
+    PARENTHETICAL = "pa"
     NAMES = (
         (OPINION, "Opinions"),
         (RECAP, "RECAP"),
         (DOCKETS, "RECAP Dockets"),
         (ORAL_ARGUMENT, "Oral Arguments"),
         (PEOPLE, "People"),
+        (PARENTHETICAL, "Parenthetical"),
     )
     ALL_TYPES = [OPINION, RECAP, ORAL_ARGUMENT, PEOPLE]

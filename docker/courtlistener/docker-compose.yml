@@ -20,13 +20,25 @@ services:
   # use, you will have ot migrate it yourself. See DEVELOPING.md
   cl-postgresql:
     container_name: cl-postgres
+    build:
+      context: ../../../courtlistener/docker/postgresql/
+      dockerfile: ../../../courtlistener/docker/postgresql/Dockerfile
+      args:
+        POSTGRES_VERSION: 15.2-alpine
     ports:
       - "5432:5432"
-    image: postgres:15.2-alpine
     environment:
       POSTGRES_USER: "postgres"
       POSTGRES_PASSWORD: "postgres"
       POSTGRES_DB: "courtlistener"
+    command:
+      - "postgres"
+      - "-c"
+      - "ssl=on"
+      - "-c"
+      - "ssl_cert_file=/etc/ssl/private/cl-postgres.crt"
+      - "-c"
+      - "ssl_key_file=/etc/ssl/private/cl-postgres.key"
     networks:
       - cl_net_overlay
 
@@ -71,11 +83,13 @@ services:
       - cl-selenium
       - cl-doctor
       - cl-disclosures
+      - cl-es
     ports:
       - "8000:8000"
     volumes:
       - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
       - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
+      - ${CL_BASE_DIR:-../../../courtlistener/.postgresql}:/root/.postgresql
     networks:
       - cl_net_overlay
     env_file:
@@ -109,5 +123,37 @@ services:
   cl-webhook-sentry:
     image: juggernaut/webhook-sentry:latest
     container_name: "cl-webhook-sentry"
+    networks:
+      - cl_net_overlay
+
+  cl-es:
+    container_name: cl-es
+    image: elasticsearch:8.8.1
+    environment:
+      - discovery.type=single-node
+      - cluster.name=courtlistener-cluster
+      - cluster.routing.allocation.disk.threshold_enabled=false
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=true
+      - xpack.security.http.ssl.key=certs/cl-es.key
+      - xpack.security.http.ssl.certificate=certs/cl-es.crt
+      - xpack.security.http.ssl.certificate_authorities=certs/ca.crt
+      - xpack.security.transport.ssl.enabled=true
+      - xpack.security.transport.ssl.key=certs/cl-es.key
+      - xpack.security.transport.ssl.certificate=certs/cl-es.crt
+      - xpack.security.transport.ssl.certificate_authorities=certs/ca.crt
+      - xpack.security.transport.ssl.verification_mode=certificate
+      - ELASTIC_PASSWORD=password
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: 500
+        hard: 600
+    volumes:
+      - ${CL_BASE_DIR:-../../../courtlistener/docker/elastic/cl-es.crt}:/usr/share/elasticsearch/config/certs/cl-es.crt
+      - ${CL_BASE_DIR:-../../../courtlistener/docker/elastic/cl-es.key}:/usr/share/elasticsearch/config/certs/cl-es.key
+      - ${CL_BASE_DIR:-../../../courtlistener/docker/elastic/ca.crt}:/usr/share/elasticsearch/config/certs/ca.crt
+    ports:
+      - "9200:9200"
     networks:
       - cl_net_overlay

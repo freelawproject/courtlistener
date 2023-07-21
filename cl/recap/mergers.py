@@ -5,6 +5,7 @@ from copy import deepcopy
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+from asgiref.sync import async_to_sync
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, OperationalError, transaction
@@ -80,7 +81,7 @@ def confirm_docket_number_core_lookup_match(
     return docket
 
 
-def find_docket_object(
+async def find_docket_object(
     court_id: str,
     pacer_case_id: str | None,
     docket_number: str,
@@ -134,11 +135,11 @@ def find_docket_object(
 
     for kwargs in lookups:
         ds = Docket.objects.filter(court_id=court_id, **kwargs).using(using)
-        count = ds.count()
+        count = await ds.acount()
         if count == 0:
             continue  # Try a looser lookup.
         if count == 1:
-            d = ds[0]
+            d = await ds.afirst()
             if kwargs.get("pacer_case_id") is None and kwargs.get(
                 "docket_number_core"
             ):
@@ -147,7 +148,7 @@ def find_docket_object(
                 break  # Nailed it!
         elif count > 1:
             # Choose the oldest one and live with it.
-            d = ds.earliest("date_created")
+            d = await ds.aearliest("date_created")
             if kwargs.get("pacer_case_id") is None and kwargs.get(
                 "docket_number_core"
             ):
@@ -164,7 +165,7 @@ def find_docket_object(
 
     if using != "default":
         # Get the item from the default DB
-        d = Docket.objects.get(pk=d.pk)
+        d = await Docket.objects.aget(pk=d.pk)
 
     return d
 
@@ -555,7 +556,9 @@ def normalize_long_description(docket_entry):
     docket_entry["description"] = desc
 
 
-def merge_unnumbered_docket_entries(des):
+def merge_unnumbered_docket_entries(
+    des: QuerySet, docket_entry: dict[str, any]
+) -> DocketEntry:
     """Unnumbered docket entries come from many sources, with different data.
     This sometimes results in two docket entries when there should be one. The
     docket history report is the one source that sometimes has the long and
@@ -563,15 +566,36 @@ def merge_unnumbered_docket_entries(des):
     them back together again, deleting the duplicate items.
 
     :param des: A QuerySet of DocketEntries that we believe are the same.
+    :param docket_entry: The scraped dict from Juriscraper for the docket
+    entry.
     :return The winning DocketEntry
     """
-    # Choose the earliest as the winner; delete the rest
+
+    # Look for docket entries that match by equal long description or if the
+    # long description is not set.
+    matched_entries = [
+        de.pk
+        for de in des
+        if de.description == docket_entry["description"] or not de.description
+    ]
+    if matched_entries:
+        # Return the entry that matches the long description and remove the
+        # rest if there are any duplicates.
+        matched_entries_queryset = des.filter(pk__in=matched_entries)
+        winner = matched_entries_queryset.earliest("date_created")
+        matched_entries_queryset.exclude(pk=winner.pk).delete()
+        return winner
+
+    # No duplicates found by long description, choose the earliest as the
+    # winner; delete the rest
     winner = des.earliest("date_created")
     des.exclude(pk=winner.pk).delete()
     return winner
 
 
-def get_or_make_docket_entry(d, docket_entry):
+def get_or_make_docket_entry(
+    d: Docket, docket_entry: dict[str, any]
+) -> tuple[DocketEntry, bool]:
     """Lookup or create a docket entry to match the one that was scraped.
 
     :param d: The docket we expect to find it in.
@@ -641,7 +665,7 @@ def get_or_make_docket_entry(d, docket_entry):
             )
             # There's so little metadata with unnumbered des that if there's
             # more than one match, we can just select the oldest as canonical.
-            de = merge_unnumbered_docket_entries(des)
+            de = merge_unnumbered_docket_entries(des, docket_entry)
             de_created = False
     return de, de_created
 
@@ -1262,7 +1286,7 @@ def get_data_from_appellate_att_report(
     return att_data
 
 
-def add_tags_to_objs(tag_names: List[str], objs: Any) -> QuerySet:
+async def add_tags_to_objs(tag_names: List[str], objs: Any) -> QuerySet:
     """Add tags by name to objects
 
     :param tag_names: A list of tag name strings
@@ -1276,7 +1300,7 @@ def add_tags_to_objs(tag_names: List[str], objs: Any) -> QuerySet:
 
     tags = []
     for tag_name in tag_names:
-        tag, _ = Tag.objects.get_or_create(name=tag_name)
+        tag, _ = await Tag.objects.aget_or_create(name=tag_name)
         tags.append(tag)
 
     for tag in tags:
@@ -1306,7 +1330,7 @@ def merge_pacer_docket_into_cl_docket(
             og_info.save()
             d.originating_court_information = og_info
 
-    tags = add_tags_to_objs(tag_names, [d])
+    tags = async_to_sync(add_tags_to_objs)(tag_names, [d])
 
     # Add the HTML to the docket in case we need it someday.
     upload_type = (
@@ -1526,7 +1550,7 @@ def process_orphan_documents(
         try:
             from cl.recap.tasks import process_recap_pdf
 
-            process_recap_pdf(pq)
+            async_to_sync(process_recap_pdf)(pq)
         except:
             # We can ignore this. If we don't, we get all of the
             # exceptions that were previously raised for the

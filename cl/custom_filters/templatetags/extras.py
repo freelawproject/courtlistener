@@ -125,6 +125,16 @@ def random_int(a: int, b: int) -> int:
     return random.randint(a, b)
 
 
+@register.filter
+def get_attrdict(mapping, key):
+    """Emulates the dictionary get for AttrDict objects. Useful when keys
+    have spaces or other punctuation."""
+    try:
+        return mapping[key]
+    except KeyError:
+        return ""
+
+
 # sourced from: https://stackoverflow.com/questions/2272370/sortable-table-columns-in-django
 @register.simple_tag
 def url_replace(request, value):
