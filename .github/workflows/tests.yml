@@ -114,20 +114,15 @@ jobs:
       - name: Show the docker startup logs
         working-directory: courtlistener/docker/courtlistener
         run: docker-compose logs
+
       # Run the checks and tests
       - name: Check if migrations are missing
         run: docker exec cl-django python /opt/courtlistener/manage.py makemigrations --check --dry-run
-      - name: Check disk space before tests
-        run: df -h
       - name: Run the tests!
         run: >
           docker exec -e SELENIUM_DEBUG=1 -e SELENIUM_TIMEOUT=30 cl-django
           python /opt/courtlistener/manage.py test
           cl --verbosity=2 ${{ matrix.tag_flags }} --parallel
-
-      - name: Check disk space after tests.
-        if: failure()
-        run: df -h
       - name: cp selenium results from docker to host
         if: failure()
         run: |
@@ -143,11 +138,6 @@ jobs:
         with:
           name: selenium-screenshots
           path: selenium-screenshots/extract
-
-      - name: Show cl-es service logs
-        working-directory: courtlistener/docker/courtlistener
-        if: failure()
-        run: docker-compose logs cl-es
 
       # Temp fix
       # https://github.com/docker/build-push-action/issues/252
