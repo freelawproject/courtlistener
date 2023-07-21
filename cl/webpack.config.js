@@ -1,6 +1,5 @@
 const path = require('path');
 const webpack = require('webpack');
-const CompressionPlugin = require('compression-webpack-plugin');
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
