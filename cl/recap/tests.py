@@ -1247,11 +1247,9 @@ class RecapPdfTaskTest(TestCase):
         Alas, we fail. In theory, this shouldn't happen.
         """
         self.de.delete()
-        with self.assertRaises(DocketEntry.DoesNotExist):
-            async_to_sync(process_recap_pdf)(self.pq.pk)
+        rd = async_to_sync(process_recap_pdf)(self.pq.pk)
+        self.assertIsNone(rd)
         self.pq.refresh_from_db()
-        # This doesn't do the celery retries, unfortunately. If we get that
-        # working, the correct status is PROCESSING_STATUS.FAILED.
         self.assertEqual(self.pq.status, PROCESSING_STATUS.FAILED)
         self.assertIn("Unable to find docket entry", self.pq.error_message)
 
@@ -1284,11 +1282,9 @@ class RecapPdfTaskTest(TestCase):
         In practice, this shouldn't happen.
         """
         self.docket.delete()
-        with self.assertRaises(Docket.DoesNotExist):
-            async_to_sync(process_recap_pdf)(self.pq.pk)
+        rd = async_to_sync(process_recap_pdf)(self.pq.pk)
+        self.assertIsNone(rd)
         self.pq.refresh_from_db()
-        # This doesn't do the celery retries, unfortunately. If we get that
-        # working, the correct status is PROCESSING_STATUS.FAILED.
         self.assertEqual(self.pq.status, PROCESSING_STATUS.FAILED)
         self.assertIn("Unable to find docket", self.pq.error_message)
 
@@ -2267,11 +2263,13 @@ class RecapAttachmentPageTaskTest(TestCase):
     def test_no_rd_match(self, mock):
         """If there's no RECAPDocument to match on, do we fail gracefully?"""
         RECAPDocument.objects.all().delete()
-        with self.assertRaises(RECAPDocument.DoesNotExist):
-            async_to_sync(process_recap_attachment)(self.pq.pk)
+        pq_status, msg, items = async_to_sync(process_recap_attachment)(
+            self.pq.pk
+        )
+        self.assertEqual(
+            msg, "Could not find docket to associate with attachment metadata"
+        )
         self.pq.refresh_from_db()
-        # This doesn't do the celery retries, unfortunately. If we get that
-        # working, the correct status is PROCESSING_STATUS.FAILED.
         self.assertEqual(self.pq.status, PROCESSING_STATUS.FAILED)
 
 
