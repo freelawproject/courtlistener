@@ -260,7 +260,7 @@ async def process_recap_pdf(pk):
                 await mark_pq_status(
                     pq, error_message, PROCESSING_STATUS.FAILED
                 )
-                raise exc
+                return None
             except Docket.MultipleObjectsReturned:
                 msg = f"Too many dockets found when trying to save '{pq}'"
                 await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
@@ -289,7 +289,7 @@ async def process_recap_pdf(pk):
                     await asyncio.sleep(1)
                     continue
                 await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
-                raise exc
+                return None
             else:
                 # If we're here, we've got the docket and docket
                 # entry, but were unable to find the document by
@@ -630,12 +630,12 @@ async def process_recap_attachment(
             pq, msg, PROCESSING_STATUS.FAILED
         )
         return pq_status, msg, []
-    except RECAPDocument.DoesNotExist as exc:
+    except RECAPDocument.DoesNotExist:
         msg = "Could not find docket to associate with attachment metadata"
         pq_status, msg = await mark_pq_status(
             pq, msg, PROCESSING_STATUS.FAILED
         )
-        raise exc
+        return pq_status, msg, []
 
     await add_tags_to_objs(tag_names, rds_affected)
     pq_status, msg = await mark_pq_successful(
