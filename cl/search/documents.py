@@ -1,7 +1,7 @@
 from django.conf import settings
 from django_elasticsearch_dsl import Document, Index, fields
 
-from cl.search.models import Citation, ParentheticalGroup
+from cl.search.models import Citation, Docket, ParentheticalGroup
 
 # Define parenthetical elasticsearch index
 parenthetical_group_index = Index("parenthetical_group")
@@ -63,7 +63,28 @@ class ParentheticalGroupDocument(Document):
     class Django:
         model = ParentheticalGroup
         fields = ["score"]
-        ignore_signals = settings.ELASTICSEARCH_DISABLED
+        ignore_signals = True
+
+    def document_mapping_fields(
+        self, field_list: list[str], instance: Docket
+    ) -> dict:
+        fields_map = {
+            "docket_number": "docketNumber",
+            "court_id": "court_id",
+            "extracted_by_ocr": "opinion_extracted_by_ocr",
+            "cluster_id": "cluster_id",
+            "author_id": "author_id",
+            "case_name": "caseName",
+            "citation_count": "citeCount",
+            "date_filed": "dateFiled",
+            "slug": "describing_opinion_cluster_slug",
+            "docket_id": "docket_id",
+            "judges": "judge",
+            "nature_of_suit": "suitNature",
+        }
+        return {
+            fields_map[field]: getattr(instance, field) for field in field_list
+        }
 
     def prepare_citation(self, instance):
         return [str(cite) for cite in instance.opinion.cluster.citations.all()]

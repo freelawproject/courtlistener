@@ -46,6 +46,7 @@ from cl.lib.test_helpers import (
     IndexedSolrTestCase,
     SolrTestCase,
 )
+from cl.people_db.factories import PersonFactory
 from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.factories import DocketEntriesDataFactory, DocketEntryDataFactory
 from cl.recap.mergers import add_docket_entries
@@ -2536,6 +2537,94 @@ class ElasticSearchTest(TestCase):
             < r.content.decode().index("Smith"),
             msg="'Riley' should come before 'Peck' and before 'Smith' when order_by asc.",
         )
+
+    def test_keep_in_sync_related_pa_objects(self) -> None:
+        """Test PA documents are updated when related objects change."""
+
+        doc = ParentheticalGroupDocument.get(id=self.pg.pk)
+        self.assertEqual(self.cluster.docket.docket_number, doc.docketNumber)
+
+        # Update docket number and confirm it's updated in ES.
+        self.cluster.docket.docket_number = "1:98-cr-0000"
+        self.cluster.docket.save()
+        self.cluster.refresh_from_db()
+
+        ParentheticalGroupDocument._index.refresh()
+        doc = ParentheticalGroupDocument.get(id=self.pg.pk)
+        self.assertEqual("1:98-cr-0000", doc.docketNumber)
+
+        # Avoid updating documents in ES when a related object field is not
+        # including in the document mapping.
+
+        # Confirm initial version is 2.
+        self.assertEqual(2, doc.meta.version)
+        self.cluster.docket.view_count = 5
+        self.cluster.docket.save()
+        self.cluster.refresh_from_db()
+        ParentheticalGroupDocument._index.refresh()
+        doc = ParentheticalGroupDocument.get(id=self.pg.pk)
+        # Document version remains the same since document was not updated.
+        self.assertEqual(2, doc.meta.version)
+
+        # Confirm court_id is updated in ES.
+        self.cluster.docket.court = self.c2
+        self.cluster.docket.save()
+        self.cluster.refresh_from_db()
+        ParentheticalGroupDocument._index.refresh()
+        doc = ParentheticalGroupDocument.get(id=self.pg.pk)
+        self.assertEqual(self.c2.pk, doc.court_id)
+
+        cluster_1 = OpinionClusterFactory(
+            case_name="Lorem Ipsum",
+            case_name_short="Ipsum",
+            judges="Lorem 2",
+            scdb_id="0000",
+            nature_of_suit="410",
+            docket=DocketFactory(
+                court=self.c1,
+                docket_number="1:95-cr-0000",
+                date_reargued=date(1985, 1, 30),
+                date_reargument_denied=date(1985, 5, 30),
+            ),
+            date_filed=date(1975, 3, 10),
+            source="H",
+            precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
+        )
+        author_1 = PersonFactory()
+        docket_1 = DocketFactory()
+
+        # Confirm opinion related fields are updated in ES.
+        self.o.extracted_by_ocr = False
+        self.o.cluster = cluster_1
+        self.o.author = author_1
+        self.o.save()
+        self.cluster.refresh_from_db()
+        ParentheticalGroupDocument._index.refresh()
+        doc = ParentheticalGroupDocument.get(id=self.pg.pk)
+        self.assertEqual(False, doc.opinion_extracted_by_ocr)
+        self.assertEqual(cluster_1.pk, doc.cluster_id)
+        self.assertEqual(author_1.pk, doc.author_id)
+
+        # Confirm opinion cluster related fields are updated in ES.
+        cluster_1.case_name = "USA vs IPSUM"
+        cluster_1.citation_count = 10
+        cluster_1.date_filed = datetime.datetime(2023, 3, 10)
+        cluster_1.slug = "usa-vs-ipsum"
+        cluster_1.docket = docket_1
+        cluster_1.judges = "Bill Clinton"
+        cluster_1.nature_of_suit = "110"
+
+        cluster_1.save()
+        cluster_1.refresh_from_db()
+        ParentheticalGroupDocument._index.refresh()
+        doc = ParentheticalGroupDocument.get(id=self.pg.pk)
+        self.assertEqual("USA vs IPSUM", doc.caseName)
+        self.assertEqual(10, doc.citeCount)
+        self.assertEqual(datetime.datetime(2023, 3, 10), doc.dateFiled)
+        self.assertEqual("usa-vs-ipsum", doc.describing_opinion_cluster_slug)
+        self.assertEqual(docket_1.pk, doc.docket_id)
+        self.assertEqual("Bill Clinton", doc.judge)
+        self.assertEqual("110", doc.suitNature)
 
 
 class DocketEntriesTimezone(TestCase):
