@@ -24,27 +24,30 @@ header {
 
 .navbar {
   margin-bottom: 0;
-  border-bottom: 1px solid #e7e7e7;
+  border-right: none;
+  border-bottom-color: #e7e7e7;
+  border-left: none;
+}
+
+.navbar-brand > img {
+  display: block;
+  margin: 0 0 0 -1px; /* visually compensate for leading edge 'C' */
 }
 
 .navbar-toggle {
   margin-bottom: 0;
 }
 
-.navbar-nav > li > a {
+.navbar-default .navbar-nav > li a {
   padding-top: 13px;
-  padding-bottom: 13px;
+  padding-bottom: 10px;
+  border-bottom: 3px solid transparent;
+  color: #555555;
 }
 
 .navbar-default .navbar-nav > li.active a {
   background-color: transparent;
-  border-bottom: 3px solid #AE0B0B;
-}
-
-.navbar-default .navbar-nav > li a {
-  /* Layout fix. */
-  border-bottom: 3px solid transparent;
-  color: #555555;
+  border-bottom-color: #AE0B0B;
 }
 
 .subnav {
@@ -217,7 +220,12 @@ a.button:active {
   }
 
   #donate-image {
-    text-align: start;
+    text-align: center;
+    margin: 1em auto;
+  }
+
+  #by-line {
+    text-align: center;
   }
 
   .dl-horizontal dd {
@@ -745,12 +753,17 @@ input.bottom {
 .sidebar-section h3 {
   margin-bottom: 0.6em;
   margin-top: 0;
+  border-bottom: 1px solid #ddd;
 }
 
 .sidebar-section h3 > span {
   padding: 0.5em 0 0.1em;
-  border-bottom: 1px solid #ddd;
   line-height: 1.4em;
+}
+
+.sidebar-section h3 > .edit {
+  font-size: 1.2ex;
+  font-weight: normal;
 }
 
 div.sidebar-checkbox {
