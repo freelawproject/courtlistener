@@ -15,7 +15,7 @@
     <script defer type="text/javascript"
             src="{% static "js/jquery.tablesorter.widgets.min.js" %}"></script>
 
-    <script type="text/javascript">
+    <script type="text/javascript" nonce="{{ request.csp_nonce }}">
       $(document).ready(function(){
         $(".edit-note-trigger").on("click", function (event) {
           event.preventDefault();

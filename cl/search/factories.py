@@ -25,7 +25,9 @@ from cl.search.models import (
     DocketEntry,
     Opinion,
     OpinionCluster,
+    OpinionsCited,
     Parenthetical,
+    ParentheticalGroup,
     RECAPDocument,
 )
 from cl.tests.providers import LegalProvider
@@ -75,6 +77,14 @@ class ParentheticalFactory(DjangoModelFactory):
     describing_opinion = SelfAttribute("described_opinion")
     text = Faker("sentence")
     score = Faker("pyfloat", min_value=0, max_value=1, right_digits=4)
+
+
+class ParentheticalGroupFactory(DjangoModelFactory):
+    class Meta:
+        model = ParentheticalGroup
+
+    score = Faker("pyfloat", min_value=0, max_value=1, right_digits=4)
+    size = Faker("random_int", min=1, max=100)
 
 
 class ParentheticalWithParentsFactory(ParentheticalFactory):
@@ -197,6 +207,15 @@ class OpinionClusterWithParentsFactory(
     pass
 
 
+class RECAPDocumentFactory(DjangoModelFactory):
+    class Meta:
+        model = RECAPDocument
+
+    description = Faker("text", max_nb_chars=750)
+    document_type = RECAPDocument.PACER_DOCUMENT
+    pacer_doc_id = Faker("pyint", min_value=100_000, max_value=400_000)
+
+
 class DocketEntryFactory(DjangoModelFactory):
     class Meta:
         model = DocketEntry
@@ -243,15 +262,6 @@ class DocketEntryReuseParentsFactory(
     pass
 
 
-class RECAPDocumentFactory(DjangoModelFactory):
-    class Meta:
-        model = RECAPDocument
-
-    description = Faker("text", max_nb_chars=750)
-    document_type = RECAPDocument.PACER_DOCUMENT
-    pacer_doc_id = Faker("pyint", min_value=100_000, max_value=400_000)
-
-
 class DocketFactory(DjangoModelFactory):
     class Meta:
         model = Docket
@@ -293,3 +303,17 @@ class OpinionClusterFactoryMultipleOpinions(
         size=3,  # by default create 3 opinions
     )
     precedential_status = ("Published", "Precedential")
+
+
+class OpinionsCitedWithParentsFactory(DjangoModelFactory):
+    """Make a DocketEntry with Docket parents"""
+
+    class Meta:
+        model = OpinionsCited
+
+    citing_opinion = SubFactory(
+        "cl.search.factories.OpinionFactory",
+    )
+    cited_opinion = SubFactory(
+        "cl.search.factories.OpinionFactory",
+    )

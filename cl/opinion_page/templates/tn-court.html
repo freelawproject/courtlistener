@@ -22,7 +22,7 @@
 {% block footer-scripts %}
   <script src="{% static "js/jquery.bootstrap-growl.js" %}"></script>
 
-  <script type="text/javascript">
+  <script type="text/javascript" nonce="{{ request.csp_nonce }}">
     $(document).ready(function () {
       $('#tenn-search-form').on("submit", function (e) {
         let checkboxes = $('input:checkbox');

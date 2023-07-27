@@ -1,6 +1,6 @@
 ARG BUILD_ENV=prod
 
-FROM python:3.10-slim as build-base
+FROM python:3.11-slim as build-base
 
 RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
     apt-get install \
@@ -16,9 +16,13 @@ RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
         # Other dependencies
         libffi-dev libxml2-dev libxslt-dev procps vim cmake
 
+# Set PGSSLCERT at a dummy location ro avoid a SSL error connection.
+# https://github.com/freelawproject/courtlistener/issues/2827
+ENV PGSSLCERT=/tmp/postgresql.crt
+
 # poetry
 # https://python-poetry.org/docs/configuration/#using-environment-variables
-ENV POETRY_VERSION=1.5.0 \
+ENV POETRY_VERSION=1.5.1 \
     # make poetry install to this location
     POETRY_HOME="/opt/poetry" \
     # Don't build a virtualenv to save space

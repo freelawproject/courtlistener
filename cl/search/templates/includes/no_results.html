@@ -1,53 +1,51 @@
 {% if not error %}
-    <h2 class="alt">Your search
-        {% if search_summary_str %}
-            &mdash; <strong>{{ search_summary_str }}</strong> &mdash;
-        {% endif %}
-        had no results.</h2>
-    <p>Search tips:</p>
-    <ul>
-        <li>Check your spelling.</li>
-        <li>Try fewer filters.</li>
-        <li>Remove quotes if you used them.</li>
-        {% if type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION %}
-          <li>Did you mean to <a href="{% url "advanced_r" %}">search on the RECAP Archive</a>?</li>
-        {% endif %}
-    </ul>
-    {% if type == SEARCH_TYPES.RECAP or type == SEARCH_TYPES.DOCKETS or type_override == SEARCH_TYPES.RECAP or type_override == SEARCH_TYPES.DOCKETS %}
-        <p>The RECAP Archive only contains cases that were downloaded from PACER using the <a href="https://free.law/recap/">RECAP Extensions</a>. If you are looking for a certain case or document that has not yet been downloaded in this way, it will not appear here. If you are encountering this problem, please install the <a href="https://free.law/recap/">RECAP Extension</a>, and purchase this case from PACER.
-        </p>
-    {% else %}
-        <p>Our <a href="{% url "coverage" %}">coverage page</a> details which jurisdictions we support.
-        </p>
+  <h2 class="alt">Your search
+    {% if search_summary_str %}
+        &mdash; <strong>{{ search_summary_str }}</strong> &mdash;
     {% endif %}
-    <p>If you expected more results than this, <a href="{% url "contact" %}">please let us know</a>. We value your feedback.
+    had no results.</h2>
+  <p>Search tips:</p>
+  <ul>
+    <li>Check your spelling.</li>
+    <li>Try fewer filters.</li>
+    <li>Remove quotes if you used them.</li>
+    {% if type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION %}
+      <li>Did you mean to <a href="{% url "advanced_r" %}">search on the RECAP Archive</a>?</li>
+    {% endif %}
+  </ul>
+  {% if type == SEARCH_TYPES.RECAP or type == SEARCH_TYPES.DOCKETS or type_override == SEARCH_TYPES.RECAP or type_override == SEARCH_TYPES.DOCKETS %}
+     <p>The RECAP Archive does not contain everything in PACER. To learn more about what we have and how to add content to the RECAP Archive, please see <a href="{% url "coverage" %}">our coverage page</a>.</p>
+  {% else %}
+    <p>Our <a href="{% url "coverage" %}">coverage page</a> details which jurisdictions we support.
     </p>
+  {% endif %}
+  <p>If you expected more results than this, <a href="{% url "contact" %}">please let us know</a>. We value your feedback.
+  </p>
 {% else %}
-    <h2 class="alt">Your search
-        {% if request.GET.q %}
-            &mdash; <strong>{{ request.GET.q }}</strong> &mdash;
-        {% endif %}
-        encountered an error.
-    </h2>
-
-    <p>This could be because:</p>
-    {% if search_form.errors %}
-        <ul>
-            <li>A date field could not be understood as a date.</li>
-            <li>A numeric field (like a citation count) couldn't be understood as a number.</li>
-            <li>A similar error with your input.</li>
-        </ul>
-        <p>Please double check your query and filters and if you still have issues, please <a href="{% url "contact" %}">get in touch for assistance</a>.
-        </p>
-    {% else %}
-        <ul>
-            <li>CourtListener couldn't make sense of your query.</li>
-            <li>Our system is down and can't respond.</li>
-            <li>Some other reason.</li>
-        </ul>
-        <p>We log these errors and work to resolve them, but if you think we can
-            benefit from your experience, don't hesitate to <a
-                    href="{% url "contact" %}">let us know</a>! We value your
-            feedback.</p>
+  <h2 class="alt">Your search
+    {% if request.GET.q %}
+        &mdash; <strong>{{ request.GET.q }}</strong> &mdash;
     {% endif %}
+    encountered an error.
+  </h2>
+  <p>This could be because:</p>
+  {% if search_form.errors %}
+    <ul>
+        <li>A date field could not be understood as a date.</li>
+        <li>A numeric field (like a citation count) couldn't be understood as a number.</li>
+        <li>A similar error with your input.</li>
+    </ul>
+    <p>Please double check your query and filters and if you still have issues, please <a href="{% url "contact" %}">get in touch for assistance</a>.
+    </p>
+  {% else %}
+    <ul>
+        <li>CourtListener couldn't make sense of your query.</li>
+        <li>Our system is down and can't respond.</li>
+        <li>Some other reason.</li>
+    </ul>
+    <p>We log these errors and work to resolve them, but if you think we can
+        benefit from your experience, don't hesitate to <a
+                href="{% url "contact" %}">let us know</a>! We value your
+        feedback.</p>
+  {% endif %}
 {% endif %}
