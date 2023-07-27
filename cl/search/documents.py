@@ -77,7 +77,7 @@ class ParentheticalGroupDocument(Document):
             "case_name": "caseName",
             "citation_count": "citeCount",
             "date_filed": "dateFiled",
-            "slug": "describing_opinion_cluster_slug",
+            "slug": "opinion_cluster_slug",
             "docket_id": "docket_id",
             "judges": "judge",
             "nature_of_suit": "suitNature",
