@@ -3,6 +3,7 @@ import random
 import traceback
 from typing import List, Optional, Tuple, Union
 
+import httpx
 import requests
 from asgiref.sync import async_to_sync, sync_to_async
 from django.apps import apps
@@ -199,7 +200,7 @@ def extract_doc_content(
 
 @app.task(
     bind=True,
-    autoretry_for=(requests.ConnectionError, requests.ReadTimeout),
+    autoretry_for=(httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout),
     max_retries=3,
     retry_backoff=10,
 )

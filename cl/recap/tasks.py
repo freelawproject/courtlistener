@@ -375,8 +375,10 @@ async def process_recap_pdf(pk):
             return None
 
     if not existing_document and not pq.debug:
-        await extract_recap_pdf_base(rd.pk),
-        await sync_to_async(add_items_to_solr)([rd.pk], "search.RECAPDocument")
+        await sync_to_async(chain(
+            extract_recap_pdf.si(rd.pk),
+            add_items_to_solr.s("search.RECAPDocument"),
+        ).apply_async)()
 
     de = await DocketEntry.objects.aget(recap_documents=rd)
     await mark_pq_successful(
