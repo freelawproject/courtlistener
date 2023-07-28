@@ -65,27 +65,6 @@ class ParentheticalGroupDocument(Document):
         fields = ["score"]
         ignore_signals = True
 
-    def document_mapping_fields(
-        self, field_list: list[str], instance: Docket
-    ) -> dict:
-        fields_map = {
-            "docket_number": "docketNumber",
-            "court_id": "court_id",
-            "extracted_by_ocr": "opinion_extracted_by_ocr",
-            "cluster_id": "cluster_id",
-            "author_id": "author_id",
-            "case_name": "caseName",
-            "citation_count": "citeCount",
-            "date_filed": "dateFiled",
-            "slug": "opinion_cluster_slug",
-            "docket_id": "docket_id",
-            "judges": "judge",
-            "nature_of_suit": "suitNature",
-        }
-        return {
-            fields_map[field]: getattr(instance, field) for field in field_list
-        }
-
     def prepare_citation(self, instance):
         return [str(cite) for cite in instance.opinion.cluster.citations.all()]
 

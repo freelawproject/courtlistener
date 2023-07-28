@@ -2428,6 +2428,7 @@ class OpinionCluster(AbstractDateTimeModel):
             "docket_id",
             "judges",
             "nature_of_suit",
+            "precedential_status",
         ]
     )
 
@@ -3218,6 +3219,7 @@ class Parenthetical(models.Model):
         help_text="A score between 0 and 1 representing how descriptive the "
         "parenthetical is",
     )
+    es_pa_field_tracker = FieldTracker(fields=["score", "text"])
 
     def __str__(self) -> str:
         return (

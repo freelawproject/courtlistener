@@ -2602,6 +2602,7 @@ class ElasticSearchTest(TestCase):
         # Update docket number and confirm it's updated in ES.
         cluster_1.docket.docket_number = "1:98-cr-0000"
         cluster_1.docket.save()
+
         cluster_1.refresh_from_db()
 
         ParentheticalGroupDocument._index.refresh()
@@ -2629,7 +2630,7 @@ class ElasticSearchTest(TestCase):
         doc = ParentheticalGroupDocument.get(id=pg.pk)
         self.assertEqual(self.c2.pk, doc.court_id)
 
-        author_1 = PersonFactory()
+        author_1 = PersonFactory(name_first="John")
         docket_1 = DocketFactory()
 
         # Confirm opinion related fields are updated in ES.
@@ -2674,7 +2675,71 @@ class ElasticSearchTest(TestCase):
         self.assertEqual("Bill Clinton", doc.judge)
         self.assertEqual("110", doc.suitNature)
 
+        p5.text = "New text"
+        p5.score = 0.70
+        p5.save()
+        p5.save()
+
+        ParentheticalGroupDocument._index.refresh()
+        doc = ParentheticalGroupDocument.get(id=pg.pk)
+        self.assertEqual("New text", doc.representative_text)
+        self.assertEqual(0.70, doc.representative_score)
+
+        self.assertEqual([], doc.panel_ids)
+
+        cluster_1.panel.add(author_1)
+        ParentheticalGroupDocument._index.refresh()
+        doc = ParentheticalGroupDocument.get(id=pg.pk)
+        self.assertEqual([author_1.pk], doc.panel_ids)
+
+        self.assertEqual([], doc.citation)
+        citation = CitationWithParentsFactory(cluster=cluster_1)
+        citation_lexis = CitationWithParentsFactory(
+            cluster=cluster_1, type=Citation.LEXIS
+        )
+        citation_neutral = CitationWithParentsFactory(
+            cluster=cluster_1, type=Citation.NEUTRAL
+        )
+
+        o.opinions_cited.add(o_2)
+
+        ParentheticalGroupDocument._index.refresh()
+        doc = ParentheticalGroupDocument.get(id=pg.pk)
+        self.assertEqual(
+            [str(citation), str(citation_lexis), str(citation_neutral)],
+            doc.citation,
+        )
+        self.assertEqual(str(citation_lexis), doc.lexisCite)
+        self.assertEqual(str(citation_neutral), doc.neutralCite)
+        self.assertEqual([o_2.pk], doc.cites)
+
+        citation.delete()
+        citation_lexis.delete()
+        citation_neutral.delete()
+
+        ParentheticalGroupDocument._index.refresh()
+        doc = ParentheticalGroupDocument.get(id=pg.pk)
+
+        self.assertEqual(None, doc.citation)
+        self.assertEqual(None, doc.lexisCite)
+        self.assertEqual(None, doc.neutralCite)
+
+        cluster_1.precedential_status = PRECEDENTIAL_STATUS.PUBLISHED
+        cluster_1.save()
+        ParentheticalGroupDocument._index.refresh()
+        doc = ParentheticalGroupDocument.get(id=pg.pk)
+
+        cluster_1.panel.remove(author_1)
+        o.opinions_cited.remove(o_2)
+        ParentheticalGroupDocument._index.refresh()
+        doc = ParentheticalGroupDocument.get(id=pg.pk)
+        self.assertEqual(None, doc.cites)
+        self.assertEqual(None, doc.panel_ids)
+
+        pg_id = pg.pk
         pg.delete()
+        self.assertEqual(False, ParentheticalGroupDocument.exists(id=pg_id))
+
         ParentheticalGroupDocument._index.refresh()
 
 

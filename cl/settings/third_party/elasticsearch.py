@@ -7,6 +7,7 @@ ELASTICSEARCH_DISABLED = env(
     default=True,
 )
 
+
 #
 # Connection settings
 #
