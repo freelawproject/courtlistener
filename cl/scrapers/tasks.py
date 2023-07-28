@@ -200,7 +200,11 @@ def extract_doc_content(
 
 @app.task(
     bind=True,
-    autoretry_for=(httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout),
+    autoretry_for=(
+        httpx.ConnectError,
+        httpx.ConnectTimeout,
+        httpx.ReadTimeout,
+    ),
     max_retries=3,
     retry_backoff=10,
 )
