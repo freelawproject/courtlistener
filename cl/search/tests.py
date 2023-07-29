@@ -2726,11 +2726,9 @@ class ElasticSearchTest(TestCase):
 
         cluster_1.precedential_status = PRECEDENTIAL_STATUS.PUBLISHED
         cluster_1.save()
-        ParentheticalGroupDocument._index.refresh()
-        doc = ParentheticalGroupDocument.get(id=pg.pk)
-
         cluster_1.panel.remove(author_1)
         o.opinions_cited.remove(o_2)
+
         ParentheticalGroupDocument._index.refresh()
         doc = ParentheticalGroupDocument.get(id=pg.pk)
         self.assertEqual(None, doc.cites)
@@ -2740,6 +2738,21 @@ class ElasticSearchTest(TestCase):
         pg.delete()
         self.assertEqual(False, ParentheticalGroupDocument.exists(id=pg_id))
 
+        # Simulate document is not indexed in ES yet.
+        pg_1 = ParentheticalGroupFactory(
+            opinion=o, representative=p5, score=0.3236, size=1
+        )
+        pg_1_id = pg_1.pk
+        ParentheticalGroupDocument._index.refresh()
+        doc = ParentheticalGroupDocument.get(id=pg_1.pk)
+        doc.delete()
+        self.assertEqual(False, ParentheticalGroupDocument.exists(id=pg_1_id))
+
+        cluster_1.precedential_status = PRECEDENTIAL_STATUS.IN_CHAMBERS
+        cluster_1.save()
+        ParentheticalGroupDocument._index.refresh()
+        self.assertEqual(True, ParentheticalGroupDocument.exists(id=pg_1_id))
+        pg_1.delete()
         ParentheticalGroupDocument._index.refresh()
 
 
