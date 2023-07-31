@@ -4,7 +4,7 @@ env = environ.FileAwareEnv()
 
 ELASTICSEARCH_DISABLED = env(
     "ELASTICSEARCH_DISABLED",
-    default=True,
+    default=False,
 )
 
 

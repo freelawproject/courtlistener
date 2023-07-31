@@ -1,7 +1,7 @@
 from django.conf import settings
 from django_elasticsearch_dsl import Document, Index, fields
 
-from cl.search.models import Citation, Docket, ParentheticalGroup
+from cl.search.models import Citation, ParentheticalGroup
 
 # Define parenthetical elasticsearch index
 parenthetical_group_index = Index("parenthetical_group")

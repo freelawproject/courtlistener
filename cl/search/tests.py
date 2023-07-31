@@ -5,7 +5,7 @@ import os
 from datetime import date
 from functools import reduce
 from pathlib import Path
-from unittest import mock, skipUnless
+from unittest import mock
 
 import pytz
 from asgiref.sync import sync_to_async
@@ -19,9 +19,8 @@ from django.core.management import call_command
 from django.db import IntegrityError, transaction
 from django.http import HttpRequest
 from django.test import AsyncRequestFactory, override_settings
-from django.test.utils import captured_stderr
 from django.urls import reverse
-from elasticsearch_dsl import Q, connections
+from elasticsearch_dsl import Q
 from factory import RelatedFactory
 from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
@@ -2038,9 +2037,6 @@ class CaptionTest(TestCase):
         self.assertEqual(cs, cs_sorted)
 
 
-from cl.search.models import ParentheticalGroup
-
-
 class ElasticSearchTest(TestCase):
     # Mock ElasticSearch search and responses are difficult due to its implementation,
     # that's why we skip testing if Elasticsearch instance is offline, this can be
@@ -2542,8 +2538,9 @@ class ElasticSearchTest(TestCase):
         )
 
     def test_keep_in_sync_related_pa_objects(self) -> None:
-        """Test PA documents are updated when related objects change."""
+        """Test PA documents are updated in ES when related objects change."""
 
+        # Create factories for the test.
         cluster_1 = OpinionClusterFactory(
             case_name="Lorem Ipsum",
             case_name_short="Ipsum",
@@ -2572,7 +2569,6 @@ class ElasticSearchTest(TestCase):
             source="H",
             precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
         )
-
         o = OpinionWithParentsFactory(
             cluster=cluster_1,
             type="Plurality Opinion",
@@ -2581,7 +2577,6 @@ class ElasticSearchTest(TestCase):
         o_2 = OpinionWithParentsFactory(
             cluster=cluster_2,
         )
-
         p5 = ParentheticalFactory(
             describing_opinion=o_2,
             described_opinion=o_2,
@@ -2589,31 +2584,30 @@ class ElasticSearchTest(TestCase):
             text="Lorem Ipsum Dolor.",
             score=0.4218,
         )
-
         pg = ParentheticalGroupFactory(
             opinion=o, representative=p5, score=0.3236, size=1
         )
-
         p5.group = pg
         p5.save()
 
+        # Retrieve the document from ES and confirm it was indexed.
         doc = ParentheticalGroupDocument.get(id=pg.pk)
         self.assertEqual(cluster_1.docket.docket_number, doc.docketNumber)
         # Update docket number and confirm it's updated in ES.
         cluster_1.docket.docket_number = "1:98-cr-0000"
         cluster_1.docket.save()
-
         cluster_1.refresh_from_db()
-
         ParentheticalGroupDocument._index.refresh()
         doc = ParentheticalGroupDocument.get(id=pg.pk)
         self.assertEqual("1:98-cr-0000", doc.docketNumber)
 
-        # Avoid updating documents in ES when a related object field is not
-        # including in the document mapping.
-
+        # Confirm we can avoid updating documents in ES when a related object
+        # field is not including in the document mapping.
         # Confirm initial version is 2.
         self.assertEqual(2, doc.meta.version)
+
+        # Update a related object field which is not including in the document
+        # mapping.
         cluster_1.docket.view_count = 5
         cluster_1.docket.save()
         cluster_1.refresh_from_db()
@@ -2630,10 +2624,8 @@ class ElasticSearchTest(TestCase):
         doc = ParentheticalGroupDocument.get(id=pg.pk)
         self.assertEqual(self.c2.pk, doc.court_id)
 
-        author_1 = PersonFactory(name_first="John")
-        docket_1 = DocketFactory()
-
         # Confirm opinion related fields are updated in ES.
+        author_1 = PersonFactory(name_first="John")
         o.extracted_by_ocr = False
         o.cluster = cluster_1
         o.author = author_1
@@ -2646,6 +2638,7 @@ class ElasticSearchTest(TestCase):
         self.assertEqual(author_1.pk, doc.author_id)
 
         # Confirm opinion cluster related fields are updated in ES.
+        docket_1 = DocketFactory()
         cluster_1.case_name = "USA vs IPSUM"
         cluster_1.citation_count = 10
         cluster_1.date_filed = datetime.datetime(2023, 3, 10)
@@ -2654,7 +2647,6 @@ class ElasticSearchTest(TestCase):
         cluster_1.nature_of_suit = "110"
         cluster_1.save()
         cluster_1.refresh_from_db()
-
         pg.representative.describing_opinion.cluster.case_name = (
             "California vs Doe"
         )
@@ -2670,11 +2662,11 @@ class ElasticSearchTest(TestCase):
         self.assertEqual(
             "california-vs-doe", doc.describing_opinion_cluster_slug
         )
-
         self.assertEqual(docket_1.pk, doc.docket_id)
         self.assertEqual("Bill Clinton", doc.judge)
         self.assertEqual("110", doc.suitNature)
 
+        # Confirm representative Parenthetical fields are updated in ES.
         p5.text = "New text"
         p5.score = 0.70
         p5.save()
@@ -2685,47 +2677,20 @@ class ElasticSearchTest(TestCase):
         self.assertEqual("New text", doc.representative_text)
         self.assertEqual(0.70, doc.representative_score)
 
+        # Confirm m2m related fields are updated in ES.
+        # Check initial m2m values are empty.
         self.assertEqual([], doc.panel_ids)
-
+        self.assertEqual([], doc.cites)
+        # Add m2m relation.
         cluster_1.panel.add(author_1)
-        ParentheticalGroupDocument._index.refresh()
-        doc = ParentheticalGroupDocument.get(id=pg.pk)
-        self.assertEqual([author_1.pk], doc.panel_ids)
-
-        self.assertEqual([], doc.citation)
-        citation = CitationWithParentsFactory(cluster=cluster_1)
-        citation_lexis = CitationWithParentsFactory(
-            cluster=cluster_1, type=Citation.LEXIS
-        )
-        citation_neutral = CitationWithParentsFactory(
-            cluster=cluster_1, type=Citation.NEUTRAL
-        )
-
         o.opinions_cited.add(o_2)
-
         ParentheticalGroupDocument._index.refresh()
         doc = ParentheticalGroupDocument.get(id=pg.pk)
-        self.assertEqual(
-            [str(citation), str(citation_lexis), str(citation_neutral)],
-            doc.citation,
-        )
-        self.assertEqual(str(citation_lexis), doc.lexisCite)
-        self.assertEqual(str(citation_neutral), doc.neutralCite)
+        # m2m fields are properly updated in ES.
+        self.assertEqual([author_1.pk], doc.panel_ids)
         self.assertEqual([o_2.pk], doc.cites)
 
-        citation.delete()
-        citation_lexis.delete()
-        citation_neutral.delete()
-
-        ParentheticalGroupDocument._index.refresh()
-        doc = ParentheticalGroupDocument.get(id=pg.pk)
-
-        self.assertEqual(None, doc.citation)
-        self.assertEqual(None, doc.lexisCite)
-        self.assertEqual(None, doc.neutralCite)
-
-        cluster_1.precedential_status = PRECEDENTIAL_STATUS.PUBLISHED
-        cluster_1.save()
+        # Confirm m2m fields are cleaned in ES when the relation is removed.
         cluster_1.panel.remove(author_1)
         o.opinions_cited.remove(o_2)
 
@@ -2734,11 +2699,55 @@ class ElasticSearchTest(TestCase):
         self.assertEqual(None, doc.cites)
         self.assertEqual(None, doc.panel_ids)
 
+        # Confirm reverse related fields are updated in ES.
+        self.assertEqual([], doc.citation)
+        # Create reverse related objects to cluster_1.
+        citation = CitationWithParentsFactory(cluster=cluster_1)
+        citation_lexis = CitationWithParentsFactory(
+            cluster=cluster_1, type=Citation.LEXIS
+        )
+        citation_neutral = CitationWithParentsFactory(
+            cluster=cluster_1, type=Citation.NEUTRAL
+        )
+        # Reverse related object fields are updated in ES.
+        ParentheticalGroupDocument._index.refresh()
+        doc = ParentheticalGroupDocument.get(id=pg.pk)
+        self.assertEqual(
+            [str(citation), str(citation_lexis), str(citation_neutral)],
+            doc.citation,
+        )
+        self.assertEqual(str(citation_lexis), doc.lexisCite)
+        self.assertEqual(str(citation_neutral), doc.neutralCite)
+
+        # Confirm reverse related object fields are cleaned in ES when the
+        # object is removed.
+        citation.delete()
+        citation_lexis.delete()
+        citation_neutral.delete()
+        ParentheticalGroupDocument._index.refresh()
+        doc = ParentheticalGroupDocument.get(id=pg.pk)
+        self.assertEqual(None, doc.citation)
+        self.assertEqual(None, doc.lexisCite)
+        self.assertEqual(None, doc.neutralCite)
+
+        # Confirm related object fields using display value are properly indexed.
+        self.assertEqual("Non-Precedential", doc.status)
+        cluster_1.precedential_status = PRECEDENTIAL_STATUS.PUBLISHED
+        cluster_1.save()
+        ParentheticalGroupDocument._index.refresh()
+        doc = ParentheticalGroupDocument.get(id=pg.pk)
+        self.assertEqual("Precedential", doc.status)
+
+        # Confirm document is removed from ES, when the ParentheticalGroup is
+        # removed from DB.
         pg_id = pg.pk
         pg.delete()
         self.assertEqual(False, ParentheticalGroupDocument.exists(id=pg_id))
 
-        # Simulate document is not indexed in ES yet.
+        # Confirm we can index a document if it doesn't exist when trying to
+        # update a related document.
+        # Simulate new document is not indexed in ES yet, index it and delete
+        # the document from ES but keep the object in DB.
         pg_1 = ParentheticalGroupFactory(
             opinion=o, representative=p5, score=0.3236, size=1
         )
@@ -2748,9 +2757,11 @@ class ElasticSearchTest(TestCase):
         doc.delete()
         self.assertEqual(False, ParentheticalGroupDocument.exists(id=pg_1_id))
 
+        # Try to update a related object field.
         cluster_1.precedential_status = PRECEDENTIAL_STATUS.IN_CHAMBERS
         cluster_1.save()
         ParentheticalGroupDocument._index.refresh()
+        # Document is indexed in ES again.
         self.assertEqual(True, ParentheticalGroupDocument.exists(id=pg_1_id))
         pg_1.delete()
         ParentheticalGroupDocument._index.refresh()

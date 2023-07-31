@@ -1,5 +1,6 @@
 from typing import Callable, Union
 
+from django.conf import settings
 from django.db.models.signals import m2m_changed, post_delete, post_save
 from elasticsearch.exceptions import NotFoundError
 from elasticsearch_dsl import Document
@@ -216,7 +217,9 @@ class ESSignalProcessor(object):
         self.main_model = documents_model_dicts[0]
         self.es_document = documents_model_dicts[1]
         self.documents_model_mapping = documents_model_dicts[2]
-        self.setup()
+
+        if not settings.ELASTICSEARCH_DISABLED:
+            self.setup()
 
     def setup(self):
         models_save = list(self.documents_model_mapping["save"].keys())
