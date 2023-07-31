@@ -17,7 +17,12 @@ from cl.search.models import (
 )
 
 instance_typing = Union[
-    Docket, Opinion, OpinionCluster, Parenthetical, ParentheticalGroup
+    Citation,
+    Docket,
+    Opinion,
+    OpinionCluster,
+    Parenthetical,
+    ParentheticalGroup,
 ]
 es_document_typing = Union[ParentheticalGroupDocument]
 
@@ -172,7 +177,7 @@ def update_remove_m2m_documents(
             main_doc = get_or_create_doc(es_document, main_object)
             if not main_doc:
                 return
-            get_m2m_value = getattr(main_doc, "prepare_" + affected_field)(
+            get_m2m_value = getattr(main_doc, f"prepare_{affected_field}")(
                 main_object
             )
             Document.update(
@@ -206,13 +211,18 @@ def update_reverse_related_documents(
         Document.update(
             main_doc,
             **{
-                field: getattr(main_doc, "prepare_" + field)(main_object)
+                field: getattr(main_doc, f"prepare_{field}")(main_object)
                 for field in affected_fields
             },
         )
 
 
 class ESSignalProcessor(object):
+    """Custom signal processor for Elasticsearch documents. It is responsible
+    for managing the Elasticsearch index after certain events happen, such as
+    saving, deleting, or modifying instances of related models.
+    """
+
     def __init__(self, documents_model_dicts):
         self.main_model = documents_model_dicts[0]
         self.es_document = documents_model_dicts[1]
@@ -225,53 +235,50 @@ class ESSignalProcessor(object):
         models_save = list(self.documents_model_mapping["save"].keys())
         models_delete = list(self.documents_model_mapping["delete"].keys())
         models_m2m = list(self.documents_model_mapping["m2m"].keys())
-        models_reverse_foreign_key = [Citation]
+        models_reverse_foreign_key = list(
+            self.documents_model_mapping["reverse"].keys()
+        )
 
-        # Connect each signal to the respective handler
-        for model in models_save:
-            post_save.connect(
-                self.handle_save,
-                sender=model,
-                dispatch_uid="update_related_es_documents_on_{}_save".format(
-                    model.__name__.lower()
-                ),
-                weak=False,
-            )
-        for model in models_delete:
-            post_delete.connect(
-                self.handle_delete,
-                sender=model,
-                dispatch_uid="remove_{}_from_es_index".format(
-                    model.__name__.lower()
-                ),
-                weak=False,
-            )
-        for model in models_m2m:
-            m2m_changed.connect(
-                self.handle_m2m,
-                sender=model,
-                dispatch_uid="update_{}_m2m_changed_in_es_index".format(
-                    model.__name__.lower()
-                ),
-                weak=False,
-            )
-        for model in models_reverse_foreign_key:
-            post_save.connect(
-                self.handle_reverse_actions,
-                sender=model,
-                dispatch_uid="update_reverse_related_es_documents_on_{}_save".format(
-                    model.__name__.lower()
-                ),
-                weak=False,
-            )
-            post_delete.connect(
-                self.handle_reverse_actions,
-                sender=model,
-                dispatch_uid="update_reverse_related_es_documents_on_{}_delete".format(
-                    model.__name__.lower()
-                ),
-                weak=False,
-            )
+        # Connect signals for save
+        self.connect_signals(
+            models_save,
+            self.handle_save,
+            {post_save: "update_related_es_documents_in_es_index"},
+        )
+        # Connect signals for deletion
+        self.connect_signals(
+            models_delete,
+            self.handle_delete,
+            {post_delete: "remove_from_es_index"},
+        )
+        # Connect signals for many-to-many changes
+        self.connect_signals(
+            models_m2m,
+            self.handle_m2m,
+            {m2m_changed: "update_m2m_changed_in_es_index"},
+        )
+        # Connect signals for save and delete on models with reverse foreign keys
+        self.connect_signals(
+            models_reverse_foreign_key,
+            self.handle_reverse_actions,
+            {
+                post_save: "update_reverse_related_es_documents_on_save",
+                post_delete: "update_reverse_related_es_documents_on_delete",
+            },
+        )
+
+    @staticmethod
+    def connect_signals(models, handler, signal_to_uid_mapping, weak=False):
+        """Helper method to connect signals to a handler for multiple models."""
+        for model in models:
+            model_name = model.__name__.lower()
+            for signal, uid_base in signal_to_uid_mapping.items():
+                signal.connect(
+                    handler,
+                    sender=model,
+                    dispatch_uid=f"{uid_base}_{model_name}",
+                    weak=weak,
+                )
 
     def handle_save(self, sender, instance=None, created=False, **kwargs):
         """Receiver function that gets called after an object instance is saved"""
