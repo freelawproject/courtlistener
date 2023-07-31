@@ -283,13 +283,14 @@ class ESSignalProcessor(object):
     def handle_save(self, sender, instance=None, created=False, **kwargs):
         """Receiver function that gets called after an object instance is saved"""
         mapping_fields = self.documents_model_mapping["save"][sender]
-        update_es_documents(
-            self.main_model,
-            self.es_document,
-            instance,
-            created,
-            mapping_fields,
-        )
+        if not created:
+            update_es_documents(
+                self.main_model,
+                self.es_document,
+                instance,
+                created,
+                mapping_fields,
+            )
         if not mapping_fields:
             save_document_in_es(instance, self.es_document)
 
