@@ -1253,7 +1253,7 @@ class RecapPdfTaskTest(TestCase):
         self.assertEqual(self.pq.status, PROCESSING_STATUS.FAILED)
         self.assertIn("Unable to find docket entry", self.pq.error_message)
 
-    @mock.patch("cl.recap.tasks.extract_recap_pdf_base")
+    @mock.patch("cl.recap.tasks.extract_recap_pdf.si")
     def test_docket_and_docket_entry_already_exist(self, mock_extract):
         """What happens if we have everything but the PDF?
 
@@ -1349,7 +1349,7 @@ class RecapZipTaskTest(TestCase):
         Docket.objects.all().delete()
         ProcessingQueue.objects.all().delete()
 
-    @mock.patch("cl.recap.tasks.extract_recap_pdf_base")
+    @mock.patch("cl.recap.tasks.extract_recap_pdf.si")
     def test_simple_zip_upload(self, mock_extract):
         """Do we unpack the zip and process it's contents properly?"""
         # The original pq should be marked as complete with a good message.
