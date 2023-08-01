@@ -872,6 +872,11 @@ def map_and_merge_opinions(
                     if author
                     else "",
                 )
+            else:
+                raise OpinionTypeException(
+                    f"Harvard opinion has no type "
+                    f"attribute: {cluster.filepath_json_harvard}"
+                )
     else:
         # Skip creating new opinion cluster due to differences between
         # Columbia and Harvard data set/parsing.
