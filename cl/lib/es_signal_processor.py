@@ -46,19 +46,39 @@ def updated_fields(
     return changed_fields
 
 
+def get_fields_to_update(
+    changed_fields: list[str], fields_map: dict[str, str]
+) -> list[str]:
+    """Generate a list of fields to be updated based on provided map and changed fields.
+
+    :param changed_fields: A list of field names that have been changed.
+    :param fields_map: A dict containing field names that can be updated.
+    :return: A list with field names that need to be updated.
+    """
+    fields_to_update = []
+    for field in changed_fields:
+        if field in list(fields_map.keys()):
+            fields_to_update.append(field)
+        if f"get_{field}_display" in list(fields_map.keys()):
+            fields_to_update.append(f"get_{field}_display")
+    return fields_to_update
+
+
 def document_fields_to_update(
     field_list: list[str], instance: instance_typing, fields_map: dict
 ) -> dict:
     """Generate a dictionary of fields and values to update based on a
      provided map and an instance.
+
     :param field_list: A list of field names that need to be updated.
     :param instance: The instance from which field values are to be extracted.
     :param fields_map: A map from which ES field names are to be extracted.
     :return: A dictionary with fields and values to update.
     """
+
     return {
-        fields_map[field][0]: getattr(instance, f"get_{field}_display")()
-        if fields_map[field][1] == "display"
+        fields_map[field]: getattr(instance, field)()
+        if field.startswith("get_") and field.endswith("_display")
         else getattr(instance, field)
         for field in field_list
     }
@@ -141,11 +161,9 @@ def update_es_documents(
                 main_doc = get_or_create_doc(es_document, main_object)
                 if not main_doc:
                     return
-                fields_to_update = [
-                    element
-                    for element in changed_fields
-                    if element in list(fields_map.keys())
-                ]
+                fields_to_update = get_fields_to_update(
+                    changed_fields, fields_map
+                )
                 if fields_to_update:
                     Document.update(
                         main_doc,
@@ -223,10 +241,10 @@ class ESSignalProcessor(object):
     saving, deleting, or modifying instances of related models.
     """
 
-    def __init__(self, documents_model_dicts):
-        self.main_model = documents_model_dicts[0]
-        self.es_document = documents_model_dicts[1]
-        self.documents_model_mapping = documents_model_dicts[2]
+    def __init__(self, main_model, es_document, documents_model_mapping):
+        self.main_model = main_model
+        self.es_document = es_document
+        self.documents_model_mapping = documents_model_mapping
 
         if not settings.ELASTICSEARCH_DISABLED:
             self.setup()
