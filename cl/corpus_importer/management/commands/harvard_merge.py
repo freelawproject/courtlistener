@@ -826,6 +826,12 @@ def map_and_merge_opinions(
 ) -> None:
     """Map and merge opinion data
 
+    Map and merge opinions in clusters. If an opinion cluster has multiple
+    opinions, we attempt to map the opinions to each other. In some
+    cases - the style between Harvard and Columbia is different.
+    In those cases we do not create new opinions and just rely on the data
+    that we previously had and log that we did not create new opinions.
+
     :param cluster: Cluster object
     :param harvard_data: json data from harvard case
     :return: None
@@ -866,6 +872,12 @@ def map_and_merge_opinions(
                     if author
                     else "",
                 )
+    else:
+        # Skip creating new opinion cluster due to differences between
+        # Columbia and Harvard data set/parsing.
+        logger.info(
+            msg=f"Skip merging mismatched opinions on cluster: {cluster.id}"
+        )
 
 
 class Command(VerboseCommand):
