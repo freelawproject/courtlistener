@@ -3,9 +3,10 @@ import operator
 import re
 import time
 import traceback
+from collections import defaultdict
 from datetime import date
 from functools import reduce
-from typing import Any, Dict, List
+from typing import Any, DefaultDict, Dict, List
 
 from django.conf import settings
 from django.core.paginator import Page
@@ -19,6 +20,7 @@ from elasticsearch_dsl.utils import AttrDict
 
 from cl.lib.search_utils import BOOSTS, cleanup_main_query
 from cl.lib.types import CleanData
+from cl.people_db.models import Person, Position
 from cl.search.constants import (
     ALERTS_HL_TAG,
     SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS,
@@ -316,7 +318,11 @@ def build_es_main_query(
     """
 
     string_query = None
-    filters = build_es_filters(cd)
+    join_field_documents = [SEARCH_TYPES.PEOPLE]
+    if cd["type"] in join_field_documents:
+        filters = build_join_es_filters(cd)
+    else:
+        filters = build_es_filters(cd)
 
     match cd["type"]:
         case SEARCH_TYPES.PARENTHETICAL:
@@ -334,6 +340,17 @@ def build_es_main_query(
                 fields,
                 cd.get("q", ""),
             )
+        case SEARCH_TYPES.PEOPLE:
+            child_query_fields = {
+                "position": ["appointer"],
+                "education": ["school"],
+            }
+            parent_query_fields = ["name"]
+            string_query = build_join_fulltext_queries(
+                child_query_fields,
+                parent_query_fields,
+                cd.get("q", ""),
+            )
 
     if filters or string_query:
         # Apply filters first if there is at least one set.
@@ -344,7 +361,13 @@ def build_es_main_query(
         if string_query:
             search_query = search_query.query(string_query)
     else:
-        search_query = search_query.query("match_all")
+        if cd["type"] == SEARCH_TYPES.PEOPLE:
+            # Only return Person documents.
+            search_query = search_query.query(
+                Q("match", person_child="person")
+            )
+        else:
+            search_query = search_query.query("match_all")
     total_query_results = search_query.count()
 
     # Create groups aggregation if needed.
@@ -561,25 +584,33 @@ def group_search_results(
 
 
 def convert_str_date_fields_to_date_objects(
-    results: Page, date_field_name: str, search_type: str
+    results: Page, search_type: str
 ) -> None:
     """Converts string date fields in Elasticsearch search results to date
     objects.
 
     :param results: A Page object containing the search results to be modified.
-    :param date_field_name: The date field name containing the date strings
-    to be converted.
     :param search_type: The search type to perform.
     :return: None, the function modifies the search results object in place.
     """
     if search_type == SEARCH_TYPES.PARENTHETICAL:
+        date_field_name = ("dateFiled",)
         for result in results.object_list:
-            if search_type == SEARCH_TYPES.PARENTHETICAL:
-                top_hits = result.grouped_by_opinion_cluster_id.hits.hits
-                for hit in top_hits:
-                    date_str = hit["_source"][date_field_name]
+            top_hits = result.grouped_by_opinion_cluster_id.hits.hits
+            for hit in top_hits:
+                date_str = hit["_source"][date_field_name]
+                date_obj = date.fromisoformat(date_str)
+                hit["_source"][date_field_name] = date_obj
+    else:
+        if search_type == SEARCH_TYPES.PEOPLE:
+            date_field_names = ["dob", "dod"]
+            for result in results.object_list:
+                for date_field_name in date_field_names:
+                    date_str = result[date_field_name]
+                    if not date_str:
+                        continue
                     date_obj = date.fromisoformat(date_str)
-                    hit["_source"][date_field_name] = date_obj
+                    result[date_field_name] = date_obj
 
 
 def merge_courts_from_db(results: Page, search_type: str) -> None:
@@ -609,6 +640,31 @@ def merge_courts_from_db(results: Page, search_type: str) -> None:
             for hit in top_hits:
                 court_id = hit["_source"]["court_id"]
                 hit["_source"]["citation_string"] = courts_dict.get(court_id)
+
+
+def merge_unavailable_fields_on_parent_document(
+    results: Page, search_type: str
+) -> None:
+    """Merges unavailable fields on parent document from the database into
+    search results.
+
+    :param results: A Page object containing the search results to be modified.
+    :param search_type: The search type to perform.
+    :return: None, the function modifies the search results object in place.
+    """
+
+    if search_type == SEARCH_TYPES.PEOPLE:
+        # Merge positions courts.
+        person_ids = [d["id"] for d in results]
+        positions_in_page = Position.objects.filter(
+            person_id__in=person_ids
+        ).only("court")
+        courts_dict: DefaultDict[int, list[str]] = defaultdict(list)
+        for position in positions_in_page:
+            courts_dict[position.person.pk].append(position.court)
+        for result in results:
+            person_id = result["id"]
+            result["court"] = courts_dict.get(person_id)
 
 
 def fetch_es_results(
@@ -656,18 +712,22 @@ def es_index_exists(index_name: str) -> bool:
 
 
 def build_join_fulltext_queries(
-    query_values: dict[str, list[str]], parent_fields: list[str], value: str
+    child_query_fields: dict[str, list[str]],
+    parent_fields: list[str],
+    value: str,
 ) -> QueryString | List:
     """Creates a full text query string for join parent-child documents.
 
-    :param query_values: A list of name fields to search in.
+    :param child_query_fields: A list of child name fields to search in.
     :param parent_fields: The parent fields to search in.
     :param value: The string value to search for.
     :return: A Elasticsearch QueryString or [] if the "value" param is empty.
     """
 
+    if not value:
+        return []
     q_should = []
-    for child_type, fields in query_values.items():
+    for child_type, fields in child_query_fields.items():
         query = Q(
             "has_child",
             type=child_type,
@@ -747,6 +807,12 @@ def build_join_es_filters(cd: CleanData) -> List:
                 cd.get("dob_state", ""),
             )
         )
+        queries_list.extend(
+            build_term_query(
+                "name",
+                cd.get("name", ""),
+            )
+        )
 
         selection_method = cd.get("selection_method", "")
         if selection_method:
@@ -759,6 +825,13 @@ def build_join_es_filters(cd: CleanData) -> List:
         if school:
             queries_list.extend(
                 build_has_child_filter("text", "school", school, "education")
+            )
+        court = cd.get("court", "")
+        if court:
+            queries_list.extend(
+                build_has_child_filter(
+                    "term", "court_exact", court, "position"
+                )
             )
 
     return queries_list

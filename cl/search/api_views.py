@@ -16,7 +16,7 @@ from cl.search.api_serializers import (
     SearchResultSerializer,
     TagSerializer,
 )
-from cl.search.documents import AudioDocument
+from cl.search.documents import AudioDocument, PersonBaseDocument
 from cl.search.filters import (
     CourtFilter,
     DocketEntryFilter,
@@ -193,6 +193,20 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
                         ]["mappings"]
                     },
                 )
+            elif (
+                search_type == SEARCH_TYPES.PEOPLE
+                and not waffle.flag_is_active(request, "p-es-deactivate")
+            ):
+                serializer = SearchESResultSerializer(
+                    result_page,
+                    many=True,
+                    context={
+                        "schema": PersonBaseDocument._index.get_mapping()[
+                            "people_db_index"
+                        ]["mappings"]
+                    },
+                )
+
             else:
                 serializer = SearchResultSerializer(
                     result_page, many=True, context={"schema": sl.conn.schema}

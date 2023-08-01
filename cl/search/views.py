@@ -34,6 +34,7 @@ from cl.lib.elasticsearch_utils import (
     convert_str_date_fields_to_date_objects,
     fetch_es_results,
     merge_courts_from_db,
+    merge_unavailable_fields_on_parent_document,
     set_results_highlights,
 )
 from cl.lib.paginators import ESPaginator
@@ -51,7 +52,11 @@ from cl.lib.search_utils import (
     regroup_snippets,
 )
 from cl.search.constants import RELATED_PATTERN
-from cl.search.documents import AudioDocument, ParentheticalGroupDocument
+from cl.search.documents import (
+    AudioDocument,
+    ParentheticalGroupDocument,
+    PersonBaseDocument,
+)
 from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import SEARCH_TYPES, Court, Opinion, OpinionCluster
 from cl.stats.models import Stat
@@ -482,6 +487,12 @@ def show_results(request: HttpRequest) -> HttpResponse:
                         search_results = do_search(request.GET.copy())
                     else:
                         search_results = do_es_search(request.GET.copy())
+                elif request.GET.get("type") == SEARCH_TYPES.PEOPLE:
+                    # Check if waffle flag is active.
+                    if waffle.flag_is_active(request, "p-es-deactivate"):
+                        search_results = do_search(request.GET.copy())
+                    else:
+                        search_results = do_es_search(request.GET.copy())
 
                     render_dict.update(search_results)
                     # Set the value to the query as a convenience
@@ -620,6 +631,8 @@ def do_es_search(
         document_type = ParentheticalGroupDocument
     elif get_params.get("type") == SEARCH_TYPES.ORAL_ARGUMENT:
         document_type = AudioDocument
+    elif get_params.get("type") == SEARCH_TYPES.PEOPLE:
+        document_type = PersonBaseDocument
 
     if search_form.is_valid() and document_type:
         cd = search_form.cleaned_data
@@ -707,8 +720,9 @@ def fetch_and_paginate_results(
     search_type = get_params.get("type")
     # Set highlights in results.
     set_results_highlights(results, search_type)
-    convert_str_date_fields_to_date_objects(results, "dateFiled", search_type)
+    convert_str_date_fields_to_date_objects(results, search_type)
     merge_courts_from_db(results, search_type)
+    merge_unavailable_fields_on_parent_document(results, search_type)
 
     if cache_key is not None:
         cache.set(cache_key, results, settings.QUERY_RESULTS_CACHE)

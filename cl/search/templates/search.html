@@ -285,9 +285,13 @@
               {% include "includes/pa_search_result.html" %}
             {% else %}
               {% flag "oa-es-deactivate" %}
-                 {% include "includes/search_result_solr.html" %}
+                {% include "includes/search_result_solr.html" %}
               {% else %}
-                {% include "includes/search_result.html" %}
+                {% flag "p-es-deactivate" %}
+                  {% include "includes/search_result_solr.html" %}
+                {% else %}
+                  {% include "includes/search_result.html" %}
+                {% endflag %}
               {% endflag %}
             {% endif %}
         {% else %}

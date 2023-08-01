@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from django.conf import settings
 from django.template import loader
@@ -381,13 +381,6 @@ class PositionDocument(PersonBaseDocument):
     selection_method = fields.KeywordField()
     selection_method_id = fields.KeywordField(attr="how_selected")
     termination_reason = fields.KeywordField()
-    text = fields.TextField(
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(analyzer="english_exact"),
-        },
-        search_analyzer="search_analyzer",
-    )
 
     class Django:
         model = Position
@@ -407,10 +400,6 @@ class PositionDocument(PersonBaseDocument):
 
     def prepare_termination_reason(self, instance):
         return instance.get_termination_reason_display()
-
-    def prepare_text(self, instance):
-        text_template = loader.get_template("indexes/person_text.txt")
-        return text_template.render({"item": instance}).translate(null_map)
 
 
 class PersonDocument(PersonBaseDocument):
@@ -435,7 +424,7 @@ class PersonDocument(PersonBaseDocument):
         search_analyzer="search_analyzer",
     )
     name_reverse = fields.TextField(
-        attr="name_reverse",
+        attr="name_full_reverse",
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(
@@ -461,6 +450,13 @@ class PersonDocument(PersonBaseDocument):
     )
     aba_rating = fields.ListField(
         fields.KeywordField(),
+    )
+    text = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
     )
 
     def save(self, **kwargs):
@@ -497,3 +493,7 @@ class PersonDocument(PersonBaseDocument):
         return [
             r.get_rating_display() for r in instance.aba_ratings.all() if r
         ]
+
+    def prepare_text(self, instance):
+        text_template = loader.get_template("indexes/person_text.txt")
+        return text_template.render({"item": instance}).translate(null_map)

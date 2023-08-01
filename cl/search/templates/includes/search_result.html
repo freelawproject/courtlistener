@@ -10,7 +10,7 @@
     {% if type == SEARCH_TYPES.PEOPLE or type_override == SEARCH_TYPES.PEOPLE %}
       <a href="{{ result.absolute_url }}?{{ request.META.QUERY_STRING }}"
          class="visitable">
-      {{ result.solr_highlights.name_reverse.0|safe }}
+      {{ result.name_reverse|safe }}
       {% if result.court %}
         ({{ result.court|uniq|safeseq|join:", " }})
       {% endif %}
@@ -229,18 +229,18 @@
         <div class="inline-block">
           <span class="meta-data-header">Born:</span>
           <span class="meta-data-value"
-                datetime="{% granular_date result 'dob' granularity=result.date_granularity_dob iso=True %}">
-            {% granular_date result 'dob' granularity=result.date_granularity_dob %}
+                datetime="{% granular_date result.to_dict 'dob' granularity=result.date_granularity_dob iso=True %}">
+            {% granular_date result.to_dict 'dob' granularity=result.date_granularity_dob %}
             {% spaceless %}
-            {% if result.solr_highlights.dob_city.0 or result.solr_highlights.dob_state.0 %}
+            {% if result.dob_city or result.dob_state %}
               <span class="gray">in </span>
-              {% if result.solr_highlights.dob_city.0 %}
-                <span>{{ result.solr_highlights.dob_city.0|safe }}</span>
+              {% if result.dob_city %}
+                <span>{{ result.dob_city|safe }}</span>
               {% endif %}
-              {% if result.solr_highlights.dob_city.0 and result.solr_highlights.dob_state.0 %}<span class="gray">, </span>
+              {% if result.dob_city and result.dob_state %}<span class="gray">, </span>
               {% endif %}
-              {% if result.solr_highlights.dob_state.0 %}
-                <span>{{ result.solr_highlights.dob_state.0|safe }}</span>
+              {% if result.dob_state %}
+                <span>{{ result.dob_state|safe }}</span>
               {% endif %}
             {% endif %}
             {% endspaceless %}
@@ -251,8 +251,8 @@
         <div class="inline-block">
           <span class="meta-data-header">Deceased:</span>
           <time class="meta-data-value"
-                datetime="{% granular_date result 'dod' granularity=result.date_granularity_dod iso=True %}">
-            {% granular_date result 'dod' granularity=result.date_granularity_dod %}
+                datetime="{% granular_date result.to_dict 'dod' granularity=result.date_granularity_dod iso=True %}">
+            {% granular_date result.to_dict 'dod' granularity=result.date_granularity_dod %}
           </time>
         </div>
       {% endif %}

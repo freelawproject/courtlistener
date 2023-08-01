@@ -5192,3 +5192,19 @@ class PeopleSearchTestElasticSearch(
         has_child_filters = build_join_es_filters(cd)
         s = s.filter(reduce(operator.iand, has_child_filters))
         self.assertEqual(s.count(), 1)
+
+    def test_name_field(self) -> None:
+        # Frontend
+        params = {"type": SEARCH_TYPES.PEOPLE, "name": "judith"}
+        self._test_article_count(params, 2, "name")
+        # API
+        self._test_api_results_count(params, 2, "name")
+
+    def test_court_filter(self) -> None:
+        # Frontend
+        params = {"type": SEARCH_TYPES.PEOPLE, "court": "ca1"}
+        self._test_article_count(params, 1, "court")
+
+        # Frontend
+        params = {"type": SEARCH_TYPES.PEOPLE, "court": "scotus"}
+        self._test_article_count(params, 0, "court")
