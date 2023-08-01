@@ -33,7 +33,7 @@ ELASTICSEARCH_DSL = {
         "hosts": ELASTICSEARCH_DSL_HOST,
         "http_auth": (ELASTICSEARCH_USER, ELASTICSEARCH_PASSWORD),
         "use_ssl": True,
-        "verify_certs": True,
+        "verify_certs": False,
         "ca_certs": ELASTICSEARCH_CA_CERT,
     },
 }

@@ -924,8 +924,83 @@ a.gray:hover, a.gray:focus, a.grey:hover, a.grey:focus {
   padding-top: 1em;
 }
 
-#resource-org-text div.footnote > p {
+/*Custom css to display Harvard content*/
+/*The id that starts with A indicates a new line in the body of the text, sometimes the
+information is on the same line and needs to be formatted to make the context resemble more
+closely the content in the book*/
+#headmatter > *[id^="A"] {
+  margin-left: 5px;
+}
+
+#headmatter > div.footnotes > .footnote > p {
   margin-left: 2em;
+}
+
+
+#headmatter > div.footnotes {
+  border-top: 1px dotted black;
+  padding-top: 1em;
+}
+
+#headmatter > .footnotes > .footnote > a {
+  color: #000099;
+  position: absolute;
+  font-size: 1em;
+}
+
+#headmatter {
+  border: 1px rgba(210, 210, 210, 0.55) solid;
+  padding: 10px;
+  background: rgba(232, 232, 232, 0.37);
+  margin: 10px;
+}
+
+#headmatter > attorneys, docketnumbers, judges, footnotes, court, decisiondate {
+  line-height: 2em;
+  font-size: 14px;
+}
+
+#headmatter > parties {
+  font-style: italic;
+  line-height: 1em;
+  font-size: 14px;
+}
+
+#headmatter > .footnotes > div.footnote {
+   font-size: 12px;
+}
+
+#headmatter > * > span.star-pagination::after {
+   left: -1.5em;
+}
+
+.harvard > opinion > div.footnotes > .footnote > p {
+  margin-left: 2em;
+}
+
+.harvard > opinion > div.footnotes {
+  border-top: 1px dotted black;
+  padding-top: 1em;
+}
+
+.harvard > opinion > .footnotes > .footnote > a {
+  color: #000099;
+  position: absolute;
+  font-size: 1em;
+}
+
+.harvard > opinion > p > a.footnote {
+  border-bottom: 0;
+  margin-bottom: 5px;
+  color: #000099;
+  vertical-align: super;
+  font-size: .85em;
+  font-weight: bold;
+}
+
+.harvard > opinion > author {
+  line-height: 2em;
+  font-size: 20px;
 }
 
 #resource-org-text div.prelims {
