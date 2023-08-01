@@ -924,8 +924,10 @@ a.gray:hover, a.gray:focus, a.grey:hover, a.grey:focus {
   padding-top: 1em;
 }
 
-/*Harvard CSS Changes*/
-/*Add custom css for displaying harvard content*/
+/*Custom css to display Harvard content*/
+/*The id that starts with A indicates a new line in the body of the text, sometimes the
+information is on the same line and needs to be formatted to make the context resemble more
+closely the content in the book*/
 #headmatter > *[id^="A"] {
   margin-left: 5px;
 }
