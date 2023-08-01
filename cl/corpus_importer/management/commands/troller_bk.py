@@ -12,6 +12,7 @@ from queue import Queue
 from typing import Any, DefaultDict, Mapping, TypedDict
 from urllib.parse import unquote
 
+from asgiref.sync import async_to_sync, sync_to_async
 from dateutil.parser import ParserError
 from django.db import DataError, IntegrityError, transaction
 from django.db.models import Q
@@ -45,7 +46,7 @@ from cl.search.tasks import add_items_to_solr
 FILES_BUFFER_THRESHOLD = 3
 
 
-def check_for_early_termination(
+async def check_for_early_termination(
     court_id: str, docket: dict[str, Any]
 ) -> str | None:
     """Check for early termination, skip the rest of the file in case a cached
@@ -58,13 +59,13 @@ def check_for_early_termination(
     omitted, "continue" if only the current item should be omitted or None.
     """
     item_hash = hash_item(docket)
-    if is_cached(item_hash):
+    if await is_cached(item_hash):
         logger.info(
             f"Hit a cached item, finishing adding bulk entries for {court_id} feed. "
         )
         return "break"
 
-    cache_hash(item_hash)
+    await cache_hash(item_hash)
     if (
         not docket["pacer_case_id"]
         and not docket["docket_number"]
@@ -228,7 +229,7 @@ def get_rds_to_add(
     return rds_to_create_bulk
 
 
-def merge_rss_data(
+async def merge_rss_data(
     feed_data: list[dict[str, Any]],
     court_id: str,
     build_date: datetime | None,
@@ -242,7 +243,7 @@ def merge_rss_data(
     """
 
     court_id = map_pacer_to_cl_id(court_id)
-    court = Court.objects.get(pk=court_id)
+    court = await Court.objects.aget(pk=court_id)
     dockets_created = 0
     all_rds_created: list[int] = []
     district_court_ids = (
@@ -255,7 +256,7 @@ def merge_rss_data(
         build_date
         and build_date
         > make_aware(datetime(year=2018, month=4, day=20), timezone.utc)
-        and court_id in district_court_ids
+        and await district_court_ids.filter(id=court_id).aexists()
         and court_id not in courts_exceptions_no_rss
     ):
         # Avoid parsing/adding feeds after we start scraping RSS Feeds for
@@ -269,13 +270,13 @@ def merge_rss_data(
         str, list[dict[str, Any]]
     ] = defaultdict(list)
     for docket in feed_data:
-        skip_or_break = check_for_early_termination(court_id, docket)
+        skip_or_break = await check_for_early_termination(court_id, docket)
         if skip_or_break == "continue":
             continue
         elif skip_or_break == "break":
             break
 
-        d = find_docket_object(
+        d = await find_docket_object(
             court_id,
             docket["pacer_case_id"],
             docket["docket_number"],
@@ -285,7 +286,9 @@ def merge_rss_data(
         if (
             document_number
             and d.pk
-            and d.docket_entries.filter(entry_number=document_number).exists()
+            and await d.docket_entries.filter(
+                entry_number=document_number
+            ).aexists()
         ):
             # It's an existing docket entry; let's not add it.
             continue
@@ -301,11 +304,11 @@ def merge_rss_data(
                 )
             if (
                 d.pk
-                and d.docket_entries.filter(
+                and await d.docket_entries.filter(
                     query,
                     date_filed=docket_entry["date_filed"],
                     entry_number=docket_entry["document_number"],
-                ).exists()
+                ).aexists()
             ):
                 # It's an existing docket entry; let's not add it.
                 continue
@@ -322,7 +325,7 @@ def merge_rss_data(
                 # court and doesn't have a pacer_case_id
                 continue
 
-            add_new_docket_from_rss(
+            await sync_to_async(add_new_docket_from_rss)(
                 court_id,
                 d,
                 docket,
@@ -338,15 +341,15 @@ def merge_rss_data(
             # docket entry to add in bulk.
             des_to_add_existing_docket.append((d.pk, docket_entry))
             try:
-                d.save(update_fields=["source"])
-                add_bankruptcy_data_to_docket(d, docket)
+                await d.asave(update_fields=["source"])
+                await sync_to_async(add_bankruptcy_data_to_docket)(d, docket)
             except (DataError, IntegrityError) as exc:
                 # Trouble. Log and move on
                 logger.warn(
                     f"Got DataError or IntegrityError while saving docket."
                 )
 
-    rds_created_pks, dockets_created = do_bulk_additions(
+    rds_created_pks, dockets_created = await sync_to_async(do_bulk_additions)(
         court_id,
         unique_dockets,
         dockets_to_create,
@@ -601,7 +604,7 @@ def iterate_and_import_files(
                 f"Skipping: {item_path=} with {court_id=} due to incorrect date format. \n"
             )
             continue
-        rds_for_solr, dockets_created = merge_rss_data(
+        rds_for_solr, dockets_created = async_to_sync(merge_rss_data)(
             feed_data, court_id, build_date
         )
 

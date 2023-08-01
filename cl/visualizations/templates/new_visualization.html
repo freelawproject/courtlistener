@@ -12,7 +12,7 @@
     <script src="{% static "js/typeahead.jquery.js" %}"></script>
     <script src="{% static "js/scotus_map_new.js" %}"></script>
 
-    <script type="application/javascript">
+    <script type="text/javascript" nonce="{{ request.csp_nonce }}">
         var last_year = "{{ SCDB_LATEST_CASE }}";
         var opinions = {
             {% for viz in demo_viz %}

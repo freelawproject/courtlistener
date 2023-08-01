@@ -7,6 +7,7 @@ from sentry_sdk.integrations.redis import RedisIntegration
 
 env = environ.FileAwareEnv()
 SENTRY_DSN = env("SENTRY_DSN", default="")
+SENTRY_REPORT_URI = env("SENTRY_REPORT_URI", default="")
 
 # IA's library logs a lot of errors, which get sent to sentry unnecessarily
 ignore_logger("internetarchive.session")
