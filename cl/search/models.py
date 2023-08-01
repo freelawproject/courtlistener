@@ -2986,7 +2986,7 @@ class Opinion(OrderedModel, AbstractDateTimeModel):
     order_with_respect_to = "cluster"
 
     class Meta:
-        ordering = ()
+        ordering = ("order",)
 
     @property
     def siblings(self) -> QuerySet:

@@ -5,7 +5,7 @@ import os
 from datetime import date
 from functools import reduce
 from pathlib import Path
-from unittest import mock, skipUnless
+from unittest import mock
 
 import pytz
 from asgiref.sync import sync_to_async
@@ -19,9 +19,8 @@ from django.core.management import call_command
 from django.db import IntegrityError, transaction
 from django.http import HttpRequest
 from django.test import AsyncRequestFactory, override_settings
-from django.test.utils import captured_stderr
 from django.urls import reverse
-from elasticsearch_dsl import Q, connections
+from elasticsearch_dsl import Q
 from factory import RelatedFactory
 from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
@@ -58,6 +57,7 @@ from cl.search.factories import (
     DocketFactory,
     OpinionClusterFactory,
     OpinionClusterFactoryWithChildrenAndParents,
+    OpinionFactory,
     OpinionsCitedWithParentsFactory,
     OpinionWithChildrenFactory,
     OpinionWithParentsFactory,
@@ -282,6 +282,69 @@ class ModelTest(TestCase):
             .count()
         )
         self.assertEqual(cluster_count, expected_count)
+
+    def test_opinions_order(self) -> None:
+        """Test django-ordered-model library"""
+
+        # Create court
+        court = CourtFactory(id="nyappdiv")
+
+        # Create cluster
+        cluster = OpinionClusterFactory(
+            case_name="Foo v. Bar",
+            case_name_short="Foo v. Bar",
+            docket=DocketFactory(
+                court=court,
+            ),
+            date_filed=date(1978, 3, 10),
+            source="U",
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+        )
+
+        # Create three opinions
+        op_1 = OpinionFactory(
+            cluster=cluster,
+            type="Concurrence Opinion",
+        )
+
+        op_2 = OpinionFactory(
+            cluster=cluster,
+            type="Dissent",
+        )
+
+        op_3 = OpinionFactory(
+            cluster=cluster,
+            type="Lead Opinion",
+        )
+
+        # Test that the value of the order field matches the order in which
+        # they were created
+        self.assertEqual(op_1.order, 0)
+        self.assertEqual(op_2.order, 1)
+        self.assertEqual(op_3.order, 2)
+
+        # Use library method to move lead opinion to first position, we can
+        # use this function to easily reorder existing opinions
+        op_3.to(0)
+
+        # The position of the elements was modified, we refresh the objects
+        op_1.refresh_from_db()
+        op_2.refresh_from_db()
+        op_3.refresh_from_db()
+
+        # Test new order
+        self.assertEqual(op_3.order, 0)
+        self.assertEqual(op_1.order, 1)
+        self.assertEqual(op_2.order, 2)
+
+        # Add new opinion to cluster
+        op_4 = OpinionFactory(
+            cluster=cluster,
+            type="Dissent",
+        )
+
+        # Test that the new opinion is in last place
+        self.assertEqual(op_4.order, 3)
 
 
 class DocketValidationTest(TestCase):
