@@ -252,12 +252,6 @@
             <p>
               {% include "includes/add_note_button.html" with form_instance_id=note_form.instance.cluster_id %}
             </p>
-            {% if cluster.syllabus %}
-                <div class="well well-sm">
-                    <h4>Summary of Opinion</h4>
-                    <p>{{ cluster.syllabus | safe }} </p>
-                </div>
-            {% endif %}
 
             <p class="bottom">
                 <span class="meta-data-header">Filed{% if cluster.date_filed_is_approximate %} Approximately{% endif %}:</span>
@@ -361,7 +355,6 @@
                 {% endif %}
                 {% endwith %}
             {% endif %}
-
             {% if cluster.nature_of_suit %}
             <p class="bottom">
                 <span class="meta-data-header">Nature of suit:</span>
@@ -416,6 +409,13 @@
                   {{ cluster.headmatter|safe }}
                 </div>
               {% endif %}
+            {% endif %}
+
+            {% if cluster.syllabus %}
+                <div class="well well-sm">
+                    <h4>Summary of Opinion</h4>
+                    <p>{{ cluster.syllabus | safe }} </p>
+                </div>
             {% endif %}
 
             {# Only display tabs and make panels if more than one sub-opinion. #}
