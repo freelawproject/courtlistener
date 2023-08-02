@@ -151,13 +151,26 @@ def get_text(xml_filepath: str) -> dict:
 
     find_opinions = soup.findAll(re.compile("[A-Za-z]+_text"))
     order = 0
-    for op in find_opinions:
+    # Store texts without a byline
+    floating_texts = []
+    for opinion_index, op in enumerate(find_opinions, start=1):
         # Find author before opinion text tag
         opinion_author = ""
         byline = op.find_previous_sibling()
         # Check that tag name contains _byline
         if byline and "_byline" in byline.name:
             opinion_author = byline.get_text()
+        else:
+            floating_texts.append(op.decode_contents())
+
+            if len(find_opinions) == opinion_index and floating_texts:
+                # If is the last opinion, and we still have opinions without
+                # byline
+                logger.info(
+                    f"Could not store a part of the information from {xml_filepath}"
+                )
+            else:
+                continue
 
         # Find all footnotes after opinion text tag until the end of xml or
         # find other tag
@@ -169,17 +182,20 @@ def get_text(xml_filepath: str) -> dict:
 
         opinion_type = op.name.replace("_text", "")
 
-        new_opinion = {
-            "byline": opinion_author,
-            "type": opinion_type,
-            "raw_opinion": op,
-            "opinion": op.decode_contents(),
-            "order": order,
-            "raw_footnotes": raw_footnotes,
-        }
+        if opinion_author:
+            # If we have an opinion author then proceed to store the opinion
+            new_opinion = {
+                "byline": opinion_author,
+                "type": opinion_type,
+                "raw_opinion": op,
+                "opinion": "".join(floating_texts) + op.decode_contents(),
+                "order": order,
+                "raw_footnotes": raw_footnotes,
+            }
 
-        opinions.append(new_opinion)
-        order = order + 1
+            opinions.append(new_opinion)
+            order = order + 1
+            floating_texts = []
 
     SIMPLE_TAGS = [
         "attorneys",

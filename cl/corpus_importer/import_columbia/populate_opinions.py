@@ -237,9 +237,10 @@ OPINION_TYPE_MAPPING = {
 }
 
 
-def convert_columbia_html(text: str) -> str:
+def convert_columbia_html(text: str, opinion_index: int) -> str:
     """Convert xml tags to html tags
     :param text: Text to convert to html
+    :param opinion_index: opinion index from a list of all opinions
     :return: converted text
     """
 
@@ -276,7 +277,7 @@ def convert_columbia_html(text: str) -> str:
         else:
             f_num = None
         if f_num:
-            rep = f'<sup id="ref-fn{f_num}"><a href="#fn{f_num}">{f_num}</a></sup>'
+            rep = f'<sup id="op{opinion_index}-ref-fn{f_num}"><a href="#op{opinion_index}-fn{f_num}">{f_num}</a></sup>'
             text = text.replace(ref, rep)
 
     # Add footnotes to opinion
@@ -297,10 +298,13 @@ def convert_columbia_html(text: str) -> str:
         else:
             f_num = None
         if f_num:
-            rep = r'<sup id="fn%s"><a href="#ref-fn%s">%s</a></sup>' % (
-                f_num,
-                f_num,
-                f_num,
+            rep = (
+                rf'<sup id="op{opinion_index}-fn%s"><a href="#op{opinion_index}-ref-fn%s">%s</a></sup>'
+                % (
+                    f_num,
+                    f_num,
+                    f_num,
+                )
             )
             text = text.replace(ref, rep)
 
@@ -507,7 +511,7 @@ def add_new_case(
     )
 
     opinions = []
-    for i, opinion_info in enumerate(item["opinions"]):
+    for opinion_index, opinion_info in enumerate(item["opinions"]):
         if opinion_info["author"] is None:
             author = None
             author_str = ""
@@ -524,10 +528,10 @@ def add_new_case(
             )
 
         converted_text = convert_columbia_html(
-            opinion_info["opinion"] + footnotes
+            opinion_info["opinion"] + footnotes, opinion_index
         )
         opinion_type = OPINION_TYPE_MAPPING[opinion_info["type"]]
-        if opinion_type == Opinion.LEAD and i > 0:
+        if opinion_type == Opinion.LEAD and opinion_index > 0:
             opinion_type = Opinion.ADDENDUM
 
         # TODO add order field when changes get merged in main
