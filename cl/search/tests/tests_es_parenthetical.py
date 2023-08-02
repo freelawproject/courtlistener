@@ -500,7 +500,7 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
 
 class ParentheticalESSignalProcessorTest(ESIndexTestCase, TestCase):
     """ Parenthetical ES indexing related tests """
-    
+
     @classmethod
     def setUpTestData(cls):
         # Create a unique index for this test case
