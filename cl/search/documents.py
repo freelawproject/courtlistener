@@ -1,9 +1,11 @@
-from django.conf import settings
-from django_elasticsearch_dsl import Document, Index, fields
+from django_elasticsearch_dsl import Document, fields
 
 from cl.audio.models import Audio
 from cl.lib.utils import deepgetattr
-from cl.search.es_indices import parenthetical_group_index
+from cl.search.es_indices import (
+    oral_arguments_index,
+    parenthetical_group_index,
+)
 from cl.search.models import Citation, ParentheticalGroup
 
 
@@ -92,14 +94,6 @@ class ParentheticalGroupDocument(Document):
 
     def prepare_status(self, instance):
         return instance.opinion.cluster.get_precedential_status_display()
-
-
-# Define oral arguments elasticsearch index
-oral_arguments_index = Index("oral_arguments")
-oral_arguments_index.settings(
-    number_of_shards=settings.ELASTICSEARCH_NUMBER_OF_SHARDS,
-    number_of_replicas=settings.ELASTICSEARCH_NUMBER_OF_REPLICAS,
-)
 
 
 @oral_arguments_index.document
