@@ -110,16 +110,17 @@ def build_term_query(
     :return: Empty list or list with DSL Match query
     """
 
-    if value and make_phrase:
+    if not value:
+        return []
+
+    if make_phrase:
         return [Q("match_phrase", **{field: {"query": value, "slop": slop}})]
 
-    if value and isinstance(value, list):
+    if isinstance(value, list):
         value = list(filter(None, value))
         return [Q("terms", **{field: value})]
 
-    if value:
-        return [Q("term", **{field: value})]
-    return []
+    return [Q("term", **{field: value})]
 
 
 def build_text_filter(field: str, value: str) -> List:
