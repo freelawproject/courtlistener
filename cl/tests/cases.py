@@ -4,6 +4,7 @@ from unittest import mock
 
 from django import test
 from django.contrib.staticfiles import testing
+from django.core.management import call_command
 from rest_framework.test import APITestCase
 
 from cl.lib.redis_utils import make_redis_interface
@@ -105,3 +106,23 @@ class APITestCase(
     APITestCase,
 ):
     pass
+
+
+@test.override_settings(ELASTICSEARCH_DSL_AUTO_REFRESH=True)
+class ESIndexTestCase(SimpleTestCase):
+    """Common Django Elasticsearch DSL index commands, useful in testing."""
+
+    @classmethod
+    def rebuild_index(self, model):
+        """Create and populate the Elasticsearch index and mapping"""
+        call_command("search_index", "--rebuild", "-f", "--models", model)
+
+    @classmethod
+    def create_index(self, model):
+        """Create the elasticsearch index."""
+        call_command("search_index", "--create", "-f", "--models", model)
+
+    @classmethod
+    def delete_index(self, model):
+        """Delete the elasticsearch index."""
+        call_command("search_index", "--delete", "-f", "--models", model)

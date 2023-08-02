@@ -95,7 +95,9 @@ def save_document_in_es(
     es_doc = es_document()
     doc = es_doc.prepare(instance)
     es_document(meta={"id": instance.pk}, **doc).save(
-        skip_empty=False, return_doc_meta=True
+        skip_empty=False,
+        return_doc_meta=True,
+        refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
     )
 
 
@@ -127,7 +129,7 @@ def remove_doc_from_es_index(
     """
     try:
         doc = es_document.get(id=instance_id)
-        doc.delete()
+        doc.delete(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)
     except NotFoundError:
         logger.error(
             f"The Audio with ID:{instance_id} can't be deleted from "
@@ -170,6 +172,7 @@ def update_es_documents(
                         **document_fields_to_update(
                             fields_to_update, instance, fields_map
                         ),
+                        refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
                     )
 
 
@@ -201,6 +204,7 @@ def update_remove_m2m_documents(
             Document.update(
                 main_doc,
                 **{affected_field: get_m2m_value},
+                refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
             )
 
 
@@ -232,6 +236,7 @@ def update_reverse_related_documents(
                 field: getattr(main_doc, f"prepare_{field}")(main_object)
                 for field in affected_fields
             },
+            refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
         )
 
 
@@ -256,32 +261,33 @@ class ESSignalProcessor(object):
         models_reverse_foreign_key = list(
             self.documents_model_mapping["reverse"].keys()
         )
+        main_model = self.main_model.__name__.lower()
 
         # Connect signals for save
         self.connect_signals(
             models_save,
             self.handle_save,
-            {post_save: "update_related_es_documents_in_es_index"},
+            {post_save: f"update_related_{main_model}_documents_in_es_index"},
         )
         # Connect signals for deletion
         self.connect_signals(
             models_delete,
             self.handle_delete,
-            {post_delete: "remove_from_es_index"},
+            {post_delete: f"remove_{main_model}_from_es_index"},
         )
         # Connect signals for many-to-many changes
         self.connect_signals(
             models_m2m,
             self.handle_m2m,
-            {m2m_changed: "update_m2m_changed_in_es_index"},
+            {m2m_changed: f"update_{main_model}_m2m_in_es_index"},
         )
         # Connect signals for save and delete on models with reverse foreign keys
         self.connect_signals(
             models_reverse_foreign_key,
             self.handle_reverse_actions,
             {
-                post_save: "update_reverse_related_es_documents_on_save",
-                post_delete: "update_reverse_related_es_documents_on_delete",
+                post_save: f"update_reverse_related_{main_model}_on_save",
+                post_delete: f"update_reverse_related_{main_model}_on_delete",
             },
         )
 
