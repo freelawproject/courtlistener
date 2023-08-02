@@ -15,6 +15,7 @@ from django.urls import NoReverseMatch, reverse
 from django.utils.encoding import force_str
 from django.utils.text import slugify
 from eyecite import get_citations
+from model_utils import FieldTracker
 
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.custom_filters.templatetags.text_filters import best_case_name
@@ -667,6 +668,7 @@ class Docket(AbstractDateTimeModel):
         ),
         default=False,
     )
+    es_pa_field_tracker = FieldTracker(fields=["docket_number", "court_id"])
 
     class Meta:
         unique_together = ("docket_number", "pacer_case_id", "court")
@@ -2419,6 +2421,18 @@ class OpinionCluster(AbstractDateTimeModel):
     )
 
     objects = ClusterCitationQuerySet.as_manager()
+    es_pa_field_tracker = FieldTracker(
+        fields=[
+            "case_name",
+            "citation_count",
+            "date_filed",
+            "slug",
+            "docket_id",
+            "judges",
+            "nature_of_suit",
+            "precedential_status",
+        ]
+    )
 
     @property
     def caption(self):
@@ -2984,6 +2998,9 @@ class Opinion(AbstractDateTimeModel):
         default=False,
         db_index=True,
     )
+    es_pa_field_tracker = FieldTracker(
+        fields=["extracted_by_ocr", "cluster_id", "author_id"]
+    )
 
     @property
     def siblings(self) -> QuerySet:
@@ -3204,6 +3221,7 @@ class Parenthetical(models.Model):
         help_text="A score between 0 and 1 representing how descriptive the "
         "parenthetical is",
     )
+    es_pa_field_tracker = FieldTracker(fields=["score", "text"])
 
     def __str__(self) -> str:
         return (
