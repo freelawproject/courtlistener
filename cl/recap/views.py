@@ -1,3 +1,4 @@
+from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib.auth.models import User
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
@@ -49,9 +50,10 @@ class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
         "date_modified",
     )
 
-    def perform_create(self, serializer):
-        pq = serializer.save(uploader=self.request.user)
-        process_recap_upload(pq)
+    @async_to_sync
+    async def perform_create(self, serializer):
+        pq = await sync_to_async(serializer.save)(uploader=self.request.user)
+        await process_recap_upload(pq)
 
 
 class EmailProcessingQueueViewSet(LoggingMixin, ModelViewSet):

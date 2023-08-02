@@ -2,6 +2,7 @@ import datetime
 from typing import Optional, Union
 
 import requests
+from asgiref.sync import async_to_sync
 from dateutil.parser import ParserError, parse
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -55,12 +56,12 @@ def make_financial_disclosure_thumbnail_from_pdf(self, pk: int) -> None:
     disclosure = FinancialDisclosure.objects.select_for_update().get(pk=pk)
     pdf_content = disclosure.filepath.read()
 
-    response = microservice(
+    response = async_to_sync(microservice)(
         service="generate-thumbnail",
         file_type="pdf",
         file=pdf_content,
     )
-    if not response.ok:
+    if not response.is_success:
         if self.request.retries == self.max_retries:
             disclosure.thumbnail_status = THUMBNAIL_STATUSES.FAILED
             disclosure.save()
@@ -88,13 +89,13 @@ def extract_content(
 
     # Extraction takes between 7 seconds and 80 minutes for super
     # long Trump extraction with ~5k investments
-    response = microservice(
+    response = async_to_sync(microservice)(
         service="extract-disclosure",
         file_type="pdf",
         file=pdf_bytes,
     )
 
-    if not response.ok:
+    if not response.is_success:
         logger.warning(
             msg="Could not extract data from this document",
             extra=dict(
@@ -327,7 +328,7 @@ def save_and_upload_disclosure(
     if len(disclosure) > 0:
         return disclosure[0]
 
-    page_count = microservice(
+    page_count = async_to_sync(microservice)(
         service="page-count",
         file_type="pdf",
         file=response.content,
