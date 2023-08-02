@@ -40,10 +40,7 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        # Create a unique index for this test case
-        parenthetical_group_index._name = cls.__name__.lower()
         cls.rebuild_index("search.ParentheticalGroup")
-
         cls.c1 = CourtFactory(id="canb", jurisdiction="I")
         cls.c2 = CourtFactory(id="ca1", jurisdiction="F")
         cls.c3 = CourtFactory(id="cacd", jurisdiction="FB")
@@ -503,10 +500,7 @@ class ParentheticalESSignalProcessorTest(ESIndexTestCase, TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        # Create a unique index for this test case
-        parenthetical_group_index._name = cls.__name__.lower()
         cls.rebuild_index("search.ParentheticalGroup")
-
         # Create factories for the test.
         cls.c1 = CourtFactory(id="canb", jurisdiction="I")
         cls.c2 = CourtFactory(id="ca1", jurisdiction="F")
