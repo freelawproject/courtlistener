@@ -36,7 +36,7 @@ from cl.tests.cases import ESIndexTestCase, TestCase
 
 
 class ParentheticalESTest(ESIndexTestCase, TestCase):
-    """ Parenthetical ES search related tests """
+    """Parenthetical ES search related tests"""
 
     @classmethod
     def setUpTestData(cls):
@@ -499,7 +499,7 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
 
 
 class ParentheticalESSignalProcessorTest(ESIndexTestCase, TestCase):
-    """ Parenthetical ES indexing related tests """
+    """Parenthetical ES indexing related tests"""
 
     @classmethod
     def setUpTestData(cls):
