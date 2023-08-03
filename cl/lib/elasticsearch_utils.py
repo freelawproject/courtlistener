@@ -6,7 +6,7 @@ import traceback
 from collections import defaultdict
 from datetime import date
 from functools import reduce
-from typing import Any, DefaultDict, Dict, List
+from typing import Any, DefaultDict, Dict, List, Literal
 
 from django.conf import settings
 from django.core.paginator import Page
@@ -601,16 +601,6 @@ def convert_str_date_fields_to_date_objects(
                 date_str = hit["_source"][date_field_name]
                 date_obj = date.fromisoformat(date_str)
                 hit["_source"][date_field_name] = date_obj
-    else:
-        if search_type == SEARCH_TYPES.PEOPLE:
-            date_field_names = ["dob", "dod"]
-            for result in results.object_list:
-                for date_field_name in date_field_names:
-                    date_str = result[date_field_name]
-                    if not date_str:
-                        continue
-                    date_obj = date.fromisoformat(date_str)
-                    result[date_field_name] = date_obj
 
 
 def merge_courts_from_db(results: Page, search_type: str) -> None:
@@ -747,7 +737,10 @@ def build_join_fulltext_queries(
 
 
 def build_has_child_filter(
-    filter_type: str, field: str, value: str | list, child_type: str
+    filter_type: Literal["text", "term"],
+    field: str,
+    value: str | list,
+    child_type: str,
 ) -> list:
     """Builds a has_child filter query based on the given parameters.
 
@@ -782,11 +775,11 @@ def build_has_child_filter(
                 query=build_text_filter(
                     field,
                     value,
-                ),
+                )[0],
                 inner_hits={},
                 max_children=10,
                 min_children=0,
-            )[0]
+            )
         ]
     return []
 
@@ -808,7 +801,20 @@ def build_join_es_filters(cd: CleanData) -> List:
             )
         )
         queries_list.extend(
-            build_term_query(
+            build_daterange_query(
+                "dob",
+                cd.get("born_before", ""),
+                cd.get("born_after", ""),
+            )
+        )
+        queries_list.extend(
+            build_text_filter(
+                "dob_city",
+                cd.get("dob_city", ""),
+            )
+        )
+        queries_list.extend(
+            build_text_filter(
                 "name",
                 cd.get("name", ""),
             )
@@ -826,11 +832,19 @@ def build_join_es_filters(cd: CleanData) -> List:
             queries_list.extend(
                 build_has_child_filter("text", "school", school, "education")
             )
-        court = cd.get("court", "")
+        court = cd.get("court", "").split()
         if court:
             queries_list.extend(
                 build_has_child_filter(
                     "term", "court_exact", court, "position"
+                )
+            )
+
+        appointer = cd.get("appointer", "")
+        if appointer:
+            queries_list.extend(
+                build_has_child_filter(
+                    "text", "appointer", appointer, "position"
                 )
             )
 

@@ -6,7 +6,7 @@ from cl.lib import search_utils
 from cl.lib.elasticsearch_utils import build_es_main_query
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import map_to_docket_entry_sorting
-from cl.search.documents import AudioDocument, PersonBaseDocument
+from cl.search.documents import AudioDocument, PersonDocument
 from cl.search.models import SEARCH_TYPES
 
 
@@ -43,7 +43,7 @@ def get_object_list(request, cd, paginator):
         search_query = (
             AudioDocument.search()
             if is_oral_argument_active
-            else PersonBaseDocument.search()
+            else PersonDocument.search()
         )
         main_query, total_query_results, top_hits_limit = build_es_main_query(
             search_query, cd

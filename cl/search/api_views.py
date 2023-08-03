@@ -16,7 +16,7 @@ from cl.search.api_serializers import (
     SearchResultSerializer,
     TagSerializer,
 )
-from cl.search.documents import AudioDocument, PersonBaseDocument
+from cl.search.documents import AudioDocument, PersonDocument
 from cl.search.filters import (
     CourtFilter,
     DocketEntryFilter,
@@ -173,8 +173,6 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
         search_form = SearchForm(request.GET)
         if search_form.is_valid():
             cd = search_form.cleaned_data
-            if cd["q"] == "":
-                cd["q"] = "*"  # Get everything
 
             search_type = cd["type"]
             paginator = pagination.PageNumberPagination()
@@ -201,13 +199,15 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
                     result_page,
                     many=True,
                     context={
-                        "schema": PersonBaseDocument._index.get_mapping()[
+                        "schema": PersonDocument._index.get_mapping()[
                             "people_db_index"
                         ]["mappings"]
                     },
                 )
 
             else:
+                if cd["q"] == "":
+                    cd["q"] = "*"  # Get everything
                 serializer = SearchResultSerializer(
                     result_page, many=True, context={"schema": sl.conn.schema}
                 )

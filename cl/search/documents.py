@@ -3,6 +3,7 @@ from datetime import date, datetime
 from django.conf import settings
 from django.template import loader
 from django_elasticsearch_dsl import Document, Index, fields
+from django_elasticsearch_dsl.fields import DEDField
 from elasticsearch_dsl import Join, Percolator
 
 from cl.alerts.models import Alert
@@ -272,9 +273,12 @@ class PEOPLE_DOCS_TYPE_ID:
         return f"ed_{self.instance_id}"
 
 
-@people_db_index.document
+class JoinField(DEDField, Join):
+    pass
+
+
 class PersonBaseDocument(Document):
-    person_child = Join(relations={"person": ["position", "education"]})
+    person_child = JoinField(relations={"person": ["position", "education"]})
     timestamp = fields.DateField()
 
     class Django:
@@ -285,6 +289,7 @@ class PersonBaseDocument(Document):
         return datetime.utcnow()
 
 
+@people_db_index.document
 class EducationDocument(PersonBaseDocument):
     school = fields.TextField(
         attr="school.name",
@@ -313,7 +318,12 @@ class EducationDocument(PersonBaseDocument):
         model = Education
         ignore_signals = True
 
+    def prepare_person_child(self, instance):
+        parent_id = getattr(instance.person, "pk", None)
+        return {"name": "education", "parent": parent_id}
 
+
+@people_db_index.document
 class PositionDocument(PersonBaseDocument):
     court = fields.TextField(
         attr="court.short_name",
@@ -401,7 +411,12 @@ class PositionDocument(PersonBaseDocument):
     def prepare_termination_reason(self, instance):
         return instance.get_termination_reason_display()
 
+    def prepare_person_child(self, instance):
+        parent_id = getattr(instance.person, "pk", None)
+        return {"name": "position", "parent": parent_id}
 
+
+@people_db_index.document
 class PersonDocument(PersonBaseDocument):
     id = fields.IntegerField(attr="pk")
     fjc_id = fields.IntegerField(attr="fjc_id")
@@ -436,8 +451,8 @@ class PersonDocument(PersonBaseDocument):
 
     date_granularity_dob = fields.KeywordField(attr="date_granularity_dob")
     date_granularity_dod = fields.KeywordField(attr="date_granularity_dod")
-    dob_city = fields.KeywordField(attr="dob_city")
-    dob_state = fields.KeywordField()
+    dob_city = fields.TextField(attr="dob_city")
+    dob_state = fields.TextField()
     dob_state_id = fields.KeywordField(attr="dob_state")
     absolute_url = fields.KeywordField(attr="get_absolute_url")
     dob = fields.DateField(attr="date_dob")
@@ -458,10 +473,6 @@ class PersonDocument(PersonBaseDocument):
         },
         search_analyzer="search_analyzer",
     )
-
-    def save(self, **kwargs):
-        self.person_child = "person"
-        return super().save(**kwargs)
 
     def prepare_races(self, instance):
         return [r.get_race_display() for r in instance.race.all()]
@@ -497,3 +508,6 @@ class PersonDocument(PersonBaseDocument):
     def prepare_text(self, instance):
         text_template = loader.get_template("indexes/person_text.txt")
         return text_template.render({"item": instance}).translate(null_map)
+
+    def prepare_person_child(self, instance):
+        return "person"

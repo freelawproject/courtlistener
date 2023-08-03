@@ -74,7 +74,7 @@ from cl.search.documents import (
     AudioDocument,
     AudioPercolator,
     ParentheticalGroupDocument,
-    PersonBaseDocument,
+    PersonDocument,
 )
 from cl.search.factories import (
     CitationWithParentsFactory,
@@ -4880,7 +4880,7 @@ class PeopleSearchTestElasticSearch(
         cls.delete_index("people_db.Person")
         cls.create_index("people_db.Person")
         super().setUpTestData()
-        PersonBaseDocument._index.refresh()
+        PersonDocument._index.refresh()
 
     @classmethod
     def tearDownClass(cls):
@@ -4922,7 +4922,7 @@ class PeopleSearchTestElasticSearch(
         """Confirm Parent object and child objects are properly indexed."""
 
         # Judges are indexed.
-        s = PersonBaseDocument.search()
+        s = PersonDocument.search()
         s = s.query(Q("match", person_child="person"))
         self.assertEqual(s.count(), 3)
 
@@ -4935,7 +4935,7 @@ class PeopleSearchTestElasticSearch(
         ]
         for position_pk in position_pks:
             self.assertTrue(
-                PersonBaseDocument.exists(
+                PersonDocument.exists(
                     id=PEOPLE_DOCS_TYPE_ID(position_pk).POSITION
                 )
             )
@@ -4944,7 +4944,7 @@ class PeopleSearchTestElasticSearch(
         education_pks = [self.education_1.pk, self.education_2.pk]
         for education_pk in education_pks:
             self.assertTrue(
-                PersonBaseDocument.exists(
+                PersonDocument.exists(
                     id=PEOPLE_DOCS_TYPE_ID(education_pk).EDUCATION
                 )
             )
@@ -4973,22 +4973,20 @@ class PeopleSearchTestElasticSearch(
             degree_level="ma",
             degree_year="1990",
         )
-        PersonBaseDocument._index.refresh()
+        PersonDocument._index.refresh()
 
         person_pk = person.pk
         pos_1_pk = pos_1.pk
         education_pk = education.pk
         # Person instance is indexed.
-        self.assertTrue(PersonBaseDocument.exists(id=person_pk))
+        self.assertTrue(PersonDocument.exists(id=person_pk))
         # Position instance is indexed.
         self.assertTrue(
-            PersonBaseDocument.exists(
-                id=PEOPLE_DOCS_TYPE_ID(pos_1_pk).POSITION
-            )
+            PersonDocument.exists(id=PEOPLE_DOCS_TYPE_ID(pos_1_pk).POSITION)
         )
         # Education instance is indexed.
         self.assertTrue(
-            PersonBaseDocument.exists(
+            PersonDocument.exists(
                 id=PEOPLE_DOCS_TYPE_ID(education_pk).EDUCATION
             )
         )
@@ -5003,15 +5001,15 @@ class PeopleSearchTestElasticSearch(
         education.degree_year = "1995"
         education.save()
 
-        person_doc = PersonBaseDocument.get(id=person.pk)
+        person_doc = PersonDocument.get(id=person.pk)
         self.assertIn("Debbas", person_doc.name)
 
-        position_doc = PersonBaseDocument.get(
+        position_doc = PersonDocument.get(
             id=PEOPLE_DOCS_TYPE_ID(pos_1_pk).POSITION
         )
         self.assertEqual(self.court_2.pk, position_doc.court_exact)
 
-        education_doc = PersonBaseDocument.get(
+        education_doc = PersonDocument.get(
             id=PEOPLE_DOCS_TYPE_ID(education.pk).EDUCATION
         )
         self.assertEqual("1995", str(education_doc.degree_year))
@@ -5019,19 +5017,17 @@ class PeopleSearchTestElasticSearch(
         # Delete person instance; it should be removed from the index along
         # with its child documents.
         person.delete()
-        PersonBaseDocument._index.refresh()
+        PersonDocument._index.refresh()
 
         # Person document should be removed.
-        self.assertFalse(PersonBaseDocument.exists(id=person_pk))
+        self.assertFalse(PersonDocument.exists(id=person_pk))
         # Position document is removed.
         self.assertFalse(
-            PersonBaseDocument.exists(
-                id=PEOPLE_DOCS_TYPE_ID(pos_1_pk).POSITION
-            )
+            PersonDocument.exists(id=PEOPLE_DOCS_TYPE_ID(pos_1_pk).POSITION)
         )
         # Education document is removed.
         self.assertFalse(
-            PersonBaseDocument.exists(
+            PersonDocument.exists(
                 id=PEOPLE_DOCS_TYPE_ID(education_pk).EDUCATION
             )
         )
@@ -5062,22 +5058,20 @@ class PeopleSearchTestElasticSearch(
             degree_year="1990",
         )
 
-        PersonBaseDocument._index.refresh()
+        PersonDocument._index.refresh()
 
         person_pk = person.pk
         pos_1_pk = pos_1.pk
         education_pk = education.pk
         # Person instance is indexed.
-        self.assertTrue(PersonBaseDocument.exists(id=person_pk))
+        self.assertTrue(PersonDocument.exists(id=person_pk))
         # Position instance is indexed.
         self.assertTrue(
-            PersonBaseDocument.exists(
-                id=PEOPLE_DOCS_TYPE_ID(pos_1_pk).POSITION
-            )
+            PersonDocument.exists(id=PEOPLE_DOCS_TYPE_ID(pos_1_pk).POSITION)
         )
         # Education instance is indexed.
         self.assertTrue(
-            PersonBaseDocument.exists(
+            PersonDocument.exists(
                 id=PEOPLE_DOCS_TYPE_ID(education_pk).EDUCATION
             )
         )
@@ -5085,25 +5079,23 @@ class PeopleSearchTestElasticSearch(
         # Delete pos_1 and education, keep the parent person instance.
         pos_1.delete()
         education.delete()
-        PersonBaseDocument._index.refresh()
+        PersonDocument._index.refresh()
 
         # Person instance still exists.
-        self.assertTrue(PersonBaseDocument.exists(id=person_pk))
+        self.assertTrue(PersonDocument.exists(id=person_pk))
 
         # Position object is removed
         self.assertFalse(
-            PersonBaseDocument.exists(
-                id=PEOPLE_DOCS_TYPE_ID(pos_1_pk).POSITION
-            )
+            PersonDocument.exists(id=PEOPLE_DOCS_TYPE_ID(pos_1_pk).POSITION)
         )
         # Education is removed.
         self.assertFalse(
-            PersonBaseDocument.exists(
+            PersonDocument.exists(
                 id=PEOPLE_DOCS_TYPE_ID(education_pk).EDUCATION
             )
         )
         person.delete()
-        PersonBaseDocument._index.refresh()
+        PersonDocument._index.refresh()
 
     def test_has_child_queries(self) -> None:
         """Test the build_join_fulltext_queries has child query, it returns a
@@ -5112,11 +5104,11 @@ class PeopleSearchTestElasticSearch(
         """
 
         person = PersonFactory.create(name_first="John American")
-        PersonBaseDocument._index.refresh()
+        PersonDocument._index.refresh()
 
         # Query only over child objects, match position appointer.
         query_values = {"position": ["appointer"], "education": ["school"]}
-        s = PersonBaseDocument.search()
+        s = PersonDocument.search()
         has_child_queries = build_join_fulltext_queries(
             query_values, [], "Bill"
         )
@@ -5129,7 +5121,7 @@ class PeopleSearchTestElasticSearch(
 
         # Query only over child objects, match education school.
         query_values = {"position": ["appointer"], "education": ["school"]}
-        s = PersonBaseDocument.search()
+        s = PersonDocument.search()
         has_child_queries = build_join_fulltext_queries(
             query_values, [], "American University"
         )
@@ -5145,7 +5137,7 @@ class PeopleSearchTestElasticSearch(
         # Query over the parent object and child objects, match education
         # school and person name.
         query_values = {"position": ["appointer"], "education": ["school"]}
-        s = PersonBaseDocument.search()
+        s = PersonDocument.search()
         has_child_queries = build_join_fulltext_queries(
             query_values, ["name"], "American"
         )
@@ -5164,7 +5156,7 @@ class PeopleSearchTestElasticSearch(
         )
 
         person.delete()
-        PersonBaseDocument._index.refresh()
+        PersonDocument._index.refresh()
 
     def test_has_child_filters(self) -> None:
         """Test the build_join_es_filters has child filter, it returns a
@@ -5177,7 +5169,7 @@ class PeopleSearchTestElasticSearch(
             "dob_state": "NY",
             "type": SEARCH_TYPES.PEOPLE,
         }
-        s = PersonBaseDocument.search()
+        s = PersonDocument.search()
         has_child_filters = build_join_es_filters(cd)
         s = s.filter(reduce(operator.iand, has_child_filters))
         self.assertEqual(s.count(), 2)
@@ -5188,7 +5180,7 @@ class PeopleSearchTestElasticSearch(
             "selection_method": "e_part",
             "type": SEARCH_TYPES.PEOPLE,
         }
-        s = PersonBaseDocument.search()
+        s = PersonDocument.search()
         has_child_filters = build_join_es_filters(cd)
         s = s.filter(reduce(operator.iand, has_child_filters))
         self.assertEqual(s.count(), 1)
@@ -5205,6 +5197,131 @@ class PeopleSearchTestElasticSearch(
         params = {"type": SEARCH_TYPES.PEOPLE, "court": "ca1"}
         self._test_article_count(params, 1, "court")
 
+        # API
+        self._test_api_results_count(params, 1, "court")
+
         # Frontend
         params = {"type": SEARCH_TYPES.PEOPLE, "court": "scotus"}
         self._test_article_count(params, 0, "court")
+        # API
+        self._test_api_results_count(params, 0, "court")
+
+        # Frontend
+        params = {"type": SEARCH_TYPES.PEOPLE, "court": "scotus ca1"}
+        self._test_article_count(params, 1, "court")
+        # API
+        self._test_api_results_count(params, 1, "court")
+
+    def test_dob_filters(self) -> None:
+        # Frontend
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "born_after": "1941",
+            "born_before": "1943",
+        }
+        self._test_article_count(params, 1, "born_{before|after}")
+        # API
+        self._test_api_results_count(params, 1, "born_{before|after}")
+
+        # Are reversed dates corrected?
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "born_after": "1943",
+            "born_before": "1941",
+        }
+        # Frontend
+        self._test_article_count(params, 1, "born_{before|after}")
+        # API
+        self._test_api_results_count(params, 1, "born_{before|after}")
+
+        # Just one filter, but Judy is older than this.
+        params = {"type": SEARCH_TYPES.PEOPLE, "born_after": "1946"}
+        # Frontend
+        self._test_article_count(params, 0, "born_{before|after}")
+        # API
+        self._test_api_results_count(
+            params,
+            0,
+            "born_{before|after}",
+        )
+
+    def test_birth_location(self) -> None:
+        """Can we filter by city and state?"""
+
+        params = {"type": SEARCH_TYPES.PEOPLE, "dob_city": "brookyln"}
+        # Frontend
+        self._test_article_count(
+            params,
+            1,
+            "dob_city",
+        )
+        # API
+        self._test_api_results_count(params, 1, "dob_city")
+
+        params = {"type": SEARCH_TYPES.PEOPLE, "dob_city": "brooklyn2"}
+        # Frontend
+        self._test_article_count(
+            params,
+            0,
+            "dob_city",
+        )
+        # API
+        self._test_api_results_count(
+            params,
+            0,
+            "dob_city",
+        )
+
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "dob_city": "brookyln",
+            "dob_state": "NY",
+        }
+        # Frontend
+        self._test_article_count(params, 1, "dob_city")
+        # API
+        self._test_api_results_count(params, 1, "dob_city")
+
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "dob_city": "brookyln",
+            "dob_state": "OK",
+        }
+        # Frontend
+        self._test_article_count(
+            params,
+            0,
+            "dob_city",
+        )
+        # API
+        self._test_api_results_count(params, 0, "dob_city")
+
+    def test_schools_filter(self) -> None:
+        params = {"type": SEARCH_TYPES.PEOPLE, "school": "american"}
+        # Frontend
+        self._test_article_count(params, 1, "school")
+        # API
+        self._test_api_results_count(params, 1, "school")
+
+        params = {"type": SEARCH_TYPES.PEOPLE, "school": "pitzer"}
+        # Frontend
+        self._test_article_count(params, 0, "school")
+        # API
+        self._test_api_results_count(params, 0, "school")
+
+    def test_appointer_filter(self) -> None:
+        params = {"type": SEARCH_TYPES.PEOPLE, "appointer": "clinton"}
+        # Frontend
+        self._test_article_count(
+            params,
+            2,
+            "appointer",
+        )
+        # API
+        self._test_api_results_count(params, 2, "appointer")
+
+        params = {"type": SEARCH_TYPES.PEOPLE, "appointer": "obama"}
+        # Frontend
+        self._test_article_count(params, 0, "appointer")
+        # API
+        self._test_api_results_count(params, 0, "appointer")

@@ -55,7 +55,7 @@ from cl.search.constants import RELATED_PATTERN
 from cl.search.documents import (
     AudioDocument,
     ParentheticalGroupDocument,
-    PersonBaseDocument,
+    PersonDocument,
 )
 from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import SEARCH_TYPES, Court, Opinion, OpinionCluster
@@ -487,12 +487,6 @@ def show_results(request: HttpRequest) -> HttpResponse:
                         search_results = do_search(request.GET.copy())
                     else:
                         search_results = do_es_search(request.GET.copy())
-                elif request.GET.get("type") == SEARCH_TYPES.PEOPLE:
-                    # Check if waffle flag is active.
-                    if waffle.flag_is_active(request, "p-es-deactivate"):
-                        search_results = do_search(request.GET.copy())
-                    else:
-                        search_results = do_es_search(request.GET.copy())
 
                     render_dict.update(search_results)
                     # Set the value to the query as a convenience
@@ -500,7 +494,13 @@ def show_results(request: HttpRequest) -> HttpResponse:
                         "value"
                     ] = render_dict["search_summary_str"]
                     render_dict.update({"alert_form": alert_form})
-
+                elif request.GET.get("type") == SEARCH_TYPES.PEOPLE:
+                    # Check if waffle flag is active.
+                    if waffle.flag_is_active(request, "p-es-deactivate"):
+                        search_results = do_search(request.GET.copy())
+                    else:
+                        search_results = do_es_search(request.GET.copy())
+                    render_dict.update(search_results)
                 else:
                     render_dict.update(do_search(request.GET.copy()))
                     # Set the value to the query as a convenience
@@ -632,7 +632,7 @@ def do_es_search(
     elif get_params.get("type") == SEARCH_TYPES.ORAL_ARGUMENT:
         document_type = AudioDocument
     elif get_params.get("type") == SEARCH_TYPES.PEOPLE:
-        document_type = PersonBaseDocument
+        document_type = PersonDocument
 
     if search_form.is_valid() and document_type:
         cd = search_form.cleaned_data
@@ -658,6 +658,7 @@ def do_es_search(
     search_summary_str = search_form.as_text(court_count_human)
     search_summary_dict = search_form.as_display_dict(court_count_human)
     results_details = [query_time, total_query_results, top_hits_limit]
+
     return {
         "results": paged_results,
         "results_details": results_details,

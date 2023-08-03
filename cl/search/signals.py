@@ -99,7 +99,7 @@ def remove_audio_from_es_index(sender, instance=None, **kwargs):
 @receiver(
     post_save,
     sender=Person,
-    dispatch_uid=" create_or_update_person_in_es_index",
+    dispatch_uid="create_or_update_person_in_es_index",
 )
 def create_or_update_person_in_es_index(sender, instance=None, **kwargs):
     """Receiver function that gets called after a Person instance is saved.
@@ -135,7 +135,6 @@ def create_or_update_position_in_es_index(sender, instance=None, **kwargs):
         PositionDocument(
             meta={"id": doc_id},
             _routing=parent_id,
-            person_child={"name": "position", "parent": parent_id},
             **doc,
         ).save(skip_empty=False)
 
@@ -163,7 +162,6 @@ def create_or_update_education_in_es_index(sender, instance=None, **kwargs):
         EducationDocument(
             meta={"id": doc_id},
             _routing=parent_id,
-            person_child={"name": "education", "parent": parent_id},
             **doc,
         ).save(skip_empty=False)
 
