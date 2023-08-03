@@ -18,7 +18,7 @@ repos:
      - id: check-yaml
      - id: debug-statements
      - id: detect-private-key
-       exclude: '^docker/postgresql/cl-postgres.key$'
+       exclude: '^docker/postgresql/cl-postgres.key$|^docker/elastic/cl-es.key$'
      - id: fix-byte-order-marker
      - id: fix-encoding-pragma
        args: [--remove]

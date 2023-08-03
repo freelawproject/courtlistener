@@ -1,13 +1,12 @@
 import datetime
 import io
-import operator
 import os
 from datetime import date
-from functools import reduce
 from pathlib import Path
-from unittest import mock, skipUnless
+from unittest import mock
 
 import pytz
+from asgiref.sync import sync_to_async
 from dateutil.tz import tzoffset, tzutc
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
@@ -18,10 +17,8 @@ from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db import IntegrityError, transaction
 from django.http import HttpRequest
-from django.test import RequestFactory, override_settings
-from django.test.utils import captured_stderr
+from django.test import AsyncRequestFactory, override_settings
 from django.urls import reverse
-from elasticsearch_dsl import Q, connections
 from factory import RelatedFactory
 from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
@@ -31,15 +28,6 @@ from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
 
 from cl.audio.factories import AudioFactory
-from cl.lib.elasticsearch_utils import (
-    build_daterange_query,
-    build_es_filters,
-    build_es_main_query,
-    build_fulltext_query,
-    build_sort_results,
-    build_terms_query,
-    group_search_results,
-)
 from cl.lib.search_utils import cleanup_main_query, make_fq
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
@@ -53,19 +41,12 @@ from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.factories import DocketEntriesDataFactory, DocketEntryDataFactory
 from cl.recap.mergers import add_docket_entries
 from cl.scrapers.factories import PACERFreeDocumentLogFactory
-from cl.search.documents import ParentheticalGroupDocument
 from cl.search.factories import (
-    CitationWithParentsFactory,
     CourtFactory,
     DocketEntryWithParentsFactory,
     DocketFactory,
-    OpinionClusterFactory,
     OpinionClusterFactoryWithChildrenAndParents,
-    OpinionsCitedWithParentsFactory,
     OpinionWithChildrenFactory,
-    OpinionWithParentsFactory,
-    ParentheticalFactory,
-    ParentheticalGroupFactory,
     RECAPDocumentFactory,
 )
 from cl.search.feeds import JurisdictionFeed
@@ -435,53 +416,63 @@ class AdvancedTest(IndexedSolrTestCase):
             docket_entry=cls.de_1, description="Leave to File"
         )
 
-    def test_a_intersection_query(self) -> None:
+    async def test_a_intersection_query(self) -> None:
         """Does AND queries work"""
-        r = self.client.get(reverse("show_results"), {"q": "Howard AND Honda"})
+        r = await self.async_client.get(
+            reverse("show_results"), {"q": "Howard AND Honda"}
+        )
         self.assertIn("Howard", r.content.decode())
         self.assertIn("Honda", r.content.decode())
         self.assertIn("1 Opinion", r.content.decode())
 
-    def test_a_union_query(self) -> None:
+    async def test_a_union_query(self) -> None:
         """Does OR queries work"""
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"), {"q": "Howard OR Lissner"}
         )
         self.assertIn("Howard", r.content.decode())
         self.assertIn("Lissner", r.content.decode())
         self.assertIn("2 Opinions", r.content.decode())
 
-    def test_query_negation(self) -> None:
+    async def test_query_negation(self) -> None:
         """Does negation query work"""
-        r = self.client.get(reverse("show_results"), {"q": "Howard"})
+        r = await self.async_client.get(
+            reverse("show_results"), {"q": "Howard"}
+        )
         self.assertIn("Howard", r.content.decode())
         self.assertIn("1 Opinion", r.content.decode())
 
-        r = self.client.get(reverse("show_results"), {"q": "Howard NOT Honda"})
+        r = await self.async_client.get(
+            reverse("show_results"), {"q": "Howard NOT Honda"}
+        )
         self.assertIn("had no results", r.content.decode())
 
-        r = self.client.get(reverse("show_results"), {"q": "Howard !Honda"})
+        r = await self.async_client.get(
+            reverse("show_results"), {"q": "Howard !Honda"}
+        )
         self.assertIn("had no results", r.content.decode())
 
-        r = self.client.get(reverse("show_results"), {"q": "Howard -Honda"})
+        r = await self.async_client.get(
+            reverse("show_results"), {"q": "Howard -Honda"}
+        )
         self.assertIn("had no results", r.content.decode())
 
-    def test_query_phrase(self) -> None:
+    async def test_query_phrase(self) -> None:
         """Can we query by phrase"""
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"), {"q": '"Harvey Howard v. Antonin Honda"'}
         )
         self.assertIn("Harvey Howard", r.content.decode())
         self.assertIn("1 Opinion", r.content.decode())
 
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"), {"q": '"Antonin Honda v. Harvey Howard"'}
         )
         self.assertIn("had no results", r.content.decode())
 
-    def test_query_grouped_and_sub_queries(self) -> None:
+    async def test_query_grouped_and_sub_queries(self) -> None:
         """Does grouped and sub queries work"""
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"), {"q": "(Lissner OR Honda) AND Howard"}
         )
         self.assertIn("Howard", r.content.decode())
@@ -489,60 +480,62 @@ class AdvancedTest(IndexedSolrTestCase):
         self.assertIn("Lissner", r.content.decode())
         self.assertIn("1 Opinion", r.content.decode())
 
-    def test_query_fielded(self) -> None:
+    async def test_query_fielded(self) -> None:
         """Does fielded queries work"""
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"), {"q": "status:precedential"}
         )
         self.assertIn("docket number 2", r.content.decode())
         self.assertIn("docket number 3", r.content.decode())
         self.assertIn("2 Opinions", r.content.decode())
 
-    def test_a_wildcard_query(self) -> None:
+    async def test_a_wildcard_query(self) -> None:
         """Does a wildcard query work"""
-        r = self.client.get(reverse("show_results"), {"q": "Ho*"})
+        r = await self.async_client.get(reverse("show_results"), {"q": "Ho*"})
         self.assertIn("Howard", r.content.decode())
         self.assertIn("Honda", r.content.decode())
         self.assertIn("1 Opinion", r.content.decode())
 
-        r = self.client.get(reverse("show_results"), {"q": "?owa*"})
+        r = await self.async_client.get(
+            reverse("show_results"), {"q": "?owa*"}
+        )
         self.assertIn("docket number 2", r.content.decode())
         self.assertIn("1 Opinion", r.content.decode())
 
-    def test_a_fuzzy_query(self) -> None:
+    async def test_a_fuzzy_query(self) -> None:
         """Does a fuzzy query work"""
-        r = self.client.get(reverse("show_results"), {"q": "ond~"})
+        r = await self.async_client.get(reverse("show_results"), {"q": "ond~"})
         self.assertIn("docket number 2", r.content.decode())
         self.assertIn("docket number 3", r.content.decode())
         self.assertIn("2 Opinions", r.content.decode())
 
-    def test_proximity_query(self) -> None:
+    async def test_proximity_query(self) -> None:
         """Does a proximity query work"""
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"), {"q": "'Testing Court'~3"}
         )
         self.assertIn("docket number 2", r.content.decode())
         self.assertIn("1 Opinion", r.content.decode())
 
-    def test_range_query(self) -> None:
+    async def test_range_query(self) -> None:
         """Does a range query work"""
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"), {"q": "citation:([22 TO 33])"}
         )
         self.assertIn("docket number 2", r.content.decode())
         self.assertIn("docket number 3", r.content.decode())
         self.assertIn("2 Opinions", r.content.decode())
 
-    def test_date_query(self) -> None:
+    async def test_date_query(self) -> None:
         """Does a date query work"""
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"),
             {"q": "dateFiled:[2015-01-01T00:00:00Z TO 2015-12-31T00:00:00Z]"},
         )
         self.assertIn("docket number 3", r.content.decode())
         self.assertIn("1 Opinion", r.content.decode())
 
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"),
             {"q": "dateFiled:[1895-01-01T00:00:00Z TO 2015-12-31T00:00:00Z]"},
         )
@@ -609,17 +602,21 @@ class AdvancedTest(IndexedSolrTestCase):
             fq, "description:(leave AND to AND file AND amicus AND curie)"
         )
 
-    def test_phrase_plus_conjunction_search(self) -> None:
+    async def test_phrase_plus_conjunction_search(self) -> None:
         """Confirm phrase + conjunction search works properly"""
 
-        add_docket_to_solr_by_rds([self.rd.pk], force_commit=True)
-        add_docket_to_solr_by_rds([self.rd_1.pk], force_commit=True)
+        await sync_to_async(add_docket_to_solr_by_rds)(
+            [self.rd.pk], force_commit=True
+        )
+        await sync_to_async(add_docket_to_solr_by_rds)(
+            [self.rd_1.pk], force_commit=True
+        )
         params = {
             "q": "",
             "description": '"leave to file" AND amicus',
             "type": SEARCH_TYPES.RECAP,
         }
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"),
             params,
         )
@@ -627,7 +624,7 @@ class AdvancedTest(IndexedSolrTestCase):
         self.assertIn("SUBPOENAS SERVED ON", r.content.decode())
 
         params["description"] = '"leave to file" amicus'
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"),
             params,
         )
@@ -635,7 +632,7 @@ class AdvancedTest(IndexedSolrTestCase):
         self.assertIn("SUBPOENAS SERVED ON", r.content.decode())
 
         params["description"] = '"leave to file" AND "amicus"'
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"),
             params,
         )
@@ -645,7 +642,7 @@ class AdvancedTest(IndexedSolrTestCase):
         params[
             "description"
         ] = '"leave to file" AND "amicus" "Curiae september"'
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"),
             params,
         )
@@ -681,30 +678,32 @@ class SearchTest(IndexedSolrTestCase):
         """Get the article count in a query response"""
         return len(html.fromstring(r.content.decode()).xpath("//article"))
 
-    def test_a_simple_text_query(self) -> None:
+    async def test_a_simple_text_query(self) -> None:
         """Does typing into the main query box work?"""
-        r = self.client.get(reverse("show_results"), {"q": "supreme"})
+        r = await self.async_client.get(
+            reverse("show_results"), {"q": "supreme"}
+        )
         self.assertIn("Honda", r.content.decode())
         self.assertIn("1 Opinion", r.content.decode())
 
-    def test_a_case_name_query(self) -> None:
+    async def test_a_case_name_query(self) -> None:
         """Does querying by case name work?"""
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"), {"q": "*", "case_name": "honda"}
         )
         self.assertIn("Honda", r.content.decode())
 
-    def test_a_query_with_white_space_only(self) -> None:
+    async def test_a_query_with_white_space_only(self) -> None:
         """Does everything work when whitespace is in various fields?"""
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"), {"q": " ", "judge": " ", "case_name": " "}
         )
         self.assertIn("Honda", r.content.decode())
         self.assertNotIn("an error", r.content.decode())
 
-    def test_a_query_with_a_date(self) -> None:
+    async def test_a_query_with_a_date(self) -> None:
         """Does querying by date work?"""
-        response = self.client.get(
+        response = await self.async_client.get(
             reverse("show_results"),
             {"q": "*", "filed_after": "1895-06", "filed_before": "1896-01"},
         )
@@ -712,70 +711,72 @@ class SearchTest(IndexedSolrTestCase):
         print(text)
         self.assertIn("Honda", response.content.decode())
 
-    def test_faceted_queries(self) -> None:
+    async def test_faceted_queries(self) -> None:
         """Does querying in a given court return the document? Does querying
         the wrong facets exclude it?
         """
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"), {"q": "*", "court_test": "on"}
         )
         self.assertIn("Honda", r.content.decode())
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"), {"q": "*", "stat_Errata": "on"}
         )
         self.assertNotIn("Honda", r.content.decode())
         self.assertIn("Debbas", r.content.decode())
 
-    def test_a_docket_number_query(self) -> None:
+    async def test_a_docket_number_query(self) -> None:
         """Can we query by docket number?"""
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"), {"q": "*", "docket_number": "2"}
         )
         self.assertIn(
             "Honda", r.content.decode(), "Result not found by docket number!"
         )
 
-    def test_a_west_citation_query(self) -> None:
+    async def test_a_west_citation_query(self) -> None:
         """Can we query by citation number?"""
         get_dicts = [{"q": "*", "citation": "33"}, {"q": "citation:33"}]
         for get_dict in get_dicts:
-            r = self.client.get(reverse("show_results"), get_dict)
+            r = await self.async_client.get(reverse("show_results"), get_dict)
             self.assertIn("Honda", r.content.decode())
 
-    def test_a_neutral_citation_query(self) -> None:
+    async def test_a_neutral_citation_query(self) -> None:
         """Can we query by neutral citation numbers?"""
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"), {"q": "*", "neutral_cite": "22"}
         )
         self.assertIn("Honda", r.content.decode())
 
-    def test_a_query_with_a_old_date(self) -> None:
+    async def test_a_query_with_a_old_date(self) -> None:
         """Do we have any recurrent issues with old dates and strftime (issue
         220)?"""
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"), {"q": "*", "filed_after": "1890"}
         )
         self.assertEqual(200, r.status_code)
 
-    def test_a_judge_query(self) -> None:
+    async def test_a_judge_query(self) -> None:
         """Can we query by judge name?"""
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"), {"q": "*", "judge": "david"}
         )
         self.assertIn("Honda", r.content.decode())
-        r = self.client.get(reverse("show_results"), {"q": "judge:david"})
+        r = await self.async_client.get(
+            reverse("show_results"), {"q": "judge:david"}
+        )
         self.assertIn("Honda", r.content.decode())
 
-    def test_a_nature_of_suit_query(self) -> None:
+    async def test_a_nature_of_suit_query(self) -> None:
         """Can we query by nature of suit?"""
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"), {"q": 'suitNature:"copyright"'}
         )
         self.assertIn("Honda", r.content.decode())
 
-    def test_citation_filtering(self) -> None:
+    async def test_citation_filtering(self) -> None:
         """Can we find Documents by citation filtering?"""
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"), {"q": "*", "cited_lt": 7, "cited_gt": 5}
         )
         self.assertIn(
@@ -783,16 +784,18 @@ class SearchTest(IndexedSolrTestCase):
             r.content.decode(),
             msg="Did not get case back when filtering by citation count.",
         )
-        r = self.client.get("/", {"q": "*", "cited_lt": 100, "cited_gt": 80})
+        r = await self.async_client.get(
+            "/", {"q": "*", "cited_lt": 100, "cited_gt": 80}
+        )
         self.assertIn(
             "had no results",
             r.content.decode(),
             msg="Got case back when filtering by crazy citation count.",
         )
 
-    def test_citation_ordering(self) -> None:
+    async def test_citation_ordering(self) -> None:
         """Can the results be re-ordered by citation count?"""
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"), {"q": "*", "order_by": "citeCount desc"}
         )
         most_cited_name = "case name cluster 3"
@@ -804,7 +807,9 @@ class SearchTest(IndexedSolrTestCase):
             "citeCount." % (most_cited_name, less_cited_name),
         )
 
-        r = self.client.get("/", {"q": "*", "order_by": "citeCount asc"})
+        r = await self.async_client.get(
+            "/", {"q": "*", "order_by": "citeCount asc"}
+        )
         self.assertTrue(
             r.content.decode().index(most_cited_name)
             > r.content.decode().index(less_cited_name),
@@ -812,20 +817,20 @@ class SearchTest(IndexedSolrTestCase):
             "citeCount." % (most_cited_name, less_cited_name),
         )
 
-    def test_random_ordering(self) -> None:
+    async def test_random_ordering(self) -> None:
         """Can the results be ordered randomly?
 
         This test is difficult since we can't check that things actually get
         ordered randomly, but we can at least make sure the query succeeds.
         """
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"), {"q": "*", "order_by": "random_123 desc"}
         )
         self.assertNotIn("an error", r.content.decode())
 
-    def test_homepage(self) -> None:
+    async def test_homepage(self) -> None:
         """Is the homepage loaded when no GET parameters are provided?"""
-        response = self.client.get(reverse("show_results"))
+        response = await self.async_client.get(reverse("show_results"))
         self.assertIn(
             'id="homepage"',
             response.content.decode(),
@@ -833,9 +838,9 @@ class SearchTest(IndexedSolrTestCase):
             "load the homepage",
         )
 
-    def test_fail_gracefully(self) -> None:
+    async def test_fail_gracefully(self) -> None:
         """Do we fail gracefully when an invalid search is created?"""
-        response = self.client.get(
+        response = await self.async_client.get(
             reverse("show_results"), {"neutral_cite": "-"}
         )
         self.assertEqual(response.status_code, 200)
@@ -845,24 +850,24 @@ class SearchTest(IndexedSolrTestCase):
             msg="Invalid search did not result in an error.",
         )
 
-    def test_issue_635_leading_zeros(self) -> None:
+    async def test_issue_635_leading_zeros(self) -> None:
         """Do queries with leading zeros work equal to ones without?"""
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"),
             {"docket_number": "005", "stat_Errata": "on"},
         )
         expected = 1
         self.assertEqual(expected, self.get_article_count(r))
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"),
             {"docket_number": "5", "stat_Errata": "on"},
         )
         self.assertEqual(expected, self.get_article_count(r))
 
-    def test_issue_1193_docket_numbers_as_phrase(self) -> None:
+    async def test_issue_1193_docket_numbers_as_phrase(self) -> None:
         """Are docket numbers searched as a phrase?"""
         # Search for the full docket number. Does it work?
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"),
             {"docket_number": "docket number 1 005", "stat_Errata": "on"},
         )
@@ -876,7 +881,7 @@ class SearchTest(IndexedSolrTestCase):
         )
 
         # Twist up the docket numbers. Do we get no results?
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"),
             {"docket_number": "docket 005 number", "stat_Errata": "on"},
         )
@@ -887,22 +892,22 @@ class SearchTest(IndexedSolrTestCase):
             "Got results for badly ordered docket number.",
         )
 
-    def test_issue_727_doc_att_numbers(self) -> None:
+    async def test_issue_727_doc_att_numbers(self) -> None:
         """Can we send integers to the document number and attachment number
         fields?
         """
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"),
             {"type": SEARCH_TYPES.RECAP, "document_number": "1"},
         )
         self.assertEqual(r.status_code, HTTP_200_OK)
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"),
             {"type": SEARCH_TYPES.RECAP, "attachment_number": "1"},
         )
         self.assertEqual(r.status_code, HTTP_200_OK)
 
-    def test_issue_1296_abnormal_citation_type_queries(self) -> None:
+    async def test_issue_1296_abnormal_citation_type_queries(self) -> None:
         """Does search work OK when there are supra, id, or non-opinion
         citations in the query?
         """
@@ -911,35 +916,35 @@ class SearchTest(IndexedSolrTestCase):
             {"type": SEARCH_TYPES.OPINION, "q": "supra, at 22"},
         )
         for param in params:
-            r = self.client.get(reverse("show_results"), param)
+            r = await self.async_client.get(reverse("show_results"), param)
             self.assertEqual(
                 r.status_code,
                 HTTP_200_OK,
                 msg=f"Didn't get good status code with params: {param}",
             )
 
-    def test_rendering_unicode_o_text(self) -> None:
+    async def test_rendering_unicode_o_text(self) -> None:
         """Does unicode HTML unicode is properly rendered in search results?"""
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"), {"q": "*", "case_name": "Washington"}
         )
         self.assertIn("Code, §", r.content.decode())
 
-    def test_docket_number_proximity_query(self) -> None:
+    async def test_docket_number_proximity_query(self) -> None:
         """Test docket_number proximity query, so that docket numbers like
         1:21-cv-1234 can be matched by queries like: 21-1234
         """
 
         # Query 21-1234, return results for 1:21-bk-1234
         search_params = {"type": SEARCH_TYPES.OPINION, "q": "21-1234"}
-        r = self.client.get(reverse("show_results"), search_params)
+        r = await self.async_client.get(reverse("show_results"), search_params)
         actual = self.get_article_count(r)
         self.assertEqual(actual, 1)
         self.assertIn("Washington", r.content.decode())
 
         # Query 1:21-cv-1234
         search_params["q"] = "1:21-cv-1234"
-        r = self.client.get(reverse("show_results"), search_params)
+        r = await self.async_client.get(reverse("show_results"), search_params)
         actual = self.get_article_count(r)
         self.assertEqual(actual, 1)
         self.assertIn("Washington", r.content.decode())
@@ -950,7 +955,7 @@ class SearchTest(IndexedSolrTestCase):
             "docket_number": f"21-1234",
         }
         # Frontend
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"),
             search_params,
         )
@@ -959,7 +964,7 @@ class SearchTest(IndexedSolrTestCase):
         self.assertEqual(actual, expected)
         self.assertIn("Washington", r.content.decode())
 
-    def test_docket_number_suffixes_query(self) -> None:
+    async def test_docket_number_suffixes_query(self) -> None:
         """Test docket_number with suffixes can be found."""
 
         # Indexed: 1:21-cv-1234 -> Search: 1:21-cv-1234-ABC
@@ -968,7 +973,7 @@ class SearchTest(IndexedSolrTestCase):
             "type": SEARCH_TYPES.OPINION,
             "q": f"1:21-cv-1234-ABC",
         }
-        r = self.client.get(reverse("show_results"), search_params)
+        r = await self.async_client.get(reverse("show_results"), search_params)
         actual = self.get_article_count(r)
         self.assertEqual(actual, 1)
         self.assertIn("Washington", r.content.decode())
@@ -978,7 +983,7 @@ class SearchTest(IndexedSolrTestCase):
             "type": SEARCH_TYPES.OPINION,
             "q": "123456",
         }
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("show_results"),
             search_params,
         )
@@ -1011,7 +1016,7 @@ class RelatedSearchTest(IndexedSolrTestCase):
 
         super(RelatedSearchTest, self).setUp()
 
-    def test_more_like_this_opinion(self) -> None:
+    async def test_more_like_this_opinion(self) -> None:
         """Does the MoreLikeThis query return the correct number and order of
         articles."""
         seed_pk = 1  # Paul Debbas v. Franklin
@@ -1029,7 +1034,7 @@ class RelatedSearchTest(IndexedSolrTestCase):
             {f"stat_{v}": "on" for s, v in PRECEDENTIAL_STATUS.NAMES}
         )
 
-        r = self.client.get(reverse("show_results"), params)
+        r = await self.async_client.get(reverse("show_results"), params)
         self.assertEqual(r.status_code, HTTP_200_OK)
 
         self.assertEqual(
@@ -1041,16 +1046,18 @@ class RelatedSearchTest(IndexedSolrTestCase):
             msg="'Howard v. Honda' should come AFTER 'case name cluster 3'.",
         )
 
-    def test_more_like_this_opinion_detail_detail(self) -> None:
+    async def test_more_like_this_opinion_detail_detail(self) -> None:
         """MoreLikeThis query on opinion detail page with status filter"""
         seed_pk = 3  # case name cluster 3
 
         # Login as staff user (related items are by default disabled for guests)
         self.assertTrue(
-            self.client.login(username="admin", password="password")
+            await sync_to_async(self.async_client.login)(
+                username="admin", password="password"
+            )
         )
 
-        r = self.client.get("/opinion/%i/asdf/" % seed_pk)
+        r = await self.async_client.get("/opinion/%i/asdf/" % seed_pk)
         self.assertEqual(r.status_code, 200)
 
         tree = html.fromstring(r.content.decode())
@@ -1075,19 +1082,21 @@ class RelatedSearchTest(IndexedSolrTestCase):
             msg="Unexpected opinion recommendations.",
         )
 
-        self.client.logout()
+        await sync_to_async(self.async_client.logout)()
 
     @override_settings(RELATED_FILTER_BY_STATUS=None)
-    def test_more_like_this_opinion_detail_no_filter(self) -> None:
+    async def test_more_like_this_opinion_detail_no_filter(self) -> None:
         """MoreLikeThis query on opinion detail page (without filter)"""
         seed_pk = 1  # Paul Debbas v. Franklin
 
         # Login as staff user (related items are by default disabled for guests)
         self.assertTrue(
-            self.client.login(username="admin", password="password")
+            await sync_to_async(self.async_client.login)(
+                username="admin", password="password"
+            )
         )
 
-        r = self.client.get("/opinion/%i/asdf/" % seed_pk)
+        r = await self.async_client.get("/opinion/%i/asdf/" % seed_pk)
         self.assertEqual(r.status_code, 200)
 
         tree = html.fromstring(r.content.decode())
@@ -1112,7 +1121,7 @@ class RelatedSearchTest(IndexedSolrTestCase):
             msg="Unexpected opinion recommendations.",
         )
 
-        self.client.logout()
+        await sync_to_async(self.async_client.logout)()
 
 
 class GroupedSearchTest(EmptySolrTestCase):
@@ -1132,7 +1141,7 @@ class GroupedSearchTest(EmptySolrTestCase):
             "--noinput",
         ]
         call_command("cl_update_index", *args)
-        self.factory = RequestFactory()
+        self.factory = AsyncRequestFactory()
 
     def test_grouped_queries(self) -> None:
         """When we have a cluster with multiple opinions, do results get
@@ -1151,7 +1160,7 @@ class GroupedSearchTest(EmptySolrTestCase):
 
 
 class JudgeSearchTest(IndexedSolrTestCase):
-    def test_sorting(self) -> None:
+    async def test_sorting(self) -> None:
         """Can we do sorting on various fields?"""
         sort_fields = [
             "score desc",
@@ -1160,7 +1169,7 @@ class JudgeSearchTest(IndexedSolrTestCase):
             "dod desc,name_reverse asc",
         ]
         for sort_field in sort_fields:
-            r = self.client.get(
+            r = await self.async_client.get(
                 "/", {"type": SEARCH_TYPES.PEOPLE, "ordered_by": sort_field}
             )
             self.assertNotIn(
@@ -1169,8 +1178,8 @@ class JudgeSearchTest(IndexedSolrTestCase):
                 msg=f"Got an error when doing a judge search ordered by {sort_field}",
             )
 
-    def _test_article_count(self, params, expected_count, field_name):
-        r = self.client.get("/", params)
+    async def _test_article_count(self, params, expected_count, field_name):
+        r = await self.async_client.get("/", params)
         tree = html.fromstring(r.content.decode())
         got = len(tree.xpath("//article"))
         self.assertEqual(
@@ -1303,9 +1312,9 @@ class JudgeSearchTest(IndexedSolrTestCase):
 
 
 class FeedTest(IndexedSolrTestCase):
-    def test_jurisdiction_feed(self) -> None:
+    async def test_jurisdiction_feed(self) -> None:
         """Can we simply load the jurisdiction feed?"""
-        response = self.client.get(
+        response = await self.async_client.get(
             reverse("jurisdiction_feed", kwargs={"court": "test"})
         )
         self.assertEqual(
@@ -1930,512 +1939,6 @@ class CaptionTest(TestCase):
         # Now sort the messed up list, and check if it worked.
         cs_sorted = sorted(cs_shuffled, key=sort_cites)
         self.assertEqual(cs, cs_sorted)
-
-
-def is_es_online(connection_alias="default"):
-    """Validate that ES instance is online
-    :param connection_alias: Name of connection to use
-    :return: True or False
-    """
-    with captured_stderr():
-        es = connections.get_connection(connection_alias)
-        return es.ping()
-
-
-@skipUnless(is_es_online(), "Elasticsearch is offline")
-class ElasticSearchTest(TestCase):
-    fixtures = ["test_court.json"]
-
-    # Mock ElasticSearch search and responses are difficult due to its implementation,
-    # that's why we skip testing if Elasticsearch instance is offline, this can be
-    # fixed by implementing the service in Github actions or using external library to
-    # Mock elasticsearch like: ElasticMock
-
-    @classmethod
-    def rebuild_index(self):
-        """
-        Create and populate the Elasticsearch index and mapping
-        """
-        # -f rebuilds index without prompt for confirmation
-        call_command(
-            "search_index",
-            "--rebuild",
-            "-f",
-            "--models",
-            "search.ParentheticalGroup",
-        )
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.c1 = CourtFactory(id="canb", jurisdiction="I")
-        cls.c2 = CourtFactory(id="ca1", jurisdiction="F")
-        cls.c3 = CourtFactory(id="cacd", jurisdiction="FB")
-
-        cls.cluster = OpinionClusterFactory(
-            case_name="Peck, Williams and Freeman v. Stephens",
-            case_name_short="Stephens",
-            judges="Lorem ipsum",
-            scdb_id="1952-121",
-            nature_of_suit="710",
-            docket=DocketFactory(
-                court=cls.c1,
-                docket_number="1:98-cr-35856",
-                date_reargued=date(1986, 1, 30),
-                date_reargument_denied=date(1986, 5, 30),
-            ),
-            date_filed=date(1978, 3, 10),
-            source="H",
-            precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
-        )
-        cls.o = OpinionWithParentsFactory(
-            cluster=cls.cluster,
-            type="Plurality Opinion",
-            extracted_by_ocr=True,
-        )
-        cls.o.joined_by.add(cls.o.author)
-        cls.cluster.panel.add(cls.o.author)
-        cls.citation = CitationWithParentsFactory(cluster=cls.cluster)
-        cls.citation_lexis = CitationWithParentsFactory(
-            cluster=cls.cluster, type=Citation.LEXIS
-        )
-        cls.citation_neutral = CitationWithParentsFactory(
-            cluster=cls.cluster, type=Citation.NEUTRAL
-        )
-        cls.opinion_cited = OpinionsCitedWithParentsFactory(
-            citing_opinion=cls.o, cited_opinion=cls.o
-        )
-        cls.o2 = OpinionWithParentsFactory(
-            cluster=OpinionClusterFactory(
-                case_name="Riley v. Brewer-Hall",
-                case_name_short="Riley",
-                docket=DocketFactory(
-                    court=cls.c2,
-                ),
-                date_filed=date(1976, 8, 30),
-                source="H",
-                precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
-            ),
-            type="Concurrence Opinion",
-            extracted_by_ocr=False,
-        )
-
-        cls.o3 = OpinionWithParentsFactory(
-            cluster=OpinionClusterFactory(
-                case_name="Smith v. Herrera",
-                case_name_short="Herrera",
-                docket=DocketFactory(
-                    court=cls.c3,
-                ),
-                date_filed=date(1981, 7, 11),
-                source="LC",
-                precedential_status=PRECEDENTIAL_STATUS.SEPARATE,
-            ),
-            type="In Part Opinion",
-            extracted_by_ocr=True,
-        )
-
-        cls.p = ParentheticalFactory(
-            describing_opinion=cls.o,
-            described_opinion=cls.o,
-            group=None,
-            text="At responsibility learn point year rate.",
-            score=0.3236,
-        )
-
-        cls.p2 = ParentheticalFactory(
-            describing_opinion=cls.o2,
-            described_opinion=cls.o2,
-            group=None,
-            text="Necessary Together friend conference end different such.",
-            score=0.4218,
-        )
-
-        cls.p3 = ParentheticalFactory(
-            describing_opinion=cls.o3,
-            described_opinion=cls.o3,
-            group=None,
-            text="Necessary drug realize matter provide different.",
-            score=0.1578,
-        )
-
-        cls.p4 = ParentheticalFactory(
-            describing_opinion=cls.o3,
-            described_opinion=cls.o3,
-            group=None,
-            text="Necessary realize matter to provide further.",
-            score=0.1478,
-        )
-
-        cls.pg = ParentheticalGroupFactory(
-            opinion=cls.o, representative=cls.p, score=0.3236, size=1
-        )
-        cls.pg2 = ParentheticalGroupFactory(
-            opinion=cls.o2, representative=cls.p2, score=0.318, size=1
-        )
-        cls.pg3 = ParentheticalGroupFactory(
-            opinion=cls.o3, representative=cls.p3, score=0.1578, size=1
-        )
-        cls.pg4 = ParentheticalGroupFactory(
-            opinion=cls.o3, representative=cls.p4, score=0.1678, size=1
-        )
-
-        # Set parenthetical group
-        cls.p.group = cls.pg
-        cls.p.save()
-        cls.p2.group = cls.pg2
-        cls.p2.save()
-        cls.p3.group = cls.pg3
-        cls.p3.save()
-        cls.p4.group = cls.pg4
-        cls.p4.save()
-        cls.rebuild_index()
-
-    # Notes:
-    # "term" Returns documents that contain an exact term in a provided field.
-    # "match" Returns documents that match a provided text, number, date or boolean
-    # value. The provided text is analyzed before matching.
-
-    def test_filter_search(self) -> None:
-        """Test filtering and search at the same time"""
-
-        filters = []
-        filters.append(Q("match", representative_text="different"))
-        s1 = ParentheticalGroupDocument.search().filter(
-            reduce(operator.iand, filters)
-        )
-        self.assertEqual(s1.count(), 2)
-
-        filters.append(Q("match", opinion_extracted_by_ocr=False))
-        s2 = ParentheticalGroupDocument.search().filter(
-            reduce(operator.iand, filters)
-        )
-        self.assertEqual(s2.count(), 1)
-
-    def test_filter_daterange(self) -> None:
-        """Test filter by date range"""
-        filters = []
-        date_gte = "1976-08-30T00:00:00Z"
-        date_lte = "1978-03-10T23:59:59Z"
-
-        filters.append(
-            Q(
-                "range",
-                dateFiled={
-                    "gte": date_gte,
-                    "lte": date_lte,
-                },
-            )
-        )
-
-        s1 = ParentheticalGroupDocument.search().filter(
-            reduce(operator.iand, filters)
-        )
-
-        self.assertEqual(s1.count(), 2)
-
-    def test_filter_search_2(self) -> None:
-        """Test filtering date range and search at the same time"""
-        filters = []
-        date_gte = "1976-08-30T00:00:00Z"
-        date_lte = "1978-03-10T23:59:59Z"
-
-        filters.append(Q("match", representative_text="different"))
-        filters.append(
-            Q(
-                "range",
-                dateFiled={
-                    "gte": date_gte,
-                    "lte": date_lte,
-                },
-            )
-        )
-
-        s = ParentheticalGroupDocument.search().filter(
-            reduce(operator.iand, filters)
-        )
-        self.assertEqual(s.count(), 1)
-
-    def test_ordering(self) -> None:
-        """Test filter and then ordering by descending
-        dateFiled"""
-        filters = []
-        date_gte = "1976-08-30T00:00:00Z"
-        date_lte = "1978-03-10T23:59:59Z"
-
-        filters.append(
-            Q(
-                "range",
-                dateFiled={
-                    "gte": date_gte,
-                    "lte": date_lte,
-                },
-            )
-        )
-
-        s = (
-            ParentheticalGroupDocument.search()
-            .filter(reduce(operator.iand, filters))
-            .sort("-dateFiled")
-        )
-        s1 = s.sort("-dateFiled")
-        self.assertEqual(s1.count(), 2)
-        self.assertEqual(
-            s1.execute()[0].dateFiled,
-            datetime.datetime(1978, 3, 10, 0, 0),
-        )
-        s2 = s.sort("dateFiled")
-        self.assertEqual(
-            s2.execute()[0].dateFiled,
-            datetime.datetime(1976, 8, 30, 0, 0),
-        )
-
-    @staticmethod
-    def get_article_count(r):
-        """Get the article count in a query response"""
-        return len(html.fromstring(r.content.decode()).xpath("//article"))
-
-    def test_build_daterange_query(self) -> None:
-        """Test build es daterange query"""
-        filters = []
-        date_gte = datetime.datetime(1976, 8, 30, 0, 0).date()
-        date_lte = datetime.datetime(1978, 3, 10, 0, 0).date()
-
-        q1 = build_daterange_query("dateFiled", date_lte, date_gte)
-        filters.extend(q1)
-
-        s = ParentheticalGroupDocument.search().filter(
-            reduce(operator.iand, filters)
-        )
-        self.assertEqual(s.count(), 2)
-
-    def test_build_fulltext_query(self) -> None:
-        """Test build es fulltext query"""
-
-        q1 = build_fulltext_query("representative_text", "responsibility")
-        s = ParentheticalGroupDocument.search().filter(q1)
-        self.assertEqual(s.count(), 1)
-
-    def test_build_terms_query(self) -> None:
-        """Test build es terms query"""
-        filters = []
-        q = build_terms_query(
-            "court_id",
-            [self.c1.pk, self.c2.pk],
-        )
-        filters.extend(q)
-        s = ParentheticalGroupDocument.search().filter(
-            reduce(operator.iand, filters)
-        )
-        self.assertEqual(s.count(), 2)
-
-    def test_cd_query(self) -> None:
-        """Test build es query with cleaned data"""
-
-        cd = {
-            "filed_after": datetime.datetime(1976, 8, 30, 0, 0).date(),
-            "filed_before": datetime.datetime(1978, 3, 10, 0, 0).date(),
-            "q": "responsibility",
-            "type": "pa",
-        }
-        search_query = ParentheticalGroupDocument.search()
-        s, total_query_results, top_hits_limit = build_es_main_query(
-            search_query, cd
-        )
-        self.assertEqual(s.count(), 1)
-
-    def test_cd_query_2(self) -> None:
-        """Test build es query with cleaned data"""
-        cd = {"filed_after": "", "filed_before": "", "q": ""}
-
-        filters = build_es_filters(cd)
-
-        if not filters:
-            # Return all results
-            s = ParentheticalGroupDocument.search().query("match_all")
-            self.assertEqual(s.count(), 4)
-
-    def test_docker_number_filter(self) -> None:
-        """Test filter by docker_number"""
-        filters = []
-
-        filters.append(Q("term", docketNumber="1:98-cr-35856"))
-
-        s = ParentheticalGroupDocument.search().filter(
-            reduce(operator.iand, filters)
-        )
-        self.assertEqual(s.count(), 1)
-
-    def test_build_sort(self) -> None:
-        """Test we can build sort dict and sort ES query"""
-        cd = {"order_by": "dateFiled desc"}
-        ordering = build_sort_results(cd)
-        s = (
-            ParentheticalGroupDocument.search()
-            .query("match_all")
-            .sort(ordering)
-        )
-        self.assertEqual(s.count(), 4)
-        self.assertEqual(
-            s.execute()[0].dateFiled,
-            datetime.datetime(1981, 7, 11, 0, 0),
-        )
-
-        cd = {"order_by": "dateFiled asc"}
-        ordering = build_sort_results(cd)
-        s = (
-            ParentheticalGroupDocument.search()
-            .query("match_all")
-            .sort(ordering)
-        )
-        self.assertEqual(
-            s.execute()[0].dateFiled,
-            datetime.datetime(1976, 8, 30, 0, 0),
-        )
-
-        cd = {"order_by": "score desc"}
-        ordering = build_sort_results(cd)
-        s = (
-            ParentheticalGroupDocument.search()
-            .query("match_all")
-            .sort(ordering)
-        )
-        self.assertEqual(
-            s.execute()[0].dateFiled,
-            datetime.datetime(1978, 3, 10, 0, 0),
-        )
-
-    def test_group_results(self) -> None:
-        """Test retrieve results grouped by group_id"""
-
-        cd = {"type": "pa", "q": ""}
-        q1 = build_fulltext_query("representative_text", "Necessary")
-        s = ParentheticalGroupDocument.search().query(q1)
-        # Group results.
-        group_search_results(s, cd, {"score": {"order": "desc"}})
-        hits = s.execute()
-        groups = hits.aggregations.groups.buckets
-
-        # Compare groups and hits content.
-        self.assertEqual(len(groups), 2)
-        self.assertEqual(
-            len(groups[0].grouped_by_opinion_cluster_id.hits.hits), 2
-        )
-        self.assertEqual(
-            len(groups[1].grouped_by_opinion_cluster_id.hits.hits), 1
-        )
-
-        group_1_hits = groups[0].grouped_by_opinion_cluster_id.hits.hits
-        self.assertEqual(group_1_hits[0]._source.score, 0.1578)
-        self.assertEqual(group_1_hits[1]._source.score, 0.1678)
-
-    def test_index_advanced_search_fields(self) -> None:
-        """Test confirm advanced search fields are indexed."""
-
-        filters = []
-        filters.append(Q("term", docketNumber="1:98-cr-35856"))
-        s = ParentheticalGroupDocument.search().filter(
-            reduce(operator.iand, filters)
-        )
-        results = s.execute()
-
-        # Check advanced search fields are indexed and confirm their data types
-        self.assertEqual(len(results), 1)
-        self.assertEqual(type(results[0].author_id), int)
-        self.assertEqual(type(results[0].caseName), str)
-        self.assertEqual(results[0].citeCount, 0)
-        self.assertIsNotNone(results[0].citation)
-        self.assertEqual(type(results[0].citation[0]), str)
-        self.assertEqual(type(results[0].cites[0]), int)
-        self.assertEqual(type(results[0].court_id), str)
-        self.assertEqual(type(results[0].dateArgued), datetime.datetime)
-        self.assertEqual(type(results[0].dateFiled), datetime.datetime)
-        self.assertEqual(type(results[0].dateReargued), datetime.datetime)
-        self.assertEqual(
-            type(results[0].dateReargumentDenied), datetime.datetime
-        )
-        self.assertEqual(type(results[0].docket_id), int)
-        self.assertEqual(type(results[0].docketNumber), str)
-        self.assertEqual(type(results[0].joined_by_ids[0]), int)
-        self.assertEqual(type(results[0].judge), str)
-        self.assertEqual(type(results[0].lexisCite), str)
-        self.assertEqual(type(results[0].neutralCite), str)
-        self.assertEqual(type(results[0].panel_ids[0]), int)
-        self.assertEqual(type(results[0].scdb_id), str)
-        self.assertEqual(type(results[0].status), str)
-        self.assertEqual(type(results[0].suitNature), str)
-
-    def test_pa_search_form_search_and_filtering(self) -> None:
-        """Test Parenthetical search directly from the form."""
-        r = self.client.get(
-            reverse("show_results"),
-            {
-                "q": "Necessary",
-                "type": SEARCH_TYPES.PARENTHETICAL,
-            },
-        )
-        actual = self.get_article_count(r)
-        expected = 2
-        self.assertEqual(
-            actual,
-            expected,
-            msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
-        )
-
-        r = self.client.get(
-            reverse("show_results"),
-            {
-                "q": "",
-                "docket_number": "1:98-cr-35856",
-                "type": SEARCH_TYPES.PARENTHETICAL,
-            },
-        )
-        actual = self.get_article_count(r)
-        expected = 1
-        self.assertEqual(
-            actual,
-            expected,
-            msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
-        )
-        r = self.client.get(
-            reverse("show_results"),
-            {
-                "q": "",
-                "filed_after": "1978/02/10",
-                "type": SEARCH_TYPES.PARENTHETICAL,
-            },
-        )
-        actual = self.get_article_count(r)
-        expected = 2
-        self.assertEqual(
-            actual,
-            expected,
-            msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
-        )
-        r = self.client.get(
-            reverse("show_results"),
-            {
-                "q": "",
-                "order_by": "dateFiled asc",
-                "type": SEARCH_TYPES.PARENTHETICAL,
-            },
-        )
-        actual = self.get_article_count(r)
-        expected = 3
-        self.assertEqual(
-            actual,
-            expected,
-            msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
-        )
-        self.assertTrue(
-            r.content.decode().index("Riley")
-            < r.content.decode().index("Peck")
-            < r.content.decode().index("Smith"),
-            msg="'Riley' should come before 'Peck' and before 'Smith' when order_by asc.",
-        )
 
 
 class DocketEntriesTimezone(TestCase):
