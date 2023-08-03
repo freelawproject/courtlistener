@@ -13,7 +13,7 @@ from django_ratelimit.exceptions import Ratelimited
 from redis import ConnectionError
 
 
-def strip_port_to_make_ip_key(group: str, request: HttpRequest) -> str:
+def get_user_ip_from_cloudfront_headers(request: HttpRequest) -> str:
     """Make a good key to use for caching the request's IP
 
     CloudFront provides a header that returns the user's IP and port. Weirdly,
@@ -28,12 +28,21 @@ def strip_port_to_make_ip_key(group: str, request: HttpRequest) -> str:
 
         96.23.39.106
 
-    :param group: Unused: The group key from the ratelimiter
     :param request: The HTTP request from the user
     :return: A simple key that can be used to throttle the user if needed.
     """
     header = get_header(request, "CloudFront-Viewer-Address")
     return header.split(":")[0]
+
+
+def get_ip_for_ratelimiter(group: str, request: HttpRequest) -> str:
+    """A wrapper to get the IP in a ratelimiter
+
+    :param group: Unused: The group key from the ratelimiter
+    :param request: The HTTP request from the user
+    :return: A simple key that can be used to throttle the user if needed.
+    """
+    return get_user_ip_from_cloudfront_headers(request)
 
 
 def get_path_to_make_key(group: str, request: HttpRequest) -> str:
@@ -48,7 +57,7 @@ def get_path_to_make_key(group: str, request: HttpRequest) -> str:
 
 
 ratelimiter_all_250_per_h = ratelimit(
-    key=strip_port_to_make_ip_key,
+    key=get_ip_for_ratelimiter,
     rate="250/h",
 )
 # Decorators can't easily be mocked, and we need to not trigger this decorator
@@ -61,16 +70,16 @@ if "test" in sys.argv:
     ratelimiter_unsafe_2000_per_h = lambda func: func
 else:
     ratelimiter_all_2_per_m = ratelimit(
-        key=strip_port_to_make_ip_key,
+        key=get_ip_for_ratelimiter,
         rate="2/m",
     )
     ratelimiter_unsafe_3_per_m = ratelimit(
-        key=strip_port_to_make_ip_key,
+        key=get_ip_for_ratelimiter,
         rate="3/m",
         method=UNSAFE,
     )
     ratelimiter_unsafe_10_per_m = ratelimit(
-        key=strip_port_to_make_ip_key,
+        key=get_ip_for_ratelimiter,
         rate="10/m",
         method=UNSAFE,
     )
@@ -158,7 +167,7 @@ def is_allowlisted(request: HttpRequest) -> bool:
     cache_name = getattr(settings, "RATELIMIT_USE_CACHE", "default")
     cache = caches[cache_name]
     allowlist_cache_prefix = "rl:allowlist"
-    ip_address = request.META.get("REMOTE_ADDR")
+    ip_address = get_user_ip_from_cloudfront_headers(request)
     if ip_address is None:
         return False
 
