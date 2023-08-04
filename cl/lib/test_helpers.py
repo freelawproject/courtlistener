@@ -215,12 +215,16 @@ class AudioESTestCase(SimpleTestCase):
     @classmethod
     def setUpTestData(cls):
         cls.court_1 = CourtFactory(
-            id="cabc", full_name="Testing Supreme Court", jurisdiction="FB"
+            id="cabc",
+            full_name="Testing Supreme Court",
+            jurisdiction="FB",
+            citation_string="Bankr. C.D. Cal.",
         )
         cls.court_2 = CourtFactory(
             id="nyed",
             full_name="Court of Appeals for the First Circuit",
             jurisdiction="FB",
+            citation_string="Bankr. C.D. Cal.",
         )
         cls.docket_1 = DocketFactory.create(
             docket_number="19-5733",
@@ -237,39 +241,55 @@ class AudioESTestCase(SimpleTestCase):
             court_id=cls.court_2.pk,
             date_argued=datetime.date(2015, 8, 14),
         )
+        cls.docket_4 = DocketFactory.create(
+            docket_number="19-5736",
+            court_id=cls.court_1.pk,
+            date_argued=datetime.date(2013, 8, 14),
+        )
         cls.audio_1 = AudioFactory.create(
-            case_name="SEC v. Frank J. Custable, Jr.",
+            case_name="SEC v. Frank J. Custable, WikiLeaks",
             docket_id=cls.docket_1.pk,
             duration=420,
-            judges="",
+            judges="Administrative procedures act",
             local_path_original_file="test/audio/ander_v._leo.mp3",
             local_path_mp3="test/audio/2.mp3",
             source="C",
             blocked=False,
+            sha1="a49ada009774496ac01fb49818837e2296705c97",
         )
         cls.audio_2 = AudioFactory.create(
             case_name="Jose A. Dominguez v. Loretta E. Lynch",
             docket_id=cls.docket_2.pk,
             duration=837,
-            judges="",
+            judges="Wallace and Friedland",
             local_path_original_file="mp3/2014/06/09/ander_v._leo.mp3",
             local_path_mp3="test/audio/2.mp3",
             source="C",
+            sha1="a49ada009774496ac01fb49818837e2296705c92",
         )
         cls.audio_3 = AudioFactory.create(
             case_name="Hong Liu Yang v. Lynch-Loretta E.",
             docket_id=cls.docket_3.pk,
             duration=653,
-            judges="",
+            judges="H Administrative magazine",
             local_path_original_file="mp3/2015/07/08/hong_liu_yang_v._loretta_e._lynch.mp3",
             local_path_mp3="test/audio/2.mp3",
             source="CR",
+            sha1="a49ada009774496ac01fb49818837e2296705c93",
         )
         cls.author = PersonFactory.create()
         cls.audio_4 = AudioFactory.create(
             case_name="Hong Liu Lorem v. Lynch-Loretta E.",
             docket_id=cls.docket_3.pk,
             duration=653,
-            judges="John Smith",
+            judges="John Smith ptsd mag",
+            sha1="a49ada009774496ac01fb49818837e2296705c94",
         )
         cls.audio_4.panel.add(cls.author)
+        cls.audio_5 = AudioFactory.create(
+            case_name="Freedom of Information Wikileaks",
+            docket_id=cls.docket_4.pk,
+            duration=400,
+            judges="Wallace to Friedland ⚖️ xx-xxxx apa magistrate",
+            sha1="a49ada009774496ac01fb49818837e2296705c95",
+        )

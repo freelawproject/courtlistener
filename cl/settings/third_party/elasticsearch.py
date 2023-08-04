@@ -37,6 +37,58 @@ ELASTICSEARCH_DSL = {
         "verify_certs": False,
         "ca_certs": ELASTICSEARCH_CA_CERT,
     },
+    "analysis": {
+        "analyzer": {
+            "text_en_splitting_cl": {
+                "type": "custom",
+                "tokenizer": "whitespace",
+                "filter": [
+                    "lowercase",
+                    "custom_word_delimiter_filter",
+                    "remove_leading_zeros",
+                    "english_stop",
+                    "english_stemmer",
+                    "remove_duplicates",
+                ],
+            },
+            "search_analyzer": {
+                "type": "custom",
+                "tokenizer": "whitespace",
+                "filter": [
+                    "lowercase",
+                    "synonym_filter",
+                    "custom_word_delimiter_filter",
+                    "remove_leading_zeros",
+                    "english_stop",
+                    "english_stemmer",
+                    "remove_duplicates",
+                ],
+            },
+        },
+        "filter": {
+            "custom_word_delimiter_filter": {
+                "type": "word_delimiter",
+                "split_on_numerics": False,
+                "preserve_original": True,
+            },
+            "synonym_filter": {
+                "type": "synonym_graph",
+                "expand": True,
+                "synonyms_path": "synonyms_en.txt",
+            },
+            "english_stemmer": {"type": "stemmer", "language": "english"},
+            "english_stop": {
+                "type": "stop",
+                "stopwords_path": "stopwords_en.txt",
+            },
+            "remove_duplicates": {"type": "unique"},
+            "remove_leading_zeros": {
+                "type": "pattern_replace",
+                "pattern": "^0*",
+                "replacement": "",
+            },
+        },
+    },
 }
 
 #

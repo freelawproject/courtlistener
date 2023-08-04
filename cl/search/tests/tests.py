@@ -2459,9 +2459,9 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         expected = 2
         self.assertEqual(actual, expected)
         self.assertTrue(
-            r.content.decode().index("Yang")
-            < r.content.decode().index("Lorem"),
-            msg="'Yang' should come BEFORE 'Lorem' when order_by relevance.",
+            r.content.decode().index("Lorem")
+            < r.content.decode().index("Yang"),
+            msg="'Lorem' should come BEFORE 'Yang' when order_by relevance.",
         )
         # API
         r = self.client.get(
@@ -2471,9 +2471,9 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         actual = self.get_results_count(r)
         self.assertEqual(actual, expected)
         self.assertTrue(
-            r.content.decode().index("Yang")
-            < r.content.decode().index("Lorem"),
-            msg="'Yang' should come BEFORE 'Lorem' when order_by relevance.",
+            r.content.decode().index("Lorem")
+            < r.content.decode().index("Yang"),
+            msg="'Lorem' should come BEFORE 'Yang' when order_by relevance.",
         )
 
         # Text query combine case name and docket name.
@@ -2592,7 +2592,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
-        self.assertIn("<mark>19-5734", r.content.decode())
+        self.assertIn("<mark>19", r.content.decode())
         self.assertEqual(r.content.decode().count("<mark>19"), 2)
 
         # Judge highlights
@@ -2609,6 +2609,21 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         self.assertEqual(actual, expected)
         self.assertIn("<mark>John</mark>", r.content.decode())
         self.assertEqual(r.content.decode().count("<mark>John</mark>"), 2)
+
+        # Court citation string highlights
+        r = self.client.get(
+            reverse("show_results"),
+            {
+                "q": "Freedom of Information Wikileaks (Bankr. C.D. Cal. 2013)",
+                "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                "order_by": "score desc",
+            },
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("<mark>Bankr.</mark>", r.content.decode())
+        self.assertEqual(r.content.decode().count("<mark>Bankr.</mark>"), 2)
 
     def test_oa_case_name_filtering(self) -> None:
         """Filter by case_name"""
@@ -2641,6 +2656,41 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             msg="Did not get expected number of results when filtering by "
             "case name. Expected %s, but got %s." % (expected, actual),
         )
+
+    def test_oa_docket_number_filtering(self) -> None:
+        """Filter by docket number"""
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "docket_number": f"{self.audio_1.docket.docket_number}",
+        }
+        # Frontend
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(
+            actual,
+            expected,
+            msg="Did not get expected number of results when filtering by "
+            "docket number. Expected %s, but got %s." % (expected, actual),
+        )
+        self.assertIn("SEC", r.content.decode())
+
+        # API
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v3"}),
+            search_params,
+        )
+        actual = self.get_results_count(r)
+        self.assertEqual(
+            actual,
+            expected,
+            msg="Did not get expected number of results when filtering by "
+            "docket number. Expected %s, but got %s." % (expected, actual),
+        )
+        self.assertIn("SEC", r.content.decode())
 
     def test_oa_jurisdiction_filtering(self) -> None:
         """Filter by court"""
@@ -2696,10 +2746,10 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             actual,
             expected,
             msg="Did not get expected number of results when filtering by "
-            "jurisdiction. Expected %s, but got %s." % (actual, expected),
+            "argued_after. Expected %s, but got %s." % (actual, expected),
         )
         self.assertIn(
-            "SEC v. Frank J. Custable, Jr.",
+            "SEC v. Frank J. Custable, WikiLeaks",
             r.content.decode(),
             msg="Did not get the expected oral argument.",
         )
@@ -2713,10 +2763,10 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             actual,
             expected,
             msg="Did not get expected number of results when filtering by "
-            "jurisdiction. Expected %s, but got %s." % (actual, expected),
+            "argued_after. Expected %s, but got %s." % (actual, expected),
         )
         self.assertIn(
-            "SEC v. Frank J. Custable, Jr.",
+            "SEC v. Frank J. Custable, WikiLeaks",
             r.content.decode(),
             msg="Did not get the expected oral argument.",
         )
@@ -3065,12 +3115,14 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
 
     def test_last_oral_arguments_home_page(self) -> None:
         """Test last oral arguments in home page"""
-        cache.delete("homepage-data-oa")
+        cache.delete("homepage-data-oa-es")
         r = self.client.get(
             reverse("show_results"),
         )
         self.assertIn("Latest Oral Arguments", r.content.decode())
-        self.assertIn("SEC v. Frank J. Custable, Jr.", r.content.decode())
+        self.assertIn(
+            "SEC v. Frank J. Custable, WikiLeaks", r.content.decode()
+        )
         self.assertIn(
             "Jose A. Dominguez v. Loretta E. Lynch", r.content.decode()
         )
@@ -3097,6 +3149,22 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             reverse("search-list", kwargs={"version": "v3"}), search_params
         )
         actual = self.get_results_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("Jose", r.content.decode())
+
+    def test_oa_search_by_no_exact_docket_number(self) -> None:
+        # Query a not exact docket number: 19-5734 -> 19 5734
+        # Frontend
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": f'docketNumber:"19 5734"',
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
         self.assertIn("Jose", r.content.decode())
@@ -3280,9 +3348,9 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             search_params,
         )
         actual = self.get_article_count(r)
-        expected = 4
+        expected = 5
         self.assertEqual(actual, expected)
-        self.assertIn("24", r.content.decode())
+        self.assertIn("25", r.content.decode())
         self.assertIn("2 of 2", r.content.decode())
 
         search_params = {
@@ -3295,7 +3363,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         actual = self.get_results_count(r)
         expected = 20
         self.assertEqual(actual, expected)
-        self.assertEqual(24, r.data["count"])
+        self.assertEqual(25, r.data["count"])
         self.assertIn("page=2", r.data["next"])
 
         # Test next page.
@@ -3307,11 +3375,255 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             reverse("search-list", kwargs={"version": "v3"}), search_params
         )
         actual = self.get_results_count(r)
-        expected = 4
+        expected = 5
         self.assertEqual(actual, expected)
-        self.assertEqual(24, r.data["count"])
+        self.assertEqual(25, r.data["count"])
         self.assertEqual(None, r.data["next"])
 
         # Remove Audio objects to avoid affecting other tests.
         for created_audio in created_audios:
             created_audio.delete()
+
+    def test_oa_synonym_search(self) -> None:
+        # Query using a synonym
+        # Frontend
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": f"Freedom of Info",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("Freedom", r.content.decode())
+        # API
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v3"}), search_params
+        )
+        actual = self.get_results_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("Freedom", r.content.decode())
+
+        # Top abbreviations in legal documents
+        # Single term posttraumatic
+        search_params["q"] = "posttraumatic stress disorder"
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("<mark>ptsd</mark>", r.content.decode())
+
+        # Split terms post traumatic
+        search_params["q"] = "post traumatic stress disorder"
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("<mark>ptsd</mark>", r.content.decode())
+
+        # Search acronym "apa"
+        search_params["q"] = "apa"
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 2
+        self.assertEqual(actual, expected)
+        self.assertIn("<mark>apa</mark>", r.content.decode())
+        self.assertIn("<mark>Administrative</mark>", r.content.decode())
+        self.assertIn("<mark>procedures</mark>", r.content.decode())
+        self.assertIn("<mark>act</mark>", r.content.decode())
+
+        # Search by "Administrative procedures act"
+        search_params["q"] = "Administrative procedures act"
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 2
+        self.assertEqual(actual, expected)
+        self.assertIn("<mark>apa</mark>", r.content.decode())
+        self.assertIn("<mark>Administrative</mark>", r.content.decode())
+        self.assertIn("<mark>procedures</mark>", r.content.decode())
+        self.assertIn("<mark>act</mark>", r.content.decode())
+
+        # Search by "Administrative" shouldn't return results for "apa" but for
+        # "Administrative" and "Administrative procedures act".
+        search_params["q"] = "Administrative"
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 2
+        self.assertEqual(actual, expected)
+        self.assertIn("Hong Liu Yang", r.content.decode())
+        self.assertIn("procedures act", r.content.decode())
+
+        # Single word one-way synonyms.
+        # mag => mag,magazine,magistrate
+        search_params["q"] = "mag"
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 3
+        self.assertEqual(actual, expected)
+        self.assertIn("<mark>mag</mark>", r.content.decode())
+        self.assertIn("<mark>magazine</mark>", r.content.decode())
+        self.assertIn("<mark>magistrate</mark>", r.content.decode())
+
+        # Searching "magazine" only returns results containing "magazine"
+        search_params["q"] = "magazine"
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        self.assertIn("<mark>magazine</mark>", r.content.decode())
+
+
+def test_oa_stopwords_search(self) -> None:
+    # Query using a stopword, indexed content doesn't contain the stop word
+    # Frontend
+    search_params = {
+        "type": SEARCH_TYPES.ORAL_ARGUMENT,
+        "q": f"judge:Wallace and Friedland",
+    }
+    r = self.client.get(
+        reverse("show_results"),
+        search_params,
+    )
+    actual = self.get_article_count(r)
+    expected = 1
+    self.assertEqual(actual, expected)
+    self.assertIn("Jose", r.content.decode())
+
+    search_params = {
+        "type": SEARCH_TYPES.ORAL_ARGUMENT,
+        "q": f"judge:Wallace to Friedland",
+    }
+    r = self.client.get(
+        reverse("show_results"),
+        search_params,
+    )
+    actual = self.get_article_count(r)
+    expected = 1
+    self.assertEqual(actual, expected)
+    self.assertIn("Freedom", r.content.decode())
+
+    # Special stopwords are not found.
+    search_params = {
+        "type": SEARCH_TYPES.ORAL_ARGUMENT,
+        "q": f"xx-xxxx",
+    }
+    r = self.client.get(
+        reverse("show_results"),
+        search_params,
+    )
+    actual = self.get_article_count(r)
+    expected = 0
+    self.assertEqual(actual, expected)
+
+
+def test_phrase_queries_with_stop_words(self) -> None:
+    # Do phrase queries with stop words return results properly?
+    # Frontend
+    search_params = {
+        "type": SEARCH_TYPES.ORAL_ARGUMENT,
+        "q": f'caseName:"Freedom of Information"',
+    }
+    r = self.client.get(
+        reverse("show_results"),
+        search_params,
+    )
+    actual = self.get_article_count(r)
+    expected = 1
+    self.assertEqual(actual, expected)
+    self.assertIn("Freedom", r.content.decode())
+    # API
+    r = self.client.get(
+        reverse("search-list", kwargs={"version": "v3"}), search_params
+    )
+    actual = self.get_results_count(r)
+    expected = 1
+    self.assertEqual(actual, expected)
+    self.assertIn("Freedom", r.content.decode())
+
+
+def test_character_case_queries(self) -> None:
+    # Do character case queries works properly?
+    # Queries like WikiLeaks and wikileaks or GraphQL and GraphqL, should
+    # return the same results in both cases.
+    # Frontend
+    search_params = {
+        "type": SEARCH_TYPES.ORAL_ARGUMENT,
+        "q": "WikiLeaks",
+    }
+    r = self.client.get(
+        reverse("show_results"),
+        search_params,
+    )
+    actual = self.get_article_count(r)
+    expected = 2
+    self.assertEqual(actual, expected)
+    self.assertIn("SEC", r.content.decode())
+    self.assertIn("Freedom", r.content.decode())
+
+    search_params = {
+        "type": SEARCH_TYPES.ORAL_ARGUMENT,
+        "q": "wikileaks",
+    }
+    r = self.client.get(
+        reverse("show_results"),
+        search_params,
+    )
+    actual = self.get_article_count(r)
+    expected = 2
+    self.assertEqual(actual, expected)
+    self.assertIn("SEC", r.content.decode())
+    self.assertIn("Freedom", r.content.decode())
+
+
+def test_emojis_searchable(self) -> None:
+    # Are emojis are searchable?
+    # Frontend
+    search_params = {
+        "type": SEARCH_TYPES.ORAL_ARGUMENT,
+        "q": "⚖️",
+    }
+    r = self.client.get(
+        reverse("show_results"),
+        search_params,
+    )
+    actual = self.get_article_count(r)
+    expected = 1
+    self.assertEqual(actual, expected)
+    self.assertIn("Wallace", r.content.decode())
+    # Is the emoji highlighted?
+    self.assertIn("<mark>⚖️</mark>", r.content.decode())
+    self.assertEqual(r.content.decode().count("<mark>⚖️</mark>"), 2)
+
+    # API
+    r = self.client.get(
+        reverse("search-list", kwargs={"version": "v3"}), search_params
+    )
+    actual = self.get_results_count(r)
+    expected = 1
+    self.assertEqual(actual, expected)
+    self.assertIn("Wallace", r.content.decode())

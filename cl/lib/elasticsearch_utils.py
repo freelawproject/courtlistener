@@ -93,7 +93,11 @@ def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
     return []
 
 
-def build_term_query(field: str, value: str | list) -> list:
+def build_term_query(
+    field: str,
+    value: str | list,
+    make_phrase: bool = False,
+) -> list:
     """Given field name and value or list of values, return Elasticsearch term
     or terms query or [].
     "term" Returns documents that contain an exact term in a provided field
@@ -102,8 +106,14 @@ def build_term_query(field: str, value: str | list) -> list:
 
     :param field: elasticsearch index fieldname
     :param value: term or terms to find
+    :param make_phrase: Whether we should make a match_phrase query for
+    TextField filtering.
     :return: Empty list or list with DSL Match query
     """
+
+    if value and make_phrase:
+        return [Q("match_phrase", **{field: f"{value}"})]
+
     if value and isinstance(value, list):
         value = list(filter(None, value))
         return [Q("terms", **{field: value})]
@@ -204,6 +214,7 @@ def build_es_filters(cd: CleanData) -> List:
             build_term_query(
                 "docketNumber",
                 cd.get("docket_number", ""),
+                make_phrase=True,
             )
         )
     if cd["type"] == SEARCH_TYPES.PARENTHETICAL:
@@ -451,19 +462,6 @@ def merge_courts_from_db(results: Page, search_type: str) -> None:
             for hit in top_hits:
                 court_id = hit["_source"]["court_id"]
                 hit["_source"]["citation_string"] = courts_dict.get(court_id)
-
-    if search_type == SEARCH_TYPES.ORAL_ARGUMENT:
-        court_ids = [d["court_id"] for d in results]
-        courts_in_page = Court.objects.filter(pk__in=court_ids).only(
-            "pk", "citation_string"
-        )
-        courts_dict = {}
-        for court in courts_in_page:
-            courts_dict[court.pk] = court.citation_string
-
-        for result in results.object_list:
-            court_id = result["court_id"]
-            result["citation_string"] = courts_dict.get(court_id)
 
 
 def fetch_es_results(

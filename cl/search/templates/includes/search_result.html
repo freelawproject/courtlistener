@@ -37,7 +37,7 @@
       <a href="{% url 'view_audio_file' result.id result.docket_slug %}?{{ request.META.QUERY_STRING }}"
          class="visitable">
       {{ result.caseName|safe  }}
-      ({% if result.court_id != 'scotus' %}{{ result.citation_string|nbsp|safe }}&nbsp;{% endif %}{{ result.dateArgued|date:"Y" }})
+      ({% if result.court_id != 'scotus' %}{{ result.court_citation_string|safe|nbsp }}&nbsp;{% endif %}{{ result.dateArgued|date:"Y" }})
       </a>
     {% endif %}
   </h3>
