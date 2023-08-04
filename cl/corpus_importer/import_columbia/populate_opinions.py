@@ -237,13 +237,10 @@ OPINION_TYPE_MAPPING = {
 }
 
 
-def convert_columbia_html(text: str, opinion_index: int) -> str:
+def convert_columbia_html(text):
     """Convert xml tags to html tags
     :param text: Text to convert to html
-    :param opinion_index: opinion index from a list of all opinions
-    :return: converted text
     """
-
     conversions = [
         ("italic", "em"),
         ("block_quote", "blockquote"),
@@ -259,6 +256,28 @@ def convert_columbia_html(text: str, opinion_index: int) -> str:
     for pattern, replacement in conversions:
         text = re.sub(f"<{pattern}>", f"<{replacement}>", text)
         text = re.sub(f"</{pattern}>", f"</{replacement}>", text)
+
+    # Make nice paragraphs. This replaces double newlines with paragraphs, then
+    # nests paragraphs inside blockquotes, rather than vice versa. The former
+    # looks good. The latter is bad.
+    text = f"<p>{text}</p>"
+    text = re.sub(r"</blockquote>\s*<blockquote>", "\n\n", text)
+    text = re.sub("\n\n", "</p>\n<p>", text)
+    text = re.sub(r"<p>\s*<blockquote>", "<blockquote><p>", text, re.M)
+    text = re.sub("</blockquote></p>", "</p></blockquote>", text, re.M)
+
+    return text
+
+
+def convert_columbia_opinion(text: str, opinion_index: int) -> str:
+    """Convert xml tags to html tags and process additional data from opinions
+    like footnotes,
+    :param text: Text to convert to html
+    :param opinion_index: opinion index from a list of all opinions
+    :return: converted text
+    """
+
+    text = convert_columbia_html(text)
 
     # grayed-out page numbers
     text = re.sub("<page_number>", ' <span class="star-pagination">*', text)
@@ -307,15 +326,6 @@ def convert_columbia_html(text: str, opinion_index: int) -> str:
                 )
             )
             text = text.replace(ref, rep)
-
-    # Make nice paragraphs. This replaces double newlines with paragraphs, then
-    # nests paragraphs inside blockquotes, rather than vice versa. The former
-    # looks good. The latter is bad.
-    text = f"<p>{text}</p>"
-    text = re.sub(r"</blockquote>\s*<blockquote>", "\n\n", text)
-    text = re.sub("\n\n", "</p>\n<p>", text)
-    text = re.sub(r"<p>\s*<blockquote>", "<blockquote><p>", text, re.M)
-    text = re.sub("</blockquote></p>", "</p></blockquote>", text, re.M)
 
     return text
 
@@ -505,6 +515,7 @@ def add_new_case(
         source=SOURCES.COLUMBIA_ARCHIVE,
         attorneys=item["attorneys"] or "",
         posture=item["posture"] or "",
+        syllabus=convert_columbia_html(item["syllabus"]) or "",
     )
     panel = lookup_judges_by_last_name_list(
         item["panel"], item["court_id"], panel_date
@@ -527,7 +538,7 @@ def add_new_case(
                 f'<div class="footnotes">{opinion_info["footnotes"]}</div>'
             )
 
-        converted_text = convert_columbia_html(
+        converted_text = convert_columbia_opinion(
             opinion_info["opinion"] + footnotes, opinion_index
         )
         opinion_type = OPINION_TYPE_MAPPING[opinion_info["type"]]

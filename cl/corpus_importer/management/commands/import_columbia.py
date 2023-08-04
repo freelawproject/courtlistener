@@ -153,7 +153,9 @@ def get_text(xml_filepath: str) -> dict:
     order = 0
     # Store texts without a byline
     floating_texts = []
+    extra_text = []
     for opinion_index, op in enumerate(find_opinions, start=1):
+        opinion_type = op.name.replace("_text", "")
         # Find author before opinion text tag
         opinion_author = ""
         byline = op.find_previous_sibling()
@@ -161,14 +163,24 @@ def get_text(xml_filepath: str) -> dict:
         if byline and "_byline" in byline.name:
             opinion_author = byline.get_text()
         else:
-            floating_texts.append(op.decode_contents())
+            floating_texts.append((op.decode_contents(), opinion_type))
 
             if len(find_opinions) == opinion_index and floating_texts:
                 # If is the last opinion, and we still have opinions without
-                # byline
-                logger.info(
-                    f"Could not store a part of the information from {xml_filepath}"
-                )
+                # byline, create an opinion without an author and the contents
+                # that couldn't be merged
+
+                new_opinion = {
+                    "byline": None,
+                    "type": op.name.replace("_text", ""),
+                    "opinion": "\n".join([f[0] for f in floating_texts]),
+                    "order": order,
+                    "raw_footnotes": "",
+                }
+
+                opinions.append(new_opinion)
+                floating_texts = []
+
             else:
                 continue
 
@@ -180,22 +192,48 @@ def get_text(xml_filepath: str) -> dict:
             raw_footnotes.append(str(footnote))
             footnote = footnote.find_next_sibling()
 
-        opinion_type = op.name.replace("_text", "")
+        floating_texts = [f for f in floating_texts if type(f) == tuple]
 
         if opinion_author:
             # If we have an opinion author then proceed to store the opinion
+            # Merge only contents from the same type (opinion with opinion,
+            # dissent with dissent, etc.)
             new_opinion = {
                 "byline": opinion_author,
                 "type": opinion_type,
-                "raw_opinion": op,
-                "opinion": "".join(floating_texts) + op.decode_contents(),
+                "opinion": "\n".join(
+                    [f[0] for f in floating_texts if f[1] == opinion_type]
+                )
+                + op.decode_contents(),
                 "order": order,
                 "raw_footnotes": raw_footnotes,
             }
 
             opinions.append(new_opinion)
             order = order + 1
-            floating_texts = []
+
+            # Keep floating text that are not from the same type, we need to
+            # create a separate opinion for those, for example: in
+            # 2713f39c5a8e8684.xml we have an opinion without an author,
+            # and the next opinion with an author is a dissent opinion,
+            # we can't combine both
+
+            floating_texts = [
+                f for f in floating_texts if f[1] != opinion_type
+            ]
+
+            if floating_texts:
+                new_opinion = {
+                    "byline": None,
+                    "type": floating_texts[0][1],
+                    "opinion": "\n".join([f[0] for f in floating_texts]),
+                    "order": order,
+                    "raw_footnotes": "",
+                }
+
+                opinions.append(new_opinion)
+                order = order + 1
+                floating_texts = []
 
     SIMPLE_TAGS = [
         "attorneys",
@@ -208,7 +246,6 @@ def get_text(xml_filepath: str) -> dict:
         "panel",
         "posture",
         "reporter_caption",
-        "syllabus",
     ]
 
     for tag in SIMPLE_TAGS:
@@ -222,10 +259,9 @@ def get_text(xml_filepath: str) -> dict:
                 for r in extra_tags_to_remove:
                     if r.next_sibling:
                         if type(r.next_sibling) == NavigableString:
-                            # raw string
+                            # The element is not tagged, it is just a text
+                            # string
                             r.next_sibling.extract()
-                        else:
-                            print(">>> Not navigable string", r.next_sibling)
                     r.extract()
 
         # We use space as a separator to add a space when we have one tag
@@ -239,6 +275,11 @@ def get_text(xml_filepath: str) -> dict:
             # Sometimes we have multiple citation tags with same citation,
             # we need to remove duplicates (e.g. ebbde4042b7a019c.xml)
             data[tag] = list(set(data[tag]))
+
+    # Get syllabus from file
+    data["syllabus"] = "\n".join(
+        [s.decode_contents() for s in soup.findAll("syllabus")]
+    )
 
     # Add opinions to dict
     data["opinions"] = opinions
@@ -256,6 +297,7 @@ def parse_file(file_path: str) -> dict:
     raw_info = get_text(file_path)
     info = {
         "unpublished": raw_info["unpublished"],
+        "syllabus": raw_info["syllabus"],
         "file": os.path.splitext(os.path.basename(file_path))[0],
         "docket": "".join(raw_info.get("docket", [])) or None,
         "citations": raw_info.get("citation", []),
