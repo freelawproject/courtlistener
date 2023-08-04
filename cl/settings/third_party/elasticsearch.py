@@ -53,4 +53,6 @@ ELASTICSEARCH_NUMBER_OF_REPLICAS = env(
 # refresh (every ~1 second) since it's a resource-intensive operation.
 # This setting is overridden for testing.
 # https://www.elastic.co/guide/en/elasticsearch/reference/current/indices-refresh.html#refresh-api-desc
-ELASTICSEARCH_DSL_AUTO_REFRESH = False
+ELASTICSEARCH_DSL_AUTO_REFRESH = env(
+    "ELASTICSEARCH_DSL_AUTO_REFRESH", default=True
+)
