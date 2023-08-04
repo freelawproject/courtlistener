@@ -1,3 +1,4 @@
+import waffle
 from rest_framework import pagination, permissions, response, status, viewsets
 
 from cl.api.utils import CacheListMixin, LoggingMixin, RECAPUsersReadOnly
@@ -11,9 +12,11 @@ from cl.search.api_serializers import (
     OpinionSerializer,
     OriginalCourtInformationSerializer,
     RECAPDocumentSerializer,
+    SearchESResultSerializer,
     SearchResultSerializer,
     TagSerializer,
 )
+from cl.search.documents import AudioDocument
 from cl.search.filters import (
     CourtFilter,
     DocketEntryFilter,
@@ -25,6 +28,7 @@ from cl.search.filters import (
 )
 from cl.search.forms import SearchForm
 from cl.search.models import (
+    SEARCH_TYPES,
     Court,
     Docket,
     DocketEntry,
@@ -172,15 +176,28 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
             if cd["q"] == "":
                 cd["q"] = "*"  # Get everything
 
+            search_type = cd["type"]
             paginator = pagination.PageNumberPagination()
             sl = api_utils.get_object_list(request, cd=cd, paginator=paginator)
-
             result_page = paginator.paginate_queryset(sl, request)
-            serializer = SearchResultSerializer(
-                result_page, many=True, context={"schema": sl.conn.schema}
-            )
+            if (
+                search_type == SEARCH_TYPES.ORAL_ARGUMENT
+                and not waffle.flag_is_active(request, "oa-es-deactivate")
+            ):
+                serializer = SearchESResultSerializer(
+                    result_page,
+                    many=True,
+                    context={
+                        "schema": AudioDocument._index.get_mapping()[
+                            "oral_arguments"
+                        ]["mappings"]
+                    },
+                )
+            else:
+                serializer = SearchResultSerializer(
+                    result_page, many=True, context={"schema": sl.conn.schema}
+                )
             return paginator.get_paginated_response(serializer.data)
-
         # Invalid search.
         return response.Response(
             search_form.errors, status=status.HTTP_400_BAD_REQUEST

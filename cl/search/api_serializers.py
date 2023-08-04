@@ -289,3 +289,50 @@ class SearchResultSerializer(serializers.Serializer):
                 fields.pop(field)
         fields = OrderedDict(sorted(fields.items()))  # Sort by key
         return fields
+
+
+class SearchESResultSerializer(serializers.Serializer):
+    """The serializer for Elasticsearch results.
+    Does not presently support the fields argument.
+    """
+
+    def update(self, instance, validated_data):
+        raise NotImplementedError
+
+    def create(self, validated_data):
+        raise NotImplementedError
+
+    es_field_mappings = {
+        "boolean": serializers.BooleanField,
+        "text": serializers.CharField,
+        "keyword": serializers.CharField,
+        "date": serializers.DateTimeField,
+        # Numbers
+        "integer": serializers.IntegerField,
+    }
+    skipped_fields = ["text", "docket_slug"]
+
+    def get_fields(self):
+        """Return a list of fields so that they don't have to be declared one
+        by one and updated whenever there's a new field.
+        """
+        fields = {
+            "snippet": serializers.CharField(read_only=True),
+            "panel_ids": serializers.ListField(read_only=True),
+        }
+
+        properties = self._context["schema"]["properties"]
+        # Map each field in the ES schema to a DRF field
+        for field_name, value in properties.items():
+            if field_name in fields:
+                # Exclude fields that are already set in fields.
+                continue
+            drf_field = self.es_field_mappings[properties[field_name]["type"]]
+            fields[field_name] = drf_field(read_only=True)
+
+        for field in self.skipped_fields:
+            if field in fields:
+                fields.pop(field)
+
+        fields = OrderedDict(sorted(fields.items()))  # Sort by key
+        return fields
