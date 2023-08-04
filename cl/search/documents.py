@@ -438,15 +438,8 @@ class PersonDocument(PersonBaseDocument):
         },
         search_analyzer="search_analyzer",
     )
-    name_reverse = fields.TextField(
+    name_reverse = fields.KeywordField(
         attr="name_full_reverse",
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(
-                attr="name_reverse", analyzer="english_exact"
-            ),
-        },
-        search_analyzer="search_analyzer",
     )
 
     date_granularity_dob = fields.KeywordField(attr="date_granularity_dob")

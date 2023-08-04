@@ -4924,13 +4924,11 @@ class PeopleSearchTestElasticSearch(
         # Judges are indexed.
         s = PersonDocument.search()
         s = s.query(Q("match", person_child="person"))
-        self.assertEqual(s.count(), 3)
+        self.assertEqual(s.count(), 2)
 
         # Positions are indexed.
         position_pks = [
-            self.position_1.pk,
             self.position_2.pk,
-            self.position_3.pk,
             self.position_4.pk,
         ]
         for position_pk in position_pks:
@@ -5103,9 +5101,6 @@ class PeopleSearchTestElasticSearch(
         document itself match the query.
         """
 
-        person = PersonFactory.create(name_first="John American")
-        PersonDocument._index.refresh()
-
         # Query only over child objects, match position appointer.
         query_values = {"position": ["appointer"], "education": ["school"]}
         s = PersonDocument.search()
@@ -5117,7 +5112,10 @@ class PeopleSearchTestElasticSearch(
         self.assertEqual(s.count(), 2)
 
         for hit in response["hits"]["hits"]:
-            self.assertIn("Bill", hit["inner_hits"]["position"][0].appointer)
+            self.assertIn(
+                "Bill",
+                hit["inner_hits"]["text_query_inner_position"][0].appointer,
+            )
 
         # Query only over child objects, match education school.
         query_values = {"position": ["appointer"], "education": ["school"]}
@@ -5131,9 +5129,25 @@ class PeopleSearchTestElasticSearch(
 
         for hit in response["hits"]["hits"]:
             self.assertEqual(
-                "American University", hit["inner_hits"]["education"][0].school
+                "American University",
+                hit["inner_hits"]["text_query_inner_education"][0].school,
             )
 
+        person = PersonFactory.create(name_first="John American")
+        position_5 = PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            court=self.court_1,
+            date_start=datetime.date(2015, 12, 14),
+            predecessor=self.person_2,
+            appointer=self.position_1,
+            judicial_committee_action="no_rep",
+            termination_reason="retire_mand",
+            position_type="c-jud",
+            person=person,
+            how_selected="e_part",
+            nomination_process="fed_senate",
+        )
+        PersonDocument._index.refresh()
         # Query over the parent object and child objects, match education
         # school and person name.
         query_values = {"position": ["appointer"], "education": ["school"]}
@@ -5152,7 +5166,9 @@ class PeopleSearchTestElasticSearch(
 
         self.assertEqual(
             "American University",
-            response["hits"]["hits"][1]["inner_hits"]["education"][0].school,
+            response["hits"]["hits"][1]["inner_hits"][
+                "text_query_inner_education"
+            ][0].school,
         )
 
         person.delete()
@@ -5184,6 +5200,25 @@ class PeopleSearchTestElasticSearch(
         has_child_filters = build_join_es_filters(cd)
         s = s.filter(reduce(operator.iand, has_child_filters))
         self.assertEqual(s.count(), 1)
+
+    def test_sorting(self) -> None:
+        """Can we do sorting on various fields?"""
+        sort_fields = [
+            "score desc",
+            "name_reverse asc",
+            "dob desc,name_reverse asc",
+            "dod desc,name_reverse asc",
+            "random_123 desc",
+        ]
+        for sort_field in sort_fields:
+            r = self.client.get(
+                "/", {"type": SEARCH_TYPES.PEOPLE, "order_by": sort_field}
+            )
+            self.assertNotIn(
+                "an error",
+                r.content.decode().lower(),
+                msg=f"Got an error when doing a judge search ordered by {sort_field}",
+            )
 
     def test_name_field(self) -> None:
         # Frontend
@@ -5325,3 +5360,135 @@ class PeopleSearchTestElasticSearch(
         self._test_article_count(params, 0, "appointer")
         # API
         self._test_api_results_count(params, 0, "appointer")
+
+    def test_selection_method_filter(self) -> None:
+        params = {"type": SEARCH_TYPES.PEOPLE, "selection_method": "e_part"}
+        # Frontend
+        self._test_article_count(params, 1, "selection_method")
+        # API
+        self._test_api_results_count(params, 1, "selection_method")
+
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "selection_method": "e_non_part",
+        }
+        # Frontend
+        self._test_article_count(params, 0, "selection_method")
+        # API
+        self._test_api_results_count(
+            params,
+            0,
+            "selection_method",
+        )
+
+    def test_political_affiliation_filter(self) -> None:
+        params = {"type": SEARCH_TYPES.PEOPLE, "political_affiliation": "d"}
+        # Frontend
+        self._test_article_count(params, 1, "political_affiliation")
+        # API
+        self._test_api_results_count(params, 1, "political_affiliation")
+
+        params = {"type": SEARCH_TYPES.PEOPLE, "political_affiliation": "r"}
+        # Frontend
+        self._test_article_count(params, 0, "political_affiliation")
+        # API
+        self._test_api_results_count(params, 0, "political_affiliation")
+
+    def test_search_query_and_order(self) -> None:
+        # Search by name and relevance result order.
+        # Frontend
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "Judith Sheindlin",
+            "order_by": "score desc",
+        }
+        r = self._test_article_count(params, 2, "q")
+        self.assertTrue(
+            r.content.decode().index("Susan")
+            < r.content.decode().index("Olivia"),
+            msg="'Susan' should come BEFORE 'Olivia'.",
+        )
+        # API
+        self._test_api_results_count(params, 2, "q")
+
+        # Search by name and dob order.
+        # Frontend
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "Judith Sheindlin",
+            "order_by": "dob desc,name_reverse asc",
+        }
+        r = self._test_article_count(params, 2, "q")
+        self.assertTrue(
+            r.content.decode().index("Olivia")
+            < r.content.decode().index("Susan"),
+            msg="'Susan' should come AFTER 'Olivia'.",
+        )
+        # API
+        self._test_api_results_count(params, 2, "q")
+
+        # Search by name and filter.
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "Judith Sheindlin",
+            "school": "american",
+        }
+        # Frontend
+        self._test_article_count(params, 1, "q + school")
+        # API
+        self._test_api_results_count(params, 1, "q + school")
+
+    def test_advanced_search(self) -> None:
+        # Search by advanced field.
+        # Frontend
+        params = {"type": SEARCH_TYPES.PEOPLE, "q": "name:Judith Sheindlin"}
+        self._test_article_count(params, 2, "q")
+        # API
+        self._test_api_results_count(params, 2, "q")
+
+        # Combine fields in advanced search.
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "name:Judith Sheindlin AND dob_city:Queens",
+        }
+        # Frontend
+        r = self._test_article_count(
+            params,
+            1,
+            "q",
+        )
+        self.assertIn("Olivia", r.content.decode())
+        # API
+        r = self._test_api_results_count(params, 1, "q")
+        self.assertIn("Olivia", r.content.decode())
+
+    def test_has_child_queries_combine_filters(self) -> None:
+        """Test confirm if we can combine multiple has child filter inner hits
+        into a single dict.
+        """
+        cd = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "appointer": "clinton",
+            "selection_method": "e_part",
+            "order_by": "name_reverse asc",
+        }
+        search_query = PersonDocument.search()
+        s, total_query_results, top_hits_limit = build_es_main_query(
+            search_query, cd
+        )
+        self.assertEqual(s.count(), 1)
+        response = s.execute().to_dict()
+        self.assertEqual(
+            1,
+            len(
+                response["hits"]["hits"][0]["inner_hits"][
+                    "filter_inner_position"
+                ]["hits"]["hits"]
+            ),
+        )
+        self.assertIn(
+            "Bill",
+            response["hits"]["hits"][0]["inner_hits"]["filter_inner_position"][
+                "hits"
+            ]["hits"][0]["_source"]["appointer"],
+        )

@@ -1,11 +1,17 @@
 from django.db.models.signals import m2m_changed, post_delete, post_save
 from django.dispatch import receiver
+from elasticsearch_dsl import Document
 
 from cl.alerts.send_alerts import send_or_schedule_alerts
 from cl.audio.models import Audio
 from cl.lib.command_utils import logger
 from cl.lib.elasticsearch_utils import es_index_exists
-from cl.people_db.models import Education, Person, Position
+from cl.people_db.models import (
+    Education,
+    Person,
+    PoliticalAffiliation,
+    Position,
+)
 from cl.search.documents import (
     PEOPLE_DOCS_TYPE_ID,
     AudioDocument,
@@ -101,12 +107,14 @@ def remove_audio_from_es_index(sender, instance=None, **kwargs):
     sender=Person,
     dispatch_uid="create_or_update_person_in_es_index",
 )
-def create_or_update_person_in_es_index(sender, instance=None, **kwargs):
+def create_or_update_person_in_es_index(
+    sender, instance=None, created=False, **kwargs
+):
     """Receiver function that gets called after a Person instance is saved.
     This method creates or updates a Person object in the PersonDocument index.
     """
 
-    if es_index_exists("people_db_index"):
+    if es_index_exists("people_db_index") and not created:
         person_doc = PersonDocument()
         doc = person_doc.prepare(instance)
         PersonDocument(meta={"id": instance.pk}, **doc).save(
@@ -124,11 +132,26 @@ def create_or_update_position_in_es_index(sender, instance=None, **kwargs):
     This method creates or updates a Position object in the PositionDocument index.
     """
     parent_id = getattr(instance.person, "pk", None)
-    if (
-        es_index_exists("people_db_index")
-        and parent_id
-        and PersonDocument.exists(id=parent_id)
-    ):
+    if not es_index_exists("people_db_index") or not parent_id:
+        return
+    if PersonDocument.exists(id=parent_id) and instance.person.is_judge:
+        position_doc = PositionDocument()
+        doc = position_doc.prepare(instance)
+        doc_id = PEOPLE_DOCS_TYPE_ID(instance.pk).POSITION
+        PositionDocument(
+            meta={"id": doc_id},
+            _routing=parent_id,
+            **doc,
+        ).save(skip_empty=False)
+
+    elif not PersonDocument.exists(id=parent_id) and instance.person.is_judge:
+        # Add the Judge first.
+        person_doc = PersonDocument()
+        doc = person_doc.prepare(instance.person)
+        PersonDocument(meta={"id": parent_id}, **doc).save(
+            skip_empty=False, return_doc_meta=True
+        )
+        # Then add the position object.
         position_doc = PositionDocument()
         doc = position_doc.prepare(instance)
         doc_id = PEOPLE_DOCS_TYPE_ID(instance.pk).POSITION
@@ -164,6 +187,40 @@ def create_or_update_education_in_es_index(sender, instance=None, **kwargs):
             _routing=parent_id,
             **doc,
         ).save(skip_empty=False)
+
+
+@receiver(
+    post_save,
+    sender=PoliticalAffiliation,
+    dispatch_uid=" create_or_update_political_affiliation_in_es_index",
+)
+def create_or_update_affiliation_in_es_index(sender, instance=None, **kwargs):
+    """Receiver function that gets called after an Education instance is saved.
+    This method creates or updates an Education object in the EducationDocument
+    index.
+    """
+
+    parent_id = getattr(instance.person, "pk", None)
+    if (
+        es_index_exists("people_db_index")
+        and parent_id
+        and PersonDocument.exists(id=parent_id)
+    ):
+        doc = PersonDocument.get(id=instance.person.pk)
+        political_affiliation = getattr(doc, "prepare_political_affiliation")(
+            instance.person
+        )
+        political_affiliation_id = getattr(
+            doc, "prepare_political_affiliation_id"
+        )(instance.person)
+
+        Document.update(
+            doc,
+            **{
+                "political_affiliation": political_affiliation,
+                "political_affiliation_id": political_affiliation_id,
+            },
+        )
 
 
 @receiver(

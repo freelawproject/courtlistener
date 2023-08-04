@@ -208,13 +208,29 @@ def build_sort_results(cd: CleanData) -> Dict:
     :return: The short dict.
     """
 
-    if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
+    if (
+        cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT
+        or cd["type"] == SEARCH_TYPES.PEOPLE
+    ):
         order_by_map = {
             "score desc": {"_score": {"order": "desc"}},
             "dateArgued desc": {"dateArgued": {"order": "desc"}},
             "dateArgued asc": {"dateArgued": {"order": "asc"}},
             "random_123 desc": {"random_123": {"order": "desc"}},
             "random_123 asc": {"random_123": {"order": "asc"}},
+            "name_reverse asc": {"name_reverse": {"order": "asc"}},
+            "dob desc,name_reverse asc": {
+                "dob": {"order": "desc"},
+                "name_reverse": {"order": "asc"},
+            },
+            "dob asc,name_reverse asc": {
+                "dob": {"order": "asc"},
+                "name_reverse": {"order": "asc"},
+            },
+            "dod desc,name_reverse asc": {
+                "dod": {"order": "desc"},
+                "name_reverse": {"order": "asc"},
+            },
         }
 
     else:
@@ -378,7 +394,10 @@ def build_es_main_query(
     )
 
     search_query = add_es_highlighting(search_query, cd)
-    if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
+    if (
+        cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT
+        or cd["type"] == SEARCH_TYPES.PEOPLE
+    ):
         search_query = search_query.sort(build_sort_results(cd))
 
     return search_query, total_query_results, top_hits_limit
@@ -722,7 +741,7 @@ def build_join_fulltext_queries(
             "has_child",
             type=child_type,
             query=build_fulltext_query(fields, value),
-            inner_hits={},
+            inner_hits={"name": f"text_query_inner_{child_type}"},
             max_children=10,
             min_children=0,
         )
@@ -734,6 +753,48 @@ def build_join_fulltext_queries(
     if q_should:
         return Q("bool", should=q_should)
     return []
+
+
+def build_has_child_filters(child_type, cd) -> List:
+    queries_list = []
+    if cd["type"] == SEARCH_TYPES.PEOPLE:
+        if child_type == "position":
+            selection_method = cd.get("selection_method", "")
+            court = cd.get("court", "").split()
+            appointer = cd.get("appointer", "")
+
+            if selection_method:
+                queries_list.extend(
+                    build_term_query(
+                        "selection_method_id",
+                        selection_method,
+                    )
+                )
+
+            if court:
+                queries_list.extend(build_term_query("court_exact", court))
+
+            if appointer:
+                queries_list.extend(build_text_filter("appointer", appointer))
+
+        elif child_type == "education":
+            school = cd.get("school", "")
+            if school:
+                queries_list.extend(build_text_filter("school", school))
+
+    if not queries_list:
+        return []
+
+    return [
+        Q(
+            "has_child",
+            type=child_type,
+            query=reduce(operator.iand, queries_list),
+            inner_hits={"name": f"filter_inner_{child_type}"},
+            max_children=10,
+            min_children=0,
+        )
+    ]
 
 
 def build_has_child_filter(
@@ -761,7 +822,7 @@ def build_has_child_filter(
                     field,
                     value,
                 )[0],
-                inner_hits={},
+                inner_hits={"name": f"filter_inner_{field}"},
                 max_children=10,
                 min_children=0,
             )
@@ -776,7 +837,7 @@ def build_has_child_filter(
                     field,
                     value,
                 )[0],
-                inner_hits={},
+                inner_hits={"name": f"filter_inner_{field}"},
                 max_children=10,
                 min_children=0,
             )
@@ -792,12 +853,17 @@ def build_join_es_filters(cd: CleanData) -> List:
     """
 
     queries_list = []
-
     if cd["type"] == SEARCH_TYPES.PEOPLE:
         queries_list.extend(
             build_term_query(
                 "dob_state_id",
                 cd.get("dob_state", ""),
+            )
+        )
+        queries_list.extend(
+            build_term_query(
+                "political_affiliation_id",
+                cd.get("political_affiliation", "").split(),
             )
         )
         queries_list.extend(
@@ -820,32 +886,10 @@ def build_join_es_filters(cd: CleanData) -> List:
             )
         )
 
-        selection_method = cd.get("selection_method", "")
-        if selection_method:
-            queries_list.extend(
-                build_has_child_filter(
-                    "term", "selection_method_id", selection_method, "position"
-                )
-            )
-        school = cd.get("school", "")
-        if school:
-            queries_list.extend(
-                build_has_child_filter("text", "school", school, "education")
-            )
-        court = cd.get("court", "").split()
-        if court:
-            queries_list.extend(
-                build_has_child_filter(
-                    "term", "court_exact", court, "position"
-                )
-            )
+        # Build position has child filter:
+        queries_list.extend(build_has_child_filters("position", cd))
 
-        appointer = cd.get("appointer", "")
-        if appointer:
-            queries_list.extend(
-                build_has_child_filter(
-                    "text", "appointer", appointer, "position"
-                )
-            )
+        # Build Education has child filter:
+        queries_list.extend(build_has_child_filters("education", cd))
 
     return queries_list
