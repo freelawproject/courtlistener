@@ -6,7 +6,7 @@ from elasticsearch.exceptions import NotFoundError
 from elasticsearch_dsl import Document
 
 from cl.lib.command_utils import logger
-from cl.search.documents import ParentheticalGroupDocument
+from cl.search.documents import AudioDocument, ParentheticalGroupDocument
 from cl.search.models import (
     Citation,
     Docket,
@@ -24,24 +24,27 @@ instance_typing = Union[
     Parenthetical,
     ParentheticalGroup,
 ]
-es_document_typing = Union[ParentheticalGroupDocument]
+es_document_typing = Union[AudioDocument, ParentheticalGroupDocument]
 
 
 def updated_fields(
-    instance: instance_typing,
+    instance: instance_typing, es_document: es_document_typing
 ) -> list[str]:
     """Look for changes in the tracked fields of an instance.
     :param instance: The instance to check for changed fields.
+    :param es_document: The Elasticsearch document type.
     :return: A list of the names of fields that have changed in the instance.
     """
     # Get the field names being tracked
-    tracked_fields = instance.es_pa_field_tracker.fields
+    if isinstance(es_document, AudioDocument):
+        tracked_set = instance.es_oa_field_tracker
+    else:
+        tracked_set = instance.es_pa_field_tracker
     # Check each tracked field to see if it has changed
     changed_fields = [
         field
-        for field in tracked_fields
-        if getattr(instance, field)
-        != instance.es_pa_field_tracker.previous(field)
+        for field in tracked_set.fields
+        if getattr(instance, field) != tracked_set.previous(field)
     ]
     return changed_fields
 
@@ -155,7 +158,7 @@ def update_es_documents(
     """
     if created:
         return
-    changed_fields = updated_fields(instance)
+    changed_fields = updated_fields(instance, es_document)
     if changed_fields:
         for query, fields_map in mapping_fields.items():
             main_objects = main_model.objects.filter(**{query: instance})
