@@ -45,7 +45,7 @@ from cl.simple_pages.forms import ContactForm
 logger = logging.getLogger(__name__)
 
 
-def about(request: HttpRequest) -> HttpResponse:
+async def about(request: HttpRequest) -> HttpResponse:
     """Loads the about page"""
     return TemplateResponse(request, "about.html", {"private": False})
 
@@ -80,7 +80,7 @@ def faq(request: HttpRequest) -> HttpResponse:
     )
 
 
-def help_home(request: HttpRequest) -> HttpResponse:
+async def help_home(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "help/index.html", {"private": False})
 
 
@@ -119,35 +119,35 @@ def alert_help(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "help/alert_help.html", context)
 
 
-def donation_help(request: HttpRequest) -> HttpResponse:
+async def donation_help(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(
         request, "help/donation_help.html", {"private": False}
     )
 
 
-def delete_help(request: HttpRequest) -> HttpResponse:
+async def delete_help(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(
         request, "help/delete_account_help.html", {"private": False}
     )
 
 
-def markdown_help(request: HttpRequest) -> HttpResponse:
+async def markdown_help(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(
         request, "help/markdown_help.html", {"private": False}
     )
 
 
-def tag_notes_help(request: HttpRequest) -> HttpResponse:
+async def tag_notes_help(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "help/tags_help.html", {"private": False})
 
 
-def recap_email_help(request: HttpRequest) -> HttpResponse:
+async def recap_email_help(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(
         request, "help/recap_email_help.html", {"private": False}
     )
 
 
-def broken_email_help(request: HttpRequest) -> HttpResponse:
+async def broken_email_help(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(
         request,
         "help/broken_email_help.html",
@@ -306,7 +306,7 @@ def podcasts(request: HttpRequest) -> HttpResponse:
     )
 
 
-def contribute(request: HttpRequest) -> HttpResponse:
+async def contribute(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "contribute.html", {"private": False})
 
 
@@ -373,13 +373,13 @@ def contact(
     return TemplateResponse(request, template_path, template_data)
 
 
-def contact_thanks(request: HttpRequest) -> HttpResponse:
+async def contact_thanks(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "contact_thanks.html", {"private": True})
 
 
-def advanced_search(request: HttpRequest) -> HttpResponse:
+async def advanced_search(request: HttpRequest) -> HttpResponse:
     types = ["opinions", "parentheticals", "recap_archive", "oral_arguments"]
-    json_template = loader.get_template("includes/available_fields.txt")
+    json_template = loader.get_template("includes/available_fields.json")
     json_content = json_template.render()
     data = json.loads(json_content)
     return TemplateResponse(
@@ -389,7 +389,7 @@ def advanced_search(request: HttpRequest) -> HttpResponse:
     )
 
 
-def old_terms(request: HttpRequest, v: str) -> HttpResponse:
+async def old_terms(request: HttpRequest, v: str) -> HttpResponse:
     return TemplateResponse(
         request,
         f"terms/{v}.html",
@@ -401,7 +401,7 @@ def old_terms(request: HttpRequest, v: str) -> HttpResponse:
     )
 
 
-def latest_terms(request: HttpRequest) -> HttpResponse:
+async def latest_terms(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(
         request,
         "terms/latest.html",
@@ -421,11 +421,13 @@ def robots(request: HttpRequest) -> HttpResponse:
     return response
 
 
-def validate_for_wot(request: HttpRequest) -> HttpResponse:
+async def validate_for_wot(request: HttpRequest) -> HttpResponse:
     return HttpResponse("bcb982d1e23b7091d5cf4e46826c8fc0")
 
 
-def ratelimited(request: HttpRequest, exception: Exception) -> HttpResponse:
+async def ratelimited(
+    request: HttpRequest, exception: Exception
+) -> HttpResponse:
     return TemplateResponse(
         request,
         "429.html",

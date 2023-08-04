@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from datetime import date, datetime
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple, no_type_check
 
 from django.conf import settings
 from eyecite import resolve_citations
@@ -27,7 +27,7 @@ from cl.lib.types import (
     SearchParam,
     SupportedCitationType,
 )
-from cl.search.models import Opinion
+from cl.search.models import Opinion, RECAPDocument
 
 DEBUG = True
 
@@ -287,13 +287,21 @@ def resolve_supra_citation(
     )
 
 
+@no_type_check
 def do_resolve_citations(
-    citations: List[CitationBase], citing_opinion: Opinion
+    citations: List[CitationBase], citing_object: Opinion | RECAPDocument
 ) -> Dict[MatchedResourceType, List[SupportedCitationType]]:
     # Set the citing opinion on FullCaseCitation objects for later matching
     for c in citations:
         if type(c) is FullCaseCitation:
-            c.citing_opinion = citing_opinion
+            if isinstance(citing_object, Opinion):
+                c.citing_opinion = citing_object
+            elif isinstance(citing_object, RECAPDocument):
+                # if the object doing the citing is a RECAPDocument,
+                # refer to it as a citing document.
+                c.citing_document = citing_object
+            else:
+                raise "Unknown citing type."
 
     # Call and return eyecite's resolve_citations() function
     return resolve_citations(
