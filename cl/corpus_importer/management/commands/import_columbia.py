@@ -153,7 +153,6 @@ def get_text(xml_filepath: str) -> dict:
     order = 0
     # Store texts without a byline
     floating_texts = []
-    extra_text = []
     for opinion_index, op in enumerate(find_opinions, start=1):
         opinion_type = op.name.replace("_text", "")
         # Find author before opinion text tag
@@ -165,39 +164,47 @@ def get_text(xml_filepath: str) -> dict:
         else:
             floating_texts.append((op.decode_contents(), opinion_type))
 
-            if len(find_opinions) == opinion_index and floating_texts:
-                # If is the last opinion, and we still have opinions without
-                # byline, create an opinion without an author and the contents
-                # that couldn't be merged
-
-                new_opinion = {
-                    "byline": None,
-                    "type": op.name.replace("_text", ""),
-                    "opinion": "\n".join([f[0] for f in floating_texts]),
-                    "order": order,
-                    "raw_footnotes": "",
-                }
-
-                opinions.append(new_opinion)
-                floating_texts = []
-
-            else:
-                continue
-
-        # Find all footnotes after opinion text tag until the end of xml or
-        # find other tag
-        footnote = op.find_next_sibling()
-        raw_footnotes = []
-        while footnote and footnote.name == "footnote_body":
-            raw_footnotes.append(str(footnote))
-            footnote = footnote.find_next_sibling()
-
-        floating_texts = [f for f in floating_texts if type(f) == tuple]
-
         if opinion_author:
             # If we have an opinion author then proceed to store the opinion
             # Merge only contents from the same type (opinion with opinion,
             # dissent with dissent, etc.)
+
+            # Find all footnotes after opinion text tag until the end of xml or
+            # find other tag
+            footnote = op.find_next_sibling()
+            raw_footnotes = []
+            while footnote and footnote.name == "footnote_body":
+                raw_footnotes.append(str(footnote))
+                footnote = footnote.find_next_sibling()
+
+            # Make sure we only have tuples
+            floating_texts = [f for f in floating_texts if type(f) == tuple]
+
+            # Extra content that don't match current opinion type
+            alternative_floating_texts = [
+                f for f in floating_texts if f[1] != opinion_type
+            ]
+
+            if any(alternative_floating_texts):
+                # Keep floating text that are not from the same type,
+                # we need to create a separate opinion for those,
+                # for example: in 2713f39c5a8e8684.xml we have an opinion
+                # without an author, and the next opinion with an author is
+                # a dissent opinion, we can't combine both
+
+                new_opinion = {
+                    "byline": None,
+                    "type": alternative_floating_texts[0][1],
+                    "opinion": "\n".join(
+                        [f[0] for f in alternative_floating_texts]
+                    ),
+                    "order": order,
+                    "raw_footnotes": "",
+                }
+                order = order + 1
+                opinions.append(new_opinion)
+
+            # Add new opinion
             new_opinion = {
                 "byline": opinion_author,
                 "type": opinion_type,
@@ -211,29 +218,21 @@ def get_text(xml_filepath: str) -> dict:
 
             opinions.append(new_opinion)
             order = order + 1
+            floating_texts = []
 
-            # Keep floating text that are not from the same type, we need to
-            # create a separate opinion for those, for example: in
-            # 2713f39c5a8e8684.xml we have an opinion without an author,
-            # and the next opinion with an author is a dissent opinion,
-            # we can't combine both
+        if len(find_opinions) == opinion_index and floating_texts:
+            # If is the last opinion, and we still have opinions without
+            # byline, create an opinion without an author and the contents
+            # that couldn't be merged
 
-            floating_texts = [
-                f for f in floating_texts if f[1] != opinion_type
-            ]
-
-            if floating_texts:
-                new_opinion = {
-                    "byline": None,
-                    "type": floating_texts[0][1],
-                    "opinion": "\n".join([f[0] for f in floating_texts]),
-                    "order": order,
-                    "raw_footnotes": "",
-                }
-
-                opinions.append(new_opinion)
-                order = order + 1
-                floating_texts = []
+            new_opinion = {
+                "byline": None,
+                "type": op.name.replace("_text", ""),
+                "opinion": "\n".join([f[0] for f in floating_texts]),
+                "order": order,
+                "raw_footnotes": "",
+            }
+            opinions.append(new_opinion)
 
     SIMPLE_TAGS = [
         "attorneys",
@@ -610,13 +609,15 @@ class Command(VerboseCommand):
             "--avoid_no_cites",
             action="store_true",
             default=False,
-            help="If set, will not import dates after the earliest case without a citation.",
+            help="If set, will not import dates after the earliest case "
+            "without a citation.",
         )
         parser.add_argument(
             "--court_dates",
             action="store_true",
             default=False,
-            help="If set, will throw exception for cases before court was founded.",
+            help="If set, will throw exception for cases before court was "
+            "founded.",
         )
         parser.add_argument(
             "--start_folder",

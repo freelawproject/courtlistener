@@ -515,7 +515,9 @@ def add_new_case(
         source=SOURCES.COLUMBIA_ARCHIVE,
         attorneys=item["attorneys"] or "",
         posture=item["posture"] or "",
-        syllabus=convert_columbia_html(item["syllabus"]) or "",
+        syllabus=convert_columbia_html(item.get("syllabus"))
+        if item.get("syllabus")
+        else "",
     )
     panel = lookup_judges_by_last_name_list(
         item["panel"], item["court_id"], panel_date
