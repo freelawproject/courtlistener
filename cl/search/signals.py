@@ -1,5 +1,6 @@
+from cl.audio.models import Audio
 from cl.lib.es_signal_processor import ESSignalProcessor
-from cl.search.documents import ParentheticalGroupDocument
+from cl.search.documents import AudioDocument, ParentheticalGroupDocument
 from cl.search.models import (
     Citation,
     Docket,
@@ -92,10 +93,33 @@ pa_field_mapping = {
     },
 }
 
+oa_field_mapping = {
+    "save": {
+        Docket: {
+            "docket": {
+                "date_argued": "dateArgued",
+                "date_reargued": "dateReargued",
+                "date_reargument_denied": "dateReargumentDenied",
+                "docket_number": "docketNumber",
+                "slug": "docket_slug",
+            }
+        }
+    },
+    "delete": {},
+    "m2m": {},
+    "reverse": {},
+}
+
 # Instantiate a new ESSignalProcessor() for each Model/Document that needs to
 # be tracked. The arguments are: main model, ES document mapping, and field mapping dict.
 _pa_signal_processor = ESSignalProcessor(
     ParentheticalGroup,
     ParentheticalGroupDocument,
     pa_field_mapping,
+)
+
+_oa_signal_processor = ESSignalProcessor(
+    Audio,
+    AudioDocument,
+    oa_field_mapping,
 )
