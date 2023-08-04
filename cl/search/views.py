@@ -37,7 +37,6 @@ from cl.lib.elasticsearch_utils import (
     set_results_highlights,
 )
 from cl.lib.paginators import ESPaginator
-from cl.lib.ratelimiter import ratelimit_deny_list
 from cl.lib.redis_utils import make_redis_interface
 from cl.lib.search_utils import (
     add_depth_counts,
@@ -303,7 +302,6 @@ def get_homepage_stats():
 
 
 @never_cache
-@ratelimit_deny_list
 def show_results(request: HttpRequest) -> HttpResponse:
     """
     This view can vary significantly, depending on how it is called:
@@ -554,32 +552,29 @@ def es_search(request: HttpRequest) -> HttpResponse:
     :return: HttpResponse
     """
     render_dict = {"private": False}
-    template = None
-
-    if request.path == reverse("advanced_pa"):
-        courts = Court.objects.filter(in_use=True)
-        render_dict.update({"search_type": "parenthetical"})
-        obj_type = SEARCH_TYPES.PARENTHETICAL
-        search_form = SearchForm({"type": obj_type})
-        if search_form.is_valid():
-            search_form = _clean_form(
-                request.GET.copy(),
-                search_form.cleaned_data,
-                courts,
-            )
-        template = "advanced.html"
-
-        courts, court_count_human, court_count = merge_form_with_courts(
-            courts, search_form
+    courts = Court.objects.filter(in_use=True)
+    render_dict.update({"search_type": "parenthetical"})
+    obj_type = SEARCH_TYPES.PARENTHETICAL
+    search_form = SearchForm({"type": obj_type})
+    if search_form.is_valid():
+        search_form = _clean_form(
+            request.GET.copy(),
+            search_form.cleaned_data,
+            courts,
         )
-        render_dict.update(
-            {
-                "search_form": search_form,
-                "courts": courts,
-                "court_count_human": court_count_human,
-                "court_count": court_count,
-            }
-        )
+    template = "advanced.html"
+
+    courts, court_count_human, court_count = merge_form_with_courts(
+        courts, search_form
+    )
+    render_dict.update(
+        {
+            "search_form": search_form,
+            "courts": courts,
+            "court_count_human": court_count_human,
+            "court_count": court_count,
+        }
+    )
 
     return render(request, template, render_dict)
 

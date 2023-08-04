@@ -28,7 +28,7 @@
                 src="{% static "js/admin_tools.js" %}"></script>
     {% endif %}
 
-    <script type="text/javascript">
+    <script type="text/javascript" nonce="{{ request.csp_nonce }}">
       // Set this variable for the docket alerts script to find
       var userAlertAcount = {{ user.docket_alerts.subscriptions.count|default:"0" }};
     </script>

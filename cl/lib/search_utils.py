@@ -3,6 +3,7 @@ from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 from urllib.parse import parse_qs, urlencode
 
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.cache import cache, caches
 from django.http import HttpRequest, QueryDict
@@ -1283,7 +1284,7 @@ def get_mlt_query(
     return si.mlt_query(hl_fields).add_extra(**q)
 
 
-def clean_up_recap_document_file(item: RECAPDocument) -> None:
+async def clean_up_recap_document_file(item: RECAPDocument) -> None:
     """Clean up the RecapDocument file-related fields after detecting the file
     doesn't exist in the storage.
 
@@ -1292,10 +1293,10 @@ def clean_up_recap_document_file(item: RECAPDocument) -> None:
     """
 
     if type(item) == RECAPDocument:
-        item.filepath_local.delete()
+        await sync_to_async(item.filepath_local.delete)()
         item.sha1 = ""
         item.date_upload = None
         item.file_size = None
         item.page_count = None
         item.is_available = False
-        item.save()
+        await item.asave()

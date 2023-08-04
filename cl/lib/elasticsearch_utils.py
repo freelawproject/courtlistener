@@ -161,16 +161,17 @@ def build_term_query(
     :return: Empty list or list with DSL Match query
     """
 
-    if value and make_phrase:
+    if not value:
+        return []
+
+    if make_phrase:
         return [Q("match_phrase", **{field: {"query": value, "slop": slop}})]
 
-    if value and isinstance(value, list):
+    if isinstance(value, list):
         value = list(filter(None, value))
         return [Q("terms", **{field: value})]
 
-    if value:
-        return [Q("term", **{field: value})]
-    return []
+    return [Q("term", **{field: value})]
 
 
 def build_text_filter(field: str, value: str) -> List:
@@ -216,7 +217,11 @@ def build_sort_results(cd: CleanData) -> Dict:
         }
 
     order_by = cd.get("order_by")
-    if order_by in order_by_map and "random_123" in order_by:
+    if order_by not in order_by_map:
+        # Sort by score in descending order
+        return {"score": {"order": "desc"}}
+
+    if "random_123" in order_by:
         # Return random sorting if available.
         # Define the random seed using the current timestamp
         seed = int(time.time())
@@ -233,11 +238,7 @@ def build_sort_results(cd: CleanData) -> Dict:
         }
         return random_sort
 
-    if order_by and order_by in order_by_map:
-        return order_by_map[order_by]
-
-    # Default sort by score in descending order
-    return {"score": {"order": "desc"}}
+    return order_by_map[order_by]
 
 
 def build_es_filters(cd: CleanData) -> List:
