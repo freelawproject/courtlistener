@@ -425,7 +425,7 @@ def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
     )
 
 
-def delete_profile_done(request: HttpRequest) -> HttpResponse:
+async def delete_profile_done(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "profile/deleted.html", {"private": True})
 
 
@@ -449,7 +449,7 @@ def take_out(request: AuthenticatedHttpRequest) -> HttpResponse:
     )
 
 
-def take_out_done(request: HttpRequest) -> HttpResponse:
+async def take_out_done(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(
         request,
         "profile/take_out_done.html",

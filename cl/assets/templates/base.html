@@ -175,16 +175,14 @@
             <span class="icon-bar"></span>
           </button>
           <a class="navbar-brand hidden-xs" href="/">
-            <img src="{% static "png/logo-large.png" %}"
-                 alt="CourtListener logo"
-                 width="364"
+            <img src="{% static "svg/logo-full.svg" %}"
+                 alt="CourtListener"
                  height="40"
                  tabindex="1"/>
           </a>
           <a class="navbar-brand visible-xs-block" href="/">
-            <img src="{% static "png/logo-initials-only.png" %}"
-                 alt="CourtListener Logo"
-                 width="67"
+            <img src="{% static "svg/logo-initials-only.svg" %}"
+                 alt="CourtListener"
                  height="40"
                  tabindex="1"/>
           </a>
@@ -465,7 +463,7 @@
   <script type="text/javascript" src="{% static "js/bootstrap.min.js" %}"></script>
 {% endif %}
 <script type="text/javascript" src="{% static "js/base.js" %}"></script>
-<script type="text/javascript">
+<script type="text/javascript" nonce="{{ request.csp_nonce }}">
   {# Default values are to ensure JS parsing even if 500 error thrown #}
   var totalDonatedLastYear = parseFloat({{ user.profile.total_donated_last_year|safe|default:0}}),
       userAlertCount = {{ user.docket_alerts.subscriptions.count|default:"0" }},

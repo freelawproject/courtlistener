@@ -14,8 +14,7 @@
     {% endif %}
   </ul>
   {% if type == SEARCH_TYPES.RECAP or type == SEARCH_TYPES.DOCKETS or type_override == SEARCH_TYPES.RECAP or type_override == SEARCH_TYPES.DOCKETS %}
-    <p>The RECAP Archive only contains cases that were downloaded from PACER using the <a href="https://free.law/recap/">RECAP Extensions</a>. If you are looking for a certain case or document that has not yet been downloaded in this way, it will not appear here. If you are encountering this problem, please install the <a href="https://free.law/recap/">RECAP Extension</a>, and purchase this case from PACER.
-    </p>
+     <p>The RECAP Archive does not contain everything in PACER. To learn more about what we have and how to add content to the RECAP Archive, please see <a href="{% url "coverage" %}">our coverage page</a>.</p>
   {% else %}
     <p>Our <a href="{% url "coverage" %}">coverage page</a> details which jurisdictions we support.
     </p>
