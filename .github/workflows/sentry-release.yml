@@ -3,7 +3,7 @@ name: sentry-release
 on:
   push:
     branches:
-      - '**'
+      - 'main'
 
 jobs:
   createSentryRelease:
