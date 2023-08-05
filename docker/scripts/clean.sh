@@ -9,7 +9,7 @@ flp_images=`docker image ls | awk '/^freelawproject/{print $3}'`
 
 docker image rm -f $flp_images
 
-echo Y | docker image prune
+docker image prune --force
 
 active=$(docker images --format "{{.Tag}}|{{.Repository}}" | awk -F\| '$1 != "<none>"{print $2}')
 for image in $active ; do
