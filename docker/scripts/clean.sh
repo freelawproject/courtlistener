@@ -1,17 +1,15 @@
 #!/bin/bash
 
-# Take any running versions down
+# Stop all running Courtlistener cointainers 
 docker-compose -f  ../courtlistener/docker-compose.yml  down
-#
-# Now we need to get rid of any images in docker that are related to
-# courtlistener
-flp_images=`docker image ls | awk '/^freelawproject/{print $3}'`
 
-docker image rm -f $flp_images
-
+# Remove any Docker images that are related to Courtlistener
+flp_images=`docker image ls | awk '/^freelawproject/{print $1}'`
+echo $flp_images
+docker image rm --force $flp_images
 docker image prune --force
 
-active=$(docker images --format "{{.Tag}}|{{.Repository}}" | awk -F\| '$1 != "<none>"{print $2}')
-for image in $active ; do
+# Pull fresh copies of the Docker images for CL's various services
+for image in $flp_images; do
     docker pull $image
 done
