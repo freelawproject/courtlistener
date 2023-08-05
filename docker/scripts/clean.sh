@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Stop all running Courtlistener cointainers 
+# Stop all running Courtlistener cointainers
 docker-compose -f  ../courtlistener/docker-compose.yml  down
 
 # Remove any Docker images that are related to Courtlistener
