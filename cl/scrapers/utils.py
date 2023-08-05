@@ -6,6 +6,7 @@ from typing import Optional, Tuple
 from urllib.parse import urljoin
 
 import requests
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.db.models import QuerySet
 from juriscraper.AbstractSite import logger
@@ -38,7 +39,7 @@ def test_for_meta_redirections(r: Response) -> Tuple[bool, Optional[str]]:
     :param r: A response object
     :return:  A boolean and value
     """
-    extension = microservice(
+    extension = async_to_sync(microservice)(
         service="buffer-extension",
         file=r.content,
         params={"mime": True},
@@ -88,7 +89,7 @@ def follow_redirections(r: Response, s: Session) -> Response:
 )
 def get_extension(content: bytes) -> str:
     """A handful of workarounds for getting extensions we can trust."""
-    return microservice(
+    return async_to_sync(microservice)(
         service="buffer-extension",
         file=content,
     ).text
@@ -231,7 +232,7 @@ def update_or_create_docket(
     :param ia_needs_upload: If the docket needs upload to IA, default None.
     :return: The docket docket.
     """
-    docket = find_docket_object(court_id, None, docket_number)
+    docket = async_to_sync(find_docket_object)(court_id, None, docket_number)
     if docket.pk:
         docket.case_name = case_name
         docket.case_name_short = case_name_short

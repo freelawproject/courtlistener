@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from http import HTTPStatus
 from pathlib import Path
 
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.utils.timezone import now
@@ -33,7 +34,7 @@ class ScraperIngestionTest(TestCase):
         cls.court = CourtFactory(id="test", jurisdiction="F")
 
     def test_extension(self):
-        r = microservice(
+        r = async_to_sync(microservice)(
             service="buffer-extension",
             params={"mime": True},
         )
@@ -512,7 +513,7 @@ class AudioFileTaskTest(TestCase):
             "case_name_short": audio_obj.case_name_short,
             "download_url": audio_obj.download_url,
         }
-        audio_response = microservice(
+        audio_response = async_to_sync(microservice)(
             service="convert-audio",
             item=audio_obj,
             params=audio_data,

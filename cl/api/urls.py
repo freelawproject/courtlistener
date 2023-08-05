@@ -146,12 +146,6 @@ urlpatterns_base = [
         include("rest_framework.urls", namespace="rest_framework"),
     ),
     re_path(r"^api/rest/(?P<version>[v3]+)/", include(router.urls)),
-    # Schemas
-    path(
-        "api/schema/",
-        views.deprecated_api,
-        name="deprecated_core_api_schema",
-    ),
     # Documentation
     path("help/api/", views.api_index, name="api_index"),
     path("help/api/jurisdictions/", views.court_index, name="court_index"),

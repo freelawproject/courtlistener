@@ -1,14 +1,7 @@
-from django.conf import settings
-from django_elasticsearch_dsl import Document, Index, fields
+from django_elasticsearch_dsl import Document, fields
 
+from cl.search.es_indices import parenthetical_group_index
 from cl.search.models import Citation, ParentheticalGroup
-
-# Define parenthetical elasticsearch index
-parenthetical_group_index = Index("parenthetical_group")
-parenthetical_group_index.settings(
-    number_of_shards=settings.ELASTICSEARCH_NUMBER_OF_SHARDS,
-    number_of_replicas=settings.ELASTICSEARCH_NUMBER_OF_REPLICAS,
-)
 
 
 @parenthetical_group_index.document
@@ -63,6 +56,7 @@ class ParentheticalGroupDocument(Document):
     class Django:
         model = ParentheticalGroup
         fields = ["score"]
+        ignore_signals = True
 
     def prepare_citation(self, instance):
         return [str(cite) for cite in instance.opinion.cluster.citations.all()]
