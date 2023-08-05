@@ -1,3 +1,4 @@
+import html
 from typing import Dict, List
 
 from eyecite import annotate_citations, clean_text
@@ -78,16 +79,15 @@ def create_cited_html(
             source_text=opinion.source_text,
             unbalanced_tags="skip",  # Don't risk overwriting existing tags
         )
-    else:  # Else, make sure to wrap the new text in <pre> HTML tags...
+    else:  # Else, present `source_text` wrapped in <pre> HTML tags...
         new_html = annotate_citations(
             plain_text=opinion.cleaned_text,
             annotations=[
                 [a[0], f"</pre>{a[1]}", f'{a[2]}<pre class="inline">']
                 for a in generate_annotations(citation_resolutions)
             ],
-            source_text=opinion.source_text,
+            source_text=f'<pre class="inline">{html.escape(opinion.source_text)}</pre>',
         )
-        new_html = f'<pre class="inline">{new_html}</pre>'
 
     # Return the newly-annotated text
     return new_html
