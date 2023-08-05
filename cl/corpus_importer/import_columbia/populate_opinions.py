@@ -263,6 +263,7 @@ def convert_columbia_html(text):
     text = f"<p>{text}</p>"
     text = re.sub(r"</blockquote>\s*<blockquote>", "\n\n", text)
     text = re.sub("\n\n", "</p>\n<p>", text)
+    text = re.sub("\n  ", "</p>\n<p>", text)
     text = re.sub(r"<p>\s*<blockquote>", "<blockquote><p>", text, re.M)
     text = re.sub("</blockquote></p>", "</p></blockquote>", text, re.M)
 
@@ -543,6 +544,7 @@ def add_new_case(
         converted_text = convert_columbia_opinion(
             opinion_info["opinion"] + footnotes, opinion_index
         )
+
         opinion_type = OPINION_TYPE_MAPPING[opinion_info["type"]]
         if opinion_type == Opinion.LEAD and opinion_index > 0:
             opinion_type = Opinion.ADDENDUM

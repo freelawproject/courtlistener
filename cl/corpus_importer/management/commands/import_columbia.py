@@ -372,7 +372,6 @@ def parse_file(file_path: str) -> dict:
         info["opinions"].append(
             {
                 "opinion": opinion.get("opinion"),
-                # "opinion_texts": last_texts,
                 "type": opinion.get("type"),
                 "author": titlecase(opinion_author[0])
                 if opinion_author
