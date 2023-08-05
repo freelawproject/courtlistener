@@ -1,4 +1,8 @@
 #!/bin/bash
+# Run this shell script to purge/refresh CL-related Docker images when:
+# 1) Merging `main` into a working branch;
+# 2) Forking off of `main` to start a new working branch 
+# Run it before using the build script. Usage of both of these shell scripts is optional.
 
 # Stop all running Courtlistener cointainers
 docker-compose -f  ../courtlistener/docker-compose.yml  down

@@ -1,8 +1,11 @@
 #!/bin/sh
-#
-# Build a Docker image from current code instead of using
+# 
+# Builds a Docker image from current code instead of using
 # image pulled from external src. Building locally avoids
 # issue of checked-out code being ahead of image on Docker Hub
+# Use after the clean script. Usage of both of these shell scripts is optional. 
+
+# Build image from local code
 BUILD_ENV=dev
 SHA=`git rev-parse HEAD`
 make -e VERSION=${SHA} -f ../django/Makefile development
