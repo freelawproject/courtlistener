@@ -158,7 +158,7 @@ class CitationTextTest(SimpleTestCase):
 
             # Id. citation across line break
             ('asdf." Id., at 315.\n       Lorem ipsum dolor sit amet',
-             '<pre class="inline">asdf." </pre><span class="citation '
+             '<pre class="inline">asdf.&quot; </pre><span class="citation '
              'no-link">Id., at 315</span><pre class="inline">.\n       Lorem '
              'ipsum dolor sit amet</pre>'),
 
@@ -173,6 +173,10 @@ class CitationTextTest(SimpleTestCase):
              '<pre class="inline">Lorem ipsum dolor sit amet. U.S. Code </pre>'
              '<span class="citation no-link">§3617.</span><pre class="inline">'
              ' Foo bar.</pre>'),
+
+            # Plaintext with HTML text (see Alexis Hunley v. Instagram, LLC)
+            ('<script async src="//www.instagram.com/embed.js"></script>',
+             '<pre class="inline">&lt;script async src=&quot;//www.instagram.com/embed.js&quot;&gt;&lt;/script&gt;</pre>'),
         ]
 
         # fmt: on

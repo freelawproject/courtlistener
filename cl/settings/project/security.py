@@ -85,9 +85,9 @@ CSP_CONNECT_SRC = (
     "'self'",
     f"https://{AWS_S3_CUSTOM_DOMAIN}/",  # for embedded PDFs
     "https://hcaptcha.com/",
-    "https://*.hcaptcha.com",
+    "https://*.hcaptcha.com/",
     "https://plausible.io/",
-    "https://api.stripe.com",
+    "https://api.stripe.com/",
 )
 CSP_FONT_SRC = (
     "'self'",
@@ -98,16 +98,21 @@ CSP_FRAME_SRC = (
     "'self'",
     f"https://{AWS_S3_CUSTOM_DOMAIN}/",  # for embedded PDFs
     "https://hcaptcha.com/",
-    "https://*.hcaptcha.com",
-    "https://js.stripe.com",
-    "https://hooks.stripe.com",
+    "https://*.hcaptcha.com/",
+    "https://js.stripe.com/",
+    "https://hooks.stripe.com/",
 )
 CSP_IMG_SRC = (
     "'self'",
     f"https://{AWS_S3_CUSTOM_DOMAIN}/",
-    "https://portraits.free.law",
+    "https://portraits.free.law/",
     "data:",  # @tailwindcss/forms uses data URIs for images.
-    "https://*.stripe.com",
+    "https://*.stripe.com/",
+)
+CSP_MEDIA_SRC = (
+    "'self'",
+    f"https://{AWS_S3_CUSTOM_DOMAIN}/",
+    "data:",  # Some browser extensions like this.
 )
 CSP_OBJECT_SRC = (
     "'self'",
@@ -118,28 +123,25 @@ CSP_SCRIPT_SRC = (
     "'report-sample'",
     f"https://{AWS_S3_CUSTOM_DOMAIN}/",
     "https://hcaptcha.com/",
-    "https://*.hcaptcha.com",
+    "https://*.hcaptcha.com/",
     "https://plausible.io/",
-    "https://js.stripe.com",
+    "https://js.stripe.com/",
 )
 CSP_STYLE_SRC = (
     "'self'",
     "'report-sample'",
     f"https://{AWS_S3_CUSTOM_DOMAIN}/",
     "https://hcaptcha.com/",
-    "https://*.hcaptcha.com",
+    "https://*.hcaptcha.com/",
     "'unsafe-inline'",
 )
 CSP_DEFAULT_SRC = (
     "'self'",
     f"https://{AWS_S3_CUSTOM_DOMAIN}/",
 )
-CSP_BASE_URI = "'none'"
+CSP_BASE_URI = "'self'"
 CSP_INCLUDE_NONCE_IN = ["script-src"]
 if not any(
     (DEVELOPMENT, TESTING)
 ):  # Development and test aren’t used over HTTPS (yet)
     CSP_UPGRADE_INSECURE_REQUESTS = True
-if SENTRY_REPORT_URI:
-    CSP_REPORT_URI = SENTRY_REPORT_URI
-CSP_REPORT_ONLY = True
