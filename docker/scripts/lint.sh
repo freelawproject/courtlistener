@@ -1,4 +1,6 @@
 #!/bin/sh
+
+
 if [ "$1" = 'restart' ] ; then
     docker-compose -f ../courtlistener/docker-compose.yml restart
 fi
