@@ -10,8 +10,6 @@ services:
   cl-redis:
     container_name: cl-redis
     image: redis
-    ports:
-      - "6379:6379"
     networks:
       - cl_net_overlay
 
@@ -25,8 +23,6 @@ services:
       dockerfile: ../../../courtlistener/docker/postgresql/Dockerfile
       args:
         POSTGRES_VERSION: 15.2-alpine
-    ports:
-      - "5432:5432"
     environment:
       POSTGRES_USER: "postgres"
       POSTGRES_PASSWORD: "postgres"
@@ -99,7 +95,6 @@ services:
     container_name: cl-selenium
     image: seleniarm/standalone-chromium:113.0
     ports:
-      - 4444:4444  # Selenium
       - 5900:5900  # VNC server
     volumes:
       - ${CL_SHM_DIR:-/dev/shm}:/dev/shm
