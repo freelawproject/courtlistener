@@ -1,6 +1,6 @@
-from typing import List, cast, Iterable
 import sys
 import time
+from typing import Iterable, List, cast
 
 from django.conf import settings
 from django.core.management import CommandError, call_command
@@ -10,9 +10,9 @@ from cl.citations.tasks import (
     find_citations_and_parantheticals_for_recap_documents,
 )
 from cl.lib.argparse_types import valid_date_time
-from cl.lib.types import OptionsType
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand
+from cl.lib.types import OptionsType
 from cl.search.models import RECAPDocument
 
 
