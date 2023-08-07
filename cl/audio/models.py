@@ -5,6 +5,7 @@ import pghistory
 from django.db import models
 from django.template import loader
 from django.urls import NoReverseMatch, reverse
+from model_utils import FieldTracker
 
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.date_time import midnight_pt
@@ -146,6 +147,15 @@ class Audio(AbstractDateTimeModel):
         "Speech to text Google response",
         help_text="The JSON response object returned by Google Speech.",
         blank=True,
+    )
+    es_oa_field_tracker = FieldTracker(
+        fields=[
+            "case_name",
+            "duration",
+            "download_url",
+            "local_path_mp3",
+            "source",
+        ]
     )
 
     @property
