@@ -2317,6 +2317,12 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         cls.rebuild_index("alerts.Alert")
 
     @classmethod
+    def delete_documents_from_index(self, index_alias, queries):
+        es_conn = connections.get_connection()
+        for query_id in queries:
+            es_conn.delete(index=index_alias, id=query_id)
+
+    @classmethod
     def tearDownClass(cls):
         Audio.objects.all().delete()
         super().tearDownClass()
@@ -4181,15 +4187,6 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         self.assertEqual(len(response), expected_queries)
         self.assertEqual(self.confirm_query_matched(response, query_id), True)
 
-        # Remove queries from percolator
-        connections.create_connection(
-            hosts=[
-                f"{settings.ELASTICSEARCH_DSL_HOST}:{settings.ELASTICSEARCH_DSL_PORT}"
-            ],
-            timeout=50,
+        self.delete_documents_from_index(
+            "oral_arguments_percolator", created_queries_ids
         )
-        es = Elasticsearch(
-            f"{settings.ELASTICSEARCH_DSL_HOST}:{settings.ELASTICSEARCH_DSL_PORT}"
-        )
-        for query_id in created_queries_ids:
-            es.delete(index="oral_arguments_percolator", id=query_id)
