@@ -40,9 +40,12 @@ def updated_fields(
     """
     # Get the field names being tracked
     if isinstance(es_document, AudioDocument):
-        tracked_set = instance.es_oa_field_tracker
+        tracked_set = getattr(instance, "es_oa_field_tracker", None)
     else:
-        tracked_set = instance.es_pa_field_tracker
+        tracked_set = getattr(instance, "es_pa_field_tracker", None)
+    # Check the set before trying to get the fields
+    if not tracked_set:
+        return []
     # Check each tracked field to see if it has changed
     changed_fields = [
         field
@@ -203,7 +206,7 @@ def update_remove_m2m_documents(
     :return: None
     """
     for key, fields_map in mapping_fields.items():
-        if main_model.__name__.lower() != key:
+        if main_model.__name__.lower() != key:  # type: ignore
             # The m2m relationship is not defined in the main model but
             # we use the relationship to add data to the ES documents.
             main_objects = main_model.objects.filter(**{key: instance})
