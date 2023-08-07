@@ -26,6 +26,7 @@ from cl.search.models import SOURCES, Docket
 class Audio(AbstractDateTimeModel):
     """A class representing oral arguments and their associated metadata"""
 
+    SUPPORT_ALERTS = True
     STT_NEEDED = 0
     STT_COMPLETE = 1
     STT_FAILED = 2

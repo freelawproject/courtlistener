@@ -5,6 +5,8 @@ from django.db.models.signals import m2m_changed, post_delete, post_save
 from elasticsearch.exceptions import NotFoundError
 from elasticsearch_dsl import Document
 
+from cl.alerts.send_alerts import percolate_document, send_rt_alerts
+from cl.audio.models import Audio
 from cl.lib.command_utils import logger
 from cl.search.documents import AudioDocument, ParentheticalGroupDocument
 from cl.search.models import (
@@ -23,6 +25,7 @@ instance_typing = Union[
     OpinionCluster,
     Parenthetical,
     ParentheticalGroup,
+    Audio,
 ]
 es_document_typing = Union[AudioDocument, ParentheticalGroupDocument]
 
@@ -97,11 +100,15 @@ def save_document_in_es(
     """
     es_doc = es_document()
     doc = es_doc.prepare(instance)
-    es_document(meta={"id": instance.pk}, **doc).save(
+    response = es_document(meta={"id": instance.pk}, **doc).save(
         skip_empty=False,
         return_doc_meta=True,
         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
     )
+    support_alerts = getattr(instance, "SUPPORT_ALERTS", None)
+    if support_alerts and response["_version"] == 1:
+        response = percolate_document(response["_id"], "oral_arguments")
+        send_rt_alerts(response, doc)
 
 
 def get_or_create_doc(
