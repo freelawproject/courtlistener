@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Pattern, Tuple, Union
 
 import internetarchive as ia
 import requests
+from asgiref.sync import async_to_sync
 from celery import Task
 from celery.exceptions import SoftTimeLimitExceeded
 from django.conf import settings
@@ -664,7 +665,9 @@ def get_and_process_free_pdf(
 
     # Get the data temporarily. OCR is done for all nightly free
     # docs in a separate batch, but may as well do the easy ones.
-    extract_recap_pdf_base(rd.pk, ocr_available=False, check_if_needed=False)
+    async_to_sync(extract_recap_pdf_base)(
+        rd.pk, ocr_available=False, check_if_needed=False
+    )
     return {"result": result, "rd_pk": rd.pk}
 
 
@@ -1056,7 +1059,7 @@ def do_case_query_by_pacer_case_id(
 
     # Merge the contents into CL.
     if d is None:
-        d = find_docket_object(
+        d = async_to_sync(find_docket_object)(
             court_id, pacer_case_id, docket_data["docket_number"]
         )
 
@@ -1184,7 +1187,7 @@ def make_docket_by_iquery(
         )
         return None
 
-    d = find_docket_object(
+    d = async_to_sync(find_docket_object)(
         court_id,
         str(pacer_case_id),
         report.data["docket_number"],
@@ -1287,7 +1290,7 @@ def get_docket_by_pacer_case_id(
         return None
 
     if d is None:
-        d = find_docket_object(
+        d = async_to_sync(find_docket_object)(
             court_id, pacer_case_id, docket_data["docket_number"]
         )
 
@@ -1365,7 +1368,9 @@ def get_appellate_docket_by_docket_number(
         d = None
 
     if d is None:
-        d = find_docket_object(court_id, docket_number, docket_number)
+        d = async_to_sync(find_docket_object)(
+            court_id, docket_number, docket_number
+        )
 
     rds_created, content_updated = merge_pacer_docket_into_cl_docket(
         d,
@@ -1676,12 +1681,12 @@ def get_document_number_for_appellate(
             pdf_bytes = local_path.read()
     if pdf_bytes:
         # For other jurisdictions try first to get it from the PDF document.
-        dn_response = microservice(
+        dn_response = async_to_sync(microservice)(
             service="document-number",
             file_type="pdf",
             file=pdf_bytes,
         )
-        if dn_response.ok and dn_response.text:
+        if dn_response.is_success and dn_response.text:
             document_number = dn_response.text
 
     if not document_number and pacer_doc_id:
@@ -1783,11 +1788,11 @@ def update_rd_metadata(
     # request.content is sometimes a str, sometimes unicode, so
     # force it all to be bytes, pleasing hashlib.
     rd.sha1 = sha1(pdf_bytes)
-    response = microservice(
+    response = async_to_sync(microservice)(
         service="page-count",
         item=rd,
     )
-    if response.ok:
+    if response.is_success:
         rd.page_count = response.text
 
     # Save and extract, skipping OCR.
@@ -1978,7 +1983,7 @@ def get_pacer_doc_by_rd_and_description(
         return
 
     # Skip OCR for now. It'll happen in a second step.
-    extract_recap_pdf_base(rd.pk, ocr_available=False)
+    async_to_sync(extract_recap_pdf_base)(rd.pk, ocr_available=False)
     add_items_to_solr([rd.pk], "search.RECAPDocument")
 
 

@@ -1,5 +1,6 @@
 from typing import Any
 
+from asgiref.sync import async_to_sync
 from django.core.files.base import ContentFile
 
 from cl.lib.microservice_utils import microservice
@@ -21,12 +22,12 @@ def make_png_thumbnail_for_instance(
     :param max_dimension: The longest you want any edge to be
     """
     item = klass.objects.get(pk=pk)
-    response = microservice(
+    response = async_to_sync(microservice)(
         service="generate-thumbnail",
         item=item,
         params={"max_dimension": max_dimension},
     )
-    if not response.ok:
+    if not response.is_success:
         item.thumbnail_status = THUMBNAIL_STATUSES.FAILED
         item.save()
     else:
