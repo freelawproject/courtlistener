@@ -7,6 +7,7 @@ from cl.audio.models import Audio
 from cl.lib.command_utils import logger
 from cl.lib.elasticsearch_utils import es_index_exists
 from cl.people_db.models import (
+    ABARating,
     Education,
     Person,
     PoliticalAffiliation,
@@ -301,4 +302,28 @@ def remove_education_from_es_index(sender, instance=None, **kwargs):
         logger.error(
             f"The Education instance with ID:{instance.pk} can't be deleted from "
             f"the ES index, it doesn't exists."
+        )
+
+
+@receiver(
+    post_save,
+    sender=ABARating,
+    dispatch_uid=" create_or_update_aba_ratings_in_es_index",
+)
+def create_or_update_aba_ratings_in_es_index(sender, instance=None, **kwargs):
+    """Receiver function that gets called after an Education instance is saved.
+    This method creates or updates an Education object in the EducationDocument
+    index.
+    """
+
+    parent_id = getattr(instance.person, "pk", None)
+    if (
+        es_index_exists("people_db_index")
+        and parent_id
+        and PersonDocument.exists(id=parent_id)
+    ):
+        person_doc = PersonDocument()
+        doc = person_doc.prepare(instance.person)
+        PersonDocument(meta={"id": instance.person.pk}, **doc).save(
+            skip_empty=False, return_doc_meta=True
         )

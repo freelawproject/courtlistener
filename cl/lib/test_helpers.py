@@ -155,6 +155,11 @@ class PeopleTestCase(SimpleTestCase):
             person=cls.person_2,
             school=cls.school_2,
         )
+        cls.education_3 = EducationFactory(
+            degree_level="ba",
+            person=cls.person_3,
+            school=cls.school_1,
+        )
 
         cls.political_affiliation_1 = PoliticalAffiliationFactory.create(
             political_party="d",

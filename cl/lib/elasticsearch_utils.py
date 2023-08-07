@@ -20,7 +20,7 @@ from elasticsearch_dsl.utils import AttrDict
 
 from cl.lib.search_utils import BOOSTS, cleanup_main_query
 from cl.lib.types import CleanData
-from cl.people_db.models import Person, Position
+from cl.people_db.models import Education, Person, Position
 from cl.search.constants import (
     ALERTS_HL_TAG,
     SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS,
@@ -399,7 +399,6 @@ def build_es_main_query(
         or cd["type"] == SEARCH_TYPES.PEOPLE
     ):
         search_query = search_query.sort(build_sort_results(cd))
-
     return search_query, total_query_results, top_hits_limit
 
 
@@ -665,15 +664,48 @@ def merge_unavailable_fields_on_parent_document(
     if search_type == SEARCH_TYPES.PEOPLE:
         # Merge positions courts.
         person_ids = [d["id"] for d in results]
-        positions_in_page = Position.objects.filter(
-            person_id__in=person_ids
-        ).only("court")
+        positions_in_page = Position.objects.filter(person_id__in=person_ids)
+        educations_in_page = Education.objects.filter(person_id__in=person_ids)
         courts_dict: DefaultDict[int, list[str]] = defaultdict(list)
+        appointers_dict: DefaultDict[int, list[str]] = defaultdict(list)
+        selection_methods_dict: DefaultDict[int, list[str]] = defaultdict(list)
+        supervisors_dict: DefaultDict[int, list[str]] = defaultdict(list)
+        predecessors_dict: DefaultDict[int, list[str]] = defaultdict(list)
+        schools_dict: DefaultDict[int, list[str]] = defaultdict(list)
+
         for position in positions_in_page:
-            courts_dict[position.person.pk].append(position.court)
+            if position.court:
+                courts_dict[position.person.pk].append(position.court)
+            # Extract all the positions from DB and linkby judge ID.
+            if position.appointer:
+                appointers_dict[position.person.pk].append(
+                    position.appointer.person.name_full_reverse
+                )
+            if position.how_selected:
+                selection_methods_dict[position.person.pk].append(
+                    position.get_how_selected_display()
+                )
+            if position.supervisor:
+                supervisors_dict[position.person.pk].append(
+                    position.supervisor.name_full_reverse
+                )
+            if position.predecessor:
+                predecessors_dict[position.person.pk].append(
+                    position.predecessor.name_full_reverse
+                )
+
+        for education in educations_in_page:
+            if education.school:
+                schools_dict[education.person.pk].append(education.school.name)
+
         for result in results:
             person_id = result["id"]
             result["court"] = courts_dict.get(person_id)
+            result["appointer"] = appointers_dict.get(person_id)
+            result["selection_method"] = selection_methods_dict.get(person_id)
+            result["supervisor"] = supervisors_dict.get(person_id)
+            result["predecessor"] = predecessors_dict.get(person_id)
+            result["school"] = schools_dict.get(person_id)
 
 
 def fetch_es_results(

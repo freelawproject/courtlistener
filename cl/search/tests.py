@@ -75,6 +75,7 @@ from cl.search.documents import (
     AudioPercolator,
     ParentheticalGroupDocument,
     PersonDocument,
+    PositionDocument,
 )
 from cl.search.factories import (
     CitationWithParentsFactory,
@@ -4918,6 +4919,25 @@ class PeopleSearchTestElasticSearch(
         )
         return r
 
+    @staticmethod
+    def _get_meta_value(article, html_content, header):
+        tree = html.fromstring(html_content)
+        article = tree.xpath("//article")[article]
+        for element in article.xpath('//span[@class="meta-data-header"]'):
+            if element.text_content() == header:
+                value_element = element.getnext()
+                if (
+                    value_element is not None
+                    and (
+                        value_element.tag == "span"
+                        or value_element.tag == "time"
+                    )
+                    and "meta-data-value" in value_element.classes
+                ):
+                    value_str = value_element.text_content()
+                    return " ".join(value_str.split())
+        return None
+
     def test_index_parent_and_child_objects(self) -> None:
         """Confirm Parent object and child objects are properly indexed."""
 
@@ -5462,6 +5482,101 @@ class PeopleSearchTestElasticSearch(
         r = self._test_api_results_count(params, 1, "q")
         self.assertIn("Olivia", r.content.decode())
 
+    def test_parent_document_fields_on_search_results(self):
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "name:Judith Sheindlin Susan",
+        }
+        r = self._test_article_count(params, 1, "q")
+
+        born = self._get_meta_value(0, r.content.decode(), "Born:")
+        self.assertEqual(born, "October 21, 1942 in Brookyln, New York")
+
+        deceased = self._get_meta_value(0, r.content.decode(), "Deceased:")
+        self.assertEqual(deceased, "November 25, 2020")
+
+        political_affiliations = self._get_meta_value(
+            0, r.content.decode(), "Political Affiliations:"
+        )
+        self.assertEqual(
+            political_affiliations,
+            self.political_affiliation_2.get_political_party_display(),
+        )
+
+        aba_ratings = self._get_meta_value(
+            0, r.content.decode(), "ABA Ratings:"
+        )
+        self.assertEqual(aba_ratings, self.aba_rating_1.get_rating_display())
+
+    def test_merge_unavailable_fields_on_parent_document(self):
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "name:Judith Sheindlin Olivia",
+        }
+        r = self._test_article_count(params, 1, "q")
+
+        appointers = self._get_meta_value(0, r.content.decode(), "Appointers:")
+        self.assertEqual(appointers, self.person_1.name_full_reverse)
+
+        selection_methods = self._get_meta_value(
+            0, r.content.decode(), "Selection Methods:"
+        )
+        self.assertEqual(
+            selection_methods, self.position_4.get_how_selected_display()
+        )
+
+        selection_methods = self._get_meta_value(
+            0, r.content.decode(), "Selection Methods:"
+        )
+        self.assertEqual(
+            selection_methods, self.position_4.get_how_selected_display()
+        )
+
+        predecessors = self._get_meta_value(
+            0, r.content.decode(), "Predecessors:"
+        )
+        self.assertEqual(predecessors, self.person_3.name_full_reverse)
+
+        person = PersonFactory.create(name_first="John American")
+        position_5 = PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            court=self.court_1,
+            date_start=datetime.date(2015, 12, 14),
+            predecessor=self.person_2,
+            appointer=self.position_1,
+            judicial_committee_action="no_rep",
+            termination_reason="retire_mand",
+            position_type="c-jud",
+            person=person,
+            how_selected="e_part",
+            nomination_process="fed_senate",
+        )
+
+        position_6 = PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            court=self.court_1,
+            date_start=datetime.date(2015, 12, 14),
+            predecessor=self.person_2,
+            appointer=self.position_1,
+            judicial_committee_action="no_rep",
+            termination_reason="retire_mand",
+            position_type="clerk",
+            person=self.person_3,
+            supervisor=person,
+            how_selected="e_part",
+            nomination_process="fed_senate",
+        )
+        PersonDocument._index.refresh()
+
+        r = self._test_article_count(params, 1, "q")
+        supervisors = self._get_meta_value(
+            0, r.content.decode(), "Supervisors:"
+        )
+        self.assertEqual(supervisors, position_6.supervisor.name_full_reverse)
+
+        schools = self._get_meta_value(0, r.content.decode(), "Schools:")
+        self.assertEqual(schools, self.education_3.school.name)
+
     def test_has_child_queries_combine_filters(self) -> None:
         """Test confirm if we can combine multiple has child filter inner hits
         into a single dict.
@@ -5476,8 +5591,14 @@ class PeopleSearchTestElasticSearch(
         s, total_query_results, top_hits_limit = build_es_main_query(
             search_query, cd
         )
-        self.assertEqual(s.count(), 1)
+
+        # Main result.
+        # Person 3 Judith Susan Sheindlin II
+        #    Inner hits:
+        #       Position 2
+        #          Appointer Bill Clinton.
         response = s.execute().to_dict()
+        self.assertEqual(s.count(), 1)
         self.assertEqual(
             1,
             len(
@@ -5492,3 +5613,166 @@ class PeopleSearchTestElasticSearch(
                 "hits"
             ]["hits"][0]["_source"]["appointer"],
         )
+
+        appointer = PersonFactory.create(
+            name_first="Obama", name_last="Clinton"
+        )
+        position_obama = PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            date_start=datetime.date(1993, 1, 20),
+            date_retirement=datetime.date(2001, 1, 20),
+            termination_reason="retire_mand",
+            position_type="pres",
+            person=appointer,
+            how_selected="e_part",
+        )
+        PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            court=self.court_1,
+            date_start=datetime.date(2015, 12, 14),
+            predecessor=self.person_3,
+            appointer=position_obama,
+            judicial_committee_action="no_rep",
+            termination_reason="retire_mand",
+            position_type="c-jud",
+            person=self.person_2,
+            how_selected="e_part",
+            nomination_process="fed_senate",
+        )
+        PersonDocument._index.refresh()
+
+        search_query = PersonDocument.search()
+        s, total_query_results, top_hits_limit = build_es_main_query(
+            search_query, cd
+        )
+        response = s.execute().to_dict()
+        # Main result. All Courts
+        # Person 3 Judith Susan Sheindlin II
+        #    Inner hits:
+        #       Position 2
+        #          Appointer Bill Clinton.
+        #       Position 5
+        #          Appointer Bill Obama
+
+        self.assertEqual(s.count(), 1)
+        self.assertEqual(
+            2,
+            len(
+                response["hits"]["hits"][0]["inner_hits"][
+                    "filter_inner_position"
+                ]["hits"]["hits"]
+            ),
+        )
+        self.assertIn(
+            "Bill",
+            response["hits"]["hits"][0]["inner_hits"]["filter_inner_position"][
+                "hits"
+            ]["hits"][0]["_source"]["appointer"],
+        )
+        self.assertIn(
+            "Obama",
+            response["hits"]["hits"][0]["inner_hits"]["filter_inner_position"][
+                "hits"
+            ]["hits"][1]["_source"]["appointer"],
+        )
+
+        cd = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "appointer": "clinton",
+            "selection_method": "e_part",
+            "court": "ca5",
+            "order_by": "name_reverse asc",
+        }
+        search_query = PersonDocument.search()
+        s, total_query_results, top_hits_limit = build_es_main_query(
+            search_query, cd
+        )
+        # Main result. Court that doesn't belong any of the positions
+        # No results
+        self.assertEqual(s.count(), 0)
+
+        cd = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "appointer": "clinton",
+            "order_by": "name_reverse asc",
+        }
+
+        search_query = PersonDocument.search()
+        s, total_query_results, top_hits_limit = build_es_main_query(
+            search_query, cd
+        )
+        # Two main results, matched by has_child.
+        # [parent_filter, has_child_filters[]]
+        # Only 1 result.
+        self.assertEqual(s.count(), 2)
+
+        cd = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "appointer": "clinton",
+            "name": "olivia",
+            "order_by": "name_reverse asc",
+        }
+
+        search_query = PersonDocument.search()
+        s, total_query_results, top_hits_limit = build_es_main_query(
+            search_query, cd
+        )
+        # Main result. Combine has child filters and parent filter.
+        # Must:
+        # [parent_filter, has_child_filters[]]
+        # Only 1 result.
+        self.assertEqual(s.count(), 1)
+
+        # Include Education.
+        cd = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "appointer": "clinton",
+            "school": "american",
+            "order_by": "name_reverse asc",
+        }
+
+        search_query = PersonDocument.search()
+        s, total_query_results, top_hits_limit = build_es_main_query(
+            search_query, cd
+        )
+        self.assertEqual(s.count(), 1)
+
+        cd = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "clinton Olivia",
+            "order_by": "name_reverse asc",
+        }
+
+        search_query = PersonDocument.search()
+        s, total_query_results, top_hits_limit = build_es_main_query(
+            search_query, cd
+        )
+        # No results since by default string queries work as phrase (AND)
+        self.assertEqual(s.count(), 0)
+
+        cd = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "clinton OR Olivia",
+            "order_by": "name_reverse asc",
+        }
+
+        search_query = PersonDocument.search()
+        s, total_query_results, top_hits_limit = build_es_main_query(
+            search_query, cd
+        )
+        # Two main results, matched by string queries on parent and position
+        self.assertEqual(s.count(), 2)
+
+        # Include Education.
+        cd = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "appointer": "obama",
+            "q": "clinton",
+            "order_by": "name_reverse asc",
+        }
+
+        search_query = PersonDocument.search()
+        s, total_query_results, top_hits_limit = build_es_main_query(
+            search_query, cd
+        )
+        self.assertEqual(s.count(), 1)
