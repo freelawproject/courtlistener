@@ -203,19 +203,41 @@ def update_remove_m2m_documents(
     :return: None
     """
     for key, fields_map in mapping_fields.items():
-        main_objects = main_model.objects.filter(**{key: instance})
-        for main_object in main_objects:
-            main_doc = get_or_create_doc(es_document, main_object)
-            if not main_doc:
-                return
-            get_m2m_value = getattr(main_doc, f"prepare_{affected_field}")(
-                main_object
+        if main_model.__name__.lower() != key:
+            # The m2m relationship is not defined in the main model but
+            # we use the relationship to add data to the ES documents.
+            main_objects = main_model.objects.filter(**{key: instance})
+            for main_object in main_objects:
+                update_m2m_field_in_es_document(
+                    main_object, es_document, affected_field
+                )
+        else:
+            update_m2m_field_in_es_document(
+                instance, es_document, affected_field
             )
-            Document.update(
-                main_doc,
-                **{affected_field: get_m2m_value},
-                refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
-            )
+
+
+def update_m2m_field_in_es_document(
+    instance: instance_typing,
+    es_document: es_document_typing,
+    affected_field: str,
+) -> None:
+    """Update a single field created using a many-to-many relationship.
+    :param instance: The instance of the document to update.
+    :param es_document: The Elasticsearch document type.
+    :param affected_field: The name of the field that has many-to-many
+    relationships with the instance.
+    :return: None
+    """
+    document = get_or_create_doc(es_document, instance)
+    if not document:
+        return
+    get_m2m_value = getattr(document, f"prepare_{affected_field}")(instance)
+    Document.update(
+        document,
+        **{affected_field: get_m2m_value},
+        refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
+    )
 
 
 def update_reverse_related_documents(
