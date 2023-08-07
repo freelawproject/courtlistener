@@ -66,10 +66,9 @@
         <li><a href="#og-court-info-endpoint">{% url 'originatingcourtinformation-list' version="v3" %}</a></li>
         <li><a href="#idb-data-endpoint">{% url 'fjcintegrateddatabase-list' version="v3" %}</a></li>
         <li><a href="#docket-entry-endpoint">{% url "docketentry-list" version="v3" %}
-          <span
-            class="alt">&amp;</span> {% url "recapdocument-list" version="v3" %}</a></li>
+          &amp; {% url "recapdocument-list" version="v3" %}</a></li>
         <li><a href="#party-and-attorney-endpoints">{% url "party-list" version="v3" %}
-          <span class="alt">&amp;</span> {% url "attorney-list" version="v3" %}</a></li>
+          &amp; {% url "attorney-list" version="v3" %}</a></li>
         <li><a href="#cluster-endpoint">{% url "opinioncluster-list" version="v3" %}</a></li>
         <li><a href="#opinion-endpoint">{% url "opinion-list" version="v3" %}</a></li>
         <li><a href="#audio-endpoint">{% url "audio-list" version="v3" %}</a></li>
@@ -114,10 +113,16 @@
         </li>
         <li>
           <a href="#visualization-endpoint">{% url "scotusmap-list" version="v3" %}
-            <span class="alt">&amp;</span> {% url "jsonversion-list" version="v3" %}</a>
+            &amp; {% url "jsonversion-list" version="v3" %}</a>
         </li>
       </ul>
     </li>
+    <li><a href="#available-jurisdictions">Available Jurisdictions</a></li>
+    <li><a href="#powered-by">Powered By</a></li>
+    <li><a href="#citegeist-scores">CiteGeist Scores</a></li>
+    <li><a href="#maintenance-schedule">Maintenance Schedule</a></li>
+    <li><a href="#browser-tools">Browser Tools</a></li>
     <li><a href="#footnotes">Footnotes</a></li>
+    <li><a href="#api-change-log">API Change Log</a></li>
   </ul>
 </div>

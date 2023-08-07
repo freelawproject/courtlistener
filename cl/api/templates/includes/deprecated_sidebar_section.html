@@ -1,5 +1,5 @@
 <div class="sidebar-section">
-  <h3><span>API Change Log</span></h3>
+  <h3 id="api-change-log"><span>API Change Log</span></h3>
   <ul>
     <li>
       <p><strong>v3.14</strong> &mdash; This release blocks users from paginating past page 100 in the API. This release is not backwards incompatible, but is being released on an emergency basis to stop crawlers that have been impacting our database tier. In our performance documentation, we have long warned against using deep pagination. Now it is blocked. If you need this functionality for your application, please consider using filters to complete your crawling instead.
