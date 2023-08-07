@@ -40,9 +40,12 @@ def updated_fields(
     """
     # Get the field names being tracked
     if isinstance(es_document, AudioDocument):
-        tracked_set = instance.es_oa_field_tracker
+        tracked_set = getattr(instance, "es_oa_field_tracker", None)
     else:
-        tracked_set = instance.es_pa_field_tracker
+        tracked_set = getattr(instance, "es_pa_field_tracker", None)
+    # Check the set before trying to get the fields
+    if not tracked_set:
+        return []
     # Check each tracked field to see if it has changed
     changed_fields = [
         field
