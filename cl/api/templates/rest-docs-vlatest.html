@@ -1058,33 +1058,9 @@ PACER_TO_CL_IDS = {
     <p>Visualizations can be marked as deleted by flipping the <code>deleted</code> field to <code>True</code>, or can be deleted forthright via a <code>DELETE</code> request.</p>
     
     <h2 id="available-jurisdictions"><span>Available Jurisdictions</span></h2>
-    <p>We currently have <strong>{{ court_count }}</strong> jurisdictions that can be accessed with our APIs. Details about the jurisdictions that are available can <a href="{% url "court_index" %}">be found here</a>.
+    <p>We currently have <strong>{{ court_count }}</strong> jurisdictions that can be accessed with our APIs. Details about the jurisdictions that are available, including all abbreviations, can <a href="{% url "court_index" %}">be found here</a>.
     </p>
-    <p>Below is a cheat sheet listing the abbreviations for all available jurisdictions.</p>
-    <div id="scrollable-jurisdictions">
-      <table class="table settings-table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th title="Gathered from Blue Book, Cornell.edu and ALWD">Abbreviation</th>
-            <th title="The number of cases in this jurisdiction on CourtListener">Count</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for court in courts %}
-          <tr>
-            <td>{{ court.full_name }}</td>
-            <td>
-              <a href="/?q=&court_{{ court.pk }}=on&order_by=score+desc"
-                  rel="nofollow"
-              >{{ court.pk }}</a>
-            </td>
-            <td>{{ court.count }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+
 
     <h2 id="powered-by"><span>Powered By</span></h2>
     <p> If you are interested, we have a variety of <a href="https://free.law/press-assets/">"Powered By" logos</a> available for your website or application. We appreciate a reference, and it supports our work, but it's not currently required.
