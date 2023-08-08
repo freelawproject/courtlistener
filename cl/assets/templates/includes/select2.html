@@ -7,7 +7,7 @@
   <script defer type="application/javascript"
           src="{% static "js/select2.min.js" %}"></script>
 {% endif %}
-<script type="text/javascript">
+<script type="text/javascript" nonce="{{ request.csp_nonce }}">
   $(document).ready(function() {
 
     $.each(array_forms, function(i, item) {

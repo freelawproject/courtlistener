@@ -6,6 +6,7 @@ from urllib.parse import urlencode
 
 import eyecite
 import natsort
+from asgiref.sync import sync_to_async
 from django.contrib import messages
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
@@ -40,7 +41,6 @@ from cl.lib.bot_detector import is_og_bot
 from cl.lib.http import is_ajax
 from cl.lib.model_helpers import choices_to_csv
 from cl.lib.models import THUMBNAIL_STATUSES
-from cl.lib.ratelimiter import ratelimit_deny_list
 from cl.lib.search_utils import (
     get_citing_clusters_with_cache,
     get_related_clusters_with_cache,
@@ -181,12 +181,12 @@ def redirect_og_lookup(request: HttpRequest) -> HttpResponse:
         )
 
 
-def redirect_docket_recap(
+async def redirect_docket_recap(
     request: HttpRequest,
     court: Court,
     pacer_case_id: str,
 ) -> HttpResponseRedirect:
-    docket = get_object_or_404(
+    docket = await sync_to_async(get_object_or_404)(
         Docket, pacer_case_id=pacer_case_id, court=court
     )
     return HttpResponseRedirect(
@@ -257,7 +257,6 @@ def core_docket_data(
     )
 
 
-@ratelimit_deny_list
 def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     docket, context = core_docket_data(request, pk)
     increment_view_count(docket, request)
@@ -304,7 +303,6 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     return TemplateResponse(request, "docket.html", context)
 
 
-@ratelimit_deny_list
 def view_parties(
     request: HttpRequest,
     docket_id: int,
@@ -360,7 +358,6 @@ def view_parties(
     return TemplateResponse(request, "docket_parties.html", context)
 
 
-@ratelimit_deny_list
 def docket_idb_data(
     request: HttpRequest,
     docket_id: int,
@@ -435,7 +432,6 @@ def make_thumb_if_needed(
     return rd
 
 
-@ratelimit_deny_list
 def view_recap_document(
     request: HttpRequest,
     docket_id: int | None = None,
@@ -540,7 +536,6 @@ def view_recap_document(
 
 
 @never_cache
-@ratelimit_deny_list
 def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     """Using the cluster ID, return the cluster of opinions.
 
@@ -629,7 +624,6 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     )
 
 
-@ratelimit_deny_list
 def view_summaries(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     cluster = get_object_or_404(OpinionCluster, pk=pk)
     parenthetical_groups = list(
@@ -658,7 +652,6 @@ def view_summaries(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     )
 
 
-@ratelimit_deny_list
 def view_authorities(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     cluster = get_object_or_404(OpinionCluster, pk=pk)
 
@@ -674,7 +667,6 @@ def view_authorities(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     )
 
 
-@ratelimit_deny_list
 def cluster_visualizations(
     request: HttpRequest, pk: int, slug: str
 ) -> HttpResponse:

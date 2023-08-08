@@ -45,6 +45,7 @@ class PositionFactory(DjangoModelFactory):
 class PersonWithChildrenFactory(PersonFactory):
     positions = RelatedFactory(
         PositionFactory,
+        factory_related_name="person",
     )
 
 
