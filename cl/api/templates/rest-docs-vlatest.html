@@ -522,7 +522,7 @@
     </p>
 
 
-    <h3 id="docket-entry-endpoint">{% url "docketentry-list" version="v3" %} <span class="alt">&amp;</span> {% url "recapdocument-list" version="v3" %}</h3>
+    <h3 id="docket-entry-endpoint">{% url "docketentry-list" version="v3" %} &amp; {% url "recapdocument-list" version="v3" %}</h3>
     <p><code>Docket Entry</code> objects represent the rows on a PACER docket, and contain nested <code>RECAP Document</code> objects. This follows the design on PACER, in which a single row on a docket may represent a document and several additional attachments.
     </p>
     <p>One comment about the <code>entry_number</code> field. In district courts, this number is consistently provided by the court, and is usually a number between zero and the low thousands (depending on the length of the case). In appellate court, this number is not provided by some courts, and so we use the internal PACER document ID to populate this field. We <a href="https://law.builders/@flp/109554336659947687">are advocating</a> for courts to always use docket entry numbers.
@@ -535,7 +535,7 @@
     {% endif %}
 
 
-    <h3 id="party-and-attorney-endpoints">{% url "party-list" version="v3" %} <span class="alt">&amp;</span> {% url "attorney-list" version="v3" %}</h3>
+    <h3 id="party-and-attorney-endpoints">{% url "party-list" version="v3" %} &amp; {% url "attorney-list" version="v3" %}</h3>
     <p>The <code>Party</code> and <code>Attorney</code> endpoints provide details about parties and attorneys that have been involved in federal cases in PACER. Each endpoint can be filtered by docket ID as described above, and lists the relationship of parties to attorneys according to the <code>role</code> field.
     </p>
     <p>As with all other endpoints, you can look up the field descriptions, filtering options, ordering options, and rendering options by making an OPTIONS request.
@@ -1034,7 +1034,7 @@ PACER_TO_CL_IDS = {
   "{% get_full_host %}{% url "docket-alert-list" version="v3" %}"</pre>
 
     <h3 id="visualization-endpoint">{% url "scotusmap-list" version="v3" %}
-      <span class="alt">&amp;</span> {% url "jsonversion-list" version="v3" %}</h3>
+      &amp; {% url "jsonversion-list" version="v3" %}</h3>
     <p>These endpoints allow you to programmatically see and create <a href="{% url "mapper_homepage" %}">visualizations of Supreme Court networks</a> in CourtListener. All visualizations are associated with a user and are private by default. When you GET these endpoints, you will see data for visualizations that have been made public by their owners or that you have created yourself.
     </p>
     <p>
@@ -1091,7 +1091,10 @@ PACER_TO_CL_IDS = {
     <p><a href="#fn-ref-1">Back to reference 1 &#8617;</a></p>
     <p><a href="#fn-ref-2">Back to reference 2 &#8617;</a></p>
 
-    {% include "includes/deprecated_sidebar_section.html" %}
+    <h2 id="footnotes">API Change Log</h2>
+    <p><a href="{% url "rest_change_log" %}"
+          class="btn btn-lg btn-primary">View REST API Change Log</a>
+    </p>
 
     <h2 id="copyright"><span>Copyright</span></h2>
     <p>Our data is free of known copyright restrictions.<br />
