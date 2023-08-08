@@ -146,7 +146,7 @@ class Command(VerboseCommand):
 
             self.count = query.count()
             self.average_per_s = 0.0
-            self.timings: List[float] = []
+            self.timings = []
 
             document_pks = query.values_list("pk", flat=True).iterator()
             queue = cast(str, options["queue"])
