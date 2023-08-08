@@ -1231,8 +1231,10 @@ class JudgeSearchTest(IndexedSolrTestCase):
         )
         return r
 
-    def _test_api_results_count(self, params, expected_count, field_name):
-        r = self.client.get(
+    async def _test_api_results_count(
+        self, params, expected_count, field_name
+    ):
+        r = await self.async_client.get(
             reverse("search-list", kwargs={"version": "v3"}), params
         )
         got = len(r.data["results"])
@@ -1421,7 +1423,7 @@ class JudgeSearchTest(IndexedSolrTestCase):
         # API
         self._test_api_results_count(params, 0, "political_affiliation")
 
-    def test_search_query_and_order(self) -> None:
+    async def test_search_query_and_order(self) -> None:
         # Search by name and relevance result order.
         # Frontend
         params = {
@@ -1429,7 +1431,7 @@ class JudgeSearchTest(IndexedSolrTestCase):
             "q": "Judith Sheindlin",
             "order_by": "score desc",
         }
-        r = self._test_article_count(params, 2, "q")
+        r = await self._test_article_count(params, 2, "q")
         self.assertTrue(
             r.content.decode().index("Susan")
             < r.content.decode().index("Olivia"),
@@ -1445,7 +1447,7 @@ class JudgeSearchTest(IndexedSolrTestCase):
             "q": "Judith Sheindlin",
             "order_by": "dob desc,name_reverse asc",
         }
-        r = self._test_article_count(params, 2, "q")
+        r = await self._test_article_count(params, 2, "q")
         self.assertTrue(
             r.content.decode().index("Olivia")
             < r.content.decode().index("Susan"),
@@ -1465,7 +1467,7 @@ class JudgeSearchTest(IndexedSolrTestCase):
         # API
         self._test_api_results_count(params, 1, "q + school")
 
-    def test_advanced_search(self) -> None:
+    async def test_advanced_search(self) -> None:
         # Search by advanced field.
         # Frontend
         params = {"type": SEARCH_TYPES.PEOPLE, "q": "name:Judith Sheindlin"}
@@ -1479,14 +1481,14 @@ class JudgeSearchTest(IndexedSolrTestCase):
             "q": "name:Judith Sheindlin AND dob_city:Queens",
         }
         # Frontend
-        r = self._test_article_count(
+        r = await self._test_article_count(
             params,
             1,
             "q",
         )
         self.assertIn("Olivia", r.content.decode())
         # API
-        r = self._test_api_results_count(params, 1, "q")
+        r = await self._test_api_results_count(params, 1, "q")
         self.assertIn("Olivia", r.content.decode())
 
 
