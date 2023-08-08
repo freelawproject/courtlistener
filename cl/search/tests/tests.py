@@ -3992,11 +3992,12 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             self.assertEqual(results[0].docketNumber, "1:22-bk-12345")
             self.assertEqual(results[0].panel_ids, [])
 
-            # Update docket number.
+            # Update docket number and dateArgued
             docket_5.docket_number = "23-98765"
+            docket_5.date_argued = datetime.date(2023, 5, 15)
             docket_5.save()
             AudioDocument._index.refresh()
-            # Confirm docket number is updated in the index.
+            # Confirm docket number and dateArgued are updated in the index.
             s, total_query_results, top_hits_limit = build_es_main_query(
                 search_query, cd
             )
@@ -4004,6 +4005,9 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             results = s.execute()
             self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. USA")
             self.assertEqual(results[0].docketNumber, "23-98765")
+            self.assertEqual(
+                results[0].dateArgued, datetime.datetime(2023, 5, 15, 0, 0)
+            )
 
             # Trigger a ManyToMany insert.
             audio_7.refresh_from_db()
@@ -4018,6 +4022,18 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
             results = s.execute()
             self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. IRS")
             self.assertEqual(results[0].panel_ids, [self.author.pk])
+
+            # Confirm duration is updated in the index after Audio is updated.
+            audio_7.duration = 322
+            audio_7.save()
+            audio_7.refresh_from_db()
+            s, total_query_results, top_hits_limit = build_es_main_query(
+                search_query, cd
+            )
+            self.assertEqual(s.count(), 1)
+            results = s.execute()
+            self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. IRS")
+            self.assertEqual(results[0].duration, audio_7.duration)
 
             # Delete parent docket.
             docket_5.delete()

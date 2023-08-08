@@ -148,15 +148,6 @@ class Audio(AbstractDateTimeModel):
         help_text="The JSON response object returned by Google Speech.",
         blank=True,
     )
-    es_oa_field_tracker = FieldTracker(
-        fields=[
-            "case_name",
-            "duration",
-            "download_url",
-            "local_path_mp3",
-            "source",
-        ]
-    )
 
     @property
     def transcript(self) -> str:

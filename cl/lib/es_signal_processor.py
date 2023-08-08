@@ -39,7 +39,8 @@ def updated_fields(
     :return: A list of the names of fields that have changed in the instance.
     """
     # Get the field names being tracked
-    if isinstance(es_document, AudioDocument):
+
+    if es_document is AudioDocument:
         tracked_set = getattr(instance, "es_oa_field_tracker", None)
     else:
         tracked_set = getattr(instance, "es_pa_field_tracker", None)
