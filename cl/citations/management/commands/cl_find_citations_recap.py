@@ -96,7 +96,7 @@ class Command(VerboseCommand):
         sys.stdout.flush()
 
         chunk = []
-        chunk_size = 100
+        chunk_size = 25
         processed_count = 0
         throttle = CeleryThrottle(queue_name=queue_name)
 
@@ -142,7 +142,7 @@ class Command(VerboseCommand):
                 "everything."
             )
 
-        query = RECAPDocument.objects.all().order_by("pk")
+        query = RECAPDocument.objects.filter(is_available=True).order_by("pk")
         if options.get("doc_id"):
             query = query.filter(pk__in=options["doc_id"])
         if options.get("end_id"):
@@ -158,9 +158,6 @@ class Command(VerboseCommand):
 
         if options.get("uploaded_before"):
             query = query.filter(date_upload__lte=options["uploaded_before"])
-
-        if options.get("all"):
-            query = RECAPDocument.objects.all()
 
         self.count = query.count()
         self.average_per_s = 0.0
