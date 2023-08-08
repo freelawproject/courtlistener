@@ -206,7 +206,7 @@ def update_remove_m2m_documents(
     :return: None
     """
     for key, fields_map in mapping_fields.items():
-        if main_model.__name__.lower() != key:
+        if main_model.__name__.lower() != key:  # type: ignore
             # The m2m relationship is not defined in the main model but
             # we use the relationship to add data to the ES documents.
             main_objects = main_model.objects.filter(**{key: instance})
