@@ -37,22 +37,20 @@ class Command(VerboseCommand):
             help="end id for a range of documents to update (inclusive)",
         )
         parser.add_argument(
-            "--filed-after",
-            type=valid_date_time,
-            help="Start date in ISO-8601 format for a range of documents to "
-            "update.",
-        )
-        parser.add_argument(
-            "--filed-before",
-            type=valid_date_time,
-            help="End date in ISO-8601 format for a range of documents to "
-            "update.",
-        )
-        parser.add_argument(
             "--modified-after",
             type=valid_date_time,
             help="The modification date ISO-8601 format for a range of "
             "documents to update.",
+        )
+        parser.add_argument(
+            "--uploaded-before",
+            type=valid_date_time,
+            help="Parse documents uploaded to RECAP before this date.",
+        )
+        parser.add_argument(
+            "--uploaded-after",
+            type=valid_date_time,
+            help="Parse documents uploaded to RECAP after this date.",
         )
         parser.add_argument(
             "--all",
@@ -122,8 +120,8 @@ class Command(VerboseCommand):
         both_list_and_endpoints = options.get("doc_id") is not None and (
             options.get("start_id") is not None
             or options.get("end_id") is not None
-            or options.get("filed_after") is not None
-            or options.get("filed_before") is not None
+            or options.get("uploaded_before") is None
+            or options.get("uploaded_after") is None
             or options.get("modified_after") is not None
         )
         no_option = not any(
@@ -131,8 +129,8 @@ class Command(VerboseCommand):
                 options.get("doc_id") is None,
                 options.get("start_id") is None,
                 options.get("end_id") is None,
-                options.get("filed_after") is None,
-                options.get("filed_before") is None,
+                options.get("uploaded_before") is None,
+                options.get("uploaded_after") is None,
                 options.get("modified_after") is None,
                 options.get("all") is False,
             ]
@@ -144,7 +142,6 @@ class Command(VerboseCommand):
                 "everything."
             )
 
-        self.index = options["index"]
         query = RECAPDocument.objects.all().order_by("pk")
         if options.get("doc_id"):
             query = query.filter(pk__in=options["doc_id"])
@@ -153,18 +150,14 @@ class Command(VerboseCommand):
         if options.get("start_id"):
             query = query.filter(pk__gte=options["start_id"])
 
-        if options.get("filed_after"):
-            query = query.filter(
-                cluster__date_filed__gte=options["filed_after"]
-            )
-
-        if options.get("filed_before"):
-            query = query.filter(
-                cluster__date_filed__lte=options["filed_before"]
-            )
-
         if options.get("modified_after"):
             query = query.filter(date_modified__gte=options["modified_after"])
+
+        if options.get("uploaded_after"):
+            query = query.filter(date_upload__gte=options["uploaded_after"])
+
+        if options.get("uploaded_before"):
+            query = query.filter(date_upload__lte=options["uploaded_before"])
 
         if options.get("all"):
             query = RECAPDocument.objects.all()
