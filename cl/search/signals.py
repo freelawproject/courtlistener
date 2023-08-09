@@ -165,7 +165,7 @@ def create_or_update_position_in_es_index(sender, instance=None, **kwargs):
 @receiver(
     post_save,
     sender=Education,
-    dispatch_uid=" create_or_update_education_in_es_index",
+    dispatch_uid="create_or_update_education_in_es_index",
 )
 def create_or_update_education_in_es_index(sender, instance=None, **kwargs):
     """Receiver function that gets called after an Education instance is saved.
@@ -189,7 +189,7 @@ def create_or_update_education_in_es_index(sender, instance=None, **kwargs):
 @receiver(
     post_save,
     sender=PoliticalAffiliation,
-    dispatch_uid=" create_or_update_political_affiliation_in_es_index",
+    dispatch_uid="create_or_update_political_affiliation_in_es_index",
 )
 def create_or_update_affiliation_in_es_index(sender, instance=None, **kwargs):
     """Receiver function that gets called after an Education instance is saved.
