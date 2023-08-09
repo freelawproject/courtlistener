@@ -16,7 +16,6 @@ from cl.people_db.models import (
 from cl.search.documents import (
     PEOPLE_DOCS_TYPE_ID,
     AudioDocument,
-    EducationDocument,
     PersonDocument,
     PositionDocument,
 )
@@ -180,14 +179,11 @@ def create_or_update_education_in_es_index(sender, instance=None, **kwargs):
         and parent_id
         and PersonDocument.exists(id=parent_id)
     ):
-        education_doc = EducationDocument()
-        doc = education_doc.prepare(instance)
-        doc_id = PEOPLE_DOCS_TYPE_ID(instance.pk).EDUCATION
-        EducationDocument(
-            meta={"id": doc_id},
-            _routing=parent_id,
-            **doc,
-        ).save(skip_empty=False)
+        person_doc = PersonDocument()
+        doc = person_doc.prepare(instance.person)
+        PersonDocument(meta={"id": instance.person.pk}, **doc).save(
+            skip_empty=False, return_doc_meta=True
+        )
 
 
 @receiver(
@@ -240,17 +236,10 @@ def remove_person_from_es_index(sender, instance=None, **kwargs):
         doc.delete()
 
         position_objects = instance.positions.all()
-        education_objects = instance.educations.all()
         for position in position_objects:
             doc_id = PEOPLE_DOCS_TYPE_ID(position.pk).POSITION
             if PositionDocument.exists(id=doc_id):
                 doc = PositionDocument.get(id=doc_id)
-                doc.delete()
-
-        for education in education_objects:
-            doc_id = PEOPLE_DOCS_TYPE_ID(education.pk).EDUCATION
-            if EducationDocument.exists(id=doc_id):
-                doc = EducationDocument.get(id=doc_id)
                 doc.delete()
 
     else:
@@ -290,29 +279,52 @@ def remove_position_from_es_index(sender, instance=None, **kwargs):
 )
 def remove_education_from_es_index(sender, instance=None, **kwargs):
     """Receiver function that gets called after an Education instance is deleted.
-    This function removes an Education document from the ES index.
+    This function removes an Education fields from the ES index.
     """
-    # Check if the document exists before deleting it
-    doc_id = PEOPLE_DOCS_TYPE_ID(instance.pk).EDUCATION
-    if EducationDocument.exists(id=doc_id):
-        doc = EducationDocument.get(id=doc_id)
-        doc.delete()
-
-    else:
-        logger.error(
-            f"The Education instance with ID:{instance.pk} can't be deleted from "
-            f"the ES index, it doesn't exists."
+    parent_id = getattr(instance.person, "pk", None)
+    if (
+        es_index_exists("people_db_index")
+        and parent_id
+        and PersonDocument.exists(id=parent_id)
+    ):
+        person_doc = PersonDocument()
+        doc = person_doc.prepare(instance.person)
+        PersonDocument(meta={"id": instance.person.pk}, **doc).save(
+            skip_empty=False, return_doc_meta=True
         )
 
 
 @receiver(
     post_save,
     sender=ABARating,
-    dispatch_uid=" create_or_update_aba_ratings_in_es_index",
+    dispatch_uid="create_or_update_aba_ratings_in_es_index",
 )
 def create_or_update_aba_ratings_in_es_index(sender, instance=None, **kwargs):
-    """Receiver function that gets called after an Education instance is saved.
-    This method creates or updates an Education object in the EducationDocument
+    """Receiver function that gets called after an ABARating instance is saved.
+    This method creates or updates an ABARating object in the PersonDocument
+    index.
+    """
+
+    parent_id = getattr(instance.person, "pk", None)
+    if (
+        es_index_exists("people_db_index")
+        and parent_id
+        and PersonDocument.exists(id=parent_id)
+    ):
+        person_doc = PersonDocument()
+        doc = person_doc.prepare(instance.person)
+        PersonDocument(meta={"id": instance.person.pk}, **doc).save(
+            skip_empty=False, return_doc_meta=True
+        )
+
+@receiver(
+    post_delete,
+    sender=ABARating,
+    dispatch_uid="delete_aba_ratings_in_es_index",
+)
+def delete_aba_ratings_in_es_index(sender, instance=None, **kwargs):
+    """Receiver function that gets called after an ABARating instance is deleted.
+    This method removes ABARating fields in the PersonDocument
     index.
     """
 

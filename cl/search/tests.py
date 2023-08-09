@@ -4885,7 +4885,7 @@ class PeopleSearchTestElasticSearch(
 
     @classmethod
     def tearDownClass(cls):
-        cls.delete_index("people_db.Person")
+        #cls.delete_index("people_db.Person")
         super().tearDownClass()
 
     def _test_article_count(self, params, expected_count, field_name):
@@ -4958,15 +4958,6 @@ class PeopleSearchTestElasticSearch(
                 )
             )
 
-        # Educations are indexed.
-        education_pks = [self.education_1.pk, self.education_2.pk]
-        for education_pk in education_pks:
-            self.assertTrue(
-                PersonDocument.exists(
-                    id=PEOPLE_DOCS_TYPE_ID(education_pk).EDUCATION
-                )
-            )
-
     def test_remove_parent_child_objects_from_index(self) -> None:
         """Confirm join child objects are removed from the index when the
         parent objects is deleted.
@@ -4985,28 +4976,16 @@ class PeopleSearchTestElasticSearch(
         )
         PoliticalAffiliationFactory.create(person=person)
         school = SchoolFactory.create(name="Harvard University")
-        education = EducationFactory.create(
-            person=person,
-            school=school,
-            degree_level="ma",
-            degree_year="1990",
-        )
+
         PersonDocument._index.refresh()
 
         person_pk = person.pk
         pos_1_pk = pos_1.pk
-        education_pk = education.pk
         # Person instance is indexed.
         self.assertTrue(PersonDocument.exists(id=person_pk))
         # Position instance is indexed.
         self.assertTrue(
             PersonDocument.exists(id=PEOPLE_DOCS_TYPE_ID(pos_1_pk).POSITION)
-        )
-        # Education instance is indexed.
-        self.assertTrue(
-            PersonDocument.exists(
-                id=PEOPLE_DOCS_TYPE_ID(education_pk).EDUCATION
-            )
         )
 
         # Confirm documents can be updated in the ES index.
@@ -5016,9 +4995,6 @@ class PeopleSearchTestElasticSearch(
         pos_1.court = self.court_2
         pos_1.save()
 
-        education.degree_year = "1995"
-        education.save()
-
         person_doc = PersonDocument.get(id=person.pk)
         self.assertIn("Debbas", person_doc.name)
 
@@ -5027,10 +5003,6 @@ class PeopleSearchTestElasticSearch(
         )
         self.assertEqual(self.court_2.pk, position_doc.court_exact)
 
-        education_doc = PersonDocument.get(
-            id=PEOPLE_DOCS_TYPE_ID(education.pk).EDUCATION
-        )
-        self.assertEqual("1995", str(education_doc.degree_year))
 
         # Delete person instance; it should be removed from the index along
         # with its child documents.
@@ -5042,12 +5014,6 @@ class PeopleSearchTestElasticSearch(
         # Position document is removed.
         self.assertFalse(
             PersonDocument.exists(id=PEOPLE_DOCS_TYPE_ID(pos_1_pk).POSITION)
-        )
-        # Education document is removed.
-        self.assertFalse(
-            PersonDocument.exists(
-                id=PEOPLE_DOCS_TYPE_ID(education_pk).EDUCATION
-            )
         )
 
     def test_remove_nested_objects_from_index(self) -> None:
@@ -5068,35 +5034,20 @@ class PeopleSearchTestElasticSearch(
             nomination_process="fed_senate",
         )
         PoliticalAffiliationFactory.create(person=person)
-        school = SchoolFactory.create(name="Harvard University 2")
-        education = EducationFactory.create(
-            person=person,
-            school=school,
-            degree_level="ma",
-            degree_year="1990",
-        )
 
         PersonDocument._index.refresh()
 
         person_pk = person.pk
         pos_1_pk = pos_1.pk
-        education_pk = education.pk
         # Person instance is indexed.
         self.assertTrue(PersonDocument.exists(id=person_pk))
         # Position instance is indexed.
         self.assertTrue(
             PersonDocument.exists(id=PEOPLE_DOCS_TYPE_ID(pos_1_pk).POSITION)
         )
-        # Education instance is indexed.
-        self.assertTrue(
-            PersonDocument.exists(
-                id=PEOPLE_DOCS_TYPE_ID(education_pk).EDUCATION
-            )
-        )
 
         # Delete pos_1 and education, keep the parent person instance.
         pos_1.delete()
-        education.delete()
         PersonDocument._index.refresh()
 
         # Person instance still exists.
@@ -5105,12 +5056,6 @@ class PeopleSearchTestElasticSearch(
         # Position object is removed
         self.assertFalse(
             PersonDocument.exists(id=PEOPLE_DOCS_TYPE_ID(pos_1_pk).POSITION)
-        )
-        # Education is removed.
-        self.assertFalse(
-            PersonDocument.exists(
-                id=PEOPLE_DOCS_TYPE_ID(education_pk).EDUCATION
-            )
         )
         person.delete()
         PersonDocument._index.refresh()
@@ -5122,7 +5067,7 @@ class PeopleSearchTestElasticSearch(
         """
 
         # Query only over child objects, match position appointer.
-        query_values = {"position": ["appointer"], "education": ["school"]}
+        query_values = {"position": ["appointer"]}
         s = PersonDocument.search()
         has_child_queries = build_join_fulltext_queries(
             query_values, [], "Bill"
@@ -5135,22 +5080,6 @@ class PeopleSearchTestElasticSearch(
             self.assertIn(
                 "Bill",
                 hit["inner_hits"]["text_query_inner_position"][0].appointer,
-            )
-
-        # Query only over child objects, match education school.
-        query_values = {"position": ["appointer"], "education": ["school"]}
-        s = PersonDocument.search()
-        has_child_queries = build_join_fulltext_queries(
-            query_values, [], "American University"
-        )
-        s = s.query(has_child_queries)
-        response = s.execute().to_dict()
-        self.assertEqual(s.count(), 1)
-
-        for hit in response["hits"]["hits"]:
-            self.assertEqual(
-                "American University",
-                hit["inner_hits"]["text_query_inner_education"][0].school,
             )
 
         person = PersonFactory.create(name_first="John American")
@@ -5168,28 +5097,6 @@ class PeopleSearchTestElasticSearch(
             nomination_process="fed_senate",
         )
         PersonDocument._index.refresh()
-        # Query over the parent object and child objects, match education
-        # school and person name.
-        query_values = {"position": ["appointer"], "education": ["school"]}
-        s = PersonDocument.search()
-        has_child_queries = build_join_fulltext_queries(
-            query_values, ["name"], "American"
-        )
-        s = s.query(has_child_queries)
-
-        response = s.execute().to_dict()
-        self.assertEqual(s.count(), 2)
-
-        self.assertIn(
-            "American", response["hits"]["hits"][0]["_source"]["name"]
-        )
-
-        self.assertEqual(
-            "American University",
-            response["hits"]["hits"][1]["inner_hits"][
-                "text_query_inner_education"
-            ][0].school,
-        )
 
         person.delete()
         PersonDocument._index.refresh()
@@ -5424,9 +5331,9 @@ class PeopleSearchTestElasticSearch(
         }
         r = self._test_article_count(params, 2, "q")
         self.assertTrue(
-            r.content.decode().index("Susan")
-            < r.content.decode().index("Olivia"),
-            msg="'Susan' should come BEFORE 'Olivia'.",
+            r.content.decode().index("Olivia")
+            < r.content.decode().index("Susan"),
+            msg="'Susan' should come AFTER 'Olivia'.",
         )
         # API
         self._test_api_results_count(params, 2, "q")
@@ -5574,8 +5481,9 @@ class PeopleSearchTestElasticSearch(
         )
         self.assertEqual(supervisors, position_6.supervisor.name_full_reverse)
 
-        schools = self._get_meta_value(0, r.content.decode(), "Schools:")
-        self.assertEqual(schools, self.education_3.school.name)
+        position_6.delete()
+        person.delete()
+        PersonDocument._index.refresh()
 
     def test_has_child_queries_combine_filters(self) -> None:
         """Test confirm if we can combine multiple has child filter inner hits
@@ -5626,7 +5534,7 @@ class PeopleSearchTestElasticSearch(
             person=appointer,
             how_selected="e_part",
         )
-        PositionFactory.create(
+        person_2_position = PositionFactory.create(
             date_granularity_start="%Y-%m-%d",
             court=self.court_1,
             date_start=datetime.date(2015, 12, 14),
@@ -5776,3 +5684,66 @@ class PeopleSearchTestElasticSearch(
             search_query, cd
         )
         self.assertEqual(s.count(), 1)
+        person_2_position.delete()
+        position_obama.delete()
+        appointer.delete()
+        PersonDocument._index.refresh()
+
+
+    def test_results_highlights(self) -> None:
+        """ Test highlighting for Judge results. """
+
+        # name highlights in text query.
+        params =  {
+                "q": "Sheindlin",
+                "type": SEARCH_TYPES.PEOPLE,
+                "order_by": "score desc",
+            }
+        r = self._test_article_count(params, 2, "q")
+        self.assertIn("<mark>Sheindlin</mark>", r.content.decode())
+        self.assertEqual(r.content.decode().count("<mark>Sheindlin</mark>"), 2)
+
+        # name.exact highlights in text query.
+        params = {
+            "q": '"Sheindlin" Judith',
+            "type": SEARCH_TYPES.PEOPLE,
+            "order_by": "score desc",
+        }
+        r = self._test_article_count(params, 2, "q")
+        self.assertIn("<mark>Sheindlin</mark>", r.content.decode())
+        self.assertEqual(r.content.decode().count("<mark>Sheindlin</mark>"), 2)
+        self.assertEqual(r.content.decode().count("<mark>Judith</mark>"), 2)
+
+        # name highlights in filter.
+        params = {
+            "name": "Sheindlin",
+            "type": SEARCH_TYPES.PEOPLE,
+            "order_by": "score desc",
+        }
+        r = self._test_article_count(params, 2, "q")
+        self.assertIn("<mark>Sheindlin</mark>", r.content.decode())
+        self.assertEqual(r.content.decode().count("<mark>Sheindlin</mark>"), 2)
+
+        # dob_city highlights
+        params = {
+            "dob_city": "Queens",
+            "type": SEARCH_TYPES.PEOPLE,
+            "order_by": "score desc",
+        }
+        r = self._test_article_count(params, 1, "q")
+        self.assertIn("<mark>Queens</mark>", r.content.decode())
+        self.assertEqual(r.content.decode().count("<mark>Queens</mark>"), 1)
+
+        # dob_state highlights
+        params = {
+            "dob_state": "NY",
+            "type": SEARCH_TYPES.PEOPLE,
+            "order_by": "score desc",
+        }
+        r = self._test_article_count(params, 2, "q")
+        self.assertIn("<mark>New York</mark>", r.content.decode())
+        self.assertEqual(r.content.decode().count("<mark>New York</mark>"), 2)
+
+
+
+

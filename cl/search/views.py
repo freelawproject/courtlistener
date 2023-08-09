@@ -706,6 +706,7 @@ def fetch_and_paginate_results(
     hits, query_time, error = fetch_es_results(
         get_params, search_query, page, rows_per_page
     )
+
     if error:
         return [], query_time, error
     if get_params.get("type") == SEARCH_TYPES.PARENTHETICAL:
@@ -720,6 +721,8 @@ def fetch_and_paginate_results(
 
     search_type = get_params.get("type")
     # Set highlights in results.
+
+
     set_results_highlights(results, search_type)
     convert_str_date_fields_to_date_objects(results, search_type)
     merge_courts_from_db(results, search_type)

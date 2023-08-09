@@ -10,7 +10,7 @@ from cl.alerts.models import Alert
 from cl.audio.models import Audio
 from cl.lib.search_index_utils import null_map
 from cl.lib.utils import deepgetattr
-from cl.people_db.models import Education, Person, Position
+from cl.people_db.models import Person, Position
 from cl.search.models import Citation, ParentheticalGroup
 
 # Define parenthetical elasticsearch index
@@ -268,17 +268,13 @@ class PEOPLE_DOCS_TYPE_ID:
     def POSITION(self) -> str:
         return f"po_{self.instance_id}"
 
-    @property
-    def EDUCATION(self) -> str:
-        return f"ed_{self.instance_id}"
-
 
 class JoinField(DEDField, Join):
     pass
 
 
 class PersonBaseDocument(Document):
-    person_child = JoinField(relations={"person": ["position", "education"]})
+    person_child = JoinField(relations={"person": ["position"]})
     timestamp = fields.DateField()
 
     class Django:
@@ -287,40 +283,6 @@ class PersonBaseDocument(Document):
 
     def prepare_timestamp(self, instance):
         return datetime.utcnow()
-
-
-@people_db_index.document
-class EducationDocument(PersonBaseDocument):
-    school = fields.TextField(
-        attr="school.name",
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(
-                attr="school.name", analyzer="english_exact"
-            ),
-        },
-        search_analyzer="search_analyzer",
-    )
-    degree_level = fields.KeywordField(attr="degree_level")
-    degree_detail = fields.TextField(
-        attr="degree_detail",
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(
-                attr="degree_detail", analyzer="english_exact"
-            ),
-        },
-        search_analyzer="search_analyzer",
-    )
-    degree_year = fields.IntegerField(attr="degree_year")
-
-    class Django:
-        model = Education
-        ignore_signals = True
-
-    def prepare_person_child(self, instance):
-        parent_id = getattr(instance.person, "pk", None)
-        return {"name": "education", "parent": parent_id}
 
 
 @people_db_index.document
@@ -466,6 +428,15 @@ class PersonDocument(PersonBaseDocument):
         },
         search_analyzer="search_analyzer",
     )
+    school = fields.ListField(
+        fields.TextField(
+            analyzer="text_en_splitting_cl",
+            fields={
+                "exact": fields.TextField(analyzer="english_exact"),
+            },
+            search_analyzer="search_analyzer",
+        )
+    )
 
     def prepare_races(self, instance):
         return [r.get_race_display() for r in instance.race.all()]
@@ -504,3 +475,6 @@ class PersonDocument(PersonBaseDocument):
 
     def prepare_person_child(self, instance):
         return "person"
+
+    def prepare_school(self, instance):
+        return [e.school.name for e in instance.educations.all()]

@@ -47,6 +47,12 @@ SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS = [
     "text.exact",
 ]
 SOLR_PEOPLE_HL_FIELDS = ["name", "dob_city", "dob_state", "name_reverse"]
+SOLR_PEOPLE_ES_HL_FIELDS = [
+    "name",
+    "name.exact",
+    "dob_city",
+    "dob_state_id",
+]
 SEARCH_HL_TAG = "mark"
 ALERTS_HL_TAG = "strong"
 

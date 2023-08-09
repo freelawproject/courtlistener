@@ -6,7 +6,8 @@ import traceback
 from collections import defaultdict
 from datetime import date
 from functools import reduce
-from typing import Any, DefaultDict, Dict, List, Literal
+from typing import Any, DefaultDict, Dict, List
+from localflavor.us.us_states import STATE_CHOICES
 
 from django.conf import settings
 from django.core.paginator import Page
@@ -20,12 +21,13 @@ from elasticsearch_dsl.utils import AttrDict
 
 from cl.lib.search_utils import BOOSTS, cleanup_main_query
 from cl.lib.types import CleanData
-from cl.people_db.models import Education, Person, Position
+from cl.people_db.models import Position
 from cl.search.constants import (
     ALERTS_HL_TAG,
     SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS,
     SEARCH_HL_TAG,
     SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS,
+    SOLR_PEOPLE_ES_HL_FIELDS
 )
 from cl.search.models import SEARCH_TYPES, Court
 
@@ -359,9 +361,8 @@ def build_es_main_query(
         case SEARCH_TYPES.PEOPLE:
             child_query_fields = {
                 "position": ["appointer"],
-                "education": ["school"],
             }
-            parent_query_fields = ["name"]
+            parent_query_fields = ["name", "text"]
             string_query = build_join_fulltext_queries(
                 child_query_fields,
                 parent_query_fields,
@@ -399,6 +400,8 @@ def build_es_main_query(
         or cd["type"] == SEARCH_TYPES.PEOPLE
     ):
         search_query = search_query.sort(build_sort_results(cd))
+
+    print("Final query: ", search_query)
     return search_query, total_query_results, top_hits_limit
 
 
@@ -413,23 +416,93 @@ def add_es_highlighting(
     :return: The modified Elasticsearch search query object with highlights set
     """
 
+    types_to_highlight = [SEARCH_TYPES.ORAL_ARGUMENT, SEARCH_TYPES.PEOPLE]
+    if cd["type"] not in types_to_highlight:
+        return search_query
+
+    fields_to_exclude = []
+    highlighting_fields = []
+    hl_tag = []
     if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
         highlighting_fields = SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS
         hl_tag = SEARCH_HL_TAG
+        fields_to_exclude = ["sha1"]
         if alerts:
             highlighting_fields = SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS
             hl_tag = ALERTS_HL_TAG
-        fields_to_exclude = ["sha1"]
-        search_query = search_query.source(excludes=fields_to_exclude)
-        for field in highlighting_fields:
-            search_query = search_query.highlight(
-                field,
-                number_of_fragments=0,
-                pre_tags=[f"<{hl_tag}>"],
-                post_tags=[f"</{hl_tag}>"],
-            )
+
+    elif cd["type"] == SEARCH_TYPES.PEOPLE:
+        highlighting_fields = SOLR_PEOPLE_ES_HL_FIELDS
+        hl_tag = SEARCH_HL_TAG
+        fields_to_exclude = []
+
+    search_query = search_query.source(excludes=fields_to_exclude)
+    for field in highlighting_fields:
+        search_query = search_query.highlight(
+            field,
+            number_of_fragments=0,
+            pre_tags=[f"<{hl_tag}>"],
+            post_tags=[f"</{hl_tag}>"],
+        )
 
     return search_query
+
+
+
+def replace_value_with_tag(highlighted_value:str, original_value:str, field_name, tag:str)->str:
+    """Replaces a specific field value within the marked version of that field.
+
+    :param highlighted_value: The highlight with marked content to extract.
+    :param original_value: The original field where the replacement needs to be made.
+    :param field_name: The name of the field, used for custom replacement rules.
+    :param tag: The HTML tag to use for marking the value.
+    :return: The original string with the marked word replaced by the tagged version.
+    """
+
+    # Extract the word inside the specified tags from the highlighted_value
+    marked_word = re.search(f'<{tag}>(.*?)</{tag}>', highlighted_value).group(1)
+
+    if field_name == "dob_state_id":
+        # dob_state_id field, replace it with its corresponding state name from
+        # the STATE_CHOICES
+        states_dict = dict(list(STATE_CHOICES))
+        marked_word = str(states_dict[marked_word])
+
+    # Replace the marked word with its tagged version in the original_value
+    original_value = original_value.replace(marked_word, f'<{tag}>{marked_word}</{tag}>')
+    return original_value
+
+
+def swap_fields_to_highlight(highlights:dict[str, Any], result:AttrDict | dict[str, Any], search_type:str, tag:str)->None:
+    """Swaps fields with their highlighted version. This method is useful on
+    document types where the search/highlighted fields don't match the fields
+    to be displayed in fronted. So a conversion is required to show highlights.
+
+    :param highlights: A dictionary containing the fields to be highlighted.
+    :param result: An dictionary containing the search results.
+    :param search_type: The search type.
+    :param tag: The HTML tag to use for highlighting.
+    :return: None, highlights dict is modified in-place.
+    """
+
+    field_mapping = {}
+    if search_type == SEARCH_TYPES.PEOPLE:
+        field_mapping = {
+            "name": "name_reverse",
+            "name.exact": "name_reverse.exact",
+            "dob_state_id": "dob_state",
+        }
+
+    if not field_mapping:
+        return
+
+    for field, target_field in field_mapping.items():
+        # Check if the field exists in the highlight's dictionary.
+        original_value = result[target_field.split(".exact")[0]]
+        if field in highlights:
+            # Assign the highlight to the target field.
+            highlights[target_field] = [replace_value_with_tag(highlights[field][0],
+                                                        original_value, field, tag)]
 
 
 def merge_highlights_into_result(
@@ -456,6 +529,7 @@ def merge_highlights_into_result(
         # both versions are available. Highlighted terms in each
         # version can differ, so the best thing to do is combine
         # highlighted terms from each version and set it.
+
         if "exact" in field:
             field = field.split(".exact")[0]
             marked_strings_2 = []
@@ -491,8 +565,6 @@ def merge_highlights_into_result(
                 rf"<{tag}>\1</{tag}>",
                 combined_highlights,
             )
-
-            # Set combined highlighted terms.
             result[field] = combined_highlights
             exact_hl_fields.append(field)
 
@@ -527,8 +599,10 @@ def set_results_highlights(results: Page, search_type: str) -> None:
             if not hasattr(result.meta, "highlight"):
                 return
 
+            highlights = result.meta.highlight.to_dict()
+            swap_fields_to_highlight(highlights, result, search_type, SEARCH_HL_TAG)
             merge_highlights_into_result(
-                result.meta.highlight.to_dict(),
+                highlights,
                 result,
                 SEARCH_HL_TAG,
             )
@@ -665,7 +739,6 @@ def merge_unavailable_fields_on_parent_document(
         # Merge positions courts.
         person_ids = [d["id"] for d in results]
         positions_in_page = Position.objects.filter(person_id__in=person_ids)
-        educations_in_page = Education.objects.filter(person_id__in=person_ids)
         courts_dict: DefaultDict[int, list[str]] = defaultdict(list)
         appointers_dict: DefaultDict[int, list[str]] = defaultdict(list)
         selection_methods_dict: DefaultDict[int, list[str]] = defaultdict(list)
@@ -694,10 +767,6 @@ def merge_unavailable_fields_on_parent_document(
                     position.predecessor.name_full_reverse
                 )
 
-        for education in educations_in_page:
-            if education.school:
-                schools_dict[education.person.pk].append(education.school.name)
-
         for result in results:
             person_id = result["id"]
             result["court"] = courts_dict.get(person_id)
@@ -705,7 +774,6 @@ def merge_unavailable_fields_on_parent_document(
             result["selection_method"] = selection_methods_dict.get(person_id)
             result["supervisor"] = supervisors_dict.get(person_id)
             result["predecessor"] = predecessors_dict.get(person_id)
-            result["school"] = schools_dict.get(person_id)
 
 
 def fetch_es_results(
@@ -768,6 +836,7 @@ def build_join_fulltext_queries(
     if not value:
         return []
     q_should = []
+    # Build  child documents fulltext queries.
     for child_type, fields in child_query_fields.items():
         query = Q(
             "has_child",
@@ -779,6 +848,7 @@ def build_join_fulltext_queries(
         )
         q_should.append(query)
 
+    # Build parent document fulltext queries.
     if parent_fields:
         q_should.append(build_fulltext_query(parent_fields, value))
 
@@ -794,7 +864,6 @@ def build_has_child_filters(child_type, cd) -> List:
             selection_method = cd.get("selection_method", "")
             court = cd.get("court", "").split()
             appointer = cd.get("appointer", "")
-
             if selection_method:
                 queries_list.extend(
                     build_term_query(
@@ -802,17 +871,10 @@ def build_has_child_filters(child_type, cd) -> List:
                         selection_method,
                     )
                 )
-
             if court:
                 queries_list.extend(build_term_query("court_exact", court))
-
             if appointer:
                 queries_list.extend(build_text_filter("appointer", appointer))
-
-        elif child_type == "education":
-            school = cd.get("school", "")
-            if school:
-                queries_list.extend(build_text_filter("school", school))
 
     if not queries_list:
         return []
@@ -829,54 +891,6 @@ def build_has_child_filters(child_type, cd) -> List:
     ]
 
 
-def build_has_child_filter(
-    filter_type: Literal["text", "term"],
-    field: str,
-    value: str | list,
-    child_type: str,
-) -> list:
-    """Builds a has_child filter query based on the given parameters.
-
-    :param filter_type: The type of filter to build. Accepts 'term' or 'text'.
-    :param field: The name of the field to apply the filter on.
-    :param value: The value to match in the filter. For 'term' filter,
-    this can be a single string or a list of strings.
-    :param child_type: The type of the child documents.
-    :return: Empty list or list with DSL Match query
-    """
-
-    if filter_type == "term":
-        return [
-            Q(
-                "has_child",
-                type=child_type,
-                query=build_term_query(
-                    field,
-                    value,
-                )[0],
-                inner_hits={"name": f"filter_inner_{field}"},
-                max_children=10,
-                min_children=0,
-            )
-        ]
-
-    elif filter_type == "text" and isinstance(value, str):
-        return [
-            Q(
-                "has_child",
-                type=child_type,
-                query=build_text_filter(
-                    field,
-                    value,
-                )[0],
-                inner_hits={"name": f"filter_inner_{field}"},
-                max_children=10,
-                min_children=0,
-            )
-        ]
-    return []
-
-
 def build_join_es_filters(cd: CleanData) -> List:
     """Builds join elasticsearch filters based on the CleanData object.
 
@@ -886,6 +900,7 @@ def build_join_es_filters(cd: CleanData) -> List:
 
     queries_list = []
     if cd["type"] == SEARCH_TYPES.PEOPLE:
+        # Build parent document filters.
         queries_list.extend(
             build_term_query(
                 "dob_state_id",
@@ -917,11 +932,14 @@ def build_join_es_filters(cd: CleanData) -> List:
                 cd.get("name", ""),
             )
         )
+        queries_list.extend(
+            build_text_filter(
+                "school",
+                cd.get("school", ""),
+            )
+        )
 
         # Build position has child filter:
         queries_list.extend(build_has_child_filters("position", cd))
-
-        # Build Education has child filter:
-        queries_list.extend(build_has_child_filters("education", cd))
 
     return queries_list
