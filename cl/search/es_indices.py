@@ -28,4 +28,8 @@ oral_arguments_percolator_index.settings(
 
 # Register ES indices here. In order to create a unique name for each index for
 # testing purposes.
-es_indices_registered = [parenthetical_group_index, oral_arguments_index]
+es_indices_registered = [
+    parenthetical_group_index,
+    oral_arguments_index,
+    oral_arguments_percolator_index,
+]
