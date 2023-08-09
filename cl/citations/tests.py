@@ -27,13 +27,12 @@ from cl.citations.filter_parentheticals import (
     is_parenthetical_descriptive,
 )
 from cl.citations.group_parentheticals import (
-    ComputedParentheticalGroup,
     compute_parenthetical_groups,
     get_graph_component,
     get_parenthetical_tokens,
     get_representative_parenthetical,
 )
-from cl.citations.management.commands.cl_add_parallel_citations import (
+from cl.citations.management.commands.add_parallel_citations import (
     identify_parallel_citations,
     make_edge_list,
 )
@@ -845,7 +844,7 @@ class CitationFeedTest(IndexedSolrTestCase):
 
 
 class CitationCommandTest(IndexedSolrTestCase):
-    """Test a variety of the ways that cl_find_citations can be called."""
+    """Test a variety of the ways that find_citations can be called."""
 
     fixtures: List = []
 
@@ -896,7 +895,7 @@ class CitationCommandTest(IndexedSolrTestCase):
         super().setUpTestData()
 
     def call_command_and_test_it(self, args):
-        call_command("cl_find_citations", *args)
+        call_command("find_citations", *args)
         cited = Opinion.objects.get(cluster__pk=self.citation1.cluster_id)
         expected_count = 1
         self.assertEqual(

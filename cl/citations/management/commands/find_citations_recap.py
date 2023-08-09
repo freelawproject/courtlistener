@@ -2,8 +2,7 @@ import sys
 import time
 from typing import Iterable, List, cast
 
-from django.conf import settings
-from django.core.management import CommandError, call_command
+from django.core.management import CommandError
 from django.core.management.base import CommandParser
 
 from cl.citations.tasks import (
@@ -163,6 +162,6 @@ class Command(VerboseCommand):
         self.average_per_s = 0.0
         self.timings: List[float] = []
 
-        document_pks = query.values_list("pk", flat=True).iterator()
+        document_pks = query.only("pk").iterator()
         queue = cast(str, options["queue"])
         self.update_documents(document_pks, queue)
