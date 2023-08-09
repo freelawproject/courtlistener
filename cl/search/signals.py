@@ -317,6 +317,7 @@ def create_or_update_aba_ratings_in_es_index(sender, instance=None, **kwargs):
             skip_empty=False, return_doc_meta=True
         )
 
+
 @receiver(
     post_delete,
     sender=ABARating,

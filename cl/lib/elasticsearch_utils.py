@@ -7,7 +7,6 @@ from collections import defaultdict
 from datetime import date
 from functools import reduce
 from typing import Any, DefaultDict, Dict, List
-from localflavor.us.us_states import STATE_CHOICES
 
 from django.conf import settings
 from django.core.paginator import Page
@@ -18,6 +17,7 @@ from elasticsearch_dsl import A, Q, connections
 from elasticsearch_dsl.query import QueryString, Range
 from elasticsearch_dsl.response import Response
 from elasticsearch_dsl.utils import AttrDict
+from localflavor.us.us_states import STATE_CHOICES
 
 from cl.lib.search_utils import BOOSTS, cleanup_main_query
 from cl.lib.types import CleanData
@@ -27,7 +27,7 @@ from cl.search.constants import (
     SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS,
     SEARCH_HL_TAG,
     SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS,
-    SOLR_PEOPLE_ES_HL_FIELDS
+    SOLR_PEOPLE_ES_HL_FIELDS,
 )
 from cl.search.models import SEARCH_TYPES, Court
 
@@ -448,8 +448,9 @@ def add_es_highlighting(
     return search_query
 
 
-
-def replace_value_with_tag(highlighted_value:str, original_value:str, field_name, tag:str)->str:
+def replace_value_with_tag(
+    highlighted_value: str, original_value: str, field_name, tag: str
+) -> str:
     """Replaces a specific field value within the marked version of that field.
 
     :param highlighted_value: The highlight with marked content to extract.
@@ -460,7 +461,9 @@ def replace_value_with_tag(highlighted_value:str, original_value:str, field_name
     """
 
     # Extract the word inside the specified tags from the highlighted_value
-    marked_word = re.search(f'<{tag}>(.*?)</{tag}>', highlighted_value).group(1)
+    marked_word = re.search(f"<{tag}>(.*?)</{tag}>", highlighted_value).group(
+        1
+    )
 
     if field_name == "dob_state_id":
         # dob_state_id field, replace it with its corresponding state name from
@@ -469,11 +472,18 @@ def replace_value_with_tag(highlighted_value:str, original_value:str, field_name
         marked_word = str(states_dict[marked_word])
 
     # Replace the marked word with its tagged version in the original_value
-    original_value = original_value.replace(marked_word, f'<{tag}>{marked_word}</{tag}>')
+    original_value = original_value.replace(
+        marked_word, f"<{tag}>{marked_word}</{tag}>"
+    )
     return original_value
 
 
-def swap_fields_to_highlight(highlights:dict[str, Any], result:AttrDict | dict[str, Any], search_type:str, tag:str)->None:
+def swap_fields_to_highlight(
+    highlights: dict[str, Any],
+    result: AttrDict | dict[str, Any],
+    search_type: str,
+    tag: str,
+) -> None:
     """Swaps fields with their highlighted version. This method is useful on
     document types where the search/highlighted fields don't match the fields
     to be displayed in fronted. So a conversion is required to show highlights.
@@ -501,8 +511,11 @@ def swap_fields_to_highlight(highlights:dict[str, Any], result:AttrDict | dict[s
         original_value = result[target_field.split(".exact")[0]]
         if field in highlights:
             # Assign the highlight to the target field.
-            highlights[target_field] = [replace_value_with_tag(highlights[field][0],
-                                                        original_value, field, tag)]
+            highlights[target_field] = [
+                replace_value_with_tag(
+                    highlights[field][0], original_value, field, tag
+                )
+            ]
 
 
 def merge_highlights_into_result(
@@ -600,7 +613,9 @@ def set_results_highlights(results: Page, search_type: str) -> None:
                 return
 
             highlights = result.meta.highlight.to_dict()
-            swap_fields_to_highlight(highlights, result, search_type, SEARCH_HL_TAG)
+            swap_fields_to_highlight(
+                highlights, result, search_type, SEARCH_HL_TAG
+            )
             merge_highlights_into_result(
                 highlights,
                 result,

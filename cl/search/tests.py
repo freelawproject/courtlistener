@@ -4885,7 +4885,7 @@ class PeopleSearchTestElasticSearch(
 
     @classmethod
     def tearDownClass(cls):
-        #cls.delete_index("people_db.Person")
+        # cls.delete_index("people_db.Person")
         super().tearDownClass()
 
     def _test_article_count(self, params, expected_count, field_name):
@@ -5002,7 +5002,6 @@ class PeopleSearchTestElasticSearch(
             id=PEOPLE_DOCS_TYPE_ID(pos_1_pk).POSITION
         )
         self.assertEqual(self.court_2.pk, position_doc.court_exact)
-
 
         # Delete person instance; it should be removed from the index along
         # with its child documents.
@@ -5689,16 +5688,15 @@ class PeopleSearchTestElasticSearch(
         appointer.delete()
         PersonDocument._index.refresh()
 
-
     def test_results_highlights(self) -> None:
-        """ Test highlighting for Judge results. """
+        """Test highlighting for Judge results."""
 
         # name highlights in text query.
-        params =  {
-                "q": "Sheindlin",
-                "type": SEARCH_TYPES.PEOPLE,
-                "order_by": "score desc",
-            }
+        params = {
+            "q": "Sheindlin",
+            "type": SEARCH_TYPES.PEOPLE,
+            "order_by": "score desc",
+        }
         r = self._test_article_count(params, 2, "q")
         self.assertIn("<mark>Sheindlin</mark>", r.content.decode())
         self.assertEqual(r.content.decode().count("<mark>Sheindlin</mark>"), 2)
@@ -5743,7 +5741,3 @@ class PeopleSearchTestElasticSearch(
         r = self._test_article_count(params, 2, "q")
         self.assertIn("<mark>New York</mark>", r.content.decode())
         self.assertEqual(r.content.decode().count("<mark>New York</mark>"), 2)
-
-
-
-
