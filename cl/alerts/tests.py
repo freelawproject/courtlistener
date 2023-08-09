@@ -70,7 +70,7 @@ from cl.search.models import (
 from cl.search.tasks import add_items_to_solr
 from cl.stats.models import Stat
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
-from cl.tests.cases import APITestCase, TestCase
+from cl.tests.cases import APITestCase, ESIndexTestCase, TestCase
 from cl.tests.utils import MockResponse, make_client
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
@@ -1480,7 +1480,7 @@ class DocketAlertGetNotesTagsTests(TestCase):
         self.assertEqual(tags_docket_3_user_1, [])
 
 
-class SearchAlertsOAESTests(ESTestCaseMixin, TestCase):
+class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
     """Test ES Search Alerts"""
 
     @classmethod
