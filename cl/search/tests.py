@@ -46,6 +46,7 @@ from cl.lib.elasticsearch_utils import (
     build_term_query,
     group_search_results,
 )
+from cl.lib.search_index_utils import solr_list
 from cl.lib.search_utils import cleanup_main_query, make_fq
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
@@ -5415,6 +5416,7 @@ class PeopleSearchTestElasticSearch(
         self.assertEqual(aba_ratings, self.aba_rating_1.get_rating_display())
 
     def test_merge_unavailable_fields_on_parent_document(self):
+        """Confirm unavailable ES fields are properly merged from DB in fronted"""
         params = {
             "type": SEARCH_TYPES.PEOPLE,
             "q": "name:Judith Sheindlin Olivia",
@@ -5741,3 +5743,236 @@ class PeopleSearchTestElasticSearch(
         r = self._test_article_count(params, 2, "q")
         self.assertIn("<mark>New York</mark>", r.content.decode())
         self.assertEqual(r.content.decode().count("<mark>New York</mark>"), 2)
+
+    def test_api_fields(self) -> None:
+        """Confirm the search API for People return the expected fields."""
+
+        params = {"type": SEARCH_TYPES.PEOPLE, "q": "Susan"}
+        r = self._test_api_results_count(params, 1, "API")
+        keys_to_check = [
+            "aba_rating",
+            "absolute_url",
+            "alias_ids",
+            "appointer",
+            "court",
+            "court_exact",
+            "date_confirmation",
+            "date_elected",
+            "date_granularity_dob",
+            "date_granularity_dod",
+            "date_granularity_start",
+            "date_granularity_termination",
+            "date_hearing",
+            "date_judicial_committee_action",
+            "date_nominated",
+            "date_recess_appointment",
+            "date_referred_to_judicial_committee",
+            "date_retirement",
+            "date_start",
+            "date_termination",
+            "dob",
+            "dob_city",
+            "dob_state",
+            "dob_state_id",
+            "dod",
+            "fjc_id",
+            "gender",
+            "id",
+            "judicial_committee_action",
+            "name",
+            "name_reverse",
+            "nomination_process",
+            "political_affiliation",
+            "political_affiliation_id",
+            "position_type",
+            "predecessor",
+            "races",
+            "religion",
+            "school",
+            "selection_method",
+            "selection_method_id",
+            "snippet",
+            "supervisor",
+            "termination_reason",
+            "timestamp",
+        ]
+        keys_count = len(r.data["results"][0])
+        self.assertEqual(keys_count, 45)
+        for key in keys_to_check:
+            self.assertTrue(
+                key in r.data["results"][0],
+                msg=f"Key {key} not found in the result object.",
+            )
+
+    def test_merge_unavailable_fields_api(self) -> None:
+        """Confirm unavailable ES fields are properly merged from DB in the API"""
+
+        person = PersonFactory.create(name_first="John American")
+        position_5 = PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            court=self.court_1,
+            date_start=datetime.date(2015, 12, 14),
+            predecessor=self.person_3,
+            appointer=self.position_1,
+            judicial_committee_action="no_rep",
+            termination_reason="retire_mand",
+            position_type="c-jud",
+            person=person,
+            how_selected="e_part",
+            nomination_process="fed_senate",
+        )
+
+        position_6 = PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            court=self.court_2,
+            date_start=datetime.date(2015, 12, 14),
+            predecessor=self.person_2,
+            appointer=self.position_1,
+            judicial_committee_action="no_rep",
+            termination_reason="retire_mand",
+            position_type="clerk",
+            person=self.person_2,
+            supervisor=person,
+            date_nominated=datetime.date(2015, 11, 14),
+            date_recess_appointment=datetime.date(2016, 11, 14),
+            date_referred_to_judicial_committee=datetime.date(2017, 11, 14),
+            date_judicial_committee_action=datetime.date(2017, 10, 14),
+            date_confirmation=datetime.date(2017, 10, 11),
+            date_hearing=datetime.date(2017, 10, 16),
+            date_retirement=datetime.date(2020, 10, 10),
+            date_termination=datetime.date(2019, 10, 24),
+            date_granularity_termination="%Y-%m-%d",
+            how_selected="a_legis",
+            nomination_process="fed_senate",
+        )
+        PersonDocument._index.refresh()
+
+        params = {"type": SEARCH_TYPES.PEOPLE, "q": "Susan"}
+
+        # API
+        r = self._test_api_results_count(params, 1, "API")
+
+        self.assertEqual(
+            r.data["results"][0]["court"],
+            [self.position_2.court.full_name, position_6.court.full_name],
+        )
+        self.assertEqual(
+            r.data["results"][0]["court_exact"],
+            [self.position_2.court.pk, position_6.court.pk],
+        )
+        self.assertEqual(
+            r.data["results"][0]["position_type"],
+            [
+                self.position_2.get_position_type_display(),
+                position_6.get_position_type_display(),
+            ],
+        )
+        self.assertEqual(
+            r.data["results"][0]["appointer"],
+            [
+                self.position_2.appointer.person.name_full_reverse,
+                position_6.appointer.person.name_full_reverse,
+            ],
+        )
+        self.assertEqual(
+            r.data["results"][0]["supervisor"],
+            [position_6.supervisor.name_full_reverse],
+        )
+        self.assertEqual(
+            r.data["results"][0]["predecessor"],
+            [
+                self.position_2.predecessor.name_full_reverse,
+                position_6.predecessor.name_full_reverse,
+            ],
+        )
+
+        positions = self.person_2.positions.all()
+        self.assertEqual(
+            r.data["results"][0]["date_nominated"],
+            solr_list(positions, "date_nominated"),
+        )
+        self.assertEqual(
+            r.data["results"][0]["date_elected"],
+            solr_list(positions, "date_elected"),
+        )
+        self.assertEqual(
+            r.data["results"][0]["date_recess_appointment"],
+            solr_list(positions, "date_recess_appointment"),
+        )
+        self.assertEqual(
+            r.data["results"][0]["date_referred_to_judicial_committee"],
+            solr_list(positions, "date_referred_to_judicial_committee"),
+        )
+        self.assertEqual(
+            r.data["results"][0]["date_judicial_committee_action"],
+            solr_list(positions, "date_judicial_committee_action"),
+        )
+        self.assertEqual(
+            r.data["results"][0]["date_hearing"],
+            solr_list(positions, "date_hearing"),
+        )
+        self.assertEqual(
+            r.data["results"][0]["date_confirmation"],
+            solr_list(positions, "date_confirmation"),
+        )
+        self.assertEqual(
+            r.data["results"][0]["date_start"],
+            solr_list(positions, "date_start"),
+        )
+        self.assertEqual(
+            r.data["results"][0]["date_granularity_start"],
+            [
+                self.position_2.date_granularity_start,
+                self.position_3.date_granularity_start,
+                position_6.date_granularity_start,
+            ],
+        )
+        self.assertEqual(
+            r.data["results"][0]["date_retirement"],
+            solr_list(positions, "date_retirement"),
+        )
+        self.assertEqual(
+            r.data["results"][0]["date_termination"],
+            solr_list(positions, "date_termination"),
+        )
+        self.assertEqual(
+            r.data["results"][0]["date_granularity_termination"],
+            [position_6.date_granularity_termination],
+        )
+        self.assertEqual(
+            r.data["results"][0]["judicial_committee_action"],
+            [
+                self.position_2.get_judicial_committee_action_display(),
+                position_6.get_judicial_committee_action_display(),
+            ],
+        )
+        self.assertEqual(
+            r.data["results"][0]["nomination_process"],
+            [
+                self.position_2.get_nomination_process_display(),
+                position_6.get_nomination_process_display(),
+            ],
+        )
+        self.assertEqual(
+            r.data["results"][0]["selection_method"],
+            [
+                self.position_2.get_how_selected_display(),
+                position_6.get_how_selected_display(),
+            ],
+        )
+        self.assertEqual(
+            r.data["results"][0]["selection_method_id"],
+            [self.position_2.how_selected, position_6.how_selected],
+        )
+        self.assertEqual(
+            r.data["results"][0]["termination_reason"],
+            [
+                self.position_2.get_termination_reason_display(),
+                position_6.get_termination_reason_display(),
+            ],
+        )
+
+        position_5.delete()
+        position_6.delete()
+        person.delete()
+        PersonDocument._index.refresh()

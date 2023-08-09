@@ -118,6 +118,7 @@ class PeopleTestCase(SimpleTestCase):
             person=cls.person_2,
             how_selected="e_part",
             nomination_process="fed_senate",
+            date_elected=datetime.date(2015, 11, 12),
         )
         cls.position_3 = PositionFactory.create(
             date_granularity_start="%Y-%m-%d",

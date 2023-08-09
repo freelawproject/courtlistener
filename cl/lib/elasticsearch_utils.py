@@ -4,7 +4,7 @@ import re
 import time
 import traceback
 from collections import defaultdict
-from datetime import date
+from datetime import date, datetime
 from functools import reduce
 from typing import Any, DefaultDict, Dict, List
 
@@ -19,6 +19,7 @@ from elasticsearch_dsl.response import Response
 from elasticsearch_dsl.utils import AttrDict
 from localflavor.us.us_states import STATE_CHOICES
 
+from cl.lib.date_time import midnight_pt
 from cl.lib.search_utils import BOOSTS, cleanup_main_query
 from cl.lib.types import CleanData
 from cl.people_db.models import Position
@@ -401,7 +402,6 @@ def build_es_main_query(
     ):
         search_query = search_query.sort(build_sort_results(cd))
 
-    print("Final query: ", search_query)
     return search_query, total_query_results, top_hits_limit
 
 
@@ -701,7 +701,7 @@ def convert_str_date_fields_to_date_objects(
     :return: None, the function modifies the search results object in place.
     """
     if search_type == SEARCH_TYPES.PARENTHETICAL:
-        date_field_name = ("dateFiled",)
+        date_field_name = "dateFiled"
         for result in results.object_list:
             top_hits = result.grouped_by_opinion_cluster_id.hits.hits
             for hit in top_hits:
@@ -740,13 +740,15 @@ def merge_courts_from_db(results: Page, search_type: str) -> None:
 
 
 def merge_unavailable_fields_on_parent_document(
-    results: Page, search_type: str
+    results: Page | dict, search_type: str, request_type: str = "fronted"
 ) -> None:
     """Merges unavailable fields on parent document from the database into
-    search results.
+    search results, not all fields are required in fronted, so that fields are
+    completed according to the received request_type (frontend or api).
 
     :param results: A Page object containing the search results to be modified.
     :param search_type: The search type to perform.
+    :param request_type: The request type, fronted or api.
     :return: None, the function modifies the search results object in place.
     """
 
@@ -754,41 +756,210 @@ def merge_unavailable_fields_on_parent_document(
         # Merge positions courts.
         person_ids = [d["id"] for d in results]
         positions_in_page = Position.objects.filter(person_id__in=person_ids)
-        courts_dict: DefaultDict[int, list[str]] = defaultdict(list)
-        appointers_dict: DefaultDict[int, list[str]] = defaultdict(list)
-        selection_methods_dict: DefaultDict[int, list[str]] = defaultdict(list)
-        supervisors_dict: DefaultDict[int, list[str]] = defaultdict(list)
-        predecessors_dict: DefaultDict[int, list[str]] = defaultdict(list)
-        schools_dict: DefaultDict[int, list[str]] = defaultdict(list)
+
+        # API and Frontend
+        court_dict: DefaultDict[int, list[str]] = defaultdict(list)
+        appointer_dict: DefaultDict[int, list[str]] = defaultdict(list)
+        selection_method_dict: DefaultDict[int, list[str]] = defaultdict(list)
+        supervisor_dict: DefaultDict[int, list[str]] = defaultdict(list)
+        predecessor_dict: DefaultDict[int, list[str]] = defaultdict(list)
+
+        # API
+        court_exact_dict: DefaultDict[int, list[str]] = defaultdict(list)
+        position_type_dict: DefaultDict[int, list[str]] = defaultdict(list)
+
+        date_nominated_dict: DefaultDict[int, list[datetime]] = defaultdict(
+            list
+        )
+        date_elected_dict: DefaultDict[int, list[datetime]] = defaultdict(list)
+
+        date_recess_appointment_dict: DefaultDict[
+            int, list[datetime]
+        ] = defaultdict(list)
+        date_referred_to_judicial_committee_dict: DefaultDict[
+            int, list[datetime]
+        ] = defaultdict(list)
+        date_judicial_committee_action_dict: DefaultDict[
+            int, list[datetime]
+        ] = defaultdict(list)
+        date_hearing_dict: DefaultDict[int, list[datetime]] = defaultdict(list)
+        date_confirmation_dict: DefaultDict[int, list[datetime]] = defaultdict(
+            list
+        )
+        date_start_dict: DefaultDict[int, list[datetime]] = defaultdict(list)
+        date_granularity_start_dict: DefaultDict[
+            int, list[datetime]
+        ] = defaultdict(list)
+        date_retirement_dict: DefaultDict[int, list[datetime]] = defaultdict(
+            list
+        )
+        date_termination_dict: DefaultDict[int, list[datetime]] = defaultdict(
+            list
+        )
+        date_granularity_termination_dict: DefaultDict[
+            int, list[datetime]
+        ] = defaultdict(list)
+
+        judicial_committee_action_dict: DefaultDict[
+            int, list[str]
+        ] = defaultdict(list)
+        nomination_process_dict: DefaultDict[int, list[str]] = defaultdict(
+            list
+        )
+        selection_method_id_dict: DefaultDict[int, list[int]] = defaultdict(
+            list
+        )
+        termination_reason_dict: DefaultDict[int, list[str]] = defaultdict(
+            list
+        )
 
         for position in positions_in_page:
+            # Extract all the positions from DB and link by judge ID.
+            # API and Frontend
             if position.court:
-                courts_dict[position.person.pk].append(position.court)
-            # Extract all the positions from DB and linkby judge ID.
+                court_dict[position.person.pk].append(position.court.full_name)
+                court_exact_dict[position.person.pk].append(position.court.pk)
             if position.appointer:
-                appointers_dict[position.person.pk].append(
+                appointer_dict[position.person.pk].append(
                     position.appointer.person.name_full_reverse
                 )
             if position.how_selected:
-                selection_methods_dict[position.person.pk].append(
+                selection_method_dict[position.person.pk].append(
                     position.get_how_selected_display()
                 )
             if position.supervisor:
-                supervisors_dict[position.person.pk].append(
+                supervisor_dict[position.person.pk].append(
                     position.supervisor.name_full_reverse
                 )
             if position.predecessor:
-                predecessors_dict[position.person.pk].append(
+                predecessor_dict[position.person.pk].append(
                     position.predecessor.name_full_reverse
                 )
 
+            if not request_type == "api":
+                continue
+            # API
+            if position.position_type:
+                position_type_dict[position.person.pk].append(
+                    position.get_position_type_display()
+                )
+            if position.date_nominated:
+                date_nominated_dict[position.person.pk].append(
+                    midnight_pt(position.date_nominated)
+                )
+            if position.date_elected:
+                date_elected_dict[position.person.pk].append(
+                    midnight_pt(position.date_elected)
+                )
+            if position.date_recess_appointment:
+                date_recess_appointment_dict[position.person.pk].append(
+                    midnight_pt(position.date_recess_appointment)
+                )
+            if position.date_referred_to_judicial_committee:
+                date_referred_to_judicial_committee_dict[
+                    position.person.pk
+                ].append(
+                    midnight_pt(position.date_referred_to_judicial_committee)
+                )
+            if position.date_judicial_committee_action:
+                date_judicial_committee_action_dict[position.person.pk].append(
+                    midnight_pt(position.date_judicial_committee_action)
+                )
+            if position.date_hearing:
+                date_hearing_dict[position.person.pk].append(
+                    midnight_pt(position.date_hearing)
+                )
+            if position.date_confirmation:
+                date_confirmation_dict[position.person.pk].append(
+                    midnight_pt(position.date_confirmation)
+                )
+            if position.date_start:
+                date_start_dict[position.person.pk].append(
+                    midnight_pt(position.date_start)
+                )
+            if position.date_granularity_start:
+                date_granularity_start_dict[position.person.pk].append(
+                    position.date_granularity_start
+                )
+            if position.date_retirement:
+                date_retirement_dict[position.person.pk].append(
+                    midnight_pt(position.date_retirement)
+                )
+            if position.date_termination:
+                date_termination_dict[position.person.pk].append(
+                    midnight_pt(position.date_termination)
+                )
+            if position.date_granularity_termination:
+                date_granularity_termination_dict[position.person.pk].append(
+                    position.date_granularity_termination
+                )
+
+            if position.judicial_committee_action:
+                judicial_committee_action_dict[position.person.pk].append(
+                    position.get_judicial_committee_action_display()
+                )
+            if position.nomination_process:
+                nomination_process_dict[position.person.pk].append(
+                    position.get_nomination_process_display()
+                )
+            if position.how_selected:
+                selection_method_id_dict[position.person.pk].append(
+                    position.how_selected
+                )
+            if position.termination_reason:
+                termination_reason_dict[position.person.pk].append(
+                    position.get_termination_reason_display()
+                )
+
         for result in results:
+            # Frontend
             person_id = result["id"]
-            result["court"] = courts_dict.get(person_id)
-            result["appointer"] = appointers_dict.get(person_id)
-            result["selection_method"] = selection_methods_dict.get(person_id)
-            result["supervisor"] = supervisors_dict.get(person_id)
-            result["predecessor"] = predecessors_dict.get(person_id)
+            result["court"] = court_dict.get(person_id)
+            result["appointer"] = appointer_dict.get(person_id)
+            result["selection_method"] = selection_method_dict.get(person_id)
+            result["supervisor"] = supervisor_dict.get(person_id)
+            result["predecessor"] = predecessor_dict.get(person_id)
+
+            if not request_type == "api":
+                continue
+            # API
+            result["court_exact"] = court_exact_dict.get(person_id)
+            result["position_type"] = position_type_dict.get(person_id)
+            result["date_nominated"] = date_nominated_dict.get(person_id)
+            result["date_elected"] = date_elected_dict.get(person_id)
+            result[
+                "date_recess_appointment"
+            ] = date_recess_appointment_dict.get(person_id)
+            result[
+                "date_referred_to_judicial_committee"
+            ] = date_referred_to_judicial_committee_dict.get(person_id)
+            result[
+                "date_judicial_committee_action"
+            ] = date_judicial_committee_action_dict.get(person_id)
+            result["date_hearing"] = date_hearing_dict.get(person_id)
+            result["date_confirmation"] = date_confirmation_dict.get(person_id)
+            result["date_start"] = date_start_dict.get(person_id)
+            result["date_granularity_start"] = date_granularity_start_dict.get(
+                person_id
+            )
+            result["date_retirement"] = date_retirement_dict.get(person_id)
+            result["date_termination"] = date_termination_dict.get(person_id)
+            result[
+                "date_granularity_termination"
+            ] = date_granularity_termination_dict.get(person_id)
+
+            result[
+                "judicial_committee_action"
+            ] = judicial_committee_action_dict.get(person_id)
+            result["nomination_process"] = nomination_process_dict.get(
+                person_id
+            )
+            result["selection_method_id"] = selection_method_id_dict.get(
+                person_id
+            )
+            result["termination_reason"] = termination_reason_dict.get(
+                person_id
+            )
 
 
 def fetch_es_results(

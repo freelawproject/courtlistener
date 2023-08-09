@@ -188,7 +188,8 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
                     context={
                         "schema": AudioDocument._index.get_mapping()[
                             "oral_arguments"
-                        ]["mappings"]
+                        ]["mappings"],
+                        "document_type": AudioDocument,
                     },
                 )
             elif (
@@ -201,7 +202,8 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
                     context={
                         "schema": PersonDocument._index.get_mapping()[
                             "people_db_index"
-                        ]["mappings"]
+                        ]["mappings"],
+                        "document_type": PersonDocument,
                     },
                 )
 

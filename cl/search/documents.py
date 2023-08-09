@@ -439,10 +439,10 @@ class PersonDocument(PersonBaseDocument):
     )
 
     def prepare_races(self, instance):
-        return [r.get_race_display() for r in instance.race.all()]
+        return [r.get_race_display() for r in instance.race.all()] or None
 
     def prepare_alias_ids(self, instance):
-        return [alias.pk for alias in instance.aliases.all()]
+        return [alias.pk for alias in instance.aliases.all()] or None
 
     def prepare_gender(self, instance):
         return instance.get_gender_display()
@@ -455,19 +455,19 @@ class PersonDocument(PersonBaseDocument):
             pa.get_political_party_display()
             for pa in instance.political_affiliations.all()
             if pa
-        ]
+        ] or None
 
     def prepare_political_affiliation_id(self, instance):
         return [
             pa.political_party
             for pa in instance.political_affiliations.all()
             if pa
-        ]
+        ] or None
 
     def prepare_aba_rating(self, instance):
         return [
             r.get_rating_display() for r in instance.aba_ratings.all() if r
-        ]
+        ] or None
 
     def prepare_text(self, instance):
         text_template = loader.get_template("indexes/person_text.txt")
@@ -477,4 +477,4 @@ class PersonDocument(PersonBaseDocument):
         return "person"
 
     def prepare_school(self, instance):
-        return [e.school.name for e in instance.educations.all()]
+        return [e.school.name for e in instance.educations.all()] or None

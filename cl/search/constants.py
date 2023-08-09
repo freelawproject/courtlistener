@@ -52,6 +52,8 @@ SOLR_PEOPLE_ES_HL_FIELDS = [
     "name.exact",
     "dob_city",
     "dob_state_id",
+    "text",
+    "text.exact",
 ]
 SEARCH_HL_TAG = "mark"
 ALERTS_HL_TAG = "strong"

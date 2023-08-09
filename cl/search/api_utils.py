@@ -3,7 +3,10 @@ from django.conf import settings
 from rest_framework.exceptions import ParseError
 
 from cl.lib import search_utils
-from cl.lib.elasticsearch_utils import build_es_main_query
+from cl.lib.elasticsearch_utils import (
+    build_es_main_query,
+    merge_unavailable_fields_on_parent_document,
+)
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import map_to_docket_entry_sorting
 from cl.search.documents import AudioDocument, PersonDocument
@@ -113,6 +116,11 @@ class ESList(object):
         ]
         results = self.main_query.execute()
 
+        # Merge unavailable fields in ES by pulling data from the DB to make
+        # the API backwards compatible
+        merge_unavailable_fields_on_parent_document(
+            results, SEARCH_TYPES.PEOPLE, "api"
+        )
         # Pull the text snippet up a level
         for result in results:
             if hasattr(result.meta, "highlight") and hasattr(
