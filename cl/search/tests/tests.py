@@ -73,7 +73,7 @@ from cl.search.models import (
 from cl.search.tasks import add_docket_to_solr_by_rds
 from cl.search.views import do_search
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
-from cl.tests.cases import TestCase
+from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.utils import get_with_wait
 from cl.users.factories import UserProfileWithParentsFactory
 
@@ -2464,7 +2464,7 @@ class DocketEntriesTimezone(TestCase):
         self.assertEqual(de_nyed_utc.datetime_filed, target_date_aware)
 
 
-class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
+class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
     """Oral argument search tests for Elasticsearch"""
 
     @classmethod
@@ -4266,7 +4266,7 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
 
     def test_percolator(self) -> None:
         """Test if a variety of documents triggers a percolator query."""
-
+        oral_argument_index_alias = AudioDocument._index._name
         created_queries_ids = []
         # Add queries to percolator.
         cd = {
@@ -4277,7 +4277,9 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
         AudioPercolator._index.refresh()
-        response = percolate_document(str(self.audio_2.pk), "oral_arguments")
+        response = percolate_document(
+            str(self.audio_2.pk), oral_argument_index_alias
+        )
         expected_queries = 1
         self.assertEqual(len(response), expected_queries)
         self.assertEqual(self.confirm_query_matched(response, query_id), True)
@@ -4292,7 +4294,9 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
         AudioPercolator._index.refresh()
-        response = percolate_document(str(self.audio_2.pk), "oral_arguments")
+        response = percolate_document(
+            str(self.audio_2.pk), oral_argument_index_alias
+        )
         expected_queries = 2
         self.assertEqual(len(response), expected_queries)
         self.assertEqual(self.confirm_query_matched(response, query_id), True)
@@ -4306,7 +4310,9 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
         AudioPercolator._index.refresh()
-        response = percolate_document(str(self.audio_1.pk), "oral_arguments")
+        response = percolate_document(
+            str(self.audio_1.pk), oral_argument_index_alias
+        )
         expected_queries = 1
         self.assertEqual(len(response), expected_queries)
         self.assertEqual(self.confirm_query_matched(response, query_id), True)
@@ -4322,7 +4328,9 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
         AudioPercolator._index.refresh()
-        response = percolate_document(str(self.audio_5.pk), "oral_arguments")
+        response = percolate_document(
+            str(self.audio_5.pk), oral_argument_index_alias
+        )
         expected_queries = 1
         self.assertEqual(len(response), expected_queries)
         self.assertEqual(self.confirm_query_matched(response, query_id), True)
@@ -4339,7 +4347,9 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
         AudioPercolator._index.refresh()
-        response = percolate_document(str(self.audio_1.pk), "oral_arguments")
+        response = percolate_document(
+            str(self.audio_1.pk), oral_argument_index_alias
+        )
         expected_queries = 2
         self.assertEqual(len(response), expected_queries)
         self.assertEqual(self.confirm_query_matched(response, query_id), True)
@@ -4355,7 +4365,9 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
         AudioPercolator._index.refresh()
-        response = percolate_document(str(self.audio_2.pk), "oral_arguments")
+        response = percolate_document(
+            str(self.audio_2.pk), oral_argument_index_alias
+        )
         expected_queries = 3
         self.assertEqual(len(response), expected_queries)
         self.assertEqual(self.confirm_query_matched(response, query_id), True)
@@ -4371,11 +4383,13 @@ class OASearchTestElasticSearch(ESTestCaseMixin, AudioESTestCase, TestCase):
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
         AudioPercolator._index.refresh()
-        response = percolate_document(str(self.audio_4.pk), "oral_arguments")
+        response = percolate_document(
+            str(self.audio_4.pk), oral_argument_index_alias
+        )
         expected_queries = 2
         self.assertEqual(len(response), expected_queries)
         self.assertEqual(self.confirm_query_matched(response, query_id), True)
 
         self.delete_documents_from_index(
-            "oral_arguments_percolator", created_queries_ids
+            AudioPercolator._index._name, created_queries_ids
         )
