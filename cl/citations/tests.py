@@ -27,13 +27,12 @@ from cl.citations.filter_parentheticals import (
     is_parenthetical_descriptive,
 )
 from cl.citations.group_parentheticals import (
-    ComputedParentheticalGroup,
     compute_parenthetical_groups,
     get_graph_component,
     get_parenthetical_tokens,
     get_representative_parenthetical,
 )
-from cl.citations.management.commands.cl_add_parallel_citations import (
+from cl.citations.management.commands.add_parallel_citations import (
     identify_parallel_citations,
     make_edge_list,
 )
