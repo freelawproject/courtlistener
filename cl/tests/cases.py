@@ -141,7 +141,9 @@ class ESIndexTestCase(SimpleTestCase):
         # Create a unique index name for all indices registered in es_indices.
         # So each test class get an isolated index from each other.
         for index_registered in es_indices_registered:
-            index_registered._name = cls.__name__.lower()
+            index_registered._name = (
+                f"{cls.__name__.lower()}-{index_registered}"
+            )
         super().setUpClass()
 
     @classmethod
