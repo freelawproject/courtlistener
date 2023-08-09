@@ -26,6 +26,7 @@ from cl.lib.elasticsearch_utils import (
     merge_highlights_into_result,
 )
 from cl.search.constants import ALERTS_HL_TAG
+from cl.search.documents import AudioPercolator
 from cl.search.models import SEARCH_TYPES
 from cl.stats.utils import tally_stat
 from cl.users.models import UserProfile
@@ -70,7 +71,7 @@ def percolate_document(
     """
 
     try:
-        s = Search(index="oral_arguments_percolator")
+        s = Search(index=AudioPercolator._index._name)
         percolate_query = Q(
             "percolate",
             field="percolator_query",

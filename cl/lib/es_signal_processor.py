@@ -1,4 +1,4 @@
-from typing import Callable, Union
+from typing import Union
 
 from django.conf import settings
 from django.db.models.signals import m2m_changed, post_delete, post_save
@@ -95,7 +95,7 @@ def document_fields_to_update(
 
 
 def save_document_in_es(
-    instance: instance_typing, es_document: Callable
+    instance: instance_typing, es_document: es_document_typing
 ) -> None:
     """Save a document in Elasticsearch using a provided callable.
     :param instance: The instance of the document to save.
@@ -111,7 +111,7 @@ def save_document_in_es(
     )
     support_alerts = getattr(instance, "SUPPORT_ALERTS", None)
     if support_alerts and response["_version"] == 1:
-        send_or_schedule_alerts(response["_id"], "oral_arguments", doc)
+        send_or_schedule_alerts(response["_id"], es_document._index._name, doc)
 
 
 def get_or_create_doc(

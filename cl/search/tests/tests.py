@@ -2464,7 +2464,9 @@ class DocketEntriesTimezone(TestCase):
         self.assertEqual(de_nyed_utc.datetime_filed, target_date_aware)
 
 
-class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
+class OASearchTestElasticSearch(
+    ESTestCaseMixin, ESIndexTestCase, AudioESTestCase, TestCase
+):
     """Oral argument search tests for Elasticsearch"""
 
     @classmethod
