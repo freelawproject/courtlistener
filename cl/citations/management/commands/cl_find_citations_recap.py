@@ -108,7 +108,7 @@ class Command(VerboseCommand):
 
             if processed_count % chunk_size == 0 or last_item:
                 find_citations_and_parantheticals_for_recap_documents.apply_async(
-                    args=(chunk),
+                    args=(chunk,),
                     queue=queue_name,
                 )
                 chunk = []
