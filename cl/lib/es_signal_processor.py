@@ -144,8 +144,9 @@ def remove_doc_from_es_index(
         doc = es_document.get(id=instance_id)
         doc.delete(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)
     except NotFoundError:
+        model_label = es_document.Django.model._meta.app_label.capitalize()
         logger.error(
-            f"The Audio with ID:{instance_id} can't be deleted from "
+            f"The {model_label} with ID:{instance_id} can't be deleted from "
             f"the ES index, it doesn't exists."
         )
 
