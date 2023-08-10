@@ -1059,7 +1059,6 @@ PACER_TO_CL_IDS = {
     <p>We currently have <strong>{{ court_count }}</strong> jurisdictions that can be accessed with our APIs. Details about the jurisdictions that are available, including all abbreviations, can <a href="{% url "court_index" %}">be found here</a>.
     </p>
 
-
     <h2 id="powered-by"><span>Powered By</span></h2>
     <p> If you are interested, we have a variety of <a href="https://free.law/press-assets/">"Powered By" logos</a> available for your website or application. We appreciate a reference, and it supports our work, but it's not currently required.
     </p>
@@ -1093,6 +1092,10 @@ PACER_TO_CL_IDS = {
     <p><a href="{% url "rest_change_log" %}"
           class="btn btn-lg btn-primary">View REST API Change Log</a>
     </p>
+
+    <a href="https://www.courtlistener.com/donate/?referrer=rest-api-help">
+      <img src="{% static "png/please-support-open-legal-data.png" %}" class="img-responsive">
+    </a>
 
     <h2 id="copyright"><span>Copyright</span></h2>
     <p>Our data is free of known copyright restrictions.<br />
