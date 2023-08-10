@@ -383,7 +383,7 @@ class PersonDocument(PersonBaseDocument):
     id = fields.IntegerField(attr="pk")
     fjc_id = fields.IntegerField(attr="fjc_id")
     alias_ids = fields.ListField(
-        fields.KeywordField(),
+        fields.IntegerField(),
     )
     races = fields.ListField(
         fields.KeywordField(),
@@ -406,20 +406,47 @@ class PersonDocument(PersonBaseDocument):
 
     date_granularity_dob = fields.KeywordField(attr="date_granularity_dob")
     date_granularity_dod = fields.KeywordField(attr="date_granularity_dod")
-    dob_city = fields.TextField(attr="dob_city")
-    dob_state = fields.TextField()
+    dob_city = fields.TextField(
+        attr="dob_city",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="dob_city", analyzer="english_exact"
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    dob_state = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
     dob_state_id = fields.KeywordField(attr="dob_state")
     absolute_url = fields.KeywordField(attr="get_absolute_url")
     dob = fields.DateField(attr="date_dob")
     dod = fields.DateField(attr="date_dod")
     political_affiliation = fields.ListField(
-        fields.KeywordField(),
+        fields.TextField(
+            analyzer="text_en_splitting_cl",
+            fields={
+                "exact": fields.TextField(analyzer="english_exact"),
+            },
+            search_analyzer="search_analyzer",
+        )
     )
     political_affiliation_id = fields.ListField(
         fields.KeywordField(),
     )
     aba_rating = fields.ListField(
-        fields.KeywordField(),
+        fields.TextField(
+            analyzer="text_en_splitting_cl",
+            fields={
+                "exact": fields.TextField(analyzer="english_exact"),
+            },
+            search_analyzer="search_analyzer",
+        )
     )
     text = fields.TextField(
         analyzer="text_en_splitting_cl",
