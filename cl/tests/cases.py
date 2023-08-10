@@ -132,7 +132,10 @@ class APITestCase(
     pass
 
 
-@test.override_settings(ELASTICSEARCH_DSL_AUTO_REFRESH=True)
+@test.override_settings(
+    ELASTICSEARCH_DSL_AUTO_REFRESH=True,
+    ELASTICSEARCH_DISABLED=False,
+)
 class ESIndexTestCase(SimpleTestCase):
     @classmethod
     def setUpClass(cls):
