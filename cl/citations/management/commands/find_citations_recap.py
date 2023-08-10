@@ -90,7 +90,7 @@ class Command(VerboseCommand):
 
         sys.stdout.flush()
 
-    def update_documents(self, pks: Iterable, queue_name: str):
+    def update_documents(self, docs: Iterable, queue_name: str):
         sys.stdout.write(f"Graph size is {self.count:d} nodes.\n")
         sys.stdout.flush()
 
@@ -99,11 +99,11 @@ class Command(VerboseCommand):
         processed_count = 0
         throttle = CeleryThrottle(queue_name=queue_name)
 
-        for pk in pks:
+        for doc in docs:
             throttle.maybe_wait()
             processed_count += 1
             last_item = self.count == processed_count
-            chunk.append(pk)
+            chunk.append(doc.pk)
 
             if processed_count % chunk_size == 0 or last_item:
                 find_citations_and_parantheticals_for_recap_documents.apply_async(
@@ -112,7 +112,7 @@ class Command(VerboseCommand):
                 )
                 chunk = []
 
-            self.log_progress(processed_count, pk)
+            self.log_progress(processed_count, doc.pk)
 
     def handle(self, *args: List[str], **options: OptionsType):
         super(Command, self).handle(*args, **options)
@@ -162,6 +162,6 @@ class Command(VerboseCommand):
         self.average_per_s = 0.0
         self.timings: List[float] = []
 
-        document_pks = query.only("pk").iterator()
+        docs = query.only("pk").iterator()
         queue = cast(str, options["queue"])
-        self.update_documents(document_pks, queue)
+        self.update_documents(docs, queue)
