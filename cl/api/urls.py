@@ -154,7 +154,7 @@ urlpatterns_base = [
         views.rest_docs,
         name="rest_docs",
     ),
-    re_path(
+    path(
         "help/api/rest/changes/",
         views.rest_change_log,
         name="rest_change_log",
