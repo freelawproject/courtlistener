@@ -19,21 +19,6 @@
   <div class="col-xs-12 col-md-8 col-lg-6">
     <h1 id="about">REST API &ndash; v3.14</h1>
 
-    <div class="well">
-      <h3 class="top">Your Authorization Token</h3>
-      {% if user.is_authenticated %}
-        <p>Your permanent token for use with this API is:</p>
-        <h4><code>{{ user.auth_token }}</code></h4>
-        <p>Do not share your API token. Keep it private like a password.
-        </p>
-        <p class="text-right"><a class="btn btn-default" href="{% url "view_api" %}#usage">See Usage</a></p>
-      {% else %}
-        <p><a href="{% url "sign-in" %}?next={{ request.path }}"
-                class="btn btn-primary btn-lg">Sign In To See Your Token</a>
-        </p>
-      {% endif %}
-    </div>
-
     <h2 id="api-overview">Getting Started &amp; Overview</h2>
 
     <p>For developers that wish to have a granular API for our data, we provide a RESTful API based on the <a href="http://www.django-rest-framework.org/" target="_blank">Django REST Framework</a>.
@@ -133,6 +118,22 @@
     </p>
 
 
+    <div class="well">
+      <h3 class="top">Your Authorization Token</h3>
+      {% if user.is_authenticated %}
+        <p>Your permanent token for use with this API is:</p>
+        <h4><code>{{ user.auth_token }}</code></h4>
+        <p>Do not share your API token. Keep it private like a password.
+        </p>
+        <p class="text-right"><a class="btn btn-default" href="{% url "view_api" %}#usage">See Usage</a></p>
+      {% else %}
+        <p><a href="{% url "sign-in" %}?next={{ request.path }}"
+                class="btn btn-primary btn-lg">Sign In To See Your Token</a>
+        </p>
+      {% endif %}
+    </div>
+
+
     <h3 id="authentication">Authentication</h3>
     <p>Authentication is necessary so we can monitor usage of the system and so we can assist with any errors that may occur. Per our <a href="{% url "terms" %}#privacy">privacy policy</a>, we do not track your queries in the API, though we do collect statistical information for system monitoring.
     </p>
@@ -187,12 +188,12 @@
     <p>Note that quotes are used to enclose the whitespace in the header.</p>
     <p class="alert alert-warning"><i class="fa fa-warning"></i> <strong>Careful!</strong> The most common mistake we see is forgetting the word "Token" in the token authentication header value. Remember that the header name is <code>Authorization</code> and the value is <code>Token&nbsp;{% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}</code></p>
     {% if user.is_authenticated %}
-      <p>Your permanent token for use with this API is being used in the examples above, is at the top of this page, and is:</p>
+      <p>Your permanent token for use with this API is being used in the examples above and is:</p>
       <pre class="scrollable">{{ user.auth_token }}</pre>
       <p>Do not share this value publicly via code check ins, emails, etc. Treat this value as you would a password. Do not email it to us.
       </p>
     {% else %}
-      <p><a href="{% url "sign-in" %}?next={{ request.path }}#token-auth">Sign in to see your permanent token in these examples and at the top of this page.</a>
+      <p><a href="{% url "sign-in" %}?next={{ request.path }}#token-auth">Sign in to see your permanent token in these examples.</a>
       </p>
     {% endif %}
 
