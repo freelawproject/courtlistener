@@ -179,7 +179,7 @@ def process_percolator_response(
                 alert_user.profile.total_donated_last_year
                 < settings.MIN_DONATION["rt_alerts"]
             )
-            if not_donated_enough and alert_triggered.rate == Alert.REAL_TIME:
+            if not_donated_enough:
                 logger.info(
                     "User: %s has not donated enough for their "
                     "RT alerts to be sent.\n" % alert_user
