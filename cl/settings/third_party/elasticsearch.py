@@ -2,11 +2,15 @@ import environ
 
 env = environ.FileAwareEnv()
 
-ELASTICSEARCH_DISABLED = env(
-    "ELASTICSEARCH_DISABLED",
-    default=False,
-)
+from ..django import TESTING
 
+if TESTING:
+    ELASTICSEARCH_DISABLED = True
+else:
+    ELASTICSEARCH_DISABLED = env(
+        "ELASTICSEARCH_DISABLED",
+        default=False,
+    )
 
 #
 # Connection settings
