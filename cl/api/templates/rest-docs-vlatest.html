@@ -1076,14 +1076,10 @@ PACER_TO_CL_IDS = {
     <p><a href="#fn-ref-1">Back to reference 1 &#8617;</a></p>
     <p><a href="#fn-ref-2">Back to reference 2 &#8617;</a></p>
 
-    <h2 id="footnotes">API Change Log</h2>
+    <h2 id="api-change-log">API Change Log</h2>
     <p><a href="{% url "rest_change_log" %}"
           class="btn btn-lg btn-primary">View REST API Change Log</a>
     </p>
-
-    <a href="https://www.courtlistener.com/donate/?referrer=rest-api-help">
-      <img src="{% static "png/please-support-open-legal-data.png" %}" class="img-responsive">
-    </a>
 
     <h2 id="copyright"><span>Copyright</span></h2>
     <p>Our data is free of known copyright restrictions.<br />
@@ -1091,6 +1087,23 @@ PACER_TO_CL_IDS = {
         <img src="{% static "png/cc-pd.png" %}" alt="Public Domain Mark" height="31" width="88"/>
       </a>
     </p>
+
+    <div class="well v-offset-above-3">
+      <h2 class="top text-center">Please Support Open Legal Data</h2>
+      <p>These bulk data files are sponsored by <a href="https://free.law">Free Law Project</a> and users like you. We provide these files in furtherance of our mission to make the legal sector more innovative and equitable.
+      </p>
+      <p>We have provided these files for over a decade, and we need your contributions to continue curating and enhancing this service.
+      </p>
+      <p>Will you support us today with a donation?</p>
+      <div class="row">
+        <div class="hidden-xs col-sm-1 col-md-2 col-lg-3"></div>
+        <div class="col-xs-12 col-sm-10 col-md-8 col-lg-6">
+          <p class="text-center">
+            <a href="{% url "donate" %}?referrer={{ request.path }}" class="btn btn-lg btn-block btn-danger"><i class="fa fa-heart-o"></i> Donate Now</a>
+          </p>
+        </div>
+      </div>
+    </div>
 
   </div>
 {% endblock %}
