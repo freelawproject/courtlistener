@@ -13,6 +13,7 @@ from django.http.request import QueryDict
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.exceptions import RequestError, TransportError
 from elasticsearch_dsl import A, Q
+from elasticsearch_dsl.connections import connections
 from elasticsearch_dsl.query import QueryString, Range
 from elasticsearch_dsl.response import Response
 from elasticsearch_dsl.utils import AttrDict
@@ -39,6 +40,16 @@ def elasticsearch_enabled(func: Callable) -> Callable:
             func(*args, **kwargs)
 
     return wrapper_func
+
+
+def check_index(index: str) -> bool:
+    """Check if the given index exists
+
+    :param field: elasticsearch index name
+    :return: Whether the index exists
+    """
+    es = connections.get_connection()
+    return es.indices.exists(index=index)
 
 
 def build_daterange_query(
