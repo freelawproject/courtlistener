@@ -8,6 +8,7 @@ from elasticsearch_dsl import Document
 from cl.alerts.send_alerts import send_or_schedule_alerts
 from cl.audio.models import Audio
 from cl.lib.command_utils import logger
+from cl.lib.elasticsearch_utils import elasticsearch_enabled
 from cl.search.documents import AudioDocument, ParentheticalGroupDocument
 from cl.search.models import (
     Citation,
@@ -287,8 +288,7 @@ class ESSignalProcessor(object):
         self.es_document = es_document
         self.documents_model_mapping = documents_model_mapping
 
-        if not settings.ELASTICSEARCH_DISABLED:
-            self.setup()
+        self.setup()
 
     def setup(self):
         models_save = list(self.documents_model_mapping["save"].keys())
@@ -340,6 +340,7 @@ class ESSignalProcessor(object):
                     weak=weak,
                 )
 
+    @elasticsearch_enabled
     def handle_save(self, sender, instance=None, created=False, **kwargs):
         """Receiver function that gets called after an object instance is saved"""
         mapping_fields = self.documents_model_mapping["save"][sender]
@@ -354,10 +355,12 @@ class ESSignalProcessor(object):
         if not mapping_fields:
             save_document_in_es(instance, self.es_document)
 
+    @elasticsearch_enabled
     def handle_delete(self, sender, instance, **kwargs):
         """Receiver function that gets called after an object instance is deleted"""
         remove_doc_from_es_index(self.es_document, instance.pk)
 
+    @elasticsearch_enabled
     def handle_m2m(self, sender, instance=None, action=None, **kwargs):
         """Receiver function that gets called after a m2m relation is modified"""
         if action == "post_add" or action == "post_remove":
@@ -372,6 +375,7 @@ class ESSignalProcessor(object):
                     affected_field,
                 )
 
+    @elasticsearch_enabled
     def handle_reverse_actions(self, sender, instance=None, **kwargs):
         """Receiver function that gets called after a reverse relation is
         created, updated or removed.
