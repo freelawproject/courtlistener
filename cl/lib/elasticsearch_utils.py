@@ -4,8 +4,8 @@ import re
 import time
 import traceback
 from datetime import date
-from functools import reduce
-from typing import Any, Dict, List
+from functools import reduce, wraps
+from typing import Any, Callable, Dict, List
 
 from django.conf import settings
 from django.core.paginator import Page
@@ -28,6 +28,17 @@ from cl.search.constants import (
 from cl.search.models import SEARCH_TYPES, Court
 
 logger = logging.getLogger(__name__)
+
+
+def elasticsearch_enabled(func: Callable) -> Callable:
+    """A decorator to avoid executing Elasticsearch methods when it's disabled."""
+
+    @wraps(func)
+    def wrapper_func(*args, **kwargs) -> Any:
+        if not settings.ELASTICSEARCH_DISABLED:
+            func(*args, **kwargs)
+
+    return wrapper_func
 
 
 def build_daterange_query(
