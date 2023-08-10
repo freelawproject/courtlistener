@@ -81,10 +81,12 @@ def make_es_boost_list(fields: Dict[str, float]) -> list[str]:
     return boosted_fields
 
 
-def add_fields_boosting(cd: CleanData) -> list[str]:
+def add_fields_boosting(cd: CleanData, fields: list[str] = None) -> list[str]:
     """Applies boosting to specific fields according the search type.
 
     :param cd: The user input CleanedData
+    :param fields: If provided, a custom fields list to apply boosting,
+    otherwise apply to all fields.
     :return: A list of Elasticsearch fields with their respective boost values.
     """
     # Apply standard qf parameters
@@ -106,6 +108,8 @@ def add_fields_boosting(cd: CleanData) -> list[str]:
         if any([vs_query, in_re_query, matter_of_query, ex_parte_query]):
             qf.update({"caseName": 50})
 
+    if fields:
+        qf = {key: value for key, value in qf.items() if key in fields}
     return make_es_boost_list(qf)
 
 
@@ -361,9 +365,11 @@ def build_es_main_query(
             )
         case SEARCH_TYPES.PEOPLE:
             child_query_fields = {
-                "position": ["appointer"],
+                "position": add_fields_boosting(
+                    cd, ["appointer", "supervisor", "predecessor"]
+                ),
             }
-            parent_query_fields = ["name", "text"]
+            parent_query_fields = add_fields_boosting(cd, ["name", "text"])
             string_query = build_join_fulltext_queries(
                 child_query_fields,
                 parent_query_fields,
@@ -459,22 +465,21 @@ def replace_value_with_tag(
     :param tag: The HTML tag to use for marking the value.
     :return: The original string with the marked word replaced by the tagged version.
     """
+    # Extract all highlighted words from the highlighted_value
 
-    # Extract the word inside the specified tags from the highlighted_value
-    marked_word = re.search(f"<{tag}>(.*?)</{tag}>", highlighted_value).group(
-        1
-    )
+    marked_words = re.findall(f"<{tag}>(.*?)</{tag}>", highlighted_value)
 
     if field_name == "dob_state_id":
         # dob_state_id field, replace it with its corresponding state name from
-        # the STATE_CHOICES
+        # STATE_CHOICES
         states_dict = dict(list(STATE_CHOICES))
-        marked_word = str(states_dict[marked_word])
+        marked_words = [str(states_dict[marked_words[0]])]
 
-    # Replace the marked word with its tagged version in the original_value
-    original_value = original_value.replace(
-        marked_word, f"<{tag}>{marked_word}</{tag}>"
-    )
+    # Replace each highlighted word with its tagged version in the original_value
+    for marked_word in marked_words:
+        original_value = original_value.replace(
+            marked_word, f"<{tag}>{marked_word}</{tag}>"
+        )
     return original_value
 
 
@@ -610,7 +615,7 @@ def set_results_highlights(results: Page, search_type: str) -> None:
                     hit["_source"][highlighted_field] = highlight
         else:
             if not hasattr(result.meta, "highlight"):
-                return
+                continue
 
             highlights = result.meta.highlight.to_dict()
             swap_fields_to_highlight(
@@ -1027,6 +1032,7 @@ def build_join_fulltext_queries(
         query = Q(
             "has_child",
             type=child_type,
+            score_mode="max",
             query=build_fulltext_query(fields, value),
             inner_hits={"name": f"text_query_inner_{child_type}"},
             max_children=10,
@@ -1043,7 +1049,17 @@ def build_join_fulltext_queries(
     return []
 
 
-def build_has_child_filters(child_type, cd) -> List:
+def build_has_child_filters(
+    child_type: str, cd: CleanData
+) -> list[QueryString]:
+    """Builds Elasticsearch 'has_child' filters based on the given child type
+    and CleanData.
+
+    :param child_type: The type of child filter to build (e.g., "position").
+    :param cd: The user input CleanedData.
+    :return: A list of QueryString objects containing the 'has_child' filters.
+    """
+
     queries_list = []
     if cd["type"] == SEARCH_TYPES.PEOPLE:
         if child_type == "position":
@@ -1069,6 +1085,7 @@ def build_has_child_filters(child_type, cd) -> List:
         Q(
             "has_child",
             type=child_type,
+            score_mode="max",
             query=reduce(operator.iand, queries_list),
             inner_hits={"name": f"filter_inner_{child_type}"},
             max_children=10,

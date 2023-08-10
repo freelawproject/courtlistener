@@ -60,7 +60,6 @@ from cl.lib.test_helpers import (
     SolrTestCase,
 )
 from cl.people_db.factories import (
-    EducationFactory,
     PersonFactory,
     PoliticalAffiliationFactory,
     PositionFactory,
@@ -76,7 +75,6 @@ from cl.search.documents import (
     AudioPercolator,
     ParentheticalGroupDocument,
     PersonDocument,
-    PositionDocument,
 )
 from cl.search.factories import (
     CitationWithParentsFactory,
@@ -5394,17 +5392,17 @@ class PeopleSearchTestElasticSearch(
     def test_results_highlights(self) -> None:
         """Test highlighting for Judge results."""
 
-        # name highlights in text query.
+        # name query highlights in text query.
         params = {
-            "q": "Sheindlin",
+            "q": "Sheindlin Olivia",
             "type": SEARCH_TYPES.PEOPLE,
             "order_by": "score desc",
         }
-        r = self._test_article_count(params, 2, "q")
+        r = self._test_article_count(params, 1, "q")
         self.assertIn("<mark>Sheindlin</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>Sheindlin</mark>"), 2)
+        self.assertIn("<mark>Olivia</mark>", r.content.decode())
 
-        # name.exact highlights in text query.
+        # name.exact query highlights in text query.
         params = {
             "q": '"Sheindlin" Judith',
             "type": SEARCH_TYPES.PEOPLE,
