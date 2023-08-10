@@ -16,6 +16,7 @@ from cl.lib.elasticsearch_utils import (
     build_term_query,
     group_search_results,
 )
+from cl.lib.test_helpers import ESTestCaseMixin
 from cl.people_db.factories import PersonFactory
 from cl.search.documents import (
     ParentheticalGroupDocument,
@@ -35,7 +36,7 @@ from cl.search.models import PRECEDENTIAL_STATUS, SEARCH_TYPES, Citation
 from cl.tests.cases import ESIndexTestCase, TestCase
 
 
-class ParentheticalESTest(ESIndexTestCase, TestCase):
+class ParentheticalESTest(ESIndexTestCase, ESTestCaseMixin, TestCase):
     """Parenthetical ES search related tests"""
 
     @classmethod
@@ -161,6 +162,11 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
         cls.p3.save()
         cls.p4.group = cls.pg4
         cls.p4.save()
+
+    @classmethod
+    def setUpClass(cls):
+        super(ParentheticalESTest, cls).setUpClass()
+        cls.rebuild_index("search.ParentheticalGroup")
 
     def test_filter_search(self) -> None:
         """Test filtering and search at the same time"""
@@ -500,12 +506,13 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
         )
 
 
-class ParentheticalESSignalProcessorTest(ESIndexTestCase, TestCase):
+class ParentheticalESSignalProcessorTest(
+    ESIndexTestCase, ESTestCaseMixin, TestCase
+):
     """Parenthetical ES indexing related tests"""
 
     @classmethod
     def setUpTestData(cls):
-        cls.rebuild_index("search.ParentheticalGroup")
         # Create factories for the test.
         cls.c1 = CourtFactory(id="canb", jurisdiction="I")
         cls.c2 = CourtFactory(id="ca1", jurisdiction="F")
@@ -557,9 +564,9 @@ class ParentheticalESSignalProcessorTest(ESIndexTestCase, TestCase):
         cls.p5.group = cls.pg_test
         cls.p5.save()
 
-    def setUp(self) -> None:
-        self.setUpTestData()
+    def setUp(self):
         super().setUp()
+        self.rebuild_index("search.ParentheticalGroup")
 
     def test_keep_in_sync_related_pa_objects_on_save(self) -> None:
         """Test PA documents are updated in ES when related objects change."""

@@ -2465,24 +2465,9 @@ class DocketEntriesTimezone(TestCase):
 
 
 class OASearchTestElasticSearch(
-    ESTestCaseMixin, ESIndexTestCase, AudioESTestCase, TestCase
+    ESIndexTestCase, ESTestCaseMixin, AudioESTestCase, TestCase
 ):
     """Oral argument search tests for Elasticsearch"""
-
-    @classmethod
-    def rebuild_index(self, model):
-        """
-        Create and populate the Elasticsearch index and mapping
-        """
-
-        # -f rebuilds index without prompt for confirmation
-        call_command(
-            "search_index",
-            "--rebuild",
-            "-f",
-            "--models",
-            model,
-        )
 
     @classmethod
     def setUpTestData(cls):
