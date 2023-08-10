@@ -1060,19 +1060,6 @@ PACER_TO_CL_IDS = {
     <p>We currently have <strong>{{ court_count }}</strong> jurisdictions that can be accessed with our APIs. Details about the jurisdictions that are available, including all abbreviations, can <a href="{% url "court_index" %}">be found here</a>.
     </p>
 
-    <h2 id="powered-by"><span>Powered By</span></h2>
-    <p> If you are interested, we have a variety of <a href="https://free.law/press-assets/">"Powered By" logos</a> available for your website or application. We appreciate a reference, and it supports our work, but it's not currently required.
-    </p>
-    <a href="https://free.law/press-assets/">
-      <img src="{% static "png/logo-long-w350.png" %}" width="350" height="81">
-    </a>
-
-    <h2 id="citegeist-scores"><span>CiteGeist Scores</span></h2>
-    <p>If you are interested in the CiteGeist score for each opinion, it is now available via our <a href="{% url "bulk_data_index" %}#citegeist">bulk data API</a>.
-    </p>
-    <p>This data is not available via the REST API because a single new citation between cases causes a ripple effect through every value in the database.
-    </p>
-
     <h2 id="maintenance-schedule"><span>Maintenance Schedule</span></h2>
     <p>Generally, we keep the APIs up and running around the clock, but for the rare times where maintenance requires downtime, we will schedule that downtime during a weekly maintenance window from 21:00-23:59PT on a Thursday night. If you are scheduling cron jobs or otherwise crawling the API, you may experience downtime during this window.
     </p>
