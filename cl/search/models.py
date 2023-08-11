@@ -944,25 +944,27 @@ class Docket(AbstractDateTimeModel):
         )
 
         # Parties, attorneys, firms
-        out.update(
-            {
-                "party_id": set(),
-                "party": set(),
-                "attorney_id": set(),
-                "attorney": set(),
-                "firm_id": set(),
-                "firm": set(),
-            }
-        )
-        for p in self.prefetched_parties:
-            out["party_id"].add(p.pk)
-            out["party"].add(p.name)
-            for a in p.attys_in_docket:
-                out["attorney_id"].add(a.pk)
-                out["attorney"].add(a.name)
-                for f in a.firms_in_docket:
-                    out["firm_id"].add(f.pk)
-                    out["firm"].add(f.name)
+        if self.pk != 6245245:
+            # Don't do parties for the J&J talcum powder case. It's too big.
+            out.update(
+                {
+                    "party_id": set(),
+                    "party": set(),
+                    "attorney_id": set(),
+                    "attorney": set(),
+                    "firm_id": set(),
+                    "firm": set(),
+                }
+            )
+            for p in self.prefetched_parties:
+                out["party_id"].add(p.pk)
+                out["party"].add(p.name)
+                for a in p.attys_in_docket:
+                    out["attorney_id"].add(a.pk)
+                    out["attorney"].add(a.name)
+                    for f in a.firms_in_docket:
+                        out["firm_id"].add(f.pk)
+                        out["firm"].add(f.name)
 
         # Do RECAPDocument and Docket Entries in a nested loop
         for de in self.docket_entries.all().iterator():
@@ -1559,6 +1561,12 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
                 "firm": set(),
             }
         )
+
+        if docket.pk == 6245245:
+            # Skip the parties for the J&J talcum powder case, it's just too
+            # big to pull from the DB. Sorry folks.
+            return out
+
         for p in docket.prefetched_parties:
             out["party_id"].add(p.pk)
             out["party"].add(p.name)
