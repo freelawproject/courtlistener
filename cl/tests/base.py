@@ -24,7 +24,7 @@ from cl.lib.decorators import retry
 from cl.lib.test_helpers import SerializeSolrTestMixin
 from cl.search.models import Opinion
 from cl.search.tasks import add_items_to_solr
-from cl.tests.cases import StaticLiveServerTestCase
+from cl.tests.cases import ESIndexTestCase, StaticLiveServerTestCase
 
 SELENIUM_TIMEOUT = 120
 if "SELENIUM_TIMEOUT" in os.environ:
@@ -41,7 +41,9 @@ if "SELENIUM_TIMEOUT" in os.environ:
     SOLR_URLS=settings.SOLR_TEST_URLS,
     ALLOWED_HOSTS=["*"],
 )
-class BaseSeleniumTest(SerializeSolrTestMixin, StaticLiveServerTestCase):
+class BaseSeleniumTest(
+    SerializeSolrTestMixin, StaticLiveServerTestCase, ESIndexTestCase
+):
     """Base class for Selenium Tests. Sets up a few attributes:
       * browser - instance of Selenium WebDriver
       * screenshot - boolean for if the test should save a final screenshot
@@ -76,15 +78,6 @@ class BaseSeleniumTest(SerializeSolrTestMixin, StaticLiveServerTestCase):
         return webdriver.Chrome(chrome_options=options, keep_alive=True)
 
     @classmethod
-    def rebuild_index(self):
-        """
-        Create and populate the Elasticsearch index and mapping
-        """
-
-        # -f rebuilds index without prompt for confirmation
-        call_command("search_index", "--rebuild", "-f")
-
-    @classmethod
     def setUpClass(cls) -> None:
         super(BaseSeleniumTest, cls).setUpClass()
 
@@ -102,7 +95,7 @@ class BaseSeleniumTest(SerializeSolrTestMixin, StaticLiveServerTestCase):
     def setUp(self) -> None:
         self.reset_browser()
         self._update_index()
-        self.rebuild_index()
+        self.rebuild_index("audio.Audio")
 
     def reset_browser(self) -> None:
         self.browser.delete_all_cookies()

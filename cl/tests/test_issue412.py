@@ -10,7 +10,6 @@ from timeout_decorator import timeout_decorator
 
 from cl.search.models import Docket
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
-from cl.tests.cases import ESIndexTestCase
 from cl.users.factories import UserProfileWithParentsFactory
 
 BLOCKED_MSG = "Blocked"
