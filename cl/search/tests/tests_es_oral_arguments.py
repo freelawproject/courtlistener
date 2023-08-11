@@ -10,7 +10,7 @@ from cl.alerts.models import Alert
 from cl.alerts.send_alerts import percolate_document
 from cl.audio.factories import AudioFactory
 from cl.audio.models import Audio
-from cl.lib.elasticsearch_utils import build_es_main_query
+from cl.lib.elasticsearch_utils import build_es_main_query, fetch_es_results
 from cl.lib.test_helpers import AudioESTestCase
 from cl.search.documents import AudioDocument, AudioPercolator
 from cl.search.factories import DocketFactory
@@ -1104,13 +1104,41 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
                 msg=f"Key {key} not found in the result object.",
             )
 
-    def test_oa_results_api_pagination(self) -> None:
+    def test_oa_results_pagination(self) -> None:
         created_audios = []
-        for i in range(20):
+        audios_to_create = 20
+        for i in range(audios_to_create):
             audio = AudioFactory.create(
                 docket_id=self.audio_3.docket.pk,
             )
             created_audios.append(audio)
+
+        # Confirm that fetch_es_results works properly with different sorting
+        # types, returning sequential results for each requested page.
+        page_size = 5
+        total_pages = int(audios_to_create / page_size) + 1
+        order_types = ["score desc", "dateArgued desc", "dateArgued asc"]
+        for order in order_types:
+            ids_in_results = []
+            for page in range(total_pages):
+                cd = {
+                    "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                    "order_by": order,
+                }
+                search_query = AudioDocument.search()
+                s, total_query_results, top_hits_limit = build_es_main_query(
+                    search_query, cd
+                )
+                hits, query_time, error = fetch_es_results(
+                    cd, s, page=page + 1, rows_per_page=5
+                )
+                results = hits.hits
+                for result in results:
+                    self.assertNotIn(result.id, ids_in_results)
+                    ids_in_results.append(result.id)
+            self.assertEqual(len(ids_in_results), Audio.objects.all().count())
+
+        # Test pagination requests.
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
         }
@@ -1122,7 +1150,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 20
         self.assertEqual(actual, expected)
-        self.assertIn("24", r.content.decode())
+        self.assertIn("25 Results", r.content.decode())
         self.assertIn("1 of 2", r.content.decode())
 
         # Test next page.
@@ -1137,7 +1165,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 5
         self.assertEqual(actual, expected)
-        self.assertIn("25", r.content.decode())
+        self.assertIn("25 Results", r.content.decode())
         self.assertIn("2 of 2", r.content.decode())
 
         search_params = {
