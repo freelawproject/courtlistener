@@ -24,14 +24,32 @@ SOLR_RECAP_HL_FIELDS = [
     "suitNature",
     "text",
 ]
-SOLR_ORAL_ARGUMENT_HL_FIELDS = [
+SEARCH_ORAL_ARGUMENT_HL_FIELDS = [
     "text",
     "caseName",
     "judge",
     "docketNumber",
     "court_citation_string",
 ]
+SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS = [
+    "text",
+    "text.exact",
+    "caseName",
+    "caseName.exact",
+    "judge",
+    "judge.exact",
+    "docketNumber",
+    "docketNumber.exact",
+    "court_citation_string",
+]
+SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS = [
+    "text",
+    "text.exact",
+]
 SOLR_PEOPLE_HL_FIELDS = ["name", "dob_city", "dob_state", "name_reverse"]
+SEARCH_HL_TAG = "mark"
+ALERTS_HL_TAG = "strong"
+
 
 # Search query for related items
 RELATED_PATTERN = re.compile(

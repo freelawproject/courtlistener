@@ -11,7 +11,6 @@ from dateutil.tz import tzoffset, tzutc
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import AnonymousUser
-from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.management import call_command
@@ -27,7 +26,6 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
 
-from cl.audio.factories import AudioFactory
 from cl.lib.search_utils import cleanup_main_query, make_fq
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
@@ -36,7 +34,6 @@ from cl.lib.test_helpers import (
     IndexedSolrTestCase,
     SolrTestCase,
 )
-from cl.people_db.factories import PersonFactory
 from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.factories import DocketEntriesDataFactory, DocketEntryDataFactory
 from cl.recap.mergers import add_docket_entries
@@ -66,7 +63,7 @@ from cl.search.models import (
 from cl.search.tasks import add_docket_to_solr_by_rds
 from cl.search.views import do_search
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
-from cl.tests.cases import TestCase
+from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.utils import get_with_wait
 from cl.users.factories import UserProfileWithParentsFactory
 
@@ -114,7 +111,7 @@ class UpdateIndexCommandTest(SolrTestCase):
         )
 
         # Check a simple citation query
-        results = self.si_opinion.query(cites=3).execute()
+        results = self.si_opinion.query(cites=self.opinion_3.pk).execute()
         actual_count = self._get_result_count(results)
         expected_citation_count = 2
         self.assertEqual(
@@ -156,9 +153,9 @@ class UpdateIndexCommandTest(SolrTestCase):
                 f"{settings.SOLR_HOST}/solr/{self.core_name_opinion}",
                 "--update",
                 "--items",
-                "1",
-                "2",
-                "3",
+                f"{self.opinion_1.pk}",
+                f"{self.opinion_2.pk}",
+                f"{self.opinion_3.pk}",
                 "--do-commit",
             ]
         )
@@ -391,8 +388,6 @@ class AdvancedTest(IndexedSolrTestCase):
     Advanced query techniques
     """
 
-    fixtures = ["test_objects_search.json", "judge_judy.json"]
-
     @classmethod
     def setUpTestData(cls):
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
@@ -415,6 +410,7 @@ class AdvancedTest(IndexedSolrTestCase):
         cls.rd_1 = RECAPDocumentFactory(
             docket_entry=cls.de_1, description="Leave to File"
         )
+        super().setUpTestData()
 
     async def test_a_intersection_query(self) -> None:
         """Does AND queries work"""
@@ -650,7 +646,7 @@ class AdvancedTest(IndexedSolrTestCase):
         self.assertIn("SUBPOENAS SERVED OFF", r.content.decode())
 
 
-class SearchTest(IndexedSolrTestCase):
+class SearchTest(ESIndexTestCase, IndexedSolrTestCase):
     @classmethod
     def setUpTestData(cls):
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
@@ -672,6 +668,7 @@ class SearchTest(IndexedSolrTestCase):
             docket=DocketFactory(court=cls.court, docket_number="123456"),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
         )
+        super().setUpTestData()
 
     @staticmethod
     def get_article_count(r):
@@ -1019,10 +1016,10 @@ class RelatedSearchTest(IndexedSolrTestCase):
     async def test_more_like_this_opinion(self) -> None:
         """Does the MoreLikeThis query return the correct number and order of
         articles."""
-        seed_pk = 1  # Paul Debbas v. Franklin
+        seed_pk = self.opinion_1.pk  # Paul Debbas v. Franklin
         expected_article_count = 3
-        expected_first_pk = 2  # Howard v. Honda
-        expected_second_pk = 3  # case name cluster 3
+        expected_first_pk = self.opinion_cluster_2.pk  # Howard v. Honda
+        expected_second_pk = self.opinion_cluster_3.pk  # case name cluster 3
 
         params = {
             "type": "o",
@@ -1048,7 +1045,7 @@ class RelatedSearchTest(IndexedSolrTestCase):
 
     async def test_more_like_this_opinion_detail_detail(self) -> None:
         """MoreLikeThis query on opinion detail page with status filter"""
-        seed_pk = 3  # case name cluster 3
+        seed_pk = self.opinion_cluster_3.pk  # case name cluster 3
 
         # Login as staff user (related items are by default disabled for guests)
         self.assertTrue(
@@ -1068,11 +1065,26 @@ class RelatedSearchTest(IndexedSolrTestCase):
         ]
 
         recommendations_expected = [
-            ("/opinion/2/case-name-cluster/?", "Howard v. Honda"),
-            ("/opinion/1/case-name-cluster/?", "Debbas v. Franklin"),
-            ("/opinion/1/case-name-cluster/?", "Debbas v. Franklin"),
-            ("/opinion/1/case-name-cluster/?", "Debbas v. Franklin"),
-            ("/opinion/1/case-name-cluster/?", "Debbas v. Franklin"),
+            (
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
+                "Debbas v. Franklin",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
+                "Debbas v. Franklin",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
+                "Debbas v. Franklin",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
+                "Debbas v. Franklin",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                "Howard v. Honda",
+            ),
         ]
 
         # Test if related opinion exist in expected order
@@ -1087,7 +1099,7 @@ class RelatedSearchTest(IndexedSolrTestCase):
     @override_settings(RELATED_FILTER_BY_STATUS=None)
     async def test_more_like_this_opinion_detail_no_filter(self) -> None:
         """MoreLikeThis query on opinion detail page (without filter)"""
-        seed_pk = 1  # Paul Debbas v. Franklin
+        seed_pk = self.opinion_cluster_1.pk  # Paul Debbas v. Franklin
 
         # Login as staff user (related items are by default disabled for guests)
         self.assertTrue(
@@ -1107,11 +1119,26 @@ class RelatedSearchTest(IndexedSolrTestCase):
         ]
 
         recommendations_expected = [
-            ("/opinion/2/case-name-cluster/?", "Howard v. Honda"),
-            ("/opinion/2/case-name-cluster/?", "Howard v. Honda"),
-            ("/opinion/2/case-name-cluster/?", "Howard v. Honda"),
-            ("/opinion/2/case-name-cluster/?", "Howard v. Honda"),
-            ("/opinion/3/case-name-cluster/?", "case name cluster 3"),
+            (
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                "Howard v. Honda",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                "Howard v. Honda",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                "Howard v. Honda",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                "Howard v. Honda",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_3.pk}/{self.opinion_cluster_3.slug}/?",
+                "case name cluster 3",
+            ),
         ]
 
         # Test if related opinion exist in expected order
@@ -1167,6 +1194,7 @@ class JudgeSearchTest(IndexedSolrTestCase):
             "name_reverse asc",
             "dob desc,name_reverse asc",
             "dod desc,name_reverse asc",
+            "random_123 desc",
         ]
         for sort_field in sort_fields:
             r = await self.async_client.get(
@@ -1191,124 +1219,267 @@ class JudgeSearchTest(IndexedSolrTestCase):
             "     Got: %s\n\n"
             "Params were: %s" % (field_name, expected_count, got, params),
         )
+        return r
+
+    async def _test_api_results_count(
+        self, params, expected_count, field_name
+    ):
+        r = await self.async_client.get(
+            reverse("search-list", kwargs={"version": "v3"}), params
+        )
+        got = len(r.data["results"])
+        self.assertEqual(
+            got,
+            expected_count,
+            msg="Did not get the right number of search results with %s "
+            "filter applied.\n"
+            "Expected: %s\n"
+            "     Got: %s\n\n"
+            "Params were: %s" % (field_name, expected_count, got, params),
+        )
+        return r
 
     def test_name_field(self) -> None:
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "name": "judith"}, 1, "name"
-        )
+        # Frontend
+        params = {"type": SEARCH_TYPES.PEOPLE, "name": "judith"}
+        self._test_article_count(params, 2, "name")
+        # API
+        self._test_api_results_count(params, 2, "name")
 
     def test_court_filter(self) -> None:
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "court": "ca1"}, 1, "court"
-        )
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "court": "scotus"}, 0, "court"
-        )
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "court": "scotus ca1"}, 1, "court"
-        )
+        # Frontend
+        params = {"type": SEARCH_TYPES.PEOPLE, "court": "ca1"}
+        self._test_article_count(params, 1, "court")
+        # API
+        self._test_api_results_count(params, 1, "court")
+
+        # Frontend
+        params = {"type": SEARCH_TYPES.PEOPLE, "court": "scotus"}
+        self._test_article_count(params, 0, "court")
+        # API
+        self._test_api_results_count(params, 0, "court")
+
+        # Frontend
+        params = {"type": SEARCH_TYPES.PEOPLE, "court": "scotus ca1"}
+        self._test_article_count(params, 1, "court")
+        # API
+        self._test_api_results_count(params, 1, "court")
 
     def test_dob_filters(self) -> None:
-        self._test_article_count(
-            {
-                "type": SEARCH_TYPES.PEOPLE,
-                "born_after": "1941",
-                "born_before": "1943",
-            },
-            1,
-            "born_{before|after}",
-        )
+        # Frontend
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "born_after": "1941",
+            "born_before": "1943",
+        }
+        self._test_article_count(params, 1, "born_{before|after}")
+
+        # API
+        self._test_api_results_count(params, 1, "born_{before|after}")
+
         # Are reversed dates corrected?
-        self._test_article_count(
-            {
-                "type": SEARCH_TYPES.PEOPLE,
-                "born_after": "1943",
-                "born_before": "1941",
-            },
-            1,
-            "born_{before|after}",
-        )
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "born_after": "1943",
+            "born_before": "1941",
+        }
+        # Frontend
+        self._test_article_count(params, 1, "born_{before|after}")
+        # API
+        self._test_api_results_count(params, 1, "born_{before|after}")
+
         # Just one filter, but Judy is older than this.
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "born_after": "1946"},
+        params = {"type": SEARCH_TYPES.PEOPLE, "born_after": "1946"}
+        # Frontend
+        self._test_article_count(params, 0, "born_{before|after}")
+        # API
+        self._test_api_results_count(
+            params,
             0,
             "born_{before|after}",
         )
 
     def test_birth_location(self) -> None:
         """Can we filter by city and state?"""
+
+        params = {"type": SEARCH_TYPES.PEOPLE, "dob_city": "brookyln"}
+        # Frontend
         self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "dob_city": "brookyln"},
+            params,
             1,
             "dob_city",
         )
+        # API
+        self._test_api_results_count(params, 1, "dob_city")
+
+        params = {"type": SEARCH_TYPES.PEOPLE, "dob_city": "brooklyn2"}
+        # Frontend
         self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "dob_city": "brooklyn2"},
+            params,
             0,
             "dob_city",
         )
-        self._test_article_count(
-            {
-                "type": SEARCH_TYPES.PEOPLE,
-                "dob_city": "brookyln",
-                "dob_state": "NY",
-            },
-            1,
-            "dob_city",
-        )
-        self._test_article_count(
-            {
-                "type": SEARCH_TYPES.PEOPLE,
-                "dob_city": "brookyln",
-                "dob_state": "OK",
-            },
+        # API
+        self._test_api_results_count(
+            params,
             0,
             "dob_city",
         )
+
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "dob_city": "brookyln",
+            "dob_state": "NY",
+        }
+        # Frontend
+        self._test_article_count(params, 1, "dob_city")
+        # API
+        self._test_api_results_count(params, 1, "dob_city")
+
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "dob_city": "brookyln",
+            "dob_state": "OK",
+        }
+        # Frontend
+        self._test_article_count(
+            params,
+            0,
+            "dob_city",
+        )
+        # API
+        self._test_api_results_count(params, 0, "dob_city")
 
     def test_schools_filter(self) -> None:
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "school": "american"}, 1, "school"
-        )
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "school": "pitzer"}, 0, "school"
-        )
+        params = {"type": SEARCH_TYPES.PEOPLE, "school": "american"}
+        # Frontend
+        self._test_article_count(params, 1, "school")
+        # API
+        self._test_api_results_count(params, 1, "school")
+
+        params = {"type": SEARCH_TYPES.PEOPLE, "school": "pitzer"}
+        # Frontend
+        self._test_article_count(params, 0, "school")
+        # API
+        self._test_api_results_count(params, 0, "school")
 
     def test_appointer_filter(self) -> None:
+        params = {"type": SEARCH_TYPES.PEOPLE, "appointer": "clinton"}
+        # Frontend
         self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "appointer": "clinton"},
-            1,
+            params,
+            2,
             "appointer",
         )
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "appointer": "obama"},
-            0,
-            "appointer",
-        )
+        # API
+        self._test_api_results_count(params, 2, "appointer")
+
+        params = {"type": SEARCH_TYPES.PEOPLE, "appointer": "obama"}
+        # Frontend
+        self._test_article_count(params, 0, "appointer")
+        # API
+        self._test_api_results_count(params, 0, "appointer")
 
     def test_selection_method_filter(self) -> None:
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "selection_method": "e_part"},
-            1,
-            "selection_method",
-        )
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "selection_method": "e_non_part"},
+        params = {"type": SEARCH_TYPES.PEOPLE, "selection_method": "e_part"}
+        # Frontend
+        self._test_article_count(params, 1, "selection_method")
+        # API
+        self._test_api_results_count(params, 1, "selection_method")
+
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "selection_method": "e_non_part",
+        }
+        # Frontend
+        self._test_article_count(params, 0, "selection_method")
+        # API
+        self._test_api_results_count(
+            params,
             0,
             "selection_method",
         )
 
     def test_political_affiliation_filter(self) -> None:
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "political_affiliation": "d"},
+        params = {"type": SEARCH_TYPES.PEOPLE, "political_affiliation": "d"}
+        # Frontend
+        self._test_article_count(params, 1, "political_affiliation")
+        # API
+        self._test_api_results_count(params, 1, "political_affiliation")
+
+        params = {"type": SEARCH_TYPES.PEOPLE, "political_affiliation": "r"}
+        # Frontend
+        self._test_article_count(params, 0, "political_affiliation")
+        # API
+        self._test_api_results_count(params, 0, "political_affiliation")
+
+    async def test_search_query_and_order(self) -> None:
+        # Search by name and relevance result order.
+        # Frontend
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "Judith Sheindlin",
+            "order_by": "score desc",
+        }
+        r = await self._test_article_count(params, 2, "q")
+        self.assertTrue(
+            r.content.decode().index("Susan")
+            < r.content.decode().index("Olivia"),
+            msg="'Susan' should come BEFORE 'Olivia'.",
+        )
+        # API
+        self._test_api_results_count(params, 2, "q")
+
+        # Search by name and dob order.
+        # Frontend
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "Judith Sheindlin",
+            "order_by": "dob desc,name_reverse asc",
+        }
+        r = await self._test_article_count(params, 2, "q")
+        self.assertTrue(
+            r.content.decode().index("Olivia")
+            < r.content.decode().index("Susan"),
+            msg="'Susan' should come AFTER 'Olivia'.",
+        )
+        # API
+        self._test_api_results_count(params, 2, "q")
+
+        # Search by name and filter.
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "Judith Sheindlin",
+            "school": "american",
+        }
+        # Frontend
+        self._test_article_count(params, 1, "q + school")
+        # API
+        self._test_api_results_count(params, 1, "q + school")
+
+    async def test_advanced_search(self) -> None:
+        # Search by advanced field.
+        # Frontend
+        params = {"type": SEARCH_TYPES.PEOPLE, "q": "name:Judith Sheindlin"}
+        self._test_article_count(params, 2, "q")
+        # API
+        self._test_api_results_count(params, 2, "q")
+
+        # Combine fields in advanced search.
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "name:Judith Sheindlin AND dob_city:Queens",
+        }
+        # Frontend
+        r = await self._test_article_count(
+            params,
             1,
-            "political_affiliation",
+            "q",
         )
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "political_affiliation": "r"},
-            0,
-            "political_affiliation",
-        )
+        self.assertIn("Olivia", r.content.decode())
+        # API
+        r = await self._test_api_results_count(params, 1, "q")
+        self.assertIn("Olivia", r.content.decode())
 
 
 class FeedTest(IndexedSolrTestCase):
@@ -2281,904 +2452,3 @@ class DocketEntriesTimezone(TestCase):
             datetime.datetime(2023, 1, 15, 21, 46, 51)
         )
         self.assertEqual(de_nyed_utc.datetime_filed, target_date_aware)
-
-
-class OASearchTest(IndexedSolrTestCase, AudioTestCase):
-    """Oral argument search tests"""
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.author = PersonFactory.create()
-        cls.audio_4 = AudioFactory.create(
-            case_name="Hong Liu Lorem v. Lynch-Loretta E.",
-            docket_id=3,
-            duration=653,
-            judges="John Smith",
-        )
-        cls.audio_4.panel.add(cls.author)
-
-    @staticmethod
-    def get_article_count(r):
-        """Get the article count in a query response"""
-        return len(html.fromstring(r.content.decode()).xpath("//article"))
-
-    @staticmethod
-    def get_results_count(r):
-        """Get the result count in a API query response"""
-        return len(r.data["results"])
-
-    def test_oa_results_basic(self) -> None:
-        # Frontend
-        r = self.client.get(
-            reverse("show_results"), {"type": SEARCH_TYPES.ORAL_ARGUMENT}
-        )
-        self.assertIn("Jose", r.content.decode())
-
-        # API
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}),
-            {"type": SEARCH_TYPES.ORAL_ARGUMENT},
-        )
-        self.assertIn("Jose", r.content.decode())
-
-    def test_oa_results_date_argued_ordering(self) -> None:
-        # Order by dateArgued desc
-        search_params = {
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "order_by": "dateArgued desc",
-        }
-        # Frontend
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        self.assertTrue(
-            r.content.decode().index("SEC") < r.content.decode().index("Jose"),
-            msg="'SEC' should come BEFORE 'Jose' when order_by desc.",
-        )
-        # API
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}),
-            search_params,
-        )
-        self.assertTrue(
-            r.content.decode().index("SEC") < r.content.decode().index("Jose"),
-            msg="'SEC' should come BEFORE 'Jose' when order_by desc.",
-        )
-
-        # Order by dateArgued asc
-        search_params = {
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "order_by": "dateArgued asc",
-        }
-        # Frontend
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        self.assertTrue(
-            r.content.decode().index("Jose") < r.content.decode().index("SEC"),
-            msg="'Jose' should come AFTER 'SEC' when order_by asc.",
-        )
-
-        # API
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}),
-            search_params,
-        )
-        self.assertTrue(
-            r.content.decode().index("Jose") < r.content.decode().index("SEC"),
-            msg="'Jose' should come AFTER 'SEC' when order_by asc.",
-        )
-
-    def test_oa_results_relevance_ordering(self) -> None:
-        # Relevance order, single word match.
-        search_params = {
-            "q": "Loretta",
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "order_by": "score desc",
-        }
-        # Frontend
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        actual = self.get_article_count(r)
-        expected = 3
-        self.assertEqual(actual, expected)
-        self.assertTrue(
-            r.content.decode().index("Jose")
-            < r.content.decode().index("Hong Liu"),
-            msg="'Jose' should come BEFORE 'Hong Liu' when order_by relevance.",
-        )
-
-        # API
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}),
-            search_params,
-        )
-        actual = self.get_results_count(r)
-        expected = 3
-        self.assertEqual(actual, expected)
-        self.assertTrue(
-            r.content.decode().index("Jose")
-            < r.content.decode().index("Hong Liu"),
-            msg="'Jose' should come BEFORE 'Hong Liu' when order_by relevance.",
-        )
-
-        # Relevance order, two words match.
-        search_params = {
-            "q": "Lynch Loretta",
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "order_by": "score desc",
-        }
-        # Frontend
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        actual = self.get_article_count(r)
-        expected = 3
-        self.assertEqual(actual, expected)
-        self.assertTrue(
-            r.content.decode().index("Hong Liu Yang")
-            < r.content.decode().index("Hong Liu Lorem")
-            < r.content.decode().index("Jose"),
-            msg="'Hong Liu Yang' should come BEFORE 'Hong Liu Lorem' and 'Jose' when order_by relevance.",
-        )
-        # API
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}),
-            search_params,
-        )
-        actual = self.get_results_count(r)
-        expected = 3
-        self.assertEqual(actual, expected)
-        self.assertTrue(
-            r.content.decode().index("Hong Liu Yang")
-            < r.content.decode().index("Hong Liu Lorem")
-            < r.content.decode().index("Jose"),
-            msg="'Hong Liu Yang' should come BEFORE 'Hong Liu Lorem' and 'Jose' when order_by relevance.",
-        )
-
-        # Relevance order, two words match, reverse order.
-        search_params = {
-            "q": "Loretta Lynch",
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "order_by": "score desc",
-        }
-        # Frontend
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        actual = self.get_article_count(r)
-        expected = 3
-        self.assertEqual(actual, expected)
-        self.assertTrue(
-            r.content.decode().index("Jose")
-            < r.content.decode().index("Hong Liu Yang")
-            < r.content.decode().index("Hong Liu Lorem"),
-            msg="'Jose' should come BEFORE 'Hong Liu Yang' and 'Hong Liu Lorem' when order_by relevance.",
-        )
-
-        # API
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}),
-            search_params,
-        )
-        actual = self.get_results_count(r)
-        expected = 3
-        self.assertEqual(actual, expected)
-        self.assertTrue(
-            r.content.decode().index("Jose")
-            < r.content.decode().index("Hong Liu Yang")
-            < r.content.decode().index("Hong Liu Lorem"),
-            msg="'Jose' should come BEFORE 'Hong Liu Yang' and 'Hong Liu Lorem' when order_by relevance.",
-        )
-
-        # Relevance order, hyphenated compound word.
-        search_params = {
-            "q": "Lynch-Loretta E.",
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "order_by": "score desc",
-        }
-        # Frontend
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        actual = self.get_article_count(r)
-        expected = 3
-        self.assertEqual(actual, expected)
-        self.assertTrue(
-            r.content.decode().index("Hong Liu Yang")
-            < r.content.decode().index("Hong Liu Lorem")
-            < r.content.decode().index("Jose"),
-            msg="'Hong Liu Yang' should come BEFORE 'Hong Liu Lorem' and 'Jose' when order_by relevance.",
-        )
-
-        # API
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}),
-            search_params,
-        )
-        actual = self.get_results_count(r)
-        expected = 3
-        self.assertEqual(actual, expected)
-        self.assertTrue(
-            r.content.decode().index("Hong Liu Yang")
-            < r.content.decode().index("Hong Liu Lorem")
-            < r.content.decode().index("Jose"),
-            msg="'Hong Liu Yang' should come BEFORE 'Hong Liu Lorem' and 'Jose' when order_by relevance.",
-        )
-
-        # Search by phrase that only matches one result.
-        search_params = {
-            "q": "Hong Liu Lorem",
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "order_by": "score desc",
-        }
-        # Frontend
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        actual = self.get_article_count(r)
-        expected = 1
-        self.assertEqual(actual, expected)
-
-        # API
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}),
-            search_params,
-        )
-        actual = self.get_results_count(r)
-        expected = 1
-        self.assertEqual(actual, expected)
-
-    def test_oa_results_search_in_text(self) -> None:
-        # Text query search by docket number
-        search_params = {
-            "q": "docket number 3",
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "order_by": "score desc",
-        }
-        # Frontend
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        actual = self.get_article_count(r)
-        expected = 2
-        self.assertEqual(actual, expected)
-        self.assertTrue(
-            r.content.decode().index("Yang")
-            < r.content.decode().index("Lorem"),
-            msg="'Yang' should come BEFORE 'Lorem' when order_by relevance.",
-        )
-
-        search_params = {
-            "q": "docket number 3",
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "order_by": "score desc",
-        }
-        # API
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}),
-            search_params,
-        )
-        actual = self.get_results_count(r)
-        self.assertEqual(actual, expected)
-        self.assertTrue(
-            r.content.decode().index("Yang")
-            < r.content.decode().index("Lorem"),
-            msg="'Yang' should come BEFORE 'Lorem' when order_by relevance.",
-        )
-
-        # Text query combine case name and docket name.
-        search_params = {
-            "q": "Lorem docket number 3",
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "order_by": "score desc",
-        }
-        # Frontend
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        actual = self.get_article_count(r)
-        expected = 1
-        self.assertEqual(actual, expected)
-        # API
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}),
-            search_params,
-        )
-        actual = self.get_results_count(r)
-        self.assertEqual(actual, expected)
-
-        # Text query search by Judge in text.
-        search_params = {
-            "q": "John Smith",
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "order_by": "score desc",
-        }
-        # Frontend
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        actual = self.get_article_count(r)
-        expected = 1
-        self.assertEqual(actual, expected)
-
-        # API
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}),
-            search_params,
-        )
-        actual = self.get_results_count(r)
-        self.assertEqual(actual, expected)
-
-        # Text query search by Court in text.
-        search_params = {
-            "q": "ca1",
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "order_by": "score desc",
-        }
-        # Frontend
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        actual = self.get_article_count(r)
-        expected = 2
-        self.assertEqual(actual, expected)
-        # API
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}),
-            search_params,
-        )
-        actual = self.get_results_count(r)
-        self.assertEqual(actual, expected)
-
-    def test_oa_results_highlights(self) -> None:
-        # Case name highlights
-        r = self.client.get(
-            reverse("show_results"),
-            {
-                "q": "Hong Liu Yang",
-                "type": SEARCH_TYPES.ORAL_ARGUMENT,
-                "order_by": "score desc",
-            },
-        )
-        actual = self.get_article_count(r)
-        expected = 1
-        self.assertEqual(actual, expected)
-        self.assertIn("<mark>Hong</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>Hong</mark>"), 2)
-
-        # Docket number highlights
-        r = self.client.get(
-            reverse("show_results"),
-            {
-                "q": "docket number 2",
-                "type": SEARCH_TYPES.ORAL_ARGUMENT,
-                "order_by": "score desc",
-            },
-        )
-        actual = self.get_article_count(r)
-        expected = 1
-        self.assertEqual(actual, expected)
-        self.assertIn("<mark>docket</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>docket</mark>"), 2)
-
-        # Judge highlights
-        r = self.client.get(
-            reverse("show_results"),
-            {
-                "q": "John Smith",
-                "type": SEARCH_TYPES.ORAL_ARGUMENT,
-                "order_by": "score desc",
-            },
-        )
-        actual = self.get_article_count(r)
-        expected = 1
-        self.assertEqual(actual, expected)
-        self.assertIn("<mark>John</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>John</mark>"), 2)
-
-    def test_oa_case_name_filtering(self) -> None:
-        """Filter by case_name"""
-        search_params = {
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "case_name": "jose",
-        }
-        # Frontend
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        actual = self.get_article_count(r)
-        expected = 1
-        self.assertEqual(
-            actual,
-            expected,
-            msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
-        )
-        # API
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}),
-            search_params,
-        )
-        actual = self.get_results_count(r)
-        self.assertEqual(
-            actual,
-            expected,
-            msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
-        )
-
-    def test_oa_jurisdiction_filtering(self) -> None:
-        """Filter by court"""
-        search_params = {"type": SEARCH_TYPES.ORAL_ARGUMENT, "court": "test"}
-        # Frontend
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        actual = self.get_article_count(r)
-        expected = 2
-        self.assertEqual(
-            actual,
-            expected,
-            msg="Did not get expected number of results when filtering by "
-            "jurisdiction. Expected %s, but got %s." % (expected, actual),
-        )
-
-        # API
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}),
-            search_params,
-        )
-        actual = self.get_results_count(r)
-        self.assertEqual(
-            actual,
-            expected,
-            msg="Did not get expected number of results when filtering by "
-            "jurisdiction. Expected %s, but got %s." % (expected, actual),
-        )
-
-    def test_oa_date_argued_filtering(self) -> None:
-        """Filter by date_argued"""
-
-        search_params = {
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "argued_after": "2015-08-16",
-        }
-        # Frontend
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        self.assertNotIn(
-            "an error",
-            r.content.decode(),
-            msg="Got an error when doing a Date Argued filter.",
-        )
-        actual = self.get_article_count(r)
-        expected = 1
-        self.assertEqual(
-            actual,
-            expected,
-            msg="Did not get expected number of results when filtering by "
-            "jurisdiction. Expected %s, but got %s." % (actual, expected),
-        )
-        self.assertIn(
-            "SEC v. Frank J. Custable, Jr.",
-            r.content.decode(),
-            msg="Did not get the expected oral argument.",
-        )
-
-        # API
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}),
-            search_params,
-        )
-        actual = self.get_results_count(r)
-        self.assertEqual(
-            actual,
-            expected,
-            msg="Did not get expected number of results when filtering by "
-            "jurisdiction. Expected %s, but got %s." % (actual, expected),
-        )
-        self.assertIn(
-            "SEC v. Frank J. Custable, Jr.",
-            r.content.decode(),
-            msg="Did not get the expected oral argument.",
-        )
-
-    def test_oa_combine_search_and_filtering(self) -> None:
-        """Test combine text query and filtering"""
-
-        # Text query
-        search_params = {
-            "q": "Loretta",
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-        }
-        # Frontend
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        actual = self.get_article_count(r)
-        expected = 3
-        self.assertEqual(
-            actual,
-            expected,
-            msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
-        )
-        # API
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}),
-            search_params,
-        )
-        actual = self.get_results_count(r)
-        self.assertEqual(
-            actual,
-            expected,
-            msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
-        )
-
-        # Text query filtered by case_name
-        search_params = {
-            "q": "Loretta",
-            "case_name": "Hong Liu",
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-        }
-        # Frontend
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        actual = self.get_article_count(r)
-        expected = 2
-        self.assertEqual(
-            actual,
-            expected,
-            msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
-        )
-        # API
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}),
-            search_params,
-        )
-        actual = self.get_results_count(r)
-        self.assertEqual(
-            actual,
-            expected,
-            msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
-        )
-
-        # Text query filtered by case_name and judge
-        search_params = {
-            "q": "Loretta",
-            "case_name": "Hong Liu",
-            "judge": "John Smith",
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-        }
-        # Frontend
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        actual = self.get_article_count(r)
-        expected = 1
-        self.assertEqual(
-            actual,
-            expected,
-            msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
-        )
-        # API
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}),
-            search_params,
-        )
-        actual = self.get_results_count(r)
-        self.assertEqual(
-            actual,
-            expected,
-            msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
-        )
-
-    def test_oa_advanced_search(self) -> None:
-        """Test advanced search queries"""
-
-        # NOT query
-        search_params = {
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": "Loretta NOT Hong Liu",
-        }
-        # Frontend
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        actual = self.get_article_count(r)
-        expected = 1
-        self.assertEqual(actual, expected)
-        self.assertIn("Jose A.", r.content.decode())
-
-        # API
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}),
-            search_params,
-        )
-        actual = self.get_results_count(r)
-        self.assertEqual(actual, expected)
-        self.assertIn("Jose A.", r.content.decode())
-
-        # AND query
-        search_params = {
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": "Loretta AND judge:John Smith",
-        }
-        # Frontend
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        actual = self.get_article_count(r)
-        expected = 1
-        self.assertEqual(actual, expected)
-        self.assertIn("Hong Liu Lorem v. Lynch", r.content.decode())
-        self.assertIn("John Smith", r.content.decode())
-        # API
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}),
-            search_params,
-        )
-        actual = self.get_results_count(r)
-        self.assertEqual(actual, expected)
-        self.assertIn("Hong Liu Lorem v. Lynch", r.content.decode())
-        self.assertIn("John Smith", r.content.decode())
-
-        # Grouped "OR" query and "AND" query
-        search_params = {
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": "(Loretta OR SEC) AND Jose",
-        }
-        # Frontend
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-
-        actual = self.get_article_count(r)
-        expected = 1
-        self.assertEqual(actual, expected)
-        self.assertIn("Jose", r.content.decode())
-        # API
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}),
-            search_params,
-        )
-        actual = self.get_results_count(r)
-        self.assertEqual(actual, expected)
-        self.assertIn("Jose", r.content.decode())
-
-        # Query by docket_id advanced field
-        search_params = {
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": "docket_id:1",
-        }
-        # Frontend
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        actual = self.get_article_count(r)
-        expected = 1
-        self.assertEqual(actual, expected)
-        self.assertIn("SEC v. Frank", r.content.decode())
-        # API
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}),
-            search_params,
-        )
-        actual = self.get_results_count(r)
-        self.assertEqual(actual, expected)
-        self.assertIn("SEC v. Frank", r.content.decode())
-
-        # Query by id advanced field
-        search_params = {
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": f"id:{self.audio_4.pk}",
-        }
-        # Frontend
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        actual = self.get_article_count(r)
-        expected = 1
-        self.assertEqual(actual, expected)
-        self.assertIn("Hong Liu Lorem", r.content.decode())
-        # API
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}),
-            search_params,
-        )
-        actual = self.get_results_count(r)
-        self.assertEqual(actual, expected)
-        self.assertIn("Hong Liu Lorem", r.content.decode())
-
-        # Query by court_id advanced field
-        search_params = {
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": f"court_id:{self.audio_3.docket.court_id}",
-        }
-        # Frontend
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        actual = self.get_article_count(r)
-        expected = 2
-        self.assertEqual(actual, expected)
-        self.assertIn("Hong Liu Yang v. Lynch-Loretta E", r.content.decode())
-        self.assertIn("Hong Liu Lorem v. Lynch-Loretta E.", r.content.decode())
-
-        # API
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}),
-            search_params,
-        )
-        actual = self.get_results_count(r)
-        self.assertEqual(actual, expected)
-        self.assertIn("Hong Liu Yang v. Lynch-Loretta E", r.content.decode())
-        self.assertIn("Hong Liu Lorem v. Lynch-Loretta E.", r.content.decode())
-
-        # Query by panel_ids advanced field
-        search_params = {
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": f"panel_ids:{self.author.pk}",
-        }
-        # Frontend
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        actual = self.get_article_count(r)
-        expected = 1
-        self.assertEqual(actual, expected)
-        self.assertIn("Hong Liu Lorem v. Lynch-Loretta E.", r.content.decode())
-        # API
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}),
-            search_params,
-        )
-        actual = self.get_results_count(r)
-        self.assertEqual(actual, expected)
-        self.assertIn("Hong Liu Lorem v. Lynch-Loretta E.", r.content.decode())
-
-        # Query by dateArgued advanced field
-        search_params = {
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": "dateArgued:[2015-08-15T00:00:00Z TO 2015-08-17T00:00:00Z]",
-        }
-        # Frontend
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        actual = self.get_article_count(r)
-        expected = 2
-        self.assertEqual(actual, expected)
-        self.assertIn("SEC", r.content.decode())
-        self.assertIn("Jose", r.content.decode())
-        # API
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}),
-            search_params,
-        )
-        actual = self.get_results_count(r)
-        self.assertEqual(actual, expected)
-        self.assertIn("SEC", r.content.decode())
-        self.assertIn("Jose", r.content.decode())
-
-        # Query by two advanced fields, caseName and docketNumber
-        search_params = {
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": "caseName:Loretta AND docketNumber:2",
-        }
-        # Frontend
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        actual = self.get_article_count(r)
-        expected = 1
-        self.assertEqual(actual, expected)
-        self.assertIn("Jose", r.content.decode())
-        # API
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}),
-            search_params,
-        )
-        actual = self.get_results_count(r)
-        self.assertEqual(actual, expected)
-        self.assertIn("Jose", r.content.decode())
-
-        # Query by advanced field and refine by keyword.
-        search_params = {
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": "docket_id:3 Lorem",
-        }
-        # Frontend
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        actual = self.get_article_count(r)
-        expected = 1
-        self.assertEqual(actual, expected)
-        self.assertIn("Lorem", r.content.decode())
-        # API
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}),
-            search_params,
-        )
-        actual = self.get_results_count(r)
-        expected = 1
-        self.assertEqual(actual, expected)
-        self.assertIn("Lorem", r.content.decode())
-
-    def test_oa_random_ordering(self) -> None:
-        """Can the Oral Arguments results be ordered randomly?
-
-        This test is difficult since we can't check that things actually get
-        ordered randomly, but we can at least make sure the query succeeds.
-        """
-
-        search_params = {
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": "*",
-            "order_by": "random_123 desc",
-        }
-        # Frontend
-        r = self.client.get(reverse("show_results"), search_params)
-        actual = self.get_article_count(r)
-        expected = 4
-        self.assertEqual(actual, expected)
-        self.assertNotIn("an error", r.content.decode())
-        # API
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}), search_params
-        )
-        actual = self.get_results_count(r)
-        self.assertEqual(actual, expected)
-        self.assertNotIn("an error", r.content.decode())
-
-    def test_last_oral_arguments_home_page(self) -> None:
-        """Test last oral arguments in home page"""
-        cache.delete("homepage-data-oa")
-        r = self.client.get(
-            reverse("show_results"),
-        )
-        self.assertIn("Latest Oral Arguments", r.content.decode())
-        self.assertIn("SEC v. Frank J. Custable, Jr.", r.content.decode())
-        self.assertIn(
-            "Jose A. Dominguez v. Loretta E. Lynch", r.content.decode()
-        )
-        self.assertIn("Hong Liu Yang v. Lynch-Loretta E.", r.content.decode())
-        self.assertIn("Hong Liu Lorem v. Lynch-Loretta E.", r.content.decode())

@@ -13,14 +13,11 @@ from cl.lib.elasticsearch_utils import (
     build_es_main_query,
     build_fulltext_query,
     build_sort_results,
-    build_terms_query,
+    build_term_query,
     group_search_results,
 )
 from cl.people_db.factories import PersonFactory
-from cl.search.documents import (
-    ParentheticalGroupDocument,
-    parenthetical_group_index,
-)
+from cl.search.documents import ParentheticalGroupDocument
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -162,6 +159,11 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
         cls.p4.group = cls.pg4
         cls.p4.save()
 
+    @classmethod
+    def setUpClass(cls):
+        super(ParentheticalESTest, cls).setUpClass()
+        cls.rebuild_index("search.ParentheticalGroup")
+
     def test_filter_search(self) -> None:
         """Test filtering and search at the same time"""
         filters = []
@@ -275,14 +277,14 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
 
     def test_build_fulltext_query(self) -> None:
         """Test build es fulltext query"""
-        q1 = build_fulltext_query("representative_text", "responsibility")
+        q1 = build_fulltext_query(["representative_text"], "responsibility")
         s = ParentheticalGroupDocument.search().filter(q1)
         self.assertEqual(s.count(), 1)
 
-    def test_build_terms_query(self) -> None:
+    def test_build_term_query(self) -> None:
         """Test build es terms query"""
         filters = []
-        q = build_terms_query(
+        q = build_term_query(
             "court_id",
             [self.c1.pk, self.c2.pk],
         )
@@ -309,7 +311,12 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
 
     def test_cd_query_2(self) -> None:
         """Test build es query with cleaned data"""
-        cd = {"filed_after": "", "filed_before": "", "q": ""}
+        cd = {
+            "filed_after": "",
+            "filed_before": "",
+            "q": "",
+            "type": SEARCH_TYPES.PARENTHETICAL,
+        }
 
         filters = build_es_filters(cd)
 
@@ -331,7 +338,7 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
 
     def test_build_sort(self) -> None:
         """Test we can build sort dict and sort ES query"""
-        cd = {"order_by": "dateFiled desc"}
+        cd = {"order_by": "dateFiled desc", "type": SEARCH_TYPES.PARENTHETICAL}
         ordering = build_sort_results(cd)
         s = (
             ParentheticalGroupDocument.search()
@@ -344,7 +351,7 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
             datetime.datetime(1981, 7, 11, 0, 0),
         )
 
-        cd = {"order_by": "dateFiled asc"}
+        cd = {"order_by": "dateFiled asc", "type": SEARCH_TYPES.PARENTHETICAL}
         ordering = build_sort_results(cd)
         s = (
             ParentheticalGroupDocument.search()
@@ -356,7 +363,7 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
             datetime.datetime(1976, 8, 30, 0, 0),
         )
 
-        cd = {"order_by": "score desc"}
+        cd = {"order_by": "score desc", "type": SEARCH_TYPES.PARENTHETICAL}
         ordering = build_sort_results(cd)
         s = (
             ParentheticalGroupDocument.search()
@@ -371,8 +378,8 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
     def test_group_results(self) -> None:
         """Test retrieve results grouped by group_id"""
 
-        cd = {"type": "pa", "q": ""}
-        q1 = build_fulltext_query("representative_text", "Necessary")
+        cd = {"type": SEARCH_TYPES.PARENTHETICAL, "q": ""}
+        q1 = build_fulltext_query(["representative_text"], "Necessary")
         s = ParentheticalGroupDocument.search().query(q1)
         # Group results.
         group_search_results(s, cd, {"score": {"order": "desc"}})
@@ -500,7 +507,6 @@ class ParentheticalESSignalProcessorTest(ESIndexTestCase, TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.rebuild_index("search.ParentheticalGroup")
         # Create factories for the test.
         cls.c1 = CourtFactory(id="canb", jurisdiction="I")
         cls.c2 = CourtFactory(id="ca1", jurisdiction="F")
@@ -552,9 +558,9 @@ class ParentheticalESSignalProcessorTest(ESIndexTestCase, TestCase):
         cls.p5.group = cls.pg_test
         cls.p5.save()
 
-    def setUp(self) -> None:
-        self.setUpTestData()
+    def setUp(self):
         super().setUp()
+        self.rebuild_index("search.ParentheticalGroup")
 
     def test_keep_in_sync_related_pa_objects_on_save(self) -> None:
         """Test PA documents are updated in ES when related objects change."""
