@@ -74,6 +74,9 @@ services:
     container_name: cl-django
     build:
       dockerfile: "../django/Dockerfile"
+      args:
+        BUILD_ENV: dev
+      target: web-dev
     depends_on:
       - cl-postgresql
       - cl-redis
