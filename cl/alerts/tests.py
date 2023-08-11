@@ -49,7 +49,7 @@ from cl.donate.factories import DonationFactory
 from cl.donate.models import Donation
 from cl.favorites.factories import NoteFactory, UserTagFactory
 from cl.lib.test_helpers import EmptySolrTestCase, SimpleUserDataMixin
-from cl.search.documents import AudioDocument, AudioPercolator
+from cl.search.documents import AudioPercolator
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
@@ -1476,7 +1476,7 @@ class DocketAlertGetNotesTagsTests(TestCase):
         self.assertEqual(tags_docket_3_user_1, [])
 
 
-class SearchAlertsOAESTests(TestCase):
+class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
     """Test ES Search Alerts"""
 
     @classmethod
