@@ -11,6 +11,7 @@ from django.template import loader
 from django.utils.timezone import now
 
 from cl.alerts.models import Alert, RealTimeQueue
+from cl.alerts.utils import InvalidDateError
 from cl.api.models import WebhookEventType
 from cl.api.webhooks import send_search_alert_webhook
 from cl.lib import search_utils
@@ -24,10 +25,6 @@ from cl.stats.utils import tally_stat
 # Only do this number of RT items at a time. If there are more, they will be
 # handled in the next run of this script.
 MAX_RT_ITEM_QUERY = 1000
-
-
-class InvalidDateError(Exception):
-    pass
 
 
 def get_cut_off_date(rate, d=datetime.date.today()):

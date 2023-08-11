@@ -1,13 +1,14 @@
-from typing import Callable, Union
+from typing import Union
 
 from django.conf import settings
 from django.db.models.signals import m2m_changed, post_delete, post_save
 from elasticsearch.exceptions import NotFoundError
 from elasticsearch_dsl import Document
 
-from cl.alerts.send_alerts import percolate_document, send_rt_alerts
+from cl.alerts.send_alerts import send_or_schedule_alerts
 from cl.audio.models import Audio
 from cl.lib.command_utils import logger
+from cl.lib.elasticsearch_utils import elasticsearch_enabled
 from cl.search.documents import AudioDocument, ParentheticalGroupDocument
 from cl.search.models import (
     Citation,
@@ -95,7 +96,7 @@ def document_fields_to_update(
 
 
 def save_document_in_es(
-    instance: instance_typing, es_document: Callable
+    instance: instance_typing, es_document: es_document_typing
 ) -> None:
     """Save a document in Elasticsearch using a provided callable.
     :param instance: The instance of the document to save.
@@ -111,8 +112,7 @@ def save_document_in_es(
     )
     support_alerts = getattr(instance, "SUPPORT_ALERTS", None)
     if support_alerts and response["_version"] == 1:
-        response = percolate_document(response["_id"], "oral_arguments")
-        send_rt_alerts(response, doc)
+        send_or_schedule_alerts(response["_id"], es_document._index._name, doc)
 
 
 def get_or_create_doc(
@@ -145,8 +145,9 @@ def remove_doc_from_es_index(
         doc = es_document.get(id=instance_id)
         doc.delete(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)
     except NotFoundError:
+        model_label = es_document.Django.model._meta.app_label.capitalize()
         logger.error(
-            f"The Audio with ID:{instance_id} can't be deleted from "
+            f"The {model_label} with ID:{instance_id} can't be deleted from "
             f"the ES index, it doesn't exists."
         )
 
@@ -287,8 +288,7 @@ class ESSignalProcessor(object):
         self.es_document = es_document
         self.documents_model_mapping = documents_model_mapping
 
-        if not settings.ELASTICSEARCH_DISABLED:
-            self.setup()
+        self.setup()
 
     def setup(self):
         models_save = list(self.documents_model_mapping["save"].keys())
@@ -340,6 +340,7 @@ class ESSignalProcessor(object):
                     weak=weak,
                 )
 
+    @elasticsearch_enabled
     def handle_save(self, sender, instance=None, created=False, **kwargs):
         """Receiver function that gets called after an object instance is saved"""
         mapping_fields = self.documents_model_mapping["save"][sender]
@@ -354,10 +355,12 @@ class ESSignalProcessor(object):
         if not mapping_fields:
             save_document_in_es(instance, self.es_document)
 
+    @elasticsearch_enabled
     def handle_delete(self, sender, instance, **kwargs):
         """Receiver function that gets called after an object instance is deleted"""
         remove_doc_from_es_index(self.es_document, instance.pk)
 
+    @elasticsearch_enabled
     def handle_m2m(self, sender, instance=None, action=None, **kwargs):
         """Receiver function that gets called after a m2m relation is modified"""
         if action == "post_add" or action == "post_remove":
@@ -372,6 +375,7 @@ class ESSignalProcessor(object):
                     affected_field,
                 )
 
+    @elasticsearch_enabled
     def handle_reverse_actions(self, sender, instance=None, **kwargs):
         """Receiver function that gets called after a reverse relation is
         created, updated or removed.

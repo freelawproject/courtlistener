@@ -17,10 +17,7 @@ from cl.lib.elasticsearch_utils import (
     group_search_results,
 )
 from cl.people_db.factories import PersonFactory
-from cl.search.documents import (
-    ParentheticalGroupDocument,
-    parenthetical_group_index,
-)
+from cl.search.documents import ParentheticalGroupDocument
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -161,6 +158,11 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
         cls.p3.save()
         cls.p4.group = cls.pg4
         cls.p4.save()
+
+    @classmethod
+    def setUpClass(cls):
+        super(ParentheticalESTest, cls).setUpClass()
+        cls.rebuild_index("search.ParentheticalGroup")
 
     def test_filter_search(self) -> None:
         """Test filtering and search at the same time"""
@@ -505,7 +507,6 @@ class ParentheticalESSignalProcessorTest(ESIndexTestCase, TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.rebuild_index("search.ParentheticalGroup")
         # Create factories for the test.
         cls.c1 = CourtFactory(id="canb", jurisdiction="I")
         cls.c2 = CourtFactory(id="ca1", jurisdiction="F")
@@ -557,9 +558,9 @@ class ParentheticalESSignalProcessorTest(ESIndexTestCase, TestCase):
         cls.p5.group = cls.pg_test
         cls.p5.save()
 
-    def setUp(self) -> None:
-        self.setUpTestData()
+    def setUp(self):
         super().setUp()
+        self.rebuild_index("search.ParentheticalGroup")
 
     def test_keep_in_sync_related_pa_objects_on_save(self) -> None:
         """Test PA documents are updated in ES when related objects change."""
