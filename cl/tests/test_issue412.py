@@ -10,12 +10,13 @@ from timeout_decorator import timeout_decorator
 
 from cl.search.models import Docket
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
+from cl.tests.cases import ESIndexTestCase
 from cl.users.factories import UserProfileWithParentsFactory
 
 BLOCKED_MSG = "Blocked"
 
 
-class Base412Test(BaseSeleniumTest):
+class Base412Test(ESIndexTestCase, BaseSeleniumTest):
     def setUp(self) -> None:
         UserProfileWithParentsFactory.create(
             user__username="pandora",
