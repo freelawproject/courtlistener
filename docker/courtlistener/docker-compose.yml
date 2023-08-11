@@ -72,7 +72,8 @@ services:
 
   cl-django:
     container_name: cl-django
-    image: ${DJANGO_DOCKER_IMAGE:-freelawproject/courtlistener:latest-web-dev}
+    build:
+      dockerfile: "../django/Dockerfile"
     depends_on:
       - cl-postgresql
       - cl-redis
