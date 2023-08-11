@@ -16,7 +16,7 @@ from cl.users.factories import UserProfileWithParentsFactory
 BLOCKED_MSG = "Blocked"
 
 
-class Base412Test(ESIndexTestCase, BaseSeleniumTest):
+class Base412Test(BaseSeleniumTest):
     def setUp(self) -> None:
         UserProfileWithParentsFactory.create(
             user__username="pandora",

@@ -98,11 +98,11 @@ class BaseSeleniumTest(SerializeSolrTestMixin, StaticLiveServerTestCase):
 
         cls.browser = cls._create_browser()
         cls.browser.implicitly_wait(5)
-        cls.rebuild_index()
 
     def setUp(self) -> None:
         self.reset_browser()
         self._update_index()
+        self.rebuild_index()
 
     def reset_browser(self) -> None:
         self.browser.delete_all_cookies()
