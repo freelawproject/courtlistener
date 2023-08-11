@@ -31,6 +31,7 @@ from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.bot_detector import is_bot
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
+    check_index,
     convert_str_date_fields_to_date_objects,
     fetch_es_results,
     merge_courts_from_db,
@@ -616,7 +617,9 @@ def do_es_search(
     elif get_params.get("type") == SEARCH_TYPES.ORAL_ARGUMENT:
         document_type = AudioDocument
 
-    if search_form.is_valid() and document_type:
+    if search_form.is_valid() and check_index(
+        index=document_type._index._name
+    ):
         cd = search_form.cleaned_data
         # Create necessary filters to execute ES query
         search_query = document_type.search()

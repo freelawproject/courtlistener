@@ -189,7 +189,7 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
                     many=True,
                     context={
                         "schema": AudioDocument._index.get_mapping()[
-                            "oral_arguments"
+                            AudioDocument._index._name
                         ]["mappings"]
                     },
                 )

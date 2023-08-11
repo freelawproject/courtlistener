@@ -5,10 +5,10 @@ from unittest import mock
 from django import test
 from django.contrib.staticfiles import testing
 from django.core.management import call_command
+from django_elasticsearch_dsl.registries import registry
 from rest_framework.test import APITestCase
 
 from cl.lib.redis_utils import make_redis_interface
-from cl.search.es_indices import es_indices_registered
 
 
 class OutputBlockerTestMixin:
@@ -45,6 +45,24 @@ class OneDatabaseMixin:
     databases = {"default"}
 
 
+class RestartRateLimitMixin:
+    """Restart the rate limiter counter to avoid getting blocked in frontend
+    after tests.
+    """
+
+    @classmethod
+    def restart_rate_limit(self):
+        r = make_redis_interface("CACHE")
+        keys = r.keys(":1:rl:*")
+        if keys:
+            r.delete(*keys)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.restart_rate_limit()
+        super().tearDownClass()
+
+
 class RestartSentEmailQuotaMixin:
     """Restart sent email quota in redis."""
 
@@ -72,6 +90,7 @@ class SimpleTestCase(
 class TestCase(
     OutputBlockerTestMixin,
     OneDatabaseMixin,
+    RestartRateLimitMixin,
     test.TestCase,
 ):
     pass
@@ -80,6 +99,7 @@ class TestCase(
 class TransactionTestCase(
     OutputBlockerTestMixin,
     OneDatabaseMixin,
+    RestartRateLimitMixin,
     test.TransactionTestCase,
 ):
     pass
@@ -88,6 +108,7 @@ class TransactionTestCase(
 class LiveServerTestCase(
     OutputBlockerTestMixin,
     OneDatabaseMixin,
+    RestartRateLimitMixin,
     test.LiveServerTestCase,
 ):
     pass
@@ -96,6 +117,7 @@ class LiveServerTestCase(
 class StaticLiveServerTestCase(
     OutputBlockerTestMixin,
     OneDatabaseMixin,
+    RestartRateLimitMixin,
     testing.StaticLiveServerTestCase,
 ):
     pass
@@ -104,22 +126,31 @@ class StaticLiveServerTestCase(
 class APITestCase(
     OutputBlockerTestMixin,
     OneDatabaseMixin,
+    RestartRateLimitMixin,
     APITestCase,
 ):
     pass
 
 
-@test.override_settings(ELASTICSEARCH_DSL_AUTO_REFRESH=True)
+@test.override_settings(
+    ELASTICSEARCH_DSL_AUTO_REFRESH=True,
+    ELASTICSEARCH_DISABLED=False,
+)
 class ESIndexTestCase(SimpleTestCase):
-    """Common Django Elasticsearch DSL index commands, useful in testing."""
-
     @classmethod
     def setUpClass(cls):
-        # Create a unique index name for all indices registered in es_indices.
-        # So each test class get an isolated index from each other.
-        for index_registered in es_indices_registered:
-            index_registered._name = cls.__name__.lower()
+        _index_suffixe = cls.__name__.lower()
+        for index in registry.get_indices():
+            index._name += f"-{_index_suffixe}"
+            index.create(ignore=400)
         super().setUpClass()
+
+    @classmethod
+    def tearDownClass(cls):
+        for index in registry.get_indices():
+            index.delete(ignore=[404, 400])
+            index._name = index._name.split("-")[0]
+        super().tearDownClass()
 
     @classmethod
     def rebuild_index(self, model):
