@@ -73,6 +73,10 @@ class BasicAPIPageTest(TestCase):
         r = await self.async_client.get(reverse("rest_docs"))
         self.assertEqual(r.status_code, 200)
 
+    async def test_rest_change_log(self) -> None:
+        r = await self.async_client.get(reverse("rest_change_log"))
+        self.assertEqual(r.status_code, 200)
+
     async def test_webhook_docs(self) -> None:
         r = await self.async_client.get(reverse("webhooks_docs"))
         self.assertEqual(r.status_code, 200)
