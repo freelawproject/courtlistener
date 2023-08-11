@@ -11,7 +11,6 @@ from django.utils.timezone import now
 from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
 from cl.lib.microservice_utils import microservice
-from cl.lib.test_helpers import ESTestCaseMixin
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.management.commands import (
     cl_report_scrape_status,
@@ -29,7 +28,7 @@ from cl.tests.cases import SimpleTestCase, TestCase
 from cl.tests.fixtures import ONE_SECOND_MP3_BYTES, SMALL_WAV_BYTES
 
 
-class ScraperIngestionTest(ESTestCaseMixin, TestCase):
+class ScraperIngestionTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         cls.court = CourtFactory(id="test", jurisdiction="F")

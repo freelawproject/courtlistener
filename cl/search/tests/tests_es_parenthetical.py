@@ -16,12 +16,8 @@ from cl.lib.elasticsearch_utils import (
     build_term_query,
     group_search_results,
 )
-from cl.lib.test_helpers import ESTestCaseMixin
 from cl.people_db.factories import PersonFactory
-from cl.search.documents import (
-    ParentheticalGroupDocument,
-    parenthetical_group_index,
-)
+from cl.search.documents import ParentheticalGroupDocument
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -36,7 +32,7 @@ from cl.search.models import PRECEDENTIAL_STATUS, SEARCH_TYPES, Citation
 from cl.tests.cases import ESIndexTestCase, TestCase
 
 
-class ParentheticalESTest(ESIndexTestCase, ESTestCaseMixin, TestCase):
+class ParentheticalESTest(ESIndexTestCase, TestCase):
     """Parenthetical ES search related tests"""
 
     @classmethod
@@ -506,9 +502,7 @@ class ParentheticalESTest(ESIndexTestCase, ESTestCaseMixin, TestCase):
         )
 
 
-class ParentheticalESSignalProcessorTest(
-    ESIndexTestCase, ESTestCaseMixin, TestCase
-):
+class ParentheticalESSignalProcessorTest(ESIndexTestCase, TestCase):
     """Parenthetical ES indexing related tests"""
 
     @classmethod

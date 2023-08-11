@@ -11,16 +11,14 @@ from cl.alerts.send_alerts import percolate_document
 from cl.audio.factories import AudioFactory
 from cl.audio.models import Audio
 from cl.lib.elasticsearch_utils import build_es_main_query
-from cl.lib.test_helpers import AudioESTestCase, ESTestCaseMixin
+from cl.lib.test_helpers import AudioESTestCase
 from cl.search.documents import AudioDocument, AudioPercolator
 from cl.search.factories import DocketFactory
 from cl.search.models import SEARCH_TYPES
 from cl.tests.cases import ESIndexTestCase, TestCase
 
 
-class OASearchTestElasticSearch(
-    ESIndexTestCase, ESTestCaseMixin, AudioESTestCase, TestCase
-):
+class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
     """Oral argument search tests for Elasticsearch"""
 
     @classmethod
@@ -71,7 +69,7 @@ class OASearchTestElasticSearch(
         percolator_query = AudioPercolator(
             percolator_query=query_dict, rate=Alert.REAL_TIME
         )
-        percolator_query.save()
+        percolator_query.save(refresh=True)
 
         return percolator_query.meta.id
 
@@ -1113,7 +1111,6 @@ class OASearchTestElasticSearch(
                 docket_id=self.audio_3.docket.pk,
             )
             created_audios.append(audio)
-        AudioDocument._index.refresh()
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
         }
@@ -1173,7 +1170,6 @@ class OASearchTestElasticSearch(
         # Remove Audio objects to avoid affecting other tests.
         for created_audio in created_audios:
             created_audio.delete()
-        AudioDocument._index.refresh()
 
     def test_oa_synonym_search(self) -> None:
         # Query using a synonym
@@ -1690,7 +1686,6 @@ class OASearchTestElasticSearch(
                 case_name="Lorem Ipsum Dolor vs. IRS",
                 docket_id=docket_5.pk,
             )
-            AudioDocument._index.refresh()
             cd = {
                 "type": SEARCH_TYPES.ORAL_ARGUMENT,
                 "q": "Lorem Ipsum Dolor vs. United States",
@@ -1710,7 +1705,6 @@ class OASearchTestElasticSearch(
             docket_5.docket_number = "23-98765"
             docket_5.date_argued = datetime.date(2023, 5, 15)
             docket_5.save()
-            AudioDocument._index.refresh()
             # Confirm docket number and dateArgued are updated in the index.
             s, total_query_results, top_hits_limit = build_es_main_query(
                 search_query, cd
@@ -1726,7 +1720,6 @@ class OASearchTestElasticSearch(
             # Trigger a ManyToMany insert.
             audio_7.refresh_from_db()
             audio_7.panel.add(self.author)
-            AudioDocument._index.refresh()
             # Confirm ManyToMany field is updated in the index.
             cd["q"] = "Lorem Ipsum Dolor vs. IRS"
             s, total_query_results, top_hits_limit = build_es_main_query(
@@ -1751,7 +1744,6 @@ class OASearchTestElasticSearch(
 
             # Delete parent docket.
             docket_5.delete()
-            AudioDocument._index.refresh()
             # Confirm that docket-related audio objects are removed from the
             # index.
             cd["q"] = "Lorem Ipsum Dolor"
@@ -1817,7 +1809,6 @@ class OASearchTestElasticSearch(
         }
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        AudioPercolator._index.refresh()
         response = percolate_document(
             str(self.audio_2.pk), oral_argument_index_alias
         )
@@ -1834,7 +1825,6 @@ class OASearchTestElasticSearch(
 
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        AudioPercolator._index.refresh()
         response = percolate_document(
             str(self.audio_2.pk), oral_argument_index_alias
         )
@@ -1850,7 +1840,6 @@ class OASearchTestElasticSearch(
         }
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        AudioPercolator._index.refresh()
         response = percolate_document(
             str(self.audio_1.pk), oral_argument_index_alias
         )
@@ -1868,7 +1857,6 @@ class OASearchTestElasticSearch(
 
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        AudioPercolator._index.refresh()
         response = percolate_document(
             str(self.audio_5.pk), oral_argument_index_alias
         )
@@ -1887,7 +1875,6 @@ class OASearchTestElasticSearch(
 
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        AudioPercolator._index.refresh()
         response = percolate_document(
             str(self.audio_1.pk), oral_argument_index_alias
         )
@@ -1905,7 +1892,6 @@ class OASearchTestElasticSearch(
         }
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        AudioPercolator._index.refresh()
         response = percolate_document(
             str(self.audio_2.pk), oral_argument_index_alias
         )
@@ -1923,7 +1909,6 @@ class OASearchTestElasticSearch(
 
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        AudioPercolator._index.refresh()
         response = percolate_document(
             str(self.audio_4.pk), oral_argument_index_alias
         )

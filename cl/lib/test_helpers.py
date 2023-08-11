@@ -540,11 +540,7 @@ class SitemapTest(TestCase):
         )
 
 
-class ESTestCaseMixin(SerializeMixin):
-    lockfile = __file__
-
-
-class AudioTestCase(ESTestCaseMixin, SimpleTestCase):
+class AudioTestCase(SimpleTestCase):
     """Audio test case factories"""
 
     @classmethod

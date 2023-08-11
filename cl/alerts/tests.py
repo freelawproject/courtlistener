@@ -48,11 +48,7 @@ from cl.audio.models import Audio
 from cl.donate.factories import DonationFactory
 from cl.donate.models import Donation
 from cl.favorites.factories import NoteFactory, UserTagFactory
-from cl.lib.test_helpers import (
-    EmptySolrTestCase,
-    ESTestCaseMixin,
-    SimpleUserDataMixin,
-)
+from cl.lib.test_helpers import EmptySolrTestCase, SimpleUserDataMixin
 from cl.search.documents import AudioDocument, AudioPercolator
 from cl.search.factories import (
     CourtFactory,
@@ -505,7 +501,7 @@ class AlertAPITests(APITestCase):
         self.assertEqual(response.json()["id"], alert_1.json()["id"])
 
 
-class SearchAlertsWebhooksTest(ESTestCaseMixin, EmptySolrTestCase):
+class SearchAlertsWebhooksTest(EmptySolrTestCase):
     """Test Search Alerts Webhooks"""
 
     @classmethod
@@ -1480,7 +1476,7 @@ class DocketAlertGetNotesTagsTests(TestCase):
         self.assertEqual(tags_docket_3_user_1, [])
 
 
-class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
+class SearchAlertsOAESTests(TestCase):
     """Test ES Search Alerts"""
 
     @classmethod
@@ -1564,7 +1560,6 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             name="Test Alert OA Monthly",
             query="q=Test+OA&type=oa",
         )
-        AudioPercolator._index.refresh()
 
     @classmethod
     def tearDownClass(cls):
@@ -1596,7 +1591,6 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 docket__date_argued=now() - timedelta(hours=5),
                 docket__docket_number="19-5735",
             )
-        AudioDocument._index.refresh()
 
         r = self.client.get(
             reverse(
@@ -1740,7 +1734,6 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             name="Test Alert OA",
             query="type=oa&docket_number=19-1010",
         )
-        AudioPercolator._index.refresh()
 
         # Confirm it was properly indexed in ES.
         search_alert_1_id = search_alert_1.pk
@@ -1763,7 +1756,6 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
 
         # Delete Alert
         search_alert_1.delete()
-        AudioPercolator._index.refresh()
 
         s = AudioPercolator.search().query("match_all")
         response = s.execute()
@@ -2051,8 +2043,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 query=f"q=RT+Test+OA&type=oa",
             )
             alerts_created.append(alert)
-        AudioPercolator._index.refresh()
 
+        webhooks = Webhook.objects.all()
+        self.assertEqual(len(webhooks), 11)
         donations = Donation.objects.all()
         self.assertEqual(len(donations), 11)
         total_rt_alerts = Alert.objects.filter(rate=Alert.REAL_TIME)
@@ -2123,7 +2116,6 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 query=f"q=DLY+Test+OA&type=oa",
             )
             alerts_created.append(alert)
-            AudioPercolator._index.refresh()
             # Create a new document that triggers each existing alert created
             # at this stage.
             with mock.patch(

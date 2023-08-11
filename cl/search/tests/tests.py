@@ -63,7 +63,7 @@ from cl.search.models import (
 from cl.search.tasks import add_docket_to_solr_by_rds
 from cl.search.views import do_search
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
-from cl.tests.cases import TestCase
+from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.utils import get_with_wait
 from cl.users.factories import UserProfileWithParentsFactory
 
@@ -646,7 +646,7 @@ class AdvancedTest(IndexedSolrTestCase):
         self.assertIn("SUBPOENAS SERVED OFF", r.content.decode())
 
 
-class SearchTest(IndexedSolrTestCase):
+class SearchTest(ESIndexTestCase, IndexedSolrTestCase):
     @classmethod
     def setUpTestData(cls):
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
