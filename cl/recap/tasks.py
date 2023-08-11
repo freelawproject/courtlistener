@@ -1,8 +1,10 @@
 import asyncio
+import concurrent.futures
 import hashlib
 import logging
 from dataclasses import dataclass
 from datetime import datetime
+from multiprocessing import process
 from typing import List, Optional, Tuple
 from zipfile import ZipFile
 
@@ -513,7 +515,13 @@ async def process_recap_docket(pk):
         await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
         return None
 
-    report._parse_text(text)
+    if process.current_process().daemon:
+        report._parse_text(text)
+    else:
+        with concurrent.futures.ProcessPoolExecutor() as pool:
+            await asyncio.get_running_loop().run_in_executor(
+                pool, report._parse_text, text
+            )
     data = report.data
     logger.info(f"Parsing completed of item {pq}")
 
@@ -673,7 +681,13 @@ async def process_recap_claims_register(pk):
         return None
 
     report = ClaimsRegister(map_cl_to_pacer_id(pq.court_id))
-    report._parse_text(text)
+    if process.current_process().daemon:
+        report._parse_text(text)
+    else:
+        with concurrent.futures.ProcessPoolExecutor() as pool:
+            await asyncio.get_running_loop().run_in_executor(
+                pool, report._parse_text, text
+            )
     data = report.data
     logger.info(f"Parsing completed for item {pq}")
 
@@ -750,7 +764,13 @@ async def process_recap_docket_history_report(pk):
         return None
 
     report = DocketHistoryReport(map_cl_to_pacer_id(pq.court_id))
-    report._parse_text(text)
+    if process.current_process().daemon:
+        report._parse_text(text)
+    else:
+        with concurrent.futures.ProcessPoolExecutor() as pool:
+            await asyncio.get_running_loop().run_in_executor(
+                pool, report._parse_text, text
+            )
     data = report.data
     logger.info(f"Parsing completed for item {pq}")
 
@@ -839,7 +859,13 @@ async def process_case_query_page(pk):
         return None
 
     report = CaseQuery(map_cl_to_pacer_id(pq.court_id))
-    report._parse_text(text)
+    if process.current_process().daemon:
+        report._parse_text(text)
+    else:
+        with concurrent.futures.ProcessPoolExecutor() as pool:
+            await asyncio.get_running_loop().run_in_executor(
+                pool, report._parse_text, text
+            )
     data = report.data
     logger.info(f"Parsing completed for item {pq}")
 
@@ -942,7 +968,13 @@ async def process_recap_appellate_docket(pk):
         await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
         return None
 
-    report._parse_text(text)
+    if process.current_process().daemon:
+        report._parse_text(text)
+    else:
+        with concurrent.futures.ProcessPoolExecutor() as pool:
+            await asyncio.get_running_loop().run_in_executor(
+                pool, report._parse_text, text
+            )
     data = report.data
     logger.info(f"Parsing completed of item {pq}")
 
