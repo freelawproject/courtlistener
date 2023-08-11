@@ -34,3 +34,7 @@ class OldAlertReport:
             + len(self.very_old_alerts)
             + len(self.disabled_alerts)
         )
+
+
+class InvalidDateError(Exception):
+    pass

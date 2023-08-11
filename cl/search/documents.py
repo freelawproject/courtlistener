@@ -1,9 +1,16 @@
-from django_elasticsearch_dsl import Document, fields
+from datetime import datetime
 
+from django.template import loader
+from django_elasticsearch_dsl import Document, fields
+from elasticsearch_dsl import Percolator
+
+from cl.alerts.models import Alert
 from cl.audio.models import Audio
+from cl.lib.search_index_utils import null_map
 from cl.lib.utils import deepgetattr
 from cl.search.es_indices import (
     oral_arguments_index,
+    oral_arguments_percolator_index,
     parenthetical_group_index,
 )
 from cl.search.models import Citation, ParentheticalGroup
@@ -96,18 +103,49 @@ class ParentheticalGroupDocument(Document):
         return instance.opinion.cluster.get_precedential_status_display()
 
 
-@oral_arguments_index.document
-class AudioDocument(Document):
-    caseName = fields.TextField(attr="case_name")
-    court = fields.KeywordField(attr="docket.court.full_name")
+class AudioDocumentBase(Document):
+    absolute_url = fields.KeywordField(attr="get_absolute_url")
+    caseName = fields.TextField(
+        attr="case_name",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="case_name", analyzer="english_exact"
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    court = fields.TextField(
+        attr="docket.court.full_name",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(attr="judges", analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    court_exact = fields.KeywordField(attr="docket.court.pk")
     court_id = fields.KeywordField(attr="docket.court.pk")
+    court_citation_string = fields.TextField(
+        attr="docket.court.citation_string",
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
+    )
     docket_id = fields.IntegerField(attr="docket.pk")
     dateArgued = fields.DateField(attr="docket.date_argued")
     dateReargued = fields.DateField(attr="docket.date_reargued")
     dateReargumentDenied = fields.DateField(
         attr="docket.date_reargument_denied"
     )
-    docketNumber = fields.KeywordField(attr="docket.docket_number")
+    docketNumber = fields.TextField(
+        attr="docket.docket_number",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="docket.docket_number", analyzer="english_exact"
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
     docket_slug = fields.KeywordField(attr="docket.slug")
     duration = fields.IntegerField(attr="duration")
     download_url = fields.KeywordField(attr="download_url")
@@ -115,13 +153,31 @@ class AudioDocument(Document):
     id = fields.IntegerField(attr="pk")
     judge = fields.TextField(
         attr="judges",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(attr="judges", analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
     )
-    local_path = fields.KeywordField(attr="local_path")
+    local_path = fields.KeywordField()
+    pacer_case_id = fields.KeywordField(attr="docket.pacer_case_id")
     panel_ids = fields.ListField(
         fields.IntegerField(),
     )
+    sha1 = fields.KeywordField(attr="sha1")
     source = fields.KeywordField(attr="source")
+    text = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    timestamp = fields.DateField()
 
+
+@oral_arguments_index.document
+class AudioDocument(AudioDocumentBase):
     class Django:
         model = Audio
         ignore_signals = True
@@ -132,3 +188,24 @@ class AudioDocument(Document):
     def prepare_file_size_mp3(self, instance):
         if instance.local_path_mp3:
             return deepgetattr(instance, "local_path_mp3.size", None)
+
+    def prepare_local_path(self, instance):
+        if instance.local_path_mp3:
+            return deepgetattr(instance, "local_path_mp3.name", None)
+
+    def prepare_text(self, instance):
+        text_template = loader.get_template("indexes/audio_text.txt")
+        return text_template.render({"item": instance}).translate(null_map)
+
+    def prepare_timestamp(self, instance):
+        return datetime.utcnow()
+
+
+@oral_arguments_percolator_index.document
+class AudioPercolator(AudioDocumentBase):
+    rate = fields.KeywordField(attr="rate")
+    percolator_query = Percolator()
+
+    class Django:
+        model = Alert
+        ignore_signals = True

@@ -23,8 +23,13 @@ from cl.api.pagination import ShallowOnlyPageNumberPagination
 from cl.api.views import coverage_data
 from cl.api.webhooks import send_webhook_event
 from cl.audio.api_views import AudioViewSet
+from cl.audio.factories import AudioFactory
 from cl.lib.redis_utils import make_redis_interface
-from cl.lib.test_helpers import IndexedSolrTestCase, SimpleUserDataMixin
+from cl.lib.test_helpers import (
+    AudioTestCase,
+    IndexedSolrTestCase,
+    SimpleUserDataMixin,
+)
 from cl.recap.factories import ProcessingQueueFactory
 from cl.search.models import SOURCES, Opinion
 from cl.stats.models import Event
@@ -154,7 +159,6 @@ class ApiQueryCountTests(TransactionTestCase):
     fixtures = [
         "test_objects_query_counts.json",
         "attorney_party.json",
-        "test_objects_audio.json",
     ]
 
     def setUp(self) -> None:
@@ -170,6 +174,7 @@ class ApiQueryCountTests(TransactionTestCase):
         )
 
         ProcessingQueueFactory.create(court_id="scotus", uploader=up.user)
+        AudioFactory.create(docket_id=1)
 
     def tearDown(self) -> None:
         UserProfile.objects.all().delete()
@@ -720,15 +725,17 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
         self.assertCountInResults(0)
 
 
-class DRFSearchAppAndAudioAppApiFilterTest(TestCase, FilteringCountTestCase):
+class DRFSearchAppAndAudioAppApiFilterTest(
+    TestCase, AudioTestCase, FilteringCountTestCase
+):
     fixtures = [
         "judge_judy.json",
         "test_objects_search.json",
-        "test_objects_audio.json",
     ]
 
     @classmethod
     def setUpTestData(cls) -> None:
+        super().setUpTestData()
         UserProfileWithParentsFactory.create(
             user__username="recap-user",
             user__password=make_password("password"),
