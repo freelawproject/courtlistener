@@ -1,5 +1,8 @@
+from datetime import datetime
+
 import pghistory
 from django.contrib.auth.models import User
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.utils.crypto import get_random_string
 
@@ -141,3 +144,64 @@ class RealTimeQueue(models.Model):
         db_index=True,
     )
     item_pk = models.IntegerField(help_text="the pk of the item")
+
+
+class UserRateAlert(AbstractDateTimeModel):
+    user = models.ForeignKey(
+        User,
+        help_text="The related User object.",
+        related_name="user_rates",
+        on_delete=models.CASCADE,
+    )
+    rate = models.CharField(
+        help_text="The rate chosen by the user for the alert",
+        choices=Alert.FREQUENCY,
+        max_length=10,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "rate"], name="unique_user_and_rate"
+            )
+        ]
+
+
+class ParentAlert(AbstractDateTimeModel):
+    alert = models.ForeignKey(
+        Alert,
+        help_text="The related Alert object.",
+        related_name="parent_alerts",
+        on_delete=models.CASCADE,
+    )
+    user_rate = models.ForeignKey(
+        UserRateAlert,
+        help_text="The related UserRateAlert object.",
+        related_name="parent_alerts",
+        on_delete=models.CASCADE,
+    )
+
+
+class DateJSONEncoder(DjangoJSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
+
+
+class ScheduledAlertHit(AbstractDateTimeModel):
+    parent_alert = models.ForeignKey(
+        ParentAlert,
+        help_text="The related ParentAlert object.",
+        related_name="scheduled_alerts",
+        on_delete=models.CASCADE,
+    )
+    document_content = models.JSONField(  # type: ignore
+        encoder=DateJSONEncoder,
+        help_text="The content of the document at the moment it was added.",
+    )
+    highlighted_fields = models.JSONField(  # type: ignore
+        help_text="The highlighted fields for the alert.",
+        blank=True,
+        null=True,
+    )

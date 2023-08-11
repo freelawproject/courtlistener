@@ -2,12 +2,15 @@ from datetime import datetime
 
 from django.template import loader
 from django_elasticsearch_dsl import Document, fields
+from elasticsearch_dsl import Percolator
 
+from cl.alerts.models import Alert
 from cl.audio.models import Audio
 from cl.lib.search_index_utils import null_map
 from cl.lib.utils import deepgetattr
 from cl.search.es_indices import (
     oral_arguments_index,
+    oral_arguments_percolator_index,
     parenthetical_group_index,
 )
 from cl.search.models import Citation, ParentheticalGroup
@@ -100,17 +103,24 @@ class ParentheticalGroupDocument(Document):
         return instance.opinion.cluster.get_precedential_status_display()
 
 
-@oral_arguments_index.document
-class AudioDocument(Document):
+class AudioDocumentBase(Document):
     absolute_url = fields.KeywordField(attr="get_absolute_url")
     caseName = fields.TextField(
         attr="case_name",
         analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="case_name", analyzer="english_exact"
+            ),
+        },
         search_analyzer="search_analyzer",
     )
     court = fields.TextField(
         attr="docket.court.full_name",
         analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(attr="judges", analyzer="english_exact"),
+        },
         search_analyzer="search_analyzer",
     )
     court_exact = fields.KeywordField(attr="docket.court.pk")
@@ -129,6 +139,11 @@ class AudioDocument(Document):
     docketNumber = fields.TextField(
         attr="docket.docket_number",
         analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="docket.docket_number", analyzer="english_exact"
+            ),
+        },
         search_analyzer="search_analyzer",
     )
     docket_slug = fields.KeywordField(attr="docket.slug")
@@ -139,21 +154,33 @@ class AudioDocument(Document):
     judge = fields.TextField(
         attr="judges",
         analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(attr="judges", analyzer="english_exact"),
+        },
         search_analyzer="search_analyzer",
     )
     local_path = fields.KeywordField()
+    pacer_case_id = fields.KeywordField(attr="docket.pacer_case_id")
     panel_ids = fields.ListField(
         fields.IntegerField(),
     )
     sha1 = fields.KeywordField(attr="sha1")
     source = fields.KeywordField(attr="source")
     text = fields.TextField(
-        analyzer="text_en_splitting_cl", search_analyzer="search_analyzer"
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
     )
     timestamp = fields.DateField()
 
+
+@oral_arguments_index.document
+class AudioDocument(AudioDocumentBase):
     class Django:
         model = Audio
+        ignore_signals = True
 
     def prepare_panel_ids(self, instance):
         return [judge.pk for judge in instance.panel.all()]
@@ -172,3 +199,13 @@ class AudioDocument(Document):
 
     def prepare_timestamp(self, instance):
         return datetime.utcnow()
+
+
+@oral_arguments_percolator_index.document
+class AudioPercolator(AudioDocumentBase):
+    rate = fields.KeywordField(attr="rate")
+    percolator_query = Percolator()
+
+    class Django:
+        model = Alert
+        ignore_signals = True

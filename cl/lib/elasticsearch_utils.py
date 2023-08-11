@@ -4,8 +4,8 @@ import re
 import time
 import traceback
 from datetime import date
-from functools import reduce
-from typing import Dict, List
+from functools import reduce, wraps
+from typing import Any, Callable, Dict, List
 
 from django.conf import settings
 from django.core.paginator import Page
@@ -13,14 +13,43 @@ from django.http.request import QueryDict
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.exceptions import RequestError, TransportError
 from elasticsearch_dsl import A, Q
+from elasticsearch_dsl.connections import connections
 from elasticsearch_dsl.query import QueryString, Range
 from elasticsearch_dsl.response import Response
+from elasticsearch_dsl.utils import AttrDict
 
+from cl.lib.search_utils import BOOSTS, cleanup_main_query
 from cl.lib.types import CleanData
-from cl.search.constants import SEARCH_ORAL_ARGUMENT_HL_FIELDS
+from cl.search.constants import (
+    ALERTS_HL_TAG,
+    SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS,
+    SEARCH_HL_TAG,
+    SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS,
+)
 from cl.search.models import SEARCH_TYPES, Court
 
 logger = logging.getLogger(__name__)
+
+
+def elasticsearch_enabled(func: Callable) -> Callable:
+    """A decorator to avoid executing Elasticsearch methods when it's disabled."""
+
+    @wraps(func)
+    def wrapper_func(*args, **kwargs) -> Any:
+        if not settings.ELASTICSEARCH_DISABLED:
+            func(*args, **kwargs)
+
+    return wrapper_func
+
+
+def check_index(index: str) -> bool:
+    """Check if the given index exists
+
+    :param field: elasticsearch index name
+    :return: Whether the index exists
+    """
+    es = connections.get_connection()
+    return es.indices.exists(index=index)
 
 
 def build_daterange_query(
@@ -35,6 +64,7 @@ def build_daterange_query(
     :param relation: Indicates how the range query matches values for range fields
     :return: Empty list or list with DSL Range query
     """
+
     params = {}
     if any([before, after]):
         if hasattr(after, "strftime"):
@@ -54,6 +84,49 @@ def build_daterange_query(
     return []
 
 
+def make_es_boost_list(fields: Dict[str, float]) -> list[str]:
+    """Constructs a list of Elasticsearch fields with their corresponding
+    boost values.
+
+    :param fields: A dictionary where keys are field names and values are
+    the corresponding boost values.
+    :return: A list of Elasticsearch fields with boost values formatted as 'field_name^boost_value'.
+    """
+    boosted_fields = []
+    for k, v in fields.items():
+        boosted_fields.append(f"{k}^{v}")
+    return boosted_fields
+
+
+def add_fields_boosting(cd: CleanData) -> list[str]:
+    """Applies boosting to specific fields according the search type.
+
+    :param cd: The user input CleanedData
+    :return: A list of Elasticsearch fields with their respective boost values.
+    """
+    # Apply standard qf parameters
+    qf = BOOSTS["qf"][cd["type"]].copy()
+    if cd["type"] in [SEARCH_TYPES.ORAL_ARGUMENT]:
+        # Give a boost on the case_name field if it's obviously a case_name
+        # query.
+        query = cd.get("q", "")
+        vs_query = any(
+            [
+                " v " in query,
+                " v. " in query,
+                " vs. " in query,
+                " vs " in query,
+            ]
+        )
+        in_re_query = query.lower().startswith("in re ")
+        matter_of_query = query.lower().startswith("matter of ")
+        ex_parte_query = query.lower().startswith("ex parte ")
+        if any([vs_query, in_re_query, matter_of_query, ex_parte_query]):
+            qf.update({"caseName": 50})
+
+    return make_es_boost_list(qf)
+
+
 def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
     """Given the cleaned data from a form, return a Elastic Search string query or []
     https://www.elastic.co/guide/en/elasticsearch/reference/current/full-text-queries.html
@@ -64,39 +137,44 @@ def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
     """
 
     if value:
+        value = cleanup_main_query(value)
         # In Elasticsearch, the colon (:) character is used to separate the
         # field name and the field value in a query.
         # To avoid parsing errors escape any colon characters in the value
         # parameter with a backslash.
         if "docketNumber:" in value:
-            docket_number_match = re.search("docketNumber:([^ ]+)", value)
-            if docket_number_match:
-                docket_number = docket_number_match.group(1)
-                docket_number = docket_number.replace(":", r"\:")
-                value = re.sub(
-                    r"docketNumber:([^ ]+)",
-                    f"docketNumber:{docket_number}",
-                    value,
+            docket_number_matches = re.findall("docketNumber:([^ ]+)", value)
+            for match in docket_number_matches:
+                replacement = match.replace(":", r"\:")
+                value = value.replace(
+                    f"docketNumber:{match}", f"docketNumber:{replacement}"
                 )
+
         q_should = [
             Q(
-                "multi_match",
-                query=value,
+                "query_string",
                 fields=fields,
-                type="phrase",
-                operator="AND",
+                query=value,
+                quote_field_suffix=".exact",
+                default_operator="AND",
                 tie_breaker=0.3,
             ),
-            Q("query_string", query=value, default_operator="AND"),
+            Q(
+                "query_string",
+                fields=fields,
+                query=value,
+                quote_field_suffix=".exact",
+                default_operator="AND",
+                type="phrase",
+            ),
         ]
         return Q("bool", should=q_should)
+
     return []
 
 
 def build_term_query(
-    field: str,
-    value: str | list,
-    make_phrase: bool = False,
+    field: str, value: str | list, make_phrase: bool = False, slop: int = 0
 ) -> list:
     """Given field name and value or list of values, return Elasticsearch term
     or terms query or [].
@@ -108,19 +186,22 @@ def build_term_query(
     :param value: term or terms to find
     :param make_phrase: Whether we should make a match_phrase query for
     TextField filtering.
+    :param slop: Maximum distance between terms in a phrase for a match.
+    Only applicable on make_phrase queries.
     :return: Empty list or list with DSL Match query
     """
 
-    if value and make_phrase:
-        return [Q("match_phrase", **{field: f"{value}"})]
+    if not value:
+        return []
 
-    if value and isinstance(value, list):
+    if make_phrase:
+        return [Q("match_phrase", **{field: {"query": value, "slop": slop}})]
+
+    if isinstance(value, list):
         value = list(filter(None, value))
         return [Q("terms", **{field: value})]
 
-    if value:
-        return [Q("term", **{field: value})]
-    return []
+    return [Q("term", **{field: value})]
 
 
 def build_text_filter(field: str, value: str) -> List:
@@ -215,6 +296,7 @@ def build_es_filters(cd: CleanData) -> List:
                 "docketNumber",
                 cd.get("docket_number", ""),
                 make_phrase=True,
+                slop=1,
             )
         )
     if cd["type"] == SEARCH_TYPES.PARENTHETICAL:
@@ -259,21 +341,21 @@ def build_es_main_query(
 
     string_query = None
     filters = build_es_filters(cd)
+
     match cd["type"]:
         case SEARCH_TYPES.PARENTHETICAL:
             string_query = build_fulltext_query(
                 ["representative_text"], cd.get("q", "")
             )
         case SEARCH_TYPES.ORAL_ARGUMENT:
+            fields = [
+                "court",
+                "court_citation_string",
+                "judge",
+            ]
+            fields.extend(add_fields_boosting(cd))
             string_query = build_fulltext_query(
-                [
-                    "caseName",
-                    "docketNumber",
-                    "court",
-                    "court_id",
-                    "judge",
-                    "sha1",
-                ],
+                fields,
                 cd.get("q", ""),
             )
 
@@ -303,18 +385,104 @@ def build_es_main_query(
     return search_query, total_query_results, top_hits_limit
 
 
-def add_es_highlighting(search_query: Search, cd: CleanData):
+def add_es_highlighting(
+    search_query: Search, cd: CleanData, alerts: bool = False
+) -> Search:
+    """Add elasticsearch highlighting to the search query.
+
+    :param search_query: The Elasticsearch search query object.
+    :param cd: The user input CleanedData
+    :param alerts: If highlighting is being applied to search Alerts hits.
+    :return: The modified Elasticsearch search query object with highlights set
+    """
+
     if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
-        highlighting_fields = SEARCH_ORAL_ARGUMENT_HL_FIELDS
+        highlighting_fields = SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS
+        hl_tag = SEARCH_HL_TAG
+        if alerts:
+            highlighting_fields = SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS
+            hl_tag = ALERTS_HL_TAG
+        fields_to_exclude = ["sha1"]
+        search_query = search_query.source(excludes=fields_to_exclude)
         for field in highlighting_fields:
             search_query = search_query.highlight(
                 field,
                 number_of_fragments=0,
-                pre_tags=["<mark>"],
-                post_tags=["</mark>"],
+                pre_tags=[f"<{hl_tag}>"],
+                post_tags=[f"</{hl_tag}>"],
             )
 
     return search_query
+
+
+def merge_highlights_into_result(
+    highlights: dict[str, Any], result: AttrDict | dict[str, Any], tag: str
+) -> None:
+    """Merges the highlight terms into the search result.
+    This function processes highlighted fields in the `highlights` attribute
+    dictionary, then updates the `result` attribute dictionary with the
+    combined highlighted terms.
+
+    :param highlights: The AttrDict object containing highlighted fields and
+    their highlighted terms.
+    :param result: The AttrDict object containing search results.
+    :param tag: The HTML tag used to mark highlighted terms.
+    :return: None, the function updates the results in place.
+    """
+
+    exact_hl_fields = []
+    for (
+        field,
+        highlight_list,
+    ) in highlights.items():
+        # If a query highlights fields the "field.exact", "field" or
+        # both versions are available. Highlighted terms in each
+        # version can differ, so the best thing to do is combine
+        # highlighted terms from each version and set it.
+        if "exact" in field:
+            field = field.split(".exact")[0]
+            marked_strings_2 = []
+            # Extract all unique marked strings from "field.exact"
+            marked_strings_1 = re.findall(
+                rf"<{tag}>.*?</{tag}>", highlight_list[0]
+            )
+            # Extract all unique marked strings from "field" if
+            # available
+            if field in highlights:
+                marked_strings_2 = re.findall(
+                    rf"<{tag}>.*?</{tag}>",
+                    highlights[field][0],
+                )
+
+            unique_marked_strings = list(
+                set(marked_strings_1 + marked_strings_2)
+            )
+            combined_highlights = highlight_list[0]
+            for marked_string in unique_marked_strings:
+                # Replace unique highlighted terms in a single
+                # field.
+                unmarked_string = marked_string.replace(
+                    f"<{tag}>", ""
+                ).replace(f"</{tag}>", "")
+                combined_highlights = combined_highlights.replace(
+                    unmarked_string, marked_string
+                )
+
+            # Remove nested <mark> tags after replace.
+            combined_highlights = re.sub(
+                rf"<{tag}><{tag}>(.*?)</{tag}></{tag}>",
+                rf"<{tag}>\1</{tag}>",
+                combined_highlights,
+            )
+
+            # Set combined highlighted terms.
+            result[field] = combined_highlights
+            exact_hl_fields.append(field)
+
+        if field not in exact_hl_fields:
+            # If the "field.exact" version has not been set, set
+            # the "field" version.
+            result[field] = highlight_list[0]
 
 
 def set_results_highlights(results: Page, search_type: str) -> None:
@@ -330,20 +498,23 @@ def set_results_highlights(results: Page, search_type: str) -> None:
         if search_type == SEARCH_TYPES.PARENTHETICAL:
             top_hits = result.grouped_by_opinion_cluster_id.hits.hits
             for hit in top_hits:
-                if hasattr(hit, "highlight"):
-                    highlighted_fields = [
-                        k for k in dir(hit.highlight) if not k.startswith("_")
-                    ]
-                    for highlighted_field in highlighted_fields:
-                        highlight = hit.highlight[highlighted_field][0]
-                        hit["_source"][highlighted_field] = highlight
+                if not hasattr(hit, "highlight"):
+                    continue
+                highlighted_fields = [
+                    k for k in dir(hit.highlight) if not k.startswith("_")
+                ]
+                for highlighted_field in highlighted_fields:
+                    highlight = hit.highlight[highlighted_field][0]
+                    hit["_source"][highlighted_field] = highlight
         else:
-            if hasattr(result.meta, "highlight"):
-                for (
-                    field,
-                    highlight_list,
-                ) in result.meta.highlight.to_dict().items():
-                    result[field] = highlight_list[0]
+            if not hasattr(result.meta, "highlight"):
+                return
+
+            merge_highlights_into_result(
+                result.meta.highlight.to_dict(),
+                result,
+                SEARCH_HL_TAG,
+            )
 
 
 def group_search_results(

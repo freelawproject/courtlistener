@@ -1,4 +1,5 @@
 import json
+from typing import Any
 
 import requests
 from django.conf import settings
@@ -20,8 +21,12 @@ from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.string_utils import trunc
 from cl.recap.api_serializers import PacerFetchQueueSerializer
 from cl.recap.models import PROCESSING_STATUS, PacerFetchQueue
-from cl.search.api_serializers import SearchResultSerializer
+from cl.search.api_serializers import (
+    SearchESResultSerializer,
+    SearchResultSerializer,
+)
 from cl.search.api_utils import ResultObject
+from cl.search.documents import AudioDocument
 
 
 def send_webhook_event(
@@ -179,6 +184,53 @@ def send_search_alert_webhook(
         solr_results,
         many=True,
         context={"schema": solr_interface.schema},
+    ).data
+
+    post_content = {
+        "webhook": generate_webhook_key_content(webhook),
+        "payload": {
+            "results": serialized_results,
+            "alert": serialized_alert,
+        },
+    }
+    renderer = JSONRenderer()
+    json_bytes = renderer.render(
+        post_content,
+        accepted_media_type="application/json;",
+    )
+    webhook_event = WebhookEvent.objects.create(
+        webhook=webhook,
+        content=post_content,
+    )
+    send_webhook_event(webhook_event, json_bytes)
+
+
+def send_es_search_alert_webhook(
+    results: list[dict[str, Any]],
+    webhook: Webhook,
+    alert: Alert,
+) -> None:
+    """Send a search alert webhook event containing search results from a
+    search alert object.
+
+    :param results: The search results returned by SOLR for this alert.
+    :param webhook: The webhook endpoint object to send the event to.
+    :param alert: The search alert object.
+    """
+
+    serialized_alert = SearchAlertSerializerModel(alert).data
+    es_results = []
+    for result in results:
+        result["snippet"] = result["text"]
+        es_results.append(ResultObject(initial=result))
+    serialized_results = SearchESResultSerializer(
+        es_results,
+        many=True,
+        context={
+            "schema": AudioDocument._index.get_mapping()[
+                AudioDocument._index._name
+            ]["mappings"]
+        },
     ).data
 
     post_content = {

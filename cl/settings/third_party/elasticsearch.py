@@ -2,11 +2,15 @@ import environ
 
 env = environ.FileAwareEnv()
 
-ELASTICSEARCH_DISABLED = env(
-    "ELASTICSEARCH_DISABLED",
-    default=False,
-)
+from ..django import TESTING
 
+if TESTING:
+    ELASTICSEARCH_DISABLED = True
+else:
+    ELASTICSEARCH_DISABLED = env(
+        "ELASTICSEARCH_DISABLED",
+        default=False,
+    )
 
 #
 # Connection settings
@@ -64,6 +68,17 @@ ELASTICSEARCH_DSL = {
                     "remove_duplicates",
                 ],
             },
+            "english_exact": {
+                "type": "custom",
+                "tokenizer": "whitespace",
+                "filter": [
+                    "lowercase",
+                    "custom_word_delimiter_filter",
+                    "remove_leading_zeros",
+                    "english_stop",
+                    "remove_duplicates",
+                ],
+            },
         },
         "filter": {
             "custom_word_delimiter_filter": {
@@ -101,6 +116,7 @@ ELASTICSEARCH_NUMBER_OF_REPLICAS = env(
     "ELASTICSEARCH_NUMBER_OF_REPLICAS", default=0
 )
 
+
 # ES Auto refresh. In production, it's suggested to wait for ES periodically
 # refresh (every ~1 second) since it's a resource-intensive operation.
 # This setting is overridden for testing.
@@ -108,3 +124,8 @@ ELASTICSEARCH_NUMBER_OF_REPLICAS = env(
 ELASTICSEARCH_DSL_AUTO_REFRESH = env(
     "ELASTICSEARCH_DSL_AUTO_REFRESH", default=True
 )
+
+####################################
+# Percolator batch size for Alerts #
+####################################
+PERCOLATOR_PAGE_SIZE = 100
