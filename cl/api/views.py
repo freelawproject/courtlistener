@@ -1,5 +1,7 @@
 import logging
+from datetime import date, timedelta
 
+import waffle
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.http import HttpRequest, HttpResponse, JsonResponse
@@ -9,6 +11,7 @@ from requests import Session
 from rest_framework import status
 from rest_framework.status import HTTP_400_BAD_REQUEST
 
+from cl.lib.elasticsearch_utils import build_es_main_query
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import (
     build_alert_estimation_query,
@@ -16,8 +19,9 @@ from cl.lib.search_utils import (
     build_coverage_query,
     get_solr_interface,
 )
+from cl.search.documents import AudioDocument
 from cl.search.forms import SearchForm
-from cl.search.models import Court
+from cl.search.models import SEARCH_TYPES, Court
 from cl.simple_pages.views import get_coverage_data_fds
 
 logger = logging.getLogger(__name__)
@@ -171,6 +175,7 @@ async def get_result_count(request, version, day_count):
     :return: A JSON object with the number of hits during the last day_range
     period.
     """
+
     search_form = await sync_to_async(SearchForm)(request.GET.copy())
     if not search_form.is_valid():
         return JsonResponse(
@@ -178,25 +183,41 @@ async def get_result_count(request, version, day_count):
             safe=True,
             status=HTTP_400_BAD_REQUEST,
         )
-
     cd = search_form.cleaned_data
-    with Session() as session:
-        try:
-            si = get_solr_interface(cd, http_connection=session)
-        except NotImplementedError:
-            logger.error(
-                "Tried getting solr connection for %s, but it's not "
-                "implemented yet",
-                cd["type"],
-            )
-            raise
+    search_type = cd["type"]
+    es_flag_for_oa = await sync_to_async(waffle.flag_is_active)(
+        request, "oa-es-deactivate"
+    )
+    if (
+        search_type == SEARCH_TYPES.ORAL_ARGUMENT and not es_flag_for_oa
+    ):  # Elasticsearch version for OA
+        document_type = AudioDocument
+        cd["argued_after"] = date.today() - timedelta(days=int(day_count))
+        cd["argued_before"] = None
 
-        response = (
-            si.query()
-            .add_extra(**build_alert_estimation_query(cd, int(day_count)))
-            .execute()
+        search_query = document_type.search()
+        s, total_query_results, top_hits_limit = build_es_main_query(
+            search_query, cd
         )
-    return JsonResponse({"count": response.result.numFound}, safe=True)
+    else:
+        with Session() as session:
+            try:
+                si = get_solr_interface(cd, http_connection=session)
+            except NotImplementedError:
+                logger.error(
+                    "Tried getting solr connection for %s, but it's not "
+                    "implemented yet",
+                    cd["type"],
+                )
+                raise
+
+            response = (
+                si.query()
+                .add_extra(**build_alert_estimation_query(cd, int(day_count)))
+                .execute()
+            )
+            total_query_results = response.result.numFound
+    return JsonResponse({"count": total_query_results}, safe=True)
 
 
 async def deprecated_api(request, v):

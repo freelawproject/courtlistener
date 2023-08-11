@@ -1,3 +1,7 @@
+from django.db.models.signals import m2m_changed, post_delete, post_save
+from django.dispatch import receiver
+
+from cl.alerts.send_alerts import send_or_schedule_alerts
 from cl.audio.models import Audio
 from cl.lib.es_signal_processor import ESSignalProcessor
 from cl.search.documents import AudioDocument, ParentheticalGroupDocument
@@ -103,12 +107,14 @@ oa_field_mapping = {
                 "docket_number": "docketNumber",
                 "slug": "docket_slug",
             }
-        }
+        },
+        Audio: {},
     },
-    "delete": {},
-    "m2m": {},
+    "delete": {Audio: {}},
+    "m2m": {Audio.panel.through: {"audio": {"panel_ids": "panel_ids"}}},
     "reverse": {},
 }
+
 
 # Instantiate a new ESSignalProcessor() for each Model/Document that needs to
 # be tracked. The arguments are: main model, ES document mapping, and field mapping dict.
