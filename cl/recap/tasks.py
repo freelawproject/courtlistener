@@ -690,12 +690,16 @@ async def process_recap_claims_register(pk):
         return None
 
     if process.current_process().daemon:
-        data = parse_claims_register_text(map_cl_to_pacer_id(pq.court_id), text)
+        data = parse_claims_register_text(
+            map_cl_to_pacer_id(pq.court_id), text
+        )
     else:
         with concurrent.futures.ProcessPoolExecutor() as pool:
             data = await asyncio.get_running_loop().run_in_executor(
-                pool, parse_claims_register_text,
-                map_cl_to_pacer_id(pq.court_id), text
+                pool,
+                parse_claims_register_text,
+                map_cl_to_pacer_id(pq.court_id),
+                text,
             )
     logger.info(f"Parsing completed for item {pq}")
 
@@ -782,8 +786,10 @@ async def process_recap_docket_history_report(pk):
     else:
         with concurrent.futures.ProcessPoolExecutor() as pool:
             data = await asyncio.get_running_loop().run_in_executor(
-                pool, parse_docket_history_text,
-                map_cl_to_pacer_id(pq.court_id), text
+                pool,
+                parse_docket_history_text,
+                map_cl_to_pacer_id(pq.court_id),
+                text,
             )
     logger.info(f"Parsing completed for item {pq}")
 
@@ -878,12 +884,16 @@ async def process_case_query_page(pk):
         return None
 
     if process.current_process().daemon:
-        data = parse_case_query_page_text(map_cl_to_pacer_id(pq.court_id), text)
+        data = parse_case_query_page_text(
+            map_cl_to_pacer_id(pq.court_id), text
+        )
     else:
         with concurrent.futures.ProcessPoolExecutor() as pool:
             data = await asyncio.get_running_loop().run_in_executor(
-                pool, parse_case_query_page_text,
-                map_cl_to_pacer_id(pq.court_id), text
+                pool,
+                parse_case_query_page_text,
+                map_cl_to_pacer_id(pq.court_id),
+                text,
             )
     logger.info(f"Parsing completed for item {pq}")
 
@@ -995,8 +1005,10 @@ async def process_recap_appellate_docket(pk):
     else:
         with concurrent.futures.ProcessPoolExecutor() as pool:
             data = await asyncio.get_running_loop().run_in_executor(
-                pool, parse_appellate_text,
-                map_cl_to_pacer_id(pq.court_id), text
+                pool,
+                parse_appellate_text,
+                map_cl_to_pacer_id(pq.court_id),
+                text,
             )
     logger.info(f"Parsing completed of item {pq}")
 
