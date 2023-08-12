@@ -4,6 +4,8 @@ from unittest import mock
 
 from django import test
 from django.contrib.staticfiles import testing
+from django.core.management import call_command
+from django_elasticsearch_dsl.registries import registry
 from rest_framework.test import APITestCase
 
 from cl.lib.redis_utils import make_redis_interface
@@ -128,3 +130,39 @@ class APITestCase(
     APITestCase,
 ):
     pass
+
+
+@test.override_settings(
+    ELASTICSEARCH_DSL_AUTO_REFRESH=True,
+    ELASTICSEARCH_DISABLED=False,
+)
+class ESIndexTestCase(SimpleTestCase):
+    @classmethod
+    def setUpClass(cls):
+        _index_suffixe = cls.__name__.lower()
+        for index in registry.get_indices():
+            index._name += f"-{_index_suffixe}"
+            index.create(ignore=400)
+        super().setUpClass()
+
+    @classmethod
+    def tearDownClass(cls):
+        for index in registry.get_indices():
+            index.delete(ignore=[404, 400])
+            index._name = index._name.split("-")[0]
+        super().tearDownClass()
+
+    @classmethod
+    def rebuild_index(self, model):
+        """Create and populate the Elasticsearch index and mapping"""
+        call_command("search_index", "--rebuild", "-f", "--models", model)
+
+    @classmethod
+    def create_index(self, model):
+        """Create the elasticsearch index."""
+        call_command("search_index", "--create", "-f", "--models", model)
+
+    @classmethod
+    def delete_index(self, model):
+        """Delete the elasticsearch index."""
+        call_command("search_index", "--delete", "-f", "--models", model)

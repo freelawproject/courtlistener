@@ -71,11 +71,14 @@
         {# show this div if there is a note, otherwise, put it in place, in anticipation of it becoming one. #}
         <div class="{% if not note_form.instance.cluster_id %}hidden{% endif %} sidebar-section" id="sidebar-notes">
             <div>
-                <h3 class="inline"><span>Your Notes</span></h3>
-                <p class="inline" data-toggle="modal" data-target="#modal-save-note">
-                    (<a href="#note-editor">edit</a>)
+                <h3>
+                    <span>Your Notes</span>
+                    <span class="edit" data-toggle="modal" data-target="#modal-save-note">
+                     (<a href="#note-editor">edit</a>)
                      <i class="fa fa-pencil gray pointer"></i>
-                </p>
+                     </span>
+                </h3>
+
                 <p id="sidebar-notes-text">
                     {{ note_form.instance.notes|default:"(none)" }}
                 </p>
@@ -249,12 +252,6 @@
             <p>
               {% include "includes/add_note_button.html" with form_instance_id=note_form.instance.cluster_id %}
             </p>
-            {% if cluster.syllabus %}
-                <div class="well well-sm">
-                    <h4>Summary of Opinion</h4>
-                    <p>{{ cluster.syllabus | safe }} </p>
-                </div>
-            {% endif %}
 
             <p class="bottom">
                 <span class="meta-data-header">Filed{% if cluster.date_filed_is_approximate %} Approximately{% endif %}:</span>
@@ -358,7 +355,6 @@
                 {% endif %}
                 {% endwith %}
             {% endif %}
-
             {% if cluster.nature_of_suit %}
             <p class="bottom">
                 <span class="meta-data-header">Nature of suit:</span>
@@ -406,6 +402,21 @@
             {% endif %}
 
             <br>
+            {# Add headmatter, if a Harvard opinion #}
+            {% if cluster.source in "U" %}
+              {% if cluster.headmatter %}
+                <div id="headmatter" class="serif-text">
+                  {{ cluster.headmatter|safe }}
+                </div>
+              {% endif %}
+            {% endif %}
+
+            {% if cluster.syllabus %}
+                <div class="well well-sm">
+                    <h4>Summary of Opinion</h4>
+                    <p>{{ cluster.syllabus | safe }} </p>
+                </div>
+            {% endif %}
 
             {# Only display tabs and make panels if more than one sub-opinion. #}
             {% if opinion_count > 1 %}
@@ -459,6 +470,7 @@
                                 </p>
                             {% endif %}
                         {% endif %}
+
                         {% if sub_opinion.extracted_by_ocr %}
                             <div class="col-sm-12 alert-warning alert v-offset-above-2">
                                 <p class="bottom">The text of this document was obtained by analyzing a scanned document and may have typos.
@@ -493,7 +505,7 @@
                                 {% elif sub_opinion.html_lawbox %}
                                   <div class="serif-text">{{ sub_opinion.html_lawbox|safe }}</div>
                                 {% elif sub_opinion.xml_harvard %}
-                                  <div class="serif-text">{{ sub_opinion.xml_harvard|safe }}</div>
+                                  <div class="serif-text harvard">{{ sub_opinion.xml_harvard|safe }}</div>
                                 {% elif sub_opinion.html_anon_2020 %}
                                   <div class="serif-text">{{ sub_opinion.html_anon_2020|safe }}</div>
                                 {% elif sub_opinion.html %}

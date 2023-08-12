@@ -1,168 +1,127 @@
-from django.db.models.signals import m2m_changed, post_delete, post_save
-from django.dispatch import receiver
-
-from cl.alerts.send_alerts import send_or_schedule_alerts
 from cl.audio.models import Audio
-from cl.lib.command_utils import logger
-from cl.lib.elasticsearch_utils import es_index_exists
-from cl.people_db.models import Education, Person, Position
-from cl.search.documents import (
-    PEOPLE_DOCS_TYPE_ID,
+from cl.lib.es_signal_processor import ESSignalProcessor
+from cl.search.documents import AudioDocument, ParentheticalGroupDocument
+from cl.search.models import (
+    Citation,
+    Docket,
+    Opinion,
+    OpinionCluster,
+    OpinionsCited,
+    Parenthetical,
+    ParentheticalGroup,
+)
+
+# This field mapping is used to define which fields should be updated in the
+# Elasticsearch index document when they change in the DB. The outer keys
+# represent the actions that will trigger signals:
+# save: On model save
+# delete: On model delete
+# m2m: On many-to-many field changes
+# reverse: On ForeignKey reverse relation changes
+# For every action key, a dict for each Model that needs to be tracked should
+# be added, where the key for these child dicts is the Model.
+# In each Model dict, another dict should be added for every query relation
+# (relative to the main model) that needs to be tracked. The key for these
+# dicts is the query path relative to the main model:
+# e.g: opinion__cluster__docket relative to ParentheticalGroup.
+# Within each of these dicts, an additional dict containing tracked fields
+# should be added. Keys should be the field name on the Model and values
+# should be the field name in the ES document.
+
+pa_field_mapping = {
+    "save": {
+        Docket: {
+            "opinion__cluster__docket": {
+                "docket_number": "docketNumber",
+                "court_id": "court_id",
+            }
+        },
+        Opinion: {
+            "opinion": {
+                "author_id": "author_id",
+                "cluster_id": "cluster_id",
+                "extracted_by_ocr": "opinion_extracted_by_ocr",
+            },
+        },
+        OpinionCluster: {
+            "representative__describing_opinion__cluster": {
+                "slug": "describing_opinion_cluster_slug",
+            },
+            "opinion__cluster": {
+                "case_name": "caseName",
+                "citation_count": "citeCount",
+                "date_filed": "dateFiled",
+                "slug": "opinion_cluster_slug",
+                "docket_id": "docket_id",
+                "judges": "judge",
+                "nature_of_suit": "suitNature",
+                "get_precedential_status_display": "status",  # On fields where
+                # indexed values needs to be the display() value, use get_{field_name}_display as key.
+            },
+        },
+        Parenthetical: {
+            "representative": {
+                "score": "representative_score",
+                "text": "representative_text",
+            },
+        },
+        ParentheticalGroup: {},  # For the main model, a field mapping is not
+        # required, since all its fields will be indexed/updated.
+    },
+    "delete": {ParentheticalGroup: {}},  # Delete action, this only applies to
+    # the main model, no field mapping is required.
+    "m2m": {
+        OpinionCluster.panel.through: {
+            "opinion__cluster": {
+                "panel_ids": "panel_ids",
+            },
+        },
+        OpinionsCited: {
+            "opinion": {
+                "cites": "cites",
+            },
+        },
+    },
+    "reverse": {
+        Citation: {
+            "opinion__cluster": {
+                "all": ["citation"],
+                Citation.NEUTRAL: ["citation", "neutralCite"],
+                Citation.LEXIS: ["citation", "lexisCite"],
+            },
+        }
+    },
+}
+
+oa_field_mapping = {
+    "save": {
+        Docket: {
+            "docket": {
+                "date_argued": "dateArgued",
+                "date_reargued": "dateReargued",
+                "date_reargument_denied": "dateReargumentDenied",
+                "docket_number": "docketNumber",
+                "slug": "docket_slug",
+            }
+        },
+        Audio: {},
+    },
+    "delete": {Audio: {}},
+    "m2m": {Audio.panel.through: {"audio": {"panel_ids": "panel_ids"}}},
+    "reverse": {},
+}
+
+
+# Instantiate a new ESSignalProcessor() for each Model/Document that needs to
+# be tracked. The arguments are: main model, ES document mapping, and field mapping dict.
+_pa_signal_processor = ESSignalProcessor(
+    ParentheticalGroup,
+    ParentheticalGroupDocument,
+    pa_field_mapping,
+)
+
+_oa_signal_processor = ESSignalProcessor(
+    Audio,
     AudioDocument,
-    EducationDocument,
-    PersonDocument,
-    PositionDocument,
+    oa_field_mapping,
 )
-from cl.search.models import Docket
-
-
-@receiver(
-    post_save,
-    sender=Docket,
-    dispatch_uid="update_related_es_documents_on_docket_save",
-)
-def update_related_es_documents_on_docket_save(
-    sender, instance=None, **kwargs
-):
-    """Receiver function that gets called after a Docket instance is saved.
-    This function updates the Elasticsearch index for all Audio objects related
-    to the saved Docket instance.
-
-    We'll add here more ES documents that depend on Docket values.
-    """
-    related_audios = Audio.objects.filter(docket=instance)
-    for audio in related_audios:
-        # Update the index for each related Audio
-        AudioDocument().update(audio)
-
-
-@receiver(
-    m2m_changed,
-    sender=Audio.panel.through,
-    dispatch_uid="audio_panel_changed_update_in_es",
-)
-def audio_panel_changed_update_in_es(
-    sender, instance=None, action=None, **kwargs
-):
-    """Receiver function that gets called after a new panel object is added or
-    removed to the Audio m2m relation.
-
-    This function updates the Elasticsearch index for the related Audio instance
-    """
-    if action == "post_add" or action == "post_remove":
-        audio_doc = AudioDocument()
-        doc = audio_doc.prepare(instance)
-        AudioDocument(meta={"id": instance.pk}, **doc).save(skip_empty=False)
-
-
-@receiver(
-    post_save,
-    sender=Audio,
-    dispatch_uid=" create_or_update_audio_in_es_index",
-)
-def create_or_update_audio_in_es_index(sender, instance=None, **kwargs):
-    """Receiver function that gets called after an Audio instance is saved.
-    This method creates or updates an Audio object in the AudioDocument index.
-
-    Also triggers search alerts for new documents added to the index.
-    """
-
-    audio_doc = AudioDocument()
-    doc = audio_doc.prepare(instance)
-    response = AudioDocument(meta={"id": instance.pk}, **doc).save(
-        skip_empty=False, return_doc_meta=True
-    )
-    if response["_version"] == 1:
-        send_or_schedule_alerts(response["_id"], "oral_arguments", doc)
-
-
-@receiver(
-    post_delete,
-    sender=Audio,
-    dispatch_uid="remove_audio_from_es_index",
-)
-def remove_audio_from_es_index(sender, instance=None, **kwargs):
-    """Receiver function that gets called after an Audio instance is deleted.
-    This function removes Audio from the AudioPercolator index.
-    """
-    # Check if the document exists before deleting it
-    if AudioDocument.exists(id=instance.pk):
-        doc = AudioDocument.get(id=instance.pk)
-        doc.delete()
-    else:
-        logger.error(
-            f"The Audio with ID:{instance.pk} can't be deleted from "
-            f"the ES index, it doesn't exists."
-        )
-
-
-@receiver(
-    post_save,
-    sender=Person,
-    dispatch_uid=" create_or_update_person_in_es_index",
-)
-def create_or_update_person_in_es_index(sender, instance=None, **kwargs):
-    """Receiver function that gets called after a Person instance is saved.
-    This method creates or updates a Person object in the PersonDocument index.
-    """
-
-    if es_index_exists("people_db_index"):
-        person_doc = PersonDocument()
-        doc = person_doc.prepare(instance)
-        PersonDocument(meta={"id": instance.pk}, **doc).save(
-            skip_empty=False, return_doc_meta=True
-        )
-
-
-@receiver(
-    post_save,
-    sender=Position,
-    dispatch_uid="create_or_update_position_in_es_index",
-)
-def create_or_update_position_in_es_index(sender, instance=None, **kwargs):
-    """Receiver function that gets called after a Position instance is saved.
-    This method creates or updates a Position object in the PositionDocument index.
-    """
-    parent_id = getattr(instance.person, "pk", None)
-    if (
-        es_index_exists("people_db_index")
-        and parent_id
-        and PersonDocument.exists(id=parent_id)
-    ):
-        position_doc = PositionDocument()
-        doc = position_doc.prepare(instance)
-        doc_id = PEOPLE_DOCS_TYPE_ID(instance.pk).POSITION
-        PositionDocument(
-            meta={"id": doc_id},
-            _routing=parent_id,
-            person_child={"name": "position", "parent": parent_id},
-            **doc,
-        ).save(skip_empty=False)
-
-
-@receiver(
-    post_save,
-    sender=Education,
-    dispatch_uid=" create_or_update_education_in_es_index",
-)
-def create_or_update_education_in_es_index(sender, instance=None, **kwargs):
-    """Receiver function that gets called after an Education instance is saved.
-    This method creates or updates an Education object in the EducationDocument
-    index.
-    """
-
-    parent_id = getattr(instance.person, "pk", None)
-    if (
-        es_index_exists("people_db_index")
-        and parent_id
-        and PersonDocument.exists(id=parent_id)
-    ):
-        education_doc = EducationDocument()
-        doc = education_doc.prepare(instance)
-        doc_id = PEOPLE_DOCS_TYPE_ID(instance.pk).EDUCATION
-        EducationDocument(
-            meta={"id": doc_id},
-            _routing=parent_id,
-            person_child={"name": "education", "parent": parent_id},
-            **doc,
-        ).save(skip_empty=False)

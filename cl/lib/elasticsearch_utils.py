@@ -4,15 +4,16 @@ import re
 import time
 import traceback
 from datetime import date
-from functools import reduce
-from typing import Any, Dict, List
+from functools import reduce, wraps
+from typing import Any, Callable, Dict, List
 
 from django.conf import settings
 from django.core.paginator import Page
 from django.http.request import QueryDict
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.exceptions import RequestError, TransportError
-from elasticsearch_dsl import A, Q, connections
+from elasticsearch_dsl import A, Q
+from elasticsearch_dsl.connections import connections
 from elasticsearch_dsl.query import QueryString, Range
 from elasticsearch_dsl.response import Response
 from elasticsearch_dsl.utils import AttrDict
@@ -28,6 +29,26 @@ from cl.search.constants import (
 from cl.search.models import SEARCH_TYPES, Court
 
 logger = logging.getLogger(__name__)
+
+
+def elasticsearch_enabled(func: Callable) -> Callable:
+    """A decorator to avoid executing Elasticsearch methods when it's disabled."""
+
+    @wraps(func)
+    def wrapper_func(*args, **kwargs) -> Any:
+        if not settings.ELASTICSEARCH_DISABLED:
+            func(*args, **kwargs)
+
+    return wrapper_func
+
+
+def es_index_exists(index_name: str) -> bool:
+    """Confirm if the Elasticsearch index exists in the default instance.
+    :param index_name: The index name to check.
+    :return: True if the index exists, otherwise False.
+    """
+    es = connections.get_connection()
+    return es.indices.exists(index=index_name)
 
 
 def build_daterange_query(
@@ -87,17 +108,18 @@ def add_fields_boosting(cd: CleanData) -> list[str]:
     if cd["type"] in [SEARCH_TYPES.ORAL_ARGUMENT]:
         # Give a boost on the case_name field if it's obviously a case_name
         # query.
+        query = cd.get("q", "")
         vs_query = any(
             [
-                " v " in cd.get("q", ""),
-                " v. " in cd.get("q", ""),
-                " vs. " in cd.get("q", ""),
-                " vs " in cd.get("q", ""),
+                " v " in query,
+                " v. " in query,
+                " vs. " in query,
+                " vs " in query,
             ]
         )
-        in_re_query = cd.get("q", "").lower().startswith("in re ")
-        matter_of_query = cd.get("q", "").lower().startswith("matter of ")
-        ex_parte_query = cd.get("q", "").lower().startswith("ex parte ")
+        in_re_query = query.lower().startswith("in re ")
+        matter_of_query = query.lower().startswith("matter of ")
+        ex_parte_query = query.lower().startswith("ex parte ")
         if any([vs_query, in_re_query, matter_of_query, ex_parte_query]):
             qf.update({"caseName": 50})
 
@@ -168,16 +190,17 @@ def build_term_query(
     :return: Empty list or list with DSL Match query
     """
 
-    if value and make_phrase:
+    if not value:
+        return []
+
+    if make_phrase:
         return [Q("match_phrase", **{field: {"query": value, "slop": slop}})]
 
-    if value and isinstance(value, list):
+    if isinstance(value, list):
         value = list(filter(None, value))
         return [Q("terms", **{field: value})]
 
-    if value:
-        return [Q("term", **{field: value})]
-    return []
+    return [Q("term", **{field: value})]
 
 
 def build_text_filter(field: str, value: str) -> List:
@@ -223,7 +246,11 @@ def build_sort_results(cd: CleanData) -> Dict:
         }
 
     order_by = cd.get("order_by")
-    if order_by in order_by_map and "random_123" in order_by:
+    if order_by not in order_by_map:
+        # Sort by score in descending order
+        return {"score": {"order": "desc"}}
+
+    if "random_123" in order_by:
         # Return random sorting if available.
         # Define the random seed using the current timestamp
         seed = int(time.time())
@@ -240,11 +267,7 @@ def build_sort_results(cd: CleanData) -> Dict:
         }
         return random_sort
 
-    if order_by and order_by in order_by_map:
-        return order_by_map[order_by]
-
-    # Default sort by score in descending order
-    return {"score": {"order": "desc"}}
+    return order_by_map[order_by]
 
 
 def build_es_filters(cd: CleanData) -> List:
@@ -644,12 +667,3 @@ def fetch_es_results(
         if settings.DEBUG is True:
             traceback.print_exc()
     return [], 0, error
-
-
-def es_index_exists(index_name: str) -> bool:
-    """Confirm if the Elasticsearch index exists in the default instance.
-    :param index_name: The index name to check.
-    :return: True if the index exists, otherwise False.
-    """
-    es = connections.get_connection("default")
-    return es.indices.exists(index=index_name)
