@@ -22,7 +22,9 @@ def create_or_update_alert_in_es_index(sender, instance=None, **kwargs):
         return
 
     if f"type={SEARCH_TYPES.ORAL_ARGUMENT}" in instance.query:
-        index_alert_document(instance, AudioPercolator)
+        indexed = index_alert_document(instance, AudioPercolator)
+        if not indexed:
+            logger.warning(f"Error indexing Alert ID: {instance.pk}")
 
 
 @receiver(

@@ -46,9 +46,12 @@ class Command(VerboseCommand):
 
         indexing_counter = 0
         # Indexing the Alert objects
-        for obj in queryset.iterator():
-            logger.info(f"Indexing Alert with ID: {obj.pk}")
-            index_alert_document(obj, es_document)
+        for alert in queryset.iterator():
+            logger.info(f"Indexing Alert with ID: {alert.pk}")
+            indexed = index_alert_document(alert, es_document)
+            if not indexed:
+                logger.warning(f"Error indexing Alert ID: {alert.pk}")
+                continue
             indexing_counter += 1
 
         self.stdout.write(

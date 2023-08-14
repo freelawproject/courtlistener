@@ -2291,3 +2291,35 @@ class SearchAlertsIndexingCommandTests(ESIndexTestCase, TestCase):
                 AudioPercolator.exists(id=alert_pk),
                 msg=f"Alert id: {alert_pk} was not indexed.",
             )
+
+    def test_avoid_indexing_no_valid_alert_query(self):
+        """Confirm invalid alert queries are not indexed."""
+
+        not_valid_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert OA Daily 2",
+            query="q=DLY+Test+V2&type=oa&argued_after=1",
+        )
+        valid_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert OA Daily 2",
+            query="q=DLY+Test+V2&type=oa",
+        )
+        # Call cl_index_search_alerts command.
+        call_command(
+            "cl_index_search_alerts",
+            pk_offset=not_valid_alert.pk,
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+        )
+
+        s = AudioPercolator.search().query("match_all")
+        response = s.execute()
+        response_dict = response.to_dict()
+        # Only 1 element should be indexed (valid_alert).
+        self.assertEqual(response_dict["hits"]["total"]["value"], 1)
+        self.assertTrue(
+            AudioPercolator.exists(id=valid_alert.pk),
+            msg=f"Alert id: {valid_alert.pk} was not indexed.",
+        )
