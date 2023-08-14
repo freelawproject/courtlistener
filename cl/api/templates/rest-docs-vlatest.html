@@ -47,7 +47,7 @@
     </p>
 
 
-    <h2>Support</h2>
+    <h2 id="support">Support</h2>
     <p>Questions about the APIs can be sent <a href="https://github.com/freelawproject/courtlistener/discussions" target="_blank">to our Github Discussions forum</a> or via our <a href="{% url "contact" %}">contact form</a>. In general, we prefer that questions be posted publicly in the forum so they can be searched by others in the future. If you are a private organization posting to that forum, we will work with you to avoid sharing details about your organization.
     </p>
     <p>
@@ -60,7 +60,7 @@
     </p>
 
 
-    <h2>Data Modeling</h2>
+    <h2 id="data-modeling">Data Modeling</h2>
     <p>The two images below show how these endpoints work together. The first image shows the models we use for people and the second shows the models we use for documents and metadata about them. You can see that these models currently link together on the Docket, Person, and Court tables. (<a
       href="{% static "png/complete-model-v3.13.png" %}"
       target="_blank">Here's a version of this diagram that shows everything all at once</a>.)
@@ -599,7 +599,7 @@
     </p>
 
 
-    <h3 id='cites-endpoint'>{% url "opinionscited-list" version="v3" %}</h3>
+    <h3 id="cites-endpoint">{% url "opinionscited-list" version="v3" %}</h3>
     <p>This endpoint provides an interface into the citation graph that CourtListener provides between <code>Opinions</code>. Using the filters listed in response to an <code>OPTIONS</code> request, you can see the <code>Opinions</code> that an <code>Opinion</code> cites (it's "Authorities") or you can see the <code>Opinions</code> that cite an <code>Opinion</code>.
     </p>
     <p>These can be thought of as compliments, though the results can be dramatically different. For example, a very important <code>Opinion</code>, <em><a href="{% url "view_case" "111170" "strickland-v-washington" %}">Strickland v. Washington</a></em>, has been cited thousands of times by subsequent cases, but a quick look in the database reveals that no <code>Opinion</code> has more than about 500 authorities (things it cites to), and most have about 60.
