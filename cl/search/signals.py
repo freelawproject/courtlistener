@@ -1,5 +1,6 @@
 from cl.audio.models import Audio
 from cl.lib.es_signal_processor import ESSignalProcessor
+
 from cl.people_db.models import Education, Person, Position
 from cl.search.documents import (
     AudioDocument,
