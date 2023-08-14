@@ -1,6 +1,13 @@
 from cl.audio.models import Audio
 from cl.lib.es_signal_processor import ESSignalProcessor
-from cl.search.documents import AudioDocument, ParentheticalGroupDocument
+from cl.people_db.models import Education, Person, Position
+from cl.search.documents import (
+    AudioDocument,
+    EducationDocument,
+    ParentheticalGroupDocument,
+    PersonDocument,
+    PositionDocument,
+)
 from cl.search.models import (
     Citation,
     Docket,
@@ -111,6 +118,33 @@ oa_field_mapping = {
     "reverse": {},
 }
 
+p_field_mapping = {
+    "save": {
+        Person: {},
+    },
+    "delete": {},
+    "m2m": {},
+    "reverse": {},
+}
+
+
+position_field_mapping = {
+    "save": {
+        Position: {},
+    },
+    "delete": {},
+    "m2m": {},
+    "reverse": {},
+}
+
+education_field_mapping = {
+    "save": {
+        Education: {},
+    },
+    "delete": {},
+    "m2m": {},
+    "reverse": {},
+}
 
 # Instantiate a new ESSignalProcessor() for each Model/Document that needs to
 # be tracked. The arguments are: main model, ES document mapping, and field mapping dict.
@@ -124,4 +158,16 @@ _oa_signal_processor = ESSignalProcessor(
     Audio,
     AudioDocument,
     oa_field_mapping,
+)
+
+_p_signal_processor = ESSignalProcessor(
+    Person, PersonDocument, p_field_mapping
+)
+
+_eduacation_signal_processor = ESSignalProcessor(
+    Education, EducationDocument, education_field_mapping
+)
+
+_position_signañ_processor = ESSignalProcessor(
+    Position, PositionDocument, position_field_mapping
 )
