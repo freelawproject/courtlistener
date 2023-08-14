@@ -8,8 +8,16 @@ from elasticsearch_dsl import Document
 from cl.alerts.send_alerts import send_or_schedule_alerts
 from cl.audio.models import Audio
 from cl.lib.command_utils import logger
-from cl.lib.elasticsearch_utils import elasticsearch_enabled
-from cl.search.documents import AudioDocument, ParentheticalGroupDocument
+from cl.lib.elasticsearch_utils import elasticsearch_enabled, es_index_exists
+from cl.people_db.models import Education, Person, Position
+from cl.search.documents import (
+    PEOPLE_DOCS_TYPE_ID,
+    AudioDocument,
+    EducationDocument,
+    ParentheticalGroupDocument,
+    PersonDocument,
+    PositionDocument,
+)
 from cl.search.models import (
     Citation,
     Docket,
@@ -27,8 +35,17 @@ instance_typing = Union[
     Parenthetical,
     ParentheticalGroup,
     Audio,
+    Person,
+    Position,
+    Education,
 ]
-es_document_typing = Union[AudioDocument, ParentheticalGroupDocument]
+es_document_typing = Union[
+    AudioDocument,
+    ParentheticalGroupDocument,
+    PersonDocument,
+    PositionDocument,
+    EducationDocument,
+]
 
 
 def updated_fields(
@@ -103,9 +120,30 @@ def save_document_in_es(
     :param es_document: A Elasticsearch DSL document.
     :return: None
     """
+    es_args = {}
+    if isinstance(instance, Education) or isinstance(instance, Position):
+        parent_id = getattr(instance.person, "pk", None)
+        if (
+            es_index_exists("people_db_index")
+            and parent_id
+            and PersonDocument.exists(id=parent_id)
+        ):
+            return
+        es_args["_routing"] = parent_id
+
+    if isinstance(instance, Education):
+        doc_id = PEOPLE_DOCS_TYPE_ID(instance.pk).EDUCATION
+        es_args["person_child"] = {"name": "education", "parent": parent_id}
+    elif isinstance(instance, Position):
+        doc_id = PEOPLE_DOCS_TYPE_ID(instance.pk).POSITION
+        es_args["person_child"] = {"name": "position", "parent": parent_id}
+    else:
+        doc_id = instance.pk
+
+    es_args["meta"] = {"id": doc_id}
     es_doc = es_document()
     doc = es_doc.prepare(instance)
-    response = es_document(meta={"id": instance.pk}, **doc).save(
+    response = es_document(**es_args, **doc).save(
         skip_empty=False,
         return_doc_meta=True,
         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,

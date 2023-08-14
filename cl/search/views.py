@@ -618,7 +618,7 @@ def do_es_search(
         document_type = AudioDocument
 
     if search_form.is_valid() and es_index_exists(
-        index=document_type._index._name
+        index_name=document_type._index._name
     ):
         cd = search_form.cleaned_data
         # Create necessary filters to execute ES query
