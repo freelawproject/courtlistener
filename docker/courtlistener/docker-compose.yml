@@ -73,7 +73,8 @@ services:
   cl-django:
     container_name: cl-django
     build:
-      dockerfile: "../django/Dockerfile"
+      context: "../../"
+      dockerfile: "./docker/django/Dockerfile"
       args:
         BUILD_ENV: dev
       target: web-dev
