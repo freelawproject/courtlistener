@@ -42,7 +42,6 @@ def elasticsearch_enabled(func: Callable) -> Callable:
     return wrapper_func
 
 
-
 def es_index_exists(index_name: str) -> bool:
     """Confirm if the Elasticsearch index exists in the default instance.
     :param index_name: The index name to check.

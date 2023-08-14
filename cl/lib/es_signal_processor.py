@@ -8,7 +8,6 @@ from elasticsearch_dsl import Document
 from cl.alerts.send_alerts import send_or_schedule_alerts
 from cl.audio.models import Audio
 from cl.lib.command_utils import logger
-
 from cl.lib.elasticsearch_utils import elasticsearch_enabled, es_index_exists
 from cl.people_db.models import Education, Person, Position
 from cl.search.documents import (
