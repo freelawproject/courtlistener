@@ -31,7 +31,6 @@ from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.bot_detector import is_bot
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
-    check_index,
     convert_str_date_fields_to_date_objects,
     es_index_exists,
     fetch_es_results,
