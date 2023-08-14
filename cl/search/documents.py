@@ -1,11 +1,13 @@
 from datetime import datetime
 
+from django.http import QueryDict
 from django.template import loader
 from django_elasticsearch_dsl import Document, fields
 from elasticsearch_dsl import Percolator
 
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
+from cl.lib.elasticsearch_utils import build_es_main_query
 from cl.lib.search_index_utils import null_map
 from cl.lib.utils import deepgetattr
 from cl.search.es_indices import (
@@ -13,6 +15,7 @@ from cl.search.es_indices import (
     oral_arguments_percolator_index,
     parenthetical_group_index,
 )
+from cl.search.forms import SearchForm
 from cl.search.models import Citation, ParentheticalGroup
 
 
@@ -201,11 +204,33 @@ class AudioDocument(AudioDocumentBase):
         return datetime.utcnow()
 
 
+class PercolatorField(fields.DEDField, Percolator):
+    pass
+
+
 @oral_arguments_percolator_index.document
 class AudioPercolator(AudioDocumentBase):
     rate = fields.KeywordField(attr="rate")
-    percolator_query = Percolator()
+    percolator_query = PercolatorField()
 
     class Django:
         model = Alert
         ignore_signals = True
+
+    def prepare_timestamp(self, instance):
+        return datetime.utcnow()
+
+    def prepare_percolator_query(self, instance):
+        qd = QueryDict(instance.query.encode(), mutable=True)
+        search_form = SearchForm(qd)
+        if not search_form.is_valid():
+            return None
+
+        cd = search_form.cleaned_data
+        search_query = AudioDocument.search()
+        (
+            query,
+            total_query_results,
+            top_hits_limit,
+        ) = build_es_main_query(search_query, cd)
+        return query.to_dict()["query"]

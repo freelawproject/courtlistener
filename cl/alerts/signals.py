@@ -1,15 +1,11 @@
-from datetime import datetime
-
 from django.conf import settings
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
-from django.http import QueryDict
 
 from cl.alerts.models import Alert
+from cl.alerts.utils import index_alert_document
 from cl.lib.command_utils import logger
-from cl.lib.elasticsearch_utils import build_es_main_query
-from cl.search.documents import AudioDocument, AudioPercolator
-from cl.search.forms import SearchForm
+from cl.search.documents import AudioPercolator
 from cl.search.models import SEARCH_TYPES
 
 
@@ -26,26 +22,7 @@ def create_or_update_alert_in_es_index(sender, instance=None, **kwargs):
         return
 
     if f"type={SEARCH_TYPES.ORAL_ARGUMENT}" in instance.query:
-        # Make a dict from the query string.
-        qd = QueryDict(instance.query.encode(), mutable=True)
-        cd = {}
-        search_form = SearchForm(qd)
-        if search_form.is_valid():
-            cd = search_form.cleaned_data
-        search_query = AudioDocument.search()
-        (
-            query,
-            total_query_results,
-            top_hits_limit,
-        ) = build_es_main_query(search_query, cd)
-        query_dict = query.to_dict()["query"]
-        percolator_query = AudioPercolator(
-            meta={"id": instance.pk},
-            rate=instance.rate,
-            timestamp=datetime.utcnow(),
-            percolator_query=query_dict,
-        )
-        percolator_query.save(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)
+        index_alert_document(instance, AudioPercolator)
 
 
 @receiver(

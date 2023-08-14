@@ -1,6 +1,9 @@
 from dataclasses import dataclass
 
-from cl.alerts.models import DocketAlert
+from django.conf import settings
+
+from cl.alerts.models import Alert, DocketAlert
+from cl.search.documents import AudioPercolator
 from cl.search.models import Docket
 
 
@@ -38,3 +41,18 @@ class OldAlertReport:
 
 class InvalidDateError(Exception):
     pass
+
+
+def index_alert_document(alert: Alert, es_document=AudioPercolator) -> None:
+    """Helper method to prepare and index an Alert object into Elasticsearch.
+
+    :param alert: The Alert instance to be indexed.
+    :param es_document: The Elasticsearch document percolator used for indexing
+    the Alert instance.
+    :return: None
+    """
+    document = es_document()
+    doc = document.prepare(alert)
+    es_document(meta={"id": alert.pk}, **doc).save(
+        skip_empty=True, refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH
+    )

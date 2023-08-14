@@ -1480,21 +1480,6 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
     """Test ES Search Alerts"""
 
     @classmethod
-    def rebuild_index(self, model):
-        """
-        Create and populate the Elasticsearch index and mapping
-        """
-
-        # -f rebuilds index without prompt for confirmation
-        call_command(
-            "search_index",
-            "--rebuild",
-            "-f",
-            "--models",
-            model,
-        )
-
-    @classmethod
     def setUpTestData(cls):
         cls.rebuild_index("audio.Audio")
         cls.rebuild_index("alerts.Alert")
@@ -2170,3 +2155,139 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             audio.delete()
         for alert in alerts_created:
             alert.delete()
+
+
+@override_settings(ELASTICSEARCH_DISABLED=True)
+class SearchAlertsIndexingCommandTests(ESIndexTestCase, TestCase):
+    """Test the cl_index_search_alerts command"""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user_profile = UserProfileWithParentsFactory()
+        cls.user_profile_2 = UserProfileWithParentsFactory()
+        cls.search_alert = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert OA",
+            query="q=RT+Test+OA&type=oa",
+        )
+        cls.search_alert_2 = AlertFactory(
+            user=cls.user_profile_2.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert OA 2",
+            query="q=RT+Test+OA&type=oa",
+        )
+        cls.search_alert_3 = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert OA Daily",
+            query="q=Test+OA&type=oa",
+        )
+        cls.search_alert_4 = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.WEEKLY,
+            name="Test Alert OA Weekly",
+            query="q=Test+OA&type=oa",
+        )
+        cls.search_alert_5 = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.MONTHLY,
+            name="Test Alert OA Monthly",
+            query="q=Test+OA&type=oa",
+        )
+        cls.search_alert_6 = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.MONTHLY,
+            name="Test Alert O RT",
+            query="q=Test+Opinion Alert",
+        )
+        cls.search_alert_7 = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert R",
+            query="q=Test+O&type=r",
+        )
+        cls.search_alert_8 = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert R",
+            query="q=Test+O&type=r",
+        )
+
+    def tearDown(self) -> None:
+        self.delete_index("alerts.Alert")
+        self.create_index("alerts.Alert")
+
+    @override_settings(PERCOLATOR_PAGE_SIZE=20)
+    @mock.patch("cl.alerts.management.commands.cl_index_search_alerts.logger")
+    def test_cl_index_search_alerts_command(self, mock_logger):
+        """Confirm the command only index the right Alerts into the ES."""
+        s = AudioPercolator.search().query("match_all")
+        response = s.execute()
+        response_dict = response.to_dict()
+        self.assertEqual(response_dict["hits"]["total"]["value"], 0)
+
+        # Call cl_index_search_alerts command.
+        call_command(
+            "cl_index_search_alerts",
+            pk_offset=0,
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+        )
+
+        s = AudioPercolator.search().query("match_all")
+        response = s.execute()
+        response_dict = response.to_dict()
+        # Only OA Alerts should be indexed.
+        self.assertEqual(response_dict["hits"]["total"]["value"], 5)
+
+        pks_alerts_compare = [
+            self.search_alert.pk,
+            self.search_alert_2.pk,
+            self.search_alert_3.pk,
+            self.search_alert_4.pk,
+            self.search_alert_5.pk,
+        ]
+        for alert_pk in pks_alerts_compare:
+            self.assertTrue(
+                AudioPercolator.exists(id=alert_pk),
+                msg=f"Alert id: {alert_pk} was not indexed.",
+            )
+
+        # Call cl_index_search_alerts command for a not supported query type:
+        call_command(
+            "cl_index_search_alerts",
+            pk_offset=0,
+            alert_type=SEARCH_TYPES.RECAP,
+        )
+
+        mock_logger.info.assert_called_with(
+            f"'{SEARCH_TYPES.RECAP}' Alert type indexing is not supported yet."
+        )
+
+    @mock.patch("cl.alerts.management.commands.cl_index_search_alerts.logger")
+    def test_index_from_pk_offset(self, mock_logger):
+        """Confirm elements with pk lt pk_offset are omitted from  indexing."""
+
+        # Call cl_index_search_alerts command.
+        call_command(
+            "cl_index_search_alerts",
+            pk_offset=self.search_alert_3.pk,
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+        )
+
+        s = AudioPercolator.search().query("match_all")
+        response = s.execute()
+        response_dict = response.to_dict()
+        # Only 3 elements should be indexed.
+        self.assertEqual(response_dict["hits"]["total"]["value"], 3)
+
+        pks_alerts_compare = [
+            self.search_alert_3.pk,
+            self.search_alert_4.pk,
+            self.search_alert_5.pk,
+        ]
+        for alert_pk in pks_alerts_compare:
+            self.assertTrue(
+                AudioPercolator.exists(id=alert_pk),
+                msg=f"Alert id: {alert_pk} was not indexed.",
+            )
