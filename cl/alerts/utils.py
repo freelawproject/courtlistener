@@ -61,5 +61,6 @@ def index_alert_document(
     doc_indexed = es_document(meta={"id": alert.pk}, **doc).save(
         skip_empty=True, refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH
     )
-    if doc_indexed == "created" or doc_indexed == "updated":
+    if doc_indexed in ["created", "updated"]:
         return True
+    return None
