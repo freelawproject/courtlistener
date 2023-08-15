@@ -247,11 +247,7 @@ def build_sort_results(cd: CleanData) -> Dict:
         }
 
     order_by = cd.get("order_by")
-    if order_by not in order_by_map and "random_" not in order_by:
-        # Sort by score in descending order
-        return order_by_map["score desc"]
-
-    if "random_" in order_by:
+    if order_by and "random_" in order_by:
         # Return random sorting if available.
         # Define the random seed using the value defined in random_{seed}
         seed = int(time.time())
@@ -259,8 +255,8 @@ def build_sort_results(cd: CleanData) -> Dict:
         if match:
             seed = int(match.group(1))
 
-        order_by = re.sub(r"random_(\d+)", "random_", order_by)
-        order = order_by_map[order_by]["random_"]["order"]
+        order_by_key = re.sub(r"random_(\d+)", "random_", order_by)
+        order = order_by_map[order_by_key]["random_"]["order"]
         random_sort = {
             "_script": {
                 "type": "number",
@@ -272,6 +268,10 @@ def build_sort_results(cd: CleanData) -> Dict:
             }
         }
         return random_sort
+
+    if order_by not in order_by_map:
+        # Sort by score in descending order
+        return order_by_map["score desc"]
 
     return order_by_map[order_by]
 
