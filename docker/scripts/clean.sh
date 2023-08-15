@@ -12,4 +12,4 @@ docker-compose -f ../courtlistener/docker-compose.yml stop
 # rm said containers
 docker-compose -f ../courtlistener/docker-compose.yml rm --force
 # rm the locally-stored CL images themselves
-docker rmi $(docker-compose -f ../courtlistener/docker-compose.yml config | awk '/freelawproject/{if ($1 == "image:") print $2;}')
+docker rmi $(docker compose --file ../courtlistener/docker-compose.yml config --images)
