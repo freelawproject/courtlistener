@@ -627,8 +627,9 @@
       <li>
         <p><strong>Ordering</strong>: Instead of using a minus sign to flip ordering, it uses <code>asc</code> and <code>desc</code>.
         </p>
-        <p>In addition, results may be sorted randomly by using <code>random_{your-seed} desc/asc</code> as your sort parameter. Substitute any value for <code>{your seed}</code> to get results that are consistent across pagination. For example:
+        <p>In addition, results may be sorted randomly by using <code>random_{your-seed} desc/asc</code> as your sort parameter. It's important to notice that <code>{your-seed}</code> must be an integer to get results that are consistent across pagination. If a non-integer value is used, the system will default to using the current timestamp as the seed. This means results will vary for each page load.
         </p>
+        <p>For example:</p>
         <pre class="pre-scrollable">{% get_full_host %}{% url "search-list" version="v3" %}?q=foo&order_by=random_123+desc</pre>
         <p>This way of sorting the results also works on the front end, but does not show up via the dropdowns.
         </p>
