@@ -2,8 +2,8 @@ import logging
 from datetime import date, timedelta
 
 import waffle
+from asgiref.sync import sync_to_async
 from django.conf import settings
-from django.contrib import messages
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.template import TemplateDoesNotExist
@@ -163,7 +163,7 @@ def coverage_data(request, version, court):
     )
 
 
-def get_result_count(request, version, day_count):
+async def get_result_count(request, version, day_count):
     """Get the count of results for the past `day_count` number of days
 
     GET parameters will be a complete search string
@@ -176,7 +176,7 @@ def get_result_count(request, version, day_count):
     period.
     """
 
-    search_form = SearchForm(request.GET.copy())
+    search_form = await sync_to_async(SearchForm)(request.GET.copy())
     if not search_form.is_valid():
         return JsonResponse(
             {"error": "Invalid SearchForm"},
@@ -185,9 +185,11 @@ def get_result_count(request, version, day_count):
         )
     cd = search_form.cleaned_data
     search_type = cd["type"]
+    es_flag_for_oa = await sync_to_async(waffle.flag_is_active)(
+        request, "oa-es-deactivate"
+    )
     if (
-        search_type == SEARCH_TYPES.ORAL_ARGUMENT
-        and not waffle.flag_is_active(request, "oa-es-deactivate")
+        search_type == SEARCH_TYPES.ORAL_ARGUMENT and not es_flag_for_oa
     ):  # Elasticsearch version for OA
         document_type = AudioDocument
         cd["argued_after"] = date.today() - timedelta(days=int(day_count))
@@ -218,7 +220,7 @@ def get_result_count(request, version, day_count):
     return JsonResponse({"count": total_query_results}, safe=True)
 
 
-def deprecated_api(request, v):
+async def deprecated_api(request, v):
     return JsonResponse(
         {
             "meta": {

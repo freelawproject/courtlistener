@@ -423,6 +423,7 @@ class SimpleUserDataMixin:
     SOLR_PEOPLE_URL=settings.SOLR_PEOPLE_TEST_URL,
     SOLR_RECAP_URL=settings.SOLR_RECAP_TEST_URL,
     SOLR_URLS=settings.SOLR_TEST_URLS,
+    ELASTICSEARCH_DISABLED=True,
 )
 class EmptySolrTestCase(SerializeSolrTestMixin, TestCase):
     """Sets up an empty Solr index for tests that need to set up data manually.
@@ -547,11 +548,7 @@ class SitemapTest(TestCase):
         )
 
 
-class ESTestCaseMixin(SerializeMixin):
-    lockfile = __file__
-
-
-class AudioTestCase(ESTestCaseMixin, SimpleTestCase):
+class AudioTestCase(SimpleTestCase):
     """Audio test case factories"""
 
     @classmethod

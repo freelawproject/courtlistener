@@ -6,6 +6,7 @@ from cl.alerts.send_alerts import send_or_schedule_alerts
 from cl.audio.models import Audio
 from cl.lib.command_utils import logger
 from cl.lib.elasticsearch_utils import es_index_exists
+from cl.lib.es_signal_processor import ESSignalProcessor
 from cl.people_db.models import (
     ABARating,
     Education,
@@ -14,152 +15,162 @@ from cl.people_db.models import (
     Position,
 )
 from cl.search.documents import (
-    PEOPLE_DOCS_TYPE_ID,
     AudioDocument,
+    ParentheticalGroupDocument,
     PersonDocument,
     PositionDocument,
 )
-from cl.search.models import Docket
-
-
-@receiver(
-    post_save,
-    sender=Docket,
-    dispatch_uid="update_related_es_documents_on_docket_save",
+from cl.search.models import (
+    Citation,
+    Docket,
+    Opinion,
+    OpinionCluster,
+    OpinionsCited,
+    Parenthetical,
+    ParentheticalGroup,
 )
-def update_related_es_documents_on_docket_save(
-    sender, instance=None, **kwargs
-):
-    """Receiver function that gets called after a Docket instance is saved.
-    This function updates the Elasticsearch index for all Audio objects related
-    to the saved Docket instance.
 
-    We'll add here more ES documents that depend on Docket values.
-    """
-    related_audios = Audio.objects.filter(docket=instance)
-    for audio in related_audios:
-        # Update the index for each related Audio
-        AudioDocument().update(audio)
+# This field mapping is used to define which fields should be updated in the
+# Elasticsearch index document when they change in the DB. The outer keys
+# represent the actions that will trigger signals:
+# save: On model save
+# delete: On model delete
+# m2m: On many-to-many field changes
+# reverse: On ForeignKey reverse relation changes
+# For every action key, a dict for each Model that needs to be tracked should
+# be added, where the key for these child dicts is the Model.
+# In each Model dict, another dict should be added for every query relation
+# (relative to the main model) that needs to be tracked. The key for these
+# dicts is the query path relative to the main model:
+# e.g: opinion__cluster__docket relative to ParentheticalGroup.
+# Within each of these dicts, an additional dict containing tracked fields
+# should be added. Keys should be the field name on the Model and values
+# should be the field name in the ES document.
+
+pa_field_mapping = {
+    "save": {
+        Docket: {
+            "opinion__cluster__docket": {
+                "docket_number": "docketNumber",
+                "court_id": "court_id",
+            }
+        },
+        Opinion: {
+            "opinion": {
+                "author_id": "author_id",
+                "cluster_id": "cluster_id",
+                "extracted_by_ocr": "opinion_extracted_by_ocr",
+            },
+        },
+        OpinionCluster: {
+            "representative__describing_opinion__cluster": {
+                "slug": "describing_opinion_cluster_slug",
+            },
+            "opinion__cluster": {
+                "case_name": "caseName",
+                "citation_count": "citeCount",
+                "date_filed": "dateFiled",
+                "slug": "opinion_cluster_slug",
+                "docket_id": "docket_id",
+                "judges": "judge",
+                "nature_of_suit": "suitNature",
+                "get_precedential_status_display": "status",  # On fields where
+                # indexed values needs to be the display() value, use get_{field_name}_display as key.
+            },
+        },
+        Parenthetical: {
+            "representative": {
+                "score": "representative_score",
+                "text": "representative_text",
+            },
+        },
+        ParentheticalGroup: {},  # For the main model, a field mapping is not
+        # required, since all its fields will be indexed/updated.
+    },
+    "delete": {ParentheticalGroup: {}},  # Delete action, this only applies to
+    # the main model, no field mapping is required.
+    "m2m": {
+        OpinionCluster.panel.through: {
+            "opinion__cluster": {
+                "panel_ids": "panel_ids",
+            },
+        },
+        OpinionsCited: {
+            "opinion": {
+                "cites": "cites",
+            },
+        },
+    },
+    "reverse": {
+        Citation: {
+            "opinion__cluster": {
+                "all": ["citation"],
+                Citation.NEUTRAL: ["citation", "neutralCite"],
+                Citation.LEXIS: ["citation", "lexisCite"],
+            },
+        }
+    },
+}
+
+oa_field_mapping = {
+    "save": {
+        Docket: {
+            "docket": {
+                "date_argued": "dateArgued",
+                "date_reargued": "dateReargued",
+                "date_reargument_denied": "dateReargumentDenied",
+                "docket_number": "docketNumber",
+                "slug": "docket_slug",
+            }
+        },
+        Audio: {},
+    },
+    "delete": {Audio: {}},
+    "m2m": {Audio.panel.through: {"audio": {"panel_ids": "panel_ids"}}},
+    "reverse": {},
+}
+
+p_field_mapping = {
+    "save": {
+        Person: {},
+    },
+    "delete": {Person: {}},
+    "m2m": {},
+    "reverse": {},
+}
 
 
-@receiver(
-    m2m_changed,
-    sender=Audio.panel.through,
-    dispatch_uid="audio_panel_changed_update_in_es",
+position_field_mapping = {
+    "save": {
+        Position: {},
+    },
+    "delete": {Position: {}},
+    "m2m": {},
+    "reverse": {},
+}
+
+
+# Instantiate a new ESSignalProcessor() for each Model/Document that needs to
+# be tracked. The arguments are: main model, ES document mapping, and field mapping dict.
+_pa_signal_processor = ESSignalProcessor(
+    ParentheticalGroup,
+    ParentheticalGroupDocument,
+    pa_field_mapping,
 )
-def audio_panel_changed_update_in_es(
-    sender, instance=None, action=None, **kwargs
-):
-    """Receiver function that gets called after a new panel object is added or
-    removed to the Audio m2m relation.
 
-    This function updates the Elasticsearch index for the related Audio instance
-    """
-    if action == "post_add" or action == "post_remove":
-        audio_doc = AudioDocument()
-        doc = audio_doc.prepare(instance)
-        AudioDocument(meta={"id": instance.pk}, **doc).save(skip_empty=False)
-
-
-@receiver(
-    post_save,
-    sender=Audio,
-    dispatch_uid=" create_or_update_audio_in_es_index",
+_oa_signal_processor = ESSignalProcessor(
+    Audio,
+    AudioDocument,
+    oa_field_mapping,
 )
-def create_or_update_audio_in_es_index(sender, instance=None, **kwargs):
-    """Receiver function that gets called after an Audio instance is saved.
-    This method creates or updates an Audio object in the AudioDocument index.
 
-    Also triggers search alerts for new documents added to the index.
-    """
-
-    audio_doc = AudioDocument()
-    doc = audio_doc.prepare(instance)
-    response = AudioDocument(meta={"id": instance.pk}, **doc).save(
-        skip_empty=False, return_doc_meta=True
-    )
-    if response["_version"] == 1:
-        send_or_schedule_alerts(response["_id"], "oral_arguments", doc)
-
-
-@receiver(
-    post_delete,
-    sender=Audio,
-    dispatch_uid="remove_audio_from_es_index",
+_p_signal_processor = ESSignalProcessor(
+    Person, PersonDocument, p_field_mapping
 )
-def remove_audio_from_es_index(sender, instance=None, **kwargs):
-    """Receiver function that gets called after an Audio instance is deleted.
-    This function removes Audio from the AudioPercolator index.
-    """
-    # Check if the document exists before deleting it
-    if AudioDocument.exists(id=instance.pk):
-        doc = AudioDocument.get(id=instance.pk)
-        doc.delete()
-    else:
-        logger.error(
-            f"The Audio with ID:{instance.pk} can't be deleted from "
-            f"the ES index, it doesn't exists."
-        )
 
-
-@receiver(
-    post_save,
-    sender=Person,
-    dispatch_uid="create_or_update_person_in_es_index",
+_position_signañ_processor = ESSignalProcessor(
+    Position, PositionDocument, position_field_mapping
 )
-def create_or_update_person_in_es_index(
-    sender, instance=None, created=False, **kwargs
-):
-    """Receiver function that gets called after a Person instance is saved.
-    This method creates or updates a Person object in the PersonDocument index.
-    """
-
-    if es_index_exists("people_db_index") and not created:
-        person_doc = PersonDocument()
-        doc = person_doc.prepare(instance)
-        PersonDocument(meta={"id": instance.pk}, **doc).save(
-            skip_empty=False, return_doc_meta=True
-        )
-
-
-@receiver(
-    post_save,
-    sender=Position,
-    dispatch_uid="create_or_update_position_in_es_index",
-)
-def create_or_update_position_in_es_index(sender, instance=None, **kwargs):
-    """Receiver function that gets called after a Position instance is saved.
-    This method creates or updates a Position object in the PositionDocument index.
-    """
-    parent_id = getattr(instance.person, "pk", None)
-    if not es_index_exists("people_db_index") or not parent_id:
-        return
-    if PersonDocument.exists(id=parent_id) and instance.person.is_judge:
-        position_doc = PositionDocument()
-        doc = position_doc.prepare(instance)
-        doc_id = PEOPLE_DOCS_TYPE_ID(instance.pk).POSITION
-        PositionDocument(
-            meta={"id": doc_id},
-            _routing=parent_id,
-            **doc,
-        ).save(skip_empty=False)
-
-    elif not PersonDocument.exists(id=parent_id) and instance.person.is_judge:
-        # Add the Judge first.
-        person_doc = PersonDocument()
-        doc = person_doc.prepare(instance.person)
-        PersonDocument(meta={"id": parent_id}, **doc).save(
-            skip_empty=False, return_doc_meta=True
-        )
-        # Then add the position object.
-        position_doc = PositionDocument()
-        doc = position_doc.prepare(instance)
-        doc_id = PEOPLE_DOCS_TYPE_ID(instance.pk).POSITION
-        PositionDocument(
-            meta={"id": doc_id},
-            _routing=parent_id,
-            **doc,
-        ).save(skip_empty=False)
 
 
 @receiver(
@@ -175,7 +186,7 @@ def create_or_update_education_in_es_index(sender, instance=None, **kwargs):
 
     parent_id = getattr(instance.person, "pk", None)
     if (
-        es_index_exists("people_db_index")
+        es_index_exists(PersonDocument._index._name)
         and parent_id
         and PersonDocument.exists(id=parent_id)
     ):
@@ -199,7 +210,7 @@ def create_or_update_affiliation_in_es_index(sender, instance=None, **kwargs):
 
     parent_id = getattr(instance.person, "pk", None)
     if (
-        es_index_exists("people_db_index")
+        es_index_exists(PersonDocument._index._name)
         and parent_id
         and PersonDocument.exists(id=parent_id)
     ):
@@ -222,58 +233,6 @@ def create_or_update_affiliation_in_es_index(sender, instance=None, **kwargs):
 
 @receiver(
     post_delete,
-    sender=Person,
-    dispatch_uid="remove_person_from_es_index",
-)
-def remove_person_from_es_index(sender, instance=None, **kwargs):
-    """Receiver function that gets called after a Person instance is deleted.
-    This function removes a Person document and their related child documents
-    from the ES index.
-    """
-    # Check if the document exists before deleting it
-    if PersonDocument.exists(id=instance.pk):
-        doc = PersonDocument.get(id=instance.pk)
-        doc.delete()
-
-        position_objects = instance.positions.all()
-        for position in position_objects:
-            doc_id = PEOPLE_DOCS_TYPE_ID(position.pk).POSITION
-            if PositionDocument.exists(id=doc_id):
-                doc = PositionDocument.get(id=doc_id)
-                doc.delete()
-
-    else:
-        logger.error(
-            f"The Person with ID:{instance.pk} can't be deleted from "
-            f"the ES index, it doesn't exists."
-        )
-
-
-@receiver(
-    post_delete,
-    sender=Position,
-    dispatch_uid="remove_position_from_es_index",
-)
-def remove_position_from_es_index(sender, instance=None, **kwargs):
-    """Receiver function that gets called after a Position instance is deleted.
-    This function removes a Position document from the ES index.
-    """
-    # Check if the document exists before deleting it
-
-    doc_id = PEOPLE_DOCS_TYPE_ID(instance.pk).POSITION
-    if PositionDocument.exists(id=doc_id):
-        doc = PositionDocument.get(id=doc_id)
-        doc.delete()
-
-    else:
-        logger.error(
-            f"The Position instance with ID:{instance.pk} can't be deleted from "
-            f"the ES index, it doesn't exists."
-        )
-
-
-@receiver(
-    post_delete,
     sender=Education,
     dispatch_uid="remove_education_from_es_index",
 )
@@ -283,7 +242,7 @@ def remove_education_from_es_index(sender, instance=None, **kwargs):
     """
     parent_id = getattr(instance.person, "pk", None)
     if (
-        es_index_exists("people_db_index")
+        es_index_exists(PersonDocument._index._name)
         and parent_id
         and PersonDocument.exists(id=parent_id)
     ):
@@ -307,7 +266,7 @@ def create_or_update_aba_ratings_in_es_index(sender, instance=None, **kwargs):
 
     parent_id = getattr(instance.person, "pk", None)
     if (
-        es_index_exists("people_db_index")
+        es_index_exists(PersonDocument._index._name)
         and parent_id
         and PersonDocument.exists(id=parent_id)
     ):
@@ -331,7 +290,7 @@ def delete_aba_ratings_in_es_index(sender, instance=None, **kwargs):
 
     parent_id = getattr(instance.person, "pk", None)
     if (
-        es_index_exists("people_db_index")
+        es_index_exists(PersonDocument._index._name)
         and parent_id
         and PersonDocument.exists(id=parent_id)
     ):

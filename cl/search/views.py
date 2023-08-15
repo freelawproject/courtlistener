@@ -32,13 +32,13 @@ from cl.lib.bot_detector import is_bot
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
     convert_str_date_fields_to_date_objects,
+    es_index_exists,
     fetch_es_results,
     merge_courts_from_db,
     merge_unavailable_fields_on_parent_document,
     set_results_highlights,
 )
 from cl.lib.paginators import ESPaginator
-from cl.lib.ratelimiter import ratelimit_deny_list
 from cl.lib.redis_utils import make_redis_interface
 from cl.lib.search_utils import (
     add_depth_counts,
@@ -308,7 +308,6 @@ def get_homepage_stats():
 
 
 @never_cache
-@ratelimit_deny_list
 def show_results(request: HttpRequest) -> HttpResponse:
     """
     This view can vary significantly, depending on how it is called:
@@ -565,32 +564,29 @@ def es_search(request: HttpRequest) -> HttpResponse:
     :return: HttpResponse
     """
     render_dict = {"private": False}
-    template = None
-
-    if request.path == reverse("advanced_pa"):
-        courts = Court.objects.filter(in_use=True)
-        render_dict.update({"search_type": "parenthetical"})
-        obj_type = SEARCH_TYPES.PARENTHETICAL
-        search_form = SearchForm({"type": obj_type})
-        if search_form.is_valid():
-            search_form = _clean_form(
-                request.GET.copy(),
-                search_form.cleaned_data,
-                courts,
-            )
-        template = "advanced.html"
-
-        courts, court_count_human, court_count = merge_form_with_courts(
-            courts, search_form
+    courts = Court.objects.filter(in_use=True)
+    render_dict.update({"search_type": "parenthetical"})
+    obj_type = SEARCH_TYPES.PARENTHETICAL
+    search_form = SearchForm({"type": obj_type})
+    if search_form.is_valid():
+        search_form = _clean_form(
+            request.GET.copy(),
+            search_form.cleaned_data,
+            courts,
         )
-        render_dict.update(
-            {
-                "search_form": search_form,
-                "courts": courts,
-                "court_count_human": court_count_human,
-                "court_count": court_count,
-            }
-        )
+    template = "advanced.html"
+
+    courts, court_count_human, court_count = merge_form_with_courts(
+        courts, search_form
+    )
+    render_dict.update(
+        {
+            "search_form": search_form,
+            "courts": courts,
+            "court_count_human": court_count_human,
+            "court_count": court_count,
+        }
+    )
 
     return render(request, template, render_dict)
 
@@ -634,7 +630,9 @@ def do_es_search(
     elif get_params.get("type") == SEARCH_TYPES.PEOPLE:
         document_type = PersonDocument
 
-    if search_form.is_valid() and document_type:
+    if search_form.is_valid() and es_index_exists(
+        index_name=document_type._index._name
+    ):
         cd = search_form.cleaned_data
         # Create necessary filters to execute ES query
         search_query = document_type.search()

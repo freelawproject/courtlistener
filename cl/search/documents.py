@@ -1,8 +1,7 @@
-from datetime import date, datetime
+from datetime import datetime
 
-from django.conf import settings
 from django.template import loader
-from django_elasticsearch_dsl import Document, Index, fields
+from django_elasticsearch_dsl import Document, fields
 from django_elasticsearch_dsl.fields import DEDField
 from elasticsearch_dsl import Join, Percolator
 
@@ -11,14 +10,13 @@ from cl.audio.models import Audio
 from cl.lib.search_index_utils import null_map
 from cl.lib.utils import deepgetattr
 from cl.people_db.models import Person, Position
-from cl.search.models import Citation, ParentheticalGroup
-
-# Define parenthetical elasticsearch index
-parenthetical_group_index = Index("parenthetical_group")
-parenthetical_group_index.settings(
-    number_of_shards=settings.ELASTICSEARCH_NUMBER_OF_SHARDS,
-    number_of_replicas=settings.ELASTICSEARCH_NUMBER_OF_REPLICAS,
+from cl.search.es_indices import (
+    oral_arguments_index,
+    oral_arguments_percolator_index,
+    parenthetical_group_index,
+    people_db_index,
 )
+from cl.search.models import Citation, ParentheticalGroup
 
 
 @parenthetical_group_index.document
@@ -34,14 +32,7 @@ class ParentheticalGroupDocument(Document):
     )
     cluster_id = fields.IntegerField(attr="opinion.cluster_id")
     court_id = fields.KeywordField(attr="opinion.cluster.docket.court.pk")
-    dateArgued = fields.DateField(attr="opinion.cluster.docket.date_argued")
     dateFiled = fields.DateField(attr="opinion.cluster.date_filed")
-    dateReargued = fields.DateField(
-        attr="opinion.cluster.docket.date_reargued"
-    )
-    dateReargumentDenied = fields.DateField(
-        attr="opinion.cluster.docket.date_reargument_denied"
-    )
     describing_opinion_cluster_id = fields.KeywordField(
         attr="representative.describing_opinion.cluster.id"
     )
@@ -51,9 +42,6 @@ class ParentheticalGroupDocument(Document):
     docket_id = fields.IntegerField(attr="opinion.cluster.docket_id")
     docketNumber = fields.KeywordField(
         attr="opinion.cluster.docket.docket_number"
-    )
-    joined_by_ids = fields.ListField(
-        fields.IntegerField(),
     )
     judge = fields.TextField(
         attr="opinion.cluster.judges",
@@ -75,7 +63,6 @@ class ParentheticalGroupDocument(Document):
     representative_text = fields.TextField(
         attr="representative.text",
     )
-    scdb_id = fields.KeywordField(attr="opinion.cluster.scdb_id")
     status = fields.KeywordField()
     suitNature = fields.TextField(
         attr="opinion.cluster.nature_of_suit",
@@ -84,15 +71,13 @@ class ParentheticalGroupDocument(Document):
     class Django:
         model = ParentheticalGroup
         fields = ["score"]
+        ignore_signals = True
 
     def prepare_citation(self, instance):
         return [str(cite) for cite in instance.opinion.cluster.citations.all()]
 
     def prepare_cites(self, instance):
         return [o.pk for o in instance.opinion.opinions_cited.all()]
-
-    def prepare_joined_by_ids(self, instance):
-        return [judge.pk for judge in instance.opinion.joined_by.all()]
 
     def prepare_lexisCite(self, instance):
         try:
@@ -196,15 +181,6 @@ class AudioDocumentBase(Document):
     timestamp = fields.DateField()
 
 
-# Define oral arguments elasticsearch index
-oral_arguments_index = Index("oral_arguments")
-oral_arguments_index.settings(
-    number_of_shards=settings.ELASTICSEARCH_NUMBER_OF_SHARDS,
-    number_of_replicas=settings.ELASTICSEARCH_NUMBER_OF_REPLICAS,
-    analysis=settings.ELASTICSEARCH_DSL["analysis"],
-)
-
-
 @oral_arguments_index.document
 class AudioDocument(AudioDocumentBase):
     class Django:
@@ -230,15 +206,6 @@ class AudioDocument(AudioDocumentBase):
         return datetime.utcnow()
 
 
-# Define oral arguments elasticsearch index
-oral_arguments_percolator_index = Index("oral_arguments_percolator")
-oral_arguments_percolator_index.settings(
-    number_of_shards=settings.ELASTICSEARCH_NUMBER_OF_SHARDS,
-    number_of_replicas=settings.ELASTICSEARCH_NUMBER_OF_REPLICAS,
-    analysis=settings.ELASTICSEARCH_DSL["analysis"],
-)
-
-
 @oral_arguments_percolator_index.document
 class AudioPercolator(AudioDocumentBase):
     rate = fields.KeywordField(attr="rate")
@@ -247,15 +214,6 @@ class AudioPercolator(AudioDocumentBase):
     class Django:
         model = Alert
         ignore_signals = True
-
-
-# Define people elasticsearch index
-people_db_index = Index("people_db_index")
-people_db_index.settings(
-    number_of_shards=settings.ELASTICSEARCH_NUMBER_OF_SHARDS,
-    number_of_replicas=settings.ELASTICSEARCH_NUMBER_OF_REPLICAS,
-    analysis=settings.ELASTICSEARCH_DSL["analysis"],
-)
 
 
 class PEOPLE_DOCS_TYPE_ID:
@@ -439,6 +397,7 @@ class PersonDocument(PersonBaseDocument):
     political_affiliation_id = fields.ListField(
         fields.KeywordField(),
     )
+
     aba_rating = fields.ListField(
         fields.TextField(
             analyzer="text_en_splitting_cl",

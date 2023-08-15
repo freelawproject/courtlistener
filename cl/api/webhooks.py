@@ -227,9 +227,10 @@ def send_es_search_alert_webhook(
         es_results,
         many=True,
         context={
-            "schema": AudioDocument._index.get_mapping()["oral_arguments"][
-                "mappings"
-            ]
+            "schema": AudioDocument._index.get_mapping()[
+                AudioDocument._index._name
+            ]["mappings"],
+            "document_type": AudioDocument,
         },
     ).data
 

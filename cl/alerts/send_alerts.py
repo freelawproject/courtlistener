@@ -26,6 +26,7 @@ from cl.lib.elasticsearch_utils import (
     merge_highlights_into_result,
 )
 from cl.search.constants import ALERTS_HL_TAG
+from cl.search.documents import AudioPercolator
 from cl.search.models import SEARCH_TYPES
 from cl.stats.utils import tally_stat
 from cl.users.models import UserProfile
@@ -58,19 +59,19 @@ def send_alert_email(
 def percolate_document(
     document_id: str,
     document_index: str,
-    from_index: int = 0,
+    search_after: int = 0,
 ) -> Response | None:
     """Percolate a document against a defined Elasticsearch Percolator query.
 
     :param document_id: The document ID in ES index to be percolated.
     :param document_index: The ES document index where the document lives.
-    :param from_index: The ES from_ param for pagination.
+    :param search_after: The ES search_after param for deep pagination.
     :return: The response from the Elasticsearch query or an empty list if an
     error occurred.
     """
 
     try:
-        s = Search(index="oral_arguments_percolator")
+        s = Search(index=AudioPercolator._index._name)
         percolate_query = Q(
             "percolate",
             field="percolator_query",
@@ -82,8 +83,10 @@ def percolate_document(
             s, {"type": SEARCH_TYPES.ORAL_ARGUMENT}, alerts=True
         )
         s = s.source(excludes=["percolator_query"])
-        s = s.extra(from_=from_index, size=settings.PERCOLATOR_PAGE_SIZE)
-        # execute the percolator query.
+        s = s.sort("timestamp")
+        s = s[: settings.PERCOLATOR_PAGE_SIZE]
+        if search_after:
+            s = s.extra(search_after=search_after)
         return s.execute()
     except (TransportError, ConnectionError, RequestError) as e:
         logger.warning(
@@ -178,7 +181,7 @@ def process_percolator_response(
                 alert_user.profile.total_donated_last_year
                 < settings.MIN_DONATION["rt_alerts"]
             )
-            if not_donated_enough and alert_triggered.rate == Alert.REAL_TIME:
+            if not_donated_enough:
                 logger.info(
                     "User: %s has not donated enough for their "
                     "RT alerts to be sent.\n" % alert_user
@@ -219,8 +222,11 @@ def send_or_schedule_alerts(
     Or schedule other rates alerts to send them later.
 
     Iterates through each hit in the search response, checks if the alert rate
-    is real-time, and if the user has donated enough.If so it sends an email
+    is real-time, and if the user has donated enough. If so it sends an email
     alert and triggers webhooks.
+    The process begins with an initial percolator query and continues to fetch
+    additional results in chunks determined by settings.PERCOLATOR_PAGE_SIZE,
+    until all results are retrieved or no more results are available.
 
     :param document_id: The document ID in ES index to be percolated.
     :param document_index: The ES document index where the document lives.
@@ -240,17 +246,17 @@ def send_or_schedule_alerts(
     results_returned = len(percolator_response.hits.hits)
     if total_hits > batch_size:
         documents_retrieved = results_returned
-        from_index = batch_size
+        search_after = percolator_response.hits[-1].meta.sort
         while True:
             percolator_response = percolate_document(
-                document_id, document_index, from_index=from_index
+                document_id, document_index, search_after=search_after
             )
             process_percolator_response(percolator_response, document_content)
             results_returned = len(percolator_response.hits.hits)
             documents_retrieved += results_returned
             # Check if all results have been retrieved. If so break the loop
-            # Otherwise, increase from_index.
+            # Otherwise, increase search_after.
             if documents_retrieved >= total_hits or results_returned == 0:
                 break
             else:
-                from_index += batch_size
+                search_after = percolator_response.hits[-1].meta.sort
