@@ -62,6 +62,7 @@ services:
       args:
         BUILD_ENV: dev
       target: celery
+    image: freelawproject/courtlistener:latest-celery-dev
     depends_on:
       - cl-postgresql
       - cl-redis
@@ -83,6 +84,7 @@ services:
       args:
         BUILD_ENV: dev
       target: web-dev
+    image: freelawproject/courtlistener:latest-web-dev
     depends_on:
       - cl-postgresql
       - cl-redis

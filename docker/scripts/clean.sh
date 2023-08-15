@@ -3,7 +3,6 @@
 # Use when:
 ## 1) Merging `main` into a working branch;
 ## 2) Forking off of `main` to start a new working branch
-# Run it before using the build script. Usage of both of these shell scripts is optional.
 
 # Mostly from here: https://stackoverflow.com/a/39127792/3256077
 
