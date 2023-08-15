@@ -13,8 +13,12 @@
 {% endblock %}
 
 {% block content %}
-  <div class="col-sm-7">
+  <div class="hidden-xs hidden-sm col-md-3">
+    {% include "includes/toc_sidebar.html" %}
+  </div>
+  <div class="col-xs-12 col-md-8 col-lg-6">
     <h1 id="about">REST API &ndash; v3.14</h1>
+
     <h2 id="api-overview">Getting Started &amp; Overview</h2>
 
     <p>For developers that wish to have a granular API for our data, we provide a RESTful API based on the <a href="http://www.django-rest-framework.org/" target="_blank">Django REST Framework</a>.
@@ -43,7 +47,7 @@
     </p>
 
 
-    <h2>Support</h2>
+    <h2 id="support">Support</h2>
     <p>Questions about the APIs can be sent <a href="https://github.com/freelawproject/courtlistener/discussions" target="_blank">to our Github Discussions forum</a> or via our <a href="{% url "contact" %}">contact form</a>. In general, we prefer that questions be posted publicly in the forum so they can be searched by others in the future. If you are a private organization posting to that forum, we will work with you to avoid sharing details about your organization.
     </p>
     <p>
@@ -56,7 +60,7 @@
     </p>
 
 
-    <h2>Data Modeling</h2>
+    <h2 id="data-modeling">Data Modeling</h2>
     <p>The two images below show how these endpoints work together. The first image shows the models we use for people and the second shows the models we use for documents and metadata about them. You can see that these models currently link together on the Docket, Person, and Court tables. (<a
       href="{% static "png/complete-model-v3.13.png" %}"
       target="_blank">Here's a version of this diagram that shows everything all at once</a>.)
@@ -114,6 +118,22 @@
     </p>
 
 
+    <div class="well">
+      <h3 class="top">Your Authorization Token</h3>
+      {% if user.is_authenticated %}
+        <p>Your permanent token for use with this API is:</p>
+        <h4><code>{{ user.auth_token }}</code></h4>
+        <p>Do not share your API token. Keep it private like a password.
+        </p>
+        <p class="text-right"><a class="btn btn-default" href="{% url "view_api" %}#usage">See Usage</a></p>
+      {% else %}
+        <p><a href="{% url "sign-in" %}?next={{ request.path }}"
+                class="btn btn-primary btn-lg">Sign In To See Your Token</a>
+        </p>
+      {% endif %}
+    </div>
+
+
     <h3 id="authentication">Authentication</h3>
     <p>Authentication is necessary so we can monitor usage of the system and so we can assist with any errors that may occur. Per our <a href="{% url "terms" %}#privacy">privacy policy</a>, we do not track your queries in the API, though we do collect statistical information for system monitoring.
     </p>
@@ -168,12 +188,12 @@
     <p>Note that quotes are used to enclose the whitespace in the header.</p>
     <p class="alert alert-warning"><i class="fa fa-warning"></i> <strong>Careful!</strong> The most common mistake we see is forgetting the word "Token" in the token authentication header value. Remember that the header name is <code>Authorization</code> and the value is <code>Token&nbsp;{% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}</code></p>
     {% if user.is_authenticated %}
-      <p>Your permanent token for use with this API is being used in the examples above, is at the top of this page, and is:</p>
+      <p>Your permanent token for use with this API is being used in the examples above and is:</p>
       <pre class="scrollable">{{ user.auth_token }}</pre>
       <p>Do not share this value publicly via code check ins, emails, etc. Treat this value as you would a password. Do not email it to us.
       </p>
     {% else %}
-      <p><a href="{% url "sign-in" %}?next={{ request.path }}#token-auth">Sign in to see your permanent token in these examples and at the top of this page.</a>
+      <p><a href="{% url "sign-in" %}?next={{ request.path }}#token-auth">Sign in to see your permanent token in these examples.</a>
       </p>
     {% endif %}
 
@@ -501,7 +521,7 @@
     </p>
 
 
-    <h3 id="docket-entry-endpoint">{% url "docketentry-list" version="v3" %} <span class="alt">&amp;</span> {% url "recapdocument-list" version="v3" %}</h3>
+    <h3 id="docket-entry-endpoint">{% url "docketentry-list" version="v3" %} &amp; {% url "recapdocument-list" version="v3" %}</h3>
     <p><code>Docket Entry</code> objects represent the rows on a PACER docket, and contain nested <code>RECAP Document</code> objects. This follows the design on PACER, in which a single row on a docket may represent a document and several additional attachments.
     </p>
     <p>One comment about the <code>entry_number</code> field. In district courts, this number is consistently provided by the court, and is usually a number between zero and the low thousands (depending on the length of the case). In appellate court, this number is not provided by some courts, and so we use the internal PACER document ID to populate this field. We <a href="https://law.builders/@flp/109554336659947687">are advocating</a> for courts to always use docket entry numbers.
@@ -514,7 +534,7 @@
     {% endif %}
 
 
-    <h3 id="party-and-attorney-endpoints">{% url "party-list" version="v3" %} <span class="alt">&amp;</span> {% url "attorney-list" version="v3" %}</h3>
+    <h3 id="party-and-attorney-endpoints">{% url "party-list" version="v3" %} &amp; {% url "attorney-list" version="v3" %}</h3>
     <p>The <code>Party</code> and <code>Attorney</code> endpoints provide details about parties and attorneys that have been involved in federal cases in PACER. Each endpoint can be filtered by docket ID as described above, and lists the relationship of parties to attorneys according to the <code>role</code> field.
     </p>
     <p>As with all other endpoints, you can look up the field descriptions, filtering options, ordering options, and rendering options by making an OPTIONS request.
@@ -579,7 +599,7 @@
     </p>
 
 
-    <h3 id='cites-endpoint'>{% url "opinionscited-list" version="v3" %}</h3>
+    <h3 id="cites-endpoint">{% url "opinionscited-list" version="v3" %}</h3>
     <p>This endpoint provides an interface into the citation graph that CourtListener provides between <code>Opinions</code>. Using the filters listed in response to an <code>OPTIONS</code> request, you can see the <code>Opinions</code> that an <code>Opinion</code> cites (it's "Authorities") or you can see the <code>Opinions</code> that cite an <code>Opinion</code>.
     </p>
     <p>These can be thought of as compliments, though the results can be dramatically different. For example, a very important <code>Opinion</code>, <em><a href="{% url "view_case" "111170" "strickland-v-washington" %}">Strickland v. Washington</a></em>, has been cited thousands of times by subsequent cases, but a quick look in the database reveals that no <code>Opinion</code> has more than about 500 authorities (things it cites to), and most have about 60.
@@ -1013,7 +1033,7 @@ PACER_TO_CL_IDS = {
   "{% get_full_host %}{% url "docket-alert-list" version="v3" %}"</pre>
 
     <h3 id="visualization-endpoint">{% url "scotusmap-list" version="v3" %}
-      <span class="alt">&amp;</span> {% url "jsonversion-list" version="v3" %}</h3>
+      &amp; {% url "jsonversion-list" version="v3" %}</h3>
     <p>These endpoints allow you to programmatically see and create <a href="{% url "mapper_homepage" %}">visualizations of Supreme Court networks</a> in CourtListener. All visualizations are associated with a user and are private by default. When you GET these endpoints, you will see data for visualizations that have been made public by their owners or that you have created yourself.
     </p>
     <p>
@@ -1036,107 +1056,39 @@ PACER_TO_CL_IDS = {
     <p>Similar commands can be used to update other non-readonly fields if desired.</p>
     <p>Visualizations can be marked as deleted by flipping the <code>deleted</code> field to <code>True</code>, or can be deleted forthright via a <code>DELETE</code> request.</p>
 
-    <h2>Footnotes</h2>
+    <h2 id="available-jurisdictions"><span>Available Jurisdictions</span></h2>
+    <p>We currently have <strong>{{ court_count }}</strong> jurisdictions that can be accessed with our APIs. Details about the jurisdictions that are available, including all abbreviations, can <a href="{% url "court_index" %}">be found here</a>.
+    </p>
+
+    <h2 id="maintenance-schedule"><span>Maintenance Schedule</span></h2>
+    <p>Generally, we keep the APIs up and running around the clock, but for the rare times where maintenance requires downtime, we will schedule that downtime during a weekly maintenance window from 21:00-23:59PT on a Thursday night. If you are scheduling cron jobs or otherwise crawling the API, you may experience downtime during this window.
+    </p>
+    <p>Additionally, we regularly perform bulk tasks on our servers and maintain <a href="https://www.google.com/calendar/embed?src=michaeljaylissner.com_fvcq09gchprghkghqa69be5hl0@group.calendar.google.com&ctz=America/Los_Angeles">a public calendar</a> for tracking them. You may encounter larger delays while bulk processing jobs are running.
+    </p>
+
+    <h2 id="browser-tools"><span>Browser Tools</span></h2>
+    <p>Several tools are available to help view JSON in your browser. If you are using Firefox, check out <a href="https://addons.mozilla.org/en-US/firefox/addon/jsonovich/">JSONovitch</a>. If you are using Chrome, check out <a href="https://chrome.google.com/webstore/detail/jsonview/chklaanhfefbnpoihckbnefhakgolnmc?hl=en">JSONView</a>.
+    </p>
+
+    <h2 id="footnotes">Footnotes</h2>
     <p id="fn1"><sup>1</sup> The <code>search</code> endpoint is handled by our search engine, not our database. Filters and ordering are thus applied using the same <code>GET</code> parameters as are created when using the front end of the website. Our recommendation is to hone your query there, then move the parameters to the API. See more details in <a href="#search-endpoint">the search section of this document</a>.
     </p>
     <p><a href="#fn-ref-1">Back to reference 1 &#8617;</a></p>
     <p><a href="#fn-ref-2">Back to reference 2 &#8617;</a></p>
-  </div>
 
+    <h2 id="api-change-log">API Change Log</h2>
+    <p><a href="{% url "rest_change_log" %}"
+          class="btn btn-lg btn-primary">View REST API Change Log</a>
+    </p>
 
-
-  <div class="col-sm-5">
-    <div class="well">
-      <h3 class="top">Your Authorization Token</h3>
-      {% if user.is_authenticated %}
-        <p>Your permanent token for use with this API is:</p>
-        <h4><code>{{ user.auth_token }}</code></h4>
-        <p>Do not share your API token. Keep it private like a password.
-        </p>
-        <p class="text-right"><a class="btn btn-default" href="{% url "view_api" %}#usage">See Usage</a></p>
-      {% else %}
-        <p><a href="{% url "sign-in" %}?next={{ request.path }}"
-                class="btn btn-primary btn-lg">Sign In To See Your Token</a>
-        </p>
-      {% endif %}
-    </div>
-
-    {% include "includes/toc_sidebar.html" %}
-
-    <div class="sidebar-section">
-      <h3><span>Available Jurisdictions</span></h3>
-      <p>We currently have <strong>{{ court_count }}</strong> jurisdictions that can be accessed with our APIs. Details about the jurisdictions that are available can <a href="{% url "court_index" %}">be found here</a>.
-      </p>
-      <p>Below is a cheat sheet listing the abbreviations for all available jurisdictions.</p>
-      <div id="scrollable-jurisdictions">
-        <table class="table settings-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th title="Gathered from Blue Book, Cornell.edu and ALWD">Abbreviation</th>
-              <th title="The number of cases in this jurisdiction on CourtListener">Count</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for court in courts %}
-            <tr>
-              <td>{{ court.full_name }}</td>
-              <td>
-                <a href="/?q=&court_{{ court.pk }}=on&order_by=score+desc"
-                   rel="nofollow"
-                >{{ court.pk }}</a>
-              </td>
-              <td>{{ court.count }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-
-
-
-    <div class="sidebar-section">
-      <h3><span>Powered By</span></h3>
-      <p> If you are interested, we have a variety of <a href="https://free.law/press-assets/">"Powered By" logos</a> available for your website or application. We appreciate a reference, and it supports our work, but it's not currently required.
-      </p>
-      <a href="https://free.law/press-assets/">
-        <img src="{% static "png/logo-long-w350.png" %}" width="350" height="81">
+    <h2 id="copyright"><span>Copyright</span></h2>
+    <p>Our data is free of known copyright restrictions.<br />
+      <a rel="license" href="http://creativecommons.org/publicdomain/mark/1.0/">
+        <img src="{% static "png/cc-pd.png" %}" alt="Public Domain Mark" height="31" width="88"/>
       </a>
-    </div>
+    </p>
 
-    <div class="sidebar-section">
-      <h3><span>CiteGeist Scores</span></h3>
-      <p>If you are interested in the CiteGeist score for each opinion, it is now available via our <a href="{% url "bulk_data_index" %}#citegeist">bulk data API</a>.
-      </p>
-      <p>This data is not available via the REST API because a single new citation between cases causes a ripple effect through every value in the database.
-      </p>
-    </div>
+    {% include "includes/donate_footer_plea.html" %}
 
-    <div class="sidebar-section">
-      <h3><span>Maintenance Schedule</span></h3>
-      <p>Generally, we keep the APIs up and running around the clock, but for the rare times where maintenance requires downtime, we will schedule that downtime during a weekly maintenance window from 21:00-23:59PT on a Thursday night. If you are scheduling cron jobs or otherwise crawling the API, you may experience downtime during this window.
-      </p>
-      <p>Additionally, we regularly perform bulk tasks on our servers and maintain <a href="https://www.google.com/calendar/embed?src=michaeljaylissner.com_fvcq09gchprghkghqa69be5hl0@group.calendar.google.com&ctz=America/Los_Angeles">a public calendar</a> for tracking them. You may encounter larger delays while bulk processing jobs are running.
-      </p>
-    </div>
-
-    <div class="sidebar-section">
-      <h3><span>Browser Tools</span></h3>
-      <p>Several tools are available to help view JSON in your browser. If you are using Firefox, check out <a href="https://addons.mozilla.org/en-US/firefox/addon/jsonovich/">JSONovitch</a>. If you are using Chrome, check out <a href="https://chrome.google.com/webstore/detail/jsonview/chklaanhfefbnpoihckbnefhakgolnmc?hl=en">JSONView</a>.
-      </p>
-    </div>
-
-    {% include "includes/deprecated_sidebar_section.html" %}
-
-    <div class="sidebar-section">
-      <h3 id="copyright"><span>Copyright</span></h3>
-      <p>Our data is free of known copyright restrictions.<br />
-        <a rel="license" href="http://creativecommons.org/publicdomain/mark/1.0/">
-          <img src="{% static "png/cc-pd.png" %}" alt="Public Domain Mark" height="31" width="88"/>
-        </a>
-      </p>
-    </div>
   </div>
 {% endblock %}

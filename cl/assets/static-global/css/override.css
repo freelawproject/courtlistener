@@ -1505,7 +1505,9 @@ textarea {
   margin-bottom: 5px;
 }
 #toc > ul > ul,
-#toc > ul > li > ul {
+#toc > ul > li > ul,
+#toc > ul > ul > ul,
+#toc > ul > li > ul > li > ul {
   padding-inline-start: 20px;
 }
 /* END Webhooks styles */

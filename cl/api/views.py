@@ -234,6 +234,11 @@ async def deprecated_api(request, v):
     )
 
 
+def rest_change_log(request):
+    context = {"private": False}
+    return render(request, "rest-change-log.html", context)
+
+
 def webhooks_getting_started(request):
     context = {"private": False}
     return render(request, "webhooks-getting-started.html", context)

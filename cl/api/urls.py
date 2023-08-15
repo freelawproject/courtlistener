@@ -154,6 +154,11 @@ urlpatterns_base = [
         views.rest_docs,
         name="rest_docs",
     ),
+    path(
+        "help/api/rest/changes/",
+        views.rest_change_log,
+        name="rest_change_log",
+    ),
     path("help/api/bulk-data/", views.bulk_data_index, name="bulk_data_index"),
     path(
         "help/api/replication/",
