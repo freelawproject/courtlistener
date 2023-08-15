@@ -303,13 +303,15 @@ def get_text(xml_filepath: str) -> dict:
                     # without an author, and the next opinion with an author is
                     # a dissent opinion, we can't combine both
 
-                    # Find previous opinions that matches the type
-                    relevant_opinions = [
-                        o
-                        for o in opinions
-                        if o["type"]
+                    # We check if the previous stored opinion matches the type of the
+                    # content
+                    relevant_opinions = (
+                        [opinions[-1]]
+                        if opinions
+                        and opinions[-1]["type"]
                         == alternative_authorless_content[0].get("type")
-                    ]
+                        else []
+                    )
 
                     if relevant_opinions:
                         previous_opinion = relevant_opinions[-1]
@@ -373,11 +375,15 @@ def get_text(xml_filepath: str) -> dict:
                 # byline, create an opinion without an author and the contents
                 # that couldn't be merged
 
-                relevant_opinions = [
-                    o
-                    for o in opinions
-                    if o["type"] == authorless_content[0].get("type")
-                ]
+                # We check if the previous stored opinion matches the type of the
+                # content
+                relevant_opinions = (
+                    [opinions[-1]]
+                    if opinions
+                    and opinions[-1]["type"]
+                    == authorless_content[0].get("type")
+                    else []
+                )
 
                 if relevant_opinions:
                     previous_opinion = relevant_opinions[-1]

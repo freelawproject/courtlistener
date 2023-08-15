@@ -2,13 +2,15 @@ import calendar
 import re
 import string
 from datetime import date
-from typing import Optional
+from typing import List, Optional
 
 from bs4 import BeautifulSoup
 from django.conf import settings
 from django.db import transaction
+from django.db.utils import IntegrityError
 from eyecite import clean_text
 from eyecite.find import get_citations
+from eyecite.models import FullCaseCitation
 from juriscraper.lib.string_utils import titlecase
 
 from cl.search.models import (
@@ -331,6 +333,47 @@ def convert_columbia_opinion(text: str, opinion_index: int) -> str:
     return text
 
 
+def add_citations(cites: List[Citation], cluster_id: int) -> int:
+    """Add citations to OpinionCluster
+    :param cites: Citation data
+    :param cluster_id: Cluster of found opinion in DB
+    :return: number of citations added
+    """
+    citations_added = 0
+    for cite in cites:
+        # Cleanup citations with extra spaces
+        clean_cite = re.sub(r"\s+", " ", str(cite))
+        citation = get_citations(clean_cite)
+        if (
+            not citation
+            or not isinstance(citation[0], FullCaseCitation)
+            or not citation[0].groups.get("volume", False)
+        ):
+            logger.warning(f"Citation parsing failed for {clean_cite}")
+            continue
+        if not citation[0].corrected_reporter():
+            reporter_type = Citation.STATE
+        else:
+            cite_type_str = citation[0].all_editions[0].reporter.cite_type
+            reporter_type = map_reporter_db_cite_type(cite_type_str)
+
+        try:
+            Citation.objects.get_or_create(
+                volume=citation[0].groups["volume"],
+                reporter=citation[0].corrected_reporter(),
+                page=citation[0].groups["page"],
+                type=reporter_type,
+                cluster_id=cluster_id,
+            )
+            citations_added = citations_added + 1
+        except IntegrityError:
+            logger.warning(
+                f"Reporter mismatch for cluster: {cluster_id} on cite: {clean_cite}"
+            )
+
+    return citations_added
+
+
 def add_new_case(
     item: dict,
     min_dates: Optional[dict] = None,
@@ -568,6 +611,18 @@ def add_new_case(
             docket, cluster, opinions, found_citations
         )
         if previously_imported_case:
+            with transaction.atomic():
+                citations_added = add_citations(
+                    found_citations, previously_imported_case.id
+                )
+                if citations_added:
+                    if settings.DEBUG:
+                        domain = "http://127.0.0.1:8000"
+                    else:
+                        domain = "https://www.courtlistener.com"
+                    logger.info(
+                        f"Adding citations for case at {domain}{previously_imported_case.get_absolute_url()}"
+                    )
             raise Exception(f"Found duplicate(s).")
 
     # save all the objects
