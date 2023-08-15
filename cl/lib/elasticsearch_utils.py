@@ -102,7 +102,9 @@ def make_es_boost_list(fields: Dict[str, float]) -> list[str]:
     return boosted_fields
 
 
-def add_fields_boosting(cd: CleanData, fields: list[str] = None) -> list[str]:
+def add_fields_boosting(
+    cd: CleanData, fields: list[str] | None = None
+) -> list[str]:
     """Applies boosting to specific fields according the search type.
 
     :param cd: The user input CleanedData
