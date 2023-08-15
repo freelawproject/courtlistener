@@ -8,7 +8,7 @@ from random import shuffle
 from typing import Any
 
 import dateutil.parser as dparser
-from bs4 import BeautifulSoup, NavigableString
+from bs4 import BeautifulSoup, NavigableString, Tag
 from courts_db import find_court
 from juriscraper.lib.string_utils import (
     CaseNameTweaker,
@@ -129,111 +129,6 @@ def get_text(xml_filepath: str) -> dict:
     :return: dict with data
     """
 
-    with open(xml_filepath, "r", encoding="utf-8") as f:
-        content = f.read()
-
-    data = {}  # type: dict
-    opinions = []
-
-    # Sometimes opening and ending tag mismatch (e.g. c6b39dcb29c9c.xml)
-    content = content.replace(
-        "</footnote_body></block_quote>", "</block_quote></footnote_body>"
-    )
-
-    soup = BeautifulSoup(content, "lxml")
-    data["unpublished"] = False
-
-    # Prepare opinions
-    opinion = soup.find("opinion")
-    if opinion:
-        # Outer tag is <opinion>
-        data["unpublished"] = bool(opinion.get("unpublished"))
-
-    find_opinions = soup.findAll(re.compile("[A-Za-z]+_text"))
-    order = 0
-    # Store texts without a byline
-    floating_texts = []
-    for opinion_index, op in enumerate(find_opinions, start=1):
-        opinion_type = op.name.replace("_text", "")
-        # Find author before opinion text tag
-        opinion_author = ""
-        byline = op.find_previous_sibling()
-        # Check that tag name contains _byline
-        if byline and "_byline" in byline.name:
-            opinion_author = byline.get_text()
-        else:
-            floating_texts.append((op.decode_contents(), opinion_type))
-
-        if opinion_author:
-            # If we have an opinion author then proceed to store the opinion
-            # Merge only contents from the same type (opinion with opinion,
-            # dissent with dissent, etc.)
-
-            # Find all footnotes after opinion text tag until the end of xml or
-            # find other tag
-            footnote = op.find_next_sibling()
-            raw_footnotes = []
-            while footnote and footnote.name == "footnote_body":
-                raw_footnotes.append(str(footnote))
-                footnote = footnote.find_next_sibling()
-
-            # Make sure we only have tuples
-            floating_texts = [f for f in floating_texts if type(f) == tuple]
-
-            # Extra content that don't match current opinion type
-            alternative_floating_texts = [
-                f for f in floating_texts if f[1] != opinion_type
-            ]
-
-            if any(alternative_floating_texts):
-                # Keep floating text that are not from the same type,
-                # we need to create a separate opinion for those,
-                # for example: in 2713f39c5a8e8684.xml we have an opinion
-                # without an author, and the next opinion with an author is
-                # a dissent opinion, we can't combine both
-
-                new_opinion = {
-                    "byline": None,
-                    "type": alternative_floating_texts[0][1],
-                    "opinion": "\n".join(
-                        [f[0] for f in alternative_floating_texts]
-                    ),
-                    "order": order,
-                    "raw_footnotes": "",
-                }
-                order = order + 1
-                opinions.append(new_opinion)
-
-            # Add new opinion
-            new_opinion = {
-                "byline": opinion_author,
-                "type": opinion_type,
-                "opinion": "\n".join(
-                    [f[0] for f in floating_texts if f[1] == opinion_type]
-                )
-                + op.decode_contents(),
-                "order": order,
-                "raw_footnotes": raw_footnotes,
-            }
-
-            opinions.append(new_opinion)
-            order = order + 1
-            floating_texts = []
-
-        if len(find_opinions) == opinion_index and floating_texts:
-            # If is the last opinion, and we still have opinions without
-            # byline, create an opinion without an author and the contents
-            # that couldn't be merged
-
-            new_opinion = {
-                "byline": None,
-                "type": op.name.replace("_text", ""),
-                "opinion": "\n".join([f[0] for f in floating_texts]),
-                "order": order,
-                "raw_footnotes": "",
-            }
-            opinions.append(new_opinion)
-
     SIMPLE_TAGS = [
         "attorneys",
         "caption",
@@ -246,6 +141,274 @@ def get_text(xml_filepath: str) -> dict:
         "posture",
         "reporter_caption",
     ]
+
+    data = {}  # type: dict
+
+    with open(xml_filepath, "r", encoding="utf-8") as f:
+        file_content = f.read()
+
+        data["unpublished"] = False
+
+        if "<opinion unpublished=true>" in file_content:
+            file_content = file_content.replace(
+                "<opinion unpublished=true>", "<opinion>"
+            )
+            file_content = file_content.replace("<unpublished>", "").replace(
+                "</unpublished>", ""
+            )
+
+            data["unpublished"] = True
+
+    # Sometimes opening and ending tag mismatch (e.g. c6b39dcb29c9c.xml)
+    file_content = file_content.replace(
+        "</footnote_body></block_quote>", "</block_quote></footnote_body>"
+    )
+
+    soup = BeautifulSoup(file_content, "lxml")
+
+    # Find the outer <opinion> tag to have all elements inside
+    find_opinion = soup.find("opinion")
+
+    step_one_opinions = []  # type: list
+    opinions = []  # type: list
+    order = 0
+
+    if find_opinion:
+        untagged_content = []
+
+        # We iterate all content, with and without tags
+        # STEP 1: Extract all content in multiple dict elements
+        for i, content in enumerate(find_opinion):  # type: int, Tag
+            if type(content) == NavigableString:
+                # We found a raw string, store it
+                untagged_content.append(str(content))
+
+            else:
+                if content.name in SIMPLE_TAGS + [
+                    "citation_line",
+                    "opinion_byline",
+                    "dissent_byline",
+                    "concurrence_byline",
+                ]:
+                    # Ignore these tags, it will be processed later
+                    continue
+                elif content.name in [
+                    "opinion_text",
+                    "dissent_text",
+                    "concurrence_text",
+                ]:
+                    if untagged_content:
+                        # We found something other than a navigable string that is
+                        # not an opinion, but now we have found an opinion,
+                        # let's create this content first
+
+                        # default type
+                        op_type = "opinion"
+                        if step_one_opinions:
+                            if step_one_opinions[-1].get("type"):
+                                # use type of previous opinion if exists
+                                op_type = step_one_opinions[-1].get("type")
+
+                        # Get rid of double spaces
+                        opinion_content = re.sub(
+                            " +", " ", "\n".join(untagged_content)
+                        ).strip()  # type: str
+                        if opinion_content:
+                            step_one_opinions.append(
+                                {
+                                    "opinion": opinion_content,
+                                    "order": order,
+                                    "byline": "",
+                                    "type": op_type,
+                                }
+                            )
+                            order = order + 1
+                        untagged_content = []
+
+                    byline = content.find_previous_sibling()
+                    opinion_author = ""
+                    if byline and "_byline" in byline.name:
+                        opinion_author = byline.get_text()
+
+                    opinion_content = re.sub(
+                        " +", " ", content.decode_contents()
+                    ).strip()
+                    if opinion_content:
+                        step_one_opinions.append(
+                            {
+                                "opinion": opinion_content,
+                                "order": order,
+                                "byline": opinion_author,
+                                "type": content.name.replace("_text", ""),
+                            }
+                        )
+                        order = order + 1
+
+                else:
+                    # Content not inside _text tag, we store it
+                    untagged_content.append(str(content))
+
+        if untagged_content:
+            # default type
+            op_type = "opinion"
+            if step_one_opinions:
+                if step_one_opinions[-1].get("type"):
+                    # use type of previous opinion if exists
+                    op_type = step_one_opinions[-1].get("type")
+
+            opinion_content = re.sub(
+                " +", " ", "\n".join(untagged_content)
+            ).strip()
+            if opinion_content:
+                step_one_opinions.append(
+                    {
+                        "opinion": opinion_content,
+                        "order": order,
+                        "byline": "",
+                        "type": op_type,
+                    }
+                )
+
+        # Step 2: Merge found content in the xml file
+        new_order = 0
+        authorless_content = []
+
+        for i, found_content in enumerate(step_one_opinions, start=1):
+            byline = found_content.get("byline")
+            if not byline:
+                # Opinion has no byline, store it
+                authorless_content.append(found_content)
+
+            if byline:
+                # Opinion has byline
+                opinion_type = found_content.get("type")
+                opinion_content = found_content.get("opinion", "")
+                # Store content that doesn't match the current type
+                alternative_authorless_content = [
+                    z
+                    for z in authorless_content
+                    if z.get("type") != opinion_type
+                ]
+                # Keep content that matches the current type
+                authorless_content = [
+                    z
+                    for z in authorless_content
+                    if z.get("type") == opinion_type
+                ]
+
+                if alternative_authorless_content:
+                    # Keep floating text that are not from the same type,
+                    # we need to create a separate opinion for those,
+                    # for example: in 2713f39c5a8e8684.xml we have an opinion
+                    # without an author, and the next opinion with an author is
+                    # a dissent opinion, we can't combine both
+
+                    # Find previous opinions that matches the type
+                    relevant_opinions = [
+                        o
+                        for o in opinions
+                        if o["type"]
+                        == alternative_authorless_content[0].get("type")
+                    ]
+
+                    if relevant_opinions:
+                        previous_opinion = relevant_opinions[-1]
+                        if previous_opinion.get(
+                            "type"
+                        ) == alternative_authorless_content[0].get("type"):
+                            # Merge last opinion with previous opinion, it probably
+                            # belongs the same author
+                            relevant_opinions[-1][
+                                "opinion"
+                            ] += "\n" + "\n".join(
+                                [
+                                    f.get("opinion")
+                                    for f in alternative_authorless_content
+                                    if f.get("opinion")
+                                ]
+                            )
+                        authorless_content = []
+
+                    else:
+                        # No relevant opinions found, create a new opinion
+                        new_opinion = {
+                            "byline": None,
+                            "type": alternative_authorless_content[0].get(
+                                "type"
+                            ),
+                            "opinion": "\n".join(
+                                [
+                                    f.get("opinion")
+                                    for f in alternative_authorless_content
+                                    if f.get("opinion")
+                                ]
+                            ),
+                            "order": new_order,
+                        }
+                        new_order = new_order + 1
+                        opinions.append(new_opinion)
+
+                # Add new opinion
+                new_opinion = {
+                    "byline": byline,
+                    "type": opinion_type,
+                    "opinion": "\n".join(
+                        [
+                            f.get("opinion")
+                            for f in authorless_content
+                            if f.get("type") == opinion_type
+                        ]
+                    )
+                    + "\n\n"
+                    + opinion_content,
+                    "order": new_order,
+                }
+
+                opinions.append(new_opinion)
+                new_order = new_order + 1
+                authorless_content = []
+
+            if len(step_one_opinions) == i and authorless_content:
+                # If is the last opinion, and we still have opinions without
+                # byline, create an opinion without an author and the contents
+                # that couldn't be merged
+
+                relevant_opinions = [
+                    o
+                    for o in opinions
+                    if o["type"] == authorless_content[0].get("type")
+                ]
+
+                if relevant_opinions:
+                    previous_opinion = relevant_opinions[-1]
+                    if previous_opinion.get("type") == authorless_content[
+                        0
+                    ].get("type"):
+                        # Merge last opinion with previous opinion, it probably
+                        # belongs the same author
+                        relevant_opinions[-1]["opinion"] += "\n" + "\n".join(
+                            [
+                                f.get("opinion")
+                                for f in authorless_content
+                                if f.get("opinion")
+                            ]
+                        )
+
+                else:
+                    # Create last floating opinion
+                    new_opinion = {
+                        "byline": None,
+                        "type": authorless_content[0].get("type"),
+                        "opinion": "\n".join(
+                            [
+                                f.get("opinion")
+                                for f in authorless_content
+                                if f.get("opinion")
+                            ]
+                        ),
+                        "order": new_order,
+                    }
+                    opinions.append(new_opinion)
 
     for tag in SIMPLE_TAGS:
         found_tags = soup.findAll(tag)
@@ -379,7 +542,6 @@ def parse_file(file_path: str) -> dict:
                 "joining": judges[1:] if len(judges) > 1 else [],
                 "byline": opinion_author,
                 "per_curiam": per_curiam,
-                "footnotes": " ".join(opinion.get("raw_footnotes", [])),
             }
         )
 

@@ -535,22 +535,14 @@ def add_new_case(
             )
             author_str = opinion_info["author"]
 
-        footnotes = ""
-        if opinion_info["footnotes"]:
-            footnotes = (
-                f'<div class="footnotes">{opinion_info["footnotes"]}</div>'
-            )
-
         converted_text = convert_columbia_opinion(
-            opinion_info["opinion"] + footnotes, opinion_index
+            opinion_info["opinion"], opinion_index
         )
 
         opinion_type = OPINION_TYPE_MAPPING[opinion_info["type"]]
         if opinion_type == Opinion.LEAD and opinion_index > 0:
             opinion_type = Opinion.ADDENDUM
 
-        # TODO add order field when changes get merged in main
-        # TODO local_path save file, not only path?
         opinion = Opinion(
             author=author,
             author_str=titlecase(author_str),
