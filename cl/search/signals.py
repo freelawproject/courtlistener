@@ -136,7 +136,10 @@ p_field_mapping = {
     },
     "delete": {Person: {}},
     "m2m": {},
-    "reverse": {},
+    "reverse": {
+        Education: {"educations": {"all": ["school"]}},
+        ABARating: {"aba_ratings": {"all": ["aba_rating"]}},
+    },
 }
 
 
@@ -175,30 +178,6 @@ _position_signañ_processor = ESSignalProcessor(
 
 @receiver(
     post_save,
-    sender=Education,
-    dispatch_uid="create_or_update_education_in_es_index",
-)
-def create_or_update_education_in_es_index(sender, instance=None, **kwargs):
-    """Receiver function that gets called after an Education instance is saved.
-    This method creates or updates an Education object in the EducationDocument
-    index.
-    """
-
-    parent_id = getattr(instance.person, "pk", None)
-    if (
-        es_index_exists(PersonDocument._index._name)
-        and parent_id
-        and PersonDocument.exists(id=parent_id)
-    ):
-        person_doc = PersonDocument()
-        doc = person_doc.prepare(instance.person)
-        PersonDocument(meta={"id": instance.person.pk}, **doc).save(
-            skip_empty=False, return_doc_meta=True
-        )
-
-
-@receiver(
-    post_save,
     sender=PoliticalAffiliation,
     dispatch_uid="create_or_update_political_affiliation_in_es_index",
 )
@@ -228,74 +207,4 @@ def create_or_update_affiliation_in_es_index(sender, instance=None, **kwargs):
                 "political_affiliation": political_affiliation,
                 "political_affiliation_id": political_affiliation_id,
             },
-        )
-
-
-@receiver(
-    post_delete,
-    sender=Education,
-    dispatch_uid="remove_education_from_es_index",
-)
-def remove_education_from_es_index(sender, instance=None, **kwargs):
-    """Receiver function that gets called after an Education instance is deleted.
-    This function removes an Education fields from the ES index.
-    """
-    parent_id = getattr(instance.person, "pk", None)
-    if (
-        es_index_exists(PersonDocument._index._name)
-        and parent_id
-        and PersonDocument.exists(id=parent_id)
-    ):
-        person_doc = PersonDocument()
-        doc = person_doc.prepare(instance.person)
-        PersonDocument(meta={"id": instance.person.pk}, **doc).save(
-            skip_empty=False, return_doc_meta=True
-        )
-
-
-@receiver(
-    post_save,
-    sender=ABARating,
-    dispatch_uid="create_or_update_aba_ratings_in_es_index",
-)
-def create_or_update_aba_ratings_in_es_index(sender, instance=None, **kwargs):
-    """Receiver function that gets called after an ABARating instance is saved.
-    This method creates or updates an ABARating object in the PersonDocument
-    index.
-    """
-
-    parent_id = getattr(instance.person, "pk", None)
-    if (
-        es_index_exists(PersonDocument._index._name)
-        and parent_id
-        and PersonDocument.exists(id=parent_id)
-    ):
-        person_doc = PersonDocument()
-        doc = person_doc.prepare(instance.person)
-        PersonDocument(meta={"id": instance.person.pk}, **doc).save(
-            skip_empty=False, return_doc_meta=True
-        )
-
-
-@receiver(
-    post_delete,
-    sender=ABARating,
-    dispatch_uid="delete_aba_ratings_in_es_index",
-)
-def delete_aba_ratings_in_es_index(sender, instance=None, **kwargs):
-    """Receiver function that gets called after an ABARating instance is deleted.
-    This method removes ABARating fields in the PersonDocument
-    index.
-    """
-
-    parent_id = getattr(instance.person, "pk", None)
-    if (
-        es_index_exists(PersonDocument._index._name)
-        and parent_id
-        and PersonDocument.exists(id=parent_id)
-    ):
-        person_doc = PersonDocument()
-        doc = person_doc.prepare(instance.person)
-        PersonDocument(meta={"id": instance.person.pk}, **doc).save(
-            skip_empty=False, return_doc_meta=True
         )

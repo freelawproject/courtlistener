@@ -436,13 +436,13 @@ class ESSignalProcessor(object):
         for query_string, fields_map in mapping_fields.items():
             try:
                 affected_fields = fields_map[instance.type]
-            except KeyError:
+            except (KeyError, AttributeError):
                 affected_fields = fields_map["all"]
             instance_field = query_string.split("__")[-1]
             update_reverse_related_documents(
                 self.main_model,
                 self.es_document,
-                getattr(instance, instance_field),
+                getattr(instance, instance_field, instance),
                 query_string,
                 affected_fields,
             )
