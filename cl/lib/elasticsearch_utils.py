@@ -235,8 +235,8 @@ def build_sort_results(cd: CleanData) -> Dict:
             "score desc": {"_score": {"order": "desc"}},
             "dateArgued desc": {"dateArgued": {"order": "desc"}},
             "dateArgued asc": {"dateArgued": {"order": "asc"}},
-            "random_123 desc": {"random_123": {"order": "desc"}},
-            "random_123 asc": {"random_123": {"order": "asc"}},
+            "random_ desc": {"random_": {"order": "desc"}},
+            "random_ asc": {"random_": {"order": "asc"}},
         }
 
     else:
@@ -247,20 +247,25 @@ def build_sort_results(cd: CleanData) -> Dict:
         }
 
     order_by = cd.get("order_by")
-    if order_by not in order_by_map:
+    if order_by not in order_by_map and "random_" not in order_by:
         # Sort by score in descending order
-        return {"score": {"order": "desc"}}
+        return order_by_map["score desc"]
 
-    if "random_123" in order_by:
+    if "random_" in order_by:
         # Return random sorting if available.
-        # Define the random seed using the current timestamp
+        # Define the random seed using the value defined in random_{seed}
         seed = int(time.time())
-        order = order_by_map[order_by]["random_123"]["order"]
+        match = re.search(r"random_(\d+)", order_by)
+        if match:
+            seed = int(match.group(1))
+
+        order_by = re.sub(r"random_(\d+)", "random_", order_by)
+        order = order_by_map[order_by]["random_"]["order"]
         random_sort = {
             "_script": {
                 "type": "number",
                 "script": {
-                    "source": "Math.random() * params.seed",
+                    "source": "Long.hashCode(doc['id'].value ^ params.seed)",
                     "params": {"seed": seed},
                 },
                 "order": order,

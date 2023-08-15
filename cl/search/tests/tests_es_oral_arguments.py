@@ -1117,7 +1117,12 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         # types, returning sequential results for each requested page.
         page_size = 5
         total_pages = int(audios_to_create / page_size) + 1
-        order_types = ["score desc", "dateArgued desc", "dateArgued asc"]
+        order_types = [
+            "score desc",
+            "dateArgued desc",
+            "dateArgued asc",
+            "random_123 asc",
+        ]
         for order in order_types:
             ids_in_results = []
             for page in range(total_pages):
