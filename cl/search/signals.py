@@ -139,6 +139,11 @@ p_field_mapping = {
     "reverse": {
         Education: {"educations": {"all": ["school"]}},
         ABARating: {"aba_ratings": {"all": ["aba_rating"]}},
+        PoliticalAffiliation: {
+            "political_affiliations": {
+                "all": ["political_affiliation", "political_affiliation_id"]
+            }
+        },
     },
 }
 
@@ -174,37 +179,3 @@ _p_signal_processor = ESSignalProcessor(
 _position_signañ_processor = ESSignalProcessor(
     Position, PositionDocument, position_field_mapping
 )
-
-
-@receiver(
-    post_save,
-    sender=PoliticalAffiliation,
-    dispatch_uid="create_or_update_political_affiliation_in_es_index",
-)
-def create_or_update_affiliation_in_es_index(sender, instance=None, **kwargs):
-    """Receiver function that gets called after an Education instance is saved.
-    This method creates or updates an Education object in the EducationDocument
-    index.
-    """
-
-    parent_id = getattr(instance.person, "pk", None)
-    if (
-        es_index_exists(PersonDocument._index._name)
-        and parent_id
-        and PersonDocument.exists(id=parent_id)
-    ):
-        doc = PersonDocument.get(id=instance.person.pk)
-        political_affiliation = getattr(doc, "prepare_political_affiliation")(
-            instance.person
-        )
-        political_affiliation_id = getattr(
-            doc, "prepare_political_affiliation_id"
-        )(instance.person)
-
-        Document.update(
-            doc,
-            **{
-                "political_affiliation": political_affiliation,
-                "political_affiliation_id": political_affiliation_id,
-            },
-        )
