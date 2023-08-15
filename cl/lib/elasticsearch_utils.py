@@ -10,6 +10,7 @@ from typing import Any, Callable, Dict, List
 from django.conf import settings
 from django.core.paginator import Page
 from django.http.request import QueryDict
+from django_elasticsearch_dsl import Document
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.exceptions import RequestError, TransportError
 from elasticsearch_dsl import A, Q
@@ -673,3 +674,30 @@ def fetch_es_results(
         if settings.DEBUG is True:
             traceback.print_exc()
     return [], 0, error
+
+
+def do_es_podcast_query(
+    search_query: Search,
+    cd: CleanData,
+    override_params: dict[str, str] | None = None,
+    rows: int = 20,
+) -> list[Document]:
+    """Execute an Elasticsearch query for podcasts.
+
+    :param search_query: Elasticsearch DSL Search object
+    :param cd: The query CleanedData
+    :param override_params: Search parameters to override, if any
+    :param rows: Number of rows (items) to be retrieved in the response
+    :return: A list of documents from the Elasticsearch response.
+    """
+
+    if override_params:
+        cd.update(override_params)
+    s, total_query_results, top_hits_limit = build_es_main_query(
+        search_query, cd
+    )
+    response = s.extra(from_=0, size=rows).execute()
+    items = []
+    for item in response:
+        items.append(item)
+    return items
