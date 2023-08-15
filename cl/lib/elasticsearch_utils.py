@@ -255,7 +255,7 @@ def build_sort_results(cd: CleanData) -> Dict:
         if match:
             seed = int(match.group(1))
 
-        order_by_key = re.sub(r"random_(\d+)", "random_", order_by)
+        order_by_key = re.sub(r"random_\S*", "random_", order_by)
         order = order_by_map[order_by_key]["random_"]["order"]
         random_sort = {
             "_script": {
