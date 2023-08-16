@@ -1,6 +1,5 @@
 from datetime import timedelta
 from unittest import mock
-from waffle.testutils import override_switch
 
 import time_machine
 from django.contrib.auth.hashers import make_password
@@ -18,6 +17,7 @@ from rest_framework.status import (
 )
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
+from waffle.testutils import override_switch
 
 from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
 from cl.alerts.management.commands.handle_old_docket_alerts import (
@@ -1475,6 +1475,7 @@ class DocketAlertGetNotesTagsTests(TestCase):
         ) = get_docket_notes_and_tags_by_user(self.docket_3.pk, self.user_1.pk)
         self.assertEqual(notes_docket_3_user_1, None)
         self.assertEqual(tags_docket_3_user_1, [])
+
 
 @override_switch("oa-es-alerts-active", active=True)
 class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
