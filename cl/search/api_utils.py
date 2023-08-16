@@ -27,8 +27,8 @@ def get_object_list(request, cd, paginator):
         group = True
 
     total_query_results = 0
-    if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT and not waffle.flag_is_active(
-        request, "oa-es-deactivate"
+    if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT and waffle.flag_is_active(
+        request, "oa-es-active"
     ):
         search_query = AudioDocument.search()
         main_query, total_query_results, top_hits_limit = build_es_main_query(
@@ -43,8 +43,8 @@ def get_object_list(request, cd, paginator):
     if cd["type"] == SEARCH_TYPES.RECAP:
         main_query["sort"] = map_to_docket_entry_sorting(main_query["sort"])
 
-    if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT and not waffle.flag_is_active(
-        request, "oa-es-deactivate"
+    if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT and waffle.flag_is_active(
+        request, "oa-es-active"
     ):
         sl = ESList(
             main_query=main_query,
