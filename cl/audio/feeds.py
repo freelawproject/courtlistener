@@ -1,6 +1,8 @@
 import waffle
 from django.conf import settings
+from django.shortcuts import get_object_or_404
 from django.templatetags.static import static
+from django.utils.timezone import is_naive
 from requests import Session
 
 from cl.lib import search_utils
@@ -11,7 +13,7 @@ from cl.lib.timezone_helpers import localize_naive_datetime_to_court_timezone
 from cl.search.documents import AudioDocument
 from cl.search.feeds import JurisdictionFeed, get_item
 from cl.search.forms import SearchForm
-from cl.search.models import SEARCH_TYPES
+from cl.search.models import SEARCH_TYPES, Court
 
 
 class JurisdictionPodcast(JurisdictionFeed):
@@ -30,20 +32,26 @@ class JurisdictionPodcast(JurisdictionFeed):
     item_enclosure_mime_type = "audio/mpeg"
 
     def title(self, obj):
-        return f"Oral Arguments for the {obj.full_name}"
+        court = obj[1]
+        return f"Oral Arguments for the {court.full_name}"
+
+    def get_object(self, request, court):
+        return request, get_object_or_404(Court, pk=court)
 
     def items(self, obj):
         """
         Returns a list of items to publish in this feed.
         """
-        if waffle.flag_is_active(obj, "oa-es-deactivate"):
+        request = obj[0]
+        court = obj[1]
+        if waffle.flag_is_active(request, "oa-es-deactivate"):
             with Session() as session:
                 solr = ExtraSolrInterface(
                     settings.SOLR_AUDIO_URL, http_connection=session, mode="r"
                 )
                 params = {
                     "q": "*",
-                    "fq": f"court_exact:{obj.pk}",
+                    "fq": f"court_exact:{court.pk}",
                     "sort": "dateArgued desc",
                     "rows": "20",
                     "start": "0",
@@ -54,7 +62,7 @@ class JurisdictionPodcast(JurisdictionFeed):
         else:
             cd = {
                 "q": "*",
-                "court": obj.pk,
+                "court": court.pk,
                 "order_by": "dateArgued desc",
                 "type": SEARCH_TYPES.ORAL_ARGUMENT,
             }
@@ -63,13 +71,17 @@ class JurisdictionPodcast(JurisdictionFeed):
             return items
 
     def feed_extra_kwargs(self, obj):
+        if isinstance(obj, tuple):
+            court = obj[1]
+        else:
+            court = obj
         extra_args = {
             "iTunes_name": "Free Law Project",
             "iTunes_email": "feeds@courtlistener.com",
             "iTunes_explicit": "no",
         }
-        if hasattr(obj, "pk"):
-            path = static(f"png/producer-{obj.pk}-2000x2000.png")
+        if hasattr(court, "pk"):
+            path = static(f"png/producer-{court.pk}-2000x2000.png")
         else:
             # Not a jurisdiction API -- A search API.
             path = static("png/producer-2000x2000.png")
@@ -94,9 +106,11 @@ class JurisdictionPodcast(JurisdictionFeed):
         return get_item(item)["file_size_mp3"]
 
     def item_pubdate(self, item):
-        pub_date = localize_naive_datetime_to_court_timezone(
-            get_item(item)["court"], get_item(item)["dateArgued"]
-        )
+        pub_date = get_item(item)["dateArgued"]
+        if is_naive(pub_date):
+            pub_date = localize_naive_datetime_to_court_timezone(
+                get_item(item)["court"], pub_date
+            )
         return pub_date
 
     description_template = None
@@ -115,7 +129,7 @@ class AllJurisdictionsPodcast(JurisdictionPodcast):
     )
 
     def get_object(self, request):
-        return None
+        return request
 
     def items(self, obj):
         if waffle.flag_is_active(obj, "oa-es-deactivate"):
