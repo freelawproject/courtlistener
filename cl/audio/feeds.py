@@ -7,6 +7,7 @@ from cl.lib import search_utils
 from cl.lib.elasticsearch_utils import do_es_podcast_query
 from cl.lib.podcast import iTunesPodcastsFeedGenerator
 from cl.lib.scorched_utils import ExtraSolrInterface
+from cl.lib.timezone_helpers import localize_naive_datetime_to_court_timezone
 from cl.search.documents import AudioDocument
 from cl.search.feeds import JurisdictionFeed, get_item
 from cl.search.forms import SearchForm
@@ -93,7 +94,10 @@ class JurisdictionPodcast(JurisdictionFeed):
         return get_item(item)["file_size_mp3"]
 
     def item_pubdate(self, item):
-        return get_item(item)["dateArgued"]
+        pub_date = localize_naive_datetime_to_court_timezone(
+            get_item(item)["court"], get_item(item)["dateArgued"]
+        )
+        return pub_date
 
     description_template = None
 
