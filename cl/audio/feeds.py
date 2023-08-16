@@ -32,7 +32,7 @@ class JurisdictionPodcast(JurisdictionFeed):
     item_enclosure_mime_type = "audio/mpeg"
 
     def title(self, obj):
-        court = obj[1]
+        _, court = obj
         return f"Oral Arguments for the {court.full_name}"
 
     def get_object(self, request, court):
@@ -42,8 +42,7 @@ class JurisdictionPodcast(JurisdictionFeed):
         """
         Returns a list of items to publish in this feed.
         """
-        request = obj[0]
-        court = obj[1]
+        request, court = obj
         if waffle.flag_is_active(request, "oa-es-deactivate"):
             with Session() as session:
                 solr = ExtraSolrInterface(
@@ -71,17 +70,13 @@ class JurisdictionPodcast(JurisdictionFeed):
             return items
 
     def feed_extra_kwargs(self, obj):
-        if isinstance(obj, tuple):
-            court = obj[1]
-        else:
-            court = obj
         extra_args = {
-            "iTunes_name": "Free Law Project",
-            "iTunes_email": "feeds@courtlistener.com",
-            "iTunes_explicit": "no",
+            "iTunes_name": self.iTunes_name,
+            "iTunes_email": self.iTunes_email,
+            "iTunes_explicit": self.iTunes_explicit,
         }
-        if hasattr(court, "pk"):
-            path = static(f"png/producer-{court.pk}-2000x2000.png")
+        if isinstance(obj, tuple) and hasattr(obj[1], "pk"):
+            path = static(f"png/producer-{obj[1].pk}-2000x2000.png")
         else:
             # Not a jurisdiction API -- A search API.
             path = static("png/producer-2000x2000.png")
