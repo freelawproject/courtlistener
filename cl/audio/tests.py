@@ -67,7 +67,6 @@ class PodcastTest(ESIndexTestCase, TestCase):
             ("//channel/item/title", 2),
             ("//channel/item/enclosure/@url", 2),
         )
-        print("XML T")
         for test, count in node_tests:
             node_count = len(xml_tree.xpath(test))  # type: ignore
             self.assertEqual(
