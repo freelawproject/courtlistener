@@ -1,5 +1,6 @@
 from datetime import timedelta
 from unittest import mock
+from waffle.testutils import override_switch
 
 import time_machine
 from django.contrib.auth.hashers import make_password
@@ -1475,24 +1476,9 @@ class DocketAlertGetNotesTagsTests(TestCase):
         self.assertEqual(notes_docket_3_user_1, None)
         self.assertEqual(tags_docket_3_user_1, [])
 
-
+@override_switch("oa-es-alerts-active", active=True)
 class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
     """Test ES Search Alerts"""
-
-    @classmethod
-    def rebuild_index(self, model):
-        """
-        Create and populate the Elasticsearch index and mapping
-        """
-
-        # -f rebuilds index without prompt for confirmation
-        call_command(
-            "search_index",
-            "--rebuild",
-            "-f",
-            "--models",
-            model,
-        )
 
     @classmethod
     def setUpTestData(cls):
