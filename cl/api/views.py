@@ -186,10 +186,10 @@ async def get_result_count(request, version, day_count):
     cd = search_form.cleaned_data
     search_type = cd["type"]
     es_flag_for_oa = await sync_to_async(waffle.flag_is_active)(
-        request, "oa-es-deactivate"
+        request, "oa-es-active"
     )
     if (
-        search_type == SEARCH_TYPES.ORAL_ARGUMENT and not es_flag_for_oa
+        search_type == SEARCH_TYPES.ORAL_ARGUMENT and es_flag_for_oa
     ):  # Elasticsearch version for OA
         document_type = AudioDocument
         cd["argued_after"] = date.today() - timedelta(days=int(day_count))

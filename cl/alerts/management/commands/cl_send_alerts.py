@@ -2,6 +2,7 @@ import datetime
 import traceback
 import warnings
 
+import waffle
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives
@@ -134,6 +135,11 @@ class Command(VerboseCommand):
             qd["filed_after"] = cut_off_date
         elif query_type == SEARCH_TYPES.ORAL_ARGUMENT:
             qd["argued_after"] = cut_off_date
+            if waffle.switch_is_active("oa-es-alerts-active"):
+                # Return empty results for OA alerts. They are now handled
+                # by Elasticsearch.
+                return query_type, results
+
         logger.info(f"Data sent to SearchForm is: {qd}\n")
         search_form = SearchForm(qd)
         if search_form.is_valid():
@@ -142,9 +148,6 @@ class Command(VerboseCommand):
             if (
                 rate == Alert.REAL_TIME
                 and len(self.valid_ids[query_type]) == 0
-            ) or (
-                rate == Alert.REAL_TIME
-                and query_type == SEARCH_TYPES.ORAL_ARGUMENT
             ):
                 # Bail out. No results will be found if no valid_ids.
                 return query_type, results

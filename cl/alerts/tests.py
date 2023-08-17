@@ -17,6 +17,7 @@ from rest_framework.status import (
 )
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
+from waffle.testutils import override_switch
 
 from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
 from cl.alerts.management.commands.handle_old_docket_alerts import (
@@ -501,11 +502,12 @@ class AlertAPITests(APITestCase):
         self.assertEqual(response.json()["id"], alert_1.json()["id"])
 
 
-class SearchAlertsWebhooksTest(EmptySolrTestCase):
+class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
     """Test Search Alerts Webhooks"""
 
     @classmethod
     def setUpTestData(cls):
+        cls.rebuild_index("alerts.Alert")
         cls.user_profile = UserProfileWithParentsFactory()
         cls.donation = DonationFactory(
             donor=cls.user_profile.user,
@@ -610,10 +612,21 @@ class SearchAlertsWebhooksTest(EmptySolrTestCase):
             ),
         ):
             with time_machine.travel(self.mock_date, tick=False):
+                # Send Solr Alerts (Except OA)
                 call_command("cl_send_alerts", rate="dly")
+                # Send ES Alerts (Only OA for now)
+                call_command("cl_send_scheduled_alerts", rate="dly")
 
-        # Two search alert should one to user_profile and one to user_profile_2
-        self.assertEqual(len(mail.outbox), 2)
+        # Three search alerts should be sent:
+        # Two opinion alerts to user_profile and one to user_profile_2 (Solr)
+        # One oral argument alert to user_profile (ES)
+        self.assertEqual(len(mail.outbox), 3)
+        self.assertEqual(mail.outbox[0].to[0], self.user_profile.user.email)
+        self.assertIn("daily opinion alert", mail.outbox[0].body)
+        self.assertEqual(mail.outbox[1].to[0], self.user_profile_2.user.email)
+        self.assertIn("daily opinion alert", mail.outbox[1].body)
+        self.assertEqual(mail.outbox[2].to[0], self.user_profile.user.email)
+        self.assertIn("daily oral argument alert ", mail.outbox[2].body)
 
         # Two webhook events should be sent, both of them to user_profile user
         webhook_events = WebhookEvent.objects.all()
@@ -707,7 +720,10 @@ class SearchAlertsWebhooksTest(EmptySolrTestCase):
             ):
                 # Monthly alerts cannot be run on the 29th, 30th or 31st.
                 with time_machine.travel(self.mock_date, tick=False):
+                    # Send Solr Alerts (Except OA)
                     call_command("cl_send_alerts", rate=rate)
+                    # Send ES Alerts (Only OA for now)
+                    call_command("cl_send_scheduled_alerts", rate=rate)
 
             webhook_events = WebhookEvent.objects.all()
             self.assertEqual(len(webhook_events), events)
@@ -1476,6 +1492,7 @@ class DocketAlertGetNotesTagsTests(TestCase):
         self.assertEqual(tags_docket_3_user_1, [])
 
 
+@override_switch("oa-es-alerts-active", active=True)
 class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
     """Test ES Search Alerts"""
 

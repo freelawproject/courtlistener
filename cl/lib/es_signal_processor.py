@@ -1,5 +1,6 @@
 from typing import Union
 
+import waffle
 from django.conf import settings
 from django.db.models.signals import m2m_changed, post_delete, post_save
 from elasticsearch.exceptions import NotFoundError
@@ -112,6 +113,11 @@ def save_document_in_es(
     )
     support_alerts = getattr(instance, "SUPPORT_ALERTS", None)
     if support_alerts and response["_version"] == 1:
+        if es_document == AudioDocument and not waffle.switch_is_active(
+            "oa-es-alerts-active"
+        ):
+            # Disable ES Alerts if oa-es-alerts-active switch is not enabled
+            return
         send_or_schedule_alerts(response["_id"], es_document._index._name, doc)
 
 

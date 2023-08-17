@@ -397,7 +397,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
             )
             # Get the results from the oral arguments as well
             # Check if waffle flag is active.
-            if waffle.flag_is_active(request, "oa-es-deactivate"):
+            if not waffle.flag_is_active(request, "oa-es-active"):
                 render_dict.update(
                     {
                         "results_oa": do_search(
@@ -477,7 +477,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
                     render_dict.update(search_results)
                 elif request.GET.get("type") == SEARCH_TYPES.ORAL_ARGUMENT:
                     # Check if waffle flag is active.
-                    if waffle.flag_is_active(request, "oa-es-deactivate"):
+                    if not waffle.flag_is_active(request, "oa-es-active"):
                         search_results = do_search(request.GET.copy())
                     else:
                         search_results = do_es_search(request.GET.copy())
