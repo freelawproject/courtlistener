@@ -1,9 +1,7 @@
 import datetime
 import io
-import operator
 import os
 from datetime import date
-from functools import reduce
 from pathlib import Path
 from unittest import mock
 
@@ -19,9 +17,7 @@ from django.core.management import call_command
 from django.db import IntegrityError, transaction
 from django.http import HttpRequest
 from django.test import AsyncRequestFactory, override_settings
-from django.test.utils import captured_stderr
 from django.urls import reverse
-from elasticsearch_dsl import Q, connections
 from factory import RelatedFactory
 from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
@@ -30,15 +26,6 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
 
-from cl.lib.elasticsearch_utils import (
-    build_daterange_query,
-    build_es_filters,
-    build_es_main_query,
-    build_fulltext_query,
-    build_sort_results,
-    build_term_query,
-    group_search_results,
-)
 from cl.lib.search_utils import cleanup_main_query, make_fq
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
@@ -51,19 +38,12 @@ from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.factories import DocketEntriesDataFactory, DocketEntryDataFactory
 from cl.recap.mergers import add_docket_entries
 from cl.scrapers.factories import PACERFreeDocumentLogFactory
-from cl.search.documents import ParentheticalGroupDocument
 from cl.search.factories import (
-    CitationWithParentsFactory,
     CourtFactory,
     DocketEntryWithParentsFactory,
     DocketFactory,
-    OpinionClusterFactory,
     OpinionClusterFactoryWithChildrenAndParents,
-    OpinionsCitedWithParentsFactory,
     OpinionWithChildrenFactory,
-    OpinionWithParentsFactory,
-    ParentheticalFactory,
-    ParentheticalGroupFactory,
     RECAPDocumentFactory,
 )
 from cl.search.feeds import JurisdictionFeed
