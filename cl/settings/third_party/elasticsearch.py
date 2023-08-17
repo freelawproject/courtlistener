@@ -109,6 +109,8 @@ ELASTICSEARCH_DSL = {
 #
 # Scaling/availability settings
 #
+
+# Parenthetical Search index shards and replicas
 ELASTICSEARCH_NUMBER_OF_SHARDS = env(
     "ELASTICSEARCH_NUMBER_OF_SHARDS", default=1
 )
@@ -116,6 +118,21 @@ ELASTICSEARCH_NUMBER_OF_REPLICAS = env(
     "ELASTICSEARCH_NUMBER_OF_REPLICAS", default=0
 )
 
+# Oral Arguments Search index shards and replicas
+ELASTICSEARCH_OA_NUMBER_OF_SHARDS = env(
+    "ELASTICSEARCH_OA_NUMBER_OF_SHARDS", default=1
+)
+ELASTICSEARCH_OA_NUMBER_OF_REPLICAS = env(
+    "ELASTICSEARCH_OA_NUMBER_OF_REPLICAS", default=0
+)
+
+# Oral Arguments Alerts index shards and replicas
+ELASTICSEARCH_OA_ALERTS_NUMBER_OF_SHARDS = env(
+    "ELASTICSEARCH_OA_ALERTS_NUMBER_OF_SHARDS", default=1
+)
+ELASTICSEARCH_OA_ALERTS_NUMBER_OF_REPLICAS = env(
+    "ELASTICSEARCH_OA_ALERTS_NUMBER_OF_REPLICAS", default=0
+)
 
 # ES Auto refresh. In production, it's suggested to wait for ES periodically
 # refresh (every ~1 second) since it's a resource-intensive operation.
