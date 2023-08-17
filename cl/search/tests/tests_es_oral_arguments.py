@@ -5,7 +5,6 @@ from django.db import transaction
 from django.urls import reverse
 from elasticsearch_dsl import connections
 from lxml import html
-from waffle.testutils import override_flag
 
 from cl.alerts.models import Alert
 from cl.alerts.send_alerts import percolate_document
@@ -19,7 +18,6 @@ from cl.search.models import SEARCH_TYPES
 from cl.tests.cases import ESIndexTestCase, TestCase
 
 
-@override_flag("oa-es-active", active=True)
 class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
     """Oral argument search tests for Elasticsearch"""
 

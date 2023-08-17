@@ -168,10 +168,13 @@ def process_percolator_response(
                 parent_alert, created = ParentAlert.objects.get_or_create(
                     alert=alert_triggered, user_rate=user_rate
                 )
+                highlights = {}
+                if hasattr(hit.meta, "highlight"):
+                    highlights = hit.meta["highlight"].to_dict()
                 ScheduledAlertHit.objects.create(
                     parent_alert=parent_alert,
                     document_content=document_content,
-                    highlighted_fields=hit.meta["highlight"].to_dict(),
+                    highlighted_fields=highlights,
                 )
 
         # Send RT Alerts
