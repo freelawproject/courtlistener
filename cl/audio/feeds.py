@@ -186,11 +186,11 @@ class SearchPodcast(JurisdictionPodcast):
                 override_params = {
                     "order_by": "dateArgued desc",
                 }
+                cd.update(override_params)
                 search_query = AudioDocument.search()
                 items = do_es_podcast_query(
                     search_query,
                     cd,
-                    override_params,
                     rows=20,
                 )
                 return items
