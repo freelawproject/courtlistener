@@ -43,7 +43,7 @@ class JurisdictionPodcast(JurisdictionFeed):
         Returns a list of items to publish in this feed.
         """
         request, court = obj
-        if waffle.flag_is_active(request, "oa-es-deactivate"):
+        if not waffle.flag_is_active(request, "oa-es-active"):
             with Session() as session:
                 solr = ExtraSolrInterface(
                     settings.SOLR_AUDIO_URL, http_connection=session, mode="r"
@@ -127,7 +127,7 @@ class AllJurisdictionsPodcast(JurisdictionPodcast):
         return request
 
     def items(self, obj):
-        if waffle.flag_is_active(obj, "oa-es-deactivate"):
+        if not waffle.flag_is_active(obj, "oa-es-active"):
             with Session() as session:
                 solr = ExtraSolrInterface(
                     settings.SOLR_AUDIO_URL, http_connection=session, mode="r"
@@ -162,7 +162,7 @@ class SearchPodcast(JurisdictionPodcast):
         search_form = SearchForm(obj.GET)
         if search_form.is_valid():
             cd = search_form.cleaned_data
-            if waffle.flag_is_active(obj, "oa-es-deactivate"):
+            if not waffle.flag_is_active(obj, "oa-es-active"):
                 with Session() as session:
                     solr = ExtraSolrInterface(
                         settings.SOLR_AUDIO_URL,
