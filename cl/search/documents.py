@@ -107,7 +107,7 @@ class ParentheticalGroupDocument(Document):
 
 
 class AudioDocumentBase(Document):
-    absolute_url = fields.KeywordField(attr="get_absolute_url")
+    absolute_url = fields.KeywordField(attr="get_absolute_url", index=False)
     caseName = fields.TextField(
         attr="case_name",
         analyzer="text_en_splitting_cl",
@@ -149,10 +149,10 @@ class AudioDocumentBase(Document):
         },
         search_analyzer="search_analyzer",
     )
-    docket_slug = fields.KeywordField(attr="docket.slug")
-    duration = fields.IntegerField(attr="duration")
-    download_url = fields.KeywordField(attr="download_url")
-    file_size_mp3 = fields.IntegerField()
+    docket_slug = fields.KeywordField(attr="docket.slug", index=False)
+    duration = fields.IntegerField(attr="duration", index=False)
+    download_url = fields.KeywordField(attr="download_url", index=False)
+    file_size_mp3 = fields.IntegerField(index=False)
     id = fields.IntegerField(attr="pk")
     judge = fields.TextField(
         attr="judges",
@@ -162,13 +162,13 @@ class AudioDocumentBase(Document):
         },
         search_analyzer="search_analyzer",
     )
-    local_path = fields.KeywordField()
+    local_path = fields.KeywordField(index=False)
     pacer_case_id = fields.KeywordField(attr="docket.pacer_case_id")
     panel_ids = fields.ListField(
         fields.IntegerField(),
     )
-    sha1 = fields.KeywordField(attr="sha1")
-    source = fields.KeywordField(attr="source")
+    sha1 = fields.KeywordField(attr="sha1", index=False)
+    source = fields.KeywordField(attr="source", index=False)
     text = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
