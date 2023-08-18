@@ -35,10 +35,8 @@ class PeopleSearchTestElasticSearch(
 
     @classmethod
     def setUpTestData(cls):
-        cls.rebuild_index("audio.Audio")
         cls.rebuild_index("people_db.Person")
         super().setUpTestData()
-        PersonDocument._index.refresh()
 
     def _test_article_count(self, params, expected_count, field_name):
         r = self.client.get("/", params)
@@ -129,8 +127,6 @@ class PeopleSearchTestElasticSearch(
         PoliticalAffiliationFactory.create(person=person)
         school = SchoolFactory.create(name="Harvard University")
 
-        PersonDocument._index.refresh()
-
         person_pk = person.pk
         pos_1_pk = pos_1.pk
         # Person instance is indexed.
@@ -158,7 +154,6 @@ class PeopleSearchTestElasticSearch(
         # Delete person instance; it should be removed from the index along
         # with its child documents.
         person.delete()
-        PersonDocument._index.refresh()
 
         # Person document should be removed.
         self.assertFalse(PersonDocument.exists(id=person_pk))
@@ -186,8 +181,6 @@ class PeopleSearchTestElasticSearch(
         )
         PoliticalAffiliationFactory.create(person=person)
 
-        PersonDocument._index.refresh()
-
         person_pk = person.pk
         pos_1_pk = pos_1.pk
         # Person instance is indexed.
@@ -199,7 +192,6 @@ class PeopleSearchTestElasticSearch(
 
         # Delete pos_1 and education, keep the parent person instance.
         pos_1.delete()
-        PersonDocument._index.refresh()
 
         # Person instance still exists.
         self.assertTrue(PersonDocument.exists(id=person_pk))
@@ -209,7 +201,6 @@ class PeopleSearchTestElasticSearch(
             PersonDocument.exists(id=PEOPLE_DOCS_TYPE_ID(pos_1_pk).POSITION)
         )
         person.delete()
-        PersonDocument._index.refresh()
 
     def test_has_child_queries(self) -> None:
         """Test the build_join_fulltext_queries has child query, it returns a
@@ -246,10 +237,8 @@ class PeopleSearchTestElasticSearch(
             how_selected="e_part",
             nomination_process="fed_senate",
         )
-        PersonDocument._index.refresh()
 
         person.delete()
-        PersonDocument._index.refresh()
 
     def test_has_child_filters(self) -> None:
         """Test the build_join_es_filters has child filter, it returns a
@@ -624,7 +613,6 @@ class PeopleSearchTestElasticSearch(
             how_selected="e_part",
             nomination_process="fed_senate",
         )
-        PersonDocument._index.refresh()
 
         r = self._test_article_count(params, 1, "q")
         supervisors = self._get_meta_value(
@@ -634,7 +622,6 @@ class PeopleSearchTestElasticSearch(
 
         position_6.delete()
         person.delete()
-        PersonDocument._index.refresh()
 
     def test_has_child_queries_combine_filters(self) -> None:
         """Test confirm if we can combine multiple has child filter inner hits
@@ -698,7 +685,6 @@ class PeopleSearchTestElasticSearch(
             how_selected="e_part",
             nomination_process="fed_senate",
         )
-        PersonDocument._index.refresh()
 
         search_query = PersonDocument.search()
         s, total_query_results, top_hits_limit = build_es_main_query(
@@ -838,7 +824,6 @@ class PeopleSearchTestElasticSearch(
         person_2_position.delete()
         position_obama.delete()
         appointer.delete()
-        PersonDocument._index.refresh()
 
     def test_results_highlights(self) -> None:
         """Test highlighting for Judge results."""
@@ -995,7 +980,6 @@ class PeopleSearchTestElasticSearch(
             how_selected="a_legis",
             nomination_process="fed_senate",
         )
-        PersonDocument._index.refresh()
 
         params = {"type": SEARCH_TYPES.PEOPLE, "q": "Susan"}
 
@@ -1125,7 +1109,6 @@ class PeopleSearchTestElasticSearch(
         position_5.delete()
         position_6.delete()
         person.delete()
-        PersonDocument._index.refresh()
 
     def test_update_related_documents(self):
         person = PersonFactory.create(name_first="John American")
@@ -1172,7 +1155,6 @@ class PeopleSearchTestElasticSearch(
             how_selected="e_part",
             nomination_process="fed_senate",
         )
-        PersonDocument._index.refresh()
 
         # Confirm initial values are properly indexed.
         pos_doc = PositionDocument.get(
@@ -1188,7 +1170,7 @@ class PeopleSearchTestElasticSearch(
         # Update supervisor
         position_6.supervisor = person_2
         position_6.save()
-        PersonDocument._index.refresh()
+
         pos_doc = PositionDocument.get(
             id=PEOPLE_DOCS_TYPE_ID(position_6.pk).POSITION
         )
@@ -1198,7 +1180,7 @@ class PeopleSearchTestElasticSearch(
         # Update predecessor
         position_6.predecessor = person_2
         position_6.save()
-        PersonDocument._index.refresh()
+
         pos_doc = PositionDocument.get(
             id=PEOPLE_DOCS_TYPE_ID(position_6.pk).POSITION
         )
@@ -1208,7 +1190,7 @@ class PeopleSearchTestElasticSearch(
         # Update appointer
         position_6.appointer = position_5_1
         position_6.save()
-        PersonDocument._index.refresh()
+
         pos_doc = PositionDocument.get(
             id=PEOPLE_DOCS_TYPE_ID(position_6.pk).POSITION
         )
@@ -1219,7 +1201,7 @@ class PeopleSearchTestElasticSearch(
         # Update appointer (position_5_1) person name, it should be updated.
         person_2.name_first = "Sarah Miller"
         person_2.save()
-        PersonDocument._index.refresh()
+
         pos_doc = PositionDocument.get(
             id=PEOPLE_DOCS_TYPE_ID(position_6.pk).POSITION
         )
