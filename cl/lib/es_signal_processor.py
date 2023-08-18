@@ -125,9 +125,11 @@ def save_document_in_es(
             or not parent_id
             or not instance.person.is_judge
         ):
+            # avoid indexing position records if the parent is not a judge
             return
 
         if not PersonDocument.exists(id=parent_id):
+            # create the parent document if it does not exists in ES
             person_doc = PersonDocument()
             doc = person_doc.prepare(instance.person)
             PersonDocument(meta={"id": parent_id}, **doc).save(
@@ -137,6 +139,7 @@ def save_document_in_es(
         doc_id = PEOPLE_DOCS_TYPE_ID(instance.pk).POSITION
         es_args["_routing"] = parent_id
     elif isinstance(instance, Person):
+        # index person records only if they were ever a judge.
         if not instance.is_judge:
             return
         doc_id = instance.pk
