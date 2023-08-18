@@ -19,7 +19,11 @@ from cl.people_db.factories import (
     PositionFactory,
     SchoolFactory,
 )
-from cl.search.documents import PEOPLE_DOCS_TYPE_ID, PersonDocument
+from cl.search.documents import (
+    PEOPLE_DOCS_TYPE_ID,
+    PersonDocument,
+    PositionDocument,
+)
 from cl.search.models import SEARCH_TYPES
 from cl.tests.cases import ESIndexTestCase, TestCase
 
@@ -1122,3 +1126,102 @@ class PeopleSearchTestElasticSearch(
         position_6.delete()
         person.delete()
         PersonDocument._index.refresh()
+
+    def test_update_related_documents(self):
+        person = PersonFactory.create(name_first="John American")
+        person_2 = PersonFactory.create(name_first="Barack Obama")
+        position_5 = PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            court=self.court_1,
+            date_start=datetime.date(2015, 12, 14),
+            predecessor=self.person_2,
+            appointer=self.position_1,
+            judicial_committee_action="no_rep",
+            termination_reason="retire_mand",
+            position_type="c-jud",
+            person=person,
+            how_selected="e_part",
+            nomination_process="fed_senate",
+        )
+
+        position_5_1 = PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            court=self.court_1,
+            date_start=datetime.date(2015, 12, 14),
+            predecessor=self.person_2,
+            appointer=self.position_1,
+            judicial_committee_action="no_rep",
+            termination_reason="retire_mand",
+            position_type="c-jud",
+            person=person_2,
+            how_selected="e_part",
+            nomination_process="fed_senate",
+        )
+
+        position_6 = PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            court=self.court_1,
+            date_start=datetime.date(2015, 12, 14),
+            predecessor=self.person_2,
+            appointer=self.position_1,
+            judicial_committee_action="no_rep",
+            termination_reason="retire_mand",
+            position_type="clerk",
+            person=self.person_3,
+            supervisor=person,
+            how_selected="e_part",
+            nomination_process="fed_senate",
+        )
+        PersonDocument._index.refresh()
+
+        # Confirm initial values are properly indexed.
+        pos_doc = PositionDocument.get(
+            id=PEOPLE_DOCS_TYPE_ID(position_6.pk).POSITION
+        )
+        name_full_reverse = person.name_full_reverse
+        self.assertEqual(name_full_reverse, pos_doc.supervisor)
+        self.assertEqual(self.person_2.name_full_reverse, pos_doc.predecessor)
+        self.assertEqual(
+            self.position_1.person.name_full_reverse, pos_doc.appointer
+        )
+
+        # Update supervisor
+        position_6.supervisor = person_2
+        position_6.save()
+        PersonDocument._index.refresh()
+        pos_doc = PositionDocument.get(
+            id=PEOPLE_DOCS_TYPE_ID(position_6.pk).POSITION
+        )
+        name_full_reverse = person_2.name_full_reverse
+        self.assertEqual(name_full_reverse, pos_doc.supervisor)
+
+        # Update predecessor
+        position_6.predecessor = person_2
+        position_6.save()
+        PersonDocument._index.refresh()
+        pos_doc = PositionDocument.get(
+            id=PEOPLE_DOCS_TYPE_ID(position_6.pk).POSITION
+        )
+        name_full_reverse = person_2.name_full_reverse
+        self.assertEqual(name_full_reverse, pos_doc.predecessor)
+
+        # Update appointer
+        position_6.appointer = position_5_1
+        position_6.save()
+        PersonDocument._index.refresh()
+        pos_doc = PositionDocument.get(
+            id=PEOPLE_DOCS_TYPE_ID(position_6.pk).POSITION
+        )
+
+        name_full_reverse = position_5_1.person.name_full_reverse
+        self.assertEqual(name_full_reverse, pos_doc.appointer)
+
+        # Update appointer (position_5_1) person name, it should be updated.
+        person_2.name_first = "Sarah Miller"
+        person_2.save()
+        PersonDocument._index.refresh()
+        pos_doc = PositionDocument.get(
+            id=PEOPLE_DOCS_TYPE_ID(position_6.pk).POSITION
+        )
+        name_full_reverse = person_2.name_full_reverse
+        self.assertEqual(name_full_reverse, pos_doc.appointer)

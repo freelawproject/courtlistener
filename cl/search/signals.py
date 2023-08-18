@@ -150,6 +150,7 @@ p_field_mapping = {
 
 position_field_mapping = {
     "save": {
+        Person: {"appointer__person": {"name_full_reverse": "appointer"}},
         Position: {},
     },
     "delete": {Position: {}},

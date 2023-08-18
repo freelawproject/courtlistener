@@ -8,6 +8,7 @@ from localflavor.us.models import (
     USStateField,
     USZipCodeField,
 )
+from model_utils import FieldTracker
 
 from cl.custom_filters.templatetags.extras import granular_date
 from cl.lib.date_time import midnight_pt
@@ -207,6 +208,7 @@ class Person(AbstractDateTimeModel):
         "the judge pics project.",
         default=False,
     )
+    es_p_field_tracker = FieldTracker(fields=["name_full_reverse"])
 
     def __str__(self) -> str:
         return f"{self.pk}: {self.name_full}"
