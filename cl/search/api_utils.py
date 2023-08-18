@@ -118,9 +118,7 @@ class ESList(object):
 
         # Merge unavailable fields in ES by pulling data from the DB to make
         # the API backwards compatible
-        merge_unavailable_fields_on_parent_document(
-            results, SEARCH_TYPES.PEOPLE, "api"
-        )
+        merge_unavailable_fields_on_parent_document(results, self.type, "api")
         # Pull the text snippet up a level
         for result in results:
             if hasattr(result.meta, "highlight") and hasattr(

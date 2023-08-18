@@ -905,8 +905,33 @@ def merge_unavailable_fields_on_parent_document(
 
     # Merge positions courts.
     person_ids = [d["id"] for d in results]
-    positions_in_page = Position.objects.filter(person_id__in=person_ids)
-
+    positions_in_page = (
+        Position.objects.filter(person_id__in=person_ids)
+        .only(
+            "court",
+            "appointer",
+            "supervisor",
+            "predecessor",
+            "how_selected",
+            "position_type",
+            "date_nominated",
+            "date_elected",
+            "date_recess_appointment",
+            "date_referred_to_judicial_committee",
+            "date_judicial_committee_action",
+            "date_hearing",
+            "date_confirmation",
+            "date_start",
+            "date_granularity_start",
+            "date_retirement",
+            "date_termination",
+            "date_granularity_termination",
+            "judicial_committee_action",
+            "nomination_process",
+            "termination_reason",
+        )
+        .select_related("court", "appointer", "supervisor", "predecessor")
+    )
     position_db_mapping = fill_position_mapping(
         positions_in_page, request_type
     )
