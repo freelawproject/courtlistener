@@ -3,12 +3,13 @@ from datetime import date, timedelta
 from typing import Any, Dict
 from unittest import mock
 
+from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Permission
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
 from django.db import connection
 from django.http import HttpRequest, JsonResponse
-from django.test import Client, RequestFactory
+from django.test.client import AsyncClient, RequestFactory
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework.exceptions import NotFound
@@ -43,67 +44,73 @@ class BasicAPIPageTest(TestCase):
     ]
 
     def setUp(self) -> None:
-        self.client = Client()
+        self.async_client = AsyncClient()
 
-    def test_api_root(self) -> None:
-        r = self.client.get(
+    async def test_api_root(self) -> None:
+        r = await self.async_client.get(
             reverse("api-root", kwargs={"version": "v3"}),
             HTTP_ACCEPT="text/html",
         )
         self.assertEqual(r.status_code, 200)
 
-    def test_api_index(self) -> None:
-        r = self.client.get(reverse("api_index"))
+    async def test_api_index(self) -> None:
+        r = await self.async_client.get(reverse("api_index"))
         self.assertEqual(r.status_code, 200)
 
-    def test_swagger_interface(self) -> None:
-        r = self.client.get(reverse("swagger_schema"))
+    async def test_swagger_interface(self) -> None:
+        r = await self.async_client.get(reverse("swagger_schema"))
         self.assertEqual(r.status_code, 200)
 
-    def test_options_request(self) -> None:
-        r = self.client.options(reverse("court_index"))
+    async def test_options_request(self) -> None:
+        r = await self.async_client.options(reverse("court_index"))
         self.assertEqual(r.status_code, 200)
 
-    def test_court_index(self) -> None:
-        r = self.client.get(reverse("court_index"))
+    async def test_court_index(self) -> None:
+        r = await self.async_client.get(reverse("court_index"))
         self.assertEqual(r.status_code, 200)
 
-    def test_rest_docs(self) -> None:
-        r = self.client.get(reverse("rest_docs"))
+    async def test_rest_docs(self) -> None:
+        r = await self.async_client.get(reverse("rest_docs"))
         self.assertEqual(r.status_code, 200)
 
-    def test_webhook_docs(self) -> None:
-        r = self.client.get(reverse("webhooks_docs"))
+    async def test_rest_change_log(self) -> None:
+        r = await self.async_client.get(reverse("rest_change_log"))
         self.assertEqual(r.status_code, 200)
 
-    def test_webhooks_getting_started(self) -> None:
-        r = self.client.get(reverse("webhooks_getting_started"))
+    async def test_webhook_docs(self) -> None:
+        r = await self.async_client.get(reverse("webhooks_docs"))
         self.assertEqual(r.status_code, 200)
 
-    def test_bulk_data_index(self) -> None:
-        r = self.client.get(reverse("bulk_data_index"))
+    async def test_webhooks_getting_started(self) -> None:
+        r = await self.async_client.get(reverse("webhooks_getting_started"))
         self.assertEqual(r.status_code, 200)
 
-    def test_coverage_api(self) -> None:
-        r = self.client.get(
+    async def test_bulk_data_index(self) -> None:
+        r = await self.async_client.get(reverse("bulk_data_index"))
+        self.assertEqual(r.status_code, 200)
+
+    async def test_coverage_api(self) -> None:
+        r = await self.async_client.get(
             reverse("coverage_data", kwargs={"version": 2, "court": "ca1"})
         )
         self.assertEqual(r.status_code, 200)
 
-    def test_coverage_api_via_url(self) -> None:
-        r = self.client.get("/api/rest/v2/coverage/ca1/")
+    async def test_coverage_api_via_url(self) -> None:
+        r = await self.async_client.get("/api/rest/v2/coverage/ca1/")
         self.assertEqual(r.status_code, 200)
 
-    def test_api_info_page_displays_latest_rest_docs_by_default(self) -> None:
-        response = self.client.get(reverse("rest_docs"))
+    async def test_api_info_page_displays_latest_rest_docs_by_default(
+        self,
+    ) -> None:
+        response = await self.async_client.get(reverse("rest_docs"))
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "rest-docs-vlatest.html")
 
-    def test_api_info_page_can_display_different_versions_of_rest_docs(
+    async def test_api_info_page_can_display_different_versions_of_rest_docs(
         self,
     ) -> None:
         for version in ["v1", "v2"]:
-            response = self.client.get(
+            response = await self.async_client.get(
                 reverse("rest_docs", kwargs={"version": version})
             )
             self.assertEqual(response.status_code, 200)
@@ -120,16 +127,16 @@ class CoverageTests(IndexedSolrTestCase):
         self.assertContains(response, "annual_counts")
         self.assertContains(response, "total")
 
-    def test_coverage_data_all_courts(self) -> None:
-        r = self.client.get(
+    async def test_coverage_data_all_courts(self) -> None:
+        r = await self.async_client.get(
             reverse("coverage_data", kwargs={"version": "3", "court": "all"})
         )
         j = json.loads(r.content)
         self.assertTrue(len(j["annual_counts"].keys()) > 0)
         self.assertIn("total", j)
 
-    def test_coverage_data_specific_court(self) -> None:
-        r = self.client.get(
+    async def test_coverage_data_specific_court(self) -> None:
+        r = await self.async_client.get(
             reverse("coverage_data", kwargs={"version": "3", "court": "ca1"})
         )
         j = json.loads(r.content)
@@ -317,27 +324,27 @@ class DRFOrderingTests(TestCase):
 
     fixtures = ["judge_judy.json", "test_objects_search.json"]
 
-    def test_position_ordering(self):
+    async def test_position_ordering(self):
         path = reverse("position-list", kwargs={"version": "v3"})
-        r = self.client.get(path, {"order_by": "date_start"})
+        r = await self.async_client.get(path, {"order_by": "date_start"})
         self.assertLess(
             r.data["results"][0]["date_start"],
             r.data["results"][-1]["date_start"],
         )
-        r = self.client.get(path, {"order_by": "-date_start"})
+        r = await self.async_client.get(path, {"order_by": "-date_start"})
         self.assertGreater(
             r.data["results"][0]["date_start"],
             r.data["results"][-1]["date_start"],
         )
 
-    def test_opinion_ordering_by_id(self):
+    async def test_opinion_ordering_by_id(self):
         path = reverse("opinion-list", kwargs={"version": "v3"})
-        r = self.client.get(path, {"order_by": "id"})
+        r = await self.async_client.get(path, {"order_by": "id"})
         self.assertLess(
             r.data["results"][0]["resource_uri"],
             r.data["results"][-1]["resource_uri"],
         )
-        r = self.client.get(path, {"order_by": "-id"})
+        r = await self.async_client.get(path, {"order_by": "-id"})
         self.assertGreater(
             r.data["results"][0]["resource_uri"],
             r.data["results"][-1]["resource_uri"],
@@ -348,10 +355,10 @@ class FilteringCountTestCase(object):
     """Mixin for adding an additional test assertion."""
 
     # noinspection PyPep8Naming
-    def assertCountInResults(self, expected_count):
+    async def assertCountInResults(self, expected_count):
         """Do we get the correct number of API results from the endpoint?"""
         print(f"Path and q are: {self.path}, {self.q}")
-        r = self.client.get(self.path, self.q)
+        r = await self.async_client.get(self.path, self.q)
         self.assertLess(
             r.status_code,
             400,
@@ -373,9 +380,12 @@ class DRFJudgeApiFilterTests(
 
     fixtures = ["judge_judy.json"]
 
-    def setUp(self) -> None:
+    @async_to_sync
+    async def setUp(self) -> None:
         self.assertTrue(
-            self.client.login(username="pandora", password="password")
+            await sync_to_async(self.async_client.login)(
+                username="pandora", password="password"
+            )
         )
         self.q: Dict[Any, Any] = dict()
 
@@ -574,9 +584,12 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
         ps = Permission.objects.filter(codename="has_recap_api_access")
         up.user.user_permissions.add(*ps)
 
-    def setUp(self) -> None:
+    @async_to_sync
+    async def setUp(self) -> None:
         self.assertTrue(
-            self.client.login(username="recap-user", password="password")
+            await sync_to_async(self.async_client.login)(
+                username="recap-user", password="password"
+            )
         )
         self.q: Dict[Any, Any] = dict()
 
@@ -725,9 +738,12 @@ class DRFSearchAppAndAudioAppApiFilterTest(TestCase, FilteringCountTestCase):
             user__password=make_password("password"),
         )
 
-    def setUp(self) -> None:
+    @async_to_sync
+    async def setUp(self) -> None:
         self.assertTrue(
-            self.client.login(username="recap-user", password="password")
+            await sync_to_async(self.async_client.login)(
+                username="recap-user", password="password"
+            )
         )
         self.q: Dict[Any, Any] = dict()
 
@@ -872,7 +888,7 @@ class DRFFieldSelectionTest(SimpleUserDataMixin, TestCase):
         "test_objects_search.json",
     ]
 
-    def test_only_some_fields_returned(self) -> None:
+    async def test_only_some_fields_returned(self) -> None:
         """Can we return only some of the fields?"""
 
         # First check the Judge endpoint, one of our more complicated ones.
@@ -880,9 +896,11 @@ class DRFFieldSelectionTest(SimpleUserDataMixin, TestCase):
         fields_to_return = ["educations", "date_modified", "slug"]
         q = {"fields": ",".join(fields_to_return)}
         self.assertTrue(
-            self.client.login(username="pandora", password="password")
+            await sync_to_async(self.async_client.login)(
+                username="pandora", password="password"
+            )
         )
-        r = self.client.get(path, q)
+        r = await self.async_client.get(path, q)
         self.assertEqual(
             len(r.data["results"][0].keys()), len(fields_to_return)
         )
@@ -890,7 +908,7 @@ class DRFFieldSelectionTest(SimpleUserDataMixin, TestCase):
         # One more check for good measure.
         path = reverse("opinioncluster-list", kwargs={"version": "v3"})
         fields_to_return = ["per_curiam", "slug"]
-        r = self.client.get(path, q)
+        r = await self.async_client.get(path, q)
         self.assertEqual(
             len(r.data["results"][0].keys()), len(fields_to_return)
         )
@@ -952,25 +970,29 @@ class DRFRecapPermissionTest(TestCase):
             ]
         ]
 
-    def test_has_access(self) -> None:
+    async def test_has_access(self) -> None:
         """Does the RECAP user have access to all of the RECAP endpoints?"""
         self.assertTrue(
-            self.client.login(username="recap-user", password="password")
+            await sync_to_async(self.async_client.login)(
+                username="recap-user", password="password"
+            )
         )
         for path in self.paths:
             print(f"Access allowed to recap user at: {path}... ", end="")
-            r = self.client.get(path)
+            r = await self.async_client.get(path)
             self.assertEqual(r.status_code, HTTP_200_OK)
             print("✓")
 
-    def test_lacks_access(self) -> None:
+    async def test_lacks_access(self) -> None:
         """Does a normal user lack access to the RECPAP endpoints?"""
         self.assertTrue(
-            self.client.login(username="pandora", password="password")
+            await sync_to_async(self.async_client.login)(
+                username="pandora", password="password"
+            )
         )
         for path in self.paths:
             print(f"Access denied to non-recap user at: {path}... ", end="")
-            r = self.client.get(path)
+            r = await self.async_client.get(path)
             self.assertEqual(r.status_code, HTTP_403_FORBIDDEN)
             print("✓")
 

@@ -81,7 +81,7 @@
       <div class="inline-block">
         <span class="meta-data-header">Nature of Suit:</span>
         <span class="meta-data-value">
-          <a href="?type=r&amp;nature_of_suit=&quot;{{ doc0.solr_highlights.suitNature.0|striptags }}&quot;">
+          <a href="?type=r&nature_of_suit=&quot;{{ doc0.solr_highlights.suitNature.0|striptags|urlencode }}&quot;">
               {{ doc0.solr_highlights.suitNature.0|safe }}
           </a>
         </span>
@@ -91,7 +91,7 @@
       <div class="inline-block">
         <span class="meta-data-header">Cause:</span>
         <span class="meta-data-value">
-          <a href="?type=r&amp;cause=&quot;{{ doc0.solr_highlights.cause.0|striptags }}&quot;">{{ doc0.solr_highlights.cause.0|safe }}
+          <a href="?type=r&cause=&quot;{{ doc0.solr_highlights.cause.0|striptags|urlencode }}&quot;">{{ doc0.solr_highlights.cause.0|safe }}
           </a>
         </span>
       </div>
@@ -100,7 +100,7 @@
       <div class="inline-block">
         <span class="meta-data-header">Jury Demand:</span>
         <span class="meta-data-value">
-          <a href="?type=r&amp;q=juryDemand:&quot;{{ doc0.solr_highlights.juryDemand.0|striptags }}&quot;">
+          <a href="?type=r&q=juryDemand:&quot;{{ doc0.solr_highlights.juryDemand.0|striptags|urlencode }}&quot;">
               {{ doc0.solr_highlights.juryDemand.0|safe }}
           </a>
         </span>
@@ -111,11 +111,11 @@
         <span class="meta-data-header">Assigned To:</span>
         <span class="meta-data-value">
           {% if doc0.assigned_to_id %}
-            <a href="?type=r&amp;q=assigned_to_id:{{ doc0.assigned_to_id }}">
+            <a href="?type=r&q=assigned_to_id%3A{{ doc0.assigned_to_id|urlencode }}">
                 {{ doc0.solr_highlights.assignedTo.0|safe }}
             </a>
           {% else %}
-            <a href="?type=r&amp;assigned_to=&quot;{{ doc0.solr_highlights.assignedTo.0|striptags }}&quot;">
+            <a href="?type=r&assigned_to=&quot;{{ doc0.solr_highlights.assignedTo.0|striptags|urlencode }}&quot;">
                 {{ doc0.solr_highlights.assignedTo.0|safe }}
             </a>
           {% endif %}
@@ -127,11 +127,11 @@
         <span class="meta-data-header">Referred To:</span>
         <span class="meta-data-value">
           {% if doc0.referred_to_id %}
-            <a href="?type=r&amp;q=referred_to_id:{{ doc0.referred_to_id }}">
+            <a href="?type=r&q=referred_to_id%3A{{ doc0.referred_to_id|urlencode }}">
                 {{ doc0.solr_highlights.referredTo.0|safe }}
             </a>
           {% else %}
-            <a href="?type=r&amp;referred_to=&quot;{{ doc0.solr_highlights.referredTo.0|striptags }}&quot;">
+            <a href="?type=r&referred_to=&quot;{{ doc0.solr_highlights.referredTo.0|striptags|urlencode }}&quot;">
                 {{ doc0.solr_highlights.referredTo.0|safe }}
             </a>
           {% endif %}
@@ -183,8 +183,9 @@
       {% with limit=results.object_list.params|get:"group.limit" %}
       {% with remaining=result.doclist.numFound|sub:limit %}
       {% if remaining > 0 %}
-      <a href="{% url "show_results" %}?type={{ type }}&amp;q={% if request.GET.q %}({{ request.GET.q }}) AND {% endif %}docket_id:{{ doc0.docket_id }}" class="btn-default btn">View {{ remaining }} Additional Result{{ remaining|pluralize }} for
-          this Case</a>
+      <a href="{% url "show_results" %}?type={{ type|urlencode }}&q={% if request.GET.q %}({{ request.GET.q|urlencode }})%20AND%20{% endif %}docket_id%3A{{ doc0.docket_id|urlencode }}" class="btn-default btn">
+        View {{ remaining }} Additional Result{{ remaining|pluralize }} for this Case
+      </a>
       {% endif %}
       {% endwith %}
       {% endwith %}
@@ -328,7 +329,7 @@
         <div class="inline-block">
           <span class="meta-data-header">Nature of Suit:</span>
           <span class="meta-data-value">
-            <a href="?q=suitNature:{{ result.solr_highlights.suitNature.0|striptags }}">
+            <a href="?q=suitNature%3A{{ result.solr_highlights.suitNature.0|striptags|urlencode }}">
                 {{ result.solr_highlights.suitNature.0|safe }}
             </a>
           </span>
@@ -347,7 +348,7 @@
     {% if result.citeCount > 0 %}
       <div class="bottom" class="inline-block">
         <span class="meta-data-value">
-          <a href="/?q=cites%3A({{ result.sibling_ids|join:" OR " }})"
+          <a href="/?q=cites%3A({{ result.sibling_ids|join:" OR "|urlencode }})"
              rel="nofollow"
           >Cited by {{ result.citeCount|intcomma }} opinion{{ result.citeCount|pluralize }}</a>
         </span>

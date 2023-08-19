@@ -208,12 +208,17 @@ def parse_extra_fields(soup, fields, long_field=False):
     data_set = {}
     for field in fields:
         elements = []
-        for elem in soup.find_all(field):
+        # We look for the matching tag name or matching data-type attribute
+        for elem in soup.find_all(
+            lambda tag: (tag.name == field and tag.get("data-type") is None)
+            or tag.get("data-type") == field
+        ):
             [x.extract() for x in elem.find_all("page-number")]
             if long_field:
                 elements.append(f"<p>{elem.text}</p>")
             else:
                 elements.append(elem.text)
+
         if long_field:
             data_set[field] = " ".join(elements)
         else:
@@ -456,10 +461,18 @@ def add_new_case(
     # Some documents contain images in the HTML
     # Flag them for a later crawl by using the placeholder '[[Image]]'
     judge_list = [
-        extract_judge_last_name(x.text) for x in soup.find_all("judges")
+        extract_judge_last_name(x.text)
+        for x in soup.find_all(
+            lambda tag: (tag.name == "judges" and tag.get("data-type") is None)
+            or tag.get("data-type") == "judges"
+        )
     ]
     author_list = [
-        extract_judge_last_name(x.text) for x in soup.find_all("author")
+        extract_judge_last_name(x.text)
+        for x in soup.find_all(
+            lambda tag: (tag.name == "author" and tag.get("data-type") is None)
+            or tag.get("data-type") == "author"
+        )
     ]
     # Flatten and dedupe list of judges
     judges = ", ".join(
@@ -616,7 +629,11 @@ def add_opinions(
     :return: Opinion IDs in a list
     """
     new_op_pks = []
-    for op in soup.find_all("opinion"):
+    # We look for opinion tags without data-type or tags with data-type == "opinion"
+    for op in soup.find_all(
+        lambda tag: (tag.name == "opinion" and tag.get("data-type") is None)
+        or tag.get("data-type") == "opinion"
+    ):
         # This code cleans author tags for processing.
         # It is particularly useful for identifying Per curiam
         for elem in [op.find("author")]:
@@ -704,9 +721,24 @@ def clean_body_content(case_body: str, harvard: bool = False) -> str:
         opinion_text = soup.text
     else:
         opinions = []
-        for op in soup.find_all("opinion"):
+        for op in soup.find_all(
+            lambda tag: (
+                tag.name == "opinion" and tag.get("data-type") is None
+            )
+            or tag.get("data-type") == "opinion"
+        ):
             opinions.append(op.text)
-        opinion_text = "".join([op.text for op in soup.find_all("opinion")])
+        opinion_text = "".join(
+            [
+                op.text
+                for op in soup.find_all(
+                    lambda tag: (
+                        tag.name == "opinion" and tag.get("data-type") is None
+                    )
+                    or tag.get("data-type") == "opinion"
+                )
+            ]
+        )
 
     return re.sub(r"[^a-zA-Z0-9 ]", "", opinion_text.lower())
 

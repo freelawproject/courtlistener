@@ -22,3 +22,7 @@ updates:
   directory: "/"
   schedule:
     interval: monthly
+  groups:
+    core:
+      patterns:
+        - 'actions/*' # The core actions offered by Github

@@ -29,7 +29,7 @@
           src="{% static "js/save-notes.js" %}"></script>
   <script defer type="text/javascript"
           src="{% static "js/jquery.jplayer.min.js" %}"></script>
-  <script type="text/javascript">
+  <script type="text/javascript" nonce="{{ request.csp_nonce }}">
     $(document).ready(function () {
       $("#jquery_jplayer_1").jPlayer({
         ready: function (event) {
@@ -72,13 +72,13 @@
         <div class="{% if not note_form.instance.audio_id %}hidden{% endif %} sidebar-section"
              id="sidebar-notes">
             <div>
-                <h3 class="inline"><span>Your Notes</span></h3>
-
-                <p class="inline" data-toggle="modal"
-                   data-target="#modal-save-note">
-                    (<a href="#note-editor">edit</a>)
-                    <i class="fa fa-pencil gray pointer"></i>
-                </p>
+                <h3>
+                    <span>Your Notes</span>
+                    <span class="edit" data-toggle="modal" data-target="#modal-save-note">
+                     (<a href="#note-editor">edit</a>)
+                     <i class="fa fa-pencil gray pointer"></i>
+                     </span>
+                </h3>
 
                 <p id="sidebar-notes-text">
                     {{ note_form.instance.notes|default:"(none)" }}
