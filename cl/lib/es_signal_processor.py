@@ -188,11 +188,17 @@ def update_es_documents(
                     changed_fields, fields_map
                 )
                 if fields_to_update:
+                    document_fields = document_fields_to_update(
+                        fields_to_update, instance, fields_map
+                    )
+                    # Update text field on other field updates.
+                    if getattr(main_doc, "text"):
+                        document_fields["text"] = getattr(
+                            main_doc, f"prepare_text"
+                        )(main_object)
                     Document.update(
                         main_doc,
-                        **document_fields_to_update(
-                            fields_to_update, instance, fields_map
-                        ),
+                        **document_fields,
                         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
                     )
 

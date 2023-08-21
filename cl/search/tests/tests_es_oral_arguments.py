@@ -1746,6 +1746,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             results = s.execute()
             self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. USA")
             self.assertEqual(results[0].docketNumber, "23-98765")
+            self.assertIn("23-98765", results[0].text)
             self.assertEqual(
                 results[0].dateArgued, datetime.datetime(2023, 5, 15, 0, 0)
             )
