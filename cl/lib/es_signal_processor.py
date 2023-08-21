@@ -192,7 +192,7 @@ def update_es_documents(
                         fields_to_update, instance, fields_map
                     )
                     # Update text field on other field updates.
-                    if getattr(main_doc, "text"):
+                    if hasattr(main_doc, "text"):
                         document_fields["text"] = getattr(
                             main_doc, f"prepare_text"
                         )(main_object)
