@@ -5,7 +5,6 @@ import pghistory
 from django.db import models
 from django.template import loader
 from django.urls import NoReverseMatch, reverse
-from model_utils import FieldTracker
 
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.date_time import midnight_pt

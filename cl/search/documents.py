@@ -7,6 +7,7 @@ from elasticsearch_dsl import Percolator
 
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
+from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.elasticsearch_utils import build_es_main_query
 from cl.lib.search_index_utils import null_map
 from cl.lib.utils import deepgetattr
@@ -109,12 +110,9 @@ class ParentheticalGroupDocument(Document):
 class AudioDocumentBase(Document):
     absolute_url = fields.KeywordField(attr="get_absolute_url", index=False)
     caseName = fields.TextField(
-        attr="case_name",
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(
-                attr="case_name", analyzer="english_exact"
-            ),
+            "exact": fields.TextField(analyzer="english_exact"),
         },
         search_analyzer="search_analyzer",
     )
@@ -184,6 +182,9 @@ class AudioDocument(AudioDocumentBase):
     class Django:
         model = Audio
         ignore_signals = True
+
+    def prepare_caseName(self, instance):
+        return best_case_name(instance)
 
     def prepare_panel_ids(self, instance):
         return [judge.pk for judge in instance.panel.all()]
