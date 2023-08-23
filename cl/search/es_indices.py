@@ -42,3 +42,12 @@ recap_index.settings(
     number_of_replicas=settings.ELASTICSEARCH_RECAP_NUMBER_OF_REPLICAS,
     analysis=settings.ELASTICSEARCH_DSL["analysis"],
 )
+
+
+# Define people elasticsearch index
+opinion_index = Index("opinion_index")
+opinion_index.settings(
+    number_of_shards=settings.ELASTICSEARCH_NUMBER_OF_SHARDS,
+    number_of_replicas=settings.ELASTICSEARCH_NUMBER_OF_REPLICAS,
+    analysis=settings.ELASTICSEARCH_DSL["analysis"],
+)
