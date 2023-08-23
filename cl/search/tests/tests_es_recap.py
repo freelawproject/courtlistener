@@ -47,6 +47,7 @@ class RECAPSearchTest(IndexedSolrTestCase):
                 case_name="SUBPOENAS SERVED ON",
                 case_name_full="Jackson & Sons Holdings vs. Bank",
                 date_filed=datetime.date(2015, 8, 16),
+                date_argued=datetime.date(2013, 5, 20),
                 docket_number="1:21-bk-1234",
                 assigned_to=cls.judge,
                 referred_to=cls.judge_2,
@@ -100,6 +101,7 @@ class RECAPSearchTest(IndexedSolrTestCase):
                 case_name="SUBPOENAS SERVED OFF",
                 case_name_full="The State of Franklin v. Solutions LLC",
                 date_filed=datetime.date(2016, 8, 16),
+                date_argued=datetime.date(2012, 6, 23),
                 assigned_to=cls.judge_3,
                 referred_to=cls.judge_4,
             ),
@@ -606,7 +608,7 @@ class RECAPSearchTest(IndexedSolrTestCase):
         await self._test_api_results_count(params, 2, "text query description")
 
         # Text query text.
-        params = {"type": SEARCH_TYPES.RECAP, "q": "PACER Document 2015"}
+        params = {"type": SEARCH_TYPES.RECAP, "q": "PACER Document Franklin"}
 
         # Frontend
         r = await self._test_article_count(params, 1, "text query text")
@@ -616,18 +618,6 @@ class RECAPSearchTest(IndexedSolrTestCase):
         )
         # API
         await self._test_api_results_count(params, 1, "text query text")
-
-        # Text query text.
-        params = {"type": SEARCH_TYPES.RECAP, "q": "PACER Document 2015"}
-
-        # Frontend
-        r = await self._test_article_count(params, 1, "text query text")
-        # Count child documents under docket.
-        self._count_child_documents(
-            0, r.content.decode(), 1, "text query text"
-        )
-        # API
-        await self._test_api_results_count(params, 1, "text query judge")
 
         # Text query text judge.
         params = {"type": SEARCH_TYPES.RECAP, "q": "Thalassa Miller"}
