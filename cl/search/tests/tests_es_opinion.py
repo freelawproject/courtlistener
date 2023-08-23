@@ -677,6 +677,16 @@ class OpinionsSearchTest(IndexedSolrTestCase):
                 msg=f"Key {key} not found in the result object.",
             )
 
+    async def test_results_highlights(self) -> None:
+        """Confirm highlights are shown properly"""
+
+        # Highlight case name.
+        params = {"q": "Supreme"}
+
+        r = await self._test_article_count(params, 1, "highlights case name")
+        self.assertIn("<mark>Supreme</mark>", r.content.decode())
+        self.assertEqual(r.content.decode().count("<mark>Supreme</mark>"), 1)
+
 
 @override_settings(
     # MLT results should not be cached
