@@ -35,13 +35,17 @@ class RECAPSearchTest(IndexedSolrTestCase):
     def setUpTestData(cls):
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
         cls.court_2 = CourtFactory(id="ca1", jurisdiction="F")
-        cls.judge = PersonFactory.create(name_first="Bill")
-        cls.judge_2 = PersonFactory.create(name_first="John")
-
+        cls.judge = PersonFactory.create(
+            name_first="Thalassa", name_last="Miller"
+        )
+        cls.judge_2 = PersonFactory.create(
+            name_first="Persephone", name_last="Sinclair"
+        )
         cls.de = DocketEntryWithParentsFactory(
             docket=DocketFactory(
                 court=cls.court,
                 case_name="SUBPOENAS SERVED ON",
+                case_name_full="Jackson & Sons Holdings vs. Bank",
                 date_filed=datetime.date(2015, 8, 16),
                 docket_number="1:21-bk-1234",
                 assigned_to=cls.judge,
@@ -83,15 +87,24 @@ class RECAPSearchTest(IndexedSolrTestCase):
             page_count=7,
         )
 
+        cls.judge_3 = PersonFactory.create(
+            name_first="Seraphina", name_last="Hawthorne"
+        )
+        cls.judge_4 = PersonFactory.create(
+            name_first="Leopold", name_last="Featherstone"
+        )
         cls.de_1 = DocketEntryWithParentsFactory(
             docket=DocketFactory(
                 docket_number="12-1235",
                 court=cls.court_2,
                 case_name="SUBPOENAS SERVED OFF",
+                case_name_full="The State of Franklin v. Solutions LLC",
                 date_filed=datetime.date(2016, 8, 16),
+                assigned_to=cls.judge_3,
+                referred_to=cls.judge_4,
             ),
             date_filed=datetime.date(2014, 7, 19),
-            description="MOTION for Leave to File Amicus Curiae september",
+            description="MOTION for Leave to File Amicus Discharging Debtor",
         )
         cls.rd_2 = RECAPDocumentFactory(
             docket_entry=cls.de_1,
@@ -188,7 +201,7 @@ class RECAPSearchTest(IndexedSolrTestCase):
 
         params[
             "description"
-        ] = '"leave to file" AND "amicus" "Curiae september"'
+        ] = '"leave to file" AND "amicus" "Discharging Debtor"'
         r = await self.async_client.get(
             reverse("show_results"),
             params,
@@ -267,7 +280,7 @@ class RECAPSearchTest(IndexedSolrTestCase):
 
     async def test_assigned_to_judge_filter(self) -> None:
         """Confirm assigned_to filter works properly"""
-        params = {"type": SEARCH_TYPES.RECAP, "assigned_to": "Bill"}
+        params = {"type": SEARCH_TYPES.RECAP, "assigned_to": "Thalassa Miller"}
 
         # Frontend, 1 result expected since RECAPDocuments are grouped by case
         await self._test_article_count(params, 1, "assigned_to")
@@ -276,7 +289,10 @@ class RECAPSearchTest(IndexedSolrTestCase):
 
     async def test_referred_to_judge_filter(self) -> None:
         """Confirm referred_to_judge filter works properly"""
-        params = {"type": SEARCH_TYPES.RECAP, "referred_to": "John"}
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "referred_to": "Persephone Sinclair",
+        }
 
         # Frontend, 1 result expected since RECAPDocuments are grouped by case
         await self._test_article_count(params, 1, "referred_to")
@@ -614,7 +630,7 @@ class RECAPSearchTest(IndexedSolrTestCase):
         await self._test_api_results_count(params, 1, "text query judge")
 
         # Text query text judge.
-        params = {"type": SEARCH_TYPES.RECAP, "q": "Bill"}
+        params = {"type": SEARCH_TYPES.RECAP, "q": "Thalassa Miller"}
 
         # Frontend
         r = await self._test_article_count(params, 1, "text query judge")
@@ -643,7 +659,7 @@ class RECAPSearchTest(IndexedSolrTestCase):
         self.assertEqual(r.content.decode().count("<mark>OFF</mark>"), 1)
 
         # Highlight assigned_to.
-        params = {"type": SEARCH_TYPES.RECAP, "q": "Bill"}
+        params = {"type": SEARCH_TYPES.RECAP, "q": "Thalassa Miller"}
 
         r = await self._test_article_count(params, 1, "highlights assigned_to")
         # Count child documents under docket.
@@ -651,11 +667,11 @@ class RECAPSearchTest(IndexedSolrTestCase):
             0, r.content.decode(), 2, "highlights case name"
         )
 
-        self.assertIn("<mark>Bill</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>Bill</mark>"), 3)
+        self.assertIn("<mark>Thalassa</mark>", r.content.decode())
+        self.assertEqual(r.content.decode().count("<mark>Thalassa</mark>"), 3)
 
         # Highlight referred_to.
-        params = {"type": SEARCH_TYPES.RECAP, "q": "John"}
+        params = {"type": SEARCH_TYPES.RECAP, "q": "Persephone Sinclair"}
 
         r = await self._test_article_count(params, 1, "highlights referred_to")
         # Count child documents under docket.
@@ -663,8 +679,10 @@ class RECAPSearchTest(IndexedSolrTestCase):
             0, r.content.decode(), 2, "highlights case name"
         )
 
-        self.assertIn("<mark>John</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>John</mark>"), 3)
+        self.assertIn("<mark>Persephone</mark>", r.content.decode())
+        self.assertEqual(
+            r.content.decode().count("<mark>Persephone</mark>"), 3
+        )
 
         # Highlight docketNumber.
         params = {"type": SEARCH_TYPES.RECAP, "q": "1:21-bk-1234"}
@@ -683,7 +701,7 @@ class RECAPSearchTest(IndexedSolrTestCase):
         )
 
         # Highlight description.
-        params = {"type": SEARCH_TYPES.RECAP, "q": "Curiae september"}
+        params = {"type": SEARCH_TYPES.RECAP, "q": "Discharging Debtor"}
 
         r = await self._test_article_count(params, 1, "highlights description")
         # Count child documents under docket.
@@ -691,8 +709,10 @@ class RECAPSearchTest(IndexedSolrTestCase):
             0, r.content.decode(), 1, "highlights description"
         )
 
-        self.assertIn("<mark>september</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>september</mark>"), 1)
+        self.assertIn("<mark>Discharging</mark>", r.content.decode())
+        self.assertEqual(
+            r.content.decode().count("<mark>Discharging</mark>"), 1
+        )
 
         # Highlight suitNature and text.
         params = {"type": SEARCH_TYPES.RECAP, "q": "Lorem 440"}
@@ -711,7 +731,7 @@ class RECAPSearchTest(IndexedSolrTestCase):
         """Confirm fields in RECAP Search API results."""
         search_params = {
             "type": SEARCH_TYPES.RECAP,
-            "q": "Curiae september",
+            "q": "Discharging Debtor",
         }
         # API
         r = await self._test_api_results_count(search_params, 1, "API fields")
