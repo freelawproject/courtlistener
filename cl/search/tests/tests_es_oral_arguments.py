@@ -157,8 +157,8 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         self.assertEqual(actual, expected)
         self.assertTrue(
             r.content.decode().index("Jose")
-            < r.content.decode().index("Hong Liu"),
-            msg="'Jose' should come BEFORE 'Hong Liu' when order_by relevance.",
+            > r.content.decode().index("Hong Liu"),
+            msg="'Jose' should come AFTER 'Hong Liu' when order_by relevance.",
         )
         # API
         r = self.client.get(
@@ -170,8 +170,8 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         self.assertEqual(actual, expected)
         self.assertTrue(
             r.content.decode().index("Jose")
-            < r.content.decode().index("Hong Liu"),
-            msg="'Jose' should come BEFORE 'Hong Liu' when order_by relevance.",
+            > r.content.decode().index("Hong Liu"),
+            msg="'Jose' should come AFTER 'Hong Liu' when order_by relevance.",
         )
 
     def test_oa_results_search_match_phrase(self) -> None:
@@ -362,7 +362,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         expected = 1
         self.assertEqual(actual, expected)
         self.assertIn("<mark>John</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>John</mark>"), 2)
+        self.assertEqual(r.content.decode().count("<mark>John</mark>"), 1)
 
         # Court citation string highlights
         r = self.client.get(
@@ -377,7 +377,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         expected = 1
         self.assertEqual(actual, expected)
         self.assertIn("<mark>Bankr.</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>Bankr.</mark>"), 2)
+        self.assertEqual(r.content.decode().count("<mark>Bankr.</mark>"), 1)
 
     def test_oa_case_name_filtering(self) -> None:
         """Filter by case_name"""
@@ -1007,9 +1007,9 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         self.assertEqual(actual, expected)
         self.assertTrue(
             r.content.decode().index("Jose")
-            < r.content.decode().index("Hong Liu Lorem")
+            > r.content.decode().index("Hong Liu Lorem")
             < r.content.decode().index("Hong Liu Yang"),
-            msg="'Jose' should come BEFORE 'Hong Liu Lorem' and 'Hong Liu Yang' when order_by relevance.",
+            msg="'Jose' should come AFTER 'Hong Liu Lorem' and 'Hong Liu Yang' when order_by relevance.",
         )
         # API
         r = self.client.get(
@@ -1019,9 +1019,9 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         self.assertEqual(actual, expected)
         self.assertTrue(
             r.content.decode().index("Jose")
-            < r.content.decode().index("Hong Liu Lorem")
+            > r.content.decode().index("Hong Liu Lorem")
             < r.content.decode().index("Hong Liu Yang"),
-            msg="'Jose' should come BEFORE 'Hong Liu Lorem' and 'Hong Liu Yang' when order_by relevance.",
+            msg="'Jose' should come AFTER 'Hong Liu Lorem' and 'Hong Liu Yang' when order_by relevance.",
         )
 
         # Relevance order, hyphenated compound word.
@@ -1094,10 +1094,11 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             "snippet",
             "source",
             "sha1",
+            "transcript",
             "timestamp",
         ]
         keys_count = len(r.data["results"][0])
-        self.assertEqual(keys_count, 23)
+        self.assertEqual(keys_count, 24)
         for key in keys_to_check:
             self.assertTrue(
                 key in r.data["results"][0],
@@ -1433,7 +1434,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         self.assertIn("Wallace", r.content.decode())
         # Is the emoji highlighted?
         self.assertIn("<mark>⚖️</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>⚖️</mark>"), 2)
+        self.assertEqual(r.content.decode().count("<mark>⚖️</mark>"), 1)
 
         # API
         r = self.client.get(
@@ -1655,11 +1656,11 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         self.assertIn("SEC v. Frank J.", r.content.decode())
         self.assertIn("Hong Liu Yang", r.content.decode())
         self.assertEqual(
-            r.content.decode().count("<mark>Information</mark>"), 4
+            r.content.decode().count("<mark>Information</mark>"), 3
         )
-        self.assertEqual(r.content.decode().count("<mark>Deposit</mark>"), 2)
+        self.assertEqual(r.content.decode().count("<mark>Deposit</mark>"), 1)
         self.assertEqual(
-            r.content.decode().count("<mark>Deposition</mark>"), 2
+            r.content.decode().count("<mark>Deposition</mark>"), 1
         )
 
         # Exact search '"Information" "deposit"', results for:
@@ -1689,7 +1690,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         self.assertIn("Freedom of", r.content.decode())
         self.assertIn("<mark>Inform</mark>", r.content.decode())
         self.assertEqual(r.content.decode().count("<mark>Inform</mark>"), 2)
-        self.assertEqual(r.content.decode().count("<mark>Deposit</mark>"), 2)
+        self.assertEqual(r.content.decode().count("<mark>Deposit</mark>"), 1)
 
         # API
         # Does quote_field_suffix works on API too?
@@ -1746,7 +1747,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             results = s.execute()
             self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. USA")
             self.assertEqual(results[0].docketNumber, "23-98765")
-            self.assertIn("23-98765", results[0].text)
+            self.assertIn("15 May 2023", results[0].text)
             self.assertEqual(
                 results[0].dateArgued, datetime.datetime(2023, 5, 15, 0, 0)
             )
@@ -1953,3 +1954,30 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         self.delete_documents_from_index(
             AudioPercolator._index._name, created_queries_ids
         )
+
+    def test_handle_unbalanced_parenthesis(self) -> None:
+        """Test can we avoid unbalanced parenthesis break queries?"""
+
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": "(Loretta OR (SEC) AND Jose",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": "(Loretta AND Jose",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)

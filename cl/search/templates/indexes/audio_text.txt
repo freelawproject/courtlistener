@@ -12,18 +12,10 @@
 {{ item.docket.date_argued|date:"j F Y" }}
 {{ item.docket.date_reargued|date:"j F Y" }}
 {{ item.docket.date_reargument_denied|date:"j F Y" }}
-{{ item.docket.docket_number }}
 
-{# Transcript #}
-{% if item.stt_status == 1 %}
-    {{ item.transcript }}
-{% endif %}
 
 {# Court #}
-{{ item.docket.court.full_name }}
-{{ item.docket.court.citation_string }}
 {{ item.docket.court.pk }}
 
 {# Remainder of Audio File #}
 {{ item.sha1 }}
-{{ item.judges }}

@@ -127,6 +127,76 @@ def add_fields_boosting(cd: CleanData) -> list[str]:
     return make_es_boost_list(qf)
 
 
+def sanitize_unbalanced_parenthesis(query: str) -> str:
+    """Sanitize a query by removing unbalanced opening or closing parentheses.
+
+    :param query: The input query string
+    :return: The sanitized query string, after removing unbalanced parentheses.
+    """
+    opening_count = query.count("(")
+    closing_count = query.count(")")
+
+    if opening_count == closing_count:
+        return query
+    while opening_count > closing_count:
+        # Find last unclosed opening parenthesis position
+        last_parenthesis_opened_pos = query.rfind("(")
+        # Remove the parenthesis from the query.
+        query = (
+            query[:last_parenthesis_opened_pos]
+            + query[last_parenthesis_opened_pos + 1 :]
+        )
+        opening_count -= 1
+
+    while closing_count > opening_count:
+        # Find last unclosed closing parenthesis position
+        last_parenthesis_closed_pos = query.rfind(")")
+        # Remove the parenthesis from the query.
+        query = (
+            query[:last_parenthesis_closed_pos]
+            + query[last_parenthesis_closed_pos + 1 :]
+        )
+        closing_count -= 1
+
+    return query
+
+
+def append_query_conjunctions(query: str) -> str:
+    """Append default AND conjunctions to the query string.
+    :param query: The input query string
+    :return: The query string with AND conjunctions appended
+    """
+    words = query.split()
+    clean_q = []
+    needs_and_conjunction = True
+    inside_group = 0
+    for word in words:
+        if "[" in word or "(" in word:
+            # Avoid adding AND if the word is part of a group or range query.
+            # Group or range query opened.
+            inside_group += 1
+            clean_q.append(word)
+            needs_and_conjunction = False
+        elif "]" in word or ")" in word:
+            # Avoid adding AND if the word is part of a group or range query.
+            # Group or range query closed.
+            inside_group -= 1
+            clean_q.append(word)
+            if inside_group == 0:
+                needs_and_conjunction = True
+        elif word in ["AND", "OR", "NOT"]:
+            # Avoid adding additional than the original in the original query.
+            clean_q.append(word.upper())
+            needs_and_conjunction = False
+        else:
+            # Add AND conjunction if required.
+            if needs_and_conjunction and clean_q:
+                clean_q.append("AND")
+            clean_q.append(word)
+            needs_and_conjunction = True
+    return " ".join(clean_q)
+
+
 def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
     """Given the cleaned data from a form, return a Elastic Search string query or []
     https://www.elastic.co/guide/en/elasticsearch/reference/current/full-text-queries.html
@@ -137,7 +207,7 @@ def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
     """
 
     if value:
-        value = cleanup_main_query(value)
+        value = sanitize_unbalanced_parenthesis(value)
         # In Elasticsearch, the colon (:) character is used to separate the
         # field name and the field value in a query.
         # To avoid parsing errors escape any colon characters in the value
@@ -150,11 +220,14 @@ def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
                     f"docketNumber:{match}", f"docketNumber:{replacement}"
                 )
 
+        value = cleanup_main_query(value)
+        value_conjunctions = append_query_conjunctions(value)
+
         q_should = [
             Q(
                 "query_string",
                 fields=fields,
-                query=value,
+                query=value_conjunctions,
                 quote_field_suffix=".exact",
                 default_operator="AND",
                 tie_breaker=0.3,

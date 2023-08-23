@@ -124,7 +124,7 @@ class AudioDocumentBase(Document):
         },
         search_analyzer="search_analyzer",
     )
-    court_exact = fields.KeywordField(attr="docket.court.pk")
+    court_exact = fields.KeywordField(attr="docket.court.pk", index=False)
     court_id = fields.KeywordField(attr="docket.court.pk")
     court_citation_string = fields.TextField(
         attr="docket.court.citation_string",
@@ -174,6 +174,13 @@ class AudioDocumentBase(Document):
         },
         search_analyzer="search_analyzer",
     )
+    transcript = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
     timestamp = fields.DateField()
 
 
@@ -200,6 +207,10 @@ class AudioDocument(AudioDocumentBase):
     def prepare_text(self, instance):
         text_template = loader.get_template("indexes/audio_text.txt")
         return text_template.render({"item": instance}).translate(null_map)
+
+    def prepare_transcript(self, instance):
+        if instance.stt_status == Audio.STT_COMPLETE:
+            return instance.transcript
 
     def prepare_timestamp(self, instance):
         return datetime.utcnow()
