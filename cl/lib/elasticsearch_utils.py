@@ -220,14 +220,20 @@ def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
                     f"docketNumber:{match}", f"docketNumber:{replacement}"
                 )
 
-        value = cleanup_main_query(value)
-        value_conjunctions = append_query_conjunctions(value)
+        # Used for the phrase query_string, no conjunctions appended.
+        query_value = cleanup_main_query(value)
+
+        # To enable the search of each term in the query across multiple fields
+        # it's necessary to include an "AND" conjunction between each term.
+        # https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html#query-string-multi-field
+        # Used for the best_fields query_string.
+        query_value_with_conjunctions = append_query_conjunctions(value)
 
         q_should = [
             Q(
                 "query_string",
                 fields=fields,
-                query=value_conjunctions,
+                query=query_value_with_conjunctions,
                 quote_field_suffix=".exact",
                 default_operator="AND",
                 tie_breaker=0.3,
@@ -235,7 +241,7 @@ def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
             Q(
                 "query_string",
                 fields=fields,
-                query=value,
+                query=query_value,
                 quote_field_suffix=".exact",
                 default_operator="AND",
                 type="phrase",
