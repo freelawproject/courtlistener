@@ -227,7 +227,7 @@ def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
         # it's necessary to include an "AND" conjunction between each term.
         # https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html#query-string-multi-field
         # Used for the best_fields query_string.
-        query_value_with_conjunctions = append_query_conjunctions(value)
+        query_value_with_conjunctions = append_query_conjunctions(query_value)
 
         q_should = [
             Q(

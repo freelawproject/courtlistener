@@ -66,7 +66,7 @@ class PodcastTest(IndexedSolrTestCase):
         response = self.client.get(
             reverse("search_podcast", args=["search"]),
             {
-                "q": f"court:{self.audio.docket.court}",
+                "q": f"court_id:{self.audio.docket.court.pk}",
                 "type": SEARCH_TYPES.ORAL_ARGUMENT,
             },
         )
