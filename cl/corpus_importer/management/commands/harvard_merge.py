@@ -2,6 +2,7 @@ import itertools
 import json
 import logging
 from datetime import date
+from difflib import SequenceMatcher
 from typing import Any, Dict, Optional, Tuple
 
 import requests
@@ -312,7 +313,29 @@ def merge_judges(
     ) and harvard_clean != cl_clean:
         return {"judges": judges}
     elif not temp_harvard_clean.intersection(temp_cl_clean):
-        raise JudgeException("Judges are completely different.")
+        # Last resort, use distance between words to solve typos
+        cl_clean_list = list(cl_clean)
+        harvard_clean_list = list(harvard_clean)
+        judge_pairs = list(
+            itertools.product(cl_clean_list, harvard_clean_list)
+        )
+        success = False
+        for pair in judge_pairs:
+            s = SequenceMatcher(None, pair[0].lower(), pair[1].lower())
+            if s.ratio() >= 0.7:
+                # We found a match, we assume that the data in CL is better, we keep
+                # the one from CL and remove the one from harvard
+                harvard_clean_list.remove(pair[1])
+                success = True
+        if success:
+            # At least one success that matches the names, we can create a new judges
+            # list
+            new_judges_list = sorted(
+                list(set(cl_clean_list + harvard_clean_list))
+            )
+            return {"judges": titlecase(", ".join(new_judges_list))}
+        else:
+            raise JudgeException("Judges are completely different.")
 
     return {}
 
