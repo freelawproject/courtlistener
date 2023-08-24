@@ -207,12 +207,12 @@ def update_es_documents(
                     Document.update(
                         main_doc,
                         **document_fields_to_update(
-                        main_doc,
-                        main_object,
-                        fields_to_update,
-                        instance,
-                        fields_map,
-                    ),
+                            main_doc,
+                            main_object,
+                            fields_to_update,
+                            instance,
+                            fields_map,
+                        ),
                         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
                     )
 
