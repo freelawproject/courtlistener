@@ -116,16 +116,33 @@ class AudioDocumentBase(Document):
         },
         search_analyzer="search_analyzer",
     )
+    case_name_full = fields.TextField(
+        attr="case_name_full",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="case_name_full", analyzer="english_exact"
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
     court = fields.TextField(
         attr="docket.court.full_name",
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(attr="judges", analyzer="english_exact"),
+            "exact": fields.TextField(
+                attr="docket.court.full_name", analyzer="english_exact"
+            ),
         },
         search_analyzer="search_analyzer",
     )
     court_exact = fields.KeywordField(attr="docket.court.pk", index=False)
     court_id = fields.KeywordField(attr="docket.court.pk")
+    court_id_text = fields.TextField(
+        attr="docket.court.pk",
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
+    )
     court_citation_string = fields.TextField(
         attr="docket.court.citation_string",
         analyzer="text_en_splitting_cl",
@@ -136,6 +153,27 @@ class AudioDocumentBase(Document):
     dateReargued = fields.DateField(attr="docket.date_reargued")
     dateReargumentDenied = fields.DateField(
         attr="docket.date_reargument_denied"
+    )
+    dateArgued_text = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    dateReargued_text = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    dateReargumentDenied_text = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
     )
     docketNumber = fields.TextField(
         attr="docket.docket_number",
@@ -165,16 +203,9 @@ class AudioDocumentBase(Document):
     panel_ids = fields.ListField(
         fields.IntegerField(),
     )
-    sha1 = fields.KeywordField(attr="sha1", index=False)
+    sha1 = fields.TextField(attr="sha1")
     source = fields.KeywordField(attr="source", index=False)
     text = fields.TextField(
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(analyzer="english_exact"),
-        },
-        search_analyzer="search_analyzer",
-    )
-    transcript = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(analyzer="english_exact"),
@@ -205,12 +236,20 @@ class AudioDocument(AudioDocumentBase):
             return deepgetattr(instance, "local_path_mp3.name", None)
 
     def prepare_text(self, instance):
-        text_template = loader.get_template("indexes/audio_text.txt")
-        return text_template.render({"item": instance}).translate(null_map)
-
-    def prepare_transcript(self, instance):
         if instance.stt_status == Audio.STT_COMPLETE:
             return instance.transcript
+
+    def prepare_dateArgued_text(self, instance):
+        if instance.docket.date_argued:
+            return instance.docket.date_argued.strftime("%-d %B %Y")
+
+    def prepare_dateReargued_text(self, instance):
+        if instance.docket.date_reargued:
+            return instance.docket.date_reargued.strftime("%-d %B %Y")
+
+    def prepare_dateReargumentDenied_text(self, instance):
+        if instance.docket.date_reargument_denied:
+            return instance.docket.date_reargument_denied.strftime("%-d %B %Y")
 
     def prepare_timestamp(self, instance):
         return datetime.utcnow()

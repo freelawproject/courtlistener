@@ -16,7 +16,7 @@ Edit / Delete this Alert: https://www.courtlistener.com/alert/edit/{{ alert.pk }
 Disable this Alert (one click): https://www.courtlistener.com{% url "disable_alert" alert.secret_key %}{% endif %}
 
 {{forloop.counter}}. {{ result.caseName|safe|striptags }} ({% if result.court_id != 'scotus' %}{{ result.court_citation_string|striptags }} {% endif %}{% if type == 'o' %}{{ result.dateFiled|date:"Y" }}{% elif type == 'oa' %}{{ result.dateArgued|date:"Y" }}{% endif %})
-{% if type == 'o' or type == 'oa' %}...{{ result.text|safe|striptags|underscore_to_space|compress_whitespace }}...
+{% if type == 'o' or type == 'oa' %}{% if result.text %}...{{ result.text|safe|striptags|underscore_to_space|compress_whitespace }}...{% endif %}
 {% endif %}~~~~~
  - View this item on our site: https://www.courtlistener.com{{result.absolute_url}}
 {% if result.download_url %} - Download original from the court: {{result.download_url}}

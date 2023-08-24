@@ -432,7 +432,16 @@ def build_es_main_query(
                 ["representative_text"], cd.get("q", "")
             )
         case SEARCH_TYPES.ORAL_ARGUMENT:
-            fields = ["court", "court_citation_string", "judge", "transcript"]
+            fields = [
+                "court",
+                "court_citation_string",
+                "judge",
+                "dateArgued_text",
+                "dateReargued_text",
+                "dateReargumentDenied_text",
+                "court_id_text",
+                "sha1",
+            ]
             fields.extend(add_fields_boosting(cd))
             string_query = build_fulltext_query(
                 fields,
@@ -482,8 +491,6 @@ def add_es_highlighting(
         if alerts:
             highlighting_fields = SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS
             hl_tag = ALERTS_HL_TAG
-        fields_to_exclude = ["sha1"]
-        search_query = search_query.source(excludes=fields_to_exclude)
         for field in highlighting_fields:
             search_query = search_query.highlight(
                 field,

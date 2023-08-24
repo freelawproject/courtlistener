@@ -141,14 +141,14 @@ class ESIndexTestCase(SimpleTestCase):
     def setUpClass(cls):
         _index_suffixe = cls.__name__.lower()
         for index in registry.get_indices():
-            index._name += f"-{_index_suffixe}"
+            # index._name += f"-{_index_suffixe}"
             index.create(ignore=400)
         super().setUpClass()
 
     @classmethod
     def tearDownClass(cls):
         for index in registry.get_indices():
-            index.delete(ignore=[404, 400])
+            # index.delete(ignore=[404, 400])
             index._name = index._name.split("-")[0]
         super().tearDownClass()
 

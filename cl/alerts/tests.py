@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta
 from unittest import mock
 
@@ -1615,11 +1616,28 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             mock_date = now().replace(day=1, hour=5)
             with time_machine.travel(mock_date, tick=False):
                 # When the Audio object is created it should trigger an alert.
+                transcript_response = {
+                    "response": {
+                        "results": [
+                            {
+                                "alternatives": [
+                                    {
+                                        "transcript": "RT Test OA transcript.",
+                                        "confidence": 0.85,
+                                    },
+                                ]
+                            },
+                        ]
+                    }
+                }
+                json_transcript = json.dumps(transcript_response)
                 rt_oral_argument = AudioWithParentsFactory.create(
                     case_name="RT Test OA",
                     docket__court=self.court_1,
                     docket__date_argued=now() - timedelta(hours=5),
                     docket__docket_number="19-5735",
+                    stt_status=Audio.STT_COMPLETE,
+                    stt_google_response=json_transcript,
                 )
 
         # Confirm Alert date_last_hit is updated.

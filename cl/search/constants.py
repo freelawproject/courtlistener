@@ -39,8 +39,8 @@ SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS = [
     "docketNumber",
     "docketNumber.exact",
     "court_citation_string",
-    "transcript",
-    "transcript.exact",
+    "text",
+    "text.exact",
 ]
 SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS = [
     "text",

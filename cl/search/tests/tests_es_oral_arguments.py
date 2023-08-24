@@ -36,7 +36,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        Audio.objects.all().delete()
+        # Audio.objects.all().delete()
         super().tearDownClass()
 
     @staticmethod
@@ -1094,11 +1094,10 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             "snippet",
             "source",
             "sha1",
-            "transcript",
             "timestamp",
         ]
         keys_count = len(r.data["results"][0])
-        self.assertEqual(keys_count, 24)
+        self.assertEqual(keys_count, 23)
         for key in keys_to_check:
             self.assertTrue(
                 key in r.data["results"][0],
@@ -1738,6 +1737,8 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             # Update docket number and dateArgued
             docket_5.docket_number = "23-98765"
             docket_5.date_argued = datetime.date(2023, 5, 15)
+            docket_5.date_reargued = datetime.date(2022, 5, 15)
+            docket_5.date_reargument_denied = datetime.date(2021, 5, 15)
             docket_5.save()
             # Confirm docket number and dateArgued are updated in the index.
             s, total_query_results, top_hits_limit = build_es_main_query(
@@ -1747,7 +1748,9 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             results = s.execute()
             self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. USA")
             self.assertEqual(results[0].docketNumber, "23-98765")
-            self.assertIn("15 May 2023", results[0].text)
+            self.assertIn("15 May 2023", results[0].dateArgued_text)
+            self.assertIn("15 May 2022", results[0].dateReargued_text)
+            self.assertIn("15 May 2021", results[0].dateReargumentDenied_text)
             self.assertEqual(
                 results[0].dateArgued, datetime.datetime(2023, 5, 15, 0, 0)
             )
