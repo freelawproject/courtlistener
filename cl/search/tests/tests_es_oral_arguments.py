@@ -36,7 +36,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        # Audio.objects.all().delete()
+        Audio.objects.all().delete()
         super().tearDownClass()
 
     @staticmethod
