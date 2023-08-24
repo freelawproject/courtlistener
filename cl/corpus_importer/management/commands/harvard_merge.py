@@ -299,14 +299,19 @@ def merge_judges(
     # Get last names keeping case and cleaning the string (We could have
     # the judge names in capital letters)
     cl_clean = set(find_all_judges(cl_data))
+    # Lowercase courtlistener judge names for set operations
+    temp_cl_clean = set([c.lower() for c in cl_clean])
     # Get last names in lowercase and cleaned
     harvard_clean = set(find_all_judges(harvard_data))
+    # Lowercase harvard judge names for set operations
+    temp_harvard_clean = set([h.lower() for h in harvard_clean])
+    # Prepare judges string
     judges = titlecase(", ".join(find_all_judges(harvard_data)))
     if (
-        harvard_clean.issuperset(cl_clean) or cl_data_upper
+        temp_harvard_clean.issuperset(temp_cl_clean) or cl_data_upper
     ) and harvard_clean != cl_clean:
         return {"judges": judges}
-    elif not harvard_clean.intersection(set(find_all_judges(cl_data))):
+    elif not temp_harvard_clean.intersection(temp_cl_clean):
         raise JudgeException("Judges are completely different.")
 
     return {}
@@ -544,6 +549,7 @@ def update_docket_source(cluster: OpinionCluster) -> None:
         Docket.HARVARD,
         Docket.HARVARD_AND_RECAP,
         Docket.SCRAPER_AND_HARVARD,
+        Docket.RECAP_AND_SCRAPER_AND_HARVARD,
         Docket.HARVARD_AND_COLUMBIA,
         Docket.DIRECT_INPUT_AND_HARVARD,
         Docket.ANON_2020_AND_HARVARD,
@@ -690,6 +696,10 @@ def merge_opinion_clusters(
     except ClusterSourceException:
         logger.warning(
             msg=f"Cluster source exception for cluster id: {cluster_id}"
+        )
+    except OpinionTypeException:
+        logger.warning(
+            msg=f"Opinion type not found in xml file for cluster id: {cluster_id}"
         )
 
 
