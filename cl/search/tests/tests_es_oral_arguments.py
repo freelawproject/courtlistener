@@ -333,7 +333,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         expected = 1
         self.assertEqual(actual, expected)
         self.assertIn("<mark>Hong</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>Hong</mark>"), 2)
+        self.assertEqual(r.content.decode().count("<mark>Hong</mark>"), 1)
 
         # Docket number highlights
         r = self.client.get(
@@ -688,7 +688,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
-        self.assertIn("Jose", r.content.decode())
+        self.assertIn("<mark>Jose</mark>", r.content.decode())
         # API
         r = self.client.get(
             reverse("search-list", kwargs={"version": "v3"}),
@@ -1219,7 +1219,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
-        self.assertIn("Freedom", r.content.decode())
+        self.assertIn("<mark>Freedom</mark>", r.content.decode())
         # API
         r = self.client.get(
             reverse("search-list", kwargs={"version": "v3"}), search_params
@@ -1374,7 +1374,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
-        self.assertIn("Freedom", r.content.decode())
+        self.assertIn("<mark>Freedom</mark>", r.content.decode())
         # API
         r = self.client.get(
             reverse("search-list", kwargs={"version": "v3"}), search_params
@@ -1656,7 +1656,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         self.assertIn("SEC v. Frank J.", r.content.decode())
         self.assertIn("Hong Liu Yang", r.content.decode())
         self.assertEqual(
-            r.content.decode().count("<mark>Information</mark>"), 3
+            r.content.decode().count("<mark>Information</mark>"), 2
         )
         self.assertEqual(r.content.decode().count("<mark>Deposit</mark>"), 1)
         self.assertEqual(
@@ -1689,7 +1689,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         self.assertEqual(actual, expected)
         self.assertIn("Freedom of", r.content.decode())
         self.assertIn("<mark>Inform</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>Inform</mark>"), 2)
+        self.assertEqual(r.content.decode().count("<mark>Inform</mark>"), 1)
         self.assertEqual(r.content.decode().count("<mark>Deposit</mark>"), 1)
 
         # API
@@ -1818,7 +1818,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         expected = 1
         self.assertEqual(actual, expected)
         self.assertIn("<mark>Learning</mark>", r.content.decode())
-        self.assertIn("rd", r.content.decode())
+        self.assertIn("<mark>rd</mark>", r.content.decode())
 
         # A phrase search for '"learn road"' should execute an exact and phrase
         # search simultaneously. It shouldn't return any results,
@@ -1981,3 +1981,20 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
+
+    def test_search_transcript(self) -> None:
+        """Test search transcript."""
+
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": "This is the best transcript",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(actual, expected)
+        # Transcript highlights
+        self.assertIn("<mark>transcript</mark>", r.content.decode())

@@ -381,7 +381,9 @@
     {% if type == SEARCH_TYPES.ORAL_ARGUMENT or type_override == SEARCH_TYPES.ORAL_ARGUMENT %}
       <p>
         {% if request.GET.q %}&hellip;{% endif %}
-          {{ result.text|safe|underscore_to_space }}&hellip;
+          {% if result.transcript %}
+            {{ result.transcript|safe|underscore_to_space }}&hellip;
+          {% endif %}
       </p>
     {% endif %}
   {% endif %}

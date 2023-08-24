@@ -185,7 +185,7 @@ def append_query_conjunctions(query: str) -> str:
             if inside_group == 0:
                 needs_and_conjunction = True
         elif word in ["AND", "OR", "NOT"]:
-            # Avoid adding additional than the original in the original query.
+            # Avoid adding additional conjunctions than the query originals.
             clean_q.append(word.upper())
             needs_and_conjunction = False
         else:
@@ -426,11 +426,7 @@ def build_es_main_query(
                 ["representative_text"], cd.get("q", "")
             )
         case SEARCH_TYPES.ORAL_ARGUMENT:
-            fields = [
-                "court",
-                "court_citation_string",
-                "judge",
-            ]
+            fields = ["court", "court_citation_string", "judge", "transcript"]
             fields.extend(add_fields_boosting(cd))
             string_query = build_fulltext_query(
                 fields,
