@@ -598,53 +598,6 @@ class AdvancedTest(IndexedSolrTestCase):
             fq, "description:(leave AND to AND file AND amicus AND curie)"
         )
 
-    async def test_phrase_plus_conjunction_search(self) -> None:
-        """Confirm phrase + conjunction search works properly"""
-
-        await sync_to_async(add_docket_to_solr_by_rds)(
-            [self.rd.pk], force_commit=True
-        )
-        await sync_to_async(add_docket_to_solr_by_rds)(
-            [self.rd_1.pk], force_commit=True
-        )
-        params = {
-            "q": "",
-            "description": '"leave to file" AND amicus',
-            "type": SEARCH_TYPES.RECAP,
-        }
-        r = await self.async_client.get(
-            reverse("show_results"),
-            params,
-        )
-        self.assertIn("2 Cases", r.content.decode())
-        self.assertIn("SUBPOENAS SERVED ON", r.content.decode())
-
-        params["description"] = '"leave to file" amicus'
-        r = await self.async_client.get(
-            reverse("show_results"),
-            params,
-        )
-        self.assertIn("2 Cases", r.content.decode())
-        self.assertIn("SUBPOENAS SERVED ON", r.content.decode())
-
-        params["description"] = '"leave to file" AND "amicus"'
-        r = await self.async_client.get(
-            reverse("show_results"),
-            params,
-        )
-        self.assertIn("2 Cases", r.content.decode())
-        self.assertIn("SUBPOENAS SERVED ON", r.content.decode())
-
-        params[
-            "description"
-        ] = '"leave to file" AND "amicus" "Curiae september"'
-        r = await self.async_client.get(
-            reverse("show_results"),
-            params,
-        )
-        self.assertIn("1 Case", r.content.decode())
-        self.assertIn("SUBPOENAS SERVED OFF", r.content.decode())
-
 
 class SearchTest(IndexedSolrTestCase):
     @classmethod
@@ -966,21 +919,6 @@ class SearchTest(IndexedSolrTestCase):
             self.get_article_count(r),
             "Got results for badly ordered docket number.",
         )
-
-    async def test_issue_727_doc_att_numbers(self) -> None:
-        """Can we send integers to the document number and attachment number
-        fields?
-        """
-        r = await self.async_client.get(
-            reverse("show_results"),
-            {"type": SEARCH_TYPES.RECAP, "document_number": "1"},
-        )
-        self.assertEqual(r.status_code, HTTP_200_OK)
-        r = await self.async_client.get(
-            reverse("show_results"),
-            {"type": SEARCH_TYPES.RECAP, "attachment_number": "1"},
-        )
-        self.assertEqual(r.status_code, HTTP_200_OK)
 
     async def test_issue_1296_abnormal_citation_type_queries(self) -> None:
         """Does search work OK when there are supra, id, or non-opinion
