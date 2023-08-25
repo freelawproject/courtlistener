@@ -331,22 +331,17 @@ def build_es_filters(cd: CleanData) -> List:
     return queries_list
 
 
-def build_es_main_query(
-    search_query: Search, cd: CleanData
-) -> tuple[Search, int, int | None]:
-    """Builds and returns an elasticsearch query based on the given cleaned
-     data.
+def build_es_base_query(search_query: Search, cd: CleanData) -> Search:
+    """Builds filters and fulltext_query based on the given cleaned
+     data and returns an elasticsearch query.
+
     :param search_query: The Elasticsearch search query object.
     :param cd: The cleaned data object containing the query and filters.
-
-    :return: A three tuple, the Elasticsearch search query object after applying
-    filters, string query and grouping if needed, the total number of results,
-    the total number of top hits returned by a group if applicable.
+    :return:The Elasticsearch search query object.
     """
 
     string_query = None
     filters = build_es_filters(cd)
-
     match cd["type"]:
         case SEARCH_TYPES.PARENTHETICAL:
             string_query = build_fulltext_query(
@@ -363,7 +358,6 @@ def build_es_main_query(
                 fields,
                 cd.get("q", ""),
             )
-
     if filters or string_query:
         # Apply filters first if there is at least one set.
         if filters:
@@ -374,19 +368,33 @@ def build_es_main_query(
             search_query = search_query.query(string_query)
     else:
         search_query = search_query.query("match_all")
-    total_query_results = search_query.count()
+    return search_query
 
+
+def build_es_main_query(
+    search_query: Search, cd: CleanData
+) -> tuple[Search, int, int | None]:
+    """Builds and returns an elasticsearch query based on the given cleaned
+     data, also performs grouping if required, add highlighting and returns
+     additional query related metrics.
+
+    :param search_query: The Elasticsearch search query object.
+    :param cd: The cleaned data object containing the query and filters.
+    :return: A three tuple, the Elasticsearch search query object after applying
+    filters, string query and grouping if needed, the total number of results,
+    the total number of top hits returned by a group if applicable.
+    """
+    search_query = build_es_base_query(search_query, cd)
+    total_query_results = search_query.count()
     # Create groups aggregation if needed.
     top_hits_limit = group_search_results(
         search_query,
         cd,
         build_sort_results(cd),
     )
-
     search_query = add_es_highlighting(search_query, cd)
     if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
         search_query = search_query.sort(build_sort_results(cd))
-
     return search_query, total_query_results, top_hits_limit
 
 
