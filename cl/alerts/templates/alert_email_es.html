@@ -52,6 +52,29 @@
                         Our backup
                     </a>
                 </p>
+                {% if type == 'oa' %}
+                  <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 0; padding: 0;">
+                    <strong style="font-weight: bold;">Date Argued: </strong>
+                    {% if result.dateArgued %}
+                      {{ result.dateArgued|date:"F jS, Y" }}
+                    {% else %}
+                      Unknown Date
+                    {% endif %}
+                    {% if result.docketNumber %}
+                      <br>
+                      <strong style="font-weight: bold;">Docket Number: </strong>
+                      {{ result.docketNumber|safe }}
+                    {% endif %}
+                    <br>
+                    <strong style="font-weight: bold;">Duration: </strong>
+                    {{ result.duration|naturalduration }}
+                    {% if result.judge %}
+                      <br>
+                      <strong style="font-weight: bold;"> Judge: </strong>
+                      {{ result.judge|safe|underscore_to_space }}
+                    {% endif %}
+                  </p>
+                {% endif %}
                 {% if type == 'o' or type == 'oa' %}
                     <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 1.5em; padding: 0;">
                       {% if result.text %}

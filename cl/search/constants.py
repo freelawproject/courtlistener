@@ -45,6 +45,10 @@ SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS = [
 SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS = [
     "text",
     "text.exact",
+    "docketNumber",
+    "docketNumber.exact",
+    "judge",
+    "judge.exact",
 ]
 SOLR_PEOPLE_HL_FIELDS = ["name", "dob_city", "dob_state", "name_reverse"]
 SEARCH_HL_TAG = "mark"
