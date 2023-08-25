@@ -2088,7 +2088,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 case_name=f"RT Test OA",
                 docket__court=self.court_1,
                 docket__date_argued=now() - timedelta(hours=5),
-                docket__docket_number=f"19-5730",
+                docket__docket_number=f"19-5735",
             )
 
         # 11 OA search alert emails should be sent, one for each user that
