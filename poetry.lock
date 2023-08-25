@@ -1104,28 +1104,28 @@ files = [
 
 [[package]]
 name = "django-pghistory"
-version = "2.7.0"
+version = "2.8.0"
 description = "History tracking for Django and Postgres"
 optional = false
 python-versions = ">=3.7.0,<4"
 files = [
-    {file = "django_pghistory-2.7.0-py3-none-any.whl", hash = "sha256:9c79ca6ff2efcf97c38e96f3a8b533b46467c3af6fd32d20258d4caf248dde4a"},
-    {file = "django_pghistory-2.7.0.tar.gz", hash = "sha256:918920038ca4aa9f0c2e7e4fba996c16bfd0b0a2f7bc75737abdece43303a062"},
+    {file = "django_pghistory-2.8.0-py3-none-any.whl", hash = "sha256:1337c897c0ee67c953e082b1f19b5af4a2b2bf9b9db8852c552851529960cfd3"},
+    {file = "django_pghistory-2.8.0.tar.gz", hash = "sha256:80a2eb34f8eeefeb5c5eff5dd57a558a72486aac74ca5a73ed7ac1f89e87678b"},
 ]
 
 [package.dependencies]
 django = ">=2"
-django-pgtrigger = ">=4.5.0"
+django-pgtrigger = ">=4.7.0"
 
 [[package]]
 name = "django-pgtrigger"
-version = "4.6.0"
+version = "4.7.0"
 description = "Postgres trigger support integrated with Django models."
 optional = false
 python-versions = ">=3.7.0,<4"
 files = [
-    {file = "django-pgtrigger-4.6.0.tar.gz", hash = "sha256:ef54844837bb20c4ec68f10c05a89926b307bad5b3d08411ca1c84ca46fdc4c8"},
-    {file = "django_pgtrigger-4.6.0-py3-none-any.whl", hash = "sha256:1c6e25d5733b192bc62ff956521daf2b61fa5e9834a4952229fe65945bd1aac6"},
+    {file = "django_pgtrigger-4.7.0-py3-none-any.whl", hash = "sha256:978e998f5c7bdfaf3edbb01c2075be329ce679bd87a89c5bfdf95405905885bd"},
+    {file = "django_pgtrigger-4.7.0.tar.gz", hash = "sha256:20a4139cccb17b75d065fbfd2cc8f47e3696379d7be4139ef6a67c8d14897a8d"},
 ]
 
 [package.dependencies]
@@ -4787,4 +4787,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11, <3.12"
-content-hash = "ac89c7d939f6f0f64e9dc0515c7584fb596e8915dd6b96d20622ce31f7c0f558"
+content-hash = "8e7c87535ec775ae813599028b2f3d039495d40c37b1544695563b183569d2f3"
