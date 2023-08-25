@@ -685,7 +685,7 @@ def fetch_es_results(
     return [], 0, error
 
 
-def do_es_podcast_query(
+def do_es_feed_query(
     search_query: Search,
     cd: CleanData,
     rows: int = 20,
@@ -698,8 +698,6 @@ def do_es_podcast_query(
     :return: The Elasticsearch DSL response.
     """
 
-    s, total_query_results, top_hits_limit = build_es_main_query(
-        search_query, cd
-    )
+    s = build_es_base_query(search_query, cd)
     response = s.extra(from_=0, size=rows).execute()
     return response

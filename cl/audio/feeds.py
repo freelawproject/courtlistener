@@ -6,7 +6,7 @@ from django.utils.timezone import is_naive
 from requests import Session
 
 from cl.lib import search_utils
-from cl.lib.elasticsearch_utils import do_es_podcast_query
+from cl.lib.elasticsearch_utils import do_es_feed_query
 from cl.lib.podcast import iTunesPodcastsFeedGenerator
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.timezone_helpers import localize_naive_datetime_to_court_timezone
@@ -66,7 +66,7 @@ class JurisdictionPodcast(JurisdictionFeed):
                 "type": SEARCH_TYPES.ORAL_ARGUMENT,
             }
             search_query = AudioDocument.search()
-            items = do_es_podcast_query(search_query, cd, rows=20)
+            items = do_es_feed_query(search_query, cd, rows=20)
             return items
 
     def feed_extra_kwargs(self, obj):
@@ -148,7 +148,7 @@ class AllJurisdictionsPodcast(JurisdictionPodcast):
                 "type": SEARCH_TYPES.ORAL_ARGUMENT,
             }
             search_query = AudioDocument.search()
-            items = do_es_podcast_query(search_query, cd, rows=20)
+            items = do_es_feed_query(search_query, cd, rows=20)
             return items
 
 
@@ -188,7 +188,7 @@ class SearchPodcast(JurisdictionPodcast):
                 }
                 cd.update(override_params)
                 search_query = AudioDocument.search()
-                items = do_es_podcast_query(
+                items = do_es_feed_query(
                     search_query,
                     cd,
                     rows=20,

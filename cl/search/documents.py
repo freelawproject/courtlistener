@@ -7,7 +7,7 @@ from django_elasticsearch_dsl import Document, fields
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
 from cl.lib.command_utils import logger
-from cl.lib.elasticsearch_utils import build_es_main_query
+from cl.lib.elasticsearch_utils import build_es_base_query
 from cl.lib.fields import PercolatorField
 from cl.lib.search_index_utils import null_map
 from cl.lib.utils import deepgetattr
@@ -229,9 +229,5 @@ class AudioPercolator(AudioDocumentBase):
 
         cd = search_form.cleaned_data
         search_query = AudioDocument.search()
-        (
-            query,
-            _total_query_results,
-            _top_hits_limit,
-        ) = build_es_main_query(search_query, cd)
+        query = build_es_base_query(search_query, cd)
         return query.to_dict()["query"]

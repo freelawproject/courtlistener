@@ -10,7 +10,11 @@ from cl.alerts.models import Alert
 from cl.alerts.send_alerts import percolate_document
 from cl.audio.factories import AudioFactory
 from cl.audio.models import Audio
-from cl.lib.elasticsearch_utils import build_es_main_query, fetch_es_results
+from cl.lib.elasticsearch_utils import (
+    build_es_base_query,
+    build_es_main_query,
+    fetch_es_results,
+)
 from cl.lib.test_helpers import AudioESTestCase
 from cl.search.documents import AudioDocument, AudioPercolator
 from cl.search.factories import DocketFactory
@@ -62,9 +66,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
     @staticmethod
     def save_percolator_query(cd):
         search_query = AudioDocument.search()
-        query, total_query_results, top_hits_limit = build_es_main_query(
-            search_query, cd
-        )
+        query = build_es_base_query(search_query, cd)
         query_dict = query.to_dict()["query"]
         percolator_query = AudioPercolator(
             percolator_query=query_dict, rate=Alert.REAL_TIME
