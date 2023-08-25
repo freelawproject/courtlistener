@@ -79,10 +79,11 @@ RUN tar xvfz courtlistener.tar.gz && \
 FROM build-${BUILD_ENV} as python-base
 
 # Collect compiled assets from webpack-build stage.
-# Note: Always produce production code (run the devMiddleware for legible output)
+# Note: Always produce production code and never produce source-maps
+# (run the devMiddleware for legible output)
 WORKDIR /opt/courtlistener/cl
 RUN npm install
-RUN npx webpack --mode=production
+RUN npx webpack --mode=production --no-devtool
 
 WORKDIR /opt
 

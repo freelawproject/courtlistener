@@ -22,7 +22,6 @@ module.exports = {
       name: 'vendor',
       filename: '[name].js',
     },
-    minimize: true,
     minimizer: [new TerserPlugin({
         extractComments: false,
         terserOptions: {
@@ -30,6 +29,7 @@ module.exports = {
         },
       })],
   },
+  devtool: 'inline-source-map',
   plugins: [].filter(Boolean),
   module: {
     rules: [

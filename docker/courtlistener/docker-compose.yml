@@ -61,7 +61,7 @@ services:
     env_file:
       - ../../.env.dev
     working_dir: /opt/courtlistener/cl
-    command: sh -c 'npm install && npx webpack --progress --watch --mode=production'
+    command: sh -c 'npm install && npx webpack --progress --watch --mode=development'
 
   # Task Server
   cl-celery:
