@@ -27,6 +27,7 @@ from cl.search.constants import (
     SEARCH_HL_TAG,
     SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS,
 )
+from cl.search.exception import UnbalancedQuery
 from cl.search.models import SEARCH_TYPES, Court
 
 logger = logging.getLogger(__name__)
@@ -160,6 +161,18 @@ def add_fields_boosting(cd: CleanData) -> list[str]:
     return make_es_boost_list(qf)
 
 
+def check_unbalanced_parenthesis(query: str) -> bool:
+    """Check whether the query string has unbalanced opening or closing parentheses.
+
+    :param query: The input query string
+    :return: Whether the query is balanced or not.
+    """
+    opening_count = query.count("(")
+    closing_count = query.count(")")
+
+    return opening_count != closing_count
+
+
 def sanitize_unbalanced_parenthesis(query: str) -> str:
     """Sanitize a query by removing unbalanced opening or closing parentheses.
 
@@ -168,9 +181,6 @@ def sanitize_unbalanced_parenthesis(query: str) -> str:
     """
     opening_count = query.count("(")
     closing_count = query.count(")")
-
-    if opening_count == closing_count:
-        return query
     while opening_count > closing_count:
         # Find last unclosed opening parenthesis position
         last_parenthesis_opened_pos = query.rfind("(")
@@ -229,9 +239,9 @@ def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
     :param value: The string value to search for.
     :return: A Elasticsearch QueryString or [] if the "value" param is empty.
     """
-
     if value:
-        value = sanitize_unbalanced_parenthesis(value)
+        if check_unbalanced_parenthesis(value):
+            raise UnbalancedQuery()
         # In Elasticsearch, the colon (:) character is used to separate the
         # field name and the field value in a query.
         # To avoid parsing errors escape any colon characters in the value
