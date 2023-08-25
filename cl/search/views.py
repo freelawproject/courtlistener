@@ -481,10 +481,14 @@ def show_results(request: HttpRequest) -> HttpResponse:
                     render_dict.update(do_es_search(request.GET.copy()))
                 else:
                     # Check if waffle flag is active.
-                    if not waffle.flag_is_active(request, "oa-es-active"):
-                        render_dict.update(do_search(request.GET.copy()))
-                    else:
+                    if request.GET.get(
+                        "type"
+                    ) == SEARCH_TYPES.ORAL_ARGUMENT and waffle.flag_is_active(
+                        request, "oa-es-active"
+                    ):
                         render_dict.update(do_es_search(request.GET.copy()))
+                    else:
+                        render_dict.update(do_search(request.GET.copy()))
 
                     # Set the value to the query as a convenience
                     alert_form.fields["name"].widget.attrs[
