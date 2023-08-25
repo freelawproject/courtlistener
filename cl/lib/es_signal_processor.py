@@ -31,6 +31,8 @@ instance_typing = Union[
 ]
 es_document_typing = Union[AudioDocument, ParentheticalGroupDocument]
 
+models_alert_support = [Audio]
+
 
 def updated_fields(
     instance: instance_typing, es_document: es_document_typing
@@ -111,8 +113,9 @@ def save_document_in_es(
         return_doc_meta=True,
         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
     )
-    support_alerts = getattr(instance, "SUPPORT_ALERTS", None)
-    if support_alerts and response["_version"] == 1:
+    if type(instance) in models_alert_support and response["_version"] == 1:
+        # Only send search alerts when a new instance of a model that support
+        # Alerts is indexed in ES _version:1
         if es_document == AudioDocument and not waffle.switch_is_active(
             "oa-es-alerts-active"
         ):

@@ -413,15 +413,18 @@ def show_results(request: HttpRequest) -> HttpResponse:
                     }
                 )
             else:
+                # Add additional or overridden GET parameters
+                mutable_GET.update(
+                    {
+                        "order_by": "dateArgued desc",
+                        "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                    }
+                )
                 render_dict.update(
                     {
                         "results_oa": do_es_search(
                             mutable_GET,
                             rows=5,
-                            override_params={
-                                "order_by": "dateArgued desc",
-                                "type": SEARCH_TYPES.ORAL_ARGUMENT,
-                            },
                             facet=False,
                             cache_key="homepage-data-oa-es",
                         )["results"]
@@ -473,24 +476,14 @@ def show_results(request: HttpRequest) -> HttpResponse:
                 )
 
                 if request.GET.get("type") == SEARCH_TYPES.PARENTHETICAL:
-                    search_results = do_es_search(request.GET.copy())
-                    render_dict.update(search_results)
-                elif request.GET.get("type") == SEARCH_TYPES.ORAL_ARGUMENT:
+                    render_dict.update(do_es_search(request.GET.copy()))
+                else:
                     # Check if waffle flag is active.
                     if not waffle.flag_is_active(request, "oa-es-active"):
-                        search_results = do_search(request.GET.copy())
+                        render_dict.update(do_search(request.GET.copy()))
                     else:
-                        search_results = do_es_search(request.GET.copy())
+                        render_dict.update(do_es_search(request.GET.copy()))
 
-                    render_dict.update(search_results)
-                    # Set the value to the query as a convenience
-                    alert_form.fields["name"].widget.attrs[
-                        "value"
-                    ] = render_dict["search_summary_str"]
-                    render_dict.update({"alert_form": alert_form})
-
-                else:
-                    render_dict.update(do_search(request.GET.copy()))
                     # Set the value to the query as a convenience
                     alert_form.fields["name"].widget.attrs[
                         "value"
@@ -583,7 +576,6 @@ def es_search(request: HttpRequest) -> HttpResponse:
 def do_es_search(
     get_params: QueryDict,
     rows: int = settings.SEARCH_PAGE_SIZE,
-    override_params: dict = None,
     facet: bool = True,
     cache_key: str = None,
 ):
@@ -591,8 +583,6 @@ def do_es_search(
 
     :param get_params: The request.GET params sent by user.
     :param rows: The number of solr results to request
-    :param override_params: A dict with additional or different GET params to
-    be sent to solr.
     :param facet: Whether to complete faceting in the query
     :param cache_key: A cache key with which to save the results. Note that it
     does not do anything clever with the actual query, so if you use this, your
@@ -606,10 +596,6 @@ def do_es_search(
     query_time = total_query_results = 0
     top_hits_limit = 5
     document_type = None
-
-    # Add additional or overridden GET parameters
-    if override_params:
-        get_params.update(override_params)
 
     search_form = SearchForm(get_params)
     if get_params.get("type") == SEARCH_TYPES.PARENTHETICAL:
@@ -692,8 +678,6 @@ def fetch_and_paginate_results(
     )
     if error:
         return [], query_time, error
-    if get_params.get("type") == SEARCH_TYPES.PARENTHETICAL:
-        hits = hits.aggregations.groups.buckets
     paginator = ESPaginator(hits, rows_per_page)
     try:
         results = paginator.page(page)

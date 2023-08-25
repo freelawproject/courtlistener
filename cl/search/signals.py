@@ -1,7 +1,3 @@
-from django.db.models.signals import m2m_changed, post_delete, post_save
-from django.dispatch import receiver
-
-from cl.alerts.send_alerts import send_or_schedule_alerts
 from cl.audio.models import Audio
 from cl.lib.es_signal_processor import ESSignalProcessor
 from cl.search.documents import AudioDocument, ParentheticalGroupDocument

@@ -150,33 +150,6 @@ def process_percolator_response(
         if not alert_triggered:
             continue
 
-        # Schedule no RT Alerts.
-        scheduled_rates = [Alert.DAILY, Alert.WEEKLY, Alert.MONTHLY]
-        if alert_triggered.rate in scheduled_rates:
-            with transaction.atomic(savepoint=True):
-                try:
-                    (
-                        user_rate,
-                        created,
-                    ) = UserRateAlert.objects.select_for_update().get_or_create(
-                        user=alert_triggered.user, rate=alert_triggered.rate
-                    )
-                except IntegrityError:
-                    user_rate = UserRateAlert.objects.get(
-                        user=alert_triggered.user, rate=alert_triggered.rate
-                    )
-                parent_alert, created = ParentAlert.objects.get_or_create(
-                    alert=alert_triggered, user_rate=user_rate
-                )
-                highlights = {}
-                if hasattr(hit.meta, "highlight"):
-                    highlights = hit.meta["highlight"].to_dict()
-                ScheduledAlertHit.objects.create(
-                    parent_alert=parent_alert,
-                    document_content=document_content,
-                    highlighted_fields=highlights,
-                )
-
         # Send RT Alerts
         if alert_triggered.rate == Alert.REAL_TIME:
             alert_user: UserProfile.user = alert_triggered.user
@@ -216,6 +189,33 @@ def process_percolator_response(
             tally_stat(f"alerts.sent.{Alert.REAL_TIME}", inc=1)
             logger.info(f"Sent {1} {Alert.REAL_TIME} email alerts.")
 
+        else:
+            # Schedule DAILY, WEEKLY and MONTHLY Alerts
+            with transaction.atomic(savepoint=True):
+                try:
+                    (
+                        user_rate,
+                        created,
+                    ) = UserRateAlert.objects.select_for_update().get_or_create(
+                        user=alert_triggered.user, rate=alert_triggered.rate
+                    )
+                except IntegrityError:
+                    # Race condition. Item already exists, get it instead.
+                    user_rate = UserRateAlert.objects.get(
+                        user=alert_triggered.user, rate=alert_triggered.rate
+                    )
+                parent_alert, created = ParentAlert.objects.get_or_create(
+                    alert=alert_triggered, user_rate=user_rate
+                )
+                highlights = {}
+                if hasattr(hit.meta, "highlight"):
+                    highlights = hit.meta["highlight"].to_dict()
+                ScheduledAlertHit.objects.create(
+                    parent_alert=parent_alert,
+                    document_content=document_content,
+                    highlighted_fields=highlights,
+                )
+
 
 def send_or_schedule_alerts(
     document_id: str, document_index: str, document_content: dict[str, Any]
@@ -254,6 +254,8 @@ def send_or_schedule_alerts(
             percolator_response = percolate_document(
                 document_id, document_index, search_after=search_after
             )
+            if not percolator_response:
+                break
             process_percolator_response(percolator_response, document_content)
             results_returned = len(percolator_response.hits.hits)
             documents_retrieved += results_returned
