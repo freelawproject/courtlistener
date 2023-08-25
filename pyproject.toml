@@ -96,7 +96,7 @@ PyStemmer = "^2.0.1"
 factory-boy = "^3.2.1"
 django-elasticsearch-dsl = "^7.3"
 django-override-storage = "^0.3.2"
-django-ses = {extras = ["events"], version = "^3.3.0"}
+django-ses = {extras = ["events"], version = "^3.5.0"}
 django-environ = "^0.8.1"
 judge-pics = "^2.0.1"
 django-admin-cursor-paginator = "^0.1.2"

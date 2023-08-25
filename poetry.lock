@@ -1144,13 +1144,13 @@ files = [
 
 [[package]]
 name = "django-ses"
-version = "3.3.0"
+version = "3.5.0"
 description = "A Django email backend for Amazon's Simple Email Service"
 optional = false
 python-versions = ">=3.7,<4.0"
 files = [
-    {file = "django_ses-3.3.0-py3-none-any.whl", hash = "sha256:029edd3f23333f09cd14b4ebc274a5c3700819f16f1fcd5a25b5639b3be0fdba"},
-    {file = "django_ses-3.3.0.tar.gz", hash = "sha256:bdfc5bd4bf1f95d01756761bc9dae40b79c4c709e49ff1b9bd9e853dfd09efb1"},
+    {file = "django_ses-3.5.0-py3-none-any.whl", hash = "sha256:3522fe531155eb06bb015b3b36324c059194450633b33f9bd5bc9d1328822fe2"},
+    {file = "django_ses-3.5.0.tar.gz", hash = "sha256:dc1644f50608fbf3a64f085a371c61d56d68eba3c5efa69651f13dc3ba05049d"},
 ]
 
 [package.dependencies]
@@ -4787,4 +4787,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11, <3.12"
-content-hash = "cbd288da573ef53a07c5f4d412e71b4333ff9ba3a30c8bdf1ffd5be40d7e7a05"
+content-hash = "8aa09c0b9f4e16b3a4df339acf0a5cf4a5343131708bfb6d2c659d3258b6238f"
