@@ -31,6 +31,38 @@ from cl.search.models import SEARCH_TYPES, Court
 
 logger = logging.getLogger(__name__)
 
+OPENING_CHAR = r"[\(\[\"\']"  # matches the following characters: (, [, ', "
+CLOSING_CHAR = r"[\)\]\"\']"  # matches the following characters: ), ], ', "
+FIELD_OPERATOR = r"[\w]*:"  # matches operators like docketNumber:
+
+# Matches string enclosed by the following characters: (), [], "", ''
+enclosed_str_regex = f"{OPENING_CHAR}+.*?{CLOSING_CHAR}+"
+ENCLOSED_STR_PATTERN = re.compile(
+    f"(?<!NOT ){FIELD_OPERATOR}?{enclosed_str_regex}[\S]*"
+)
+
+operant_str_regex = (
+    f"{FIELD_OPERATOR}?{OPENING_CHAR}+[\w\s\.\-\*\~]+{CLOSING_CHAR}+[\S]*"
+)
+search_term = f"{FIELD_OPERATOR}?[^()\s]+"
+
+# Matches terms that uses the unary logical operator
+UNARY_OPERATORS_STR_PATTERN = re.compile(
+    f"NOT\s{operant_str_regex}|"  # Matches NOT (a), NOT (a b ...)
+    f"NOT\s{search_term}",  # Matches NOT b
+    re.VERBOSE | re.IGNORECASE,
+)
+
+# Matches terms that uses one of the binary logical operators
+BINARY_OPERATORS_STR_PATTERN = re.compile(
+    (
+        f"({operant_str_regex}|{search_term})?"  # First operand (matches single terms and grouped expressions)
+        r"\s(AND|OR)\s"  # Operator
+        f"({operant_str_regex}|{search_term})"  # Second operand (matches single terms and grouped expressions)
+    ),
+    re.VERBOSE | re.IGNORECASE,
+)
+
 
 def elasticsearch_enabled(func: Callable) -> Callable:
     """A decorator to avoid executing Elasticsearch methods when it's disabled."""
@@ -167,35 +199,26 @@ def append_query_conjunctions(query: str) -> str:
     :param query: The input query string
     :return: The query string with AND conjunctions appended
     """
-    words = query.split()
-    clean_q = []
-    needs_and_conjunction = True
-    inside_group = 0
-    for word in words:
-        if "[" in word or "(" in word:
-            # Avoid adding AND if the word is part of a group or range query.
-            # Group or range query opened.
-            inside_group += 1
-            clean_q.append(word)
-            needs_and_conjunction = False
-        elif "]" in word or ")" in word:
-            # Avoid adding AND if the word is part of a group or range query.
-            # Group or range query closed.
-            inside_group -= 1
-            clean_q.append(word)
-            if inside_group == 0:
-                needs_and_conjunction = True
-        elif word in ["AND", "OR", "NOT"]:
-            # Avoid adding additional conjunctions than the query originals.
-            clean_q.append(word.upper())
-            needs_and_conjunction = False
-        else:
-            # Add AND conjunction if required.
-            if needs_and_conjunction and clean_q:
-                clean_q.append("AND")
-            clean_q.append(word)
-            needs_and_conjunction = True
-    return " ".join(clean_q)
+    # Get all the search terms that use a binary logical operator
+    binary_operations = [
+        match.group() for match in BINARY_OPERATORS_STR_PATTERN.finditer(query)
+    ]
+    cleaned_str = BINARY_OPERATORS_STR_PATTERN.sub("", query)
+
+    # Get all the string that are enclosed by (), [], "" or '' and not preceded by the unary operator
+    groups = ENCLOSED_STR_PATTERN.findall(cleaned_str)
+    cleaned_str = ENCLOSED_STR_PATTERN.sub("", cleaned_str)
+
+    # Get all the search terms that use the unary logical operator
+    unary_operations = UNARY_OPERATORS_STR_PATTERN.findall(cleaned_str)
+    cleaned_str = UNARY_OPERATORS_STR_PATTERN.sub("", cleaned_str)
+
+    # Get the remaining search terms
+    single_terms = cleaned_str.split()
+
+    return " AND ".join(
+        single_terms + groups + unary_operations + binary_operations
+    )
 
 
 def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:

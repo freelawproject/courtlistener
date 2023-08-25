@@ -9,6 +9,7 @@ from django.urls import reverse
 from rest_framework.status import HTTP_200_OK, HTTP_503_SERVICE_UNAVAILABLE
 
 from cl.lib.date_time import midnight_pt
+from cl.lib.elasticsearch_utils import append_query_conjunctions
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import (
@@ -957,3 +958,44 @@ class TestDateTimeHelpers(SimpleTestCase):
         pdt_date_time = midnight_pt(pdt_date)
         pdt_utc_offset_hours = pdt_date_time.utcoffset().total_seconds() / 3600  # type: ignore
         self.assertEqual(pdt_utc_offset_hours, -7.0)
+
+
+class TestAppendQueryConjunctions(SimpleTestCase):
+    def test_can_add_conjunction(self) -> None:
+        tests = [
+            {"input": "a", "output": "a"},
+            {"input": "a b", "output": "a AND b"},
+            {"input": "a b (c d)", "output": "a AND b AND (c d)"},
+            {
+                "input": "a b (c d) [a b]",
+                "output": "a AND b AND (c d) AND [a b]",
+            },
+            {
+                "input": "a b (c d) [a b] 'a c'",
+                "output": "a AND b AND (c d) AND [a b] AND 'a c'",
+            },
+            {
+                "input": 'a b (c d) [a b] "a c"',
+                "output": 'a AND b AND (c d) AND [a b] AND "a c"',
+            },
+            {
+                "input": "a b (c d) [a b] NOT word1",
+                "output": "a AND b AND (c d) AND [a b] AND NOT word1",
+            },
+            {
+                "input": 'a b NOT word1 (c d) [a b] NOT (word1 word2) "a z" NOT [word3 word4]',
+                "output": 'a AND b AND (c d) AND [a b] AND "a z" AND NOT word1 AND NOT (word1 word2) AND NOT [word3 word4]',
+            },
+            {
+                "input": 'a b NOT a (c d) [a b] NOT (a w) "a z" word1 AND word2',
+                "output": 'a AND b AND (c d) AND [a b] AND "a z" AND NOT a AND NOT (a w) AND word1 AND word2',
+            },
+            {
+                "input": 'a b NOT a (c d) [a b] AND (a w) "a z" word1 OR word2',
+                "output": 'a AND b AND (c d) AND "a z" AND NOT a AND [a b] AND (a w) AND word1 OR word2',
+            },
+        ]
+
+        for test in tests:
+            ouput_str = append_query_conjunctions(test["input"])
+            self.assertEqual(ouput_str, test["output"])
