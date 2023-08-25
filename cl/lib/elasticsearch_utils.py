@@ -10,7 +10,6 @@ from typing import Any, Callable, Dict, List
 from django.conf import settings
 from django.core.paginator import Page
 from django.http.request import QueryDict
-from django_elasticsearch_dsl import Document
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.exceptions import RequestError, TransportError
 from elasticsearch_dsl import A, Q
@@ -418,7 +417,7 @@ def build_es_filters(cd: CleanData) -> List:
             )
         )
     if cd["type"] == SEARCH_TYPES.PARENTHETICAL:
-        # Build daterange query
+        # Build dateFiled daterange query
         queries_list.extend(
             build_daterange_query(
                 "dateFiled",
@@ -427,7 +426,7 @@ def build_es_filters(cd: CleanData) -> List:
             )
         )
     if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
-        # Build daterange query
+        # Build dateArgued daterange query
         queries_list.extend(
             build_daterange_query(
                 "dateArgued",
@@ -435,11 +434,11 @@ def build_es_filters(cd: CleanData) -> List:
                 cd.get("argued_after", ""),
             )
         )
-        # Build court terms filter
+        # Build caseName terms filter
         queries_list.extend(
             build_text_filter("caseName", cd.get("case_name", ""))
         )
-        # Build court terms filter
+        # Build judge terms filter
         queries_list.extend(build_text_filter("judge", cd.get("judge", "")))
     return queries_list
 
@@ -782,6 +781,8 @@ def fetch_es_results(
         ).execute()
         query_time = response.took
         error = False
+        if response.aggregations:
+            response = response.aggregations.groups.buckets
         return response, query_time, error
     except (TransportError, ConnectionError, RequestError) as e:
         logger.warning(f"Error loading search page with request: {get_params}")

@@ -3,12 +3,13 @@ from datetime import datetime
 from django.http import QueryDict
 from django.template import loader
 from django_elasticsearch_dsl import Document, fields
-from elasticsearch_dsl import Percolator
 
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.lib.command_utils import logger
 from cl.lib.elasticsearch_utils import build_es_main_query
+from cl.lib.fields import PercolatorField
 from cl.lib.search_index_utils import null_map
 from cl.lib.utils import deepgetattr
 from cl.search.es_indices import (
@@ -255,10 +256,6 @@ class AudioDocument(AudioDocumentBase):
         return datetime.utcnow()
 
 
-class PercolatorField(fields.DEDField, Percolator):
-    pass
-
-
 @oral_arguments_percolator_index.document
 class AudioPercolator(AudioDocumentBase):
     rate = fields.KeywordField(attr="rate")
@@ -275,13 +272,17 @@ class AudioPercolator(AudioDocumentBase):
         qd = QueryDict(instance.query.encode(), mutable=True)
         search_form = SearchForm(qd)
         if not search_form.is_valid():
+            logger.warning(
+                f"The query {qd} associated with Alert ID {instance.pk} is "
+                f"invalid and was not indexed."
+            )
             return None
 
         cd = search_form.cleaned_data
         search_query = AudioDocument.search()
         (
             query,
-            total_query_results,
-            top_hits_limit,
+            _total_query_results,
+            _top_hits_limit,
         ) = build_es_main_query(search_query, cd)
         return query.to_dict()["query"]
