@@ -994,6 +994,10 @@ class TestAppendQueryConjunctions(SimpleTestCase):
                 "input": 'a b NOT a (c d) [a b] AND (a w) "a z" word1 OR word2',
                 "output": 'a AND b AND (c d) AND "a z" AND NOT a AND [a b] AND (a w) AND word1 OR word2',
             },
+            {
+                "input": "(A AND B) (a bc (a b)) and word1",
+                "output": "(A AND B) AND (a bc (a b)) and word1",
+            },
         ]
 
         for test in tests:
