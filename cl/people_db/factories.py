@@ -1,5 +1,11 @@
 from django.utils.timezone import now
-from factory import Faker, LazyFunction, RelatedFactory
+from factory import (
+    Faker,
+    LazyFunction,
+    RelatedFactory,
+    SubFactory,
+    post_generation,
+)
 from factory.django import DjangoModelFactory
 from factory.fuzzy import FuzzyChoice
 from localflavor.us.us_states import STATE_CHOICES
@@ -9,12 +15,17 @@ from cl.people_db.models import (
     SUFFIXES,
     ABARating,
     Education,
-    Person,
     PoliticalAffiliation,
     Position,
     Race,
     School,
-    Source,
+    Attorney,
+    AttorneyOrganization,
+    AttorneyOrganizationAssociation,
+    Party,
+    PartyType,
+    Person,
+    Role,
 )
 from cl.tests.providers import LegalProvider
 
@@ -88,3 +99,109 @@ class ABARatingFactory(DjangoModelFactory):
         model = ABARating
 
     rating = FuzzyChoice(ABARating.ABA_RATINGS, getter=lambda c: c[0])
+
+
+class AttorneyOrganizationFactory(DjangoModelFactory):
+    class Meta:
+        model = AttorneyOrganization
+
+    name = Faker("company")
+    address1 = Faker("address")
+    city = Faker("city")
+    state = FuzzyChoice(STATE_CHOICES, getter=lambda c: c[0])
+
+
+class AttorneyOrganizationAssociationFactory(DjangoModelFactory):
+    class Meta:
+        model = AttorneyOrganizationAssociation
+
+
+class AttorneyFactory(DjangoModelFactory):
+    class Meta:
+        model = Attorney
+
+    name = Faker("name")
+    docket = None
+
+    @post_generation
+    def docket(self, create, extracted, **kwargs):
+        if not create:
+            return
+        self.docket = extracted
+
+    @post_generation
+    def organizations(self, create, extracted, **kwargs):
+        if not create:
+            return
+
+        if extracted:
+            for organization in extracted:
+                # Use the passed-in organizations
+                AttorneyOrganizationAssociationFactory(
+                    attorney=self,
+                    attorney_organization=organization,
+                    docket=self.docket,
+                )
+        else:
+            # Create only one default organization
+            AttorneyOrganizationAssociationFactory(
+                attorney=self,
+                attorney_organization=AttorneyOrganizationFactory(),
+                docket=self.docket,
+            )
+
+
+class RoleFactory(DjangoModelFactory):
+    class Meta:
+        model = Role
+
+
+class PartyFactory(DjangoModelFactory):
+    class Meta:
+        model = Party
+
+    name = Faker("name")
+    docket = None
+
+    @post_generation
+    def docket(self, create, extracted, **kwargs):
+        """Override default docket"""
+        if not create:
+            return
+        self.docket = extracted
+
+    @post_generation
+    def attorneys(self, create, extracted, **kwargs):
+        if not create:
+            return
+
+        if extracted:
+            # Use the passed-in attorneys
+            for attorney in extracted:
+                RoleFactory(party=self, attorney=attorney, docket=self.docket)
+        else:
+            # Create 1 default attorney
+            RoleFactory(
+                party=self,
+                attorney=AttorneyFactory(docket=self.docket),
+                docket=self.docket,
+            )
+
+
+class PartyTypeFactory(DjangoModelFactory):
+    class Meta:
+        model = PartyType
+
+    name = Faker("name")
+    party = SubFactory(PartyFactory)
+
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        """Override default docket"""
+
+        docket = kwargs.pop("docket", None)
+        if not docket:
+            return None
+        kwargs["docket"] = docket
+        manager = cls._get_manager(model_class)
+        return manager.create(*args, **kwargs)

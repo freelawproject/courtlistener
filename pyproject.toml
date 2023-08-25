@@ -30,10 +30,10 @@ argparse = "*"
 beautifulsoup4 = "==4.11.*"
 boto3 = "^1.17.19"
 celery = "^5.3.0"
-certifi = "^2022.12.7"
+certifi = "^2023.7.22"
 courts-db = "^0.10.9"
 disposable-email-domains = "*"
-Django = "^4.2.3"
+Django = "^4.2.4"
 django-cache-memoize = "==0.*"
 django-cors-headers = "^3.14.0"
 django-csp = "^3.7.0"
@@ -45,7 +45,7 @@ django-mathfilters = "*"
 django-pghistory = "^2.7.0"
 django-ratelimit = "^4.0.0"
 django-storages = "^1.13.2"
-djangorestframework = "^3.14.0"
+djangorestframework = {git = "https://github.com/encode/django-rest-framework.git", rev = "cc3c89a11c7ee9cf7cfd732e0a329c318ace71b2"}
 djangorestframework-xml = "^2.0.0"
 drf-dynamic-fields = "*"
 feedparser = "^6.0.8"
@@ -82,7 +82,7 @@ unidecode = "*"
 usaddress = "^0.5.10"
 scorched = {git = "https://github.com/freelawproject/scorched.git", branch="main"}
 djangorestframework-filters = "1.0.0.dev2"
-gunicorn = "^20.0.4"
+gunicorn = "^21.2.0"
 django-hCaptcha = "^0.2.0"
 reporters-db = "^3.2.36"
 django-waffle = "^3.0.0"
@@ -106,12 +106,13 @@ ipython = "^8.10.0"
 time-machine = "^2.9.0"
 dateparser = "1.1.8"
 types-dateparser = "^1.1.4.6"
-uvicorn = {extras = ["standard"], version = "^0.22.0"}
+uvicorn = {extras = ["standard"], version = "^0.23.2"}
 daphne = "^4.0.0"
 psycopg2 = "^2.9.6"
 juriscraper = "^2.5.51"
 httpx = {extras = ["http2"], version = "^0.24.1"}
 django-model-utils = "^4.3.1"
+inflection = "^0.5.1"  # necessary for DRF schema generation - remove after drf-spectacular
 
 
 [tool.poetry.group.dev.dependencies]
