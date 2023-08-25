@@ -1969,9 +1969,12 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             reverse("show_results"),
             search_params,
         )
-        actual = self.get_article_count(r)
-        expected = 1
-        self.assertEqual(actual, expected)
+        self.assertIn(
+            "Did you forget to close one or more parentheses?",
+            r.content.decode(),
+        )
+        self.assertIn("Did you mean", r.content.decode())
+        self.assertIn("(Loretta OR SEC) AND Jose", r.content.decode())
 
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
@@ -1981,9 +1984,12 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             reverse("show_results"),
             search_params,
         )
-        actual = self.get_article_count(r)
-        expected = 1
-        self.assertEqual(actual, expected)
+        self.assertIn(
+            "Did you forget to close one or more parentheses?",
+            r.content.decode(),
+        )
+        self.assertIn("Did you mean", r.content.decode())
+        self.assertIn("Loretta AND Jose", r.content.decode())
 
     def test_search_transcript(self) -> None:
         """Test search transcript."""
