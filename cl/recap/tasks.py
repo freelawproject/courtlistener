@@ -95,6 +95,9 @@ from cl.recap.models import (
 from cl.scrapers.tasks import extract_recap_pdf, extract_recap_pdf_base
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
 from cl.search.tasks import add_items_to_solr, add_or_update_recap_docket
+from cl.citations.tasks import (
+    find_citations_and_parantheticals_for_recap_documents,
+)
 
 logger = logging.getLogger(__name__)
 cnt = CaseNameTweaker()
@@ -393,6 +396,14 @@ async def process_recap_pdf(pk):
     )
     docket = await Docket.objects.aget(id=de.docket_id)
     await sync_to_async(mark_ia_upload_needed)(docket, save_docket=True)
+
+    # enqueue RECAPDoc for citation-parsing.
+    RECAP_DOC_PARSING_QUEUE = "batch1"
+    find_citations_and_parantheticals_for_recap_documents.apply_async(
+        args=([rd.pk],),
+        queue=RECAP_DOC_PARSING_QUEUE,
+    )
+
     return rd
 
 
