@@ -892,13 +892,12 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-admin-cursor-paginator"
-version = "0.1.2"
+version = "0.1.4"
 description = "Drop-in replacement for django admin default pagination that works fast with huge tables."
 optional = false
 python-versions = ">=3.4"
 files = [
-    {file = "django-admin-cursor-paginator-0.1.2.tar.gz", hash = "sha256:2211896d0b8a101042f6a6ee68879c561c05ca638f9ec4ff124ab28938df700a"},
-    {file = "django_admin_cursor_paginator-0.1.2-py3-none-any.whl", hash = "sha256:481393e2b899d7fb6386931560f43bf46251515813ac8a48b703887bd1432261"},
+    {file = "django-admin-cursor-paginator-0.1.4.tar.gz", hash = "sha256:133a79a30c38f9a69fc51d6131b0c7e459043a4d3620fac17194badb97ee5df4"},
 ]
 
 [package.dependencies]
@@ -4784,4 +4783,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11, <3.12"
-content-hash = "5b52fce70bdc62be582385de9113bcfa1953765475f31651fb643abc94b9dfae"
+content-hash = "09bac37eb3abdf8670f8843cbb9cc002a6ef29be63450738d5350f02582f8e6e"
