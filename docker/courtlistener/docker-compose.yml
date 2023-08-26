@@ -66,7 +66,12 @@ services:
   # Task Server
   cl-celery:
     container_name: cl-celery
-    image: ${CELERY_DOCKER_IMAGE:-freelawproject/courtlistener:latest-celery-dev}
+    build:
+      context: "../../"
+      dockerfile: "./docker/django/Dockerfile"
+      args:
+        BUILD_ENV: dev
+      target: celery
     depends_on:
       - cl-postgresql
       - cl-redis
@@ -82,7 +87,12 @@ services:
 
   cl-django:
     container_name: cl-django
-    image: ${DJANGO_DOCKER_IMAGE:-freelawproject/courtlistener:latest-web-dev}
+    build:
+      context: "../../"
+      dockerfile: "./docker/django/Dockerfile"
+      args:
+        BUILD_ENV: dev
+      target: web-dev
     depends_on:
       - cl-postgresql
       - cl-redis
