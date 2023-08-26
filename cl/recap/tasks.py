@@ -393,7 +393,6 @@ async def process_recap_pdf(pk):
     )
     docket = await Docket.objects.aget(id=de.docket_id)
     await sync_to_async(mark_ia_upload_needed)(docket, save_docket=True)
-
     return rd
 
 
