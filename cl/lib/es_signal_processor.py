@@ -79,23 +79,39 @@ def get_fields_to_update(
 
 
 def document_fields_to_update(
-    field_list: list[str], instance: instance_typing, fields_map: dict
+    main_doc: es_document_typing,
+    main_object: instance_typing,
+    field_list: list[str],
+    instance: instance_typing,
+    fields_map: dict,
 ) -> dict:
     """Generate a dictionary of fields and values to update based on a
      provided map and an instance.
 
+    :param main_doc: A Elasticsearch DSL document.
+    :param main_object: The main object instance that changed.
     :param field_list: A list of field names that need to be updated.
     :param instance: The instance from which field values are to be extracted.
     :param fields_map: A map from which ES field names are to be extracted.
     :return: A dictionary with fields and values to update.
     """
 
-    return {
-        fields_map[field]: getattr(instance, field)()
-        if field.startswith("get_") and field.endswith("_display")
-        else getattr(instance, field)
-        for field in field_list
-    }
+    fields_to_update = {}
+    for field in field_list:
+        document_fields = fields_map[field]
+        for doc_field in document_fields:
+            if field.startswith("get_") and field.endswith("_display"):
+                fields_to_update[doc_field] = getattr(instance, field)()
+            else:
+                prepare_method = getattr(
+                    main_doc, f"prepare_{doc_field}", None
+                )
+                if prepare_method:
+                    field_value = prepare_method(main_object)
+                else:
+                    field_value = getattr(instance, field)
+                fields_to_update[doc_field] = field_value
+    return fields_to_update
 
 
 def save_document_in_es(
@@ -194,7 +210,11 @@ def update_es_documents(
                     Document.update(
                         main_doc,
                         **document_fields_to_update(
-                            fields_to_update, instance, fields_map
+                            main_doc,
+                            main_object,
+                            fields_to_update,
+                            instance,
+                            fields_map,
                         ),
                         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
                     )

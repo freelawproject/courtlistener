@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta
 from unittest import mock
 
@@ -1530,7 +1531,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             user=cls.user_profile.user,
             rate=Alert.REAL_TIME,
             name="Test Alert OA",
-            query="q=RT+Test+OA&type=oa",
+            query="q=RT+Test+OA+19-5735&type=oa",
         )
         cls.search_alert_2 = AlertFactory(
             user=cls.user_profile_2.user,
@@ -1615,11 +1616,29 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             mock_date = now().replace(day=1, hour=5)
             with time_machine.travel(mock_date, tick=False):
                 # When the Audio object is created it should trigger an alert.
+                transcript_response = {
+                    "response": {
+                        "results": [
+                            {
+                                "alternatives": [
+                                    {
+                                        "transcript": "RT Test OA transcript.",
+                                        "confidence": 0.85,
+                                    },
+                                ]
+                            },
+                        ]
+                    }
+                }
+                json_transcript = json.dumps(transcript_response)
                 rt_oral_argument = AudioWithParentsFactory.create(
                     case_name="RT Test OA",
                     docket__court=self.court_1,
                     docket__date_argued=now() - timedelta(hours=5),
                     docket__docket_number="19-5735",
+                    stt_status=Audio.STT_COMPLETE,
+                    judges="John Smith",
+                    stt_google_response=json_transcript,
                 )
 
         # Confirm Alert date_last_hit is updated.
@@ -1647,7 +1666,8 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
 
         # Case name is not highlighted in email alert.
         self.assertIn(rt_oral_argument.case_name, html_content)
-        # Highlighting tags are set only for text field.
+        # Highlighting tags are set for other fields.
+        self.assertIn("<strong>19-5735</strong>", html_content)
         self.assertIn("<strong>RT</strong>", html_content)
 
         # One webhook event should be sent to user_profile
@@ -2068,7 +2088,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 case_name=f"RT Test OA",
                 docket__court=self.court_1,
                 docket__date_argued=now() - timedelta(hours=5),
-                docket__docket_number=f"19-5730",
+                docket__docket_number=f"19-5735",
             )
 
         # 11 OA search alert emails should be sent, one for each user that

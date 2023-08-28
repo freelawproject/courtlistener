@@ -35,6 +35,7 @@ from cl.lib.elasticsearch_utils import (
     convert_str_date_fields_to_date_objects,
     fetch_es_results,
     merge_courts_from_db,
+    sanitize_unbalanced_parenthesis,
     set_results_highlights,
 )
 from cl.lib.paginators import ESPaginator
@@ -52,6 +53,7 @@ from cl.lib.search_utils import (
 )
 from cl.search.constants import RELATED_PATTERN
 from cl.search.documents import AudioDocument, ParentheticalGroupDocument
+from cl.search.exception import UnbalancedQuery
 from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import SEARCH_TYPES, Court, Opinion, OpinionCluster
 from cl.stats.models import Stat
@@ -600,6 +602,8 @@ def do_es_search(
     query_time = total_query_results = 0
     top_hits_limit = 5
     document_type = None
+    error_message = ""
+    suggested_query = ""
 
     search_form = SearchForm(get_params)
     if get_params.get("type") == SEARCH_TYPES.PARENTHETICAL:
@@ -611,19 +615,25 @@ def do_es_search(
         index=document_type._index._name
     ):
         cd = search_form.cleaned_data
-        # Create necessary filters to execute ES query
-        search_query = document_type.search()
-        s, total_query_results, top_hits_limit = build_es_main_query(
-            search_query, cd
-        )
-        paged_results, query_time, error = fetch_and_paginate_results(
-            get_params, s, rows_per_page=rows, cache_key=cache_key
-        )
-        search_form = _clean_form(
-            get_params,
-            search_form.cleaned_data,
-            courts,
-        )
+        try:
+            # Create necessary filters to execute ES query
+            search_query = document_type.search()
+
+            s, total_query_results, top_hits_limit = build_es_main_query(
+                search_query, cd
+            )
+            paged_results, query_time, error = fetch_and_paginate_results(
+                get_params, s, rows_per_page=rows, cache_key=cache_key
+            )
+            search_form = _clean_form(
+                get_params,
+                search_form.cleaned_data,
+                courts,
+            )
+        except UnbalancedQuery:
+            error = True
+            error_message = "has incorrect syntax. Did you forget to close one or more parentheses?"
+            suggested_query = sanitize_unbalanced_parenthesis(cd.get("q", ""))
     else:
         error = True
 
@@ -643,6 +653,8 @@ def do_es_search(
         "courts": courts,
         "court_count_human": court_count_human,
         "court_count": court_count,
+        "error_message": error_message,
+        "suggested_query": suggested_query,
     }
 
 

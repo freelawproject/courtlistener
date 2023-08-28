@@ -310,7 +310,16 @@ class SearchESResultSerializer(serializers.Serializer):
         # Numbers
         "integer": serializers.IntegerField,
     }
-    skipped_fields = ["text", "docket_slug", "percolator_query"]
+    skipped_fields = [
+        "text",
+        "docket_slug",
+        "percolator_query",
+        "case_name_full",
+        "dateArgued_text",
+        "dateReargued_text",
+        "dateReargumentDenied_text",
+        "court_id_text",
+    ]
 
     def get_fields(self):
         """Return a list of fields so that they don't have to be declared one
