@@ -361,12 +361,14 @@
   </div>
   {% if type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION %}
     {% if result.citeCount > 0 %}
-      <div class="bottom" class="inline-block">
-        <span class="meta-data-value">
-          <a href="/?q=cites%3A({{ result.sibling_ids|join:" OR "|urlencode }})"
-             rel="nofollow"
-          >Cited by {{ result.citeCount|intcomma }} opinion{{ result.citeCount|pluralize }}</a>
-        </span>
+      <div class="bottom">
+        <div class="inline-block">
+          <span class="meta-data-value">
+            <a href="/?q=cites%3A({{ result.sibling_ids|join:" OR "|urlencode }})"
+               rel="nofollow"
+            >Cited by {{ result.citeCount|intcomma }} opinion{{ result.citeCount|pluralize }}</a>
+          </span>
+        </div>
       </div>
     {% endif %}
   {% endif %}
