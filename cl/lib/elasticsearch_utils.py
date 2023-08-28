@@ -26,9 +26,13 @@ from cl.search.constants import (
     SEARCH_HL_TAG,
     SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS,
 )
+from cl.search.exception import UnbalancedQuery
 from cl.search.models import SEARCH_TYPES, Court
 
 logger = logging.getLogger(__name__)
+
+OPENING_CHAR = r"[\(\[]"  # Matches the following characters: (, [
+CLOSING_CHAR = r"[\)\]]"  # Matches the following characters: ), ]
 
 
 def elasticsearch_enabled(func: Callable) -> Callable:
@@ -127,6 +131,97 @@ def add_fields_boosting(cd: CleanData) -> list[str]:
     return make_es_boost_list(qf)
 
 
+def check_unbalanced_parenthesis(query: str) -> bool:
+    """Check whether the query string has unbalanced opening or closing parentheses.
+
+    :param query: The input query string
+    :return: Whether the query is balanced or not.
+    """
+    opening_count = query.count("(")
+    closing_count = query.count(")")
+
+    return opening_count != closing_count
+
+
+def sanitize_unbalanced_parenthesis(query: str) -> str:
+    """Sanitize a query by removing unbalanced opening or closing parentheses.
+
+    :param query: The input query string
+    :return: The sanitized query string, after removing unbalanced parentheses.
+    """
+    opening_count = query.count("(")
+    closing_count = query.count(")")
+    while opening_count > closing_count:
+        # Find last unclosed opening parenthesis position
+        last_parenthesis_opened_pos = query.rfind("(")
+        # Remove the parenthesis from the query.
+        query = (
+            query[:last_parenthesis_opened_pos]
+            + query[last_parenthesis_opened_pos + 1 :]
+        )
+        opening_count -= 1
+
+    while closing_count > opening_count:
+        # Find last unclosed closing parenthesis position
+        last_parenthesis_closed_pos = query.rfind(")")
+        # Remove the parenthesis from the query.
+        query = (
+            query[:last_parenthesis_closed_pos]
+            + query[last_parenthesis_closed_pos + 1 :]
+        )
+        closing_count -= 1
+
+    return query
+
+
+def append_query_conjunctions(query: str) -> str:
+    """Append default AND conjunctions to the query string.
+    :param query: The input query string
+    :return: The query string with AND conjunctions appended
+    """
+    words = query.split()
+    clean_q: list[str] = []
+    inside_group = 0
+    quotation = False
+    logic_operand = False
+    for word in words:
+        binary_operator = word.upper() in ["AND", "OR"]
+        """
+        This variable will be false in the following cases:
+            - When the word is a binary operator like AND or OR.
+            - When the word is preceded by a logical operator like NOT, AND, OR.
+            - When the word is enclosed by (), [] or ""
+        """
+        should_add_conjunction = clean_q and not any(
+            [inside_group, logic_operand, quotation, binary_operator]
+        )
+
+        if re.search(OPENING_CHAR, word):
+            # Group or range query opened.
+            # Increment the depth counter
+            inside_group += len(re.findall(OPENING_CHAR, word))
+        elif re.search(CLOSING_CHAR, word):
+            # Group or range query closed.
+            # Decrease the depth counter.
+            inside_group -= len(re.findall(CLOSING_CHAR, word))
+        elif '"' in word:
+            # Quote character found.
+            # Flip the quotation flag
+            quotation = not quotation
+
+        if should_add_conjunction:
+            clean_q.append("AND")
+        clean_q.append(word)
+
+        """
+        This is computed at the end of each loop, so the method won't
+        add conjunctions after logical operators
+        """
+        logic_operand = word.upper() in ["AND", "OR", "NOT"]
+
+    return " ".join(clean_q)
+
+
 def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
     """Given the cleaned data from a form, return a Elastic Search string query or []
     https://www.elastic.co/guide/en/elasticsearch/reference/current/full-text-queries.html
@@ -135,9 +230,9 @@ def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
     :param value: The string value to search for.
     :return: A Elasticsearch QueryString or [] if the "value" param is empty.
     """
-
     if value:
-        value = cleanup_main_query(value)
+        if check_unbalanced_parenthesis(value):
+            raise UnbalancedQuery()
         # In Elasticsearch, the colon (:) character is used to separate the
         # field name and the field value in a query.
         # To avoid parsing errors escape any colon characters in the value
@@ -150,11 +245,20 @@ def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
                     f"docketNumber:{match}", f"docketNumber:{replacement}"
                 )
 
+        # Used for the phrase query_string, no conjunctions appended.
+        query_value = cleanup_main_query(value)
+
+        # To enable the search of each term in the query across multiple fields
+        # it's necessary to include an "AND" conjunction between each term.
+        # https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html#query-string-multi-field
+        # Used for the best_fields query_string.
+        query_value_with_conjunctions = append_query_conjunctions(query_value)
+
         q_should = [
             Q(
                 "query_string",
                 fields=fields,
-                query=value,
+                query=query_value_with_conjunctions,
                 quote_field_suffix=".exact",
                 default_operator="AND",
                 tie_breaker=0.3,
@@ -162,7 +266,7 @@ def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
             Q(
                 "query_string",
                 fields=fields,
-                query=value,
+                query=query_value,
                 quote_field_suffix=".exact",
                 default_operator="AND",
                 type="phrase",
@@ -352,6 +456,11 @@ def build_es_base_query(search_query: Search, cd: CleanData) -> Search:
                 "court",
                 "court_citation_string",
                 "judge",
+                "dateArgued_text",
+                "dateReargued_text",
+                "dateReargumentDenied_text",
+                "court_id_text",
+                "sha1",
             ]
             fields.extend(add_fields_boosting(cd))
             string_query = build_fulltext_query(
@@ -415,8 +524,6 @@ def add_es_highlighting(
         if alerts:
             highlighting_fields = SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS
             hl_tag = ALERTS_HL_TAG
-        fields_to_exclude = ["sha1"]
-        search_query = search_query.source(excludes=fields_to_exclude)
         for field in highlighting_fields:
             search_query = search_query.highlight(
                 field,

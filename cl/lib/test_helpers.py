@@ -1,4 +1,5 @@
 import datetime
+import json
 from typing import Sized, cast
 
 import scorched
@@ -623,6 +624,25 @@ class AudioESTestCase(SimpleTestCase):
             court_id=cls.court_1.pk,
             date_argued=datetime.date(2013, 8, 14),
         )
+        transcript_response = {
+            "response": {
+                "results": [
+                    {
+                        "alternatives": [
+                            {
+                                "transcript": "This is the best transcript.",
+                                "confidence": 0.85,
+                            },
+                            {
+                                "transcript": "Another possible transcript.",
+                                "confidence": 0.75,
+                            },
+                        ]
+                    },
+                ]
+            }
+        }
+        json_transcript = json.dumps(transcript_response)
         cls.audio_1 = AudioFactory.create(
             case_name="SEC v. Frank J. Information, WikiLeaks",
             docket_id=cls.docket_1.pk,
@@ -633,6 +653,8 @@ class AudioESTestCase(SimpleTestCase):
             source="C",
             blocked=False,
             sha1="a49ada009774496ac01fb49818837e2296705c97",
+            stt_status=Audio.STT_COMPLETE,
+            stt_google_response=json_transcript,
         )
         cls.audio_2 = AudioFactory.create(
             case_name="Jose A. Dominguez v. Loretta E. Lynch",
