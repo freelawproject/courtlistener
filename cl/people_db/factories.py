@@ -14,18 +14,18 @@ from cl.people_db.models import (
     FEMALE,
     SUFFIXES,
     ABARating,
-    Education,
-    PoliticalAffiliation,
-    Position,
-    Race,
-    School,
     Attorney,
     AttorneyOrganization,
     AttorneyOrganizationAssociation,
+    Education,
     Party,
     PartyType,
     Person,
+    PoliticalAffiliation,
+    Position,
+    Race,
     Role,
+    School,
 )
 from cl.tests.providers import LegalProvider
 
