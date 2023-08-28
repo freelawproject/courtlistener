@@ -1,11 +1,4 @@
-from django.db.models.signals import m2m_changed, post_delete, post_save
-from django.dispatch import receiver
-from elasticsearch_dsl import Document
-
-from cl.alerts.send_alerts import send_or_schedule_alerts
 from cl.audio.models import Audio
-from cl.lib.command_utils import logger
-from cl.lib.elasticsearch_utils import es_index_exists
 from cl.lib.es_signal_processor import ESSignalProcessor
 from cl.people_db.models import (
     ABARating,
