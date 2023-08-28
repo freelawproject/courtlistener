@@ -120,12 +120,14 @@ def save_document_in_es(
     es_args = {}
     if isinstance(instance, Position):
         parent_id = getattr(instance.person, "pk", None)
-        if (
-            not es_index_exists(es_document._index._name)
-            or not parent_id
-            or not instance.person.is_judge
+        if not all(
+            [
+                es_index_exists(es_document._index._name),
+                parent_id,
+                # avoid indexing position records if the parent is not a judge
+                instance.person.is_judge,
+            ]
         ):
-            # avoid indexing position records if the parent is not a judge
             return
 
         if not PersonDocument.exists(id=parent_id):
