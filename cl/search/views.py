@@ -476,11 +476,11 @@ def show_results(request: HttpRequest) -> HttpResponse:
                     initial={"query": get_string, "rate": "dly"},
                     user=request.user,
                 )
-
-                if request.GET.get("type") == SEARCH_TYPES.PARENTHETICAL:
+                search_type = request.GET.get("type")
+                if search_type == SEARCH_TYPES.PARENTHETICAL:
                     search_results = do_es_search(request.GET.copy())
                     render_dict.update(search_results)
-                elif request.GET.get("type") == SEARCH_TYPES.ORAL_ARGUMENT:
+                elif search_type == SEARCH_TYPES.ORAL_ARGUMENT:
                     # Check if waffle flag is active.
                     if waffle.flag_is_active(request, "oa-es-deactivate"):
                         search_results = do_search(request.GET.copy())
@@ -493,7 +493,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
                         "value"
                     ] = render_dict["search_summary_str"]
                     render_dict.update({"alert_form": alert_form})
-                elif request.GET.get("type") == SEARCH_TYPES.PEOPLE:
+                elif search_type == SEARCH_TYPES.PEOPLE:
                     # Check if waffle flag is active.
                     if waffle.flag_is_active(request, "p-es-deactivate"):
                         search_results = do_search(request.GET.copy())
