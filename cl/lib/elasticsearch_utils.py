@@ -31,37 +31,8 @@ from cl.search.models import SEARCH_TYPES, Court
 
 logger = logging.getLogger(__name__)
 
-OPENING_CHAR = r"[\(\[\"\']"  # matches the following characters: (, [, ', "
-CLOSING_CHAR = r"[\)\]\"\']"  # matches the following characters: ), ], ', "
-FIELD_OPERATOR = r"[\w]*:"  # matches operators like docketNumber:
-
-# Matches string enclosed by the following characters: (), [], "", ''
-enclosed_str_regex = f"{OPENING_CHAR}+.*?{CLOSING_CHAR}+"
-ENCLOSED_STR_PATTERN = re.compile(
-    f"(?<!NOT ){FIELD_OPERATOR}?{enclosed_str_regex}[\S]*"
-)
-
-operant_str_regex = (
-    f"{FIELD_OPERATOR}?{OPENING_CHAR}+[\w\s\.\-\*\~]+{CLOSING_CHAR}+[\S]*"
-)
-search_term = f"{FIELD_OPERATOR}?[^()\s]+"
-
-# Matches terms that uses the unary logical operator
-UNARY_OPERATORS_STR_PATTERN = re.compile(
-    f"NOT\s{operant_str_regex}|"  # Matches NOT (a), NOT (a b ...)
-    f"NOT\s{search_term}",  # Matches NOT b
-    re.VERBOSE | re.IGNORECASE,
-)
-
-# Matches terms that uses one of the binary logical operators
-BINARY_OPERATORS_STR_PATTERN = re.compile(
-    (
-        f"({operant_str_regex}|{search_term})?"  # First operand (matches single terms and grouped expressions)
-        r"\s(AND|OR)\s"  # Operator
-        f"({operant_str_regex}|{search_term})"  # Second operand (matches single terms and grouped expressions)
-    ),
-    re.VERBOSE | re.IGNORECASE,
-)
+OPENING_CHAR = r"[\(\[]"  # Matches the following characters: (, [
+CLOSING_CHAR = r"[\)\]]"  # Matches the following characters: ), ]
 
 
 def elasticsearch_enabled(func: Callable) -> Callable:
@@ -208,26 +179,47 @@ def append_query_conjunctions(query: str) -> str:
     :param query: The input query string
     :return: The query string with AND conjunctions appended
     """
-    # Get all the search terms that use a binary logical operator
-    binary_operations = [
-        match.group() for match in BINARY_OPERATORS_STR_PATTERN.finditer(query)
-    ]
-    cleaned_str = BINARY_OPERATORS_STR_PATTERN.sub("", query)
+    words = query.split()
+    clean_q: list[str] = []
+    inside_group = 0
+    quotation = False
+    logic_operand = False
+    for word in words:
+        binary_operator = word.upper() in ["AND", "OR"]
+        """
+        This variable will be false in the following cases:
+            - When the word is a binary operator like AND or OR.
+            - When the word is preceded by a logical operator like NOT, AND, OR.
+            - When the word is enclosed by (), [] or ""
+        """
+        should_add_conjunction = clean_q and not any(
+            [inside_group, logic_operand, quotation, binary_operator]
+        )
 
-    # Get all the string that are enclosed by (), [], "" or '' and not preceded by the unary operator
-    groups = ENCLOSED_STR_PATTERN.findall(cleaned_str)
-    cleaned_str = ENCLOSED_STR_PATTERN.sub("", cleaned_str)
+        if re.search(OPENING_CHAR, word):
+            # Group or range query opened.
+            # Increment the depth counter
+            inside_group += len(re.findall(OPENING_CHAR, word))
+        elif re.search(CLOSING_CHAR, word):
+            # Group or range query closed.
+            # Decrease the depth counter.
+            inside_group -= len(re.findall(CLOSING_CHAR, word))
+        elif '"' in word:
+            # Quote character found.
+            # Flip the quotation flag
+            quotation = not quotation
 
-    # Get all the search terms that use the unary logical operator
-    unary_operations = UNARY_OPERATORS_STR_PATTERN.findall(cleaned_str)
-    cleaned_str = UNARY_OPERATORS_STR_PATTERN.sub("", cleaned_str)
+        if should_add_conjunction:
+            clean_q.append("AND")
+        clean_q.append(word)
 
-    # Get the remaining search terms
-    single_terms = cleaned_str.split()
+        """
+        This is computed at the end of each loop, so the method won't
+        add conjunctions after logical operators
+        """
+        logic_operand = word.upper() in ["AND", "OR", "NOT"]
 
-    return " AND ".join(
-        single_terms + groups + unary_operations + binary_operations
-    )
+    return " ".join(clean_q)
 
 
 def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:

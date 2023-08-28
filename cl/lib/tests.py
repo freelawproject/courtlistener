@@ -967,12 +967,12 @@ class TestAppendQueryConjunctions(SimpleTestCase):
             {"input": "a b", "output": "a AND b"},
             {"input": "a b (c d)", "output": "a AND b AND (c d)"},
             {
-                "input": "a b (c d) [a b]",
-                "output": "a AND b AND (c d) AND [a b]",
+                "input": f"caseName:Loretta AND docketNumber:(ASBCA No. 59126)",
+                "output": "caseName:Loretta AND docketNumber:(ASBCA No. 59126)",
             },
             {
-                "input": "a b (c d) [a b] 'a c'",
-                "output": "a AND b AND (c d) AND [a b] AND 'a c'",
+                "input": "a b (c d) [a b]",
+                "output": "a AND b AND (c d) AND [a b]",
             },
             {
                 "input": 'a b (c d) [a b] "a c"',
@@ -984,19 +984,23 @@ class TestAppendQueryConjunctions(SimpleTestCase):
             },
             {
                 "input": 'a b NOT word1 (c d) [a b] NOT (word1 word2) "a z" NOT [word3 word4]',
-                "output": 'a AND b AND (c d) AND [a b] AND "a z" AND NOT word1 AND NOT (word1 word2) AND NOT [word3 word4]',
+                "output": 'a AND b AND NOT word1 AND (c d) AND [a b] AND NOT (word1 word2) AND "a z" AND NOT [word3 word4]',
             },
             {
                 "input": 'a b NOT a (c d) [a b] NOT (a w) "a z" word1 AND word2',
-                "output": 'a AND b AND (c d) AND [a b] AND "a z" AND NOT a AND NOT (a w) AND word1 AND word2',
+                "output": 'a AND b AND NOT a AND (c d) AND [a b] AND NOT (a w) AND "a z" AND word1 AND word2',
             },
             {
                 "input": 'a b NOT a (c d) [a b] AND (a w) "a z" word1 OR word2',
-                "output": 'a AND b AND (c d) AND "a z" AND NOT a AND [a b] AND (a w) AND word1 OR word2',
+                "output": 'a AND b AND NOT a AND (c d) AND [a b] AND (a w) AND "a z" AND word1 OR word2',
             },
             {
                 "input": "(A AND B) (a bc (a b)) and word1",
                 "output": "(A AND B) AND (a bc (a b)) and word1",
+            },
+            {
+                "input": 'field:"a w c" (a bc (a b) and w) and docket:"word1 word3"',
+                "output": 'field:"a w c" AND (a bc (a b) and w) and docket:"word1 word3"',
             },
         ]
 
