@@ -240,37 +240,31 @@ def build_sort_results(cd: CleanData) -> Dict:
     :return: The short dict.
     """
 
-    if (
-        cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT
-        or cd["type"] == SEARCH_TYPES.PEOPLE
-    ):
-        order_by_map = {
-            "score desc": {"_score": {"order": "desc"}},
-            "dateArgued desc": {"dateArgued": {"order": "desc"}},
-            "dateArgued asc": {"dateArgued": {"order": "asc"}},
-            "random_123 desc": {"random_123": {"order": "desc"}},
-            "random_123 asc": {"random_123": {"order": "asc"}},
-            "name_reverse asc": {"name_reverse": {"order": "asc"}},
-            "dob desc,name_reverse asc": {
-                "dob": {"order": "desc"},
-                "name_reverse": {"order": "asc"},
-            },
-            "dob asc,name_reverse asc": {
-                "dob": {"order": "asc"},
-                "name_reverse": {"order": "asc"},
-            },
-            "dod desc,name_reverse asc": {
-                "dod": {"order": "desc"},
-                "name_reverse": {"order": "asc"},
-            },
-        }
+    order_by_map = {
+        "score desc": {"_score": {"order": "desc"}},
+        "dateArgued desc": {"dateArgued": {"order": "desc"}},
+        "dateArgued asc": {"dateArgued": {"order": "asc"}},
+        "random_123 desc": {"random_123": {"order": "desc"}},
+        "random_123 asc": {"random_123": {"order": "asc"}},
+        "name_reverse asc": {"name_reverse": {"order": "asc"}},
+        "dob desc,name_reverse asc": {
+            "dob": {"order": "desc"},
+            "name_reverse": {"order": "asc"},
+        },
+        "dob asc,name_reverse asc": {
+            "dob": {"order": "asc"},
+            "name_reverse": {"order": "asc"},
+        },
+        "dod desc,name_reverse asc": {
+            "dod": {"order": "desc"},
+            "name_reverse": {"order": "asc"},
+        },
+        "dateFiled desc": {"dateFiled": {"order": "desc"}},
+        "dateFiled asc": {"dateFiled": {"order": "asc"}},
+    }
 
-    else:
-        order_by_map = {
-            "score desc": {"score": {"order": "desc"}},
-            "dateFiled desc": {"dateFiled": {"order": "desc"}},
-            "dateFiled asc": {"dateFiled": {"order": "asc"}},
-        }
+    if cd["type"] == SEARCH_TYPES.PARENTHETICAL:
+        order_by_map["score desc"] = {"score": {"order": "desc"}}
 
     order_by = cd.get("order_by")
     if order_by not in order_by_map:
