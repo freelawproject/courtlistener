@@ -269,7 +269,7 @@ async def extract_recap_pdf_base(
         if check_if_needed and not rd.needs_extraction:
             # Early abort if the item doesn't need extraction and the user
             # hasn't disabled early abortion.
-            processed.append(rd.pk)
+            processed.append(pk)
             continue
 
         response = await microservice(
@@ -307,7 +307,7 @@ async def extract_recap_pdf_base(
         rd.plain_text, _ = anonymize(content)
         # Do not do indexing here. Creates race condition in celery.
         await rd.asave(index=False, do_extraction=False)
-        processed.append(rd.pk)
+        processed.append(pk)
 
     return processed
 
