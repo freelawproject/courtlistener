@@ -7,7 +7,7 @@ from elasticsearch_dsl import connections
 from lxml import html
 
 from cl.alerts.models import Alert
-from cl.alerts.send_alerts import percolate_document
+from cl.alerts.utils import percolate_document
 from cl.audio.factories import AudioFactory
 from cl.audio.models import Audio
 from cl.lib.elasticsearch_utils import (

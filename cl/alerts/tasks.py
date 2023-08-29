@@ -1,21 +1,32 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, List, Tuple, Union, cast
+from typing import Any, Dict, List, Tuple, Union, cast
 
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives, get_connection, send_mail
 from django.db import transaction
 from django.template import loader
 from django.utils.timezone import now
+from elasticsearch.exceptions import RequestError, TransportError
+from elasticsearch_dsl.response import Hit
 
-from cl.alerts.models import DocketAlert
-from cl.api.tasks import send_docket_alert_webhook_events
+from cl.alerts.models import Alert, DocketAlert, ScheduledAlertHit
+from cl.alerts.utils import percolate_document, send_alert_email
+from cl.api.models import WebhookEventType
+from cl.api.tasks import (
+    send_docket_alert_webhook_events,
+    send_es_search_alert_webhook,
+)
 from cl.celery_init import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.models import Note, UserTag
+from cl.lib.command_utils import logger
+from cl.lib.elasticsearch_utils import merge_highlights_into_result
 from cl.lib.redis_utils import create_redis_semaphore, delete_redis_semaphore
 from cl.lib.string_utils import trunc
 from cl.recap.constants import COURT_TIMEZONES
+from cl.search.constants import ALERTS_HL_TAG
 from cl.search.models import Docket, DocketEntry
 from cl.stats.utils import tally_stat
 from cl.users.models import UserProfile
@@ -406,3 +417,184 @@ def send_recap_email_user_not_found(recap_email_recipients: list[str]) -> None:
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[a[1] for a in settings.MANAGERS],
     )
+
+
+@app.task(ignore_result=True)
+def send_search_alert_and_webhooks(
+    user_id: int, hits: list[tuple[Alert, str, list[dict[str, Any]], int]]
+) -> None:
+    """Send alert emails and webhooks for a user.
+
+    One email is sent per User and one webhook event is sent for every Alert
+    per User.
+
+    :param user_id: The user to whom the alerts should be sent.
+    :param hits: A list of tuples containing the Alert, search type,
+    documents, and number of documents.
+    :return: None
+    """
+
+    alert_user: UserProfile.user = User.objects.get(pk=user_id)
+    if len(hits) > 0:
+        send_alert_email(alert_user.email, hits)
+
+    for alert, search_type, documents, num_docs in hits:
+        user_webhooks = alert_user.webhooks.filter(
+            event_type=WebhookEventType.SEARCH_ALERT, enabled=True
+        )
+        for user_webhook in user_webhooks:
+            send_es_search_alert_webhook.delay(
+                documents,
+                user_webhook,
+                alert,
+            )
+
+
+@app.task(ignore_result=True)
+def process_percolator_response(
+    response: tuple[list[Hit], dict[str, Any]]
+) -> None:
+    """Process the response from the percolator and handle alerts triggered by
+     the percolator query.
+
+    :param response: A two tuple, a list of Alerts triggered and the document
+    data that triggered the alert.
+    :return: None
+    """
+
+    if not response:
+        return None
+    alerts_triggered, document_content = response
+    for hit in alerts_triggered:
+        alert_triggered = (
+            Alert.objects.filter(pk=hit.meta.id)
+            .select_related(
+                "user",
+            )
+            .first()
+        )
+        if not alert_triggered:
+            continue
+
+        # Send RT Alerts
+        if alert_triggered.rate == Alert.REAL_TIME:
+            alert_user: UserProfile.user = alert_triggered.user
+            not_donated_enough = (
+                alert_user.profile.total_donated_last_year
+                < settings.MIN_DONATION["rt_alerts"]
+            )
+            if not_donated_enough:
+                logger.info(
+                    "User: %s has not donated enough for their "
+                    "RT alerts to be sent.\n" % alert_user
+                )
+                continue
+
+            # Set highlight if available in response.
+            if hasattr(hit.meta, "highlight"):
+                merge_highlights_into_result(
+                    hit.meta.highlight.to_dict(),
+                    document_content,
+                    ALERTS_HL_TAG,
+                )
+            hits = []
+            search_type = alert_triggered.alert_type
+            hits.append(
+                (
+                    alert_triggered,
+                    search_type,
+                    [document_content],
+                    1,
+                )
+            )
+            alert_triggered.date_last_hit = now()
+            alert_triggered.save()
+
+            # Send Alerts and Webhooks
+            send_search_alert_and_webhooks.delay(alert_user.pk, hits)
+
+            tally_stat(f"alerts.sent.{Alert.REAL_TIME}", inc=1)
+            logger.info(f"Sent {1} {Alert.REAL_TIME} email alerts.")
+
+        else:
+            # Schedule DAILY, WEEKLY and MONTHLY Alerts
+            highlights = {}
+            if hasattr(hit.meta, "highlight"):
+                highlights = hit.meta["highlight"].to_dict()
+            ScheduledAlertHit.objects.create(
+                user=alert_triggered.user,
+                rate=alert_triggered.rate,
+                alert=alert_triggered,
+                document_content=document_content,
+                highlighted_fields=highlights,  # Merge highlights in content.
+            )
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(TransportError, ConnectionError, RequestError),
+    max_retries=3,
+    interval_start=5,
+)
+def send_or_schedule_alerts(
+    self, response: tuple[str, dict[str, Any]], document_index: str
+) -> tuple[list[Hit], dict[str, Any]] | None:
+    """Send real-time alerts based on the Elasticsearch search response.
+
+    Or schedule other rates alerts to send them later.
+
+    Iterates through each hit in the search response, checks if the alert rate
+    is real-time, and if the user has donated enough. If so it sends an email
+    alert and triggers webhooks.
+    The process begins with an initial percolator query and continues to fetch
+    additional results in chunks determined by settings.PERCOLATOR_PAGE_SIZE,
+    until all results are retrieved or no more results are available.
+
+    :param self: The task
+    :param response: A two tuple, the document ID to be percolated in
+    ES index and the document data that triggered the alert.
+    :param document_index: The ES document index where the document lives.
+    :return: A two tuple, a list of Alerts triggered and the document data that
+    triggered the alert.
+    """
+
+    if not response:
+        self.request.chain = None
+        return None
+
+    document_id, document_content = response
+    # Perform an initial percolator query and process its response.
+    alerts_triggered = []
+    percolator_response = percolate_document(document_id, document_index)
+    if not percolator_response:
+        self.request.chain = None
+        return None
+
+    alerts_triggered.extend(percolator_response.hits)
+
+    # Check if the query contains more documents than PERCOLATOR_PAGE_SIZE.
+    # If so, return additional results until there are not more.
+    batch_size = settings.PERCOLATOR_PAGE_SIZE
+    total_hits = percolator_response.hits.total.value
+    results_returned = len(percolator_response.hits.hits)
+    if total_hits > batch_size:
+        documents_retrieved = results_returned
+        search_after = percolator_response.hits[-1].meta.sort
+        while True:
+            percolator_response = percolate_document(
+                document_id, document_index, search_after=search_after
+            )
+            if not percolator_response:
+                break
+
+            alerts_triggered.extend(percolator_response.hits)
+            results_returned = len(percolator_response.hits.hits)
+            documents_retrieved += results_returned
+            # Check if all results have been retrieved. If so break the loop
+            # Otherwise, increase search_after.
+            if documents_retrieved >= total_hits or results_returned == 0:
+                break
+            else:
+                search_after = percolator_response.hits[-1].meta.sort
+
+    return alerts_triggered, document_content

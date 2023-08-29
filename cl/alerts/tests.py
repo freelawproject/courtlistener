@@ -28,10 +28,8 @@ from cl.alerts.models import (
     SEARCH_TYPES,
     Alert,
     DocketAlert,
-    ParentAlert,
     RealTimeQueue,
     ScheduledAlertHit,
-    UserRateAlert,
 )
 from cl.alerts.tasks import (
     get_docket_notes_and_tags_by_user,
@@ -1670,6 +1668,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         self.assertIn("<strong>19-5735</strong>", html_content)
         self.assertIn("<strong>RT</strong>", html_content)
 
+        # The right alert type template is used.
+        self.assertIn("oral argument", html_content)
+
         # One webhook event should be sent to user_profile
         webhook_events = WebhookEvent.objects.all()
         self.assertEqual(len(webhook_events), 1)
@@ -1823,6 +1824,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         text_content = mail.outbox[alert_count - 1].body
         self.assertIn(document.case_name, text_content)
 
+        # The right alert type template is used.
+        self.assertIn("oral argument", text_content)
+
         # One webhook event should be sent to user_profile
         webhook_events = WebhookEvent.objects.all()
         self.assertEqual(len(webhook_events), alert_count)
@@ -1830,16 +1834,8 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         self.assertEqual(len(content["results"]), alert_count)
 
         # Confirm dly stored alerts instances were removed after send them.
-        user_rates = UserRateAlert.objects.filter(rate=rate)
-        self.assertEqual(user_rates.count(), 0)
-
-        if user_rates:
-            parent_alerts = ParentAlert.objects.all(user_rate=user_rates[0])
-            scheduled_alerts = ScheduledAlertHit.objects.filter(
-                parent_alert=parent_alerts[0]
-            )
-            self.assertEqual(parent_alerts.count(), 0)
-            self.assertEqual(scheduled_alerts.count(), 0)
+        scheduled_hits = ScheduledAlertHit.objects.filter(rate=rate)
+        self.assertEqual(scheduled_hits.count(), 0)
 
     def test_send_alert_multiple_alert_rates(self):
         """Confirm dly, wly and mly alerts are properly stored and sent
@@ -1854,13 +1850,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         )
         # When a new document is created, and it triggers a dly, wly or mly
         # It's stored to send it later.
-        user_rates = UserRateAlert.objects.filter(rate=Alert.DAILY)
-        parent_alerts = ParentAlert.objects.filter(user_rate=user_rates[0])
-        scheduled_alerts = ScheduledAlertHit.objects.filter(
-            parent_alert=parent_alerts[0]
-        )
-        self.assertEqual(user_rates.count(), 1)
-        self.assertEqual(parent_alerts.count(), 1)
+        scheduled_alerts = ScheduledAlertHit.objects.filter(rate=Alert.DAILY)
         self.assertEqual(scheduled_alerts.count(), 1)
         # At this stage no alerts or webhooks should go out.
         self.assertEqual(len(mail.outbox), 0)
@@ -1999,6 +1989,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         mock_logger.info.assert_called_with(f"Sent 1 dly email alerts.")
         self.assertEqual(len(mail.outbox), 1)
         text_content = mail.outbox[0].body
+
+        # The right alert type template is used.
+        self.assertIn("oral argument", text_content)
 
         # The alert email should contain 3 hits.
         self.assertIn(rt_oral_argument_1.case_name, text_content)

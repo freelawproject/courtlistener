@@ -1,18 +1,15 @@
 import datetime
+from collections import defaultdict
+from typing import Any, DefaultDict
 
-from django.db.models import Prefetch
-from django.http import QueryDict
 from django.utils.timezone import now
 
-from cl.alerts.models import Alert, ParentAlert, UserRateAlert
-from cl.alerts.send_alerts import (
-    merge_highlights_into_result,
-    send_search_alert_and_webhooks,
-)
+from cl.alerts.models import Alert, ScheduledAlertHit
+from cl.alerts.tasks import send_search_alert_and_webhooks
 from cl.alerts.utils import InvalidDateError
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.elasticsearch_utils import merge_highlights_into_result
 from cl.search.constants import ALERTS_HL_TAG
-from cl.search.models import SEARCH_TYPES
 from cl.stats.utils import tally_stat
 
 
@@ -36,27 +33,26 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
     alerts_sent_count = 0
     now_time = now()
     alerts_to_update = []
-    rate_users = (
-        UserRateAlert.objects.filter(rate=rate)
-        .select_related("user")
-        .prefetch_related(
-            Prefetch(
-                "parent_alerts",
-                queryset=ParentAlert.objects.select_related(
-                    "alert"
-                ).prefetch_related("scheduled_alerts"),
-            )
-        )
-    )
+    scheduled_hits_rate = ScheduledAlertHit.objects.filter(
+        rate=rate
+    ).select_related("user", "alert")
 
-    for rate_user in rate_users.iterator():
+    # Create a nested dictionary structure to hold the groups.
+    grouped_hits: DefaultDict[
+        int, DefaultDict[Alert, list[ScheduledAlertHit]]
+    ] = defaultdict(lambda: defaultdict(list))
+
+    # Group scheduled hits by User and Alert.
+    for hit in scheduled_hits_rate:
+        user_id = hit.user.pk
+        alert = hit.alert
+        grouped_hits[user_id][alert].append(hit)
+
+    for user_id, alerts in grouped_hits.items():
         hits = []
-        for parent_alert in rate_user.parent_alerts.all():
-            results = parent_alert.scheduled_alerts.all()
-            qd = QueryDict(parent_alert.alert.query.encode(), mutable=True)
-            search_type = qd.get("type", SEARCH_TYPES.OPINION)
+        for alert, results in alerts.items():
+            search_type = alert.alert_type
             documents = []
-
             for result in results:
                 document_content = json_date_parser(result.document_content)
                 if result.highlighted_fields:
@@ -66,27 +62,27 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
                         ALERTS_HL_TAG,
                     )
                 documents.append(document_content)
-            alerts_to_update.append(parent_alert.alert)
+
+            alerts_to_update.append(alert.pk)
             hits.append(
                 (
-                    parent_alert.alert,
+                    alert,
                     search_type,
                     documents,
                     len(documents),
                 )
             )
-        send_search_alert_and_webhooks(rate_user.user, hits)
-        if rate_user.parent_alerts.exists():
+        send_search_alert_and_webhooks(user_id, hits)
+        if hits:
             alerts_sent_count += 1
 
     # Update Alert's date_last_hit in bulk.
-    Alert.objects.filter(
-        id__in=[alert.id for alert in alerts_to_update]
-    ).update(date_last_hit=now_time)
+    Alert.objects.filter(id__in=alerts_to_update).update(
+        date_last_hit=now_time
+    )
 
-    # Remove stored alerts sent, all the related objects will be deleted
-    # in cascade.
-    rate_users.delete()
+    # Remove stored alerts sent.
+    scheduled_hits_rate.delete()
 
     tally_stat(f"alerts.sent.{rate}", inc=alerts_sent_count)
     logger.info(f"Sent {alerts_sent_count} {rate} email alerts.")

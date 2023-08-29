@@ -1,12 +1,14 @@
-from typing import Union
+from typing import Any, Union
 
-import waffle
+from celery.canvas import chain
 from django.conf import settings
 from django.db.models.signals import m2m_changed, post_delete, post_save
 from elasticsearch.exceptions import NotFoundError
-from elasticsearch_dsl import Document
 
-from cl.alerts.send_alerts import send_or_schedule_alerts
+from cl.alerts.tasks import (
+    process_percolator_response,
+    send_or_schedule_alerts,
+)
 from cl.audio.models import Audio
 from cl.lib.command_utils import logger
 from cl.lib.elasticsearch_utils import elasticsearch_enabled
@@ -19,6 +21,7 @@ from cl.search.models import (
     Parenthetical,
     ParentheticalGroup,
 )
+from cl.search.tasks import save_document_in_es, update_document_in_es
 
 instance_typing = Union[
     Citation,
@@ -30,7 +33,6 @@ instance_typing = Union[
     Audio,
 ]
 es_document_typing = Union[AudioDocument, ParentheticalGroupDocument]
-
 models_alert_support = [Audio]
 
 
@@ -84,7 +86,7 @@ def document_fields_to_update(
     field_list: list[str],
     instance: instance_typing,
     fields_map: dict,
-) -> dict:
+) -> dict[str, Any]:
     """Generate a dictionary of fields and values to update based on a
      provided map and an instance.
 
@@ -114,32 +116,6 @@ def document_fields_to_update(
     return fields_to_update
 
 
-def save_document_in_es(
-    instance: instance_typing, es_document: es_document_typing
-) -> None:
-    """Save a document in Elasticsearch using a provided callable.
-    :param instance: The instance of the document to save.
-    :param es_document: A Elasticsearch DSL document.
-    :return: None
-    """
-    es_doc = es_document()
-    doc = es_doc.prepare(instance)
-    response = es_document(meta={"id": instance.pk}, **doc).save(
-        skip_empty=False,
-        return_doc_meta=True,
-        refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
-    )
-    if type(instance) in models_alert_support and response["_version"] == 1:
-        # Only send search alerts when a new instance of a model that support
-        # Alerts is indexed in ES _version:1
-        if es_document == AudioDocument and not waffle.switch_is_active(
-            "oa-es-alerts-active"
-        ):
-            # Disable ES Alerts if oa-es-alerts-active switch is not enabled
-            return
-        send_or_schedule_alerts(response["_id"], es_document._index._name, doc)
-
-
 def get_or_create_doc(
     es_document: es_document_typing, instance: instance_typing
 ) -> es_document_typing | None:
@@ -151,7 +127,7 @@ def get_or_create_doc(
     try:
         main_doc = es_document.get(id=instance.pk)
     except NotFoundError:
-        save_document_in_es(instance, es_document)
+        save_document_in_es.delay(instance, es_document)
         return None
     return main_doc
 
@@ -207,16 +183,15 @@ def update_es_documents(
                     changed_fields, fields_map
                 )
                 if fields_to_update:
-                    Document.update(
+                    update_document_in_es.delay(
                         main_doc,
-                        **document_fields_to_update(
+                        document_fields_to_update(
                             main_doc,
                             main_object,
                             fields_to_update,
                             instance,
                             fields_map,
                         ),
-                        refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
                     )
 
 
@@ -267,11 +242,7 @@ def update_m2m_field_in_es_document(
     if not document:
         return
     get_m2m_value = getattr(document, f"prepare_{affected_field}")(instance)
-    Document.update(
-        document,
-        **{affected_field: get_m2m_value},
-        refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
-    )
+    update_document_in_es.delay(document, {affected_field: get_m2m_value})
 
 
 def update_reverse_related_documents(
@@ -296,13 +267,13 @@ def update_reverse_related_documents(
         main_doc = get_or_create_doc(es_document, main_object)
         if not main_doc:
             return
-        Document.update(
+
+        update_document_in_es.delay(
             main_doc,
-            **{
+            {
                 field: getattr(main_doc, f"prepare_{field}")(main_object)
                 for field in affected_fields
             },
-            refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
         )
 
 
@@ -382,7 +353,11 @@ class ESSignalProcessor(object):
                 mapping_fields,
             )
         if not mapping_fields:
-            save_document_in_es(instance, self.es_document)
+            chain(
+                save_document_in_es.si(instance, self.es_document),
+                send_or_schedule_alerts.s(self.es_document._index._name),
+                process_percolator_response.s(),
+            ).apply_async()
 
     @elasticsearch_enabled
     def handle_delete(self, sender, instance, **kwargs):
