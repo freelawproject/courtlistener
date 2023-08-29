@@ -453,19 +453,18 @@ def add_es_highlighting(
 
     fields_to_exclude = []
     highlighting_fields = []
-    hl_tag = []
-    if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
-        highlighting_fields = SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS
-        hl_tag = SEARCH_HL_TAG
-        fields_to_exclude = ["sha1"]
-        if alerts:
-            highlighting_fields = SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS
-            hl_tag = ALERTS_HL_TAG
+    hl_tag = ALERTS_HL_TAG if alerts else SEARCH_HL_TAG
 
-    elif cd["type"] == SEARCH_TYPES.PEOPLE:
-        highlighting_fields = SOLR_PEOPLE_ES_HL_FIELDS
-        hl_tag = SEARCH_HL_TAG
-        fields_to_exclude = []
+    match cd["type"]:
+        case SEARCH_TYPES.ORAL_ARGUMENT:
+            highlighting_fields = (
+                SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS
+                if alerts
+                else SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS
+            )
+            fields_to_exclude = ["sha1"]
+        case SEARCH_TYPES.PEOPLE:
+            highlighting_fields = SOLR_PEOPLE_ES_HL_FIELDS
 
     search_query = search_query.source(excludes=fields_to_exclude)
     for field in highlighting_fields:
