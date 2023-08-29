@@ -259,6 +259,7 @@ class AudioDocument(AudioDocumentBase):
 @oral_arguments_percolator_index.document
 class AudioPercolator(AudioDocumentBase):
     rate = fields.KeywordField(attr="rate")
+    date_created = fields.DateField(attr="date_created")
     percolator_query = PercolatorField()
 
     class Django:

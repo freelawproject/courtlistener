@@ -518,15 +518,17 @@ def process_percolator_response(
 
         else:
             # Schedule DAILY, WEEKLY and MONTHLY Alerts
-            highlights = {}
             if hasattr(hit.meta, "highlight"):
-                highlights = hit.meta["highlight"].to_dict()
+                merge_highlights_into_result(
+                    hit.meta["highlight"].to_dict(),
+                    document_content,
+                    ALERTS_HL_TAG,
+                )
             ScheduledAlertHit.objects.create(
                 user=alert_triggered.user,
                 rate=alert_triggered.rate,
                 alert=alert_triggered,
                 document_content=document_content,
-                highlighted_fields=highlights,  # Merge highlights in content.
             )
 
 

@@ -1,6 +1,6 @@
 import datetime
 from collections import defaultdict
-from typing import Any, DefaultDict
+from typing import DefaultDict
 
 from django.utils.timezone import now
 
@@ -8,8 +8,6 @@ from cl.alerts.models import Alert, ScheduledAlertHit
 from cl.alerts.tasks import send_search_alert_and_webhooks
 from cl.alerts.utils import InvalidDateError
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.elasticsearch_utils import merge_highlights_into_result
-from cl.search.constants import ALERTS_HL_TAG
 from cl.stats.utils import tally_stat
 
 
@@ -54,14 +52,7 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
             search_type = alert.alert_type
             documents = []
             for result in results:
-                document_content = json_date_parser(result.document_content)
-                if result.highlighted_fields:
-                    merge_highlights_into_result(
-                        result.highlighted_fields,
-                        document_content,
-                        ALERTS_HL_TAG,
-                    )
-                documents.append(document_content)
+                documents.append(json_date_parser(result.document_content))
 
             alerts_to_update.append(alert.pk)
             hits.append(

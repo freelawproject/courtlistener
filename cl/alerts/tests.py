@@ -35,7 +35,7 @@ from cl.alerts.tasks import (
     get_docket_notes_and_tags_by_user,
     send_alert_and_webhook,
 )
-from cl.alerts.utils import InvalidDateError
+from cl.alerts.utils import InvalidDateError, percolate_document
 from cl.api.factories import WebhookFactory
 from cl.api.models import (
     WEBHOOK_EVENT_STATUS,
@@ -49,7 +49,7 @@ from cl.donate.factories import DonationFactory
 from cl.donate.models import Donation
 from cl.favorites.factories import NoteFactory, UserTagFactory
 from cl.lib.test_helpers import EmptySolrTestCase, SimpleUserDataMixin
-from cl.search.documents import AudioPercolator
+from cl.search.documents import AudioDocument, AudioPercolator
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
@@ -1547,7 +1547,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             user=cls.user_profile.user,
             rate=Alert.DAILY,
             name="Test Alert OA Daily 2",
-            query="q=DLY+Test+V2&type=oa",
+            query="q=DLY+Test+V2+19-5741&type=oa",
         )
         cls.search_alert_5 = AlertFactory(
             user=cls.user_profile.user,
@@ -2002,6 +2002,16 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         self.assertIn(self.search_alert_3.name, text_content)
         self.assertIn(self.search_alert_4.name, text_content)
 
+        # Extract HTML version.
+        html_content = None
+        for content, content_type in mail.outbox[0].alternatives:
+            if content_type == "text/html":
+                html_content = content
+                break
+
+        # Highlights are properly set in scheduled alerts.
+        self.assertIn("<strong>19-5741</strong>", html_content)
+
         # Two webhook event should be sent to user_profile for two different
         # alerts
         webhook_events = WebhookEvent.objects.all()
@@ -2185,6 +2195,64 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             audio.delete()
         for alert in alerts_created:
             alert.delete()
+
+    @override_settings(PERCOLATOR_PAGE_SIZE=5)
+    def test_percolate_document_in_batches(self):
+        """Confirm when getting alerts in batches and an alert previously
+        retrieved is updated during this process. It's not returned again.
+        """
+
+        alerts_created = []
+        for i in range(6):
+            user_profile = UserProfileWithParentsFactory.create()
+            alert = AlertFactory.create(
+                user=user_profile.user,
+                rate=Alert.REAL_TIME,
+                name=f"Test Alert RT {i}",
+                query=f"q=Lorem+Ipsum+20-5739&type=oa",
+            )
+            alerts_created.append(alert)
+
+        # Save a document to percolate it later.
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            rt_oral_argument = AudioWithParentsFactory.create(
+                case_name=f"Lorem Ipsum",
+                docket__court=self.court_1,
+                docket__date_argued=now() - timedelta(hours=5),
+                docket__docket_number=f"20-5739",
+            )
+
+        # Percolate the document. First batch.
+        document_index = AudioDocument._index._name
+        percolator_response = percolate_document(
+            str(rt_oral_argument.pk), document_index
+        )
+
+        ids_in_results = []
+        for result in percolator_response.hits:
+            ids_in_results.append(result.id)
+
+        # Update the first in the previous batch.
+        alert_to_modify = alerts_created[0]
+        alert_to_modify.rate = "dly"
+        alert_to_modify.save()
+
+        # Percolate the next page.
+        search_after = percolator_response.hits[-1].meta.sort
+        percolator_response = percolate_document(
+            str(rt_oral_argument.pk), document_index, search_after=search_after
+        )
+
+        # The document updated shouldn't be retrieved again.
+        # Since documents are ordered by asc date_created instead of timestamp.
+        for result in percolator_response.hits:
+            self.assertNotIn(result.id, ids_in_results)
+            ids_in_results.append(result.id)
 
 
 @override_settings(ELASTICSEARCH_DISABLED=True)

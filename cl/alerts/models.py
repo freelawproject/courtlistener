@@ -187,8 +187,3 @@ class ScheduledAlertHit(AbstractDateTimeModel):
         encoder=DateJSONEncoder,
         help_text="The content of the document at the moment it was added.",
     )
-    highlighted_fields = models.JSONField(  # type: ignore
-        help_text="The highlighted fields for the alert.",
-        blank=True,
-        null=True,
-    )

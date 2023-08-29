@@ -124,7 +124,7 @@ def percolate_document(
         s, {"type": SEARCH_TYPES.ORAL_ARGUMENT}, alerts=True
     )
     s = s.source(excludes=["percolator_query"])
-    s = s.sort("timestamp")
+    s = s.sort("date_created")
     s = s[: settings.PERCOLATOR_PAGE_SIZE]
     if search_after:
         s = s.extra(search_after=search_after)
