@@ -263,13 +263,13 @@ async def extract_recap_pdf_base(
     if not is_iter(pks):
         pks = [pks]
 
-    processed_docs: List[RECAPDocument] = []
+    processed: List[int] = []
     for pk in pks:
         rd = await RECAPDocument.objects.aget(pk=pk)
         if check_if_needed and not rd.needs_extraction:
             # Early abort if the item doesn't need extraction and the user
             # hasn't disabled early abortion.
-            processed_docs.append(rd)
+            processed.append(rd.pk)
             continue
 
         response = await microservice(
@@ -307,25 +307,9 @@ async def extract_recap_pdf_base(
         rd.plain_text, _ = anonymize(content)
         # Do not do indexing here. Creates race condition in celery.
         await rd.asave(index=False, do_extraction=False)
-        processed_docs.append(rd)
+        processed.append(rd.pk)
 
-    # Enqueue RECAPDocs which have been processed successfully for citation-parsing.
-    # Although the task itself also filters based on OCR Status, we should not clog the queue
-    # with items or tasks that we do not actually need or want to process.
-    RECAP_DOC_PARSING_QUEUE = "batch1"
-    for doc in processed_docs:
-        if not doc.ocr_status in (
-            RECAPDocument.OCR_UNNECESSARY,
-            RECAPDocument.OCR_COMPLETE,
-        ):
-            continue
-
-        find_citations_and_parantheticals_for_recap_documents.apply_async(
-            args=([rd.pk],),
-            queue=RECAP_DOC_PARSING_QUEUE,
-        )
-
-    return [d.pk for d in processed_docs]
+    return processed
 
 
 @app.task(
