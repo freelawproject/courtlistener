@@ -17,7 +17,6 @@ from redis import ConnectionError as RedisConnectionError
 from cl.audio.models import Audio
 from cl.celery_init import app
 from cl.citations.tasks import (
-    find_citations_and_parantheticals_for_recap_documents,
     find_citations_and_parentheticals_for_opinion_by_pks,
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
