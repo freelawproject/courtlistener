@@ -1120,41 +1120,19 @@ def build_join_es_filters(cd: CleanData) -> List:
     if cd["type"] == SEARCH_TYPES.PEOPLE:
         # Build parent document filters.
         queries_list.extend(
-            build_term_query(
-                "dob_state_id",
-                cd.get("dob_state", ""),
-            )
-        )
-        queries_list.extend(
-            build_term_query(
-                "political_affiliation_id",
-                cd.get("political_affiliation", "").split(),
-            )
-        )
-        queries_list.extend(
-            build_daterange_query(
-                "dob",
-                cd.get("born_before", ""),
-                cd.get("born_after", ""),
-            )
-        )
-        queries_list.extend(
-            build_text_filter(
-                "dob_city",
-                cd.get("dob_city", ""),
-            )
-        )
-        queries_list.extend(
-            build_text_filter(
-                "name",
-                cd.get("name", ""),
-            )
-        )
-        queries_list.extend(
-            build_text_filter(
-                "school",
-                cd.get("school", ""),
-            )
+            [
+                *build_term_query("dob_state_id", cd.get("dob_state", "")),
+                *build_term_query(
+                    "political_affiliation_id",
+                    cd.get("political_affiliation", "").split(),
+                ),
+                *build_daterange_query(
+                    "dob", cd.get("born_before", ""), cd.get("born_after", "")
+                ),
+                *build_text_filter("dob_city", cd.get("dob_city", "")),
+                *build_text_filter("name", cd.get("name", "")),
+                *build_text_filter("school", cd.get("school", "")),
+            ]
         )
 
         # Build position has child filter:
