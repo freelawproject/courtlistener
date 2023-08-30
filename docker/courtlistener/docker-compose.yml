@@ -10,8 +10,6 @@ services:
   cl-redis:
     container_name: cl-redis
     image: redis
-    ports:
-      - "6379:6379"
     networks:
       - cl_net_overlay
 
@@ -54,6 +52,16 @@ services:
       - ${CL_SOLR_CODE_DIR:-../../../courtlistener-solr-server}/solr/cores/:/etc/opt/solr:ro
     networks:
       - cl_net_overlay
+
+  cl-webpack:
+    container_name: cl-webpack
+    image: node:16
+    volumes:
+      - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
+    env_file:
+      - ../../.env.dev
+    working_dir: /opt/courtlistener/cl
+    command: sh -c 'npm install && npx webpack --progress --watch --mode=development'
 
   # Task Server
   cl-celery:
@@ -99,7 +107,6 @@ services:
     container_name: cl-selenium
     image: seleniarm/standalone-chromium:113.0
     ports:
-      - 4444:4444  # Selenium
       - 5900:5900  # VNC server
     volumes:
       - ${CL_SHM_DIR:-/dev/shm}:/dev/shm

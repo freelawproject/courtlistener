@@ -17,6 +17,7 @@ class ProcessingQueueFilter(NoEmptyFilterSet):
         model = ProcessingQueue
         fields = {
             "court": ["exact"],
+            "docket": ["exact"],
             "pacer_case_id": ["exact", "in"],
             "status": ["exact", "in"],
             "upload_type": ["exact", "in"],

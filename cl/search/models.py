@@ -15,6 +15,7 @@ from django.urls import NoReverseMatch, reverse
 from django.utils.encoding import force_str
 from django.utils.text import slugify
 from eyecite import get_citations
+from model_utils import FieldTracker
 from ordered_model.models import OrderedModel
 
 from cl.citations.utils import get_citation_depth_between_clusters
@@ -285,6 +286,7 @@ class Docket(AbstractDateTimeModel):
     HARVARD = 16
     HARVARD_AND_RECAP = 17
     SCRAPER_AND_HARVARD = 18
+    RECAP_AND_SCRAPER_AND_HARVARD = 19
     HARVARD_AND_COLUMBIA = 20
     DIRECT_INPUT = 32
     DIRECT_INPUT_AND_HARVARD = 48
@@ -315,6 +317,7 @@ class Docket(AbstractDateTimeModel):
         (HARVARD, "Harvard"),
         (HARVARD_AND_RECAP, "Harvard and RECAP"),
         (SCRAPER_AND_HARVARD, "Scraper and Harvard"),
+        (RECAP_AND_SCRAPER_AND_HARVARD, "RECAP, Scraper and Harvard"),
         (HARVARD_AND_COLUMBIA, "Harvard and Columbia"),
         (DIRECT_INPUT, "Direct court input"),
         (DIRECT_INPUT_AND_HARVARD, "Direct court input and Harvard"),
@@ -666,6 +669,7 @@ class Docket(AbstractDateTimeModel):
         ),
         default=False,
     )
+    es_pa_field_tracker = FieldTracker(fields=["docket_number", "court_id"])
 
     class Meta:
         unique_together = ("docket_number", "pacer_case_id", "court")
@@ -932,25 +936,27 @@ class Docket(AbstractDateTimeModel):
         )
 
         # Parties, attorneys, firms
-        out.update(
-            {
-                "party_id": set(),
-                "party": set(),
-                "attorney_id": set(),
-                "attorney": set(),
-                "firm_id": set(),
-                "firm": set(),
-            }
-        )
-        for p in self.prefetched_parties:
-            out["party_id"].add(p.pk)
-            out["party"].add(p.name)
-            for a in p.attys_in_docket:
-                out["attorney_id"].add(a.pk)
-                out["attorney"].add(a.name)
-                for f in a.firms_in_docket:
-                    out["firm_id"].add(f.pk)
-                    out["firm"].add(f.name)
+        if self.pk != 6245245:
+            # Don't do parties for the J&J talcum powder case. It's too big.
+            out.update(
+                {
+                    "party_id": set(),
+                    "party": set(),
+                    "attorney_id": set(),
+                    "attorney": set(),
+                    "firm_id": set(),
+                    "firm": set(),
+                }
+            )
+            for p in self.prefetched_parties:
+                out["party_id"].add(p.pk)
+                out["party"].add(p.name)
+                for a in p.attys_in_docket:
+                    out["attorney_id"].add(a.pk)
+                    out["attorney"].add(a.name)
+                    for f in a.firms_in_docket:
+                        out["firm_id"].add(f.pk)
+                        out["firm"].add(f.name)
 
         # Do RECAPDocument and Docket Entries in a nested loop
         for de in self.docket_entries.all().iterator():
@@ -1547,6 +1553,12 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
                 "firm": set(),
             }
         )
+
+        if docket.pk == 6245245:
+            # Skip the parties for the J&J talcum powder case, it's just too
+            # big to pull from the DB. Sorry folks.
+            return out
+
         for p in docket.prefetched_parties:
             out["party_id"].add(p.pk)
             out["party"].add(p.name)
@@ -2418,6 +2430,18 @@ class OpinionCluster(AbstractDateTimeModel):
     )
 
     objects = ClusterCitationQuerySet.as_manager()
+    es_pa_field_tracker = FieldTracker(
+        fields=[
+            "case_name",
+            "citation_count",
+            "date_filed",
+            "slug",
+            "docket_id",
+            "judges",
+            "nature_of_suit",
+            "precedential_status",
+        ]
+    )
 
     @property
     def caption(self):
@@ -2983,6 +3007,9 @@ class Opinion(OrderedModel, AbstractDateTimeModel):
         default=False,
         db_index=True,
     )
+    es_pa_field_tracker = FieldTracker(
+        fields=["extracted_by_ocr", "cluster_id", "author_id"]
+    )
     order_with_respect_to = "cluster"
 
     class Meta:
@@ -3207,6 +3234,7 @@ class Parenthetical(models.Model):
         help_text="A score between 0 and 1 representing how descriptive the "
         "parenthetical is",
     )
+    es_pa_field_tracker = FieldTracker(fields=["score", "text"])
 
     def __str__(self) -> str:
         return (
