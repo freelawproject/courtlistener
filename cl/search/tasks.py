@@ -1,16 +1,60 @@
 import socket
 from datetime import timedelta
+from typing import Any, Union
 
 import scorched
+import waffle
 from django.apps import apps
 from django.conf import settings
 from django.utils.timezone import now
+from elasticsearch.exceptions import RequestError, TransportError
+from elasticsearch_dsl import Document
 from requests import Session
 from scorched.exc import SolrError
 
+from cl.audio.models import Audio
 from cl.celery_init import app
+from cl.lib.elasticsearch_utils import es_index_exists
 from cl.lib.search_index_utils import InvalidDocumentError
-from cl.search.models import Docket, OpinionCluster, RECAPDocument
+from cl.people_db.models import Education, Person, Position
+from cl.search.documents import (
+    PEOPLE_DOCS_TYPE_ID,
+    AudioDocument,
+    EducationDocument,
+    ParentheticalGroupDocument,
+    PersonDocument,
+    PositionDocument,
+)
+from cl.search.models import (
+    Citation,
+    Docket,
+    Opinion,
+    OpinionCluster,
+    Parenthetical,
+    ParentheticalGroup,
+    RECAPDocument,
+)
+
+instance_typing = Union[
+    Citation,
+    Docket,
+    Opinion,
+    OpinionCluster,
+    Parenthetical,
+    ParentheticalGroup,
+    Audio,
+    Person,
+    Position,
+    Education,
+]
+es_document_typing = Union[
+    AudioDocument,
+    ParentheticalGroupDocument,
+    PersonDocument,
+    PositionDocument,
+    EducationDocument,
+]
+models_alert_support = [Audio]
 
 
 @app.task
@@ -156,3 +200,88 @@ def delete_items(items, app_label, force_commit=False):
                 si.commit()
         except SolrError as exc:
             delete_items.retry(exc=exc, countdown=30)
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(TransportError, ConnectionError, RequestError),
+    max_retries=3,
+    interval_start=5,
+)
+def save_document_in_es(
+    self, instance: instance_typing, es_document: es_document_typing
+) -> tuple[str, dict[str, Any]] | None:
+    """Save a document in Elasticsearch using a provided callable.
+    :param self: The task
+    :param instance: The instance of the document to save.
+    :param es_document: A Elasticsearch DSL document.
+    :return: None
+    """
+    es_args = {}
+    if isinstance(instance, Education) or isinstance(instance, Position):
+        parent_id = getattr(instance.person, "pk", None)
+        if not all(
+            [
+                es_index_exists(es_document._index._name),
+                parent_id,
+                PersonDocument.exists(id=parent_id),
+            ]
+        ):
+            return
+        es_args["_routing"] = parent_id
+
+    if isinstance(instance, Education):
+        doc_id = PEOPLE_DOCS_TYPE_ID(instance.pk).EDUCATION
+        es_args["person_child"] = {"name": "education", "parent": parent_id}
+    elif isinstance(instance, Position):
+        doc_id = PEOPLE_DOCS_TYPE_ID(instance.pk).POSITION
+        es_args["person_child"] = {"name": "position", "parent": parent_id}
+    else:
+        doc_id = instance.pk
+
+    es_args["meta"] = {"id": doc_id}
+    es_doc = es_document()
+    doc = es_doc.prepare(instance)
+    response = es_document(**es_args, **doc).save(
+        skip_empty=False,
+        return_doc_meta=True,
+        refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
+    )
+    if type(instance) in models_alert_support and response["_version"] == 1:
+        # Only send search alerts when a new instance of a model that support
+        # Alerts is indexed in ES _version:1
+        if es_document == AudioDocument and not waffle.switch_is_active(
+            "oa-es-alerts-active"
+        ):
+            # Disable ES Alerts if oa-es-alerts-active switch is not enabled
+            self.request.chain = None
+            return None
+        return response["_id"], doc
+    else:
+        self.request.chain = None
+        return None
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(TransportError, ConnectionError, RequestError),
+    max_retries=3,
+    interval_start=5,
+)
+def update_document_in_es(
+    self,
+    es_document: es_document_typing,
+    fields_values_to_update: dict[str, Any],
+) -> None:
+    """Update a document in Elasticsearch.
+    :param self: The task
+    :param es_document: The instance of the document to save.
+    :param fields_values_to_update: A dictionary with fields and values to update.
+    :return: None
+    """
+
+    Document.update(
+        es_document,
+        **fields_values_to_update,
+        refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
+    )

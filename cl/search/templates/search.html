@@ -253,10 +253,10 @@
                             {{ matches|intcomma }} Docket&nbsp;Entr{{ matches|pluralize:"y,ies" }}
                             {% endwith %}
                         {% elif type == SEARCH_TYPES.ORAL_ARGUMENT %}
-                            {% flag "oa-es-deactivate" %}
-                             {{ results.paginator.count|intcomma }}
-                            {% else %}
+                            {% flag "oa-es-active" %}
                               {{ results_details.1|intcomma }}
+                            {% else %}
+                              {{ results.paginator.count|intcomma }}
                             {% endflag %}
                               Oral Argument{{ results.paginator.count|pluralize }}
                         {% elif type == SEARCH_TYPES.PEOPLE %}
@@ -283,15 +283,17 @@
             </div>
             {% if type == SEARCH_TYPES.PARENTHETICAL %}
               {% include "includes/pa_search_result.html" %}
-            {% else %}
-              {% flag "oa-es-deactivate" %}
-                 {% include "includes/search_result_solr.html" %}
-              {% else %}
+            {% elif type == SEARCH_TYPES.ORAL_ARGUMENT %}
+              {% flag "oa-es-active" %}
                 {% include "includes/search_result.html" %}
+              {% else %}
+                {% include "includes/search_result_solr.html" %}
               {% endflag %}
+            {% else %}
+              {% include "includes/search_result_solr.html" %}
             {% endif %}
         {% else %}
-            {% include "includes/no_results.html" %}
+          {% include "includes/no_results.html" %}
         {% endif %}
 
         {% include "includes/pagination.html" with page_obj=results hide_last=True %}

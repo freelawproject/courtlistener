@@ -35,6 +35,7 @@ from cl.lib.elasticsearch_utils import (
     es_index_exists,
     fetch_es_results,
     merge_courts_from_db,
+    sanitize_unbalanced_parenthesis,
     set_results_highlights,
 )
 from cl.lib.paginators import ESPaginator
@@ -52,6 +53,7 @@ from cl.lib.search_utils import (
 )
 from cl.search.constants import RELATED_PATTERN
 from cl.search.documents import AudioDocument, ParentheticalGroupDocument
+from cl.search.exception import UnbalancedQuery
 from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import SEARCH_TYPES, Court, Opinion, OpinionCluster
 from cl.stats.models import Stat
@@ -397,7 +399,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
             )
             # Get the results from the oral arguments as well
             # Check if waffle flag is active.
-            if waffle.flag_is_active(request, "oa-es-deactivate"):
+            if not waffle.flag_is_active(request, "oa-es-active"):
                 render_dict.update(
                     {
                         "results_oa": do_search(
@@ -413,15 +415,18 @@ def show_results(request: HttpRequest) -> HttpResponse:
                     }
                 )
             else:
+                # Add additional or overridden GET parameters
+                mutable_GET.update(
+                    {
+                        "order_by": "dateArgued desc",
+                        "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                    }
+                )
                 render_dict.update(
                     {
                         "results_oa": do_es_search(
                             mutable_GET,
                             rows=5,
-                            override_params={
-                                "order_by": "dateArgued desc",
-                                "type": SEARCH_TYPES.ORAL_ARGUMENT,
-                            },
                             facet=False,
                             cache_key="homepage-data-oa-es",
                         )["results"]
@@ -473,24 +478,18 @@ def show_results(request: HttpRequest) -> HttpResponse:
                 )
 
                 if request.GET.get("type") == SEARCH_TYPES.PARENTHETICAL:
-                    search_results = do_es_search(request.GET.copy())
-                    render_dict.update(search_results)
-                elif request.GET.get("type") == SEARCH_TYPES.ORAL_ARGUMENT:
-                    # Check if waffle flag is active.
-                    if waffle.flag_is_active(request, "oa-es-deactivate"):
-                        search_results = do_search(request.GET.copy())
-                    else:
-                        search_results = do_es_search(request.GET.copy())
-
-                    render_dict.update(search_results)
-                    # Set the value to the query as a convenience
-                    alert_form.fields["name"].widget.attrs[
-                        "value"
-                    ] = render_dict["search_summary_str"]
-                    render_dict.update({"alert_form": alert_form})
-
+                    render_dict.update(do_es_search(request.GET.copy()))
                 else:
-                    render_dict.update(do_search(request.GET.copy()))
+                    # Check if waffle flag is active.
+                    if request.GET.get(
+                        "type"
+                    ) == SEARCH_TYPES.ORAL_ARGUMENT and waffle.flag_is_active(
+                        request, "oa-es-active"
+                    ):
+                        render_dict.update(do_es_search(request.GET.copy()))
+                    else:
+                        render_dict.update(do_search(request.GET.copy()))
+
                     # Set the value to the query as a convenience
                     alert_form.fields["name"].widget.attrs[
                         "value"
@@ -583,7 +582,6 @@ def es_search(request: HttpRequest) -> HttpResponse:
 def do_es_search(
     get_params: QueryDict,
     rows: int = settings.SEARCH_PAGE_SIZE,
-    override_params: dict = None,
     facet: bool = True,
     cache_key: str = None,
 ):
@@ -591,8 +589,6 @@ def do_es_search(
 
     :param get_params: The request.GET params sent by user.
     :param rows: The number of solr results to request
-    :param override_params: A dict with additional or different GET params to
-    be sent to solr.
     :param facet: Whether to complete faceting in the query
     :param cache_key: A cache key with which to save the results. Note that it
     does not do anything clever with the actual query, so if you use this, your
@@ -606,10 +602,8 @@ def do_es_search(
     query_time = total_query_results = 0
     top_hits_limit = 5
     document_type = None
-
-    # Add additional or overridden GET parameters
-    if override_params:
-        get_params.update(override_params)
+    error_message = ""
+    suggested_query = ""
 
     search_form = SearchForm(get_params)
     if get_params.get("type") == SEARCH_TYPES.PARENTHETICAL:
@@ -621,19 +615,25 @@ def do_es_search(
         index_name=document_type._index._name
     ):
         cd = search_form.cleaned_data
-        # Create necessary filters to execute ES query
-        search_query = document_type.search()
-        s, total_query_results, top_hits_limit = build_es_main_query(
-            search_query, cd
-        )
-        paged_results, query_time, error = fetch_and_paginate_results(
-            get_params, s, rows_per_page=rows, cache_key=cache_key
-        )
-        search_form = _clean_form(
-            get_params,
-            search_form.cleaned_data,
-            courts,
-        )
+        try:
+            # Create necessary filters to execute ES query
+            search_query = document_type.search()
+
+            s, total_query_results, top_hits_limit = build_es_main_query(
+                search_query, cd
+            )
+            paged_results, query_time, error = fetch_and_paginate_results(
+                get_params, s, rows_per_page=rows, cache_key=cache_key
+            )
+            search_form = _clean_form(
+                get_params,
+                search_form.cleaned_data,
+                courts,
+            )
+        except UnbalancedQuery:
+            error = True
+            error_message = "has incorrect syntax. Did you forget to close one or more parentheses?"
+            suggested_query = sanitize_unbalanced_parenthesis(cd.get("q", ""))
     else:
         error = True
 
@@ -653,6 +653,8 @@ def do_es_search(
         "courts": courts,
         "court_count_human": court_count_human,
         "court_count": court_count,
+        "error_message": error_message,
+        "suggested_query": suggested_query,
     }
 
 
@@ -692,8 +694,6 @@ def fetch_and_paginate_results(
     )
     if error:
         return [], query_time, error
-    if get_params.get("type") == SEARCH_TYPES.PARENTHETICAL:
-        hits = hits.aggregations.groups.buckets
     paginator = ESPaginator(hits, rows_per_page)
     try:
         results = paginator.page(page)

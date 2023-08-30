@@ -26,9 +26,13 @@ from cl.search.constants import (
     SEARCH_HL_TAG,
     SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS,
 )
+from cl.search.exception import UnbalancedQuery
 from cl.search.models import SEARCH_TYPES, Court
 
 logger = logging.getLogger(__name__)
+
+OPENING_CHAR = r"[\(\[]"  # Matches the following characters: (, [
+CLOSING_CHAR = r"[\)\]]"  # Matches the following characters: ), ]
 
 
 def elasticsearch_enabled(func: Callable) -> Callable:
@@ -126,6 +130,97 @@ def add_fields_boosting(cd: CleanData) -> list[str]:
     return make_es_boost_list(qf)
 
 
+def check_unbalanced_parenthesis(query: str) -> bool:
+    """Check whether the query string has unbalanced opening or closing parentheses.
+
+    :param query: The input query string
+    :return: Whether the query is balanced or not.
+    """
+    opening_count = query.count("(")
+    closing_count = query.count(")")
+
+    return opening_count != closing_count
+
+
+def sanitize_unbalanced_parenthesis(query: str) -> str:
+    """Sanitize a query by removing unbalanced opening or closing parentheses.
+
+    :param query: The input query string
+    :return: The sanitized query string, after removing unbalanced parentheses.
+    """
+    opening_count = query.count("(")
+    closing_count = query.count(")")
+    while opening_count > closing_count:
+        # Find last unclosed opening parenthesis position
+        last_parenthesis_opened_pos = query.rfind("(")
+        # Remove the parenthesis from the query.
+        query = (
+            query[:last_parenthesis_opened_pos]
+            + query[last_parenthesis_opened_pos + 1 :]
+        )
+        opening_count -= 1
+
+    while closing_count > opening_count:
+        # Find last unclosed closing parenthesis position
+        last_parenthesis_closed_pos = query.rfind(")")
+        # Remove the parenthesis from the query.
+        query = (
+            query[:last_parenthesis_closed_pos]
+            + query[last_parenthesis_closed_pos + 1 :]
+        )
+        closing_count -= 1
+
+    return query
+
+
+def append_query_conjunctions(query: str) -> str:
+    """Append default AND conjunctions to the query string.
+    :param query: The input query string
+    :return: The query string with AND conjunctions appended
+    """
+    words = query.split()
+    clean_q: list[str] = []
+    inside_group = 0
+    quotation = False
+    logic_operand = False
+    for word in words:
+        binary_operator = word.upper() in ["AND", "OR"]
+        """
+        This variable will be false in the following cases:
+            - When the word is a binary operator like AND or OR.
+            - When the word is preceded by a logical operator like NOT, AND, OR.
+            - When the word is enclosed by (), [] or ""
+        """
+        should_add_conjunction = clean_q and not any(
+            [inside_group, logic_operand, quotation, binary_operator]
+        )
+
+        if re.search(OPENING_CHAR, word):
+            # Group or range query opened.
+            # Increment the depth counter
+            inside_group += len(re.findall(OPENING_CHAR, word))
+        elif re.search(CLOSING_CHAR, word):
+            # Group or range query closed.
+            # Decrease the depth counter.
+            inside_group -= len(re.findall(CLOSING_CHAR, word))
+        elif '"' in word:
+            # Quote character found.
+            # Flip the quotation flag
+            quotation = not quotation
+
+        if should_add_conjunction:
+            clean_q.append("AND")
+        clean_q.append(word)
+
+        """
+        This is computed at the end of each loop, so the method won't
+        add conjunctions after logical operators
+        """
+        logic_operand = word.upper() in ["AND", "OR", "NOT"]
+
+    return " ".join(clean_q)
+
+
 def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
     """Given the cleaned data from a form, return a Elastic Search string query or []
     https://www.elastic.co/guide/en/elasticsearch/reference/current/full-text-queries.html
@@ -134,9 +229,9 @@ def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
     :param value: The string value to search for.
     :return: A Elasticsearch QueryString or [] if the "value" param is empty.
     """
-
     if value:
-        value = cleanup_main_query(value)
+        if check_unbalanced_parenthesis(value):
+            raise UnbalancedQuery()
         # In Elasticsearch, the colon (:) character is used to separate the
         # field name and the field value in a query.
         # To avoid parsing errors escape any colon characters in the value
@@ -149,11 +244,20 @@ def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
                     f"docketNumber:{match}", f"docketNumber:{replacement}"
                 )
 
+        # Used for the phrase query_string, no conjunctions appended.
+        query_value = cleanup_main_query(value)
+
+        # To enable the search of each term in the query across multiple fields
+        # it's necessary to include an "AND" conjunction between each term.
+        # https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html#query-string-multi-field
+        # Used for the best_fields query_string.
+        query_value_with_conjunctions = append_query_conjunctions(query_value)
+
         q_should = [
             Q(
                 "query_string",
                 fields=fields,
-                query=value,
+                query=query_value_with_conjunctions,
                 quote_field_suffix=".exact",
                 default_operator="AND",
                 tie_breaker=0.3,
@@ -161,7 +265,7 @@ def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
             Q(
                 "query_string",
                 fields=fields,
-                query=value,
+                query=query_value,
                 quote_field_suffix=".exact",
                 default_operator="AND",
                 type="phrase",
@@ -234,8 +338,8 @@ def build_sort_results(cd: CleanData) -> Dict:
             "score desc": {"_score": {"order": "desc"}},
             "dateArgued desc": {"dateArgued": {"order": "desc"}},
             "dateArgued asc": {"dateArgued": {"order": "asc"}},
-            "random_123 desc": {"random_123": {"order": "desc"}},
-            "random_123 asc": {"random_123": {"order": "asc"}},
+            "random_ desc": {"random_": {"order": "desc"}},
+            "random_ asc": {"random_": {"order": "asc"}},
         }
 
     else:
@@ -246,26 +350,31 @@ def build_sort_results(cd: CleanData) -> Dict:
         }
 
     order_by = cd.get("order_by")
-    if order_by not in order_by_map:
-        # Sort by score in descending order
-        return {"score": {"order": "desc"}}
-
-    if "random_123" in order_by:
+    if order_by and "random_" in order_by:
         # Return random sorting if available.
-        # Define the random seed using the current timestamp
+        # Define the random seed using the value defined in random_{seed}
         seed = int(time.time())
-        order = order_by_map[order_by]["random_123"]["order"]
+        match = re.search(r"random_(\d+)", order_by)
+        if match:
+            seed = int(match.group(1))
+
+        order_by_key = re.sub(r"random_\S*", "random_", order_by)
+        order = order_by_map[order_by_key]["random_"]["order"]
         random_sort = {
             "_script": {
                 "type": "number",
                 "script": {
-                    "source": "Math.random() * params.seed",
+                    "source": "Long.hashCode(doc['id'].value ^ params.seed)",
                     "params": {"seed": seed},
                 },
                 "order": order,
             }
         }
         return random_sort
+
+    if order_by not in order_by_map:
+        # Sort by score in descending order
+        return order_by_map["score desc"]
 
     return order_by_map[order_by]
 
@@ -299,7 +408,7 @@ def build_es_filters(cd: CleanData) -> List:
             )
         )
     if cd["type"] == SEARCH_TYPES.PARENTHETICAL:
-        # Build daterange query
+        # Build dateFiled daterange query
         queries_list.extend(
             build_daterange_query(
                 "dateFiled",
@@ -308,7 +417,7 @@ def build_es_filters(cd: CleanData) -> List:
             )
         )
     if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
-        # Build daterange query
+        # Build dateArgued daterange query
         queries_list.extend(
             build_daterange_query(
                 "dateArgued",
@@ -316,31 +425,26 @@ def build_es_filters(cd: CleanData) -> List:
                 cd.get("argued_after", ""),
             )
         )
-        # Build court terms filter
+        # Build caseName terms filter
         queries_list.extend(
             build_text_filter("caseName", cd.get("case_name", ""))
         )
-        # Build court terms filter
+        # Build judge terms filter
         queries_list.extend(build_text_filter("judge", cd.get("judge", "")))
     return queries_list
 
 
-def build_es_main_query(
-    search_query: Search, cd: CleanData
-) -> tuple[Search, int, int | None]:
-    """Builds and returns an elasticsearch query based on the given cleaned
-     data.
+def build_es_base_query(search_query: Search, cd: CleanData) -> Search:
+    """Builds filters and fulltext_query based on the given cleaned
+     data and returns an elasticsearch query.
+
     :param search_query: The Elasticsearch search query object.
     :param cd: The cleaned data object containing the query and filters.
-
-    :return: A three tuple, the Elasticsearch search query object after applying
-    filters, string query and grouping if needed, the total number of results,
-    the total number of top hits returned by a group if applicable.
+    :return:The Elasticsearch search query object.
     """
 
     string_query = None
     filters = build_es_filters(cd)
-
     match cd["type"]:
         case SEARCH_TYPES.PARENTHETICAL:
             string_query = build_fulltext_query(
@@ -351,13 +455,17 @@ def build_es_main_query(
                 "court",
                 "court_citation_string",
                 "judge",
+                "dateArgued_text",
+                "dateReargued_text",
+                "dateReargumentDenied_text",
+                "court_id_text",
+                "sha1",
             ]
             fields.extend(add_fields_boosting(cd))
             string_query = build_fulltext_query(
                 fields,
                 cd.get("q", ""),
             )
-
     if filters or string_query:
         # Apply filters first if there is at least one set.
         if filters:
@@ -368,19 +476,33 @@ def build_es_main_query(
             search_query = search_query.query(string_query)
     else:
         search_query = search_query.query("match_all")
-    total_query_results = search_query.count()
+    return search_query
 
+
+def build_es_main_query(
+    search_query: Search, cd: CleanData
+) -> tuple[Search, int, int | None]:
+    """Builds and returns an elasticsearch query based on the given cleaned
+     data, also performs grouping if required, add highlighting and returns
+     additional query related metrics.
+
+    :param search_query: The Elasticsearch search query object.
+    :param cd: The cleaned data object containing the query and filters.
+    :return: A three tuple, the Elasticsearch search query object after applying
+    filters, string query and grouping if needed, the total number of results,
+    the total number of top hits returned by a group if applicable.
+    """
+    search_query = build_es_base_query(search_query, cd)
+    total_query_results = search_query.count()
     # Create groups aggregation if needed.
     top_hits_limit = group_search_results(
         search_query,
         cd,
         build_sort_results(cd),
     )
-
     search_query = add_es_highlighting(search_query, cd)
     if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
         search_query = search_query.sort(build_sort_results(cd))
-
     return search_query, total_query_results, top_hits_limit
 
 
@@ -401,8 +523,6 @@ def add_es_highlighting(
         if alerts:
             highlighting_fields = SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS
             hl_tag = ALERTS_HL_TAG
-        fields_to_exclude = ["sha1"]
-        search_query = search_query.source(excludes=fields_to_exclude)
         for field in highlighting_fields:
             search_query = search_query.highlight(
                 field,
@@ -660,6 +780,8 @@ def fetch_es_results(
         ).execute()
         query_time = response.took
         error = False
+        if response.aggregations:
+            response = response.aggregations.groups.buckets
         return response, query_time, error
     except (TransportError, ConnectionError, RequestError) as e:
         logger.warning(f"Error loading search page with request: {get_params}")
@@ -667,3 +789,21 @@ def fetch_es_results(
         if settings.DEBUG is True:
             traceback.print_exc()
     return [], 0, error
+
+
+def do_es_feed_query(
+    search_query: Search,
+    cd: CleanData,
+    rows: int = 20,
+) -> Response:
+    """Execute an Elasticsearch query for podcasts.
+
+    :param search_query: Elasticsearch DSL Search object
+    :param cd: The query CleanedData
+    :param rows: Number of rows (items) to be retrieved in the response
+    :return: The Elasticsearch DSL response.
+    """
+
+    s = build_es_base_query(search_query, cd)
+    response = s.extra(from_=0, size=rows).execute()
+    return response

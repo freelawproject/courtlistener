@@ -36,3 +36,18 @@ def localize_date_and_time(
         date_filed = datetime_filed_local.date()
         return date_filed, time_filed
     return date_filed, None
+
+
+def localize_naive_datetime_to_court_timezone(
+    court_id: str, naive_datetime: datetime
+) -> datetime:
+    """Convert a naive datetime to the provided court timezone it belongs to.
+
+    :param naive_datetime: The naive datetime to localize.
+    :param court_id: The court_id to get the timezone from.
+    :return: A datetime object in the court timezone.
+    """
+
+    court_timezone = pytz.timezone(COURT_TIMEZONES.get(court_id, "US/Eastern"))
+    d = court_timezone.localize(naive_datetime)
+    return d

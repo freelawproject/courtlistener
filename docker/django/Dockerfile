@@ -11,6 +11,8 @@ RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
         build-essential gcc python3-dev\
         # So postgres can compile and users can use dbshell
         libpq-dev postgresql-client \
+        # So we can use webpack to compile assets
+        nodejs npm \
         # For installing poetry and git-based deps
         curl git \
         # Other dependencies
@@ -22,7 +24,7 @@ ENV PGSSLCERT=/tmp/postgresql.crt
 
 # poetry
 # https://python-poetry.org/docs/configuration/#using-environment-variables
-ENV POETRY_VERSION=1.5.1 \
+ENV POETRY_VERSION=1.6.1 \
     # make poetry install to this location
     POETRY_HOME="/opt/poetry" \
     # Don't build a virtualenv to save space
@@ -75,6 +77,13 @@ RUN tar xvfz courtlistener.tar.gz && \
 
 # `python-base` sets up all our shared environment variables
 FROM build-${BUILD_ENV} as python-base
+
+# Collect compiled assets from webpack-build stage.
+# Note: Always produce production code and never produce source-maps
+# (run the devMiddleware for legible output)
+WORKDIR /opt/courtlistener/cl
+RUN npm install
+RUN npx webpack --mode=production --no-devtool
 
 WORKDIR /opt
 

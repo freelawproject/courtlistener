@@ -456,6 +456,9 @@ wyo,wyoming
 zam,zambia
 zim,zimbabwe
 
+# Court abbreviations
+sdny,nysd
+
 # Top abbreviations in legal documents since 1975
 american bar association, aba
 american broadcasting company, abc
