@@ -32,8 +32,6 @@ SEARCH_ORAL_ARGUMENT_HL_FIELDS = [
     "court_citation_string",
 ]
 SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS = [
-    "text",
-    "text.exact",
     "caseName",
     "caseName.exact",
     "judge",
@@ -41,10 +39,16 @@ SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS = [
     "docketNumber",
     "docketNumber.exact",
     "court_citation_string",
+    "text",
+    "text.exact",
 ]
 SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS = [
     "text",
     "text.exact",
+    "docketNumber",
+    "docketNumber.exact",
+    "judge",
+    "judge.exact",
 ]
 SOLR_PEOPLE_HL_FIELDS = ["name", "dob_city", "dob_state", "name_reverse"]
 SOLR_PEOPLE_ES_HL_FIELDS = [

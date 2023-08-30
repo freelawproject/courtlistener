@@ -78,7 +78,8 @@ jobs:
       - name: Build latest docker django image
         uses: docker/build-push-action@v4
         with:
-          file: docker/django/Dockerfile
+          context: ./courtlistener
+          file: ./courtlistener/docker/django/Dockerfile
           push: true
           target: web-dev
           build-args: |
@@ -89,7 +90,8 @@ jobs:
       - name: Build latest docker celery image
         uses: docker/build-push-action@v4
         with:
-          file: docker/django/Dockerfile
+          context: ./courtlistener
+          file: ./courtlistener/docker/django/Dockerfile
           push: true
           target: celery
           build-args: |

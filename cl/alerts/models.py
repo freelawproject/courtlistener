@@ -4,6 +4,7 @@ import pghistory
 from django.contrib.auth.models import User
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
+from django.http import QueryDict
 from django.utils.crypto import get_random_string
 
 from cl.lib.models import AbstractDateTimeModel
@@ -44,6 +45,13 @@ class Alert(AbstractDateTimeModel):
         choices=FREQUENCY,
         max_length=10,
     )
+    alert_type = models.CharField(
+        help_text="The type of search alert this is, one of: %s"
+        % ", ".join(["%s (%s)" % (t[0], t[1]) for t in SEARCH_TYPES.NAMES]),
+        max_length=3,
+        choices=SEARCH_TYPES.NAMES,
+        default=SEARCH_TYPES.OPINION,
+    )
     secret_key = models.CharField(
         verbose_name="A key to be used in links to access the alert without "
         "having to log in. Can be used for a variety of "
@@ -61,6 +69,10 @@ class Alert(AbstractDateTimeModel):
         """Ensure we get a token when we save the first time."""
         if self.pk is None:
             self.secret_key = get_random_string(length=40)
+
+        # Set the search type based on the provided query.
+        qd = QueryDict(self.query.encode(), mutable=True)
+        self.alert_type = qd.get("type", SEARCH_TYPES.OPINION)
         super(Alert, self).save(*args, **kwargs)
 
 
@@ -146,7 +158,20 @@ class RealTimeQueue(models.Model):
     item_pk = models.IntegerField(help_text="the pk of the item")
 
 
-class UserRateAlert(AbstractDateTimeModel):
+class DateJSONEncoder(DjangoJSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
+
+
+class ScheduledAlertHit(AbstractDateTimeModel):
+    alert = models.ForeignKey(
+        Alert,
+        help_text="The related Alert object.",
+        related_name="parent_alerts",
+        on_delete=models.CASCADE,
+    )
     user = models.ForeignKey(
         User,
         help_text="The related User object.",
@@ -158,50 +183,7 @@ class UserRateAlert(AbstractDateTimeModel):
         choices=Alert.FREQUENCY,
         max_length=10,
     )
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["user", "rate"], name="unique_user_and_rate"
-            )
-        ]
-
-
-class ParentAlert(AbstractDateTimeModel):
-    alert = models.ForeignKey(
-        Alert,
-        help_text="The related Alert object.",
-        related_name="parent_alerts",
-        on_delete=models.CASCADE,
-    )
-    user_rate = models.ForeignKey(
-        UserRateAlert,
-        help_text="The related UserRateAlert object.",
-        related_name="parent_alerts",
-        on_delete=models.CASCADE,
-    )
-
-
-class DateJSONEncoder(DjangoJSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, datetime):
-            return obj.isoformat()
-        return super().default(obj)
-
-
-class ScheduledAlertHit(AbstractDateTimeModel):
-    parent_alert = models.ForeignKey(
-        ParentAlert,
-        help_text="The related ParentAlert object.",
-        related_name="scheduled_alerts",
-        on_delete=models.CASCADE,
-    )
     document_content = models.JSONField(  # type: ignore
         encoder=DateJSONEncoder,
         help_text="The content of the document at the moment it was added.",
-    )
-    highlighted_fields = models.JSONField(  # type: ignore
-        help_text="The highlighted fields for the alert.",
-        blank=True,
-        null=True,
     )

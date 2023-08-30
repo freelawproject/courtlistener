@@ -316,6 +316,11 @@ class SearchESResultSerializer(serializers.Serializer):
         "docket_slug",
         "percolator_query",
         "person_child",
+        "case_name_full",
+        "dateArgued_text",
+        "dateReargued_text",
+        "dateReargumentDenied_text",
+        "court_id_text",
     ]
 
     def get_fields(self):

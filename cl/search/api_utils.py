@@ -33,13 +33,13 @@ def get_object_list(request, cd, paginator):
 
     is_oral_argument_active = cd[
         "type"
-    ] == SEARCH_TYPES.ORAL_ARGUMENT and not waffle.flag_is_active(
-        request, "oa-es-deactivate"
+    ] == SEARCH_TYPES.ORAL_ARGUMENT and waffle.flag_is_active(
+        request, "oa-es-activate"
     )
     is_people_active = cd[
         "type"
-    ] == SEARCH_TYPES.PEOPLE and not waffle.flag_is_active(
-        request, "p-es-deactivate"
+    ] == SEARCH_TYPES.PEOPLE and waffle.flag_is_active(
+        request, "p-es-activate"
     )
 
     if is_oral_argument_active or is_people_active:
@@ -60,13 +60,7 @@ def get_object_list(request, cd, paginator):
     if cd["type"] == SEARCH_TYPES.RECAP:
         main_query["sort"] = map_to_docket_entry_sorting(main_query["sort"])
 
-    if (
-        cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT
-        and not waffle.flag_is_active(request, "oa-es-deactivate")
-    ) or (
-        cd["type"] == SEARCH_TYPES.PEOPLE
-        and not waffle.flag_is_active(request, "p-es-deactivate")
-    ):
+    if is_oral_argument_active or is_people_active:
         sl = ESList(
             main_query=main_query,
             count=total_query_results,

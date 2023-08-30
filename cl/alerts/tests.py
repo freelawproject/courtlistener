@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta
 from unittest import mock
 
@@ -17,6 +18,7 @@ from rest_framework.status import (
 )
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
+from waffle.testutils import override_switch
 
 from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
 from cl.alerts.management.commands.handle_old_docket_alerts import (
@@ -26,16 +28,14 @@ from cl.alerts.models import (
     SEARCH_TYPES,
     Alert,
     DocketAlert,
-    ParentAlert,
     RealTimeQueue,
     ScheduledAlertHit,
-    UserRateAlert,
 )
 from cl.alerts.tasks import (
     get_docket_notes_and_tags_by_user,
     send_alert_and_webhook,
 )
-from cl.alerts.utils import InvalidDateError
+from cl.alerts.utils import InvalidDateError, percolate_document
 from cl.api.factories import WebhookFactory
 from cl.api.models import (
     WEBHOOK_EVENT_STATUS,
@@ -49,7 +49,7 @@ from cl.donate.factories import DonationFactory
 from cl.donate.models import Donation
 from cl.favorites.factories import NoteFactory, UserTagFactory
 from cl.lib.test_helpers import EmptySolrTestCase, SimpleUserDataMixin
-from cl.search.documents import AudioPercolator
+from cl.search.documents import AudioDocument, AudioPercolator
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
@@ -501,11 +501,12 @@ class AlertAPITests(APITestCase):
         self.assertEqual(response.json()["id"], alert_1.json()["id"])
 
 
-class SearchAlertsWebhooksTest(EmptySolrTestCase):
+class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
     """Test Search Alerts Webhooks"""
 
     @classmethod
     def setUpTestData(cls):
+        cls.rebuild_index("alerts.Alert")
         cls.user_profile = UserProfileWithParentsFactory()
         cls.donation = DonationFactory(
             donor=cls.user_profile.user,
@@ -610,10 +611,21 @@ class SearchAlertsWebhooksTest(EmptySolrTestCase):
             ),
         ):
             with time_machine.travel(self.mock_date, tick=False):
+                # Send Solr Alerts (Except OA)
                 call_command("cl_send_alerts", rate="dly")
+                # Send ES Alerts (Only OA for now)
+                call_command("cl_send_scheduled_alerts", rate="dly")
 
-        # Two search alert should one to user_profile and one to user_profile_2
-        self.assertEqual(len(mail.outbox), 2)
+        # Three search alerts should be sent:
+        # Two opinion alerts to user_profile and one to user_profile_2 (Solr)
+        # One oral argument alert to user_profile (ES)
+        self.assertEqual(len(mail.outbox), 3)
+        self.assertEqual(mail.outbox[0].to[0], self.user_profile.user.email)
+        self.assertIn("daily opinion alert", mail.outbox[0].body)
+        self.assertEqual(mail.outbox[1].to[0], self.user_profile_2.user.email)
+        self.assertIn("daily opinion alert", mail.outbox[1].body)
+        self.assertEqual(mail.outbox[2].to[0], self.user_profile.user.email)
+        self.assertIn("daily oral argument alert ", mail.outbox[2].body)
 
         # Two webhook events should be sent, both of them to user_profile user
         webhook_events = WebhookEvent.objects.all()
@@ -707,7 +719,10 @@ class SearchAlertsWebhooksTest(EmptySolrTestCase):
             ):
                 # Monthly alerts cannot be run on the 29th, 30th or 31st.
                 with time_machine.travel(self.mock_date, tick=False):
+                    # Send Solr Alerts (Except OA)
                     call_command("cl_send_alerts", rate=rate)
+                    # Send ES Alerts (Only OA for now)
+                    call_command("cl_send_scheduled_alerts", rate=rate)
 
             webhook_events = WebhookEvent.objects.all()
             self.assertEqual(len(webhook_events), events)
@@ -1476,23 +1491,9 @@ class DocketAlertGetNotesTagsTests(TestCase):
         self.assertEqual(tags_docket_3_user_1, [])
 
 
+@override_switch("oa-es-alerts-active", active=True)
 class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
     """Test ES Search Alerts"""
-
-    @classmethod
-    def rebuild_index(self, model):
-        """
-        Create and populate the Elasticsearch index and mapping
-        """
-
-        # -f rebuilds index without prompt for confirmation
-        call_command(
-            "search_index",
-            "--rebuild",
-            "-f",
-            "--models",
-            model,
-        )
 
     @classmethod
     def setUpTestData(cls):
@@ -1528,7 +1529,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             user=cls.user_profile.user,
             rate=Alert.REAL_TIME,
             name="Test Alert OA",
-            query="q=RT+Test+OA&type=oa",
+            query="q=RT+Test+OA+19-5735&type=oa",
         )
         cls.search_alert_2 = AlertFactory(
             user=cls.user_profile_2.user,
@@ -1546,7 +1547,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             user=cls.user_profile.user,
             rate=Alert.DAILY,
             name="Test Alert OA Daily 2",
-            query="q=DLY+Test+V2&type=oa",
+            query="q=DLY+Test+V2+19-5741&type=oa",
         )
         cls.search_alert_5 = AlertFactory(
             user=cls.user_profile.user,
@@ -1613,11 +1614,29 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             mock_date = now().replace(day=1, hour=5)
             with time_machine.travel(mock_date, tick=False):
                 # When the Audio object is created it should trigger an alert.
+                transcript_response = {
+                    "response": {
+                        "results": [
+                            {
+                                "alternatives": [
+                                    {
+                                        "transcript": "RT Test OA transcript.",
+                                        "confidence": 0.85,
+                                    },
+                                ]
+                            },
+                        ]
+                    }
+                }
+                json_transcript = json.dumps(transcript_response)
                 rt_oral_argument = AudioWithParentsFactory.create(
                     case_name="RT Test OA",
                     docket__court=self.court_1,
                     docket__date_argued=now() - timedelta(hours=5),
                     docket__docket_number="19-5735",
+                    stt_status=Audio.STT_COMPLETE,
+                    judges="John Smith",
+                    stt_google_response=json_transcript,
                 )
 
         # Confirm Alert date_last_hit is updated.
@@ -1645,8 +1664,12 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
 
         # Case name is not highlighted in email alert.
         self.assertIn(rt_oral_argument.case_name, html_content)
-        # Highlighting tags are set only for text field.
+        # Highlighting tags are set for other fields.
+        self.assertIn("<strong>19-5735</strong>", html_content)
         self.assertIn("<strong>RT</strong>", html_content)
+
+        # The right alert type template is used.
+        self.assertIn("oral argument", html_content)
 
         # One webhook event should be sent to user_profile
         webhook_events = WebhookEvent.objects.all()
@@ -1801,6 +1824,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         text_content = mail.outbox[alert_count - 1].body
         self.assertIn(document.case_name, text_content)
 
+        # The right alert type template is used.
+        self.assertIn("oral argument", text_content)
+
         # One webhook event should be sent to user_profile
         webhook_events = WebhookEvent.objects.all()
         self.assertEqual(len(webhook_events), alert_count)
@@ -1808,16 +1834,8 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         self.assertEqual(len(content["results"]), alert_count)
 
         # Confirm dly stored alerts instances were removed after send them.
-        user_rates = UserRateAlert.objects.filter(rate=rate)
-        self.assertEqual(user_rates.count(), 0)
-
-        if user_rates:
-            parent_alerts = ParentAlert.objects.all(user_rate=user_rates[0])
-            scheduled_alerts = ScheduledAlertHit.objects.filter(
-                parent_alert=parent_alerts[0]
-            )
-            self.assertEqual(parent_alerts.count(), 0)
-            self.assertEqual(scheduled_alerts.count(), 0)
+        scheduled_hits = ScheduledAlertHit.objects.filter(rate=rate)
+        self.assertEqual(scheduled_hits.count(), 0)
 
     def test_send_alert_multiple_alert_rates(self):
         """Confirm dly, wly and mly alerts are properly stored and sent
@@ -1832,13 +1850,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         )
         # When a new document is created, and it triggers a dly, wly or mly
         # It's stored to send it later.
-        user_rates = UserRateAlert.objects.filter(rate=Alert.DAILY)
-        parent_alerts = ParentAlert.objects.filter(user_rate=user_rates[0])
-        scheduled_alerts = ScheduledAlertHit.objects.filter(
-            parent_alert=parent_alerts[0]
-        )
-        self.assertEqual(user_rates.count(), 1)
-        self.assertEqual(parent_alerts.count(), 1)
+        scheduled_alerts = ScheduledAlertHit.objects.filter(rate=Alert.DAILY)
         self.assertEqual(scheduled_alerts.count(), 1)
         # At this stage no alerts or webhooks should go out.
         self.assertEqual(len(mail.outbox), 0)
@@ -1978,6 +1990,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         self.assertEqual(len(mail.outbox), 1)
         text_content = mail.outbox[0].body
 
+        # The right alert type template is used.
+        self.assertIn("oral argument", text_content)
+
         # The alert email should contain 3 hits.
         self.assertIn(rt_oral_argument_1.case_name, text_content)
         self.assertIn(rt_oral_argument_2.case_name, text_content)
@@ -1986,6 +2001,16 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         # Grouped  below two alerts.
         self.assertIn(self.search_alert_3.name, text_content)
         self.assertIn(self.search_alert_4.name, text_content)
+
+        # Extract HTML version.
+        html_content = None
+        for content, content_type in mail.outbox[0].alternatives:
+            if content_type == "text/html":
+                html_content = content
+                break
+
+        # Highlights are properly set in scheduled alerts.
+        self.assertIn("<strong>19-5741</strong>", html_content)
 
         # Two webhook event should be sent to user_profile for two different
         # alerts
@@ -2066,7 +2091,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 case_name=f"RT Test OA",
                 docket__court=self.court_1,
                 docket__date_argued=now() - timedelta(hours=5),
-                docket__docket_number=f"19-5730",
+                docket__docket_number=f"19-5735",
             )
 
         # 11 OA search alert emails should be sent, one for each user that
@@ -2170,3 +2195,229 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             audio.delete()
         for alert in alerts_created:
             alert.delete()
+
+    @override_settings(PERCOLATOR_PAGE_SIZE=5)
+    def test_percolate_document_in_batches(self):
+        """Confirm when getting alerts in batches and an alert previously
+        retrieved is updated during this process. It's not returned again.
+        """
+
+        alerts_created = []
+        for i in range(6):
+            user_profile = UserProfileWithParentsFactory.create()
+            alert = AlertFactory.create(
+                user=user_profile.user,
+                rate=Alert.REAL_TIME,
+                name=f"Test Alert RT {i}",
+                query=f"q=Lorem+Ipsum+20-5739&type=oa",
+            )
+            alerts_created.append(alert)
+
+        # Save a document to percolate it later.
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            rt_oral_argument = AudioWithParentsFactory.create(
+                case_name=f"Lorem Ipsum",
+                docket__court=self.court_1,
+                docket__date_argued=now() - timedelta(hours=5),
+                docket__docket_number=f"20-5739",
+            )
+
+        # Percolate the document. First batch.
+        document_index = AudioDocument._index._name
+        percolator_response = percolate_document(
+            str(rt_oral_argument.pk), document_index
+        )
+
+        ids_in_results = []
+        for result in percolator_response.hits:
+            ids_in_results.append(result.id)
+
+        # Update the first in the previous batch.
+        alert_to_modify = alerts_created[0]
+        alert_to_modify.rate = "dly"
+        alert_to_modify.save()
+
+        # Percolate the next page.
+        search_after = percolator_response.hits[-1].meta.sort
+        percolator_response = percolate_document(
+            str(rt_oral_argument.pk), document_index, search_after=search_after
+        )
+
+        # The document updated shouldn't be retrieved again.
+        # Since documents are ordered by asc date_created instead of timestamp.
+        for result in percolator_response.hits:
+            self.assertNotIn(result.id, ids_in_results)
+            ids_in_results.append(result.id)
+
+
+@override_settings(ELASTICSEARCH_DISABLED=True)
+class SearchAlertsIndexingCommandTests(ESIndexTestCase, TestCase):
+    """Test the cl_index_search_alerts command"""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user_profile = UserProfileWithParentsFactory()
+        cls.user_profile_2 = UserProfileWithParentsFactory()
+        cls.search_alert = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert OA",
+            query="q=RT+Test+OA&type=oa",
+        )
+        cls.search_alert_2 = AlertFactory(
+            user=cls.user_profile_2.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert OA 2",
+            query="q=RT+Test+OA&type=oa",
+        )
+        cls.search_alert_3 = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert OA Daily",
+            query="q=Test+OA&type=oa",
+        )
+        cls.search_alert_4 = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.WEEKLY,
+            name="Test Alert OA Weekly",
+            query="q=Test+OA&type=oa",
+        )
+        cls.search_alert_5 = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.MONTHLY,
+            name="Test Alert OA Monthly",
+            query="q=Test+OA&type=oa",
+        )
+        cls.search_alert_6 = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.MONTHLY,
+            name="Test Alert O RT",
+            query="q=Test+Opinion Alert",
+        )
+        cls.search_alert_7 = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert R",
+            query="q=Test+O&type=r",
+        )
+        cls.search_alert_8 = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert R",
+            query="q=Test+O&type=r",
+        )
+
+    def tearDown(self) -> None:
+        self.delete_index("alerts.Alert")
+        self.create_index("alerts.Alert")
+
+    @override_settings(PERCOLATOR_PAGE_SIZE=20)
+    @mock.patch("cl.alerts.management.commands.cl_index_search_alerts.logger")
+    def test_cl_index_search_alerts_command(self, mock_logger):
+        """Confirm the command only index the right Alerts into the ES."""
+        s = AudioPercolator.search().query("match_all")
+        response = s.execute()
+        response_dict = response.to_dict()
+        self.assertEqual(response_dict["hits"]["total"]["value"], 0)
+
+        # Call cl_index_search_alerts command.
+        call_command(
+            "cl_index_search_alerts",
+            pk_offset=0,
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+        )
+
+        s = AudioPercolator.search().query("match_all")
+        response = s.execute()
+        response_dict = response.to_dict()
+        # Only OA Alerts should be indexed.
+        self.assertEqual(response_dict["hits"]["total"]["value"], 5)
+
+        pks_alerts_compare = [
+            self.search_alert.pk,
+            self.search_alert_2.pk,
+            self.search_alert_3.pk,
+            self.search_alert_4.pk,
+            self.search_alert_5.pk,
+        ]
+        for alert_pk in pks_alerts_compare:
+            self.assertTrue(
+                AudioPercolator.exists(id=alert_pk),
+                msg=f"Alert id: {alert_pk} was not indexed.",
+            )
+
+        # Call cl_index_search_alerts command for a not supported query type:
+        call_command(
+            "cl_index_search_alerts",
+            pk_offset=0,
+            alert_type=SEARCH_TYPES.RECAP,
+        )
+
+        mock_logger.info.assert_called_with(
+            f"'{SEARCH_TYPES.RECAP}' Alert type indexing is not supported yet."
+        )
+
+    @mock.patch("cl.alerts.management.commands.cl_index_search_alerts.logger")
+    def test_index_from_pk_offset(self, mock_logger):
+        """Confirm elements with pk lt pk_offset are omitted from  indexing."""
+
+        # Call cl_index_search_alerts command.
+        call_command(
+            "cl_index_search_alerts",
+            pk_offset=self.search_alert_3.pk,
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+        )
+
+        s = AudioPercolator.search().query("match_all")
+        response = s.execute()
+        response_dict = response.to_dict()
+        # Only 3 elements should be indexed.
+        self.assertEqual(response_dict["hits"]["total"]["value"], 3)
+
+        pks_alerts_compare = [
+            self.search_alert_3.pk,
+            self.search_alert_4.pk,
+            self.search_alert_5.pk,
+        ]
+        for alert_pk in pks_alerts_compare:
+            self.assertTrue(
+                AudioPercolator.exists(id=alert_pk),
+                msg=f"Alert id: {alert_pk} was not indexed.",
+            )
+
+    def test_avoid_indexing_no_valid_alert_query(self):
+        """Confirm invalid alert queries are not indexed."""
+
+        not_valid_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert OA Daily 2",
+            query="q=DLY+Test+V2&type=oa&argued_after=1",
+        )
+        valid_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert OA Daily 2",
+            query="q=DLY+Test+V2&type=oa",
+        )
+        # Call cl_index_search_alerts command.
+        call_command(
+            "cl_index_search_alerts",
+            pk_offset=not_valid_alert.pk,
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
+        )
+
+        s = AudioPercolator.search().query("match_all")
+        response = s.execute()
+        response_dict = response.to_dict()
+        # Only 1 element should be indexed (valid_alert).
+        self.assertEqual(response_dict["hits"]["total"]["value"], 1)
+        self.assertTrue(
+            AudioPercolator.exists(id=valid_alert.pk),
+            msg=f"Alert id: {valid_alert.pk} was not indexed.",
+        )

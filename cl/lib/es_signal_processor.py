@@ -1,14 +1,18 @@
-from typing import Union
+from typing import Any, Union
 
+from celery.canvas import chain
 from django.conf import settings
 from django.db.models.signals import m2m_changed, post_delete, post_save
 from elasticsearch.exceptions import NotFoundError
 from elasticsearch_dsl import Document
 
-from cl.alerts.send_alerts import send_or_schedule_alerts
+from cl.alerts.tasks import (
+    process_percolator_response,
+    send_or_schedule_alerts,
+)
 from cl.audio.models import Audio
 from cl.lib.command_utils import logger
-from cl.lib.elasticsearch_utils import elasticsearch_enabled, es_index_exists
+from cl.lib.elasticsearch_utils import elasticsearch_enabled
 from cl.people_db.models import Education, Person, Position
 from cl.search.documents import (
     PEOPLE_DOCS_TYPE_ID,
@@ -25,6 +29,7 @@ from cl.search.models import (
     Parenthetical,
     ParentheticalGroup,
 )
+from cl.search.tasks import save_document_in_es, update_document_in_es
 
 instance_typing = Union[
     Citation,
@@ -41,6 +46,7 @@ instance_typing = Union[
 es_document_typing = Union[
     AudioDocument, ParentheticalGroupDocument, PersonDocument, PositionDocument
 ]
+models_alert_support = [Audio]
 
 
 def updated_fields(
@@ -90,75 +96,39 @@ def get_fields_to_update(
 
 
 def document_fields_to_update(
-    field_list: list[str], instance: instance_typing, fields_map: dict
-) -> dict:
+    main_doc: es_document_typing,
+    main_object: instance_typing,
+    field_list: list[str],
+    instance: instance_typing,
+    fields_map: dict,
+) -> dict[str, Any]:
     """Generate a dictionary of fields and values to update based on a
      provided map and an instance.
 
+    :param main_doc: A Elasticsearch DSL document.
+    :param main_object: The main object instance that changed.
     :param field_list: A list of field names that need to be updated.
     :param instance: The instance from which field values are to be extracted.
     :param fields_map: A map from which ES field names are to be extracted.
     :return: A dictionary with fields and values to update.
     """
 
-    return {
-        fields_map[field]: getattr(instance, field)()
-        if field.startswith("get_") and field.endswith("_display")
-        else getattr(instance, field)
-        for field in field_list
-    }
-
-
-def save_document_in_es(
-    instance: instance_typing, es_document: es_document_typing
-) -> None:
-    """Save a document in Elasticsearch using a provided callable.
-    :param instance: The instance of the document to save.
-    :param es_document: A Elasticsearch DSL document.
-    :return: None
-    """
-    es_args = {}
-    if isinstance(instance, Position):
-        parent_id = getattr(instance.person, "pk", None)
-        if not all(
-            [
-                es_index_exists(es_document._index._name),
-                parent_id,
-                # avoid indexing position records if the parent is not a judge
-                instance.person.is_judge,
-            ]
-        ):
-            return
-
-        if not PersonDocument.exists(id=parent_id):
-            # create the parent document if it does not exists in ES
-            person_doc = PersonDocument()
-            doc = person_doc.prepare(instance.person)
-            PersonDocument(meta={"id": parent_id}, **doc).save(
-                skip_empty=False, return_doc_meta=True
-            )
-
-        doc_id = PEOPLE_DOCS_TYPE_ID(instance.pk).POSITION
-        es_args["_routing"] = parent_id
-    elif isinstance(instance, Person):
-        # index person records only if they were ever a judge.
-        if not instance.is_judge:
-            return
-        doc_id = instance.pk
-    else:
-        doc_id = instance.pk
-
-    es_args["meta"] = {"id": doc_id}
-    es_doc = es_document()
-    doc = es_doc.prepare(instance)
-    response = es_document(**es_args, **doc).save(
-        skip_empty=False,
-        return_doc_meta=True,
-        refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
-    )
-    support_alerts = getattr(instance, "SUPPORT_ALERTS", None)
-    if support_alerts and response["_version"] == 1:
-        send_or_schedule_alerts(response["_id"], es_document._index._name, doc)
+    fields_to_update = {}
+    for field in field_list:
+        document_fields = fields_map[field]
+        for doc_field in document_fields:
+            if field.startswith("get_") and field.endswith("_display"):
+                fields_to_update[doc_field] = getattr(instance, field)()
+            else:
+                prepare_method = getattr(
+                    main_doc, f"prepare_{doc_field}", None
+                )
+                if prepare_method:
+                    field_value = prepare_method(main_object)
+                else:
+                    field_value = getattr(instance, field)
+                fields_to_update[doc_field] = field_value
+    return fields_to_update
 
 
 def get_or_create_doc(
@@ -172,7 +142,7 @@ def get_or_create_doc(
     try:
         main_doc = es_document.get(id=instance.pk)
     except NotFoundError:
-        save_document_in_es(instance, es_document)
+        save_document_in_es.delay(instance, es_document)
         return None
     return main_doc
 
@@ -241,12 +211,15 @@ def update_es_documents(
                     changed_fields, fields_map
                 )
                 if fields_to_update:
-                    Document.update(
+                    update_document_in_es.delay(
                         main_doc,
-                        **document_fields_to_update(
-                            fields_to_update, instance, fields_map
+                        document_fields_to_update(
+                            main_doc,
+                            main_object,
+                            fields_to_update,
+                            instance,
+                            fields_map,
                         ),
-                        refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
                     )
 
 
@@ -326,13 +299,13 @@ def update_reverse_related_documents(
         main_doc = get_or_create_doc(es_document, main_object)
         if not main_doc:
             return
-        Document.update(
+
+        update_document_in_es.delay(
             main_doc,
-            **{
+            {
                 field: getattr(main_doc, f"prepare_{field}")(main_object)
                 for field in affected_fields
             },
-            refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
         )
 
 
@@ -412,7 +385,11 @@ class ESSignalProcessor(object):
                 mapping_fields,
             )
         if not mapping_fields:
-            save_document_in_es(instance, self.es_document)
+            chain(
+                save_document_in_es.si(instance, self.es_document),
+                send_or_schedule_alerts.s(self.es_document._index._name),
+                process_percolator_response.s(),
+            ).apply_async()
 
     @elasticsearch_enabled
     def handle_delete(self, sender, instance, **kwargs):

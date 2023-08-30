@@ -180,7 +180,7 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
             result_page = paginator.paginate_queryset(sl, request)
             if (
                 search_type == SEARCH_TYPES.ORAL_ARGUMENT
-                and not waffle.flag_is_active(request, "oa-es-deactivate")
+                and waffle.flag_is_active(request, "oa-es-active")
             ):
                 serializer = SearchESResultSerializer(
                     result_page,
@@ -192,9 +192,8 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
                         "document_type": AudioDocument,
                     },
                 )
-            elif (
-                search_type == SEARCH_TYPES.PEOPLE
-                and not waffle.flag_is_active(request, "p-es-deactivate")
+            elif search_type == SEARCH_TYPES.PEOPLE and waffle.flag_is_active(
+                request, "p-es-activate"
             ):
                 serializer = SearchESResultSerializer(
                     result_page,

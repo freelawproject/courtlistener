@@ -11,7 +11,7 @@ from requests import Session
 from rest_framework import status
 from rest_framework.status import HTTP_400_BAD_REQUEST
 
-from cl.lib.elasticsearch_utils import build_es_main_query
+from cl.lib.elasticsearch_utils import build_es_base_query
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import (
     build_alert_estimation_query,
@@ -186,19 +186,17 @@ async def get_result_count(request, version, day_count):
     cd = search_form.cleaned_data
     search_type = cd["type"]
     es_flag_for_oa = await sync_to_async(waffle.flag_is_active)(
-        request, "oa-es-deactivate"
+        request, "oa-es-active"
     )
     if (
-        search_type == SEARCH_TYPES.ORAL_ARGUMENT and not es_flag_for_oa
+        search_type == SEARCH_TYPES.ORAL_ARGUMENT and es_flag_for_oa
     ):  # Elasticsearch version for OA
         document_type = AudioDocument
         cd["argued_after"] = date.today() - timedelta(days=int(day_count))
         cd["argued_before"] = None
-
         search_query = document_type.search()
-        s, total_query_results, top_hits_limit = build_es_main_query(
-            search_query, cd
-        )
+        s = build_es_base_query(search_query, cd)
+        total_query_results = s.count()
     else:
         with Session() as session:
             try:
@@ -232,6 +230,11 @@ async def deprecated_api(request, v):
         safe=False,
         status=status.HTTP_410_GONE,
     )
+
+
+def rest_change_log(request):
+    context = {"private": False}
+    return render(request, "rest-change-log.html", context)
 
 
 def webhooks_getting_started(request):
