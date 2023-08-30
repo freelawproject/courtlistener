@@ -1,16 +1,20 @@
 import copy
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Tuple, Union, cast
+from typing import Dict, List, Tuple, Union, cast
 
+from celery import Task
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives, get_connection, send_mail
 from django.db import transaction
 from django.template import loader
 from django.utils.timezone import now
-from elasticsearch.exceptions import RequestError, TransportError
-from elasticsearch_dsl.response import Hit
+from elasticsearch.exceptions import (
+    NotFoundError,
+    RequestError,
+    TransportError,
+)
 
 from cl.alerts.models import Alert, DocketAlert, ScheduledAlertHit
 from cl.alerts.utils import percolate_document, user_has_donated_enough
@@ -28,7 +32,14 @@ from cl.lib.redis_utils import create_redis_semaphore, delete_redis_semaphore
 from cl.lib.string_utils import trunc
 from cl.recap.constants import COURT_TIMEZONES
 from cl.search.constants import ALERTS_HL_TAG
+from cl.search.documents import AudioPercolator
 from cl.search.models import Docket, DocketEntry
+from cl.search.types import (
+    ESDocumentType,
+    PercolatorResponseType,
+    SaveDocumentResponseType,
+    SearchAlertHitType,
+)
 from cl.stats.utils import tally_stat
 from cl.users.models import UserProfile
 
@@ -420,7 +431,17 @@ def send_recap_email_user_not_found(recap_email_recipients: list[str]) -> None:
     )
 
 
-def send_webhook_alert_hits(alert_user, hits) -> None:
+def send_webhook_alert_hits(
+    alert_user: UserProfile.user, hits: list[SearchAlertHitType]
+) -> None:
+    """Send webhook alerts for search hits.
+
+    :param alert_user: The user profile object associated with the webhooks.
+    :param hits: A list of tuples, each containing information about an alert,
+    its associated search type, documents found, and the number of documents.
+    :return: None
+    """
+
     for alert, search_type, documents, num_docs in hits:
         user_webhooks = alert_user.webhooks.filter(
             event_type=WebhookEventType.SEARCH_ALERT, enabled=True
@@ -428,22 +449,20 @@ def send_webhook_alert_hits(alert_user, hits) -> None:
         for user_webhook in user_webhooks:
             send_es_search_alert_webhook.delay(
                 documents,
-                user_webhook,
+                user_webhook.pk,
                 alert,
             )
 
 
 @app.task(ignore_result=True)
 def send_search_alert_emails(
-    email_alerts_to_send: list[
-        tuple[int, list[tuple[Alert, str, list[dict[str, Any]], int]]]
-    ]
+    email_alerts_to_send: list[tuple[int, list[SearchAlertHitType]]]
 ) -> None:
     """Send search alert emails for multiple users.
 
     :param email_alerts_to_send: A list of two tuples containing the user to
-    whom the alerts should be sent. A list of tuples containing the Alert,
-    search type, documents, and number of documents.
+    whom the alerts should be sent. A list of tuples containing the Search
+    Alert, (Alert, search type, documents, and number of documents)
     :return: None
     """
 
@@ -472,9 +491,7 @@ def send_search_alert_emails(
 
 
 @app.task(ignore_result=True)
-def process_percolator_response(
-    response: tuple[list[Hit], dict[str, Any]]
-) -> None:
+def process_percolator_response(response: PercolatorResponseType) -> None:
     """Process the response from the percolator and handle alerts triggered by
      the percolator query.
 
@@ -569,8 +586,8 @@ def process_percolator_response(
     interval_start=5,
 )
 def send_or_schedule_alerts(
-    self, response: tuple[str, dict[str, Any]], document_index: str
-) -> tuple[list[Hit], dict[str, Any]] | None:
+    self: Task, response: SaveDocumentResponseType, document_index: str
+) -> PercolatorResponseType | None:
     """Send real-time alerts based on the Elasticsearch search response.
 
     Or schedule other rates alerts to send them later.
@@ -582,7 +599,7 @@ def send_or_schedule_alerts(
     additional results in chunks determined by settings.PERCOLATOR_PAGE_SIZE,
     until all results are retrieved or no more results are available.
 
-    :param self: The task
+    :param self: The celery task
     :param response: A two tuple, the document ID to be percolated in
     ES index and the document data that triggered the alert.
     :param document_index: The ES document index where the document lives.
@@ -630,3 +647,63 @@ def send_or_schedule_alerts(
                 search_after = percolator_response.hits[-1].meta.sort
 
     return alerts_triggered, document_content
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(TransportError, ConnectionError, RequestError),
+    max_retries=3,
+    interval_start=5,
+    ignore_result=True,
+)
+def index_alert_document(
+    self: Task, alert: Alert, es_document=AudioPercolator
+) -> None:
+    """Helper method to prepare and index an Alert object into Elasticsearch.
+
+    :param self: The celery task
+    :param alert: The Alert instance to be indexed.
+    :param es_document: The Elasticsearch document percolator used for indexing
+    the Alert instance.
+    :return: Bool, True if document was properly indexed, otherwise None.
+    """
+
+    document = es_document()
+    doc = document.prepare(alert)
+    if not doc["percolator_query"]:
+        return None
+    doc_indexed = es_document(meta={"id": alert.pk}, **doc).save(
+        skip_empty=True, refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH
+    )
+    if not doc_indexed in ["created", "updated"]:
+        logger.warning(f"Error indexing Alert ID: {alert.pk}")
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(TransportError, ConnectionError, RequestError),
+    max_retries=3,
+    interval_start=5,
+    ignore_result=True,
+)
+def remove_doc_from_es_index(
+    self: Task, es_document: ESDocumentType, instance_id: int
+) -> None:
+    """Remove a document from an Elasticsearch index.
+
+    :param self: The celery task
+    :param es_document: The Elasticsearch document type.
+    :param instance_id: The ID of the instance to be removed from the
+    Elasticsearch index.
+    :return: None
+    """
+
+    try:
+        doc = es_document.get(id=instance_id)
+        doc.delete(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)
+    except NotFoundError:
+        model_label = es_document.Django.model._meta.app_label.capitalize()
+        logger.error(
+            f"The {model_label} with ID:{instance_id} can't be deleted from "
+            f"the ES index, it doesn't exists."
+        )

@@ -17,12 +17,6 @@ DROP TRIGGER IF EXISTS pgtrigger_update_or_delete_snapshot_update_1285f ON "aler
 ALTER TABLE "alerts_alert" ADD COLUMN "alert_type" varchar(3) DEFAULT 'o' NOT NULL;
 ALTER TABLE "alerts_alert" ALTER COLUMN "alert_type" DROP DEFAULT;
 --
--- Add field alert_type to alertevent
---
-ALTER TABLE "alerts_alertevent" ADD COLUMN "alert_type" varchar(3) DEFAULT 'o' NOT NULL;
-ALTER TABLE "alerts_alertevent" ALTER COLUMN "alert_type" DROP DEFAULT;
-
---
 -- Add field alert to scheduledalerthit
 --
 ALTER TABLE "alerts_scheduledalerthit" ADD COLUMN "alert_id" integer NOT NULL CONSTRAINT "alerts_scheduledalerthit_alert_id_b407b0ad_fk_alerts_alert_id" REFERENCES "alerts_alert"("id") DEFERRABLE INITIALLY DEFERRED; SET CONSTRAINTS "alerts_scheduledalerthit_alert_id_b407b0ad_fk_alerts_alert_id" IMMEDIATE;

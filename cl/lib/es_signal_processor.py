@@ -1,43 +1,22 @@
-from typing import Any, Union
+from typing import Any
 
 from celery.canvas import chain
-from django.conf import settings
 from django.db.models.signals import m2m_changed, post_delete, post_save
 from elasticsearch.exceptions import NotFoundError
 
 from cl.alerts.tasks import (
     process_percolator_response,
+    remove_doc_from_es_index,
     send_or_schedule_alerts,
 )
-from cl.audio.models import Audio
-from cl.lib.command_utils import logger
 from cl.lib.elasticsearch_utils import elasticsearch_enabled
-from cl.search.documents import AudioDocument, ParentheticalGroupDocument
-from cl.search.models import (
-    Citation,
-    Docket,
-    Opinion,
-    OpinionCluster,
-    Parenthetical,
-    ParentheticalGroup,
-)
+from cl.search.documents import AudioDocument
 from cl.search.tasks import save_document_in_es, update_document_in_es
-
-instance_typing = Union[
-    Citation,
-    Docket,
-    Opinion,
-    OpinionCluster,
-    Parenthetical,
-    ParentheticalGroup,
-    Audio,
-]
-es_document_typing = Union[AudioDocument, ParentheticalGroupDocument]
-models_alert_support = [Audio]
+from cl.search.types import ESDocumentType, ESModelType
 
 
 def updated_fields(
-    instance: instance_typing, es_document: es_document_typing
+    instance: ESModelType, es_document: ESDocumentType
 ) -> list[str]:
     """Look for changes in the tracked fields of an instance.
     :param instance: The instance to check for changed fields.
@@ -81,10 +60,10 @@ def get_fields_to_update(
 
 
 def document_fields_to_update(
-    main_doc: es_document_typing,
-    main_object: instance_typing,
+    main_doc: ESDocumentType,
+    main_object: ESModelType,
     field_list: list[str],
-    instance: instance_typing,
+    instance: ESModelType,
     fields_map: dict,
 ) -> dict[str, Any]:
     """Generate a dictionary of fields and values to update based on a
@@ -117,8 +96,8 @@ def document_fields_to_update(
 
 
 def get_or_create_doc(
-    es_document: es_document_typing, instance: instance_typing
-) -> es_document_typing | None:
+    es_document: ESDocumentType, instance: ESModelType
+) -> ESDocumentType | None:
     """Get or create a document in Elasticsearch.
     :param es_document: The Elasticsearch document type.
     :param instance: The instance of the document to get or create.
@@ -132,31 +111,10 @@ def get_or_create_doc(
     return main_doc
 
 
-def remove_doc_from_es_index(
-    es_document: es_document_typing, instance_id: int
-) -> None:
-    """Remove a document from an Elasticsearch index.
-
-    :param es_document: The Elasticsearch document type.
-    :param instance_id: The ID of the instance to be removed from the
-    Elasticsearch index.
-    :return: None
-    """
-    try:
-        doc = es_document.get(id=instance_id)
-        doc.delete(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)
-    except NotFoundError:
-        model_label = es_document.Django.model._meta.app_label.capitalize()
-        logger.error(
-            f"The {model_label} with ID:{instance_id} can't be deleted from "
-            f"the ES index, it doesn't exists."
-        )
-
-
 def update_es_documents(
-    main_model: instance_typing,
-    es_document: es_document_typing,
-    instance: instance_typing,
+    main_model: ESModelType,
+    es_document: ESDocumentType,
+    instance: ESModelType,
     created: bool,
     mapping_fields: dict,
 ) -> None:
@@ -196,9 +154,9 @@ def update_es_documents(
 
 
 def update_remove_m2m_documents(
-    main_model: instance_typing,
-    es_document: es_document_typing,
-    instance: instance_typing,
+    main_model: ESModelType,
+    es_document: ESDocumentType,
+    instance: ESModelType,
     mapping_fields: dict,
     affected_field: str,
 ) -> None:
@@ -227,8 +185,8 @@ def update_remove_m2m_documents(
 
 
 def update_m2m_field_in_es_document(
-    instance: instance_typing,
-    es_document: es_document_typing,
+    instance: ESModelType,
+    es_document: ESDocumentType,
     affected_field: str,
 ) -> None:
     """Update a single field created using a many-to-many relationship.
@@ -246,9 +204,9 @@ def update_m2m_field_in_es_document(
 
 
 def update_reverse_related_documents(
-    main_model: instance_typing,
-    es_document: es_document_typing,
-    instance: instance_typing,
+    main_model: ESModelType,
+    es_document: ESDocumentType,
+    instance: ESModelType,
     query_string: str,
     affected_fields: list[str],
 ) -> None:
@@ -362,7 +320,7 @@ class ESSignalProcessor(object):
     @elasticsearch_enabled
     def handle_delete(self, sender, instance, **kwargs):
         """Receiver function that gets called after an object instance is deleted"""
-        remove_doc_from_es_index(self.es_document, instance.pk)
+        remove_doc_from_es_index.delay(self.es_document, instance.pk)
 
     @elasticsearch_enabled
     def handle_m2m(self, sender, instance=None, action=None, **kwargs):

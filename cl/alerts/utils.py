@@ -1,11 +1,6 @@
-import traceback
 from dataclasses import dataclass
-from typing import Any
 
 from django.conf import settings
-from django.contrib.auth.models import User
-from django.core.mail import EmailMultiAlternatives
-from django.template import loader
 from elasticsearch_dsl import Q, Search
 from elasticsearch_dsl.response import Response
 
@@ -51,29 +46,6 @@ class OldAlertReport:
 
 class InvalidDateError(Exception):
     pass
-
-
-def index_alert_document(
-    alert: Alert, es_document=AudioPercolator
-) -> bool | None:
-    """Helper method to prepare and index an Alert object into Elasticsearch.
-
-    :param alert: The Alert instance to be indexed.
-    :param es_document: The Elasticsearch document percolator used for indexing
-    the Alert instance.
-    :return: Bool, True if document was properly indexed, otherwise None.
-    """
-
-    document = es_document()
-    doc = document.prepare(alert)
-    if not doc["percolator_query"]:
-        return None
-    doc_indexed = es_document(meta={"id": alert.pk}, **doc).save(
-        skip_empty=True, refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH
-    )
-    if doc_indexed in ["created", "updated"]:
-        return True
-    return None
 
 
 def percolate_document(

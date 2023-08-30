@@ -1,9 +1,10 @@
 import socket
 from datetime import timedelta
-from typing import Any, Union
+from typing import Any
 
 import scorched
 import waffle
+from celery import Task
 from django.apps import apps
 from django.conf import settings
 from django.utils.timezone import now
@@ -15,27 +16,14 @@ from scorched.exc import SolrError
 from cl.audio.models import Audio
 from cl.celery_init import app
 from cl.lib.search_index_utils import InvalidDocumentError
-from cl.search.documents import AudioDocument, ParentheticalGroupDocument
-from cl.search.models import (
-    Citation,
-    Docket,
-    Opinion,
-    OpinionCluster,
-    Parenthetical,
-    ParentheticalGroup,
-    RECAPDocument,
+from cl.search.documents import AudioDocument
+from cl.search.models import Docket, OpinionCluster, RECAPDocument
+from cl.search.types import (
+    ESDocumentType,
+    ESModelType,
+    SaveDocumentResponseType,
 )
 
-instance_typing = Union[
-    Citation,
-    Docket,
-    Opinion,
-    OpinionCluster,
-    Parenthetical,
-    ParentheticalGroup,
-    Audio,
-]
-es_document_typing = Union[AudioDocument, ParentheticalGroupDocument]
 models_alert_support = [Audio]
 
 
@@ -191,13 +179,13 @@ def delete_items(items, app_label, force_commit=False):
     interval_start=5,
 )
 def save_document_in_es(
-    self, instance: instance_typing, es_document: es_document_typing
-) -> tuple[str, dict[str, Any]] | None:
+    self: Task, instance: ESModelType, es_document: ESDocumentType
+) -> SaveDocumentResponseType | None:
     """Save a document in Elasticsearch using a provided callable.
-    :param self: The task
+    :param self: The celery task
     :param instance: The instance of the document to save.
     :param es_document: A Elasticsearch DSL document.
-    :return: None
+    :return: SaveDocumentResponseType or None
     """
 
     es_doc = es_document()
@@ -229,12 +217,12 @@ def save_document_in_es(
     interval_start=5,
 )
 def update_document_in_es(
-    self,
-    es_document: es_document_typing,
+    self: Task,
+    es_document: ESDocumentType,
     fields_values_to_update: dict[str, Any],
 ) -> None:
     """Update a document in Elasticsearch.
-    :param self: The task
+    :param self: The celery task
     :param es_document: The instance of the document to save.
     :param fields_values_to_update: A dictionary with fields and values to update.
     :return: None
