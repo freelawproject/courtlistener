@@ -569,7 +569,7 @@ async def process_recap_docket(pk):
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
-            await sync_to_async(send_alert_and_webhook)(d.pk, start_time)
+            await sync_to_async(send_alert_and_webhook.delay)(d.pk, start_time)
     await mark_pq_successful(pq, d_id=d.pk)
     return {
         "docket_pk": d.pk,
@@ -851,7 +851,7 @@ async def process_recap_docket_history_report(pk):
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
-            await sync_to_async(send_alert_and_webhook)(d.pk, start_time)
+            await sync_to_async(send_alert_and_webhook.delay)(d.pk, start_time)
     await mark_pq_successful(pq, d_id=d.pk)
     return {
         "docket_pk": d.pk,
@@ -1057,7 +1057,7 @@ async def process_recap_appellate_docket(pk):
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
-            await sync_to_async(send_alert_and_webhook)(d.pk, start_time)
+            await sync_to_async(send_alert_and_webhook.delay)(d.pk, start_time)
     await mark_pq_successful(pq, d_id=d.pk)
     return {
         "docket_pk": d.pk,
