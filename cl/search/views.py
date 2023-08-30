@@ -588,7 +588,7 @@ def do_es_search(
     """Run Elasticsearch searching and filtering and prepare data to display
 
     :param get_params: The request.GET params sent by user.
-    :param rows: The number of solr results to request
+    :param rows: The number of Elasticsearch results to request
     :param facet: Whether to complete faceting in the query
     :param cache_key: A cache key with which to save the results. Note that it
     does not do anything clever with the actual query, so if you use this, your

@@ -177,6 +177,10 @@ class SCHEDULED_ALERT_HIT_STATUS(object):
 
 
 class ScheduledAlertHit(AbstractDateTimeModel):
+    """Store alert hits triggered by a percolated document in Elasticsearch,to
+    be sent later according to the user-defined rate.
+    """
+
     alert = models.ForeignKey(
         Alert,
         help_text="The related Alert object.",
