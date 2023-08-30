@@ -1608,7 +1608,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             rt_oral_argument = AudioWithParentsFactory.create(
                 case_name="Frequency Test OA",
                 docket__court=self.court_1,
-                docket__date_argued=now() - timedelta(hours=5),
+                docket__date_argued=now().date(),
                 docket__docket_number="19-5735",
             )
 
@@ -1651,7 +1651,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 rt_oral_argument = AudioWithParentsFactory.create(
                     case_name="RT Test OA",
                     docket__court=self.court_1,
-                    docket__date_argued=now() - timedelta(hours=5),
+                    docket__date_argued=now().date(),
                     docket__docket_number="19-5735",
                     stt_status=Audio.STT_COMPLETE,
                     judges="John Smith",
@@ -1735,7 +1735,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             rt_oral_argument = AudioWithParentsFactory.create(
                 case_name="RT Test OA",
                 docket__court=self.court_1,
-                docket__date_argued=now() - timedelta(hours=5),
+                docket__date_argued=now().date(),
                 docket__docket_number="19-5735",
             )
 
@@ -1867,7 +1867,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         dly_oral_argument = AudioWithParentsFactory.create(
             case_name="DLY Test OA",
             docket__court=self.court_1,
-            docket__date_argued=now() - timedelta(hours=5),
+            docket__date_argued=now().date(),
             docket__docket_number="19-5739",
         )
         # When a new document is created, and it triggers a dly, wly or mly
@@ -1912,7 +1912,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         wly_oral_argument = AudioWithParentsFactory.create(
             case_name="WLY Test OA",
             docket__court=self.court_1,
-            docket__date_argued=now() - timedelta(hours=5),
+            docket__date_argued=now().date(),
             docket__docket_number="19-5741",
         )
         # Send wly alerts and check assertions.
@@ -1929,7 +1929,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         mly_oral_argument = AudioWithParentsFactory.create(
             case_name="MLY Test OA",
             docket__court=self.court_1,
-            docket__date_argued=now() - timedelta(hours=5),
+            docket__date_argued=now().date(),
             docket__docket_number="19-5742",
         )
         # Send mly alerts on a day after 28th, it must fail.
@@ -1975,21 +1975,21 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             rt_oral_argument_1 = AudioWithParentsFactory.create(
                 case_name="DLY Test OA",
                 docket__court=self.court_1,
-                docket__date_argued=now() - timedelta(hours=5),
+                docket__date_argued=now().date(),
                 docket__docket_number="19-5739",
             )
             # When the Audio object is created it should trigger an alert.
             rt_oral_argument_2 = AudioWithParentsFactory.create(
                 case_name="DLY Test OA 2",
                 docket__court=self.court_1,
-                docket__date_argued=now() - timedelta(hours=5),
+                docket__date_argued=now().date(),
                 docket__docket_number="19-5740",
             )
             # When the Audio object is created it should trigger an alert.
             rt_oral_argument_3 = AudioWithParentsFactory.create(
                 case_name="DLY Test V2",
                 docket__court=self.court_1,
-                docket__date_argued=now() - timedelta(hours=5),
+                docket__date_argued=now().date(),
                 docket__docket_number="19-5741",
             )
 
@@ -2127,7 +2127,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             rt_oral_argument = AudioWithParentsFactory.create(
                 case_name=f"RT Test OA",
                 docket__court=self.court_1,
-                docket__date_argued=now() - timedelta(hours=5),
+                docket__date_argued=now().date(),
                 docket__docket_number=f"19-5735",
             )
 
@@ -2192,7 +2192,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 audio = AudioWithParentsFactory.create(
                     case_name=f"Test OA",
                     docket__court=self.court_1,
-                    docket__date_argued=now() - timedelta(hours=5),
+                    docket__date_argued=now().date(),
                     docket__docket_number=f"19-5735",
                 )
                 audios_created.append(audio)
@@ -2268,7 +2268,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             rt_oral_argument = AudioWithParentsFactory.create(
                 case_name=f"Lorem Ipsum",
                 docket__court=self.court_1,
-                docket__date_argued=now() - timedelta(hours=5),
+                docket__date_argued=now().date(),
                 docket__docket_number=f"20-5739",
             )
 

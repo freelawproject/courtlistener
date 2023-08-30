@@ -63,7 +63,7 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
                     len(documents),
                 )
             )
-        send_search_alert_emails([(user_id, hits)])
+        send_search_alert_emails.delay([(user_id, hits)])
         if hits:
             alerts_sent_count += 1
 

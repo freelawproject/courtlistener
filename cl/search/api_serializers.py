@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from datetime import date, datetime
 
 from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
@@ -291,6 +292,20 @@ class SearchResultSerializer(serializers.Serializer):
         return fields
 
 
+class DateOrDateTimeField(serializers.Field):
+    """Handles both datetime and date objects."""
+
+    def to_representation(self, value):
+        if isinstance(value, datetime):
+            return value.strftime("%Y-%m-%dT%H:%M:%S")
+        elif isinstance(value, date):
+            return value.strftime("%Y-%m-%d")
+        else:
+            raise serializers.ValidationError(
+                "Date or DateTime object expected."
+            )
+
+
 class SearchESResultSerializer(serializers.Serializer):
     """The serializer for Elasticsearch results.
     Does not presently support the fields argument.
@@ -306,7 +321,7 @@ class SearchESResultSerializer(serializers.Serializer):
         "boolean": serializers.BooleanField,
         "text": serializers.CharField,
         "keyword": serializers.CharField,
-        "date": serializers.DateTimeField,
+        "date": DateOrDateTimeField,
         # Numbers
         "integer": serializers.IntegerField,
     }
