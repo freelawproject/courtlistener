@@ -5,7 +5,7 @@ from typing import DefaultDict
 from django.utils.timezone import now
 
 from cl.alerts.models import Alert, ScheduledAlertHit
-from cl.alerts.tasks import send_search_alert_and_webhooks
+from cl.alerts.tasks import send_search_alert_emails
 from cl.alerts.utils import InvalidDateError
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.stats.utils import tally_stat
@@ -63,7 +63,7 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
                     len(documents),
                 )
             )
-        send_search_alert_and_webhooks(user_id, hits)
+        send_search_alert_emails([(user_id, hits)])
         if hits:
             alerts_sent_count += 1
 

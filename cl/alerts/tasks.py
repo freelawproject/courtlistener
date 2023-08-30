@@ -1,3 +1,4 @@
+import copy
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Tuple, Union, cast
@@ -12,7 +13,7 @@ from elasticsearch.exceptions import RequestError, TransportError
 from elasticsearch_dsl.response import Hit
 
 from cl.alerts.models import Alert, DocketAlert, ScheduledAlertHit
-from cl.alerts.utils import percolate_document, send_alert_email
+from cl.alerts.utils import percolate_document, user_has_donated_enough
 from cl.api.models import WebhookEventType
 from cl.api.tasks import (
     send_docket_alert_webhook_events,
@@ -419,25 +420,7 @@ def send_recap_email_user_not_found(recap_email_recipients: list[str]) -> None:
     )
 
 
-@app.task(ignore_result=True)
-def send_search_alert_and_webhooks(
-    user_id: int, hits: list[tuple[Alert, str, list[dict[str, Any]], int]]
-) -> None:
-    """Send alert emails and webhooks for a user.
-
-    One email is sent per User and one webhook event is sent for every Alert
-    per User.
-
-    :param user_id: The user to whom the alerts should be sent.
-    :param hits: A list of tuples containing the Alert, search type,
-    documents, and number of documents.
-    :return: None
-    """
-
-    alert_user: UserProfile.user = User.objects.get(pk=user_id)
-    if len(hits) > 0:
-        send_alert_email(alert_user.email, hits)
-
+def send_webhook_alert_hits(alert_user, hits) -> None:
     for alert, search_type, documents, num_docs in hits:
         user_webhooks = alert_user.webhooks.filter(
             event_type=WebhookEventType.SEARCH_ALERT, enabled=True
@@ -448,6 +431,44 @@ def send_search_alert_and_webhooks(
                 user_webhook,
                 alert,
             )
+
+
+@app.task(ignore_result=True)
+def send_search_alert_emails(
+    email_alerts_to_send: list[
+        tuple[int, list[tuple[Alert, str, list[dict[str, Any]], int]]]
+    ]
+) -> None:
+    """Send search alert emails for multiple users.
+
+    :param email_alerts_to_send: A list of two tuples containing the user to
+    whom the alerts should be sent. A list of tuples containing the Alert,
+    search type, documents, and number of documents.
+    :return: None
+    """
+
+    messages = []
+    subject = "New hits for your alerts"
+    txt_template = loader.get_template("alert_email_es.txt")
+    html_template = loader.get_template("alert_email_es.html")
+
+    for email_to_send in email_alerts_to_send:
+        user_id, hits = email_to_send
+        if not len(hits) > 0:
+            continue
+
+        alert_user: UserProfile.user = User.objects.get(pk=user_id)
+        context = {"hits": hits}
+        txt = txt_template.render(context)
+        html = html_template.render(context)
+        msg = EmailMultiAlternatives(
+            subject, txt, settings.DEFAULT_ALERTS_EMAIL, [alert_user.email]
+        )
+        msg.attach_alternative(html, "text/html")
+        messages.append(msg)
+
+    connection = get_connection()
+    connection.send_messages(messages)
 
 
 @app.task(ignore_result=True)
@@ -464,72 +485,81 @@ def process_percolator_response(
 
     if not response:
         return None
+
+    scheduled_hits_to_create = []
+    email_alerts_to_send = []
+    rt_alerts_send = []
     alerts_triggered, document_content = response
     for hit in alerts_triggered:
+        # Create a deep copy of the original 'document_content' to allow
+        # independent highlighting for each alert triggered.
+        document_content_copy = copy.deepcopy(document_content)
+
         alert_triggered = (
-            Alert.objects.filter(pk=hit.meta.id)
-            .select_related(
-                "user",
-            )
-            .first()
+            Alert.objects.filter(pk=hit.meta.id).select_related("user").first()
         )
         if not alert_triggered:
             continue
 
+        alert_user: UserProfile.user = alert_triggered.user
+        # Set highlight if available in response.
+        if hasattr(hit.meta, "highlight"):
+            merge_highlights_into_result(
+                hit.meta.highlight.to_dict(),
+                document_content_copy,
+                ALERTS_HL_TAG,
+            )
+
+        # Compose RT hit to send.
+        hits = [
+            (
+                alert_triggered,
+                alert_triggered.alert_type,
+                [document_content_copy],
+                1,
+            )
+        ]
+        # Send real time Webhooks for all users regardless of alert rate and
+        # user's donations.
+        send_webhook_alert_hits(alert_user, hits)
+
         # Send RT Alerts
         if alert_triggered.rate == Alert.REAL_TIME:
-            alert_user: UserProfile.user = alert_triggered.user
-            not_donated_enough = (
-                alert_user.profile.total_donated_last_year
-                < settings.MIN_DONATION["rt_alerts"]
+            user_donated_enough = user_has_donated_enough(
+                alert_user, alerts_count=1
             )
-            if not_donated_enough:
-                logger.info(
-                    "User: %s has not donated enough for their "
-                    "RT alerts to be sent.\n" % alert_user
-                )
+            if not user_donated_enough:
                 continue
 
-            # Set highlight if available in response.
-            if hasattr(hit.meta, "highlight"):
-                merge_highlights_into_result(
-                    hit.meta.highlight.to_dict(),
-                    document_content,
-                    ALERTS_HL_TAG,
-                )
-            hits = []
-            search_type = alert_triggered.alert_type
-            hits.append(
-                (
-                    alert_triggered,
-                    search_type,
-                    [document_content],
-                    1,
-                )
-            )
-            alert_triggered.date_last_hit = now()
-            alert_triggered.save()
-
-            # Send Alerts and Webhooks
-            send_search_alert_and_webhooks.delay(alert_user.pk, hits)
-
-            tally_stat(f"alerts.sent.{Alert.REAL_TIME}", inc=1)
-            logger.info(f"Sent {1} {Alert.REAL_TIME} email alerts.")
+            # Append alert RT email to be sent.
+            email_alerts_to_send.append((alert_user.pk, hits))
+            rt_alerts_send.append(alert_triggered.pk)
 
         else:
             # Schedule DAILY, WEEKLY and MONTHLY Alerts
-            if hasattr(hit.meta, "highlight"):
-                merge_highlights_into_result(
-                    hit.meta["highlight"].to_dict(),
-                    document_content,
-                    ALERTS_HL_TAG,
+            scheduled_hits_to_create.append(
+                ScheduledAlertHit(
+                    user=alert_triggered.user,
+                    rate=alert_triggered.rate,
+                    alert=alert_triggered,
+                    document_content=document_content_copy,
                 )
-            ScheduledAlertHit.objects.create(
-                user=alert_triggered.user,
-                rate=alert_triggered.rate,
-                alert=alert_triggered,
-                document_content=document_content,
             )
+
+    # Create scheduled DAILY, WEEKLY and MONTHLY Alerts in bulk.
+    if scheduled_hits_to_create:
+        ScheduledAlertHit.objects.bulk_create(scheduled_hits_to_create)
+
+    # Sent all the related document RT emails.
+    if email_alerts_to_send:
+        send_search_alert_emails.delay(email_alerts_to_send)
+
+    # Update RT Alerts date_last_hit, increase stats and log RT alerts sent.
+    if rt_alerts_send:
+        Alert.objects.filter(pk__in=rt_alerts_send).update(date_last_hit=now())
+        alerts_sent = len(rt_alerts_send)
+        tally_stat(f"alerts.sent.{Alert.REAL_TIME}", inc=alerts_sent)
+        logger.info(f"Sent {alerts_sent} {Alert.REAL_TIME} email alerts.")
 
 
 @app.task(
