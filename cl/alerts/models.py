@@ -165,6 +165,17 @@ class DateJSONEncoder(DjangoJSONEncoder):
         return super().default(obj)
 
 
+class SCHEDULED_ALERT_HIT_STATUS(object):
+    """ScheduledAlertHit Status Types"""
+
+    SCHEDULED = 0
+    SENT = 1
+    STATUS = (
+        (SCHEDULED, "Alert Hit Scheduled"),
+        (SENT, "Alert Hit Sent"),
+    )
+
+
 class ScheduledAlertHit(AbstractDateTimeModel):
     alert = models.ForeignKey(
         Alert,
@@ -186,4 +197,9 @@ class ScheduledAlertHit(AbstractDateTimeModel):
     document_content = models.JSONField(  # type: ignore
         encoder=DateJSONEncoder,
         help_text="The content of the document at the moment it was added.",
+    )
+    hit_status = models.SmallIntegerField(
+        help_text="The Scheduled Alert hit status.",
+        default=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
+        choices=SCHEDULED_ALERT_HIT_STATUS.STATUS,
     )

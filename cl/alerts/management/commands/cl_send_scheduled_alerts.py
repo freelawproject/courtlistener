@@ -4,11 +4,17 @@ from typing import DefaultDict
 
 from django.utils.timezone import now
 
-from cl.alerts.models import Alert, ScheduledAlertHit
+from cl.alerts.models import (
+    SCHEDULED_ALERT_HIT_STATUS,
+    Alert,
+    ScheduledAlertHit,
+)
 from cl.alerts.tasks import send_search_alert_emails
 from cl.alerts.utils import InvalidDateError
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.stats.utils import tally_stat
+
+DAYS_TO_DELETE = 90
 
 
 def json_date_parser(dct):
@@ -32,7 +38,7 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
     now_time = now()
     alerts_to_update = []
     scheduled_hits_rate = ScheduledAlertHit.objects.filter(
-        rate=rate
+        rate=rate, hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED
     ).select_related("user", "alert")
 
     # Create a nested dictionary structure to hold the groups.
@@ -72,8 +78,11 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
         date_last_hit=now_time
     )
 
-    # Remove stored alerts sent.
-    scheduled_hits_rate.delete()
+    # Update Scheduled alert hits status to Sent.
+    scheduled_hits_rate.update(hit_status=SCHEDULED_ALERT_HIT_STATUS.SENT)
+
+    # Remove old Scheduled alert hits sent.
+    delete_old_scheduled_alerts()
 
     tally_stat(f"alerts.sent.{rate}", inc=alerts_sent_count)
     logger.info(f"Sent {alerts_sent_count} {rate} email alerts.")
@@ -90,6 +99,19 @@ def send_scheduled_alerts(rate: str) -> None:
                 "Monthly alerts cannot be run on the 29th, 30th or 31st."
             )
         query_and_send_alerts_by_rate(Alert.MONTHLY)
+
+
+def delete_old_scheduled_alerts() -> int:
+    """Delete Scheduled alerts older than DAYS_TO_DELETE days.
+
+    :return: The number of deleted scheduled alerts.
+    """
+
+    older_than = now() - datetime.timedelta(days=DAYS_TO_DELETE)
+    scheduled_hits_to_delete = ScheduledAlertHit.objects.filter(
+        date_created__lt=older_than, hit_status=SCHEDULED_ALERT_HIT_STATUS.SENT
+    ).delete()
+    return scheduled_hits_to_delete[0]
 
 
 class Command(VerboseCommand):
