@@ -2299,6 +2299,49 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             self.assertNotIn(result.id, ids_in_results)
             ids_in_results.append(result.id)
 
+    def test_avoid_sending_or_scheduling_disabled_alerts(self):
+        """Can we avoid sending or_scheduling disabled search alerts?."""
+
+        rt_alert_disabled = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.OFF,
+            name="Test Alert OA Daily",
+            query="q=Disabled+Alert&type=oa",
+        )
+        dly_alert_disabled = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.OFF,
+            name="Test Alert OA Daily",
+            query="q=Disabled+Alert&type=oa",
+        )
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            # When the Audio object is created it should trigger an alert.
+            oral_argument = AudioWithParentsFactory.create(
+                case_name="Disabled+Alert",
+                docket__court=self.court_1,
+                docket__date_argued=now().date(),
+                docket__docket_number="19-5735",
+            )
+
+        # No RT Alert emails should be sent.
+        self.assertEqual(len(mail.outbox), 0)
+        # No Webhooks should be sent.
+        webhook_events = WebhookEvent.objects.all()
+        self.assertEqual(len(webhook_events), 0)
+
+        # No Scheduled Alerts should be created.
+        schedule_alerts = ScheduledAlertHit.objects.all()
+        self.assertEqual(schedule_alerts.count(), 0)
+
+        rt_alert_disabled.delete()
+        dly_alert_disabled.delete()
+        oral_argument.delete()
+
 
 @override_settings(ELASTICSEARCH_DISABLED=True)
 class SearchAlertsIndexingCommandTests(ESIndexTestCase, TestCase):

@@ -68,7 +68,13 @@ def percolate_document(
         index=document_index,
         id=document_id,
     )
-    s = s.query(percolate_query)
+    exclude_rate_off = Q("term", rate=Alert.OFF)
+    final_query = Q(
+        "bool",
+        must=[percolate_query],
+        must_not=[exclude_rate_off],
+    )
+    s = s.query(final_query)
     s = add_es_highlighting(
         s, {"type": SEARCH_TYPES.ORAL_ARGUMENT}, alerts=True
     )

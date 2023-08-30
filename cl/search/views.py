@@ -477,24 +477,24 @@ def show_results(request: HttpRequest) -> HttpResponse:
                     user=request.user,
                 )
 
-                if request.GET.get("type") == SEARCH_TYPES.PARENTHETICAL:
+            if request.GET.get("type") == SEARCH_TYPES.PARENTHETICAL:
+                render_dict.update(do_es_search(request.GET.copy()))
+            else:
+                # Check if waffle flag is active.
+                if request.GET.get(
+                    "type"
+                ) == SEARCH_TYPES.ORAL_ARGUMENT and waffle.flag_is_active(
+                    request, "oa-es-active"
+                ):
                     render_dict.update(do_es_search(request.GET.copy()))
                 else:
-                    # Check if waffle flag is active.
-                    if request.GET.get(
-                        "type"
-                    ) == SEARCH_TYPES.ORAL_ARGUMENT and waffle.flag_is_active(
-                        request, "oa-es-active"
-                    ):
-                        render_dict.update(do_es_search(request.GET.copy()))
-                    else:
-                        render_dict.update(do_search(request.GET.copy()))
+                    render_dict.update(do_search(request.GET.copy()))
 
-                    # Set the value to the query as a convenience
-                    alert_form.fields["name"].widget.attrs[
-                        "value"
-                    ] = render_dict["search_summary_str"]
-                    render_dict.update({"alert_form": alert_form})
+            # Set the value to the query as a convenience
+            alert_form.fields["name"].widget.attrs["value"] = render_dict[
+                "search_summary_str"
+            ]
+            render_dict.update({"alert_form": alert_form})
             return TemplateResponse(request, "search.html", render_dict)
 
 
