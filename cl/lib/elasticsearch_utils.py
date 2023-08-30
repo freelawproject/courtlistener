@@ -61,7 +61,10 @@ def es_index_exists(index_name: str) -> bool:
 
 
 def build_daterange_query(
-    field: str, before: date, after: date, relation: str | None = None
+    field: str,
+    before: date,
+    after: date,
+    relation: Literal["INTERSECTS", "CONTAINS", "WITHIN", None] = None,
 ) -> list[Range]:
     """Given field name and date range limits returns ElasticSearch range query or None
     https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html#ranges-on-dates
@@ -539,18 +542,19 @@ def build_es_main_query(
     """
     search_query = build_es_base_query(search_query, cd)
     total_query_results = search_query.count()
-    # Create groups aggregation if needed.
-    top_hits_limit = group_search_results(
-        search_query,
-        cd,
-        build_sort_results(cd),
-    )
-    search_query = add_es_highlighting(search_query, cd)
-    if (
-        cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT
-        or cd["type"] == SEARCH_TYPES.PEOPLE
-    ):
-        search_query = search_query.sort(build_sort_results(cd))
+    top_hits_limit = 5
+    match cd["type"]:
+        case SEARCH_TYPES.PARENTHETICAL:
+            # Create groups aggregation, add highlight and
+            # sort the results of a parenthetical query.
+            search_query, top_hits_limit = group_search_results(
+                search_query,
+                cd,
+                build_sort_results(cd),
+            )
+        case _:
+            search_query = add_es_highlighting(search_query, cd)
+            search_query = search_query.sort(build_sort_results(cd))
     return search_query, total_query_results, top_hits_limit
 
 
@@ -564,11 +568,6 @@ def add_es_highlighting(
     :param alerts: If highlighting is being applied to search Alerts hits.
     :return: The modified Elasticsearch search query object with highlights set
     """
-
-    types_to_highlight = [SEARCH_TYPES.ORAL_ARGUMENT, SEARCH_TYPES.PEOPLE]
-    if cd["type"] not in types_to_highlight:
-        return search_query
-
     fields_to_exclude = []
     highlighting_fields = []
     hl_tag = ALERTS_HL_TAG if alerts else SEARCH_HL_TAG
@@ -597,7 +596,7 @@ def add_es_highlighting(
 
 
 def replace_value_with_tag(
-    highlighted_value: str, original_value: str, field_name, tag: str
+    highlighted_value: str, original_value: str, field_name: str, tag: str
 ) -> str:
     """Replaces a specific field value within the marked version of that field.
 
@@ -774,67 +773,65 @@ def group_search_results(
     search: Search,
     cd: CleanData,
     order_by: dict[str, dict[str, str]],
-) -> int | None:
+) -> tuple[Search, int]:
     """Group search results by a specified field and return top hits for each
     group.
 
     :param search: The elasticsearch Search object representing the query.
     :param cd: The cleaned data object containing the query and filters.
     :param order_by: The field name to use for sorting the top hits.
-    :return: The top_hits_limit or None.
+    :return: The modified Elasticsearch search query with highlights and aggregations
     """
 
-    top_hits_limit = 5
-    if cd["type"] == SEARCH_TYPES.PARENTHETICAL:
-        # If cluster_id query set the top_hits_limit to 100
-        # Top hits limit in elasticsearch is 100
-        cluster_query = re.search(r"cluster_id:\d+", cd["q"])
-        size = top_hits_limit if not cluster_query else 100
-        group_by = "cluster_id"
-        aggregation = A("terms", field=group_by, size=1_000_000)
-        sub_aggregation = A(
-            "top_hits",
-            size=size,
-            sort={"_score": {"order": "desc"}},
-            highlight={
-                "fields": {
-                    "representative_text": {},
-                    "docketNumber": {},
-                },
-                "pre_tags": ["<mark>"],
-                "post_tags": ["</mark>"],
+    # If cluster_id query set the top_hits_limit to 100
+    # Top hits limit in elasticsearch is 100
+    cluster_query = re.search(r"cluster_id:\d+", cd["q"])
+    size = 5 if not cluster_query else 100
+    group_by = "cluster_id"
+    aggregation = A("terms", field=group_by, size=1_000_000)
+    sub_aggregation = A(
+        "top_hits",
+        size=size,
+        sort={"_score": {"order": "desc"}},
+        highlight={
+            "fields": {
+                "representative_text": {},
+                "docketNumber": {},
             },
+            "pre_tags": ["<mark>"],
+            "post_tags": ["</mark>"],
+        },
+    )
+    aggregation.bucket("grouped_by_opinion_cluster_id", sub_aggregation)
+
+    order_by_field = list(order_by.keys())[0]
+    if order_by_field != "score":
+        # If order field is other than score (elasticsearch relevance)
+        # Add a max aggregation to calculate the max value of the provided
+        # field to order, for each bucket.
+        max_value_field = A("max", field=order_by_field)
+        aggregation.bucket("max_value_field", max_value_field)
+
+        # Add a bucket_sort aggregation to sort the result buckets based on
+        # the max_value_field aggregation
+        bucket_sort = A(
+            "bucket_sort",
+            sort=[{"max_value_field": order_by[order_by_field]}],
         )
-        aggregation.bucket("grouped_by_opinion_cluster_id", sub_aggregation)
+        aggregation.bucket("sorted_buckets", bucket_sort)
+    else:
+        # If order field score (elasticsearch relevance)
+        # Add a max aggregation to calculate the max value of _score
+        max_score = A("max", script="_score")
+        aggregation.bucket("max_score", max_score)
+        bucket_sort_score = A(
+            "bucket_sort", sort=[{"max_score": {"order": "desc"}}]
+        )
+        aggregation.bucket("sorted_buckets", bucket_sort_score)
 
-        order_by_field = list(order_by.keys())[0]
-        if order_by_field != "score":
-            # If order field is other than score (elasticsearch relevance)
-            # Add a max aggregation to calculate the max value of the provided
-            # field to order, for each bucket.
-            max_value_field = A("max", field=order_by_field)
-            aggregation.bucket("max_value_field", max_value_field)
+    search.aggs.bucket("groups", aggregation)
 
-            # Add a bucket_sort aggregation to sort the result buckets based on
-            # the max_value_field aggregation
-            bucket_sort = A(
-                "bucket_sort",
-                sort=[{"max_value_field": order_by[order_by_field]}],
-            )
-            aggregation.bucket("sorted_buckets", bucket_sort)
-        else:
-            # If order field score (elasticsearch relevance)
-            # Add a max aggregation to calculate the max value of _score
-            max_score = A("max", script="_score")
-            aggregation.bucket("max_score", max_score)
-            bucket_sort_score = A(
-                "bucket_sort", sort=[{"max_score": {"order": "desc"}}]
-            )
-            aggregation.bucket("sorted_buckets", bucket_sort_score)
-
-        search.aggs.bucket("groups", aggregation)
-
-    return top_hits_limit
+    return search, size
 
 
 def convert_str_date_fields_to_date_objects(
@@ -1044,7 +1041,7 @@ def merge_unavailable_fields_on_parent_document(
             person_id
         )
 
-        if not request_type == "api":
+        if request_type != "api":
             continue
         # API
         result["court_exact"] = position_db_mapping.court_exact_dict.get(
