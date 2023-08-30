@@ -792,8 +792,8 @@ class PeopleSearchTestElasticSearch(
         s, total_query_results, top_hits_limit = build_es_main_query(
             search_query, cd
         )
-        # No results since by default string queries work as phrase (AND)
-        self.assertEqual(s.count(), 0)
+        # Two main results, matched by string queries on parent and position
+        self.assertEqual(s.count(), 2)
 
         cd = {
             "type": SEARCH_TYPES.PEOPLE,

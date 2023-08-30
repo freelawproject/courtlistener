@@ -145,12 +145,12 @@ class ESIndexTestCase(SimpleTestCase):
             index.create(ignore=400)
         super().setUpClass()
 
-    """ @classmethod
+    @classmethod
     def tearDownClass(cls):
         for index in registry.get_indices():
             index.delete(ignore=[404, 400])
             index._name = index._name.split("-")[0]
-        super().tearDownClass() """
+        super().tearDownClass()
 
     @classmethod
     def rebuild_index(self, model):

@@ -103,7 +103,8 @@ def send_es_search_alert_webhook(
         context={
             "schema": AudioDocument._index.get_mapping()[
                 AudioDocument._index._name
-            ]["mappings"]
+            ]["mappings"],
+            "document_type": AudioDocument,
         },
     ).data
 
