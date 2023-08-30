@@ -1170,8 +1170,7 @@ def build_join_fulltext_queries(
             type=child_type,
             score_mode="max",
             query=build_fulltext_query(fields, value),
-            inner_hits={"name": f"text_query_inner_{child_type}"},
-            max_children=10,
+            inner_hits={"name": f"text_query_inner_{child_type}", "size": 10},
         )
         q_should.append(query)
 
@@ -1222,8 +1221,7 @@ def build_has_child_filters(
             type=child_type,
             score_mode="max",
             query=reduce(operator.iand, queries_list),
-            inner_hits={"name": f"filter_inner_{child_type}"},
-            max_children=10,
+            inner_hits={"name": f"filter_inner_{child_type}", "size": 10},
         )
     ]
 
