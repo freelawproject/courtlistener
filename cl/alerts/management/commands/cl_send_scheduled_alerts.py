@@ -38,7 +38,7 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
     now_time = now()
     alerts_to_update = []
     scheduled_hits_rate = ScheduledAlertHit.objects.filter(
-        rate=rate, hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED
+        alert__rate=rate, hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED
     ).select_related("user", "alert")
 
     # Create a nested dictionary structure to hold the groups.
@@ -69,8 +69,8 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
                     len(documents),
                 )
             )
-        send_search_alert_emails.delay([(user_id, hits)])
         if hits:
+            send_search_alert_emails.delay([(user_id, hits)])
             alerts_sent_count += 1
 
     # Update Alert's date_last_hit in bulk.
@@ -78,11 +78,15 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
         date_last_hit=now_time
     )
 
-    # Update Scheduled alert hits status to Sent.
+    # Update Scheduled alert hits status to "SENT".
     scheduled_hits_rate.update(hit_status=SCHEDULED_ALERT_HIT_STATUS.SENT)
 
-    # Remove old Scheduled alert hits sent.
-    delete_old_scheduled_alerts()
+    # Remove old Scheduled alert hits sent, daily.
+    if rate == Alert.DAILY:
+        scheduled_alerts_deleted = delete_old_scheduled_alerts()
+        logger.info(
+            f"Removed {scheduled_alerts_deleted} Scheduled Alert Hits."
+        )
 
     tally_stat(f"alerts.sent.{rate}", inc=alerts_sent_count)
     logger.info(f"Sent {alerts_sent_count} {rate} email alerts.")
@@ -104,14 +108,26 @@ def send_scheduled_alerts(rate: str) -> None:
 def delete_old_scheduled_alerts() -> int:
     """Delete Scheduled alerts older than DAYS_TO_DELETE days.
 
-    :return: The number of deleted scheduled alerts.
+    :return: The number of deleted scheduled hit alerts.
     """
 
-    older_than = now() - datetime.timedelta(days=DAYS_TO_DELETE)
-    scheduled_hits_to_delete = ScheduledAlertHit.objects.filter(
-        date_created__lt=older_than, hit_status=SCHEDULED_ALERT_HIT_STATUS.SENT
+    # Delete SENT ScheduledAlertHits after DAYS_TO_DELETE
+    sent_older_than = now() - datetime.timedelta(days=DAYS_TO_DELETE)
+    scheduled_sent_hits_to_delete = ScheduledAlertHit.objects.filter(
+        date_created__lt=sent_older_than,
+        hit_status=SCHEDULED_ALERT_HIT_STATUS.SENT,
     ).delete()
-    return scheduled_hits_to_delete[0]
+
+    # Delete SCHEDULED ScheduledAlertHits after 2 * DAYS_TO_DELETE
+    unsent_older_than = now() - datetime.timedelta(days=2 * DAYS_TO_DELETE)
+    scheduled_unsent_hits_to_delete = ScheduledAlertHit.objects.filter(
+        date_created__lt=unsent_older_than,
+        hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
+    ).delete()
+    deleted_items = (
+        scheduled_sent_hits_to_delete + scheduled_unsent_hits_to_delete
+    )
+    return deleted_items
 
 
 class Command(VerboseCommand):

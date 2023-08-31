@@ -505,7 +505,7 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
 
     scheduled_hits_to_create = []
     email_alerts_to_send = []
-    rt_alerts_send = []
+    rt_alerts_to_send = []
     alerts_triggered, document_content = response
     for hit in alerts_triggered:
         # Create a deep copy of the original 'document_content' to allow
@@ -550,14 +550,13 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
 
             # Append alert RT email to be sent.
             email_alerts_to_send.append((alert_user.pk, hits))
-            rt_alerts_send.append(alert_triggered.pk)
+            rt_alerts_to_send.append(alert_triggered.pk)
 
         else:
             # Schedule DAILY, WEEKLY and MONTHLY Alerts
             scheduled_hits_to_create.append(
                 ScheduledAlertHit(
                     user=alert_triggered.user,
-                    rate=alert_triggered.rate,
                     alert=alert_triggered,
                     document_content=document_content_copy,
                 )
@@ -566,15 +565,16 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
     # Create scheduled DAILY, WEEKLY and MONTHLY Alerts in bulk.
     if scheduled_hits_to_create:
         ScheduledAlertHit.objects.bulk_create(scheduled_hits_to_create)
-
     # Sent all the related document RT emails.
     if email_alerts_to_send:
         send_search_alert_emails.delay(email_alerts_to_send)
 
     # Update RT Alerts date_last_hit, increase stats and log RT alerts sent.
-    if rt_alerts_send:
-        Alert.objects.filter(pk__in=rt_alerts_send).update(date_last_hit=now())
-        alerts_sent = len(rt_alerts_send)
+    if rt_alerts_to_send:
+        Alert.objects.filter(pk__in=rt_alerts_to_send).update(
+            date_last_hit=now()
+        )
+        alerts_sent = len(rt_alerts_to_send)
         tally_stat(f"alerts.sent.{Alert.REAL_TIME}", inc=alerts_sent)
         logger.info(f"Sent {alerts_sent} {Alert.REAL_TIME} email alerts.")
 
@@ -623,6 +623,9 @@ def send_or_schedule_alerts(
 
     # Check if the query contains more documents than PERCOLATOR_PAGE_SIZE.
     # If so, return additional results until there are not more.
+    # Remember, percolator results are alerts, not documents, so what you're
+    # paginating are user alerts that the document matched, not documents that
+    # an alert matched. 🙃.
     batch_size = settings.PERCOLATOR_PAGE_SIZE
     total_hits = percolator_response.hits.total.value
     results_returned = len(percolator_response.hits.hits)

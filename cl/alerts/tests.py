@@ -1860,7 +1860,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         self.assertIn("oral argument", text_content)
 
         # Confirm stored alerts instances status is set to SENT.
-        scheduled_hits = ScheduledAlertHit.objects.filter(rate=rate)
+        scheduled_hits = ScheduledAlertHit.objects.filter(alert__rate=rate)
         for scheduled_hit in scheduled_hits:
             self.assertEqual(
                 scheduled_hit.hit_status, SCHEDULED_ALERT_HIT_STATUS.SENT
@@ -1879,7 +1879,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         )
         # When a new document is created, and it triggers a dly, wly or mly
         # It's stored to send it later.
-        scheduled_alerts = ScheduledAlertHit.objects.filter(rate=Alert.DAILY)
+        scheduled_alerts = ScheduledAlertHit.objects.filter(
+            alert__rate=Alert.DAILY
+        )
         self.assertEqual(scheduled_alerts.count(), 1)
         # At this stage no alerts or webhooks should go out.
         self.assertEqual(len(mail.outbox), 0)
@@ -2377,13 +2379,13 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         self.assertEqual(len(mail.outbox), 0)
         # 1 Webhook event should be sent in RT.
         webhook_events = WebhookEvent.objects.all()
-        self.assertEqual(len(webhook_events), 1)
+        self.assertEqual(webhook_events.count(), 1)
 
         # 1 Scheduled Alert should be created in SCHEDULED status.
-        schedule_alerts = ScheduledAlertHit.objects.all()
-        self.assertEqual(schedule_alerts.count(), 1)
+        all_alert_hits = ScheduledAlertHit.objects.all()
+        self.assertEqual(all_alert_hits.count(), 1)
         self.assertEqual(
-            schedule_alerts[0].hit_status, SCHEDULED_ALERT_HIT_STATUS.SCHEDULED
+            all_alert_hits[0].hit_status, SCHEDULED_ALERT_HIT_STATUS.SCHEDULED
         )
 
         # Send dly alerts and check assertions.
@@ -2394,22 +2396,17 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
 
         # 1 Alert email should be sent.
         self.assertEqual(len(mail.outbox), 1)
-
         # No additional Webhook event should be sent.
-        webhook_events = WebhookEvent.objects.all()
-        self.assertEqual(len(webhook_events), 1)
-
+        self.assertEqual(webhook_events.count(), 1)
         # 1 Scheduled Alert should be now in SENT status.
-        schedule_alerts = ScheduledAlertHit.objects.all()
-        self.assertEqual(schedule_alerts.count(), 1)
+        self.assertEqual(all_alert_hits.count(), 1)
         self.assertEqual(
-            schedule_alerts[0].hit_status, SCHEDULED_ALERT_HIT_STATUS.SENT
+            all_alert_hits[0].hit_status, SCHEDULED_ALERT_HIT_STATUS.SENT
         )
 
         # Create a new Audio Document which will schedule a new DLY Alert hit.
         mock_date = now() + timedelta(days=DAYS_TO_DELETE - 5)
         with time_machine.travel(mock_date, tick=False):
-            # When the Audio object is created it should trigger an alert.
             oral_argument_2 = AudioWithParentsFactory.create(
                 case_name="Scheduled+Alert",
                 docket__court=self.court_1,
@@ -2419,11 +2416,8 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
 
         # No additional Alert email should be sent.
         self.assertEqual(len(mail.outbox), 1)
-
         # 1 additional Webhook event should be sent.
-        webhook_events = WebhookEvent.objects.all()
-        self.assertEqual(len(webhook_events), 2)
-
+        self.assertEqual(webhook_events.count(), 2)
         # 2 Scheduled Alert, one in Scheduled status and one in Sent status.
         schedule_alerts = ScheduledAlertHit.objects.filter(
             hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED
@@ -2443,23 +2437,62 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
 
         # 1 additional Alert email should be sent.
         self.assertEqual(len(mail.outbox), 2)
-
         # No additional Webhook event should be sent.
-        webhook_events = WebhookEvent.objects.all()
-        self.assertEqual(len(webhook_events), 2)
-
+        self.assertEqual(webhook_events.count(), 2)
         # The Old Scheduled Alert Hit should be deleted and the most recent one
         # is now in SENT status.
-        new_sent_alerts = ScheduledAlertHit.objects.all()
-        self.assertEqual(new_sent_alerts.count(), 1)
+        self.assertEqual(all_alert_hits.count(), 1)
         self.assertEqual(
-            new_sent_alerts[0].hit_status, SCHEDULED_ALERT_HIT_STATUS.SENT
+            all_alert_hits[0].hit_status, SCHEDULED_ALERT_HIT_STATUS.SENT
         )
-        self.assertEqual(new_sent_alerts[0].pk, scheduled_alert_pk)
+        self.assertEqual(all_alert_hits[0].pk, scheduled_alert_pk)
+
+        # Create a MONTHLY Alert
+        dly_alert_2 = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.MONTHLY,
+            name="Test Alert OA MONTHLY",
+            query="q=Monthly+Hit&type=oa",
+        )
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            # Schedule the MONTHLY Alert hit.
+            oral_argument_3 = AudioWithParentsFactory.create(
+                case_name="Monthly+Hit",
+                docket__court=self.court_1,
+                docket__date_argued=now().date(),
+                docket__docket_number="19-5735",
+            )
+
+        # Now we should have 1 scheduled Alert hit and 1 sent Alert hit.
+        self.assertEqual(all_alert_hits.count(), 2)
+        schedule_alerts = ScheduledAlertHit.objects.filter(
+            hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED
+        )
+        self.assertEqual(schedule_alerts.count(), 1)
+        sent_alerts = ScheduledAlertHit.objects.filter(
+            hit_status=SCHEDULED_ALERT_HIT_STATUS.SENT
+        )
+        self.assertEqual(sent_alerts.count(), 1)
+
+        # Send dly alerts after DAYS_TO_DELETE and check assertions.
+        mock_date = now() + timedelta(days=2 * DAYS_TO_DELETE + 1)
+        with time_machine.travel(mock_date, tick=False):
+            # Call dly command
+            call_command("cl_send_scheduled_alerts", rate=Alert.DAILY)
+
+        # After 2*DAYS_TO_DELETE also scheduled Alerts hits are removed.
+        self.assertEqual(all_alert_hits.count(), 0)
 
         dly_alert.delete()
+        dly_alert_2.delete()
         oral_argument.delete()
         oral_argument_2.delete()
+        oral_argument_3.delete()
 
 
 @override_settings(ELASTICSEARCH_DISABLED=True)

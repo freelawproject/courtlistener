@@ -184,19 +184,14 @@ class ScheduledAlertHit(AbstractDateTimeModel):
     alert = models.ForeignKey(
         Alert,
         help_text="The related Alert object.",
-        related_name="parent_alerts",
+        related_name="scheduled_alert_hits",
         on_delete=models.CASCADE,
     )
     user = models.ForeignKey(
         User,
         help_text="The related User object.",
-        related_name="user_rates",
+        related_name="scheduled_alert_hits",
         on_delete=models.CASCADE,
-    )
-    rate = models.CharField(
-        help_text="The rate chosen by the user for the alert",
-        choices=Alert.FREQUENCY,
-        max_length=10,
     )
     document_content = models.JSONField(  # type: ignore
         encoder=DateJSONEncoder,
