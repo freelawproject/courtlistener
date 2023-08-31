@@ -1,5 +1,5 @@
 import re
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 from bs4 import BeautifulSoup, NavigableString, Tag
 from django.core.management import BaseCommand
@@ -13,12 +13,12 @@ from cl.search.models import Opinion, OpinionCluster
 
 
 def match_text_lists(
-    file_opinions_list: list[str], cl_opinions_list: list[str]
-) -> dict[int, Any]:
+    file_opinions_list: List[Any], cl_opinions_list: List[Any]
+) -> dict[int, int]:
     """Generate matching lists above threshold
     :param file_opinions_list: Opinions from file
     :param cl_opinions_list: CL opinions
-    :return: Matches if found or False
+    :return: Matches if found or empty dict
     """
     # We import this here to avoid a circular import
     from cl.corpus_importer.management.commands.harvard_opinions import (
@@ -507,8 +507,16 @@ def run_columbia(start_id: int, end_id: int):
 
         if cl_cleaned_opinions and columbia_opinions:
             matches = match_text_lists(
-                [op.get("opinion") for op in columbia_opinions],
-                [op.get("opinion") for op in cl_cleaned_opinions],
+                [
+                    op.get("opinion")
+                    for op in columbia_opinions
+                    if op.get("opinion")
+                ],
+                [
+                    op.get("opinion")
+                    for op in cl_cleaned_opinions
+                    if op.get("opinion")
+                ],
             )
 
             if matches:
