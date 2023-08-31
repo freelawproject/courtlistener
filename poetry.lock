@@ -263,38 +263,41 @@ uvloop = ["uvloop (>=0.15.2)"]
 
 [[package]]
 name = "boto3"
-version = "1.17.43"
+version = "1.28.37"
 description = "The AWS SDK for Python"
 optional = false
-python-versions = ">= 2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*"
+python-versions = ">= 3.7"
 files = [
-    {file = "boto3-1.17.43-py2.py3-none-any.whl", hash = "sha256:66c5581ae0746a41b8e119522a5c2434cffca0ef2620d49f15f350d0b14e2dd0"},
-    {file = "boto3-1.17.43.tar.gz", hash = "sha256:b86aaa96ccbdba1aaca0a321dbe4be480a39b7d6fe85dcd7ee5d7c44c9b32726"},
+    {file = "boto3-1.28.37-py3-none-any.whl", hash = "sha256:709cf438ad3ea48d426e4659538fe1148fc2719469b52179d07a11c5d26abac6"},
+    {file = "boto3-1.28.37.tar.gz", hash = "sha256:4aec1b54ba6cd352abba2cdd7cdc76e631a4d3ce79c55c0719f85f9c9842e4a2"},
 ]
 
 [package.dependencies]
-botocore = ">=1.20.43,<1.21.0"
-jmespath = ">=0.7.1,<1.0.0"
-s3transfer = ">=0.3.0,<0.4.0"
+botocore = ">=1.31.37,<1.32.0"
+jmespath = ">=0.7.1,<2.0.0"
+s3transfer = ">=0.6.0,<0.7.0"
+
+[package.extras]
+crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
 
 [[package]]
 name = "botocore"
-version = "1.20.43"
+version = "1.31.37"
 description = "Low-level, data-driven core of boto 3."
 optional = false
-python-versions = ">= 2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*"
+python-versions = ">= 3.7"
 files = [
-    {file = "botocore-1.20.43-py2.py3-none-any.whl", hash = "sha256:7d0326fd8f8d7b3b7d2e8ecc4edb5a39ecd5537072bd0f088767ca53dd34818a"},
-    {file = "botocore-1.20.43.tar.gz", hash = "sha256:7630d734260babdc34dc53c704d937f53c362bb15ccd3863ccf1b1b26be04df8"},
+    {file = "botocore-1.31.37-py3-none-any.whl", hash = "sha256:72e10759be3dff39c5eeb29f85c11a227c369c946d044f2caf62c352d6a6fc06"},
+    {file = "botocore-1.31.37.tar.gz", hash = "sha256:5c92c8bc3c6b49950c95501b30f0ac551fd4952359b53a6fba243094028157de"},
 ]
 
 [package.dependencies]
-jmespath = ">=0.7.1,<1.0.0"
+jmespath = ">=0.7.1,<2.0.0"
 python-dateutil = ">=2.1,<3.0.0"
 urllib3 = ">=1.25.4,<1.27"
 
 [package.extras]
-crt = ["awscrt (==0.10.8)"]
+crt = ["awscrt (==0.16.26)"]
 
 [[package]]
 name = "celery"
@@ -3803,17 +3806,20 @@ six = "*"
 
 [[package]]
 name = "s3transfer"
-version = "0.3.7"
+version = "0.6.2"
 description = "An Amazon S3 Transfer Manager"
 optional = false
-python-versions = "*"
+python-versions = ">= 3.7"
 files = [
-    {file = "s3transfer-0.3.7-py2.py3-none-any.whl", hash = "sha256:efa5bd92a897b6a8d5c1383828dca3d52d0790e0756d49740563a3fb6ed03246"},
-    {file = "s3transfer-0.3.7.tar.gz", hash = "sha256:35627b86af8ff97e7ac27975fe0a98a312814b46c6333d8a6b889627bcd80994"},
+    {file = "s3transfer-0.6.2-py3-none-any.whl", hash = "sha256:b014be3a8a2aab98cfe1abc7229cc5a9a0cf05eb9c1f2b86b230fd8df3f78084"},
+    {file = "s3transfer-0.6.2.tar.gz", hash = "sha256:cab66d3380cca3e70939ef2255d01cd8aece6a4907a9528740f668c4b0611861"},
 ]
 
 [package.dependencies]
 botocore = ">=1.12.36,<2.0a.0"
+
+[package.extras]
+crt = ["botocore[crt] (>=1.20.29,<2.0a.0)"]
 
 [[package]]
 name = "schema"
@@ -5091,4 +5097,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11, <3.12"
-content-hash = "5257a6d2a26b74054bac82d0c5700a55f1e2e2ec580608921e8a27a76d015f52"
+content-hash = "dbea4c44be9788b1566692b396c5939c0763c3a82f7421ce8532962ae6551d56"
