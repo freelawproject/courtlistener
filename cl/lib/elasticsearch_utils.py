@@ -3,7 +3,8 @@ import operator
 import re
 import time
 import traceback
-from datetime import date
+from dataclasses import fields
+from datetime import date, datetime
 from functools import reduce, wraps
 from typing import Any, Callable, Dict, List, Literal
 
@@ -22,7 +23,7 @@ from localflavor.us.us_states import STATE_CHOICES
 
 from cl.lib.date_time import midnight_pt
 from cl.lib.search_utils import BOOSTS, cleanup_main_query
-from cl.lib.types import CleanData, PositionMapping
+from cl.lib.types import ApiPositionMapping, BasePositionMapping, CleanData
 from cl.people_db.models import Position
 from cl.search.constants import (
     ALERTS_HL_TAG,
@@ -886,7 +887,7 @@ def merge_courts_from_db(results: Page, search_type: str) -> None:
 def fill_position_mapping(
     positions: QuerySet[Position],
     request_type: Literal["frontend", "api"] = "frontend",
-) -> PositionMapping:
+) -> BasePositionMapping | ApiPositionMapping:
     """Extract all the data from the position queryset and
     fill the attributes of the mapping.
 
@@ -894,107 +895,36 @@ def fill_position_mapping(
     :param request_type: The request type, fronted or api.
     :return: PositionMapping, the function fill the attributes of the mapping.
     """
-    position_db_mapping = PositionMapping()
+    position_db_mapping = (
+        BasePositionMapping()
+        if request_type == "frontend"
+        else ApiPositionMapping()
+    )
+    db_to_dataclass_map = position_db_mapping.get_db_to_dataclass_map()
 
     for position in positions:
         # Add data to the mapping using the judge ID as a key.
         # API and Frontend
-        if position.court:
-            position_db_mapping.court_dict[position.person.pk].append(
-                position.court.full_name
-            )
-            position_db_mapping.court_exact_dict[position.person.pk].append(
-                position.court.pk
-            )
-        if position.appointer:
-            position_db_mapping.appointer_dict[position.person.pk].append(
-                position.appointer.person.name_full_reverse
-            )
-        if position.how_selected:
-            position_db_mapping.selection_method_dict[
-                position.person.pk
-            ].append(position.get_how_selected_display())
-        if position.supervisor:
-            position_db_mapping.supervisor_dict[position.person.pk].append(
-                position.supervisor.name_full_reverse
-            )
-        if position.predecessor:
-            position_db_mapping.predecessor_dict[position.person.pk].append(
-                position.predecessor.name_full_reverse
-            )
+        person_id = position.person.pk
+        for validation, value in db_to_dataclass_map.items():
+            if not getattr(position, validation, None):
+                continue
 
-        if not request_type == "api":
-            continue
-        # API
-        if position.position_type:
-            position_db_mapping.position_type_dict[position.person.pk].append(
-                position.get_position_type_display()
-            )
-        if position.date_nominated:
-            position_db_mapping.date_nominated_dict[position.person.pk].append(
-                midnight_pt(position.date_nominated)
-            )
-        if position.date_elected:
-            position_db_mapping.date_elected_dict[position.person.pk].append(
-                midnight_pt(position.date_elected)
-            )
-        if position.date_recess_appointment:
-            position_db_mapping.date_recess_appointment_dict[
-                position.person.pk
-            ].append(midnight_pt(position.date_recess_appointment))
-        if position.date_referred_to_judicial_committee:
-            position_db_mapping.date_referred_to_judicial_committee_dict[
-                position.person.pk
-            ].append(midnight_pt(position.date_referred_to_judicial_committee))
-        if position.date_judicial_committee_action:
-            position_db_mapping.date_judicial_committee_action_dict[
-                position.person.pk
-            ].append(midnight_pt(position.date_judicial_committee_action))
-        if position.date_hearing:
-            position_db_mapping.date_hearing_dict[position.person.pk].append(
-                midnight_pt(position.date_hearing)
-            )
-        if position.date_confirmation:
-            position_db_mapping.date_confirmation_dict[
-                position.person.pk
-            ].append(midnight_pt(position.date_confirmation))
-        if position.date_start:
-            position_db_mapping.date_start_dict[position.person.pk].append(
-                midnight_pt(position.date_start)
-            )
-        if position.date_granularity_start:
-            position_db_mapping.date_granularity_start_dict[
-                position.person.pk
-            ].append(position.date_granularity_start)
-        if position.date_retirement:
-            position_db_mapping.date_retirement_dict[
-                position.person.pk
-            ].append(midnight_pt(position.date_retirement))
-        if position.date_termination:
-            position_db_mapping.date_termination_dict[
-                position.person.pk
-            ].append(midnight_pt(position.date_termination))
-        if position.date_granularity_termination:
-            position_db_mapping.date_granularity_termination_dict[
-                position.person.pk
-            ].append(position.date_granularity_termination)
+            for db_field, position_field in value.items():
+                mapping_dict = getattr(position_db_mapping, position_field)
+                for key, attr in enumerate(db_field.split("__")):
+                    field_value = (
+                        getattr(position, attr)
+                        if not key
+                        else getattr(field_value, attr)  # type: ignore
+                    )
 
-        if position.judicial_committee_action:
-            position_db_mapping.judicial_committee_action_dict[
-                position.person.pk
-            ].append(position.get_judicial_committee_action_display())
-        if position.nomination_process:
-            position_db_mapping.nomination_process_dict[
-                position.person.pk
-            ].append(position.get_nomination_process_display())
-        if position.how_selected:
-            position_db_mapping.selection_method_id_dict[
-                position.person.pk
-            ].append(position.how_selected)
-        if position.termination_reason:
-            position_db_mapping.termination_reason_dict[
-                position.person.pk
-            ].append(position.get_termination_reason_display())
+                if callable(field_value):
+                    field_value = field_value()
+                elif isinstance(field_value, (datetime, date)):
+                    field_value = midnight_pt(field_value)
+
+                mapping_dict[person_id].append(field_value)
 
     return position_db_mapping
 
@@ -1021,90 +951,25 @@ def merge_unavailable_fields_on_parent_document(
     person_ids = [d["id"] for d in results]
     positions_in_page = Position.objects.filter(
         person_id__in=person_ids
-    ).select_related("court", "appointer", "supervisor", "predecessor")
+    ).select_related(
+        "person",
+        "court",
+        "appointer",
+        "appointer__person",
+        "supervisor",
+        "predecessor",
+    )
     position_db_mapping = fill_position_mapping(
         positions_in_page, request_type
     )
 
     for result in results:
-        # Frontend
         person_id = result["id"]
-        result["court"] = position_db_mapping.court_dict.get(person_id)
-        result["appointer"] = position_db_mapping.appointer_dict.get(person_id)
-        result[
-            "selection_method"
-        ] = position_db_mapping.selection_method_dict.get(person_id)
-        result["supervisor"] = position_db_mapping.supervisor_dict.get(
-            person_id
-        )
-        result["predecessor"] = position_db_mapping.predecessor_dict.get(
-            person_id
-        )
-
-        if request_type != "api":
-            continue
-        # API
-        result["court_exact"] = position_db_mapping.court_exact_dict.get(
-            person_id
-        )
-        result["position_type"] = position_db_mapping.position_type_dict.get(
-            person_id
-        )
-        result["date_nominated"] = position_db_mapping.date_nominated_dict.get(
-            person_id
-        )
-        result["date_elected"] = position_db_mapping.date_elected_dict.get(
-            person_id
-        )
-        result[
-            "date_recess_appointment"
-        ] = position_db_mapping.date_recess_appointment_dict.get(person_id)
-        result[
-            "date_referred_to_judicial_committee"
-        ] = position_db_mapping.date_referred_to_judicial_committee_dict.get(
-            person_id
-        )
-        result[
-            "date_judicial_committee_action"
-        ] = position_db_mapping.date_judicial_committee_action_dict.get(
-            person_id
-        )
-        result["date_hearing"] = position_db_mapping.date_hearing_dict.get(
-            person_id
-        )
-        result[
-            "date_confirmation"
-        ] = position_db_mapping.date_confirmation_dict.get(person_id)
-        result["date_start"] = position_db_mapping.date_start_dict.get(
-            person_id
-        )
-        result[
-            "date_granularity_start"
-        ] = position_db_mapping.date_granularity_start_dict.get(person_id)
-        result[
-            "date_retirement"
-        ] = position_db_mapping.date_retirement_dict.get(person_id)
-        result[
-            "date_termination"
-        ] = position_db_mapping.date_termination_dict.get(person_id)
-        result[
-            "date_granularity_termination"
-        ] = position_db_mapping.date_granularity_termination_dict.get(
-            person_id
-        )
-
-        result[
-            "judicial_committee_action"
-        ] = position_db_mapping.judicial_committee_action_dict.get(person_id)
-        result[
-            "nomination_process"
-        ] = position_db_mapping.nomination_process_dict.get(person_id)
-        result[
-            "selection_method_id"
-        ] = position_db_mapping.selection_method_id_dict.get(person_id)
-        result[
-            "termination_reason"
-        ] = position_db_mapping.termination_reason_dict.get(person_id)
+        for field in fields(position_db_mapping):
+            position_dict = getattr(position_db_mapping, field.name)
+            value = position_dict.get(person_id)
+            cleaned_name = re.sub("_dict", "", field.name)
+            result[cleaned_name] = value
 
 
 def fetch_es_results(
