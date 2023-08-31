@@ -125,7 +125,7 @@ def delete_old_scheduled_alerts() -> int:
         hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
     ).delete()
     deleted_items = (
-        scheduled_sent_hits_to_delete + scheduled_unsent_hits_to_delete
+        scheduled_sent_hits_to_delete[0] + scheduled_unsent_hits_to_delete[0]
     )
     return deleted_items
 
