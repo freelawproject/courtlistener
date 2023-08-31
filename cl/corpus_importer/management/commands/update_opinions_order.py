@@ -11,8 +11,6 @@ from cl.lib.command_utils import logger
 from cl.lib.string_diff import get_cosine_similarity
 from cl.search.models import Opinion, OpinionCluster
 
-# TODO Should we add a flag to know that the cluster has been processed?
-
 
 def match_text_lists(
     file_opinions_list: list[str], cl_opinions_list: list[str]
@@ -419,11 +417,12 @@ def get_opinions_columbia_xml(xml_filepath: FieldFile) -> list:
     return opinions
 
 
-def run_harvard(start_id: int):
+def run_harvard(start_id: int, end_id: int):
     """
     We assume that harvard data is already ordered, we just need to fill the order
     field in each opinion
     :param start_id: skip any id lower than this value
+    :param end_id: skip any id greater than this value
     """
 
     # Get all harvard clusters with more than one opinion
@@ -436,6 +435,9 @@ def run_harvard(start_id: int):
 
     if start_id:
         clusters = clusters.filter(pk__gte=start_id)
+
+    if end_id:
+        clusters = clusters.filter(pk__lte=end_id)
 
     # cluster_id: 4697264, the combined opinion will go to the last position
     for oc in clusters:
@@ -465,10 +467,11 @@ def run_harvard(start_id: int):
         logger.info(msg=f"Opinions reordered for cluster id: {oc.id}")
 
 
-def run_columbia(start_id: int):
+def run_columbia(start_id: int, end_id: int):
     """
     Update opinion order for columbia clusters
     :param start_id: skip any id lower than this value
+    :param end_id: skip any id greater than this value
     """
 
     # Get all columbia cluster ids with more than one opinion
@@ -481,6 +484,9 @@ def run_columbia(start_id: int):
 
     if start_id:
         clusters = filter(lambda x: x >= start_id, clusters)
+
+    if end_id:
+        clusters = filter(lambda x: x <= end_id, clusters)
 
     for cluster_id in clusters:
         logger.info(f"Processing cluster id: {cluster_id}")
@@ -600,7 +606,14 @@ class Command(BaseCommand):
             "--start-id",
             type=int,
             default=0,
-            help="Skip any id lower than this value",
+            help="Start id for a range of clusters (inclusive)",
+        )
+
+        parser.add_argument(
+            "--end-id",
+            type=int,
+            default=0,
+            help="End id for a range of clusters (inclusive)",
         )
 
     def handle(self, *args, **options):
@@ -611,7 +624,7 @@ class Command(BaseCommand):
             return
 
         if options["process_harvard"]:
-            run_harvard(options["start_id"])
+            run_harvard(options["start_id"], options["end_id"])
 
         if options["process_columbia"]:
-            run_columbia(options["start_id"])
+            run_columbia(options["start_id"], options["end_id"])
