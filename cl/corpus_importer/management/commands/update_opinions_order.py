@@ -4,6 +4,7 @@ from typing import Any, Optional
 from bs4 import BeautifulSoup, NavigableString, Tag
 from django.core.management import BaseCommand
 from django.db.models import Count
+from django.db.models.fields.files import FieldFile
 
 from cl.corpus_importer.utils import similarity_scores
 from cl.lib.command_utils import logger
@@ -52,7 +53,7 @@ def match_text_lists(
 
 def get_opinion_content(
     cluster_id,
-) -> tuple[Optional[str], list[dict], int, bool]:
+) -> tuple[Optional[FieldFile], list[dict], int, bool]:
     """Get the opinions content for a cluster object
     :param cluster_id: Cluster ID for a set of opinions
     :return: (xml path, list of extracted opinions, start position, True if combined
@@ -78,6 +79,8 @@ def get_opinion_content(
 
     for i, op in enumerate(opinions_from_cluster.exclude(type="010combined")):
         if op.local_path and not xml_path:
+            # We store the field because we are using S3 for storage and that backend
+            # doesn't support absolute paths
             xml_path = op.local_path
         content = None
         if len(op.html_with_citations) > 1:
@@ -111,7 +114,7 @@ def get_opinion_content(
     return xml_path, cl_cleaned_opinions, start_position, combined_opinion
 
 
-def get_opinions_columbia_xml(xml_filepath: str) -> list:
+def get_opinions_columbia_xml(xml_filepath: FieldFile) -> list:
     """Convert xml data into dict
     :param xml_filepath: path of xml file
     :return: dict with data
@@ -132,8 +135,8 @@ def get_opinions_columbia_xml(xml_filepath: str) -> list:
 
     data = {}  # type: dict
 
-    with open(xml_filepath, "r", encoding="utf-8") as f:
-        file_content = f.read()
+    with xml_filepath.open("r") as f:
+        file_content = f.read().decode("utf-8")
 
         data["unpublished"] = False
 
@@ -432,6 +435,7 @@ def run_harvard():
 
     # cluster_id: 4697264, the combined opinion will go to the last position
     for oc in clusters:
+        logger.info(f"Processing cluster id: {oc}")
         combined_opinions_cluster = oc.sub_opinions.filter(
             type="010combined"
         ).order_by("id")
@@ -468,7 +472,7 @@ def run_columbia():
         OpinionCluster.objects.annotate(opinions_count=Count("sub_opinions"))
         .filter(opinions_count__gt=1, source="Z")
         .order_by("id")
-        .values_list("id")
+        .values_list("id", flat=True)
     )
 
     for cluster_id in clusters:
@@ -482,7 +486,11 @@ def run_columbia():
 
         columbia_opinions = None
         if xml_path:
-            columbia_opinions = get_opinions_columbia_xml(xml_path)
+            try:
+                columbia_opinions = get_opinions_columbia_xml(xml_path)
+            except FileNotFoundError:
+                logger.warning(f"Xml file not found, cluster id: {cluster_id}")
+                continue
 
         if cl_cleaned_opinions and columbia_opinions:
             matches = match_text_lists(
