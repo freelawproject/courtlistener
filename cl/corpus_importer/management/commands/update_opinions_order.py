@@ -134,6 +134,16 @@ def get_opinions_columbia_xml(xml_filepath: FieldFile) -> list:
 
     data = {}  # type: dict
 
+    if "/home/mlissner" in str(xml_filepath):
+        # Temporary replace the path with the correct from S3, this way we read them
+        # directly from S3, we need the files in /sources/columbia/opinions/ in
+        # com-courtlistener-storage bucket
+        # TODO discuss this
+        xml_filepath.name = xml_filepath.name.replace(
+            "/home/mlissner", "/sources"
+        )
+
+    # print(f"Opening {xml_filepath.url}")
     with xml_filepath.open("r") as f:
         file_content = f.read()
 
@@ -502,7 +512,9 @@ def run_columbia(start_id: int, end_id: int):
             try:
                 columbia_opinions = get_opinions_columbia_xml(xml_path)
             except FileNotFoundError:
-                logger.warning(f"Xml file not found, cluster id: {cluster_id}")
+                logger.warning(
+                    f"Xml file not found in {xml_path}, cluster id: {cluster_id}"
+                )
                 continue
 
         if cl_cleaned_opinions and columbia_opinions:
