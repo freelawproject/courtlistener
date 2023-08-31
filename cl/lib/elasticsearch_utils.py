@@ -596,75 +596,6 @@ def add_es_highlighting(
     return search_query
 
 
-def replace_value_with_tag(
-    highlighted_value: str, original_value: str, field_name: str, tag: str
-) -> str:
-    """Replaces a specific field value within the marked version of that field.
-
-    :param highlighted_value: The highlight with marked content to extract.
-    :param original_value: The original field where the replacement needs to be made.
-    :param field_name: The name of the field, used for custom replacement rules.
-    :param tag: The HTML tag to use for marking the value.
-    :return: The original string with the marked word replaced by the tagged version.
-    """
-    # Extract all highlighted words from the highlighted_value
-
-    marked_words = re.findall(f"<{tag}>(.*?)</{tag}>", highlighted_value)
-
-    if field_name == "dob_state_id":
-        # dob_state_id field, replace it with its corresponding state name from
-        # STATE_CHOICES
-        states_dict = dict(list(STATE_CHOICES))
-        marked_words = [str(states_dict[marked_words[0]])]
-
-    # Replace each highlighted word with its tagged version in the original_value
-    for marked_word in marked_words:
-        original_value = original_value.replace(
-            marked_word, f"<{tag}>{marked_word}</{tag}>"
-        )
-    return original_value
-
-
-def swap_fields_to_highlight(
-    highlights: dict[str, Any],
-    result: AttrDict | dict[str, Any],
-    search_type: str,
-    tag: str,
-) -> None:
-    """Swaps fields with their highlighted version. This method is useful on
-    document types where the search/highlighted fields don't match the fields
-    to be displayed in fronted. So a conversion is required to show highlights.
-
-    :param highlights: A dictionary containing the fields to be highlighted.
-    :param result: An dictionary containing the search results.
-    :param search_type: The search type.
-    :param tag: The HTML tag to use for highlighting.
-    :return: None, highlights dict is modified in-place.
-    """
-
-    field_mapping = {}
-    if search_type == SEARCH_TYPES.PEOPLE:
-        field_mapping = {
-            "name": "name_reverse",
-            "name.exact": "name_reverse.exact",
-            "dob_state_id": "dob_state",
-        }
-
-    if not field_mapping:
-        return
-
-    for field, target_field in field_mapping.items():
-        # Check if the field exists in the highlight's dictionary.
-        original_value = result[target_field.split(".exact")[0]]
-        if field in highlights:
-            # Assign the highlight to the target field.
-            highlights[target_field] = [
-                replace_value_with_tag(
-                    highlights[field][0], original_value, field, tag
-                )
-            ]
-
-
 def merge_highlights_into_result(
     highlights: dict[str, Any], result: AttrDict | dict[str, Any], tag: str
 ) -> None:
@@ -760,9 +691,6 @@ def set_results_highlights(results: Page, search_type: str) -> None:
                 continue
 
             highlights = result.meta.highlight.to_dict()
-            swap_fields_to_highlight(
-                highlights, result, search_type, SEARCH_HL_TAG
-            )
             merge_highlights_into_result(
                 highlights,
                 result,

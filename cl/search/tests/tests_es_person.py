@@ -536,7 +536,7 @@ class PeopleSearchTestElasticSearch(
         r = self._test_article_count(params, 1, "q")
 
         born = self._get_meta_value(0, r.content.decode(), "Born:")
-        self.assertEqual(born, "October 21, 1942 in Brookyln, New York")
+        self.assertEqual(born, "October 21, 1942 in Brookyln, NY")
 
         deceased = self._get_meta_value(0, r.content.decode(), "Deceased:")
         self.assertEqual(deceased, "November 25, 2020")
@@ -876,8 +876,8 @@ class PeopleSearchTestElasticSearch(
             "order_by": "score desc",
         }
         r = self._test_article_count(params, 2, "q")
-        self.assertIn("<mark>New York</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>New York</mark>"), 2)
+        self.assertIn("<mark>NY</mark>", r.content.decode())
+        self.assertEqual(r.content.decode().count("<mark>NY</mark>"), 2)
 
     def test_api_fields(self) -> None:
         """Confirm the search API for People return the expected fields."""

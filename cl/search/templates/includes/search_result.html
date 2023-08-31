@@ -10,7 +10,7 @@
     {% if type == SEARCH_TYPES.PEOPLE or type_override == SEARCH_TYPES.PEOPLE %}
       <a href="{{ result.absolute_url }}?{{ request.META.QUERY_STRING }}"
          class="visitable">
-      {{ result.name_reverse|safe }}
+      {{ result.name|safe }}
       {% if result.court %}
         ({{ result.court|uniq|safeseq|join:", " }})
       {% endif %}
@@ -240,8 +240,8 @@
               {% endif %}
               {% if result.dob_city and result.dob_state %}<span class="gray">, </span>
               {% endif %}
-              {% if result.dob_state %}
-                <span>{{ result.dob_state|safe }}</span>
+              {% if result.dob_state_id %}
+                <span>{{ result.dob_state_id|safe }}</span>
               {% endif %}
             {% endif %}
             {% endspaceless %}
