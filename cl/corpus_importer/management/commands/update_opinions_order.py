@@ -82,6 +82,7 @@ def get_opinion_content(
             # We store the field because we are using S3 for storage and that backend
             # doesn't support absolute paths
             xml_path = op.local_path
+            # print("url", op.local_path.url)
         content = None
         if len(op.html_with_citations) > 1:
             content = op.html_with_citations
@@ -136,7 +137,7 @@ def get_opinions_columbia_xml(xml_filepath: FieldFile) -> list:
     data = {}  # type: dict
 
     with xml_filepath.open("r") as f:
-        file_content = f.read().decode("utf-8")
+        file_content = f.read()
 
         data["unpublished"] = False
 
@@ -418,10 +419,11 @@ def get_opinions_columbia_xml(xml_filepath: FieldFile) -> list:
     return opinions
 
 
-def run_harvard():
+def run_harvard(start_id: int):
     """
     We assume that harvard data is already ordered, we just need to fill the order
     field in each opinion
+    :param start_id: skip any id lower than this value
     """
 
     # Get all harvard clusters with more than one opinion
@@ -429,9 +431,11 @@ def run_harvard():
         OpinionCluster.objects.prefetch_related("sub_opinions")
         .annotate(opinions_count=Count("sub_opinions"))
         .filter(opinions_count__gt=1, source="U")
+        .order_by("id")
     )
-    # print(clusters.query)
-    print("clusters", len(clusters))
+
+    if start_id:
+        clusters = clusters.filter(pk__gte=start_id)
 
     # cluster_id: 4697264, the combined opinion will go to the last position
     for oc in clusters:
@@ -446,7 +450,6 @@ def run_harvard():
             # we don't have combined opinions, we start ordering from 0 to n
             start_position = 0
 
-        print("combined_opinions_cluster", combined_opinions_cluster)
         for opinion_order, cluster_op in enumerate(
             oc.sub_opinions.exclude(type="010combined").order_by("id"),
             start=start_position,
@@ -462,9 +465,10 @@ def run_harvard():
         logger.info(msg=f"Opinions reordered for cluster id: {oc.id}")
 
 
-def run_columbia():
+def run_columbia(start_id: int):
     """
     Update opinion order for columbia clusters
+    :param start_id: skip any id lower than this value
     """
 
     # Get all columbia cluster ids with more than one opinion
@@ -474,6 +478,9 @@ def run_columbia():
         .order_by("id")
         .values_list("id", flat=True)
     )
+
+    if start_id:
+        clusters = filter(lambda x: x >= start_id, clusters)
 
     for cluster_id in clusters:
         logger.info(f"Processing cluster id: {cluster_id}")
@@ -589,10 +596,14 @@ class Command(BaseCommand):
             help="Fix columbia opinions order",
         )
 
-    def handle(self, *args, **options):
-        print("harvard", options["process_harvard"])
-        print("columbia", options["process_columbia"])
+        parser.add_argument(
+            "--start-id",
+            type=int,
+            default=0,
+            help="Skip any id lower than this value",
+        )
 
+    def handle(self, *args, **options):
         if options["process_harvard"] and options["process_columbia"]:
             print(
                 "You can only select one option process-harvard or process-columbia"
@@ -600,7 +611,7 @@ class Command(BaseCommand):
             return
 
         if options["process_harvard"]:
-            run_harvard()
+            run_harvard(options["start_id"])
 
         if options["process_columbia"]:
-            run_columbia()
+            run_columbia(options["start_id"])
