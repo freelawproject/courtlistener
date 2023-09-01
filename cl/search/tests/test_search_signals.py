@@ -1,7 +1,8 @@
-from unittest.mock import Mock, patch
 from dataclasses import dataclass
-from django.db.models.signals import post_save
 from typing import List
+from unittest.mock import Mock, patch
+
+from django.db.models.signals import post_save
 
 from cl.search.factories import (
     DocketEntryWithParentsFactory,
