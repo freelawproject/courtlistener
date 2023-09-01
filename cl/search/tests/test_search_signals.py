@@ -1,13 +1,14 @@
 from unittest.mock import patch
+
 from django.db.models.signals import post_save
 
 from cl.search.factories import (
-    RECAPDocumentFactory,
     DocketEntryWithParentsFactory,
+    RECAPDocumentFactory,
 )
 from cl.search.models import RECAPDocument
-from cl.tests.cases import SimpleTestCase
 from cl.search.signals import handle_recap_doc_change
+from cl.tests.cases import SimpleTestCase
 
 
 # Test that event hits the receiver function
