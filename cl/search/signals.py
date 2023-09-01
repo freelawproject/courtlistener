@@ -112,7 +112,7 @@ _pa_signal_processor = ESSignalProcessor(
 def handle_recap_doc_change(sender, instance: RECAPDocument, **kwargs):
     update_fields = kwargs.get("update_fields", [])
 
-    if update_fields is not None and "ocr_status" in update_fields:
+    if update_fields is not None and "plain_text" in update_fields:
         if instance.ocr_status in (
             RECAPDocument.OCR_COMPLETE,
             RECAPDocument.OCR_UNNECESSARY,
