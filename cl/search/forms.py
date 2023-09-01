@@ -680,7 +680,7 @@ def clean_up_date_formats(
             )
 
 
-def _clean_form(get_params, cd, courts, form_class):
+def _clean_form(get_params, cd, courts):
     """Returns cleaned up values as a Form object."""
     # Send the user the cleaned up query
     get_params["q"] = cd["q"]
@@ -689,8 +689,9 @@ def _clean_form(get_params, cd, courts, form_class):
     # date cleanup on the client side via our datepickers, but it's probably
     # fine to leave it here until there's a reason to remove it. It could be
     # helpful if somebody finds a way not to use the datepickers (js off, say)
-    for date_field in form_class().get_date_field_names():
+    for date_field in SearchForm().get_date_field_names():
         clean_up_date_formats(cd, date_field, get_params)
+
     get_params["order_by"] = cd["order_by"]
     get_params["type"] = cd["type"]
 
@@ -701,6 +702,6 @@ def _clean_form(get_params, cd, courts, form_class):
         get_params[f"stat_{status[1]}"] = cd[f"stat_{status[1]}"]
 
     # Ensure that we have the cleaned_data and other related attributes set.
-    form = form_class(get_params)
+    form = SearchForm(get_params)
     form.is_valid()
     return form

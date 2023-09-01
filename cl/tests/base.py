@@ -7,6 +7,7 @@ from contextlib import contextmanager
 
 import scorched
 from django.conf import settings
+from django.core.management import call_command
 from django.test.utils import override_settings, tag
 from requests import Session
 from selenium import webdriver
@@ -23,7 +24,7 @@ from cl.lib.decorators import retry
 from cl.lib.test_helpers import SerializeSolrTestMixin
 from cl.search.models import Opinion
 from cl.search.tasks import add_items_to_solr
-from cl.tests.cases import StaticLiveServerTestCase
+from cl.tests.cases import ESIndexTestCase, StaticLiveServerTestCase
 
 SELENIUM_TIMEOUT = 120
 if "SELENIUM_TIMEOUT" in os.environ:
@@ -40,7 +41,9 @@ if "SELENIUM_TIMEOUT" in os.environ:
     SOLR_URLS=settings.SOLR_TEST_URLS,
     ALLOWED_HOSTS=["*"],
 )
-class BaseSeleniumTest(SerializeSolrTestMixin, StaticLiveServerTestCase):
+class BaseSeleniumTest(
+    SerializeSolrTestMixin, StaticLiveServerTestCase, ESIndexTestCase
+):
     """Base class for Selenium Tests. Sets up a few attributes:
       * browser - instance of Selenium WebDriver
       * screenshot - boolean for if the test should save a final screenshot
@@ -92,6 +95,7 @@ class BaseSeleniumTest(SerializeSolrTestMixin, StaticLiveServerTestCase):
     def setUp(self) -> None:
         self.reset_browser()
         self._update_index()
+        self.rebuild_index("audio.Audio")
 
     def reset_browser(self) -> None:
         self.browser.delete_all_cookies()

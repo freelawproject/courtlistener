@@ -13,14 +13,19 @@ from localflavor.us.us_states import STATE_CHOICES
 from cl.people_db.models import (
     FEMALE,
     SUFFIXES,
+    ABARating,
     Attorney,
     AttorneyOrganization,
     AttorneyOrganizationAssociation,
+    Education,
     Party,
     PartyType,
     Person,
+    PoliticalAffiliation,
     Position,
+    Race,
     Role,
+    School,
 )
 from cl.tests.providers import LegalProvider
 
@@ -53,6 +58,47 @@ class PersonWithChildrenFactory(PersonFactory):
         PositionFactory,
         factory_related_name="person",
     )
+
+
+class RaceFactory(DjangoModelFactory):
+    class Meta:
+        model = Race
+
+    race = FuzzyChoice(Race.RACES, getter=lambda c: c[0])
+
+
+class SchoolFactory(DjangoModelFactory):
+    class Meta:
+        model = School
+
+    ein = Faker("random_int", min=10000, max=100000)
+
+
+class EducationFactory(DjangoModelFactory):
+    class Meta:
+        model = Education
+
+    degree_level = FuzzyChoice(Education.DEGREE_LEVELS, getter=lambda c: c[0])
+
+
+class PoliticalAffiliationFactory(DjangoModelFactory):
+    class Meta:
+        model = PoliticalAffiliation
+
+    political_party = FuzzyChoice(
+        PoliticalAffiliation.POLITICAL_PARTIES, getter=lambda c: c[0]
+    )
+    source = FuzzyChoice(
+        PoliticalAffiliation.POLITICAL_AFFILIATION_SOURCE,
+        getter=lambda c: c[0],
+    )
+
+
+class ABARatingFactory(DjangoModelFactory):
+    class Meta:
+        model = ABARating
+
+    rating = FuzzyChoice(ABARating.ABA_RATINGS, getter=lambda c: c[0])
 
 
 class AttorneyOrganizationFactory(DjangoModelFactory):
