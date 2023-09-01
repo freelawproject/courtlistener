@@ -66,11 +66,14 @@ class ScheduledAlertHitAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "user",
-        "rate",
-        "alert",
+        "alert_rate",
+        "hit_status",
         "date_created",
     )
     raw_id_fields = (
         "alert",
         "user",
     )
+
+    def alert_rate(self, obj):
+        return obj.alert.rate

@@ -165,25 +165,40 @@ class DateJSONEncoder(DjangoJSONEncoder):
         return super().default(obj)
 
 
+class SCHEDULED_ALERT_HIT_STATUS(object):
+    """ScheduledAlertHit Status Types"""
+
+    SCHEDULED = 0
+    SENT = 1
+    STATUS = (
+        (SCHEDULED, "Alert Hit Scheduled"),
+        (SENT, "Alert Hit Sent"),
+    )
+
+
 class ScheduledAlertHit(AbstractDateTimeModel):
+    """Store alert hits triggered by a percolated document in Elasticsearch,to
+    be sent later according to the user-defined rate.
+    """
+
     alert = models.ForeignKey(
         Alert,
         help_text="The related Alert object.",
-        related_name="parent_alerts",
+        related_name="scheduled_alert_hits",
         on_delete=models.CASCADE,
     )
     user = models.ForeignKey(
         User,
         help_text="The related User object.",
-        related_name="user_rates",
+        related_name="scheduled_alert_hits",
         on_delete=models.CASCADE,
-    )
-    rate = models.CharField(
-        help_text="The rate chosen by the user for the alert",
-        choices=Alert.FREQUENCY,
-        max_length=10,
     )
     document_content = models.JSONField(  # type: ignore
         encoder=DateJSONEncoder,
         help_text="The content of the document at the moment it was added.",
+    )
+    hit_status = models.SmallIntegerField(
+        help_text="The Scheduled Alert hit status.",
+        default=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
+        choices=SCHEDULED_ALERT_HIT_STATUS.STATUS,
     )

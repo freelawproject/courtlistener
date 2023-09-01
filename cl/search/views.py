@@ -482,38 +482,39 @@ def show_results(request: HttpRequest) -> HttpResponse:
                     user=request.user,
                 )
                 search_type = request.GET.get("type")
-                if search_type == SEARCH_TYPES.PARENTHETICAL:
-                    search_results = do_es_search(request.GET.copy())
-                    render_dict.update(search_results)
-                elif search_type == SEARCH_TYPES.ORAL_ARGUMENT:
-                    # Check if waffle flag is active.
-                    if waffle.flag_is_active(request, "oa-es-active"):
+                match search_type:
+                    case SEARCH_TYPES.PARENTHETICAL:
                         search_results = do_es_search(request.GET.copy())
-                    else:
-                        search_results = do_search(request.GET.copy())
+                        render_dict.update(search_results)
+                    case SEARCH_TYPES.ORAL_ARGUMENT:
+                        # Check if waffle flag is active.
+                        if waffle.flag_is_active(request, "oa-es-active"):
+                            search_results = do_es_search(request.GET.copy())
+                        else:
+                            search_results = do_search(request.GET.copy())
 
-                    render_dict.update(search_results)
-                    # Set the value to the query as a convenience
-                    alert_form.fields["name"].widget.attrs[
-                        "value"
-                    ] = render_dict["search_summary_str"]
-                    render_dict.update({"alert_form": alert_form})
-                elif search_type == SEARCH_TYPES.PEOPLE:
-                    # Check if waffle flag is active.
-                    if waffle.flag_is_active(request, "p-es-active"):
-                        search_results = do_es_search(request.GET.copy())
-                    else:
-                        search_results = do_search(request.GET.copy())
-                    render_dict.update(search_results)
-                else:
-                    # Check if waffle flag is active.
-                    render_dict.update(do_search(request.GET.copy()))
+                        render_dict.update(search_results)
+                        # Set the value to the query as a convenience
+                        alert_form.fields["name"].widget.attrs[
+                            "value"
+                        ] = render_dict["search_summary_str"]
+                        render_dict.update({"alert_form": alert_form})
+                    case SEARCH_TYPES.PEOPLE:
+                        # Check if waffle flag is active.
+                        if waffle.flag_is_active(request, "p-es-active"):
+                            search_results = do_es_search(request.GET.copy())
+                        else:
+                            search_results = do_search(request.GET.copy())
+                        render_dict.update(search_results)
+                    case _:
+                        # Check if waffle flag is active.
+                        render_dict.update(do_search(request.GET.copy()))
 
-                    # Set the value to the query as a convenience
-                    alert_form.fields["name"].widget.attrs[
-                        "value"
-                    ] = render_dict["search_summary_str"]
-                    render_dict.update({"alert_form": alert_form})
+            # Set the value to the query as a convenience
+            alert_form.fields["name"].widget.attrs["value"] = render_dict[
+                "search_summary_str"
+            ]
+            render_dict.update({"alert_form": alert_form})
             return TemplateResponse(request, "search.html", render_dict)
 
 
@@ -607,7 +608,7 @@ def do_es_search(
     """Run Elasticsearch searching and filtering and prepare data to display
 
     :param get_params: The request.GET params sent by user.
-    :param rows: The number of solr results to request
+    :param rows: The number of Elasticsearch results to request
     :param facet: Whether to complete faceting in the query
     :param cache_key: A cache key with which to save the results. Note that it
     does not do anything clever with the actual query, so if you use this, your

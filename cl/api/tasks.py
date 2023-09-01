@@ -81,17 +81,18 @@ def send_docket_alert_webhook_events(
 @app.task()
 def send_es_search_alert_webhook(
     results: list[dict[str, Any]],
-    webhook: Webhook,
+    webhook_pk: int,
     alert: Alert,
 ) -> None:
     """Send a search alert webhook event containing search results from a
     search alert object.
 
     :param results: The search results returned by SOLR for this alert.
-    :param webhook: The webhook endpoint object to send the event to.
+    :param webhook_pk: The webhook endpoint ID object to send the event to.
     :param alert: The search alert object.
     """
 
+    webhook = Webhook.objects.get(pk=webhook_pk)
     serialized_alert = SearchAlertSerializerModel(alert).data
     es_results = []
     for result in results:
