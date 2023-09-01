@@ -32,23 +32,19 @@ ENV POETRY_VERSION=1.6.1 \
     # do not ask any interactive question
     POETRY_NO_INTERACTION=1
 
-# install poetry - respects $POETRY_VERSION & $POETRY_HOME
-RUN curl -sSL https://install.python-poetry.org | python3 -
-
 ENV PYTHONUNBUFFERED=1 \
-    # this is where our requirements will be loaded
+    # this is where our requirements are copied to
     PYSETUP_PATH="/opt/pysetup"
 
-# prepend poetry and venv to path
-ENV PATH="/opt/poetry/bin:$PATH"
-
+RUN python -m venv $POETRY_HOME && \
+    $POETRY_HOME/bin/pip install poetry==$POETRY_VERSION --quiet --upgrade
 
 FROM build-base as build-dev
 
 WORKDIR $PYSETUP_PATH
 
 COPY poetry.lock pyproject.toml ./
-RUN poetry install --no-root
+RUN $POETRY_HOME/bin/poetry install --no-root
 
 COPY . /opt/courtlistener
 
@@ -62,7 +58,7 @@ ADD https://raw.githubusercontent.com/freelawproject/courtlistener/main/poetry.l
 ADD https://raw.githubusercontent.com/freelawproject/courtlistener/main/pyproject.toml /opt/pyproject.toml
 
 # install runtime deps - uses $POETRY_VIRTUALENVS_IN_PROJECT internally
-RUN poetry install --no-root --without dev
+RUN $POETRY_HOME/bin/poetry install --no-root --without dev
 
 ADD https://github.com/freelawproject/courtlistener/archive/main.tar.gz /opt/courtlistener.tar.gz
 WORKDIR /opt
