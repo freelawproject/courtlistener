@@ -12,7 +12,7 @@ from django.template import loader
 from django.utils.timezone import now
 
 from cl.alerts.models import Alert, RealTimeQueue
-from cl.alerts.utils import InvalidDateError
+from cl.alerts.utils import InvalidDateError, user_has_donated_enough
 from cl.api.models import WebhookEventType
 from cl.api.webhooks import send_search_alert_webhook
 from cl.lib import search_utils
@@ -199,16 +199,12 @@ class Command(VerboseCommand):
             alerts = user.alerts.filter(rate=rate)
             logger.info(f"Running alerts for user '{user}': {alerts}")
 
-            not_donated_enough = (
-                user.profile.total_donated_last_year
-                < settings.MIN_DONATION["rt_alerts"]
-            )
-            if not_donated_enough and rate == Alert.REAL_TIME:
-                logger.info(
-                    "User: %s has not donated enough for their %s "
-                    "RT alerts to be sent.\n" % (user, alerts.count())
+            if rate == Alert.REAL_TIME:
+                user_donated_enough = user_has_donated_enough(
+                    user, alerts.count()
                 )
-                continue
+                if not user_donated_enough:
+                    continue
 
             hits = []
             for alert in alerts:
