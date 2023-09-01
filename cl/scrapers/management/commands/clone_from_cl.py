@@ -2,7 +2,7 @@
 This tool allows you to partially clone data from courtlistener.com to your
 local environment, you only need to pass the type and object id and run it.
 
-manage.py clone_from_cl --type search.Opinion --id 9355884
+manage.py clone_from_cl --type search.OpinionCluster --id 9355884
 manage.py clone_from_cl --type search.Docket --id 5377675
 manage.py clone_from_cl --type people_db.Person --id 16207
 manage.py clone_from_cl --type search,Court --id usnmcmilrev
@@ -13,7 +13,7 @@ env variable.
 
 You can also pass the api token before running the command:
 
-CL_API_TOKEN='my_api_key' manage.py clone_from_cl --type search.Opinion --id 9355884
+CL_API_TOKEN='my_api_key' manage.py clone_from_cl --type search.OpinionCluster --id 9355884
 
 You can also clone multiple objects at the same time, for example:
 

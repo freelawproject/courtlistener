@@ -11,6 +11,8 @@ RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
         build-essential gcc python3-dev\
         # So postgres can compile and users can use dbshell
         libpq-dev postgresql-client \
+        # So we can use webpack to compile assets
+        nodejs npm \
         # For installing poetry and git-based deps
         curl git \
         # Other dependencies
@@ -76,6 +78,13 @@ RUN tar xvfz courtlistener.tar.gz && \
 # `python-base` sets up all our shared environment variables
 FROM build-${BUILD_ENV} as python-base
 
+# Collect compiled assets from webpack-build stage.
+# Note: Always produce production code and never produce source-maps
+# (run the devMiddleware for legible output)
+WORKDIR /opt/courtlistener/cl
+RUN npm install
+RUN npx webpack --mode=production --no-devtool
+
 WORKDIR /opt
 
 # We log to stdout by default, but we have a config for logging here. Even if
@@ -93,8 +102,8 @@ FROM python-base as celery
 
 ## Needs to be two commands so second one can use variables from first.
 ENV PYTHONPATH="${PYTHONPATH}:/opt/courtlistener"
-USER 33
 
+USER www-data
 CMD celery \
     --app=cl worker \
     --loglevel=info \

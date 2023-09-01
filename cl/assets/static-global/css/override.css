@@ -1510,6 +1510,10 @@ textarea {
 #toc > ul > li > ul > li > ul {
   padding-inline-start: 20px;
 }
+#toc-container {
+  position: sticky;
+  top: 0px;
+}
 /* END Webhooks styles */
 
 
