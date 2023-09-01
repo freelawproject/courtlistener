@@ -228,10 +228,26 @@ class AudioDocument(AudioDocumentBase):
 
     def prepare_file_size_mp3(self, instance):
         if instance.local_path_mp3:
+            if not instance.local_path_mp3.storage.exists(
+                instance.local_path_mp3.name
+            ):
+                logger.warning(
+                    f"The file {instance.local_path_mp3.name} associated with "
+                    f"Audio ID {instance.pk} not found in S3. "
+                )
+                return None
             return deepgetattr(instance, "local_path_mp3.size", None)
 
     def prepare_local_path(self, instance):
         if instance.local_path_mp3:
+            if not instance.local_path_mp3.storage.exists(
+                instance.local_path_mp3.name
+            ):
+                logger.warning(
+                    f"The file {instance.local_path_mp3.name} associated with "
+                    f"Audio ID {instance.pk} not found in S3. "
+                )
+                return None
             return deepgetattr(instance, "local_path_mp3.name", None)
 
     def prepare_text(self, instance):
