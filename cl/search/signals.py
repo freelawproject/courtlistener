@@ -1,3 +1,7 @@
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+
 from cl.lib.es_signal_processor import ESSignalProcessor
 from cl.search.documents import ParentheticalGroupDocument
 from cl.search.models import (
@@ -8,6 +12,10 @@ from cl.search.models import (
     OpinionsCited,
     Parenthetical,
     ParentheticalGroup,
+    RECAPDocument,
+)
+from cl.citations.tasks import (
+    find_citations_and_parantheticals_for_recap_documents,
 )
 
 # This field mapping is used to define which fields should be updated in the
@@ -99,3 +107,15 @@ _pa_signal_processor = ESSignalProcessor(
     ParentheticalGroupDocument,
     pa_field_mapping,
 )
+
+
+@receiver(post_save, sender=RECAPDocument)
+def handle_RECAPDocument_change(sender, instance: RECAPDocument, **kwargs):
+    if "ocr_status" in kwargs.get("update_fields", []):
+        if instance.ocr_status in (
+            RECAPDocument.OCR_COMPLETE,
+            RECAPDocument.OCR_UNNECESSARY,
+        ):
+            find_citations_and_parantheticals_for_recap_documents.apply_async(
+                args=([instance.pk])
+            )
