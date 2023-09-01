@@ -29,6 +29,7 @@ from timeout_decorator import timeout_decorator
 from cl.lib.search_utils import cleanup_main_query, make_fq
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
+    AudioTestCase,
     EmptySolrTestCase,
     IndexedSolrTestCase,
     SolrTestCase,
@@ -62,7 +63,7 @@ from cl.search.models import (
 from cl.search.tasks import add_docket_to_solr_by_rds
 from cl.search.views import do_search
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
-from cl.tests.cases import TestCase
+from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.utils import get_with_wait
 from cl.users.factories import UserProfileWithParentsFactory
 
@@ -110,7 +111,7 @@ class UpdateIndexCommandTest(SolrTestCase):
         )
 
         # Check a simple citation query
-        results = self.si_opinion.query(cites=3).execute()
+        results = self.si_opinion.query(cites=self.opinion_3.pk).execute()
         actual_count = self._get_result_count(results)
         expected_citation_count = 2
         self.assertEqual(
@@ -152,9 +153,9 @@ class UpdateIndexCommandTest(SolrTestCase):
                 f"{settings.SOLR_HOST}/solr/{self.core_name_opinion}",
                 "--update",
                 "--items",
-                "1",
-                "2",
-                "3",
+                f"{self.opinion_1.pk}",
+                f"{self.opinion_2.pk}",
+                f"{self.opinion_3.pk}",
                 "--do-commit",
             ]
         )
@@ -387,8 +388,6 @@ class AdvancedTest(IndexedSolrTestCase):
     Advanced query techniques
     """
 
-    fixtures = ["test_objects_search.json", "judge_judy.json"]
-
     @classmethod
     def setUpTestData(cls):
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
@@ -411,6 +410,7 @@ class AdvancedTest(IndexedSolrTestCase):
         cls.rd_1 = RECAPDocumentFactory(
             docket_entry=cls.de_1, description="Leave to File"
         )
+        super().setUpTestData()
 
     async def test_a_intersection_query(self) -> None:
         """Does AND queries work"""
@@ -599,7 +599,7 @@ class AdvancedTest(IndexedSolrTestCase):
         )
 
 
-class SearchTest(IndexedSolrTestCase):
+class SearchTest(ESIndexTestCase, IndexedSolrTestCase):
     @classmethod
     def setUpTestData(cls):
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
@@ -621,6 +621,7 @@ class SearchTest(IndexedSolrTestCase):
             docket=DocketFactory(court=cls.court, docket_number="123456"),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
         )
+        super().setUpTestData()
 
     @staticmethod
     def get_article_count(r):
@@ -776,85 +777,6 @@ class SearchTest(IndexedSolrTestCase):
             reverse("show_results"), {"q": "*", "order_by": "random_123 desc"}
         )
         self.assertNotIn("an error", r.content.decode())
-
-    async def test_oa_results_basic(self) -> None:
-        r = await self.async_client.get(
-            reverse("show_results"), {"type": SEARCH_TYPES.ORAL_ARGUMENT}
-        )
-        self.assertIn("Jose", r.content.decode())
-
-    async def test_oa_results_date_argued_ordering(self) -> None:
-        r = await self.async_client.get(
-            reverse("show_results"),
-            {
-                "type": SEARCH_TYPES.ORAL_ARGUMENT,
-                "order_by": "dateArgued desc",
-            },
-        )
-        self.assertTrue(
-            r.content.decode().index("SEC") < r.content.decode().index("Jose"),
-            msg="'SEC' should come BEFORE 'Jose' when order_by desc.",
-        )
-
-        r = await self.async_client.get(
-            reverse("show_results"),
-            {"type": SEARCH_TYPES.ORAL_ARGUMENT, "order_by": "dateArgued asc"},
-        )
-        self.assertTrue(
-            r.content.decode().index("Jose") < r.content.decode().index("SEC"),
-            msg="'Jose' should come AFTER 'SEC' when order_by asc.",
-        )
-
-    async def test_oa_case_name_filtering(self) -> None:
-        r = await self.async_client.get(
-            reverse("show_results"),
-            {"type": SEARCH_TYPES.ORAL_ARGUMENT, "case_name": "jose"},
-        )
-        actual = self.get_article_count(r)
-        expected = 1
-        self.assertEqual(
-            actual,
-            expected,
-            msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
-        )
-
-    async def test_oa_jurisdiction_filtering(self) -> None:
-        r = await self.async_client.get(
-            reverse("show_results"),
-            {"type": SEARCH_TYPES.ORAL_ARGUMENT, "court": "test"},
-        )
-        actual = self.get_article_count(r)
-        expected = 2
-        self.assertEqual(
-            actual,
-            expected,
-            msg="Did not get expected number of results when filtering by "
-            "jurisdiction. Expected %s, but got %s." % (actual, expected),
-        )
-
-    async def test_oa_date_argued_filtering(self) -> None:
-        r = await self.async_client.get(
-            reverse("show_results"),
-            {"type": SEARCH_TYPES.ORAL_ARGUMENT, "argued_after": "2014-10-01"},
-        )
-        self.assertNotIn(
-            "an error",
-            r.content.decode(),
-            msg="Got an error when doing a Date Argued filter.",
-        )
-
-    async def test_oa_search_api(self) -> None:
-        """Can we get oa results on the search endpoint?"""
-        r = await self.async_client.get(
-            reverse("search-list", kwargs={"version": "v3"}),
-            {"type": SEARCH_TYPES.ORAL_ARGUMENT},
-        )
-        self.assertEqual(
-            r.status_code,
-            HTTP_200_OK,
-            msg="Did not get good status code from oral arguments API endpoint",
-        )
 
     async def test_homepage(self) -> None:
         """Is the homepage loaded when no GET parameters are provided?"""
@@ -1032,10 +954,10 @@ class RelatedSearchTest(IndexedSolrTestCase):
     async def test_more_like_this_opinion(self) -> None:
         """Does the MoreLikeThis query return the correct number and order of
         articles."""
-        seed_pk = 1  # Paul Debbas v. Franklin
+        seed_pk = self.opinion_1.pk  # Paul Debbas v. Franklin
         expected_article_count = 3
-        expected_first_pk = 2  # Howard v. Honda
-        expected_second_pk = 3  # case name cluster 3
+        expected_first_pk = self.opinion_cluster_2.pk  # Howard v. Honda
+        expected_second_pk = self.opinion_cluster_3.pk  # case name cluster 3
 
         params = {
             "type": "o",
@@ -1061,7 +983,7 @@ class RelatedSearchTest(IndexedSolrTestCase):
 
     async def test_more_like_this_opinion_detail_detail(self) -> None:
         """MoreLikeThis query on opinion detail page with status filter"""
-        seed_pk = 3  # case name cluster 3
+        seed_pk = self.opinion_cluster_3.pk  # case name cluster 3
 
         # Login as staff user (related items are by default disabled for guests)
         self.assertTrue(
@@ -1081,11 +1003,26 @@ class RelatedSearchTest(IndexedSolrTestCase):
         ]
 
         recommendations_expected = [
-            ("/opinion/2/case-name-cluster/?", "Howard v. Honda"),
-            ("/opinion/1/case-name-cluster/?", "Debbas v. Franklin"),
-            ("/opinion/1/case-name-cluster/?", "Debbas v. Franklin"),
-            ("/opinion/1/case-name-cluster/?", "Debbas v. Franklin"),
-            ("/opinion/1/case-name-cluster/?", "Debbas v. Franklin"),
+            (
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
+                "Debbas v. Franklin",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
+                "Debbas v. Franklin",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
+                "Debbas v. Franklin",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
+                "Debbas v. Franklin",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                "Howard v. Honda",
+            ),
         ]
 
         # Test if related opinion exist in expected order
@@ -1100,7 +1037,7 @@ class RelatedSearchTest(IndexedSolrTestCase):
     @override_settings(RELATED_FILTER_BY_STATUS=None)
     async def test_more_like_this_opinion_detail_no_filter(self) -> None:
         """MoreLikeThis query on opinion detail page (without filter)"""
-        seed_pk = 1  # Paul Debbas v. Franklin
+        seed_pk = self.opinion_cluster_1.pk  # Paul Debbas v. Franklin
 
         # Login as staff user (related items are by default disabled for guests)
         self.assertTrue(
@@ -1120,11 +1057,26 @@ class RelatedSearchTest(IndexedSolrTestCase):
         ]
 
         recommendations_expected = [
-            ("/opinion/2/case-name-cluster/?", "Howard v. Honda"),
-            ("/opinion/2/case-name-cluster/?", "Howard v. Honda"),
-            ("/opinion/2/case-name-cluster/?", "Howard v. Honda"),
-            ("/opinion/2/case-name-cluster/?", "Howard v. Honda"),
-            ("/opinion/3/case-name-cluster/?", "case name cluster 3"),
+            (
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                "Howard v. Honda",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                "Howard v. Honda",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                "Howard v. Honda",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                "Howard v. Honda",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_3.pk}/{self.opinion_cluster_3.slug}/?",
+                "case name cluster 3",
+            ),
         ]
 
         # Test if related opinion exist in expected order
@@ -1180,6 +1132,7 @@ class JudgeSearchTest(IndexedSolrTestCase):
             "name_reverse asc",
             "dob desc,name_reverse asc",
             "dod desc,name_reverse asc",
+            "random_123 desc",
         ]
         for sort_field in sort_fields:
             r = await self.async_client.get(
@@ -1204,124 +1157,267 @@ class JudgeSearchTest(IndexedSolrTestCase):
             "     Got: %s\n\n"
             "Params were: %s" % (field_name, expected_count, got, params),
         )
+        return r
+
+    async def _test_api_results_count(
+        self, params, expected_count, field_name
+    ):
+        r = await self.async_client.get(
+            reverse("search-list", kwargs={"version": "v3"}), params
+        )
+        got = len(r.data["results"])
+        self.assertEqual(
+            got,
+            expected_count,
+            msg="Did not get the right number of search results with %s "
+            "filter applied.\n"
+            "Expected: %s\n"
+            "     Got: %s\n\n"
+            "Params were: %s" % (field_name, expected_count, got, params),
+        )
+        return r
 
     def test_name_field(self) -> None:
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "name": "judith"}, 1, "name"
-        )
+        # Frontend
+        params = {"type": SEARCH_TYPES.PEOPLE, "name": "judith"}
+        self._test_article_count(params, 2, "name")
+        # API
+        self._test_api_results_count(params, 2, "name")
 
     def test_court_filter(self) -> None:
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "court": "ca1"}, 1, "court"
-        )
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "court": "scotus"}, 0, "court"
-        )
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "court": "scotus ca1"}, 1, "court"
-        )
+        # Frontend
+        params = {"type": SEARCH_TYPES.PEOPLE, "court": "ca1"}
+        self._test_article_count(params, 1, "court")
+        # API
+        self._test_api_results_count(params, 1, "court")
+
+        # Frontend
+        params = {"type": SEARCH_TYPES.PEOPLE, "court": "scotus"}
+        self._test_article_count(params, 0, "court")
+        # API
+        self._test_api_results_count(params, 0, "court")
+
+        # Frontend
+        params = {"type": SEARCH_TYPES.PEOPLE, "court": "scotus ca1"}
+        self._test_article_count(params, 1, "court")
+        # API
+        self._test_api_results_count(params, 1, "court")
 
     def test_dob_filters(self) -> None:
-        self._test_article_count(
-            {
-                "type": SEARCH_TYPES.PEOPLE,
-                "born_after": "1941",
-                "born_before": "1943",
-            },
-            1,
-            "born_{before|after}",
-        )
+        # Frontend
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "born_after": "1941",
+            "born_before": "1943",
+        }
+        self._test_article_count(params, 1, "born_{before|after}")
+
+        # API
+        self._test_api_results_count(params, 1, "born_{before|after}")
+
         # Are reversed dates corrected?
-        self._test_article_count(
-            {
-                "type": SEARCH_TYPES.PEOPLE,
-                "born_after": "1943",
-                "born_before": "1941",
-            },
-            1,
-            "born_{before|after}",
-        )
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "born_after": "1943",
+            "born_before": "1941",
+        }
+        # Frontend
+        self._test_article_count(params, 1, "born_{before|after}")
+        # API
+        self._test_api_results_count(params, 1, "born_{before|after}")
+
         # Just one filter, but Judy is older than this.
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "born_after": "1946"},
+        params = {"type": SEARCH_TYPES.PEOPLE, "born_after": "1946"}
+        # Frontend
+        self._test_article_count(params, 0, "born_{before|after}")
+        # API
+        self._test_api_results_count(
+            params,
             0,
             "born_{before|after}",
         )
 
     def test_birth_location(self) -> None:
         """Can we filter by city and state?"""
+
+        params = {"type": SEARCH_TYPES.PEOPLE, "dob_city": "brookyln"}
+        # Frontend
         self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "dob_city": "brookyln"},
+            params,
             1,
             "dob_city",
         )
+        # API
+        self._test_api_results_count(params, 1, "dob_city")
+
+        params = {"type": SEARCH_TYPES.PEOPLE, "dob_city": "brooklyn2"}
+        # Frontend
         self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "dob_city": "brooklyn2"},
+            params,
             0,
             "dob_city",
         )
-        self._test_article_count(
-            {
-                "type": SEARCH_TYPES.PEOPLE,
-                "dob_city": "brookyln",
-                "dob_state": "NY",
-            },
-            1,
-            "dob_city",
-        )
-        self._test_article_count(
-            {
-                "type": SEARCH_TYPES.PEOPLE,
-                "dob_city": "brookyln",
-                "dob_state": "OK",
-            },
+        # API
+        self._test_api_results_count(
+            params,
             0,
             "dob_city",
         )
+
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "dob_city": "brookyln",
+            "dob_state": "NY",
+        }
+        # Frontend
+        self._test_article_count(params, 1, "dob_city")
+        # API
+        self._test_api_results_count(params, 1, "dob_city")
+
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "dob_city": "brookyln",
+            "dob_state": "OK",
+        }
+        # Frontend
+        self._test_article_count(
+            params,
+            0,
+            "dob_city",
+        )
+        # API
+        self._test_api_results_count(params, 0, "dob_city")
 
     def test_schools_filter(self) -> None:
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "school": "american"}, 1, "school"
-        )
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "school": "pitzer"}, 0, "school"
-        )
+        params = {"type": SEARCH_TYPES.PEOPLE, "school": "american"}
+        # Frontend
+        self._test_article_count(params, 1, "school")
+        # API
+        self._test_api_results_count(params, 1, "school")
+
+        params = {"type": SEARCH_TYPES.PEOPLE, "school": "pitzer"}
+        # Frontend
+        self._test_article_count(params, 0, "school")
+        # API
+        self._test_api_results_count(params, 0, "school")
 
     def test_appointer_filter(self) -> None:
+        params = {"type": SEARCH_TYPES.PEOPLE, "appointer": "clinton"}
+        # Frontend
         self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "appointer": "clinton"},
-            1,
+            params,
+            2,
             "appointer",
         )
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "appointer": "obama"},
-            0,
-            "appointer",
-        )
+        # API
+        self._test_api_results_count(params, 2, "appointer")
+
+        params = {"type": SEARCH_TYPES.PEOPLE, "appointer": "obama"}
+        # Frontend
+        self._test_article_count(params, 0, "appointer")
+        # API
+        self._test_api_results_count(params, 0, "appointer")
 
     def test_selection_method_filter(self) -> None:
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "selection_method": "e_part"},
-            1,
-            "selection_method",
-        )
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "selection_method": "e_non_part"},
+        params = {"type": SEARCH_TYPES.PEOPLE, "selection_method": "e_part"}
+        # Frontend
+        self._test_article_count(params, 1, "selection_method")
+        # API
+        self._test_api_results_count(params, 1, "selection_method")
+
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "selection_method": "e_non_part",
+        }
+        # Frontend
+        self._test_article_count(params, 0, "selection_method")
+        # API
+        self._test_api_results_count(
+            params,
             0,
             "selection_method",
         )
 
     def test_political_affiliation_filter(self) -> None:
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "political_affiliation": "d"},
+        params = {"type": SEARCH_TYPES.PEOPLE, "political_affiliation": "d"}
+        # Frontend
+        self._test_article_count(params, 1, "political_affiliation")
+        # API
+        self._test_api_results_count(params, 1, "political_affiliation")
+
+        params = {"type": SEARCH_TYPES.PEOPLE, "political_affiliation": "r"}
+        # Frontend
+        self._test_article_count(params, 0, "political_affiliation")
+        # API
+        self._test_api_results_count(params, 0, "political_affiliation")
+
+    async def test_search_query_and_order(self) -> None:
+        # Search by name and relevance result order.
+        # Frontend
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "Judith Sheindlin",
+            "order_by": "score desc",
+        }
+        r = await self._test_article_count(params, 2, "q")
+        self.assertTrue(
+            r.content.decode().index("Susan")
+            < r.content.decode().index("Olivia"),
+            msg="'Susan' should come BEFORE 'Olivia'.",
+        )
+        # API
+        self._test_api_results_count(params, 2, "q")
+
+        # Search by name and dob order.
+        # Frontend
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "Judith Sheindlin",
+            "order_by": "dob desc,name_reverse asc",
+        }
+        r = await self._test_article_count(params, 2, "q")
+        self.assertTrue(
+            r.content.decode().index("Olivia")
+            < r.content.decode().index("Susan"),
+            msg="'Susan' should come AFTER 'Olivia'.",
+        )
+        # API
+        self._test_api_results_count(params, 2, "q")
+
+        # Search by name and filter.
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "Judith Sheindlin",
+            "school": "american",
+        }
+        # Frontend
+        self._test_article_count(params, 1, "q + school")
+        # API
+        self._test_api_results_count(params, 1, "q + school")
+
+    async def test_advanced_search(self) -> None:
+        # Search by advanced field.
+        # Frontend
+        params = {"type": SEARCH_TYPES.PEOPLE, "q": "name:Judith Sheindlin"}
+        self._test_article_count(params, 2, "q")
+        # API
+        self._test_api_results_count(params, 2, "q")
+
+        # Combine fields in advanced search.
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "name:Judith Sheindlin AND dob_city:Queens",
+        }
+        # Frontend
+        r = await self._test_article_count(
+            params,
             1,
-            "political_affiliation",
+            "q",
         )
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "political_affiliation": "r"},
-            0,
-            "political_affiliation",
-        )
+        self.assertIn("Olivia", r.content.decode())
+        # API
+        r = await self._test_api_results_count(params, 1, "q")
+        self.assertIn("Olivia", r.content.decode())
 
 
 class FeedTest(IndexedSolrTestCase):
@@ -1469,7 +1565,7 @@ class PagerankTest(TestCase):
             )
 
 
-class OpinionSearchFunctionalTest(BaseSeleniumTest):
+class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
     """
     Test some of the primary search functionality of CL: searching opinions.
     These tests should exercise all aspects of using the search box and SERP.
@@ -1480,7 +1576,6 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         "judge_judy.json",
         "test_objects_search.json",
         "functest_opinions.json",
-        "test_objects_audio.json",
     ]
 
     def setUp(self) -> None:
