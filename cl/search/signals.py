@@ -1,7 +1,9 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-
+from cl.citations.tasks import (
+    find_citations_and_parantheticals_for_recap_documents,
+)
 from cl.lib.es_signal_processor import ESSignalProcessor
 from cl.search.documents import ParentheticalGroupDocument
 from cl.search.models import (
@@ -13,9 +15,6 @@ from cl.search.models import (
     Parenthetical,
     ParentheticalGroup,
     RECAPDocument,
-)
-from cl.citations.tasks import (
-    find_citations_and_parantheticals_for_recap_documents,
 )
 
 # This field mapping is used to define which fields should be updated in the
