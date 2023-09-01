@@ -120,7 +120,7 @@ class Command(VerboseCommand):
                 up.save()
 
                 # Send the email.
-                current_site = Site.objects.get_current()
+                current_site = Site.objects.get_current()  # type: ignore[attr-defined]
                 email: EmailType = emails["email_not_confirmed"]
                 send_mail(
                     email["subject"] % current_site.name,
