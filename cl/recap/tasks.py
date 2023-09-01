@@ -46,9 +46,6 @@ from rest_framework.status import (
 from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
 from cl.api.webhooks import send_recap_fetch_webhooks
 from cl.celery_init import app
-from cl.citations.tasks import (
-    find_citations_and_parantheticals_for_recap_documents,
-)
 from cl.corpus_importer.tasks import (
     download_pacer_pdf_by_rd,
     download_pdf_by_magic_number,
@@ -384,9 +381,6 @@ async def process_recap_pdf(pk):
             chain(
                 extract_recap_pdf.si(rd.pk),
                 add_items_to_solr.s("search.RECAPDocument"),
-                find_citations_and_parantheticals_for_recap_documents.si(
-                    [rd.pk]
-                ),
             ).apply_async
         )()
 
