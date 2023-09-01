@@ -160,8 +160,8 @@ services:
       - ${CL_BASE_DIR:-../../../courtlistener/docker/elastic/cl-es.crt}:/usr/share/elasticsearch/config/certs/cl-es.crt
       - ${CL_BASE_DIR:-../../../courtlistener/docker/elastic/cl-es.key}:/usr/share/elasticsearch/config/certs/cl-es.key
       - ${CL_BASE_DIR:-../../../courtlistener/docker/elastic/ca.crt}:/usr/share/elasticsearch/config/certs/ca.crt
-      - ${CL_BASE_DIR:-../../../courtlistener/cl/search/elasticsearch_files/synonyms_en.txt}:/usr/share/elasticsearch/config/synonyms_en.txt
-      - ${CL_BASE_DIR:-../../../courtlistener/cl/search/elasticsearch_files/stopwords_en.txt}:/usr/share/elasticsearch/config/stopwords_en.txt
+      - ${CL_BASE_DIR:-../../../courtlistener/cl/search/elasticsearch_files/synonyms_en.txt}:/usr/share/elasticsearch/config/dictionaries/synonyms_en.txt
+      - ${CL_BASE_DIR:-../../../courtlistener/cl/search/elasticsearch_files/stopwords_en.txt}:/usr/share/elasticsearch/config/dictionaries/stopwords_en.txt
     ports:
       - "9200:9200"
     networks:
