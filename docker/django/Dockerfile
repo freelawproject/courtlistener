@@ -102,8 +102,8 @@ FROM python-base as celery
 
 ## Needs to be two commands so second one can use variables from first.
 ENV PYTHONPATH="${PYTHONPATH}:/opt/courtlistener"
-USER 33
 
+USER www-data
 CMD celery \
     --app=cl worker \
     --loglevel=info \
