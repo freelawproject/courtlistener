@@ -1,10 +1,10 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
+from cl.audio.models import Audio
 from cl.citations.tasks import (
     find_citations_and_parantheticals_for_recap_documents,
 )
-from cl.audio.models import Audio
 from cl.lib.es_signal_processor import ESSignalProcessor
 from cl.search.documents import AudioDocument, ParentheticalGroupDocument
 from cl.search.models import (
