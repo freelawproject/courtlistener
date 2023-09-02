@@ -55,10 +55,18 @@ BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
             "docketNumber": 2.0,
         },
         SEARCH_TYPES.PEOPLE: {
-            "text": 1,
             # Was previously 4, but that had bad results for the name "William"
             # due to Williams and Mary College.
             "name": 8,
+            "gender": 1,
+            "alias": 1,
+            "dob_city": 1,
+            "political_affiliation": 1,
+            "religion": 1,
+            "fjc_id": 1,
+            "aba_rating": 1,
+            "educations": 1,
+            "political_affiliation": 1,
             # Suppress these fields b/c a match on them returns the wrong
             # person.
             "appointer": 0.3,

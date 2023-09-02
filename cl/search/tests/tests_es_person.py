@@ -887,6 +887,7 @@ class PeopleSearchTestElasticSearch(
         keys_to_check = [
             "aba_rating",
             "absolute_url",
+            "alias",
             "alias_ids",
             "appointer",
             "court",
@@ -932,7 +933,7 @@ class PeopleSearchTestElasticSearch(
             "timestamp",
         ]
         keys_count = len(r.data["results"][0])
-        self.assertEqual(keys_count, 45)
+        self.assertEqual(keys_count, 46)
         for key in keys_to_check:
             self.assertTrue(
                 key in r.data["results"][0],
