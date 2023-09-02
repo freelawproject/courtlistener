@@ -110,9 +110,18 @@ _pa_signal_processor = ESSignalProcessor(
 
 @receiver(post_save, sender=RECAPDocument)
 def handle_recap_doc_change(sender, instance: RECAPDocument, **kwargs):
+    """
+    Right now, this receiver exists to enqueue the task to parse RECAPDocuments for caselaw citations.
+    More functionality can be put here later. There may be things currently in the save function
+    of RECAPDocument that would be better placed here for reasons of maintainability and testability.
+    """
     update_fields = kwargs.get("update_fields", [])
 
+    # Whenever pdf text is processed, it will update the plain_text field.
+    # When we get updated text for a doc, we want to parse it for citations.
     if update_fields is not None and "plain_text" in update_fields:
+        # Even though the task itself filters for qualifying ocr_status,
+        # we don't want to clog the TQ with unncessary items.
         if instance.ocr_status in (
             RECAPDocument.OCR_COMPLETE,
             RECAPDocument.OCR_UNNECESSARY,
