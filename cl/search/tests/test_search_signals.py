@@ -57,7 +57,7 @@ class RECAPDocumentReceiverTests(SimpleTestCase):
                 expect_enqueue=False,  # test that task is not enq'd when no update_fields even if ocr_status qualifies
             ),
             ReceiverTestCase(
-                update_fields=["tags"],
+                update_fields=["document_type"],
                 ocr_status=RECAPDocument.OCR_COMPLETE,
                 expect_enqueue=False,  # test that task is not enq'd when no relevant update_fields
             ),
