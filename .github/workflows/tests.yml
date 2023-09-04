@@ -106,6 +106,9 @@ jobs:
       - name: Start docker compose
         working-directory: courtlistener/docker/courtlistener
         run: docker-compose -f docker-compose.yml -f docker-compose.tmpfs.yml up -d
+        env:
+          CELERY_DOCKER_IMAGE: "localhost:5000/freelawproject/courtlistener:latest-celery-${{ github.sha }}"
+          DJANGO_DOCKER_IMAGE: "localhost:5000/freelawproject/courtlistener:latest-web-dev-${{ github.sha }}"
       - name: List docker images
         run: docker image ls -a --no-trunc
       - name: List docker container statuses
