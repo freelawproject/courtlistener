@@ -178,7 +178,6 @@ def redirect_og_lookup(request: HttpRequest) -> HttpResponse:
             docket_id=rd.docket_entry.docket_id,
             doc_num=rd.document_number,
             att_num=rd.attachment_number,
-            og_file_path=file_path,
         )
 
 
@@ -439,7 +438,6 @@ def view_recap_document(
     doc_num: int | None = None,
     att_num: int | None = None,
     slug: str = "",
-    og_file_path: str | None = None,
 ) -> HttpResponse:
     """This view can either load an attachment or a regular document,
     depending on the URL pattern that is matched.
@@ -527,7 +525,7 @@ def view_recap_document(
         {
             "rd": rd,
             "title": title,
-            "og_file_path": og_file_path,
+            "og_file_path": rd.filepath_local,
             "note_form": note_form,
             "private": True,  # Always True for RECAP docs.
             "timezone": COURT_TIMEZONES.get(
