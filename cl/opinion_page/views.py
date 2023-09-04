@@ -481,7 +481,6 @@ def view_recap_document(
                     "doc_num": doc_num,
                     "att_num": 1,
                     "slug": slug,
-                    "og_file_path": og_file_path,
                 },
             )
             if request.GET.urlencode():
