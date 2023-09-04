@@ -19,7 +19,8 @@ from cl.lib.search_index_utils import InvalidDocumentError
 from cl.search.documents import AudioDocument
 from cl.search.models import Docket, OpinionCluster, RECAPDocument
 from cl.search.types import (
-    ESDocumentType,
+    ESDocumentClassType,
+    ESDocumentInstanceType,
     ESModelType,
     SaveDocumentResponseType,
 )
@@ -179,7 +180,7 @@ def delete_items(items, app_label, force_commit=False):
     interval_start=5,
 )
 def save_document_in_es(
-    self: Task, instance: ESModelType, es_document: ESDocumentType
+    self: Task, instance: ESModelType, es_document: ESDocumentClassType
 ) -> SaveDocumentResponseType | None:
     """Save a document in Elasticsearch using a provided callable.
     :param self: The celery task
@@ -218,7 +219,7 @@ def save_document_in_es(
 )
 def update_document_in_es(
     self: Task,
-    es_document: ESDocumentType,
+    es_document: ESDocumentInstanceType,
     fields_values_to_update: dict[str, Any],
 ) -> None:
     """Update a document in Elasticsearch.

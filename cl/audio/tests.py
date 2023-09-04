@@ -1,12 +1,16 @@
+from unittest import mock
+
 from django.urls import reverse
 from lxml import etree
 
+from cl.alerts.tests import mock_is_new_audio
 from cl.audio.factories import AudioWithParentsFactory
 from cl.lib.test_helpers import SitemapTest
 from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.models import SEARCH_TYPES
 from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.fixtures import ONE_SECOND_MP3_BYTES, SMALL_WAV_BYTES
+from cl.tests.utils import MockResponse
 
 
 class PodcastTest(ESIndexTestCase, TestCase):
@@ -24,24 +28,31 @@ class PodcastTest(ESIndexTestCase, TestCase):
             jurisdiction="F",
             citation_string="Appeals. CA8.",
         )
-        cls.audio = AudioWithParentsFactory.create(
-            docket=DocketFactory(court=cls.court_1),
-            local_path_mp3__data=ONE_SECOND_MP3_BYTES,
-            local_path_original_file__data=ONE_SECOND_MP3_BYTES,
-            duration=1,
-        )
-        AudioWithParentsFactory.create(
-            docket=cls.audio.docket,
-            local_path_mp3__data=SMALL_WAV_BYTES,
-            local_path_original_file__data=SMALL_WAV_BYTES,
-            duration=0,
-        )
-        AudioWithParentsFactory.create(
-            docket=DocketFactory(court=cls.court_2),
-            local_path_mp3__data=SMALL_WAV_BYTES,
-            local_path_original_file__data=SMALL_WAV_BYTES,
-            duration=5,
-        )
+        with mock.patch(
+            "cl.scrapers.tasks.microservice",
+            side_effect=lambda *args, **kwargs: MockResponse(200, b"10"),
+        ), mock.patch(
+            "cl.lib.es_signal_processor.is_new_audio",
+            side_effect=mock_is_new_audio,
+        ):
+            cls.audio = AudioWithParentsFactory.create(
+                docket=DocketFactory(court=cls.court_1),
+                local_path_mp3__data=ONE_SECOND_MP3_BYTES,
+                local_path_original_file__data=ONE_SECOND_MP3_BYTES,
+                duration=1,
+            )
+            AudioWithParentsFactory.create(
+                docket=cls.audio.docket,
+                local_path_mp3__data=SMALL_WAV_BYTES,
+                local_path_original_file__data=SMALL_WAV_BYTES,
+                duration=0,
+            )
+            AudioWithParentsFactory.create(
+                docket=DocketFactory(court=cls.court_2),
+                local_path_mp3__data=SMALL_WAV_BYTES,
+                local_path_original_file__data=SMALL_WAV_BYTES,
+                duration=5,
+            )
 
     def test_do_jurisdiction_podcasts_have_good_content(self) -> None:
         """Can we simply load a jurisdiction podcast page?"""

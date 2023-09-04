@@ -1,22 +1,22 @@
 from typing import Any
 
-from celery.canvas import chain
 from django.db.models.signals import m2m_changed, post_delete, post_save
 from elasticsearch.exceptions import NotFoundError
 
-from cl.alerts.tasks import (
-    process_percolator_response,
-    remove_doc_from_es_index,
-    send_or_schedule_alerts,
-)
+from cl.alerts.tasks import es_post_save_chain, remove_doc_from_es_index
+from cl.audio.models import Audio
 from cl.lib.elasticsearch_utils import elasticsearch_enabled
 from cl.search.documents import AudioDocument
 from cl.search.tasks import save_document_in_es, update_document_in_es
-from cl.search.types import ESDocumentType, ESModelType
+from cl.search.types import (
+    ESDocumentClassType,
+    ESDocumentInstanceType,
+    ESModelType,
+)
 
 
 def updated_fields(
-    instance: ESModelType, es_document: ESDocumentType
+    instance: ESModelType, es_document: ESDocumentClassType
 ) -> list[str]:
     """Look for changes in the tracked fields of an instance.
     :param instance: The instance to check for changed fields.
@@ -60,7 +60,7 @@ def get_fields_to_update(
 
 
 def document_fields_to_update(
-    main_doc: ESDocumentType,
+    main_doc: ESDocumentInstanceType,
     main_object: ESModelType,
     field_list: list[str],
     instance: ESModelType,
@@ -96,8 +96,8 @@ def document_fields_to_update(
 
 
 def get_or_create_doc(
-    es_document: ESDocumentType, instance: ESModelType
-) -> ESDocumentType | None:
+    es_document: ESDocumentClassType, instance: ESModelType
+) -> ESDocumentInstanceType | None:
     """Get or create a document in Elasticsearch.
     :param es_document: The Elasticsearch document type.
     :param instance: The instance of the document to get or create.
@@ -113,7 +113,7 @@ def get_or_create_doc(
 
 def update_es_documents(
     main_model: ESModelType,
-    es_document: ESDocumentType,
+    es_document: ESDocumentClassType,
     instance: ESModelType,
     created: bool,
     mapping_fields: dict,
@@ -155,7 +155,7 @@ def update_es_documents(
 
 def update_remove_m2m_documents(
     main_model: ESModelType,
-    es_document: ESDocumentType,
+    es_document: ESDocumentClassType,
     instance: ESModelType,
     mapping_fields: dict,
     affected_field: str,
@@ -186,7 +186,7 @@ def update_remove_m2m_documents(
 
 def update_m2m_field_in_es_document(
     instance: ESModelType,
-    es_document: ESDocumentType,
+    es_document: ESDocumentClassType,
     affected_field: str,
 ) -> None:
     """Update a single field created using a many-to-many relationship.
@@ -205,7 +205,7 @@ def update_m2m_field_in_es_document(
 
 def update_reverse_related_documents(
     main_model: ESModelType,
-    es_document: ESDocumentType,
+    es_document: ESDocumentClassType,
     instance: ESModelType,
     query_string: str,
     affected_fields: list[str],
@@ -233,6 +233,21 @@ def update_reverse_related_documents(
                 for field in affected_fields
             },
         )
+
+
+def is_new_audio(instance: ESModelType, created: bool) -> bool:
+    """Small wrapper that determines whether the instance is an Audio object
+    and whether it was just created. This is required for mocking
+    process_audio_file in testing.
+
+    :param instance: The instance that triggered the post_save signal.
+    :param created: Indicates whether the instance was just created or not.
+    :return: True if the instance is an Audio object, and it was just created;
+    otherwise, False.
+    """
+    if type(instance) == Audio and created:
+        return True
+    return False
 
 
 class ESSignalProcessor(object):
@@ -311,11 +326,11 @@ class ESSignalProcessor(object):
                 mapping_fields,
             )
         if not mapping_fields:
-            chain(
-                save_document_in_es.si(instance, self.es_document),
-                send_or_schedule_alerts.s(self.es_document._index._name),
-                process_percolator_response.s(),
-            ).apply_async()
+            if is_new_audio(instance, created):
+                # This is a new audio instance. es_post_save_chain will be
+                # executed in cl_scrape_oral_arguments after process_audio_file
+                return
+            es_post_save_chain(instance, self.es_document).apply_async()
 
     @elasticsearch_enabled
     def handle_delete(self, sender, instance, **kwargs):
