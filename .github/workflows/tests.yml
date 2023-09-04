@@ -105,7 +105,7 @@ jobs:
         run: docker network create -d bridge --attachable cl_net_overlay
       - name: Start docker compose
         working-directory: courtlistener/docker/courtlistener
-        run: docker compose -f docker compose.yml -f docker compose.tmpfs.yml up -d
+        run: docker-compose -f docker-compose.yml -f docker-compose.tmpfs.yml up -d
         env:
           CELERY_DOCKER_IMAGE: "localhost:5000/freelawproject/courtlistener:latest-celery-${{ github.sha }}"
           DJANGO_DOCKER_IMAGE: "localhost:5000/freelawproject/courtlistener:latest-web-dev-${{ github.sha }}"
