@@ -1,3 +1,4 @@
+import csv
 import fnmatch
 import os
 import re
@@ -566,6 +567,45 @@ def parse_file(file_path: str) -> dict:
     return info
 
 
+def process_csv_file(csv_path, debug):
+    """
+    Import xml files from a list of paths in csv file
+    :param csv_path: Absolute path to csv file
+    :param debug: set true to fake process
+    """
+    logger.info(f"Loading csv file at {csv_path}")
+
+    with open(csv_path, mode="r", encoding="utf-8") as csv_file:
+        csv_reader = csv.DictReader(csv_file)
+
+        for row in csv_reader:
+            xml_path = row.get("path")
+            if xml_path and os.path.exists(xml_path):
+                try:
+                    logger.info(f"Processing opinion at {xml_path}")
+                    parsed = parse_file(xml_path)
+                    add_new_case(parsed, testing=debug)
+                except Exception as e:
+                    known = [
+                        "mismatched tag",
+                        "Failed to get a citation",
+                        "Failed to find a court ID",
+                        'null value in column "date_filed"',
+                        "Multiple matches found for court",
+                        "Found duplicate(s)",
+                        "Court doesn't exist in CourtListener",
+                    ]
+                    if any(k in str(e) for k in known):
+                        logger.info(
+                            f"Known exception in file '{xml_path}': {str(e)}"
+                        )
+                    else:
+                        logger.info(f"Unknown exception in file '{xml_path}':")
+                        logger.info(traceback.format_exc())
+            else:
+                logger.info(f"The file doesn't exist: {xml_path}")
+
+
 def parse_opinions(options):
     """Runs through a directory of the form /data/[state]/[sub]/.../[folders]/[.xml documents].
     Parses each .xml document, instantiates the associated model object, and
@@ -733,11 +773,12 @@ class Command(VerboseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "dir",
+            "--dir",
             nargs="+",
             type=str,
             help="The directory that will be recursively searched for xml "
             "files.",
+            required=False,
         )
         parser.add_argument(
             "--limit",
@@ -804,7 +845,23 @@ class Command(VerboseCommand):
             default=False,
             help="Don't change the data.",
         )
+        parser.add_argument(
+            "--csv",
+            required=False,
+            help="The absolute path to the CSV containing the path to the xml files "
+            "to import",
+        )
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
-        parse_opinions(options)
+        if not options["csv"] and not options["dir"]:
+            logger.warning("At least one option required: --csv or --dir")
+            return
+        if options["csv"]:
+            if not os.path.exists(options["csv"]):
+                logger.warning("CSV file doesn't exist.")
+                return
+            process_csv_file(options["csv"], options["debug"])
+
+        else:
+            parse_opinions(options)
