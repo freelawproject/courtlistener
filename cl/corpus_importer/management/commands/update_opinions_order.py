@@ -1,3 +1,4 @@
+import os.path
 import re
 from typing import Any, List, Optional
 
@@ -80,7 +81,6 @@ def get_opinion_content(
             # We store the field because we are using S3 for storage and that backend
             # doesn't support absolute paths
             xml_path = op.local_path
-            # print("url", op.local_path.url)
         content = None
         if len(op.html_with_citations) > 1:
             content = op.html_with_citations
@@ -113,9 +113,10 @@ def get_opinion_content(
     return xml_path, cl_cleaned_opinions, start_position, combined_opinion
 
 
-def get_opinions_columbia_xml(xml_filepath: FieldFile) -> list:
+def get_opinions_columbia_xml(xml_filepath: FieldFile, xml_dir: str) -> list:
     """Convert xml data into dict
     :param xml_filepath: path of xml file
+    :param xml_dir: absolute path to the directory with columbia xml files
     :return: dict with data
     """
 
@@ -134,17 +135,17 @@ def get_opinions_columbia_xml(xml_filepath: FieldFile) -> list:
 
     data = {}  # type: dict
 
-    if "/home/mlissner" in str(xml_filepath):
-        # Temporary replace the path with the correct from S3, this way we read them
-        # directly from S3, we need the files in /sources/columbia/opinions/ in
-        # com-courtlistener-storage bucket
-        # TODO discuss this
-        xml_filepath.name = xml_filepath.name.replace(
-            "/home/mlissner", "/sources"
+    if "/home/mlissner/columbia/opinions/" in str(xml_filepath):
+        filepath = str(
+            xml_filepath.name.replace("/home/mlissner/columbia/opinions/", "")
         )
+        # fix file path temporarily
+        new_xml_filepath = os.path.join(xml_dir, filepath)
+    else:
+        logger.info(f"Can't fix xml file path: {xml_filepath}")
+        raise FileNotFoundError
 
-    # print(f"Opening {xml_filepath.url}")
-    with xml_filepath.open("r") as f:
+    with open(new_xml_filepath, "r", encoding="utf-8") as f:
         file_content = f.read()
 
         data["unpublished"] = False
@@ -477,11 +478,12 @@ def run_harvard(start_id: int, end_id: int):
         logger.info(msg=f"Opinions reordered for cluster id: {oc.id}")
 
 
-def run_columbia(start_id: int, end_id: int):
+def run_columbia(start_id: int, end_id: int, xml_dir: str):
     """
     Update opinion order for columbia clusters
     :param start_id: skip any id lower than this value
     :param end_id: skip any id greater than this value
+    :param xml_dir: absolute path to the directory with columbia xml files
     """
 
     # Get all columbia cluster ids with more than one opinion
@@ -510,7 +512,9 @@ def run_columbia(start_id: int, end_id: int):
         columbia_opinions = None
         if xml_path:
             try:
-                columbia_opinions = get_opinions_columbia_xml(xml_path)
+                columbia_opinions = get_opinions_columbia_xml(
+                    xml_path, xml_dir
+                )
             except FileNotFoundError:
                 logger.warning(
                     f"Xml file not found in {xml_path}, cluster id: {cluster_id}"
@@ -623,6 +627,12 @@ class Command(BaseCommand):
         )
 
         parser.add_argument(
+            "--xml-dir",
+            required=False,
+            help="The absolute path to the directory with columbia xml files",
+        )
+
+        parser.add_argument(
             "--start-id",
             type=int,
             default=0,
@@ -646,5 +656,12 @@ class Command(BaseCommand):
         if options["process_harvard"]:
             run_harvard(options["start_id"], options["end_id"])
 
-        if options["process_columbia"]:
-            run_columbia(options["start_id"], options["end_id"])
+        if options["process_columbia"] and options["xml_dir"]:
+            run_columbia(
+                options["start_id"], options["end_id"], options["xml_dir"]
+            )
+
+        if options["process_columbia"] and not options["xml_dir"]:
+            print(
+                "Argument --xml-dir required to read xml files from mounted directory"
+            )
