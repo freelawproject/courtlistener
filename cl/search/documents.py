@@ -467,6 +467,9 @@ class PersonDocument(PersonBaseDocument):
     absolute_url = fields.KeywordField(attr="get_absolute_url")
     dob = fields.DateField(attr="date_dob")
     dod = fields.DateField(attr="date_dod")
+    political_affiliation_id = fields.ListField(
+        fields.KeywordField(),
+    )
     political_affiliation = fields.ListField(
         fields.TextField(
             analyzer="text_en_splitting_cl",
@@ -475,9 +478,6 @@ class PersonDocument(PersonBaseDocument):
             },
             search_analyzer="search_analyzer",
         )
-    )
-    political_affiliation = fields.ListField(
-        fields.TextField(),
     )
 
     aba_rating = fields.ListField(
