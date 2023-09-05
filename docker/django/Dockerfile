@@ -117,6 +117,7 @@ CMD celery \
 #freelawproject/courtlistener:latest-web-dev
 FROM python-base as web-dev
 
+USER www-data
 CMD python /opt/courtlistener/manage.py migrate && \
     python /opt/courtlistener/manage.py createcachetable && \
     python /opt/courtlistener/manage.py runserver 0.0.0.0:8000
@@ -124,6 +125,7 @@ CMD python /opt/courtlistener/manage.py migrate && \
 #freelawproject/courtlistener:latest-web-prod
 FROM python-base as web-prod
 
+USER www-data
 CMD gunicorn cl.asgi:application \
     --chdir /opt/courtlistener/ \
     --user www-data \
