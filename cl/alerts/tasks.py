@@ -4,7 +4,6 @@ from datetime import datetime
 from typing import Dict, List, Tuple, Union, cast
 
 from celery import Task
-from celery.canvas import chain
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives, get_connection, send_mail
@@ -35,10 +34,8 @@ from cl.recap.constants import COURT_TIMEZONES
 from cl.search.constants import ALERTS_HL_TAG
 from cl.search.documents import AudioPercolator
 from cl.search.models import Docket, DocketEntry
-from cl.search.tasks import save_document_in_es
 from cl.search.types import (
     ESDocumentClassType,
-    ESModelType,
     PercolatorResponseType,
     SaveDocumentResponseType,
     SearchAlertHitType,
@@ -713,20 +710,3 @@ def remove_doc_from_es_index(
             f"The {model_label} with ID:{instance_id} can't be deleted from "
             f"the ES index, it doesn't exists."
         )
-
-
-def es_post_save_chain(
-    instance: ESModelType, es_document: ESDocumentClassType
-) -> chain:
-    """Composes a Celery chain with the tasks required after a new document is
-    saved in ES.
-
-    :param instance: The instance that triggered the post_save signal.
-    :param es_document: The Elasticsearch document type.
-    :return: The celery chain.
-    """
-    return chain(
-        save_document_in_es.si(instance, es_document),
-        send_or_schedule_alerts.s(es_document._index._name),
-        process_percolator_response.s(),
-    )

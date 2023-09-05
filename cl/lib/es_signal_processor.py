@@ -1,10 +1,14 @@
 from typing import Any
 
+from celery.canvas import chain
 from django.db.models.signals import m2m_changed, post_delete, post_save
 from elasticsearch.exceptions import NotFoundError
 
-from cl.alerts.tasks import es_post_save_chain, remove_doc_from_es_index
-from cl.audio.models import Audio
+from cl.alerts.tasks import (
+    process_percolator_response,
+    remove_doc_from_es_index,
+    send_or_schedule_alerts,
+)
 from cl.lib.elasticsearch_utils import elasticsearch_enabled
 from cl.search.documents import AudioDocument
 from cl.search.tasks import save_document_in_es, update_document_in_es
@@ -235,21 +239,6 @@ def update_reverse_related_documents(
         )
 
 
-def is_new_audio(instance: ESModelType, created: bool) -> bool:
-    """Small wrapper that determines whether the instance is an Audio object
-    and whether it was just created. This is required for mocking
-    process_audio_file in testing.
-
-    :param instance: The instance that triggered the post_save signal.
-    :param created: Indicates whether the instance was just created or not.
-    :return: True if the instance is an Audio object, and it was just created;
-    otherwise, False.
-    """
-    if type(instance) == Audio and created:
-        return True
-    return False
-
-
 class ESSignalProcessor(object):
     """Custom signal processor for Elasticsearch documents. It is responsible
     for managing the Elasticsearch index after certain events happen, such as
@@ -314,7 +303,14 @@ class ESSignalProcessor(object):
                 )
 
     @elasticsearch_enabled
-    def handle_save(self, sender, instance=None, created=False, **kwargs):
+    def handle_save(
+        self,
+        sender,
+        instance=None,
+        created=False,
+        update_fields=None,
+        **kwargs,
+    ):
         """Receiver function that gets called after an object instance is saved"""
         mapping_fields = self.documents_model_mapping["save"][sender]
         if not created:
@@ -326,11 +322,13 @@ class ESSignalProcessor(object):
                 mapping_fields,
             )
         if not mapping_fields:
-            if is_new_audio(instance, created):
-                # This is a new audio instance. es_post_save_chain will be
-                # executed in cl_scrape_oral_arguments after process_audio_file
-                return
-            es_post_save_chain(instance, self.es_document).apply_async()
+            chain(
+                save_document_in_es.si(
+                    instance, self.es_document, update_fields
+                ),
+                send_or_schedule_alerts.s(self.es_document._index._name),
+                process_percolator_response.s(),
+            ).apply_async()
 
     @elasticsearch_enabled
     def handle_delete(self, sender, instance, **kwargs):

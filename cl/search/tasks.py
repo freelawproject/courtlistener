@@ -173,6 +173,35 @@ def delete_items(items, app_label, force_commit=False):
             delete_items.retry(exc=exc, countdown=30)
 
 
+def abort_es_audio_indexing(
+    instance: ESModelType,
+    es_document: ESDocumentClassType,
+    update_fields: list[str] | None,
+):
+    """Check conditions to abort Elasticsearch indexing for Audio instances.
+    Abort indexing for Audio instances which their mp3 file has not been
+    processed yet by process_audio_file.
+
+    :param instance: The Audio instance to evaluate for Elasticsearch indexing.
+    :param es_document: The Elasticsearch document class.
+    :param update_fields: List of fields being updated, or None.
+    :return: True if indexing should be aborted, False otherwise.
+    """
+
+    if (
+        type(instance) == Audio
+        and not es_document.exists(instance.pk)
+        and (
+            not update_fields
+            or (update_fields and "processing_complete" not in update_fields)
+        )
+    ):
+        # Abort Audio instances that haven't been previously indexed in ES and
+        # for which 'processing_complete' is not present in update_fields.
+        return True
+    return False
+
+
 @app.task(
     bind=True,
     autoretry_for=(TransportError, ConnectionError, RequestError),
@@ -180,14 +209,27 @@ def delete_items(items, app_label, force_commit=False):
     interval_start=5,
 )
 def save_document_in_es(
-    self: Task, instance: ESModelType, es_document: ESDocumentClassType
+    self: Task,
+    instance: ESModelType,
+    es_document: ESDocumentClassType,
+    update_fields: list[str] | None = None,
 ) -> SaveDocumentResponseType | None:
     """Save a document in Elasticsearch using a provided callable.
+
     :param self: The celery task
     :param instance: The instance of the document to save.
     :param es_document: A Elasticsearch DSL document.
+    :param update_fields: The set of fields to update as passed to save(),
+    or None if not fields passed.
     :return: SaveDocumentResponseType or None
     """
+
+    if abort_es_audio_indexing(instance, es_document, update_fields):
+        # This check is required to avoid indexing and triggering search alerts
+        # for Audio instances whose MP3 files have not yet been processed by
+        # process_audio_file.
+        self.request.chain = None
+        return None
 
     es_doc = es_document()
     doc = es_doc.prepare(instance)

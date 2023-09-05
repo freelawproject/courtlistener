@@ -1,5 +1,4 @@
 import json
-import random
 from collections import defaultdict
 from datetime import timedelta
 from unittest import mock
@@ -38,7 +37,6 @@ from cl.alerts.models import (
     ScheduledAlertHit,
 )
 from cl.alerts.tasks import (
-    es_post_save_chain,
     get_docket_notes_and_tags_by_user,
     send_alert_and_webhook,
 )
@@ -56,7 +54,6 @@ from cl.donate.factories import DonationFactory
 from cl.donate.models import Donation
 from cl.favorites.factories import NoteFactory, UserTagFactory
 from cl.lib.test_helpers import EmptySolrTestCase, SimpleUserDataMixin
-from cl.scrapers.tasks import process_audio_file
 from cl.search.documents import AudioDocument, AudioPercolator
 from cl.search.factories import (
     CourtFactory,
@@ -509,21 +506,6 @@ class AlertAPITests(APITestCase):
         self.assertEqual(response.json()["id"], alert_1.json()["id"])
 
 
-def mock_is_new_audio(instance: Audio, created: bool):
-    """Mocks the is_new_audio method in the es_signal_processor and calls
-    process_audio_file, completing the normal process of adding a new Audio
-    in production.
-    """
-
-    if type(instance) == Audio and created:
-        process_audio_file.apply_async(
-            args=(instance.pk,),
-            countdown=random.randint(0, 3600),
-            link=es_post_save_chain(instance, AudioDocument),
-        )
-    return False
-
-
 class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
     """Test Search Alerts Webhooks"""
 
@@ -610,8 +592,8 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
                 "cl.scrapers.tasks.microservice",
                 side_effect=lambda *args, **kwargs: MockResponse(200, b"10"),
             ), mock.patch(
-                "cl.lib.es_signal_processor.is_new_audio",
-                side_effect=mock_is_new_audio,
+                "cl.search.tasks.abort_es_audio_indexing",
+                side_effect=lambda x, y, z: False,
             ):
                 cls.dly_oral_argument = AudioWithParentsFactory.create(
                     case_name="Dly Test OA",
@@ -1541,11 +1523,8 @@ class DocketAlertGetNotesTagsTests(TestCase):
 
 @override_switch("oa-es-alerts-active", active=True)
 @mock.patch(
-    "cl.scrapers.tasks.microservice",
-    side_effect=lambda *args, **kwargs: MockResponse(200, b"10"),
-)
-@mock.patch(
-    "cl.lib.es_signal_processor.is_new_audio", side_effect=mock_is_new_audio
+    "cl.search.tasks.abort_es_audio_indexing",
+    side_effect=lambda x, y, z: False,
 )
 class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
     """Test ES Search Alerts"""
@@ -1623,9 +1602,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         Audio.objects.all().delete()
         super().tearDownClass()
 
-    def test_alert_frequency_estimation(
-        self, mock_process_audio_file, mock_audio
-    ):
+    def test_alert_frequency_estimation(self, mock_abort_audio):
         """Test alert frequency ES API endpoint."""
 
         search_params = {
@@ -1659,9 +1636,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         self.assertEqual(r.json()["count"], 1)
         rt_oral_argument.delete()
 
-    def test_send_oa_search_alert_webhooks(
-        self, mock_process_audio_file, mock_audio
-    ):
+    def test_send_oa_search_alert_webhooks(self, mock_abort_audio):
         """Can we send RT OA search alerts?"""
 
         with mock.patch(
@@ -1763,9 +1738,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         webhook_events.delete()
         rt_oral_argument.delete()
 
-    def test_send_alert_on_document_creation(
-        self, mock_process_audio_file, mock_audio
-    ):
+    def test_send_alert_on_document_creation(self, mock_abort_audio):
         """Avoid sending Search Alerts on document updates."""
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -1816,9 +1789,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         self.assertEqual(len(webhook_events), 4)
         rt_oral_argument.delete()
 
-    def test_es_alert_update_and_delete(
-        self, mock_process_audio_file, mock_audio
-    ):
+    def test_es_alert_update_and_delete(self, mock_abort_audio):
         """Can we update and delete an alert, and expect these changes to be
         properly reflected in Elasticsearch?"""
 
@@ -1906,9 +1877,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 scheduled_hit.hit_status, SCHEDULED_ALERT_HIT_STATUS.SENT
             )
 
-    def test_send_alert_multiple_alert_rates(
-        self, mock_process_audio_file, mock_audio
-    ):
+    def test_send_alert_multiple_alert_rates(self, mock_abort_audio):
         """Confirm dly, wly and mly alerts are properly stored and sent
         according to their periodicity.
         """
@@ -2014,9 +1983,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
     @mock.patch(
         "cl.alerts.management.commands.cl_send_scheduled_alerts.logger"
     )
-    def test_group_alerts_and_hits(
-        self, mock_logger, mock_process_audio_file, mock_audio
-    ):
+    def test_group_alerts_and_hits(self, mock_logger, mock_abort_audio):
         """"""
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -2119,9 +2086,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         rt_oral_argument_3.delete()
 
     @override_settings(PERCOLATOR_PAGE_SIZE=5)
-    def test_send_multiple_rt_alerts(
-        self, mock_process_audio_file, mock_audio
-    ):
+    def test_send_multiple_rt_alerts(self, mock_abort_audio):
         """Confirm all RT alerts are properly sent if the percolator response
         contains more than PERCOLATOR_PAGE_SIZE results. So additional
         requests are performed in order to retrieve all the available results.
@@ -2213,9 +2178,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             alert.delete()
 
     @override_settings(PERCOLATOR_PAGE_SIZE=5)
-    def test_batched_alerts_match_documents_ingestion(
-        self, mock_process_audio_file, mock_audio
-    ):
+    def test_batched_alerts_match_documents_ingestion(self, mock_abort_audio):
         """Confirm that batched alerts are properly stored according to
         document ingestion when percolated in real time.
         """
@@ -2299,9 +2262,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             alert.delete()
 
     @override_settings(PERCOLATOR_PAGE_SIZE=5)
-    def test_percolate_document_in_batches(
-        self, mock_process_audio_file, mock_audio
-    ):
+    def test_percolate_document_in_batches(self, mock_abort_audio):
         """Confirm when getting alerts in batches and an alert previously
         retrieved is updated during this process. It's not returned again.
         """
@@ -2359,7 +2320,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             ids_in_results.append(result.id)
 
     def test_avoid_sending_or_scheduling_disabled_alerts(
-        self, mock_process_audio_file, mock_audio
+        self, mock_abort_audio
     ):
         """Can we avoid sending or_scheduling disabled search alerts?."""
 
@@ -2403,9 +2364,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         dly_alert_disabled.delete()
         oral_argument.delete()
 
-    def test_avoid_re_sending_scheduled_sent_alerts(
-        self, mock_process_audio_file, mock_audio
-    ):
+    def test_avoid_re_sending_scheduled_sent_alerts(self, mock_abort_audio):
         """Can we prevent re-sending scheduled alerts that have already been
         sent?"""
 

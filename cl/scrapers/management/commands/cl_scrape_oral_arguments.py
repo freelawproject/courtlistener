@@ -8,7 +8,6 @@ from django.utils.encoding import force_bytes
 from juriscraper.lib.string_utils import CaseNameTweaker
 
 from cl.alerts.models import RealTimeQueue
-from cl.alerts.tasks import es_post_save_chain
 from cl.audio.models import Audio
 from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1
@@ -24,7 +23,6 @@ from cl.scrapers.utils import (
     get_extension,
     update_or_create_docket,
 )
-from cl.search.documents import AudioDocument
 from cl.search.models import SEARCH_TYPES, SOURCES, Court, Docket
 
 cnt = CaseNameTweaker()
@@ -177,7 +175,6 @@ class Command(cl_scrape_opinions.Command):
                 process_audio_file.apply_async(
                     args=(audio_file.pk,),
                     countdown=random.randint(0, 3600),
-                    link=es_post_save_chain(audio_file, AudioDocument),
                 )
 
                 logger.info(

@@ -3,14 +3,12 @@ from unittest import mock
 from django.urls import reverse
 from lxml import etree
 
-from cl.alerts.tests import mock_is_new_audio
 from cl.audio.factories import AudioWithParentsFactory
 from cl.lib.test_helpers import SitemapTest
 from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.models import SEARCH_TYPES
 from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.fixtures import ONE_SECOND_MP3_BYTES, SMALL_WAV_BYTES
-from cl.tests.utils import MockResponse
 
 
 class PodcastTest(ESIndexTestCase, TestCase):
@@ -29,11 +27,8 @@ class PodcastTest(ESIndexTestCase, TestCase):
             citation_string="Appeals. CA8.",
         )
         with mock.patch(
-            "cl.scrapers.tasks.microservice",
-            side_effect=lambda *args, **kwargs: MockResponse(200, b"10"),
-        ), mock.patch(
-            "cl.lib.es_signal_processor.is_new_audio",
-            side_effect=mock_is_new_audio,
+            "cl.search.tasks.abort_es_audio_indexing",
+            side_effect=lambda x, y, z: False,
         ):
             cls.audio = AudioWithParentsFactory.create(
                 docket=DocketFactory(court=cls.court_1),
