@@ -20,9 +20,16 @@ from cl.search.es_indices import (
     oral_arguments_percolator_index,
     parenthetical_group_index,
     people_db_index,
+    recap_index,
 )
 from cl.search.forms import SearchForm
-from cl.search.models import Citation, ParentheticalGroup
+from cl.search.models import (
+    Citation,
+    Docket,
+    DocketEntry,
+    ParentheticalGroup,
+    RECAPDocument,
+)
 
 
 @parenthetical_group_index.document
@@ -537,3 +544,204 @@ class PersonDocument(PersonBaseDocument):
 
     def prepare_school(self, instance):
         return [e.school.name for e in instance.educations.all()] or None
+
+
+# RECAP
+class DocketBaseDocument(Document):
+    docket_child = JoinField(relations={"docket": ["recap_document"]})
+    timestamp = fields.DateField()
+
+    class Django:
+        model = Docket
+        ignore_signals = True
+
+    def prepare_timestamp(self, instance):
+        return datetime.utcnow()
+
+
+@recap_index.document
+class RECAPDocument(DocketBaseDocument):
+    id = fields.IntegerField(attr="pk")
+    docket_entry_id = fields.IntegerField(attr="docket_entry.pk")
+    description = fields.TextField(
+        attr="docket_entry.description",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="docket_entry.description", analyzer="english_exact"
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    entry_number = fields.IntegerField(attr="docket_entry.entry_number")
+    entry_date_filed = fields.DateField(attr="docket_entry.date_filed")
+    short_description = fields.TextField(
+        attr="description",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="description", analyzer="english_exact"
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    document_type = fields.IntegerField()
+    document_number = fields.IntegerField(attr="document_number")
+    attachment_number = fields.IntegerField(attr="attachment_number")
+    is_available = fields.BooleanField(attr="is_available")
+    page_count = fields.IntegerField(attr="page_count")
+    filepath_local = fields.KeywordField(index=False)
+    text = fields.TextField(index=False)
+
+    class Django:
+        model = RECAPDocument
+        ignore_signals = True
+
+    def prepare_document_type(self, instance):
+        return instance.get_document_type_display()
+
+    def prepare_local_path(self, instance):
+        if instance.filepath_local:
+            if not instance.filepath_local.storage.exists(
+                instance.filepath_local.name
+            ):
+                logger.warning(
+                    f"The file {instance.filepath_local.name} associated with "
+                    f"RECAPDocument ID {instance.pk} not found in S3. "
+                )
+                return None
+            return deepgetattr(instance, "local_path_mp3.name", None)
+
+    def prepare_text(self, instance):
+        text_template = loader.get_template("indexes/dockets_text.txt")
+        return text_template.render({"item": instance}).translate(null_map)
+
+    def prepare_docket_child(self, instance):
+        parent_id = getattr(instance.docket_entry.docket, "pk", None)
+        return {"name": "recap_document", "parent": parent_id}
+
+
+@people_db_index.document
+class DocketDocument(DocketBaseDocument):
+    docket_id = fields.IntegerField(attr="pk")
+    docketNumber = fields.TextField(
+        attr="docket_number",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="docket_number", analyzer="english_exact"
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    caseName = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    suitNature = fields.TextField(
+        attr="nature_of_suit",
+    )
+    cause = fields.TextField(
+        attr="cause",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(attr="cause", analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    juryDemand = fields.TextField(
+        attr="jury_demand",
+    )
+    jurisdictionType = fields.TextField(
+        attr="jurisdiction_type",
+    )
+    dateArgued = fields.DateField(attr="date_argued")
+    dateFiled = fields.DateField(attr="date_filed")
+    dateTerminated = fields.DateField(attr="date_terminated")
+    dateArgued_text = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    dateFiled_text = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    dateTerminated_text = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    docket_slug = fields.KeywordField(attr="slug", index=False)
+    assignedTo = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    referredTo = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    court = fields.TextField(
+        attr="court.full_name",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="court.full_name", analyzer="english_exact"
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    court_exact = fields.KeywordField(attr="court.pk")
+    court_citation_string = fields.TextField(
+        attr="court.citation_string",
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
+    )
+
+    # Parties
+
+    def prepare_caseName(self, instance):
+        return best_case_name(instance)
+
+    def prepare_dateArgued_text(self, instance):
+        if instance.date_argued:
+            return instance.date_argued.strftime("%-d %B %Y")
+
+    def prepare_dateFiled_text(self, instance):
+        if instance.date_filed:
+            return instance.date_filed.strftime("%-d %B %Y")
+
+    def prepare_dateTerminated_text(self, instance):
+        if instance.date_terminated:
+            return instance.date_terminated.strftime("%-d %B %Y")
+
+    def prepare_assignedTo(self, instance):
+        if instance.assigned_to:
+            return instance.assigned_to.name_full
+        elif instance.assigned_to_str:
+            return instance.assigned_to_str
+
+    def prepare_referredTo(self, instance):
+        if instance.referred_to:
+            return instance.referred_to.name_full
+        elif instance.referred_to_str:
+            return instance.referred_to_str
+
+    def prepare_docket_child(self, instance):
+        return "docket"
