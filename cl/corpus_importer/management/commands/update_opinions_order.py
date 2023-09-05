@@ -136,8 +136,8 @@ def get_opinions_columbia_xml(xml_filepath: FieldFile, xml_dir: str) -> list:
     data = {}  # type: dict
 
     if "/home/mlissner/columbia/opinions/" in str(xml_filepath):
-        filepath = str(
-            xml_filepath.name.replace("/home/mlissner/columbia/opinions/", "")
+        filepath = str(xml_filepath).replace(
+            "/home/mlissner/columbia/opinions/", ""
         )
         # fix file path temporarily
         new_xml_filepath = os.path.join(xml_dir, filepath)
