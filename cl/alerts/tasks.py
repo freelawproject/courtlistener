@@ -534,7 +534,7 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
         # Override order_by to show the latest items when clicking the
         # "View Full Results" button.
         qd = override_alert_query(alert_triggered)
-        alert_triggered.query_run = qd.urlencode()
+        alert_triggered.query_run = qd.urlencode()  # type: ignore
 
         # Compose RT hit to send.
         hits = [
