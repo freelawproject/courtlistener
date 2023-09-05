@@ -502,7 +502,21 @@ def build_es_base_query(search_query: Search, cd: CleanData) -> Search:
                     cd, ["appointer", "supervisor", "predecessor"]
                 ),
             }
-            parent_query_fields = add_fields_boosting(cd, ["name", "text"])
+            parent_query_fields = add_fields_boosting(
+                cd,
+                [
+                    "name",
+                    "gender",
+                    "alias",
+                    "dob_city",
+                    "political_affiliation",
+                    "religion",
+                    "fjc_id",
+                    "aba_rating",
+                    "educations",
+                    "political_affiliation",
+                ],
+            )
             string_query = build_join_fulltext_queries(
                 child_query_fields,
                 parent_query_fields,

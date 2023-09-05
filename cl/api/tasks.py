@@ -10,9 +10,8 @@ from cl.api.utils import generate_webhook_key_content
 from cl.api.webhooks import send_webhook_event
 from cl.celery_init import app
 from cl.corpus_importer.api_serializers import DocketEntrySerializer
-from cl.search.api_serializers import SearchESResultSerializer
+from cl.search.api_serializers import OAESResultSerializer
 from cl.search.api_utils import ResultObject
-from cl.search.documents import AudioDocument
 from cl.search.models import DocketEntry
 
 
@@ -81,32 +80,24 @@ def send_docket_alert_webhook_events(
 @app.task()
 def send_es_search_alert_webhook(
     results: list[dict[str, Any]],
-    webhook: Webhook,
+    webhook_pk: int,
     alert: Alert,
 ) -> None:
     """Send a search alert webhook event containing search results from a
     search alert object.
 
     :param results: The search results returned by SOLR for this alert.
-    :param webhook: The webhook endpoint object to send the event to.
+    :param webhook_pk: The webhook endpoint ID object to send the event to.
     :param alert: The search alert object.
     """
 
+    webhook = Webhook.objects.get(pk=webhook_pk)
     serialized_alert = SearchAlertSerializerModel(alert).data
     es_results = []
     for result in results:
         result["snippet"] = result["text"]
         es_results.append(ResultObject(initial=result))
-    serialized_results = SearchESResultSerializer(
-        es_results,
-        many=True,
-        context={
-            "schema": AudioDocument._index.get_mapping()[
-                AudioDocument._index._name
-            ]["mappings"],
-            "document_type": AudioDocument,
-        },
-    ).data
+    serialized_results = OAESResultSerializer(es_results, many=True).data
 
     post_content = {
         "webhook": generate_webhook_key_content(webhook),

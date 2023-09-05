@@ -6,6 +6,7 @@ from rest_framework.serializers import ModelSerializer
 
 from cl.api.utils import HyperlinkedModelSerializerWithId
 from cl.audio.models import Audio
+from cl.lib.document_serializer import DocumentSerializer
 from cl.people_db.models import PartyType, Person
 from cl.recap.api_serializers import FjcIntegratedDatabaseSerializer
 from cl.search.documents import AudioDocument, PersonDocument
@@ -292,107 +293,58 @@ class SearchResultSerializer(serializers.Serializer):
         return fields
 
 
-class SearchESResultSerializer(serializers.Serializer):
-    """The serializer for Elasticsearch results.
-    Does not presently support the fields argument.
-    """
+class OAESResultSerializer(DocumentSerializer):
+    """The serializer for Oral argument results."""
 
-    def update(self, instance, validated_data):
-        raise NotImplementedError
+    snippet = serializers.CharField(read_only=True)
+    panel_ids = serializers.ListField(read_only=True)
 
-    def create(self, validated_data):
-        raise NotImplementedError
+    class Meta:
+        document = AudioDocument
+        exclude = (
+            "text",
+            "docket_slug",
+            "percolator_query",
+            "case_name_full",
+            "dateArgued_text",
+            "dateReargued_text",
+            "dateReargumentDenied_text",
+            "court_id_text",
+        )
 
-    es_field_mappings = {
-        "boolean": serializers.BooleanField,
-        "text": serializers.CharField,
-        "keyword": serializers.CharField,
-        "date": serializers.DateTimeField,
-        # Numbers
-        "integer": serializers.IntegerField,
-    }
-    skipped_fields = [
-        "text",
-        "docket_slug",
-        "percolator_query",
-        "person_child",
-        "case_name_full",
-        "dateArgued_text",
-        "dateReargued_text",
-        "dateReargumentDenied_text",
-        "court_id_text",
-    ]
 
-    def get_fields(self):
-        """Return a list of fields so that they don't have to be declared one
-        by one and updated whenever there's a new field.
-        """
-        mapping_fields = {
-            AudioDocument: {
-                "snippet": serializers.CharField(read_only=True),
-                "panel_ids": serializers.ListField(read_only=True),
-            },
-            PersonDocument: {
-                "snippet": serializers.CharField(read_only=True),
-                "aba_rating": serializers.ListField(read_only=True),
-                "alias_ids": serializers.ListField(read_only=True),
-                "appointer": serializers.ListField(read_only=True),
-                "court": serializers.ListField(read_only=True),
-                "court_exact": serializers.ListField(read_only=True),
-                "races": serializers.ListField(read_only=True),
-                "school": serializers.ListField(read_only=True),
-                "political_affiliation": serializers.ListField(read_only=True),
-                "political_affiliation_id": serializers.ListField(
-                    read_only=True
-                ),
-                "position_type": serializers.ListField(read_only=True),
-                "supervisor": serializers.ListField(read_only=True),
-                "predecessor": serializers.ListField(read_only=True),
-                "date_nominated": serializers.ListField(read_only=True),
-                "date_elected": serializers.ListField(read_only=True),
-                "date_recess_appointment": serializers.ListField(
-                    read_only=True
-                ),
-                "date_referred_to_judicial_committee": serializers.ListField(
-                    read_only=True
-                ),
-                "date_judicial_committee_action": serializers.ListField(
-                    read_only=True
-                ),
-                "date_hearing": serializers.ListField(read_only=True),
-                "date_confirmation": serializers.ListField(read_only=True),
-                "date_start": serializers.ListField(read_only=True),
-                "date_granularity_start": serializers.ListField(
-                    read_only=True
-                ),
-                "date_retirement": serializers.ListField(read_only=True),
-                "date_termination": serializers.ListField(read_only=True),
-                "date_granularity_termination": serializers.ListField(
-                    read_only=True
-                ),
-                "judicial_committee_action": serializers.ListField(
-                    read_only=True
-                ),
-                "nomination_process": serializers.ListField(read_only=True),
-                "selection_method": serializers.ListField(read_only=True),
-                "selection_method_id": serializers.ListField(read_only=True),
-                "termination_reason": serializers.ListField(read_only=True),
-            },
-        }
+class PersonESResultSerializer(DocumentSerializer):
+    """The serializer for Person results."""
 
-        fields = dict(mapping_fields[self._context["document_type"]])
-        properties = self._context["schema"]["properties"]
-        # Map each field in the ES schema to a DRF field
-        for field_name, value in properties.items():
-            if field_name in fields or field_name in self.skipped_fields:
-                # Exclude fields that are already set in fields.
-                continue
-            drf_field = self.es_field_mappings[properties[field_name]["type"]]
-            fields[field_name] = drf_field(read_only=True)
+    class Meta:
+        document = PersonDocument
+        exclude = ("text", "person_child")
 
-        for field in self.skipped_fields:
-            if field in fields:
-                fields.pop(field)
 
-        fields = OrderedDict(sorted(fields.items()))  # Sort by key
-        return fields
+class ExtendedPersonESSerializer(PersonESResultSerializer):
+    """Extends the Person serializer with all the field we get from the db"""
+
+    snippet = serializers.CharField(read_only=True)
+    appointer = serializers.ListField(read_only=True)
+    court = serializers.ListField(read_only=True)
+    court_exact = serializers.ListField(read_only=True)
+    position_type = serializers.ListField(read_only=True)
+    supervisor = serializers.ListField(read_only=True)
+    predecessor = serializers.ListField(read_only=True)
+    date_nominated = serializers.ListField(read_only=True)
+    date_elected = serializers.ListField(read_only=True)
+    date_recess_appointment = serializers.ListField(read_only=True)
+    date_referred_to_judicial_committee = serializers.ListField(read_only=True)
+    date_judicial_committee_action = serializers.ListField(read_only=True)
+    date_hearing = serializers.ListField(read_only=True)
+    date_confirmation = serializers.ListField(read_only=True)
+    date_start = serializers.ListField(read_only=True)
+    date_granularity_start = serializers.ListField(read_only=True)
+    date_retirement = serializers.ListField(read_only=True)
+    date_termination = serializers.ListField(read_only=True)
+    date_granularity_termination = serializers.ListField(read_only=True)
+    judicial_committee_action = serializers.ListField(read_only=True)
+    nomination_process = serializers.ListField(read_only=True)
+    selection_method = serializers.ListField(read_only=True)
+    selection_method_id = serializers.ListField(read_only=True)
+    termination_reason = serializers.ListField(read_only=True)

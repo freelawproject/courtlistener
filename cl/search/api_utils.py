@@ -119,7 +119,7 @@ class ESList(object):
                 result.meta.highlight, "text"
             ):
                 result["snippet"] = result.meta.highlight["text"][0]
-            else:
+            elif hasattr(result, "text"):
                 result["snippet"] = result["text"]
             self._item_cache.append(
                 ResultObject(initial=result.to_dict(skip_empty=False))

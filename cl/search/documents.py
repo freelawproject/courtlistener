@@ -1,7 +1,6 @@
 from datetime import datetime
 
 from django.http import QueryDict
-from django.template import loader
 from django_elasticsearch_dsl import Document, fields
 from django_elasticsearch_dsl.fields import DEDField
 from elasticsearch_dsl import Join
@@ -12,7 +11,6 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.command_utils import logger
 from cl.lib.elasticsearch_utils import build_es_base_query
 from cl.lib.fields import PercolatorField
-from cl.lib.search_index_utils import null_map
 from cl.lib.utils import deepgetattr
 from cl.people_db.models import Person, Position
 from cl.search.es_indices import (
@@ -419,15 +417,24 @@ class PositionDocument(PersonBaseDocument):
 @people_db_index.document
 class PersonDocument(PersonBaseDocument):
     id = fields.IntegerField(attr="pk")
-    fjc_id = fields.IntegerField(attr="fjc_id")
+    fjc_id = fields.TextField()
     alias_ids = fields.ListField(
         fields.IntegerField(),
+    )
+    alias = fields.ListField(
+        fields.TextField(
+            analyzer="text_en_splitting_cl",
+            fields={
+                "exact": fields.TextField(analyzer="english_exact"),
+            },
+            search_analyzer="search_analyzer",
+        )
     )
     races = fields.ListField(
         fields.KeywordField(),
     )
-    gender = fields.KeywordField()
-    religion = fields.KeywordField(attr="religion")
+    gender = fields.TextField()
+    religion = fields.TextField(attr="religion")
     name = fields.TextField(
         attr="name_full",
         analyzer="text_en_splitting_cl",
@@ -465,6 +472,9 @@ class PersonDocument(PersonBaseDocument):
     absolute_url = fields.KeywordField(attr="get_absolute_url")
     dob = fields.DateField(attr="date_dob")
     dod = fields.DateField(attr="date_dod")
+    political_affiliation_id = fields.ListField(
+        fields.KeywordField(),
+    )
     political_affiliation = fields.ListField(
         fields.TextField(
             analyzer="text_en_splitting_cl",
@@ -473,9 +483,6 @@ class PersonDocument(PersonBaseDocument):
             },
             search_analyzer="search_analyzer",
         )
-    )
-    political_affiliation_id = fields.ListField(
-        fields.KeywordField(),
     )
 
     aba_rating = fields.ListField(
@@ -487,13 +494,6 @@ class PersonDocument(PersonBaseDocument):
             search_analyzer="search_analyzer",
         )
     )
-    text = fields.TextField(
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(analyzer="english_exact"),
-        },
-        search_analyzer="search_analyzer",
-    )
     school = fields.ListField(
         fields.TextField(
             analyzer="text_en_splitting_cl",
@@ -503,6 +503,12 @@ class PersonDocument(PersonBaseDocument):
             search_analyzer="search_analyzer",
         )
     )
+
+    def prepare_fjc_id(self, instance):
+        return str(instance.fjc_id)
+
+    def prepare_alias(self, instance):
+        return [r.name_full for r in instance.aliases.all()] or None
 
     def prepare_races(self, instance):
         return [r.get_race_display() for r in instance.race.all()] or None
@@ -534,10 +540,6 @@ class PersonDocument(PersonBaseDocument):
         return [
             r.get_rating_display() for r in instance.aba_ratings.all() if r
         ] or None
-
-    def prepare_text(self, instance):
-        text_template = loader.get_template("indexes/person_text.txt")
-        return text_template.render({"item": instance}).translate(null_map)
 
     def prepare_person_child(self, instance):
         return "person"

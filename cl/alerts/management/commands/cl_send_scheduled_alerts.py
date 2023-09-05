@@ -4,11 +4,17 @@ from typing import DefaultDict
 
 from django.utils.timezone import now
 
-from cl.alerts.models import Alert, ScheduledAlertHit
-from cl.alerts.tasks import send_search_alert_and_webhooks
+from cl.alerts.models import (
+    SCHEDULED_ALERT_HIT_STATUS,
+    Alert,
+    ScheduledAlertHit,
+)
+from cl.alerts.tasks import send_search_alert_emails
 from cl.alerts.utils import InvalidDateError
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.stats.utils import tally_stat
+
+DAYS_TO_DELETE = 90
 
 
 def json_date_parser(dct):
@@ -32,7 +38,7 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
     now_time = now()
     alerts_to_update = []
     scheduled_hits_rate = ScheduledAlertHit.objects.filter(
-        rate=rate
+        alert__rate=rate, hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED
     ).select_related("user", "alert")
 
     # Create a nested dictionary structure to hold the groups.
@@ -63,8 +69,8 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
                     len(documents),
                 )
             )
-        send_search_alert_and_webhooks(user_id, hits)
         if hits:
+            send_search_alert_emails.delay([(user_id, hits)])
             alerts_sent_count += 1
 
     # Update Alert's date_last_hit in bulk.
@@ -72,8 +78,15 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
         date_last_hit=now_time
     )
 
-    # Remove stored alerts sent.
-    scheduled_hits_rate.delete()
+    # Update Scheduled alert hits status to "SENT".
+    scheduled_hits_rate.update(hit_status=SCHEDULED_ALERT_HIT_STATUS.SENT)
+
+    # Remove old Scheduled alert hits sent, daily.
+    if rate == Alert.DAILY:
+        scheduled_alerts_deleted = delete_old_scheduled_alerts()
+        logger.info(
+            f"Removed {scheduled_alerts_deleted} Scheduled Alert Hits."
+        )
 
     tally_stat(f"alerts.sent.{rate}", inc=alerts_sent_count)
     logger.info(f"Sent {alerts_sent_count} {rate} email alerts.")
@@ -90,6 +103,31 @@ def send_scheduled_alerts(rate: str) -> None:
                 "Monthly alerts cannot be run on the 29th, 30th or 31st."
             )
         query_and_send_alerts_by_rate(Alert.MONTHLY)
+
+
+def delete_old_scheduled_alerts() -> int:
+    """Delete Scheduled alerts older than DAYS_TO_DELETE days.
+
+    :return: The number of deleted scheduled hit alerts.
+    """
+
+    # Delete SENT ScheduledAlertHits after DAYS_TO_DELETE
+    sent_older_than = now() - datetime.timedelta(days=DAYS_TO_DELETE)
+    scheduled_sent_hits_to_delete = ScheduledAlertHit.objects.filter(
+        date_created__lt=sent_older_than,
+        hit_status=SCHEDULED_ALERT_HIT_STATUS.SENT,
+    ).delete()
+
+    # Delete SCHEDULED ScheduledAlertHits after 2 * DAYS_TO_DELETE
+    unsent_older_than = now() - datetime.timedelta(days=2 * DAYS_TO_DELETE)
+    scheduled_unsent_hits_to_delete = ScheduledAlertHit.objects.filter(
+        date_created__lt=unsent_older_than,
+        hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
+    ).delete()
+    deleted_items = (
+        scheduled_sent_hits_to_delete[0] + scheduled_unsent_hits_to_delete[0]
+    )
+    return deleted_items
 
 
 class Command(VerboseCommand):
