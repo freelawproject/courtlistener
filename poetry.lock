@@ -991,13 +991,13 @@ six = "*"
 
 [[package]]
 name = "django-environ"
-version = "0.10.0"
+version = "0.11.2"
 description = "A package that allows you to utilize 12factor inspired environment variables to configure your Django application."
 optional = false
-python-versions = ">=3.5,<4"
+python-versions = ">=3.6,<4"
 files = [
-    {file = "django-environ-0.10.0.tar.gz", hash = "sha256:b3559a91439c9d774a9e0c1ced872364772c612cdf6dc919506a2b13f7a77225"},
-    {file = "django_environ-0.10.0-py2.py3-none-any.whl", hash = "sha256:510f8c9c1d0a38b0815f91504270c29440a0cf44fab07f55942fa8d31bbb9be6"},
+    {file = "django-environ-0.11.2.tar.gz", hash = "sha256:f32a87aa0899894c27d4e1776fa6b477e8164ed7f6b3e410a62a6d72caaf64be"},
+    {file = "django_environ-0.11.2-py2.py3-none-any.whl", hash = "sha256:0ff95ab4344bfeff693836aa978e6840abef2e2f1145adff7735892711590c05"},
 ]
 
 [package.extras]
@@ -2721,7 +2721,7 @@ name = "ndg-httpsclient"
 version = "0.5.1"
 description = "Provides enhanced HTTPS support for httplib and urllib2 using PyOpenSSL"
 optional = false
-python-versions = ">=2.7,<3.0.0 || >=3.4.0"
+python-versions = ">=2.7,<3.0.dev0 || >=3.4.dev0"
 files = [
     {file = "ndg_httpsclient-0.5.1-py2-none-any.whl", hash = "sha256:d2c7225f6a1c6cf698af4ebc962da70178a99bcde24ee6d1961c4f3338130d57"},
     {file = "ndg_httpsclient-0.5.1-py3-none-any.whl", hash = "sha256:dd174c11d971b6244a891f7be2b32ca9853d3797a72edb34fa5d7b07d8fff7d4"},
@@ -5096,4 +5096,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11, <3.12"
-content-hash = "004fb10286740055904e01bf9cca28231042f2b7719e75b6fc779211db1e51d6"
+content-hash = "126a14df80fbc291ed582d379233b82d776dd3d9adf8fe3b2384dbe38aee7a11"
