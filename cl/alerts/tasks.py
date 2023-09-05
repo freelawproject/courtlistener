@@ -17,7 +17,11 @@ from elasticsearch.exceptions import (
 )
 
 from cl.alerts.models import Alert, DocketAlert, ScheduledAlertHit
-from cl.alerts.utils import percolate_document, user_has_donated_enough
+from cl.alerts.utils import (
+    override_alert_query,
+    percolate_document,
+    user_has_donated_enough,
+)
 from cl.api.models import WebhookEventType
 from cl.api.tasks import (
     send_docket_alert_webhook_events,
@@ -33,7 +37,7 @@ from cl.lib.string_utils import trunc
 from cl.recap.constants import COURT_TIMEZONES
 from cl.search.constants import ALERTS_HL_TAG
 from cl.search.documents import AudioPercolator
-from cl.search.models import Docket, DocketEntry
+from cl.search.models import SEARCH_TYPES, Docket, DocketEntry
 from cl.search.types import (
     ESDocumentClassType,
     PercolatorResponseType,
@@ -526,6 +530,11 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
                 document_content_copy,
                 ALERTS_HL_TAG,
             )
+
+        # Override order_by to show the latest items when clicking the
+        # "View Full Results" button.
+        qd = override_alert_query(alert_triggered)
+        alert_triggered.query_run = qd.urlencode()
 
         # Compose RT hit to send.
         hits = [

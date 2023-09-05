@@ -1,6 +1,8 @@
 from dataclasses import dataclass
+from datetime import date
 
 from django.conf import settings
+from django.http import QueryDict
 from elasticsearch_dsl import Q, Search
 from elasticsearch_dsl.response import Response
 
@@ -107,3 +109,27 @@ def user_has_donated_enough(
         )
         return False
     return True
+
+
+def override_alert_query(
+    alert: Alert, cut_off_date: date | None = None
+) -> QueryDict:
+    """Override the query parameters for a given alert based on its type and an
+     optional cut-off date.
+
+    :param alert: The Alert object for which the query will be overridden.
+    :param cut_off_date: An optional date used to set a threshold in the query.
+    :return: A QueryDict object containing the modified query parameters.
+    """
+
+    qd = QueryDict(alert.query.encode(), mutable=True)
+    if alert.alert_type == SEARCH_TYPES.ORAL_ARGUMENT:
+        qd["order_by"] = "dateArgued desc"
+        if cut_off_date:
+            qd["argued_after"] = cut_off_date.strftime("%m/%d/%Y")
+    else:
+        qd["order_by"] = "dateFiled desc"
+        if cut_off_date:
+            qd["filed_after"] = cut_off_date.strftime("%m/%d/%Y")
+
+    return qd

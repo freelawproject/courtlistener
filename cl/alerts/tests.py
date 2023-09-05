@@ -1,7 +1,8 @@
 import json
 from collections import defaultdict
-from datetime import timedelta
+from datetime import datetime, timedelta
 from unittest import mock
+from urllib.parse import parse_qs, urlparse
 
 import time_machine
 from django.contrib.auth.hashers import make_password
@@ -11,6 +12,7 @@ from django.core.management import call_command
 from django.test import Client, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
+from lxml import html
 from rest_framework.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
@@ -24,6 +26,7 @@ from waffle.testutils import override_switch
 from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
 from cl.alerts.management.commands.cl_send_scheduled_alerts import (
     DAYS_TO_DELETE,
+    get_cut_off_date,
 )
 from cl.alerts.management.commands.handle_old_docket_alerts import (
     build_user_report,
@@ -1702,6 +1705,13 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         self.assertIn("<strong>19-5735</strong>", html_content)
         self.assertIn("<strong>RT</strong>", html_content)
 
+        # Confirm that order_by is overridden in the 'View Full Results' URL by
+        # dateArgued+desc.
+        view_results_url = html.fromstring(str(html_content)).xpath(
+            '//a[text()="View Full Results / Edit this Alert"]/@href'
+        )
+        self.assertIn("order_by=dateArgued+desc", view_results_url[0])
+
         # The right alert type template is used.
         self.assertIn("oral argument", html_content)
 
@@ -1857,10 +1867,6 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
 
         # Confirm Alert date_last_hit is updated.
         search_alert.refresh_from_db()
-        if previous_date:
-            self.assertEqual(search_alert.date_last_hit, previous_date)
-        else:
-            self.assertEqual(search_alert.date_last_hit, mock_date)
 
         # One OA search alert email should be sent
         self.assertEqual(len(mail.outbox), alert_count)
@@ -1869,6 +1875,36 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
 
         # The right alert type template is used.
         self.assertIn("oral argument", text_content)
+
+        # Extract HTML version.
+        html_content = None
+        for content, content_type in mail.outbox[alert_count - 1].alternatives:
+            if content_type == "text/html":
+                html_content = content
+                break
+
+        # Confirm that order_by is overridden in the 'View Full Results'
+        # URL by dateArgued+desc.
+        view_results_url = html.fromstring(str(html_content)).xpath(
+            '//a[text()="View Full Results / Edit this Alert"]/@href'
+        )
+
+        parsed_url = urlparse(view_results_url[0])
+        params = parse_qs(parsed_url.query)
+        self.assertEqual("dateArgued desc", params["order_by"][0])
+
+        if previous_date:
+            self.assertEqual(search_alert.date_last_hit, previous_date)
+        else:
+            self.assertEqual(search_alert.date_last_hit, mock_date)
+
+            # Confirm that argued_after is properly set in the
+            # 'View Full Results' URL.
+            cut_off_date = get_cut_off_date(rate, mock_date.date())
+            date_in_query = datetime.strptime(
+                params["argued_after"][0], "%m/%d/%Y"
+            ).date()
+            self.assertEqual(cut_off_date, date_in_query)
 
         # Confirm stored alerts instances status is set to SENT.
         scheduled_hits = ScheduledAlertHit.objects.filter(alert__rate=rate)
