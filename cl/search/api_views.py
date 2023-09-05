@@ -7,12 +7,13 @@ from cl.search.api_serializers import (
     CourtSerializer,
     DocketEntrySerializer,
     DocketSerializer,
+    ExtendedPersonESSerializer,
+    OAESResultSerializer,
     OpinionClusterSerializer,
     OpinionsCitedSerializer,
     OpinionSerializer,
     OriginalCourtInformationSerializer,
     RECAPDocumentSerializer,
-    SearchESResultSerializer,
     SearchResultSerializer,
     TagSerializer,
 )
@@ -182,29 +183,11 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
                 search_type == SEARCH_TYPES.ORAL_ARGUMENT
                 and waffle.flag_is_active(request, "oa-es-active")
             ):
-                serializer = SearchESResultSerializer(
-                    result_page,
-                    many=True,
-                    context={
-                        "schema": AudioDocument._index.get_mapping()[
-                            AudioDocument._index._name
-                        ]["mappings"],
-                        "document_type": AudioDocument,
-                    },
-                )
+                serializer = OAESResultSerializer(result_page, many=True)
             elif search_type == SEARCH_TYPES.PEOPLE and waffle.flag_is_active(
                 request, "p-es-activate"
             ):
-                serializer = SearchESResultSerializer(
-                    result_page,
-                    many=True,
-                    context={
-                        "schema": PersonDocument._index.get_mapping()[
-                            PersonDocument._index._name
-                        ]["mappings"],
-                        "document_type": PersonDocument,
-                    },
-                )
+                serializer = ExtendedPersonESSerializer(result_page, many=True)
 
             else:
                 if cd["q"] == "":

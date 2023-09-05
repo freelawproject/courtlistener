@@ -51,11 +51,10 @@ class DocumentSerializer(serializers.Serializer):
     def __init__(self, instance=None, data=empty, **kwargs):
         super(DocumentSerializer, self).__init__(instance, data, **kwargs)
 
-        assert hasattr(
-            self, "Meta"
-        ), 'Class {serializer_class} missing "Meta" attribute'.format(
-            serializer_class=self.__class__.__name__
-        )
+        if not hasattr(self, "Meta"):
+            raise ImproperlyConfigured(
+                f'Class {self.__class__.__name__} missing "Meta" attribute'
+            )
 
         if not hasattr(self.Meta, "document") or self.Meta.document is None:
             raise ImproperlyConfigured(
@@ -108,18 +107,14 @@ class DocumentSerializer(serializers.Serializer):
         if all([fields, exclude]):
             raise ImproperlyConfigured(
                 "Cannot set both 'fields' and 'exclude' options on "
-                "serializer {serializer_class}.".format(
-                    serializer_class=self.__class__.__name__
-                )
+                f"serializer {self.__class__.__name__}."
             )
 
         if not any([fields, exclude]):
             raise ImproperlyConfigured(
                 "Creating a serializer without either the 'fields' attribute "
                 "or the 'exclude' attribute is not allowed, Add an explicit "
-                "fields = '__all__' to the {serializer_class} serializer.".format(
-                    serializer_class=self.__class__.__name__
-                )
+                f"fields = '__all__' to the {self.__class__.__name__} serializer."
             )
 
         # Match drf convention of specifying "__all__" for all available fields
@@ -132,10 +127,10 @@ class DocumentSerializer(serializers.Serializer):
             if field_name in ignore_fields:
                 continue
             # When fields to include are decided by `exclude`
-            if exclude and (field_name in exclude):
+            if exclude and field_name in exclude:
                 continue
             # When fields to include are decided by `fields`
-            if fields and (field_name not in fields):
+            if fields and field_name not in fields:
                 continue
 
             # Look up the field attributes on the current index model,

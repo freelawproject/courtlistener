@@ -305,7 +305,6 @@ class OAESResultSerializer(DocumentSerializer):
             "text",
             "docket_slug",
             "percolator_query",
-            "person_child",
             "case_name_full",
             "dateArgued_text",
             "dateReargued_text",
@@ -319,7 +318,7 @@ class PersonESResultSerializer(DocumentSerializer):
 
     class Meta:
         document = PersonDocument
-        exclude = ("text", "docket_slug", "percolator_query", "person_child")
+        exclude = ("text", "person_child")
 
 
 class ExtendedPersonESSerializer(PersonESResultSerializer):

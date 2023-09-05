@@ -10,9 +10,8 @@ from cl.api.utils import generate_webhook_key_content
 from cl.api.webhooks import send_webhook_event
 from cl.celery_init import app
 from cl.corpus_importer.api_serializers import DocketEntrySerializer
-from cl.search.api_serializers import SearchESResultSerializer
+from cl.search.api_serializers import OAESResultSerializer
 from cl.search.api_utils import ResultObject
-from cl.search.documents import AudioDocument
 from cl.search.models import DocketEntry
 
 
@@ -98,16 +97,7 @@ def send_es_search_alert_webhook(
     for result in results:
         result["snippet"] = result["text"]
         es_results.append(ResultObject(initial=result))
-    serialized_results = SearchESResultSerializer(
-        es_results,
-        many=True,
-        context={
-            "schema": AudioDocument._index.get_mapping()[
-                AudioDocument._index._name
-            ]["mappings"],
-            "document_type": AudioDocument,
-        },
-    ).data
+    serialized_results = OAESResultSerializer(es_results, many=True).data
 
     post_content = {
         "webhook": generate_webhook_key_content(webhook),
