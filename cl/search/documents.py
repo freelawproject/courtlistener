@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from django.http import QueryDict
+from django.template import loader
 from django_elasticsearch_dsl import Document, fields
 from django_elasticsearch_dsl.fields import DEDField
 from elasticsearch_dsl import Join
@@ -11,6 +12,7 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.command_utils import logger
 from cl.lib.elasticsearch_utils import build_es_base_query
 from cl.lib.fields import PercolatorField
+from cl.lib.search_index_utils import null_map
 from cl.lib.utils import deepgetattr
 from cl.people_db.models import Person, Position
 from cl.search.es_indices import (
@@ -24,7 +26,6 @@ from cl.search.forms import SearchForm
 from cl.search.models import (
     Citation,
     Docket,
-    DocketEntry,
     ParentheticalGroup,
     RECAPDocument,
 )
@@ -577,6 +578,13 @@ class RECAPDocument(DocketBaseDocument):
     )
     entry_number = fields.IntegerField(attr="docket_entry.entry_number")
     entry_date_filed = fields.DateField(attr="docket_entry.date_filed")
+    entry_date_filed_text = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
     short_description = fields.TextField(
         attr="description",
         analyzer="text_en_splitting_cl",
@@ -587,13 +595,29 @@ class RECAPDocument(DocketBaseDocument):
         },
         search_analyzer="search_analyzer",
     )
-    document_type = fields.IntegerField()
+    document_type = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
     document_number = fields.IntegerField(attr="document_number")
+    pacer_doc_id = fields.KeywordField(attr="pacer_doc_id")
+    plain_text = fields.TextField(
+        attr="plain_text",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="plain_text", analyzer="english_exact"
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
     attachment_number = fields.IntegerField(attr="attachment_number")
     is_available = fields.BooleanField(attr="is_available")
     page_count = fields.IntegerField(attr="page_count")
     filepath_local = fields.KeywordField(index=False)
-    text = fields.TextField(index=False)
 
     class Django:
         model = RECAPDocument
@@ -614,9 +638,9 @@ class RECAPDocument(DocketBaseDocument):
                 return None
             return deepgetattr(instance, "local_path_mp3.name", None)
 
-    def prepare_text(self, instance):
-        text_template = loader.get_template("indexes/dockets_text.txt")
-        return text_template.render({"item": instance}).translate(null_map)
+    def prepare_entry_date_filed_text(self, instance):
+        if instance.docket_entry.date_filed:
+            return instance.docket_entry.date_filed.strftime("%-d %B %Y")
 
     def prepare_docket_child(self, instance):
         parent_id = getattr(instance.docket_entry.docket, "pk", None)
@@ -643,8 +667,25 @@ class DocketDocument(DocketBaseDocument):
         },
         search_analyzer="search_analyzer",
     )
+    case_name_full = fields.TextField(
+        attr="case_name_full",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="case_name_full", analyzer="english_exact"
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
     suitNature = fields.TextField(
         attr="nature_of_suit",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="nature_of_suit", analyzer="english_exact"
+            ),
+        },
+        search_analyzer="search_analyzer",
     )
     cause = fields.TextField(
         attr="cause",
@@ -656,6 +697,13 @@ class DocketDocument(DocketBaseDocument):
     )
     juryDemand = fields.TextField(
         attr="jury_demand",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="jury_demand", analyzer="english_exact"
+            ),
+        },
+        search_analyzer="search_analyzer",
     )
     jurisdictionType = fields.TextField(
         attr="jurisdiction_type",
@@ -710,12 +758,33 @@ class DocketDocument(DocketBaseDocument):
         search_analyzer="search_analyzer",
     )
     court_exact = fields.KeywordField(attr="court.pk")
+    court_id_text = fields.TextField(
+        attr="court.pk",
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
+    )
     court_citation_string = fields.TextField(
         attr="court.citation_string",
         analyzer="text_en_splitting_cl",
         search_analyzer="search_analyzer",
     )
-
+    chapter = fields.TextField(
+        attr="docket.bankruptcy_information.chapter",
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
+    )
+    trustee_str = fields.TextField(
+        attr="docket.bankruptcy_information.trustee_str",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="docket.bankruptcy_information.trustee_str",
+                analyzer="english_exact",
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    text = fields.TextField(index=False)
     # Parties
 
     def prepare_caseName(self, instance):
@@ -747,3 +816,7 @@ class DocketDocument(DocketBaseDocument):
 
     def prepare_docket_child(self, instance):
         return "docket"
+
+    def prepare_text(self, instance):
+        text_template = loader.get_template("indexes/dockets_text.txt")
+        return text_template.render({"item": instance}).translate(null_map)
