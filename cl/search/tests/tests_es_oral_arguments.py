@@ -1108,7 +1108,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             )
 
     @mock.patch(
-        "cl.search.tasks.abort_es_audio_indexing",
+        "cl.lib.es_signal_processor.avoid_es_audio_indexing",
         side_effect=lambda x, y, z: False,
     )
     def test_oa_results_pagination(self, mock_abort_audio) -> None:
@@ -1711,7 +1711,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         self.assertIn("Freedom of", r.content.decode())
 
     @mock.patch(
-        "cl.search.tasks.abort_es_audio_indexing",
+        "cl.lib.es_signal_processor.avoid_es_audio_indexing",
         side_effect=lambda x, y, z: False,
     )
     def test_keep_in_sync_related_OA_objects(self, mock_abort_audio) -> None:

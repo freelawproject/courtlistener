@@ -27,7 +27,7 @@ class PodcastTest(ESIndexTestCase, TestCase):
             citation_string="Appeals. CA8.",
         )
         with mock.patch(
-            "cl.search.tasks.abort_es_audio_indexing",
+            "cl.lib.es_signal_processor.avoid_es_audio_indexing",
             side_effect=lambda x, y, z: False,
         ):
             cls.audio = AudioWithParentsFactory.create(

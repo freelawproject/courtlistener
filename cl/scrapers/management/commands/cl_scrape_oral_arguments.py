@@ -172,10 +172,7 @@ class Command(cl_scrape_opinions.Command):
                     index=False,
                     backscrape=backscrape,
                 )
-                process_audio_file.apply_async(
-                    args=(audio_file.pk,),
-                    countdown=random.randint(0, 3600),
-                )
+                process_audio_file.delay(audio_file.pk)
 
                 logger.info(
                     "Successfully added audio file {pk}: {name}".format(

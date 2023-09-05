@@ -9,6 +9,7 @@ from cl.alerts.tasks import (
     remove_doc_from_es_index,
     send_or_schedule_alerts,
 )
+from cl.audio.models import Audio
 from cl.lib.elasticsearch_utils import elasticsearch_enabled
 from cl.search.documents import AudioDocument
 from cl.search.tasks import save_document_in_es, update_document_in_es
@@ -239,6 +240,35 @@ def update_reverse_related_documents(
         )
 
 
+def avoid_es_audio_indexing(
+    instance: ESModelType,
+    es_document: ESDocumentClassType,
+    update_fields: list[str] | None,
+):
+    """Check conditions to abort Elasticsearch indexing for Audio instances.
+    Avoid indexing for Audio instances which their mp3 file has not been
+    processed yet by process_audio_file.
+
+    :param instance: The Audio instance to evaluate for Elasticsearch indexing.
+    :param es_document: The Elasticsearch document class.
+    :param update_fields: List of fields being updated, or None.
+    :return: True if indexing should be avoided, False otherwise.
+    """
+
+    if (
+        type(instance) == Audio
+        and not es_document.exists(instance.pk)
+        and (
+            not update_fields
+            or (update_fields and "processing_complete" not in update_fields)
+        )
+    ):
+        # Avoid indexing Audio instances that haven't been previously indexed
+        # in ES and for which 'processing_complete' is not present in update_fields.
+        return True
+    return False
+
+
 class ESSignalProcessor(object):
     """Custom signal processor for Elasticsearch documents. It is responsible
     for managing the Elasticsearch index after certain events happen, such as
@@ -322,10 +352,15 @@ class ESSignalProcessor(object):
                 mapping_fields,
             )
         if not mapping_fields:
+            if avoid_es_audio_indexing(
+                instance, self.es_document, update_fields
+            ):
+                # This check is required to avoid indexing and triggering
+                # search alerts for Audio instances whose MP3 files have not
+                # yet been processed by process_audio_file.
+                return None
             chain(
-                save_document_in_es.si(
-                    instance, self.es_document, update_fields
-                ),
+                save_document_in_es.si(instance, self.es_document),
                 send_or_schedule_alerts.s(self.es_document._index._name),
                 process_percolator_response.s(),
             ).apply_async()
