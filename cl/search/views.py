@@ -507,14 +507,14 @@ def show_results(request: HttpRequest) -> HttpResponse:
                             search_results = do_search(request.GET.copy())
                         render_dict.update(search_results)
                     case _:
-                        # Check if waffle flag is active.
                         render_dict.update(do_search(request.GET.copy()))
 
-            # Set the value to the query as a convenience
-            alert_form.fields["name"].widget.attrs["value"] = render_dict[
-                "search_summary_str"
-            ]
-            render_dict.update({"alert_form": alert_form})
+                        # Set the value to the query as a convenience
+                        alert_form.fields["name"].widget.attrs[
+                            "value"
+                        ] = render_dict["search_summary_str"]
+                        render_dict.update({"alert_form": alert_form})
+
             return TemplateResponse(request, "search.html", render_dict)
 
 
