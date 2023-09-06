@@ -36,14 +36,11 @@ ENV POETRY_VERSION=1.6.1 \
 RUN curl -sSL https://install.python-poetry.org | python3 -
 
 ENV PYTHONUNBUFFERED=1 \
-    # paths
-    # where to create the env
-    VENV_PATH="/opt/pysetup/.venv" \
-    # this is where our requirements + virtual environment will live
+    # this is where our requirements will be loaded
     PYSETUP_PATH="/opt/pysetup"
 
 # prepend poetry and venv to path
-ENV PATH="/opt/poetry/bin:$VENV_PATH/bin:$PATH"
+ENV PATH="/opt/poetry/bin:$PATH"
 
 
 FROM build-base as build-dev
