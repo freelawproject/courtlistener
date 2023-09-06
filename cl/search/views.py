@@ -481,39 +481,30 @@ def show_results(request: HttpRequest) -> HttpResponse:
                     initial={"query": get_string, "rate": "dly"},
                     user=request.user,
                 )
-                search_type = request.GET.get("type")
-                match search_type:
-                    case SEARCH_TYPES.PARENTHETICAL:
-                        search_results = do_es_search(request.GET.copy())
-                        render_dict.update(search_results)
-                    case SEARCH_TYPES.ORAL_ARGUMENT:
-                        # Check if waffle flag is active.
-                        if waffle.flag_is_active(request, "oa-es-active"):
-                            search_results = do_es_search(request.GET.copy())
-                        else:
-                            search_results = do_search(request.GET.copy())
-
-                        render_dict.update(search_results)
-                        # Set the value to the query as a convenience
-                        alert_form.fields["name"].widget.attrs[
-                            "value"
-                        ] = render_dict["search_summary_str"]
-                        render_dict.update({"alert_form": alert_form})
-                    case SEARCH_TYPES.PEOPLE:
-                        # Check if waffle flag is active.
-                        if waffle.flag_is_active(request, "p-es-active"):
-                            search_results = do_es_search(request.GET.copy())
-                        else:
-                            search_results = do_search(request.GET.copy())
-                        render_dict.update(search_results)
-                    case _:
+            search_type = request.GET.get("type")
+            match search_type:
+                case SEARCH_TYPES.PARENTHETICAL:
+                    render_dict.update(do_es_search(request.GET.copy()))
+                case SEARCH_TYPES.ORAL_ARGUMENT:
+                    # Check if waffle flag is active.
+                    if waffle.flag_is_active(request, "oa-es-active"):
+                        render_dict.update(do_es_search(request.GET.copy()))
+                    else:
                         render_dict.update(do_search(request.GET.copy()))
+                case SEARCH_TYPES.PEOPLE:
+                    # Check if waffle flag is active.
+                    if waffle.flag_is_active(request, "p-es-active"):
+                        render_dict.update(do_es_search(request.GET.copy()))
+                    else:
+                        render_dict.update(do_search(request.GET.copy()))
+                case _:
+                    render_dict.update(do_search(request.GET.copy()))
 
-                        # Set the value to the query as a convenience
-                        alert_form.fields["name"].widget.attrs[
-                            "value"
-                        ] = render_dict["search_summary_str"]
-                        render_dict.update({"alert_form": alert_form})
+            # Set the value to the query as a convenience
+            alert_form.fields["name"].widget.attrs["value"] = render_dict[
+                "search_summary_str"
+            ]
+            render_dict.update({"alert_form": alert_form})
 
             return TemplateResponse(request, "search.html", render_dict)
 
