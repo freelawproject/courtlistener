@@ -499,7 +499,22 @@ def build_es_base_query(search_query: Search, cd: CleanData) -> Search:
         case SEARCH_TYPES.PEOPLE:
             child_query_fields = {
                 "position": add_fields_boosting(
-                    cd, ["appointer", "supervisor", "predecessor"]
+                    cd,
+                    [
+                        "appointer",
+                        "supervisor",
+                        "predecessor",
+                        "position_type_text",
+                        "nomination_process_text",
+                        "judicial_committee_action_text",
+                        "selection_method_text",
+                        "termination_reason_text",
+                        "court_full_name",
+                        "court_citation_string",
+                        "court_id_text",
+                        "organization_name",
+                        "job_title",
+                    ],
                 ),
             }
             parent_query_fields = add_fields_boosting(
