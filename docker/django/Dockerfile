@@ -55,8 +55,8 @@ FROM build-base as build-prod
 WORKDIR $PYSETUP_PATH
 
 # copy project requirement files here to ensure they will be cached.
-ADD https://raw.githubusercontent.com/freelawproject/courtlistener/main/poetry.lock /opt/poetry.lock
-ADD https://raw.githubusercontent.com/freelawproject/courtlistener/main/pyproject.toml /opt/pyproject.toml
+ADD https://raw.githubusercontent.com/freelawproject/courtlistener/main/poetry.lock ./poetry.lock
+ADD https://raw.githubusercontent.com/freelawproject/courtlistener/main/pyproject.toml ./pyproject.toml
 
 # install runtime deps - uses $POETRY_VIRTUALENVS_IN_PROJECT internally
 RUN poetry install --no-root --without dev
