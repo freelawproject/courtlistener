@@ -513,7 +513,7 @@ def build_es_base_query(search_query: Search, cd: CleanData) -> Search:
                     "religion",
                     "fjc_id",
                     "aba_rating",
-                    "educations",
+                    "school",
                 ],
             )
             string_query = build_join_fulltext_queries(
