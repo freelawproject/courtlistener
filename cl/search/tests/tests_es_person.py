@@ -989,7 +989,7 @@ class PeopleSearchTestElasticSearch(
 
         self.assertEqual(
             r.data["results"][0]["court"],
-            [self.position_2.court.full_name, position_6.court.full_name],
+            [self.position_2.court.short_name, position_6.court.short_name],
         )
         self.assertEqual(
             r.data["results"][0]["court_exact"],

@@ -140,7 +140,7 @@ class BasePositionMapping:
 
     __db_to_dataclass_map = {
         "court": {
-            "court__full_name": "court_dict",
+            "court__short_name": "court_dict",
             "court__pk": "court_exact_dict",
         },
         "appointer": {
