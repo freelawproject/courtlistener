@@ -111,6 +111,47 @@ class and define new API-specific attributes.
 
 when adding a new attribute to one of those classes, we need to make
 sure the type of the new field is defaultdict[int, list[str]].
+
+These classes contain an internal variable called __db_to_dataclass_map,
+this mapping is used to define which fields should be included in each
+container of the dataclass. This variable must be a nested dict where
+the the first-level keys should point to fields in the Position model that
+needs to be checked before adding data to the class, each of these keys
+should have another dictionary as its value. The inner dictionary should
+use name of fields or query relationships of the Position Model as keys
+and the name of the dataclass attribute as its value. Here are some
+examples:
+
+if we have the following if-statement:
+
+    if position.how_selected:
+        map.selection_method_dict[person_pk].append(
+            position.get_how_selected_display()
+            )
+
+We can represent it in the __db_to_dataclass_map variable like this:
+
+    "how_selected": {
+        "get_how_selected_display": "selection_method_dict",
+    },
+
+where the first-level key is 'how_selected' because the the if-statement was
+checking that field before appending the value of the 'get_how_selected_display'
+method to the 'selection_method_dict' attribute.
+
+We can even use lookups that span relationships, for example:
+
+    if position.appointer:
+        map.appointer_dict[person_pk].append(
+            position.appointer.person.name_full_reverse
+        )
+
+can be represented as:
+
+    "appointer": {
+        "appointer__person__name_full_reverse": "appointer_dict"
+    },
+
 """
 
 
