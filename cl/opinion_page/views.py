@@ -522,7 +522,7 @@ def view_recap_document(
         note_form = NoteForm(instance=note)
 
     # Override the og:url if we're serving a request to an OG crawler bot
-    og_file_path_override = rd.filepath_local if is_og_bot else None
+    og_file_path_override = f"/{rd.filepath_local}" if is_og_bot else None
 
     return TemplateResponse(
         request,
