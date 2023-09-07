@@ -10,13 +10,10 @@ endif
 REPO ?= freelawproject/courtlistener
 
 # The various tags available
-DOCKER_TAG_DEV = $(VERSION)-web-dev
 DOCKER_TAG_PROD = $(VERSION)-web-prod
 WEB_PROD ?= latest-web-prod
-WEB_DEV ?= latest-web-dev
 CELERY_TAG = $(VERSION)-celery
 CELERY_LATEST ?= latest-celery
-CELERY_DEV ?= latest-celery-dev
 RSS_TAG ?= $(VERSION)-scrape-rss
 RSS_LATEST ?= latest-scrape-rss
 WEBHOOKS_TAG ?= $(VERSION)-webhooks-retry
@@ -27,10 +24,6 @@ WEBHOOKS_LATEST ?= latest-webhooks-retry
 UNAME := $(shell uname -m)
 
 all: image
-
-development:
-	docker build --target web-dev -t $(REPO):$(WEB_DEV) --build-arg BUILD_ENV=dev --file docker/django/Dockerfile .
-	docker build --target celery -t $(REPO):$(CELERY_DEV) --build-arg BUILD_ENV=dev --file docker/django/Dockerfile .
 
 image:
 	docker build --target web-prod -t $(REPO):$(DOCKER_TAG_PROD) -t $(REPO):$(WEB_PROD) --file docker/django/Dockerfile .
@@ -79,13 +72,3 @@ x86_push:
 	docker buildx build --push --platform linux/amd64 -t $(REPO):$(CELERY_LATEST) -t $(REPO):$(CELERY_TAG) --file docker/django/Dockerfile .
 	docker buildx build --push --platform linux/amd64 -t $(REPO):$(RSS_TAG)  -t $(REPO):$(RSS_LATEST) --file docker/django/Dockerfile .
 	docker buildx build --push --platform linux/amd64 -t $(REPO):$(WEBHOOKS_TAG)  -t $(REPO):$(WEBHOOKS_LATEST) --file docker/django/Dockerfile .
-
-multiarch_push_development:
-	export DOCKER_CLI_EXPERIMENTAL=enabled
-	# Fix for #2116 as per https://github.com/docker/buildx/issues/495#issuecomment-761562905
-	docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-	docker buildx create --name flp-builder --driver docker-container --use
-	# Wait for the builder to boot
-	docker buildx inspect --bootstrap
-	docker buildx build --target web-dev --push --platform linux/amd64,linux/arm64 -t $(REPO):$(WEB_DEV) --build-arg BUILD_ENV=dev --file docker/django/Dockerfile .
-	docker buildx build --target celery --push --platform linux/amd64,linux/arm64 -t $(REPO):$(CELERY_DEV) --build-arg BUILD_ENV=dev --file docker/django/Dockerfile .
