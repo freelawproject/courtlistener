@@ -108,17 +108,23 @@ async def process_recap_upload(pq: ProcessingQueue) -> None:
     """
     if pq.upload_type == UPLOAD_TYPE.DOCKET:
         docket = await process_recap_docket(pq.pk)
-        await sync_to_async(add_or_update_recap_docket.si(docket).apply_async)()
+        await sync_to_async(
+            add_or_update_recap_docket.si(docket).apply_async
+        )()
     elif pq.upload_type == UPLOAD_TYPE.ATTACHMENT_PAGE:
         await process_recap_attachment(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.PDF:
         await process_recap_pdf(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.DOCKET_HISTORY_REPORT:
         docket = await process_recap_docket_history_report(pq.pk)
-        await sync_to_async(add_or_update_recap_docket.si(docket).apply_async)()
+        await sync_to_async(
+            add_or_update_recap_docket.si(docket).apply_async
+        )()
     elif pq.upload_type == UPLOAD_TYPE.APPELLATE_DOCKET:
         docket = await process_recap_appellate_docket(pq.pk)
-        await sync_to_async(add_or_update_recap_docket.si(docket).apply_async)()
+        await sync_to_async(
+            add_or_update_recap_docket.si(docket).apply_async
+        )()
     elif pq.upload_type == UPLOAD_TYPE.APPELLATE_ATTACHMENT_PAGE:
         await process_recap_appellate_attachment(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.CLAIMS_REGISTER:
@@ -127,7 +133,9 @@ async def process_recap_upload(pq: ProcessingQueue) -> None:
         await process_recap_zip(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.CASE_QUERY_PAGE:
         docket = await process_case_query_page(pq.pk)
-        await sync_to_async(add_or_update_recap_docket.si(docket).apply_async)()
+        await sync_to_async(
+            add_or_update_recap_docket.si(docket).apply_async
+        )()
     elif pq.upload_type == UPLOAD_TYPE.APPELLATE_CASE_QUERY_PAGE:
         await sync_to_async(process_recap_appellate_case_query_page)(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.CASE_QUERY_RESULT_PAGE:
