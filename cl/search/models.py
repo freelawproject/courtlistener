@@ -1158,6 +1158,13 @@ class DocketEntry(AbstractDateTimeModel):
         ),
         blank=True,
     )
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "description",
+            "entry_number",
+            "date_filed",
+        ]
+    )
 
     class Meta:
         verbose_name_plural = "Docket Entries"

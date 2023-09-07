@@ -522,6 +522,38 @@ def build_es_base_query(search_query: Search, cd: CleanData) -> Search:
                 parent_query_fields,
                 cd.get("q", ""),
             )
+        case SEARCH_TYPES.RECAP:
+            child_query_fields = {
+                "recap_document": add_fields_boosting(
+                    cd, ["description", "short_description", "plain_text"]
+                ),
+            }
+            parent_query_fields = add_fields_boosting(
+                cd,
+                [
+                    "docketNumber",
+                    "caseName",
+                    "case_name_full",
+                    "suitNature",
+                    "cause",
+                    "juryDemand",
+                    "dateArgued_text",
+                    "dateFiled_text",
+                    "dateTerminated_text",
+                    "assignedTo",
+                    "referredTo",
+                    "court",
+                    "court_id_text",
+                    "court_citation_string",
+                    "chapter",
+                    "trustee_str",
+                ],
+            )
+            string_query = build_join_fulltext_queries(
+                child_query_fields,
+                parent_query_fields,
+                cd.get("q", ""),
+            )
 
     if filters or string_query:
         # Apply filters first if there is at least one set.

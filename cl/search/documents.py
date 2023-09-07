@@ -3,15 +3,13 @@ from datetime import datetime
 from django.http import QueryDict
 from django.template import loader
 from django_elasticsearch_dsl import Document, fields
-from django_elasticsearch_dsl.fields import DEDField
-from elasticsearch_dsl import Join
 
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.command_utils import logger
 from cl.lib.elasticsearch_utils import build_es_base_query
-from cl.lib.fields import PercolatorField
+from cl.lib.fields import PercolatorField, JoinField
 from cl.lib.search_index_utils import null_map
 from cl.lib.utils import deepgetattr
 from cl.people_db.models import Person, Position
@@ -295,8 +293,8 @@ class AudioPercolator(AudioDocumentBase):
         return query.to_dict()["query"]
 
 
-class PEOPLE_DOCS_TYPE_ID:
-    """Returns an ID for its use in people_db_index child documents"""
+class ES_CHILD_ID:
+    """Returns an ID for its use in ES child documents"""
 
     def __init__(self, instance_id: int):
         self.instance_id = instance_id
@@ -305,9 +303,9 @@ class PEOPLE_DOCS_TYPE_ID:
     def POSITION(self) -> str:
         return f"po_{self.instance_id}"
 
-
-class JoinField(DEDField, Join):
-    pass
+    @property
+    def RECAP(self) -> str:
+        return f"rd_{self.instance_id}"
 
 
 class PersonBaseDocument(Document):
@@ -563,7 +561,7 @@ class DocketBaseDocument(Document):
 
 
 @recap_index.document
-class RECAPDocument(DocketBaseDocument):
+class ESRECAPDocument(DocketBaseDocument):
     id = fields.IntegerField(attr="pk")
     docket_entry_id = fields.IntegerField(attr="docket_entry.pk")
     description = fields.TextField(
@@ -626,7 +624,7 @@ class RECAPDocument(DocketBaseDocument):
     def prepare_document_type(self, instance):
         return instance.get_document_type_display()
 
-    def prepare_local_path(self, instance):
+    def prepare_filepath_local(self, instance):
         if instance.filepath_local:
             if not instance.filepath_local.storage.exists(
                 instance.filepath_local.name
@@ -647,7 +645,7 @@ class RECAPDocument(DocketBaseDocument):
         return {"name": "recap_document", "parent": parent_id}
 
 
-@people_db_index.document
+@recap_index.document
 class DocketDocument(DocketBaseDocument):
     docket_id = fields.IntegerField(attr="pk")
     docketNumber = fields.TextField(
@@ -769,16 +767,16 @@ class DocketDocument(DocketBaseDocument):
         search_analyzer="search_analyzer",
     )
     chapter = fields.TextField(
-        attr="docket.bankruptcy_information.chapter",
+        attr="bankruptcy_information.chapter",
         analyzer="text_en_splitting_cl",
         search_analyzer="search_analyzer",
     )
     trustee_str = fields.TextField(
-        attr="docket.bankruptcy_information.trustee_str",
+        attr="bankruptcy_information.trustee_str",
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(
-                attr="docket.bankruptcy_information.trustee_str",
+                attr="bankruptcy_information.trustee_str",
                 analyzer="english_exact",
             ),
         },

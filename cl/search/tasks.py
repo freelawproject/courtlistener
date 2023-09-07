@@ -19,9 +19,10 @@ from cl.lib.elasticsearch_utils import es_index_exists
 from cl.lib.search_index_utils import InvalidDocumentError
 from cl.people_db.models import Person, Position
 from cl.search.documents import (
-    PEOPLE_DOCS_TYPE_ID,
+    ES_CHILD_ID,
     AudioDocument,
     PersonDocument,
+DocketDocument
 )
 from cl.search.models import Docket, OpinionCluster, RECAPDocument
 from cl.search.types import (
@@ -205,22 +206,40 @@ def save_document_in_es(
             ]
         ):
             return
-
         if not PersonDocument.exists(id=parent_id):
-            # create the parent document if it does not exists in ES
+            # create the parent document if it does not exist in ES
             person_doc = PersonDocument()
             doc = person_doc.prepare(instance.person)
             PersonDocument(meta={"id": parent_id}, **doc).save(
                 skip_empty=False, return_doc_meta=True
             )
 
-        doc_id = PEOPLE_DOCS_TYPE_ID(instance.pk).POSITION
+        doc_id = ES_CHILD_ID(instance.pk).POSITION
         es_args["_routing"] = parent_id
     elif isinstance(instance, Person):
         # index person records only if they were ever a judge.
         if not instance.is_judge:
             return
         doc_id = instance.pk
+    elif isinstance(instance, RECAPDocument):
+        parent_id = getattr(instance.docket_entry.docket, "pk", None)
+        if not all(
+            [
+                es_index_exists(es_document._index._name),
+                parent_id,
+            ]
+        ):
+            return
+
+        if not DocketDocument.exists(id=parent_id):
+            # create the parent document if it does not exist in ES
+            docket_doc = DocketDocument()
+            doc = docket_doc.prepare(instance.docket_entry.docket)
+            DocketDocument(meta={"id": parent_id}, **doc).save(
+                skip_empty=False, return_doc_meta=True
+            )
+        doc_id = ES_CHILD_ID(instance.pk).RECAP
+        es_args["_routing"] = parent_id
     else:
         doc_id = instance.pk
 

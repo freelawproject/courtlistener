@@ -29,6 +29,7 @@ from cl.search.models import (
     Parenthetical,
     ParentheticalGroup,
     RECAPDocument,
+BankruptcyInformation,
 )
 from cl.tests.providers import LegalProvider
 
@@ -317,3 +318,11 @@ class OpinionsCitedWithParentsFactory(DjangoModelFactory):
     cited_opinion = SubFactory(
         "cl.search.factories.OpinionFactory",
     )
+
+
+class BankruptcyInformationFactory(DjangoModelFactory):
+    class Meta:
+        model = BankruptcyInformation
+
+    chapter = Faker("random_int", min=1, max=100)
+    trustee_str = Faker("name_female")

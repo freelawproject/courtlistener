@@ -12,6 +12,8 @@ from cl.search.documents import (
     ParentheticalGroupDocument,
     PersonDocument,
     PositionDocument,
+DocketDocument,
+ESRECAPDocument
 )
 from cl.search.models import (
     Citation,
@@ -21,6 +23,9 @@ from cl.search.models import (
     OpinionsCited,
     Parenthetical,
     ParentheticalGroup,
+    BankruptcyInformation,
+RECAPDocument,
+DocketEntry
 )
 
 # This field mapping is used to define which fields should be updated in the
@@ -156,6 +161,33 @@ position_field_mapping = {
     "reverse": {},
 }
 
+docket_field_mapping = {
+    "save": {
+        Docket: {},
+    },
+    "delete": {Docket: {}},
+    "m2m": {},
+    "reverse": {
+        BankruptcyInformation: {"bankruptcy_information": {"all": ["chapter", "trustee_str"]}},
+    },
+}
+
+recap_document_field_mapping = {
+    "save": {
+        RECAPDocument: {},
+        DocketEntry:{
+            "docket_entry":{
+                "description":["description"],
+                "entry_number": ["entry_number"],
+                "date_filed": ["entry_date_filed", "entry_date_filed_text"],
+            }
+        },
+    },
+    "delete": {RECAPDocument: {}},
+    "m2m": {},
+    "reverse": {},
+}
+
 
 # Instantiate a new ESSignalProcessor() for each Model/Document that needs to
 # be tracked. The arguments are: main model, ES document mapping, and field mapping dict.
@@ -177,4 +209,12 @@ _p_signal_processor = ESSignalProcessor(
 
 _position_signañ_processor = ESSignalProcessor(
     Position, PositionDocument, position_field_mapping
+)
+
+_docket_signal_processor = ESSignalProcessor(
+    Docket, DocketDocument, docket_field_mapping
+)
+
+_recap_document_signal_processor = ESSignalProcessor(
+    RECAPDocument, ESRECAPDocument, recap_document_field_mapping
 )

@@ -5,8 +5,8 @@ from asgiref.sync import sync_to_async
 from django.urls import reverse
 from lxml import html
 from rest_framework.status import HTTP_200_OK
+from elasticsearch_dsl import Q
 
-from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.people_db.factories import (
     AttorneyFactory,
     AttorneyOrganizationFactory,
@@ -14,17 +14,25 @@ from cl.people_db.factories import (
     PartyTypeFactory,
     PersonFactory,
 )
+from cl.lib.elasticsearch_utils import (
+    build_es_main_query,
+    build_join_es_filters,
+    build_join_fulltext_queries,
+)
 from cl.search.factories import (
     CourtFactory,
     DocketEntryWithParentsFactory,
     DocketFactory,
     RECAPDocumentFactory,
+BankruptcyInformationFactory
 )
 from cl.search.models import SEARCH_TYPES, RECAPDocument
 from cl.search.tasks import add_docket_to_solr_by_rds
+from cl.tests.cases import ESIndexTestCase, TestCase
+from cl.search.documents import DocketDocument, ESRECAPDocument, ES_CHILD_ID
 
 
-class RECAPSearchTest(IndexedSolrTestCase):
+class RECAPSearchTest(ESIndexTestCase, TestCase):
     """
     RECAP Search Tests
     """
@@ -33,6 +41,7 @@ class RECAPSearchTest(IndexedSolrTestCase):
 
     @classmethod
     def setUpTestData(cls):
+        cls.rebuild_index("search.Docket")
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
         cls.court_2 = CourtFactory(id="ca1", jurisdiction="F")
         cls.judge = PersonFactory.create(
@@ -113,15 +122,10 @@ class RECAPSearchTest(IndexedSolrTestCase):
             description="Leave to File",
             document_number="3",
             page_count=10,
+            plain_text="Maecenas nunc justo"
         )
         super().setUpTestData()
 
-    def setUp(self) -> None:
-        add_docket_to_solr_by_rds(
-            [self.rd.pk, self.rd_att.pk], force_commit=True
-        )
-        add_docket_to_solr_by_rds([self.rd_2.pk], force_commit=True)
-        super().setUp()
 
     async def _test_article_count(self, params, expected_count, field_name):
         r = await self.async_client.get("/", params)
@@ -169,6 +173,192 @@ class RECAPSearchTest(IndexedSolrTestCase):
             "Expected: %s\n"
             "     Got: %s\n\n" % (field_name, expected_count, got),
         )
+
+    def test_index_recap_parent_and_child_objects(self) -> None:
+        """Confirm Dockets and RECAPDocuments are properly indexed in ES"""
+
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="docket"))
+        self.assertEqual(s.count(), 2)
+
+        # RECAPDocuments are indexed.
+        rd_pks = [
+            self.rd.pk,
+            self.rd_att.pk,
+            self.rd_2.pk,
+        ]
+        for rd_pk in rd_pks:
+            self.assertTrue(
+                DocketDocument.exists(
+                    id=ES_CHILD_ID(rd_pk).RECAP
+                )
+            )
+
+    def test_update_and_remove_parent_child_objects_in_es(self) -> None:
+        """Confirm child documents can be updated and removed properly."""
+
+        de_1 = DocketEntryWithParentsFactory(
+            docket=DocketFactory(
+                court=self.court,
+                case_name="Lorem Ipsum",
+                case_name_full="Jackson & Sons Holdings vs. Bank",
+                date_filed=datetime.date(2015, 8, 16),
+                date_argued=datetime.date(2013, 5, 20),
+                docket_number="1:21-bk-1234",
+                assigned_to=self.judge,
+                referred_to=self.judge_2,
+                nature_of_suit="440",
+            ),
+            date_filed=datetime.date(2015, 8, 19),
+            description="MOTION for Leave to File Amicus Curiae Lorem",
+            )
+        rd_1 = RECAPDocumentFactory(
+            docket_entry=de_1,
+            description="Leave to File",
+            document_number="1",
+            is_available=True,
+            page_count=5,
+        )
+
+        docket_pk = de_1.docket.pk
+        rd_pk = rd_1.pk
+        self.assertTrue(DocketDocument.exists(id=docket_pk))
+
+        self.assertTrue(
+            DocketDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP)
+        )
+
+        # Update docket field:
+        de_1.docket.case_name = "USA vs Bank"
+        de_1.docket.save()
+
+        docket_doc = DocketDocument.get(id=docket_pk)
+        self.assertIn("USA vs Bank", docket_doc.caseName)
+
+
+        # Update docket entry field:
+
+        de_1.description = "Notification to File Ipsum"
+        de_1.entry_number = 99
+        de_1.save()
+
+        rd_doc = DocketDocument.get(id=ES_CHILD_ID(rd_pk).RECAP)
+        self.assertEqual("Notification to File Ipsum", rd_doc.description)
+        self.assertEqual(99, rd_doc.entry_number)
+
+        # Add a Bankruptcy document.
+
+        bank = BankruptcyInformationFactory(docket=de_1.docket)
+        docket_doc = DocketDocument.get(id=docket_pk)
+        self.assertEqual(bank.chapter, docket_doc.chapter)
+        self.assertEqual(bank.trustee_str, docket_doc.trustee_str)
+
+        # Update Bankruptcy document.
+        bank.chapter = "97"
+        bank.trustee_str = "Victoria, Sherline"
+        bank.save()
+
+        docket_doc = DocketDocument.get(id=docket_pk)
+        self.assertEqual("97", docket_doc.chapter)
+        self.assertEqual("Victoria, Sherline", docket_doc.trustee_str)
+
+
+        # Add another RD:
+        rd_2 = RECAPDocumentFactory(
+            docket_entry=de_1,
+            description="Notification to File",
+            document_number="2",
+            is_available=True,
+            page_count=2,
+        )
+
+        rd_2_pk = rd_2.pk
+        self.assertTrue(
+            DocketDocument.exists(id=ES_CHILD_ID(rd_2_pk).RECAP)
+        )
+        rd_2.delete()
+        self.assertFalse(
+            DocketDocument.exists(id=ES_CHILD_ID(rd_2_pk).RECAP)
+        )
+
+        self.assertTrue(DocketDocument.exists(id=docket_pk))
+        self.assertTrue(
+            DocketDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP)
+        )
+
+        de_1.docket.delete()
+        self.assertFalse(DocketDocument.exists(id=docket_pk))
+        self.assertFalse(
+            DocketDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP)
+        )
+
+    def test_has_child_text_queries(self) -> None:
+        """Test the build_es_main_query method."""
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Discharging Debtor",
+        }
+        search_query = DocketDocument.search()
+        s, total_query_results, top_hits_limit = build_es_main_query(
+            search_query, cd
+        )
+
+        response = s.execute().to_dict()
+        self.assertEqual(s.count(), 1)
+        self.assertEqual(
+            1,
+            len(
+                response["hits"]["hits"][0]["inner_hits"][
+                    "text_query_inner_recap_document"
+                ]["hits"]["hits"]
+            ),
+        )
+
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Document attachment",
+        }
+        search_query = DocketDocument.search()
+        s, total_query_results, top_hits_limit = build_es_main_query(
+            search_query, cd
+        )
+        response = s.execute().to_dict()
+        self.assertEqual(s.count(), 1)
+        self.assertEqual(
+            1,
+            len(
+                response["hits"]["hits"][0]["inner_hits"][
+                    "text_query_inner_recap_document"
+                ]["hits"]["hits"]
+            ),
+        )
+        self.assertEqual(
+            "Document attachment",
+                response["hits"]["hits"][0]["inner_hits"][
+                    "text_query_inner_recap_document"
+                ]["hits"]["hits"][0]["_source"]["short_description"]
+
+        )
+
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Maecenas nunc justo",
+        }
+        search_query = DocketDocument.search()
+        s, total_query_results, top_hits_limit = build_es_main_query(
+            search_query, cd
+        )
+        response = s.execute().to_dict()
+        self.assertEqual(s.count(), 1)
+        self.assertEqual(
+            1,
+            len(
+                response["hits"]["hits"][0]["inner_hits"][
+                    "text_query_inner_recap_document"
+                ]["hits"]["hits"]
+            ),
+        )
+
 
     async def test_phrase_plus_conjunction_search(self) -> None:
         """Confirm phrase + conjunction search works properly"""

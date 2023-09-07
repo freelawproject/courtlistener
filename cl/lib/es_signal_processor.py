@@ -10,7 +10,7 @@ from cl.alerts.tasks import (
     send_or_schedule_alerts,
 )
 from cl.lib.elasticsearch_utils import elasticsearch_enabled
-from cl.search.documents import AudioDocument, ParentheticalGroupDocument
+from cl.search.documents import AudioDocument, ParentheticalGroupDocument, ESRECAPDocument
 from cl.search.tasks import save_document_in_es, update_document_in_es
 from cl.search.types import ESDocumentType, ESModelType
 
@@ -28,6 +28,8 @@ def updated_fields(
         tracked_set = getattr(instance, "es_oa_field_tracker", None)
     elif es_document is ParentheticalGroupDocument:
         tracked_set = getattr(instance, "es_pa_field_tracker", None)
+    elif es_document is ESRECAPDocument:
+        tracked_set = getattr(instance, "es_rd_field_tracker", None)
     else:
         tracked_set = getattr(instance, "es_p_field_tracker", None)
 
@@ -228,12 +230,20 @@ def update_reverse_related_documents(
         if not main_doc:
             return
 
+        fields_to_update = {}
+        for field in affected_fields:
+            prepare_method = getattr(
+                main_doc, f"prepare_{field}", None
+            )
+            if prepare_method:
+                field_value = prepare_method(main_object)
+            else:
+                field_value = getattr(instance, field)
+            fields_to_update[field] = field_value
+
         update_document_in_es.delay(
             main_doc,
-            {
-                field: getattr(main_doc, f"prepare_{field}")(main_object)
-                for field in affected_fields
-            },
+            fields_to_update,
         )
 
 

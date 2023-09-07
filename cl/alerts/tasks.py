@@ -15,6 +15,7 @@ from elasticsearch.exceptions import (
     RequestError,
     TransportError,
 )
+from django.db.models import Prefetch
 
 from cl.alerts.models import Alert, DocketAlert, ScheduledAlertHit
 from cl.alerts.utils import percolate_document, user_has_donated_enough
@@ -34,10 +35,12 @@ from cl.people_db.models import Person
 from cl.recap.constants import COURT_TIMEZONES
 from cl.search.constants import ALERTS_HL_TAG
 from cl.search.documents import (
-    PEOPLE_DOCS_TYPE_ID,
+    ES_CHILD_ID,
     AudioPercolator,
     PersonDocument,
     PositionDocument,
+    ESRECAPDocument,
+    DocketDocument
 )
 from cl.search.models import Docket, DocketEntry
 from cl.search.types import (
@@ -707,23 +710,40 @@ def remove_doc_from_es_index(
     :return: None
     """
 
-    doc_id = (
-        PEOPLE_DOCS_TYPE_ID(instance_id).POSITION
-        if es_document is PositionDocument
-        else instance_id
-    )
+    if es_document is PositionDocument:
+        doc_id = ES_CHILD_ID(instance_id).POSITION
+    elif es_document is ESRECAPDocument:
+        doc_id = ES_CHILD_ID(instance_id).RECAP
+    else:
+        doc_id = instance_id
+
     try:
         doc = es_document.get(id=doc_id)
         doc.delete(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)
-
         if es_document is PersonDocument:
             instance = Person.objects.get(pk=instance_id)
             position_objects = instance.positions.all()
             for position in position_objects:
-                doc_id = PEOPLE_DOCS_TYPE_ID(position.pk).POSITION
+                doc_id = ES_CHILD_ID(position.pk).POSITION
                 if PositionDocument.exists(id=doc_id):
                     doc = PositionDocument.get(id=doc_id)
                     doc.delete(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)
+        elif es_document is DocketDocument:
+            instance = Docket.objects.get(pk=instance_id)
+            # Prefetch the related RECAPDocument objects for each DocketEntry
+            docket_entries = (
+                instance.docket_entries
+                .prefetch_related(Prefetch('recap_documents'))
+                .all()
+            )
+            recap_documents = []
+            for docket_entry in docket_entries:
+                recap_documents.extend(
+                    list(docket_entry.recap_documents.all()))
+            for rd in recap_documents:
+                doc = ESRECAPDocument.get(id=ES_CHILD_ID(rd.pk).RECAP)
+                doc.delete(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)
+
     except NotFoundError:
         model_label = es_document.Django.model._meta.app_label.capitalize()
         logger.error(
