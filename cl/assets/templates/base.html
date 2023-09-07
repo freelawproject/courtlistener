@@ -32,7 +32,7 @@
   <meta property="og:title" content="{% block og_title %}CourtListener{% endblock %}"/>
   <meta property="og:description"
         content="{% block og_description %}Create alerts, search for and browse the latest court opinions, PACER documents, judges, and oral arguments. Updated automatically with the latest court documents. An initiative of Free Law Project.{% endblock %}">
-  <meta property="og:url" content="{% get_full_host %}{{ request.path }}"/>
+  <meta property="og:url" content="{% block og_url %}{% get_full_host %}{{ request.path }}{% endblock %}"/>
   <meta property="og:site_name" content="CourtListener"/>
   <meta property="og:image"
         content="{% block og_image %}{% static "png/og-image-300x300.png" %}{% endblock %}"/>
