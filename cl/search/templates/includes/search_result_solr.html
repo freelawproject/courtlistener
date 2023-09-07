@@ -23,7 +23,7 @@
       ({% if doc0.court_id != 'scotus' %}{{ doc0.solr_highlights.court_citation_string.0|nbsp|safe }}&nbsp;{% endif %}{{ doc0.dateFiled|date:"Y" }})
       </a>
 
-    {% elif type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION %}
+    {% elif type == SEARCH_TYPES.ORAL_ARGUMENT or type_override == SEARCH_TYPES.ORAL_ARGUMENT or type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION %}
       <a href="{{ result.absolute_url }}?{{ request.META.QUERY_STRING }}"
          class="visitable">
       {{ result.solr_highlights.caseName.0|safe }}
@@ -31,13 +31,6 @@
       {% if request.path != maine_url %}
           ({% if result.court_id != 'scotus' %}{{ result.solr_highlights.court_citation_string.0|nbsp|safe }}&nbsp;{% endif %}{% if type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION %}{{ result.dateFiled|date:"Y" }}{% else %}{{ result.dateArgued|date:"Y" }}{% endif %})
       {% endif %}
-      </a>
-
-    {% elif type == SEARCH_TYPES.ORAL_ARGUMENT or type_override == SEARCH_TYPES.ORAL_ARGUMENT %}
-      <a href="{% url 'view_audio_file' result.id result.docket_slug %}?{{ request.META.QUERY_STRING }}"
-         class="visitable">
-      {{ result.caseName|safe  }}
-      ({% if result.court_id != 'scotus' %}{{ result.court_citation_string|safe|nbsp }}&nbsp;{% endif %}{{ result.dateArgued|date:"Y" }})
       </a>
     {% endif %}
   </h3>
@@ -88,7 +81,7 @@
       <div class="inline-block">
         <span class="meta-data-header">Nature of Suit:</span>
         <span class="meta-data-value">
-          <a href="?type=r&nature_of_suit=&quot;{{ doc0.solr_highlights.suitNature.0|striptags|urlencode }}&quot;">
+          <a href="?type=r&amp;nature_of_suit=&quot;{{ doc0.solr_highlights.suitNature.0|striptags }}&quot;">
               {{ doc0.solr_highlights.suitNature.0|safe }}
           </a>
         </span>
@@ -98,7 +91,7 @@
       <div class="inline-block">
         <span class="meta-data-header">Cause:</span>
         <span class="meta-data-value">
-          <a href="?type=r&cause=&quot;{{ doc0.solr_highlights.cause.0|striptags|urlencode }}&quot;">{{ doc0.solr_highlights.cause.0|safe }}
+          <a href="?type=r&amp;cause=&quot;{{ doc0.solr_highlights.cause.0|striptags }}&quot;">{{ doc0.solr_highlights.cause.0|safe }}
           </a>
         </span>
       </div>
@@ -107,7 +100,7 @@
       <div class="inline-block">
         <span class="meta-data-header">Jury Demand:</span>
         <span class="meta-data-value">
-          <a href="?type=r&q=juryDemand:&quot;{{ doc0.solr_highlights.juryDemand.0|striptags|urlencode }}&quot;">
+          <a href="?type=r&amp;q=juryDemand:&quot;{{ doc0.solr_highlights.juryDemand.0|striptags }}&quot;">
               {{ doc0.solr_highlights.juryDemand.0|safe }}
           </a>
         </span>
@@ -118,11 +111,11 @@
         <span class="meta-data-header">Assigned To:</span>
         <span class="meta-data-value">
           {% if doc0.assigned_to_id %}
-            <a href="?type=r&q=assigned_to_id%3A{{ doc0.assigned_to_id|urlencode }}">
+            <a href="?type=r&amp;q=assigned_to_id:{{ doc0.assigned_to_id }}">
                 {{ doc0.solr_highlights.assignedTo.0|safe }}
             </a>
           {% else %}
-            <a href="?type=r&assigned_to=&quot;{{ doc0.solr_highlights.assignedTo.0|striptags|urlencode }}&quot;">
+            <a href="?type=r&amp;assigned_to=&quot;{{ doc0.solr_highlights.assignedTo.0|striptags }}&quot;">
                 {{ doc0.solr_highlights.assignedTo.0|safe }}
             </a>
           {% endif %}
@@ -134,11 +127,11 @@
         <span class="meta-data-header">Referred To:</span>
         <span class="meta-data-value">
           {% if doc0.referred_to_id %}
-            <a href="?type=r&q=referred_to_id%3A{{ doc0.referred_to_id|urlencode }}">
+            <a href="?type=r&amp;q=referred_to_id:{{ doc0.referred_to_id }}">
                 {{ doc0.solr_highlights.referredTo.0|safe }}
             </a>
           {% else %}
-            <a href="?type=r&referred_to=&quot;{{ doc0.solr_highlights.referredTo.0|striptags|urlencode }}&quot;">
+            <a href="?type=r&amp;referred_to=&quot;{{ doc0.solr_highlights.referredTo.0|striptags }}&quot;">
                 {{ doc0.solr_highlights.referredTo.0|safe }}
             </a>
           {% endif %}
@@ -190,9 +183,8 @@
       {% with limit=results.object_list.params|get:"group.limit" %}
       {% with remaining=result.doclist.numFound|sub:limit %}
       {% if remaining > 0 %}
-      <a href="{% url "show_results" %}?type={{ type|urlencode }}&q={% if request.GET.q %}({{ request.GET.q|urlencode }})%20AND%20{% endif %}docket_id%3A{{ doc0.docket_id|urlencode }}" class="btn-default btn">
-        View {{ remaining }} Additional Result{{ remaining|pluralize }} for this Case
-      </a>
+      <a href="{% url "show_results" %}?type={{ type }}&amp;q={% if request.GET.q %}({{ request.GET.q }}) AND {% endif %}docket_id:{{ doc0.docket_id }}" class="btn-default btn">View {{ remaining }} Additional Result{{ remaining|pluralize }} for
+          this Case</a>
       {% endif %}
       {% endwith %}
       {% endwith %}
@@ -307,19 +299,11 @@
         </div>
       {% endif %}
     {% endif %}
-    {% if type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION %}
+    {% if type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION or type == SEARCH_TYPES.ORAL_ARGUMENT or type_override == SEARCH_TYPES.ORAL_ARGUMENT %}
       {% if result.solr_highlights.docketNumber.0 %}
         <div class="inline-block">
           <span class="meta-data-header">Docket Number:</span>
           <span class="meta-data-value select-all">{{ result.solr_highlights.docketNumber.0|safe }}</span>
-        </div>
-      {% endif %}
-    {% endif %}
-    {% if type == SEARCH_TYPES.ORAL_ARGUMENT or type_override == SEARCH_TYPES.ORAL_ARGUMENT %}
-      {% if result.docketNumber %}
-        <div class="inline-block">
-          <span class="meta-data-header">Docket Number:</span>
-          <span class="meta-data-value select-all">{{ result.docketNumber|safe }}</span>
         </div>
       {% endif %}
     {% endif %}
@@ -332,10 +316,10 @@
   </div>
   <div class="bottom">
     {% if type == SEARCH_TYPES.ORAL_ARGUMENT or type_override == SEARCH_TYPES.ORAL_ARGUMENT %}
-      {% if result.judge %}
+      {% if result.solr_highlights.judge.0 %}
         <div class="inline-block">
           <span class="meta-data-header">Judge:</span>
-          <span class="meta-data-value">{{ result.judge|safe }}</span>
+          <span class="meta-data-value">{{ result.solr_highlights.judge.0|safe }}</span>
         </div>
       {% endif %}
     {% endif %}
@@ -344,7 +328,7 @@
         <div class="inline-block">
           <span class="meta-data-header">Nature of Suit:</span>
           <span class="meta-data-value">
-            <a href="?q=suitNature%3A{{ result.solr_highlights.suitNature.0|striptags|urlencode }}">
+            <a href="?q=suitNature:{{ result.solr_highlights.suitNature.0|striptags }}">
                 {{ result.solr_highlights.suitNature.0|safe }}
             </a>
           </span>
@@ -361,30 +345,21 @@
   </div>
   {% if type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION %}
     {% if result.citeCount > 0 %}
-      <div class="bottom">
-        <div class="inline-block">
-          <span class="meta-data-value">
-            <a href="/?q=cites%3A({{ result.sibling_ids|join:" OR "|urlencode }})"
-               rel="nofollow"
-            >Cited by {{ result.citeCount|intcomma }} opinion{{ result.citeCount|pluralize }}</a>
-          </span>
-        </div>
+      <div class="bottom" class="inline-block">
+        <span class="meta-data-value">
+          <a href="/?q=cites%3A({{ result.sibling_ids|join:" OR " }})"
+             rel="nofollow"
+          >Cited by {{ result.citeCount|intcomma }} opinion{{ result.citeCount|pluralize }}</a>
+        </span>
       </div>
     {% endif %}
   {% endif %}
   {% if simple != True %}
-    {% if type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION %}
+    {% if type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION or type == SEARCH_TYPES.ORAL_ARGUMENT or type_override == SEARCH_TYPES.ORAL_ARGUMENT %}
       <p>
         {% if request.GET.q %}&hellip;{% endif %}{% for frag in result.solr_highlights.text %}
           {{ frag|safe|underscore_to_space }}&hellip;
         {% endfor %}
-      </p>
-    {% endif %}
-    {% if type == SEARCH_TYPES.ORAL_ARGUMENT or type_override == SEARCH_TYPES.ORAL_ARGUMENT %}
-      <p>
-        {% if result.text %}
-          {{ result.text|safe|underscore_to_space }}&hellip;
-        {% endif %}
       </p>
     {% endif %}
   {% endif %}

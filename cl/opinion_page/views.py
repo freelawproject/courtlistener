@@ -178,6 +178,7 @@ def redirect_og_lookup(request: HttpRequest) -> HttpResponse:
             docket_id=rd.docket_entry.docket_id,
             doc_num=rd.document_number,
             att_num=rd.attachment_number,
+            is_og_bot=True,
         )
 
 
@@ -438,6 +439,7 @@ def view_recap_document(
     doc_num: int | None = None,
     att_num: int | None = None,
     slug: str = "",
+    is_og_bot: bool = False,
 ) -> HttpResponse:
     """This view can either load an attachment or a regular document,
     depending on the URL pattern that is matched.
@@ -519,12 +521,16 @@ def view_recap_document(
     else:
         note_form = NoteForm(instance=note)
 
+    # Override the og:url if we're serving a request to an OG crawler bot
+    og_file_path_override = rd.filepath_local if is_og_bot else None
+
     return TemplateResponse(
         request,
         "recap_document.html",
         {
             "rd": rd,
             "title": title,
+            "og_file_path": og_file_path_override,
             "note_form": note_form,
             "private": True,  # Always True for RECAP docs.
             "timezone": COURT_TIMEZONES.get(
