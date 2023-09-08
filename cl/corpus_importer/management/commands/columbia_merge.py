@@ -1,3 +1,17 @@
+"""
+Command to merge opinions with columbia xml file
+
+Merge using a csv file with cluster id and xml file path pointing to mounted directory and file path
+docker-compose -f docker/courtlistener/docker-compose.yml exec cl-django python manage.py columbia_merge --csv-file /opt/courtlistener/cl/assets/media/test1.csv
+
+Csv example:
+cluster_id,filepath
+825802,/opt/columbia/michigan/supreme_court_opinions/documents/d5a484f1bad20ba0.xml
+
+Merge using a cluster id, it will work only if at least one opinion has a xml file path in local_path field
+It requires passing the mounted directory path to the columbia xml files
+docker-compose -f docker/courtlistener/docker-compose.yml exec cl-django python manage.py columbia_merge --cluster-id 2336478 --xml-dir /opt/columbia
+"""
 import csv
 import os.path
 import re
@@ -7,6 +21,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import dateutil.parser as dparser
 from bs4 import BeautifulSoup, NavigableString, Tag
 from django.db import transaction
+from django.db.models import Q
 from juriscraper.lib.string_utils import clean_string, harmonize, titlecase
 
 from cl.corpus_importer.management.commands.harvard_opinions import (
@@ -17,6 +32,27 @@ from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_diff import get_cosine_similarity
 from cl.people_db.lookup_utils import find_just_name
 from cl.search.models import SOURCES, Docket, Opinion, OpinionCluster
+
+VALID_CLUSTER_SOURCES = [
+    SOURCES.COURT_WEBSITE,
+    SOURCES.LAWBOX,
+    SOURCES.PUBLIC_RESOURCE,
+    SOURCES.HARVARD_CASELAW,
+    SOURCES.LAWBOX_M_HARVARD,
+]
+
+ALREADY_MERGED_SOURCES = [
+    SOURCES.COLUMBIA_ARCHIVE,
+    SOURCES.COLUMBIA_M_COURT,
+    SOURCES.COLUMBIA_M_LAWBOX_COURT,
+    SOURCES.COLUMBIA_M_LAWBOX_RESOURCE,
+    SOURCES.COLUMBIA_M_LAWBOX_COURT_RESOURCE,
+    SOURCES.COLUMBIA_M_RESOURCE,
+    SOURCES.COLUMBIA_M_COURT_RESOURCE,
+    SOURCES.COLUMBIA_M_LAWBOX,
+    SOURCES.COLUMBIA_ARCHIVE_M_HARVARD,
+    SOURCES.COLUMBIA_M_LAWBOX_M_HARVARD,
+]
 
 FILED_TAGS = [
     "filed",
@@ -189,17 +225,6 @@ UNKNOWN_TAGS = [
     "as modified",
 ]
 
-VALID_DOCKET_SOURCES = [
-    Docket.COLUMBIA_AND_RECAP,
-    Docket.COLUMBIA_AND_SCRAPER,
-    Docket.COLUMBIA_AND_RECAP_AND_SCRAPER,
-    Docket.COLUMBIA_AND_IDB,
-    Docket.COLUMBIA_AND_RECAP_AND_IDB,
-    Docket.COLUMBIA_AND_SCRAPER_AND_IDB,
-    Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB,
-    Docket.HARVARD_AND_COLUMBIA,
-]
-
 
 class OpinionMatchingException(Exception):
     """An exception for wrong matching opinions"""
@@ -289,20 +314,14 @@ def match_text_lists(
 def get_cl_opinion_content(cluster_id) -> tuple[str, list[dict]]:
     """Get the opinions content for a cluster object
     :param cluster_id: Cluster ID for a set of opinions
-    :return: (xml path, list of extracted opinions, start position)
+    :return: (xml path, list of extracted opinions)
     """
     cl_cleaned_opinions = []
-    # by default the opinions are ordered by pk
-    opinions_from_cluster = Opinion.objects.filter(
-        cluster_id=cluster_id
-    ).order_by("id")
+    opinions_from_cluster = Opinion.objects.filter(cluster_id=cluster_id)
     xml_path = None
 
-    # We exclude combined opinions to try to match individual opinions
-    for i, op in enumerate(opinions_from_cluster.exclude(type="010combined")):
+    for i, op in enumerate(opinions_from_cluster):
         if op.local_path and not xml_path:
-            # We store the field because we are using S3 for storage and that backend
-            # doesn't support absolute paths
             xml_path = str(op.local_path)
         content = None
         if len(op.html_with_citations) > 1:
@@ -329,7 +348,6 @@ def get_cl_opinion_content(cluster_id) -> tuple[str, list[dict]]:
                     "byline": op.author_str,
                     "type": op.type,
                     "opinion": prep_text,
-                    "order": i,
                 }
             )
 
@@ -342,8 +360,6 @@ def read_xml(xml_filepath: str) -> dict:
     :return: dict with data
     """
 
-    # TODO map field names to model names?
-    # (xml field name, cl field name)
     SIMPLE_TAGS = [
         "attorneys",
         "caption",
@@ -631,6 +647,22 @@ def read_xml(xml_filepath: str) -> dict:
                     }
                     opinions.append(new_opinion)
 
+    # only first opinion with "opinion" type is a lead opinion, the next opinion with
+    # "opinion" type is an addendum
+    lead = False
+    for op in opinions:
+        op_type = op.get("type")
+        if not lead and op_type and op_type == "opinion":
+            lead = True
+            op["type"] = "020lead"
+            continue
+        elif lead and op_type and op_type == "opinion":
+            op["type"] = "050addendum"
+        elif op_type and op_type == "dissent":
+            op["type"] = "040dissent"
+        elif op_type and op_type == "concurrence":
+            op["type"] = "030concurrence"
+
     for tag in SIMPLE_TAGS:
         found_tags = soup.findAll(tag)
         for found_tag in found_tags:
@@ -669,7 +701,7 @@ def read_xml(xml_filepath: str) -> dict:
     # Add file path to dict
     data["file"] = xml_filepath
 
-    # Join fields values
+    # Join fields values and set model field names
     data["docket"] = "".join(data.get("docket", [])) or None
     data["attorneys"] = "".join(data.get("attorneys", [])) or None
     data["posture"] = "".join(data.get("posture", [])) or None
@@ -909,23 +941,9 @@ def parse_dates(
 def fetch_columbia_metadata(columbia_data) -> Dict[str, Any]:
     data = {}
 
-    SIMPLE_TAGS = [
-        ("attorneys", "attorneys"),
-        ("caption", "case_name_full"),
-        ("citation", None),
-        ("court", None),
-        ("date", None),
-        ("docket", None),
-        ("hearing_date", None),
-        ("panel", None),
-        ("posture", "posture"),
-        ("reporter_caption", "case_name"),
-    ]
-
     fields = [
         "syllabus",
         "attorneys",
-        "panel",
         "posture",
     ]
 
@@ -986,7 +1004,7 @@ def fetch_columbia_metadata(columbia_data) -> Dict[str, Any]:
 
     for k, v in columbia_data.items():
         if k in fields:
-            data[k] = v
+            data[k] = v if v else ""
     return data
 
 
@@ -1269,25 +1287,65 @@ def update_cluster_source(cluster: OpinionCluster) -> None:
         )
 
 
-def process_cluster(cluster_id: int, xml_dir: str):
-    cluster = OpinionCluster.objects.get(pk=cluster_id)
+def process_cluster(
+    cluster_id: int,
+    xml_dir: str = "",
+    filepath: str = "",
+    csv_file: bool = False,
+):
+    """Merge specified cluster id
+    :param cluster_id: Cluster object id to merge
+    :param xml_dir: path to mounted dir
+    :param filepath: specified path to xml file
+    :param csv_file: set to true if using a csv file
+    """
+    try:
+        cluster = OpinionCluster.objects.get(pk=cluster_id)
+    except OpinionCluster.DoesNotExist:
+        logger.info(f"Cluster ID: {cluster_id} doesn't exist")
+        return
+
+    # Early abort
+    if OpinionCluster.objects.filter(
+        pk=cluster_id, source__in=ALREADY_MERGED_SOURCES
+    ).exists():
+        logger.info(f"Cluster ID: {cluster_id} already merged.")
+        return
+    if (
+        OpinionCluster.objects.filter(pk=cluster_id)
+        .filter(~Q(source__in=VALID_CLUSTER_SOURCES))
+        .exists()
+    ):
+        logger.info(f"Cluster ID: {cluster_id} source not valid.")
+        return
+
     xml_path, cl_cleaned_opinions = get_cl_opinion_content(cluster_id)
 
-    if "/home/mlissner/columbia/opinions/" in str(xml_path):
-        filepath = str(xml_path).replace(
-            "/home/mlissner/columbia/opinions/", ""
+    if not xml_path and not csv_file:
+        logger.info(
+            f"Cluster ID: {cluster_id} doesn't have a local_path field."
         )
-        # fix file path temporarily
-        new_xml_filepath = os.path.join(xml_dir, filepath)
+        return
+
+    if not csv_file:
+        if "/home/mlissner/columbia/opinions/" in xml_path:
+            filepath = xml_path.replace(
+                "/home/mlissner/columbia/opinions/", ""
+            )
+            # fix file path temporarily
+            new_xml_filepath = os.path.join(xml_dir, filepath)
+        else:
+            logger.info(
+                f"Can't fix xml file in: {xml_path} from an opinion from cluster ID: {cluster_id}"
+            )
+            return
     else:
-        logger.info(f"Can't fix xml file path: {xml_path}")
-        raise FileNotFoundError
+        new_xml_filepath = filepath
 
     columbia_data = read_xml(new_xml_filepath)
 
     try:
         with transaction.atomic():
-            # Opinions
             map_and_merge_opinions(
                 cluster_id, cl_cleaned_opinions, columbia_data["opinions"]
             )
@@ -1308,7 +1366,7 @@ def process_cluster(cluster_id: int, xml_dir: str):
             overlapping_data_to_update = merge_overlapping_data(
                 cluster, changed_values_dictionary
             )
-            # headmatter?
+            # TODO panel
 
             # Merge results
             data_to_update = (
@@ -1350,11 +1408,10 @@ def process_cluster(cluster_id: int, xml_dir: str):
         )
 
 
-def process_csv(csv_path, xml_dir):
+def process_csv(csv_path):
     """
     Import xml files from a list of cluster ids in csv file
     :param csv_path: Absolute path to csv file
-    :param xml_dir: Absolute path to csv file
     """
     logger.info(f"Loading csv file at {csv_path}")
 
@@ -1362,8 +1419,11 @@ def process_csv(csv_path, xml_dir):
         csv_reader = csv.DictReader(csv_file)
         for row in csv_reader:
             cluster_id = row.get("cluster_id")
-            if cluster_id:
-                process_cluster(cluster_id, xml_dir)
+            filepath = row.get("filepath")
+            if cluster_id and filepath:
+                process_cluster(
+                    cluster_id=cluster_id, filepath=filepath, csv_file=True
+                )
 
 
 class Command(VerboseCommand):
@@ -1390,39 +1450,41 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options) -> None:
-        if not options["xml_dir"]:
-            logger.info(
-                "Argument --xml-dir required to read xml files from mounted directory"
-            )
-            return
-
         if options["csv_file"] and options["cluster_id"]:
-            print("You can only select one option csv-file or cluster-id")
+            logger.info(
+                "You can only select one option csv-file or cluster-id"
+            )
             return
 
         if options["csv_file"]:
             if not os.path.exists(options["csv_file"]):
                 logger.info("XML file doesn't exist")
                 return
-            process_csv(options["csv_file"], options["xml_dir"])
+            process_csv(options["csv_file"])
 
         if options["cluster_id"] and not options["xml_dir"]:
             logger.info(
-                "Argument --xml-dir required to read xml files from mounted directory"
+                "Argument --xml-dir required to read xml files from mounted directory with --cluster-id option"
             )
             return
 
         if options["cluster_id"]:
-            if not OpinionCluster.objects.filter(
-                pk=options["cluster_id"]
-            ).exists():
-                logger.info("Cluster ID doesn't exist")
-                return
-            if OpinionCluster.objects.filter(
-                pk=options["cluster_id"],
-                docket__source__in=VALID_DOCKET_SOURCES,
-            ).exists():
-                logger.info("Cluster ID already merged.")
-                return
+            process_cluster(
+                cluster_id=options["cluster_id"], xml_dir=options["xml_dir"]
+            )
 
-            process_cluster(options["cluster_id"], options["xml_dir"])
+        if not options["csv_file"] and not options["cluster_id"]:
+            cluster_ids = (
+                OpinionCluster.objects.filter(source__in=VALID_CLUSTER_SOURCES)
+                .exclude(
+                    Q(sub_opinions__local_path="")
+                    | Q(sub_opinions__local_path=None)
+                )
+                .distinct("id")
+                .values_list("id", flat=True)
+            )
+
+            for cluster_id in cluster_ids:
+                process_cluster(
+                    cluster_id=cluster_id, xml_dir=options["xml_dir"]
+                )
