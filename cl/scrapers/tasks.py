@@ -262,7 +262,7 @@ async def extract_recap_pdf_base(
     if not is_iter(pks):
         pks = [pks]
 
-    processed = []
+    processed: List[int] = []
     for pk in pks:
         rd = await RECAPDocument.objects.aget(pk=pk)
         if check_if_needed and not rd.needs_extraction:
@@ -305,7 +305,11 @@ async def extract_recap_pdf_base(
 
         rd.plain_text, _ = anonymize(content)
         # Do not do indexing here. Creates race condition in celery.
-        await rd.asave(index=False, do_extraction=False)
+        await rd.asave(
+            index=False,
+            do_extraction=False,
+            update_fields=["ocr_status", "plain_text"],
+        )
         processed.append(pk)
 
     return processed
