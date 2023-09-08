@@ -54,18 +54,11 @@ FROM build-base as build-prod
 
 WORKDIR $PYSETUP_PATH
 
-# copy project requirement files here to ensure they will be cached.
-ADD https://raw.githubusercontent.com/freelawproject/courtlistener/main/poetry.lock ./poetry.lock
-ADD https://raw.githubusercontent.com/freelawproject/courtlistener/main/pyproject.toml ./pyproject.toml
-
 # install runtime deps - uses $POETRY_VIRTUALENVS_IN_PROJECT internally
+COPY poetry.lock pyproject.toml ./
 RUN poetry install --no-root --without dev
 
-ADD https://github.com/freelawproject/courtlistener/archive/main.tar.gz /opt/courtlistener.tar.gz
-WORKDIR /opt
-RUN tar xvfz courtlistener.tar.gz && \
-    mv /opt/courtlistener-main /opt/courtlistener && \
-    rm -r /opt/courtlistener.tar.gz
+COPY . /opt/courtlistener
 
 # `python-base` sets up all our shared environment variables
 FROM build-${BUILD_ENV} as python-base
