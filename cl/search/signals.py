@@ -139,8 +139,14 @@ _oa_signal_processor = ESSignalProcessor(
 )
 
 
-@receiver(post_save, sender=RECAPDocument, dispatch_uid="handle_recap_doc_change_uid",)
-def handle_recap_doc_change(sender, instance: RECAPDocument, update_fields=None, **kwargs):
+@receiver(
+    post_save,
+    sender=RECAPDocument,
+    dispatch_uid="handle_recap_doc_change_uid",
+)
+def handle_recap_doc_change(
+    sender, instance: RECAPDocument, update_fields=None, **kwargs
+):
     """
     Right now, this receiver exists to enqueue the task to parse RECAPDocuments for caselaw citations.
     More functionality can be put here later. There may be things currently in the save function
