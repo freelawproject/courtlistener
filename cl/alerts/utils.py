@@ -6,7 +6,12 @@ from django.http import QueryDict
 from elasticsearch_dsl import Q, Search
 from elasticsearch_dsl.response import Response
 
-from cl.alerts.models import Alert, DocketAlert
+from cl.alerts.models import (
+    SCHEDULED_ALERT_HIT_STATUS,
+    Alert,
+    DocketAlert,
+    ScheduledAlertHit,
+)
 from cl.lib.command_utils import logger
 from cl.lib.elasticsearch_utils import add_es_highlighting
 from cl.search.documents import AudioPercolator
@@ -133,3 +138,26 @@ def override_alert_query(
             qd["filed_after"] = cut_off_date.strftime("%m/%d/%Y")
 
     return qd
+
+
+def alert_hits_limit_reached(alert_pk: int, user_pk: int) -> bool:
+    """Check if the alert hits limit has been reached for a specific alert-user
+     combination.
+
+    :param alert_pk: The alert_id.
+    :param user_pk: The user_id.
+    :return: True if the limit has been reached, otherwise False.
+    """
+
+    stored_hits = ScheduledAlertHit.objects.filter(
+        alert_id=alert_pk,
+        user_id=user_pk,
+        hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
+    )
+    hits_count = stored_hits.count()
+    if hits_count >= settings.SCHEDULED_ALERT_HITS_LIMIT:
+        logger.info(
+            f"Skipping hit for Alert ID: {alert_pk}, there are {hits_count} hits stored for this alert."
+        )
+        return True
+    return False

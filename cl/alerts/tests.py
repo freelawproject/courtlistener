@@ -5,6 +5,7 @@ from unittest import mock
 from urllib.parse import parse_qs, urlparse
 
 import time_machine
+from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.core import mail
@@ -2542,6 +2543,84 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         oral_argument.delete()
         oral_argument_2.delete()
         oral_argument_3.delete()
+
+    @override_settings(SCHEDULED_ALERT_HITS_LIMIT=3)
+    def test_scheduled_hits_limit(self, mock_abort_audio):
+        """Confirm we only store the max number of alert hits set in settings."""
+
+        alert_1 = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert OA Daily 1",
+            query="q=USA+vs+Bank+&type=oa",
+        )
+        alert_2 = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert OA Daily 2",
+            query="q=Texas+vs+Corp&type=oa",
+        )
+        alert_3 = AlertFactory(
+            user=self.user_profile_2.user,
+            rate=Alert.DAILY,
+            name="Test Alert OA Daily 3",
+            query="q=Texas+vs+Corp&type=oa",
+        )
+
+        oa_created = []
+        for i in range(4):
+            oral_argument = AudioWithParentsFactory.create(
+                case_name="USA vs Bank",
+                docket__court=self.court_1,
+                docket__date_argued=now().date(),
+                docket__docket_number="19-5735",
+            )
+            oa_created.append(oral_argument)
+
+            oral_argument_2 = AudioWithParentsFactory.create(
+                case_name="Texas vs Corp",
+                docket__court=self.court_1,
+                docket__date_argued=now().date(),
+                docket__docket_number="20-5030",
+            )
+            oa_created.append(oral_argument_2)
+
+        # Call dly command
+        call_command("cl_send_scheduled_alerts", rate=Alert.DAILY)
+
+        # Two emails should be sent, one for user_profile and one for user_profile_2
+        self.assertEqual(len(mail.outbox), 2)
+
+        # Confirm emails contains the hits+ count.
+        self.assertIn(
+            f"had {settings.SCHEDULED_ALERT_HITS_LIMIT}+ hits",
+            mail.outbox[0].body,
+        )
+        self.assertIn(
+            f"had {settings.SCHEDULED_ALERT_HITS_LIMIT}+ hits",
+            mail.outbox[1].body,
+        )
+
+        # Confirm each email contains the max number of hits for each alert.
+        self.assertEqual(
+            mail.outbox[0].body.count("USA vs Bank"),
+            settings.SCHEDULED_ALERT_HITS_LIMIT,
+        )
+        self.assertEqual(
+            mail.outbox[0].body.count("Texas vs Corp"),
+            settings.SCHEDULED_ALERT_HITS_LIMIT,
+        )
+        self.assertEqual(
+            mail.outbox[1].body.count("Texas vs Corp"),
+            settings.SCHEDULED_ALERT_HITS_LIMIT,
+        )
+
+        for oa in oa_created:
+            oa.delete()
+
+        alert_1.delete()
+        alert_2.delete()
+        alert_3.delete()
 
 
 @override_settings(ELASTICSEARCH_DISABLED=True)

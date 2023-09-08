@@ -18,6 +18,7 @@ from elasticsearch.exceptions import (
 
 from cl.alerts.models import Alert, DocketAlert, ScheduledAlertHit
 from cl.alerts.utils import (
+    alert_hits_limit_reached,
     override_alert_query,
     percolate_document,
     user_has_donated_enough,
@@ -563,6 +564,12 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
 
         else:
             # Schedule DAILY, WEEKLY and MONTHLY Alerts
+            if alert_hits_limit_reached(
+                alert_triggered.pk, alert_triggered.user.pk
+            ):
+                # Skip storing hits for this alert-user combination because
+                # the SCHEDULED_ALERT_HITS_LIMIT has been reached.
+                continue
             scheduled_hits_to_create.append(
                 ScheduledAlertHit(
                     user=alert_triggered.user,
