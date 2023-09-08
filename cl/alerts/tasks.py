@@ -482,7 +482,10 @@ def send_search_alert_emails(
             continue
 
         alert_user: UserProfile.user = User.objects.get(pk=user_id)
-        context = {"hits": hits}
+        context = {
+            "hits": hits,
+            "hits_limit": settings.SCHEDULED_ALERT_HITS_LIMIT,
+        }
         txt = txt_template.render(context)
         html = html_template.render(context)
         msg = EmailMultiAlternatives(

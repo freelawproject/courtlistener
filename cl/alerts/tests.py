@@ -2577,13 +2577,15 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             )
             oa_created.append(oral_argument)
 
-            oral_argument_2 = AudioWithParentsFactory.create(
-                case_name="Texas vs Corp",
-                docket__court=self.court_1,
-                docket__date_argued=now().date(),
-                docket__docket_number="20-5030",
-            )
-            oa_created.append(oral_argument_2)
+            if i in (1, 2):
+                # Only schedule two hits for this one.
+                oral_argument_2 = AudioWithParentsFactory.create(
+                    case_name="Texas vs Corp",
+                    docket__court=self.court_1,
+                    docket__date_argued=now().date(),
+                    docket__docket_number="20-5030",
+                )
+                oa_created.append(oral_argument_2)
 
         # Call dly command
         call_command("cl_send_scheduled_alerts", rate=Alert.DAILY)
@@ -2596,8 +2598,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             f"had {settings.SCHEDULED_ALERT_HITS_LIMIT}+ hits",
             mail.outbox[0].body,
         )
+        # No "+" if hits do not reach the SCHEDULED_ALERT_HITS_LIMIT.
         self.assertIn(
-            f"had {settings.SCHEDULED_ALERT_HITS_LIMIT}+ hits",
+            f"had 2 hits",
             mail.outbox[1].body,
         )
 
@@ -2608,11 +2611,11 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         )
         self.assertEqual(
             mail.outbox[0].body.count("Texas vs Corp"),
-            settings.SCHEDULED_ALERT_HITS_LIMIT,
+            2,
         )
         self.assertEqual(
             mail.outbox[1].body.count("Texas vs Corp"),
-            settings.SCHEDULED_ALERT_HITS_LIMIT,
+            2,
         )
 
         for oa in oa_created:
