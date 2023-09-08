@@ -33,7 +33,7 @@ class RECAPDocumentSignalTests(SimpleTestCase):
 
 @dataclass
 class ReceiverTestCase:
-    update_fields: List[str]
+    update_fields: List[str]|None
     ocr_status: RECAPDocument.OCR_STATUSES
     expect_enqueue: bool
 
