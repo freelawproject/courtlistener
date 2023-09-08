@@ -152,7 +152,6 @@ def handle_recap_doc_change(
     More functionality can be put here later. There may be things currently in the save function
     of RECAPDocument that would be better placed here for reasons of maintainability and testability.
     """
-    update_fields = kwargs.get("update_fields", [])
 
     # Whenever pdf text is processed, it will update the plain_text field.
     # When we get updated text for a doc, we want to parse it for citations.
