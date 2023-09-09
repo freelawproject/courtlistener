@@ -499,11 +499,11 @@ def show_results(request: HttpRequest) -> HttpResponse:
                     else:
                         render_dict.update(do_search(request.GET.copy()))
                 case SEARCH_TYPES.RECAP:
-                        if waffle.flag_is_active(request, "r-es-active"):
-                            search_results = do_es_search(request.GET.copy())
-                        else:
-                            search_results = do_search(request.GET.copy())
-                        render_dict.update(search_results)
+                    if waffle.flag_is_active(request, "r-es-active"):
+                        search_results = do_es_search(request.GET.copy())
+                    else:
+                        search_results = do_search(request.GET.copy())
+                    render_dict.update(search_results)
                 case _:
                     render_dict.update(do_search(request.GET.copy()))
 
