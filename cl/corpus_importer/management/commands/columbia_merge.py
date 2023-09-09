@@ -39,6 +39,8 @@ VALID_CLUSTER_SOURCES = [
     SOURCES.PUBLIC_RESOURCE,
     SOURCES.HARVARD_CASELAW,
     SOURCES.LAWBOX_M_HARVARD,
+    SOURCES.COURT_M_HARVARD,
+    SOURCES.LAWBOX_M_COURT_M_HARVARD,
 ]
 
 ALREADY_MERGED_SOURCES = [
@@ -52,6 +54,8 @@ ALREADY_MERGED_SOURCES = [
     SOURCES.COLUMBIA_M_LAWBOX,
     SOURCES.COLUMBIA_ARCHIVE_M_HARVARD,
     SOURCES.COLUMBIA_M_LAWBOX_M_HARVARD,
+    SOURCES.COLUMBIA_M_COURT_M_HARVARD,
+    SOURCES.COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
 ]
 
 FILED_TAGS = [
@@ -293,10 +297,10 @@ def match_text_lists(
     for i, row in enumerate(scores):
         j = row.argmax()  # type: ignore
         # Lower threshold for small opinions.
-        if (
-            get_cosine_similarity(file_opinions_list[i], cl_opinions_list[j])
-            < 0.60
-        ):
+        cosine_sim = get_cosine_similarity(
+            file_opinions_list[i], cl_opinions_list[j]
+        )
+        if cosine_sim < 0.60:
             continue
         percent_match = compare_documents(
             file_opinions_list[i], cl_opinions_list[j]
@@ -666,29 +670,90 @@ def read_xml(xml_filepath: str) -> dict:
     for tag in SIMPLE_TAGS:
         found_tags = soup.findAll(tag)
         for found_tag in found_tags:
-            # remove inner <citation> and <page-number> tags and content
+            # remove inner <citation> and <page_number> tags and content
             extra_tags_to_remove = found_tag.findAll(
-                re.compile("citation|page-number")
+                re.compile("citation|page_number")
             )
             if extra_tags_to_remove:
                 for r in extra_tags_to_remove:
-                    if r.next_sibling:
-                        if type(r.next_sibling) == NavigableString:
-                            # The element is not tagged, it is just a text
-                            # string
-                            r.next_sibling.extract()
+                    if tag == "reporter_caption":
+                        # The reporter_caption
+                        if r.next_sibling:
+                            if type(r.next_sibling) == NavigableString:
+                                # The element is not tagged, it is just a text
+                                # string
+                                r.next_sibling.extract()
                     r.extract()
 
-        # We use space as a separator to add a space when we have one tag
-        # next to other without a space, ee try to remove double spaces
+        # We use space as a separator to add a space when we have one tag next to other without a space
         data[tag] = [
-            re.sub(" +", " ", found_tag.get_text(separator=" ").strip())
+            found_tag.get_text(separator=" ").strip()
             for found_tag in found_tags
         ]
+
+        if tag in ["attorneys", "posture"]:
+            # Replace multiple line breaks in this specific fields
+            data[tag] = [re.sub("\n+", " ", c) for c in data.get(tag)]
+
+        if tag in ["reporter_caption"]:
+            # Remove the last comma from the case name
+            data[tag] = [c.rstrip(",") for c in data.get(tag)]
+
+        # Remove repeated spaces
+        data[tag] = [re.sub(" +", " ", c) for c in data.get(tag)]
 
         if tag == "citation":
             # Remove duplicated citations,
             data[tag] = list(set(data[tag]))
+
+    dates = data.get("date", []) + data.get("hearing_date", [])
+    parsed_dates = parse_dates(dates)
+    current_year = date.today().year
+    date_filed = date_argued = date_reargued = date_reargument_denied = None
+    unknown_date = None
+
+    for date_cluster in parsed_dates:
+        for date_info in date_cluster:
+            # check for any dates that clearly aren't dates
+            if date_info[1].year < 1600 or date_info[1].year > current_year:
+                continue
+            # check for untagged dates that will be assigned to date_filed
+            if date_info[0] is None:
+                date_filed = date_info[1]
+                continue
+            # try to figure out what type of date it is based on its tag string
+            if date_info[0] in FILED_TAGS:
+                date_filed = date_info[1]
+            elif date_info[0] in DECIDED_TAGS:
+                if not date_filed:
+                    date_filed = date_info[1]
+            elif date_info[0] in ARGUED_TAGS:
+                date_argued = date_info[1]
+            elif date_info[0] in REARGUE_TAGS:
+                date_reargued = date_info[1]
+            elif date_info[0] in REARGUE_DENIED_TAGS:
+                date_reargument_denied = date_info[1]
+            else:
+                unknown_date = date_info[1]
+                if date_info[0] not in UNKNOWN_TAGS:
+                    logger.info(
+                        f"Found unknown date tag {date_info[0]} with date {date_info[1]} in file {xml_filepath}"
+                    )
+
+    # the main date (used for date_filed in OpinionCluster) and panel dates
+    # (used for finding judges) are ordered in terms of which type of dates
+    # best reflect them
+    main_date = (
+        date_filed
+        or date_argued
+        or date_reargued
+        or date_reargument_denied
+        or unknown_date
+    )
+    if main_date is None:
+        raise DateException(f"Failed to get a date for {xml_filepath}")
+
+    data["date_filed"] = date_filed
 
     # Get syllabus from file
     data["syllabus"] = "\n".join(
@@ -874,6 +939,33 @@ def map_and_merge_opinions(
         else:
             raise OpinionMatchingException("Failed to match opinions")
 
+    elif (
+        len(columbia_opinions) > len(cl_cleaned_opinions)
+        and len(cl_cleaned_opinions) == 1
+    ):
+        for op in columbia_opinions:
+            opinion_type = op.get("type")
+            file = op.get("file")
+            if not opinion_type:
+                raise OpinionTypeException(
+                    f"Opinion type unknown: {op.get('type')} found in: {file}"
+                )
+            author = op.get("byline")
+
+            converted_text = convert_columbia_opinion(
+                op.get("opinion"), op.get("order")
+            )
+
+            # TODO add order field
+            Opinion.objects.create(
+                html_columbia=converted_text,
+                cluster_id=cluster_id,
+                type=opinion_type,
+                author_str=titlecase(find_just_name(author.strip(":")))
+                if author
+                else "",
+            )
+
     else:
         # Skip creating new opinion cluster due to differences between data
         logger.info(
@@ -939,6 +1031,10 @@ def parse_dates(
 
 
 def fetch_columbia_metadata(columbia_data) -> Dict[str, Any]:
+    """Extract only the desired fields
+    :param columbia_data: dict with columbia data
+    :return: reduced dict
+    """
     data = {}
 
     fields = [
@@ -946,61 +1042,6 @@ def fetch_columbia_metadata(columbia_data) -> Dict[str, Any]:
         "attorneys",
         "posture",
     ]
-
-    dates = columbia_data.get("date", []) + columbia_data.get(
-        "hearing_date", []
-    )
-    parsed_dates = parse_dates(dates)
-
-    current_year = date.today().year
-
-    date_filed = date_argued = date_reargued = date_reargument_denied = None
-    unknown_date = None
-
-    for date_cluster in parsed_dates:
-        for date_info in date_cluster:
-            # check for any dates that clearly aren't dates
-            if date_info[1].year < 1600 or date_info[1].year > current_year:
-                continue
-            # check for untagged dates that will be assigned to date_filed
-            if date_info[0] is None:
-                date_filed = date_info[1]
-                continue
-            # try to figure out what type of date it is based on its tag string
-            if date_info[0] in FILED_TAGS:
-                date_filed = date_info[1]
-            elif date_info[0] in DECIDED_TAGS:
-                if not date_filed:
-                    date_filed = date_info[1]
-            elif date_info[0] in ARGUED_TAGS:
-                date_argued = date_info[1]
-            elif date_info[0] in REARGUE_TAGS:
-                date_reargued = date_info[1]
-            elif date_info[0] in REARGUE_DENIED_TAGS:
-                date_reargument_denied = date_info[1]
-            else:
-                unknown_date = date_info[1]
-                if date_info[0] not in UNKNOWN_TAGS:
-                    logger.info(
-                        f"Found unknown date tag {date_info[0]} with date {date_info[1]} in file {columbia_data['file']}"
-                    )
-
-    # the main date (used for date_filed in OpinionCluster) and panel dates
-    # (used for finding judges) are ordered in terms of which type of dates
-    # best reflect them
-    main_date = (
-        date_filed
-        or date_argued
-        or date_reargued
-        or date_reargument_denied
-        or unknown_date
-    )
-    if main_date is None:
-        raise DateException(
-            f"Failed to get a date for {columbia_data['file']}"
-        )
-
-    data["date_filed"] = date_filed
 
     for k, v in columbia_data.items():
         if k in fields:
@@ -1022,12 +1063,13 @@ def combine_non_overlapping_data(
     to_update: dict[str, Any] = {}
     for key, value in all_data.items():
         cl_value = getattr(cluster, key)
-        if not cl_value:
+        if not cl_value and value:
             # Value is empty for key, we can add it directly to the object
             to_update[key] = value
         else:
-            if value != cl_value:
-                # We have different values, update dict
+            if value != cl_value and value:
+                # We have different values and value from file exists, update dict
+                # Tuple format: (new value, old value)
                 changed_values_dictionary[key] = (value, cl_value)
 
     if to_update:
@@ -1278,6 +1320,9 @@ def update_cluster_source(cluster: OpinionCluster) -> None:
         SOURCES.COLUMBIA_M_COURT_RESOURCE,
         SOURCES.COLUMBIA_M_LAWBOX,
         SOURCES.COLUMBIA_ARCHIVE_M_HARVARD,
+        SOURCES.COLUMBIA_M_LAWBOX_M_HARVARD,
+        SOURCES.COLUMBIA_M_COURT_M_HARVARD,
+        SOURCES.COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
     ]:
         cluster.source = new_cluster_source
         cluster.save()
@@ -1326,6 +1371,8 @@ def process_cluster(
             f"Cluster ID: {cluster_id} doesn't have a local_path field."
         )
         return
+
+    logger.info(f"Processing cluster id: {cluster_id}")
 
     if not csv_file:
         if "/home/mlissner/columbia/opinions/" in xml_path:
