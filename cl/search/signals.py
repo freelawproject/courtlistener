@@ -209,7 +209,7 @@ _p_signal_processor = ESSignalProcessor(
     Person, PersonDocument, p_field_mapping
 )
 
-_position_signañ_processor = ESSignalProcessor(
+_position_signal_processor = ESSignalProcessor(
     Position, PositionDocument, position_field_mapping
 )
 

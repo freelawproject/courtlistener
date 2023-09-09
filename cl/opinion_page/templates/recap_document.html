@@ -11,6 +11,7 @@
 {% endblock %}
 {% block og_description %}{% if rd.docket_entry.description %}{{ rd.docket_entry.description }}{% else %}{{ rd.description }}{% endif %}
 {% endblock %}
+{% block og_url %}{% if og_file_path %}{% get_full_host %}{{ og_file_path }}{% else %}{{ block.super }}{% endif %}{% endblock %}
 {% block twitter_card_type %}{% if rd.thumbnail %}summary_large_image{% else %}{{ block.super }}{% endif %}{% endblock %}
 {% block og_image %}{% if rd.thumbnail %}{{ rd.thumbnail.url }}{% else %}{{ block.super }}{% endif %}{% endblock %}
 {% block og_image_alt %}{% if rd.thumbnail %}The first page of the document in the linked PDF{% else %}{{ block.super }}{% endif %}{% endblock %}

@@ -238,10 +238,26 @@ class AudioDocument(AudioDocumentBase):
 
     def prepare_file_size_mp3(self, instance):
         if instance.local_path_mp3:
+            if not instance.local_path_mp3.storage.exists(
+                instance.local_path_mp3.name
+            ):
+                logger.warning(
+                    f"The file {instance.local_path_mp3.name} associated with "
+                    f"Audio ID {instance.pk} not found in S3. "
+                )
+                return None
             return deepgetattr(instance, "local_path_mp3.size", None)
 
     def prepare_local_path(self, instance):
         if instance.local_path_mp3:
+            if not instance.local_path_mp3.storage.exists(
+                instance.local_path_mp3.name
+            ):
+                logger.warning(
+                    f"The file {instance.local_path_mp3.name} associated with "
+                    f"Audio ID {instance.pk} not found in S3. "
+                )
+                return None
             return deepgetattr(instance, "local_path_mp3.name", None)
 
     def prepare_text(self, instance):
@@ -332,8 +348,38 @@ class PositionDocument(PersonBaseDocument):
         },
         search_analyzer="search_analyzer",
     )
+    court_full_name = fields.TextField(
+        attr="court.full_name",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="court.full_name", analyzer="english_exact"
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
     court_exact = fields.KeywordField(attr="court.pk")
+    court_id_text = fields.TextField(
+        attr="court.pk",
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
+    )
+    court_citation_string = fields.TextField(
+        attr="court.citation_string",
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
+    )
+    organization_name = fields.TextField(attr="organization_name")
+    job_title = fields.TextField(
+        attr="job_title",
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
+    )
     position_type = fields.KeywordField()
+    position_type_text = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
+    )
     appointer = fields.TextField(
         attr="appointer.person.name_full_reverse",
         analyzer="text_en_splitting_cl",
@@ -384,10 +430,29 @@ class PositionDocument(PersonBaseDocument):
         attr="date_granularity_termination"
     )
     judicial_committee_action = fields.KeywordField()
+    judicial_committee_action_text = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
+    )
+
     nomination_process = fields.KeywordField()
+    nomination_process_text = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
+    )
+
     selection_method = fields.KeywordField()
+    selection_method_text = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
+    )
     selection_method_id = fields.KeywordField(attr="how_selected")
+
     termination_reason = fields.KeywordField()
+    termination_reason_text = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
+    )
 
     class Django:
         model = Position
@@ -396,16 +461,31 @@ class PositionDocument(PersonBaseDocument):
     def prepare_position_type(self, instance):
         return instance.get_position_type_display()
 
+    def prepare_position_type_text(self, instance):
+        return instance.get_position_type_display()
+
     def prepare_judicial_committee_action(self, instance):
+        return instance.get_judicial_committee_action_display()
+
+    def prepare_judicial_committee_action_text(self, instance):
         return instance.get_judicial_committee_action_display()
 
     def prepare_nomination_process(self, instance):
         return instance.get_nomination_process_display()
 
+    def prepare_nomination_process_text(self, instance):
+        return instance.get_nomination_process_display()
+
     def prepare_selection_method(self, instance):
         return instance.get_how_selected_display()
 
+    def prepare_selection_method_text(self, instance):
+        return instance.get_how_selected_display()
+
     def prepare_termination_reason(self, instance):
+        return instance.get_termination_reason_display()
+
+    def prepare_termination_reason_text(self, instance):
         return instance.get_termination_reason_display()
 
     def prepare_person_child(self, instance):

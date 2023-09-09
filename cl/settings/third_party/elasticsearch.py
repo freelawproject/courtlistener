@@ -89,12 +89,12 @@ ELASTICSEARCH_DSL = {
             "synonym_filter": {
                 "type": "synonym_graph",
                 "expand": True,
-                "synonyms_path": "synonyms_en.txt",
+                "synonyms_path": "dictionaries/synonyms_en.txt",
             },
             "english_stemmer": {"type": "stemmer", "language": "english"},
             "english_stop": {
                 "type": "stop",
-                "stopwords_path": "stopwords_en.txt",
+                "stopwords_path": "dictionaries/stopwords_en.txt",
             },
             "remove_duplicates": {"type": "unique"},
             "remove_leading_zeros": {

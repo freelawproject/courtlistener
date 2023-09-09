@@ -744,7 +744,7 @@ def remove_doc_from_es_index(
                 doc.delete(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)
 
     except NotFoundError:
-        model_label = es_document.Django.model._meta.app_label.capitalize()
+        model_label = es_document.Django.model.__name__.capitalize()
         logger.error(
             f"The {model_label} with ID:{instance_id} can't be deleted from "
             f"the ES index, it doesn't exists."
