@@ -19,6 +19,7 @@ from cl.people_db.factories import PersonFactory
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SOURCES,
+    BankruptcyInformation,
     Citation,
     Court,
     Docket,
@@ -29,7 +30,6 @@ from cl.search.models import (
     Parenthetical,
     ParentheticalGroup,
     RECAPDocument,
-BankruptcyInformation,
 )
 from cl.tests.providers import LegalProvider
 

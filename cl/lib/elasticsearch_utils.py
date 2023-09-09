@@ -369,6 +369,8 @@ def build_sort_results(cd: CleanData) -> Dict:
         },
         "dateFiled desc": {"dateFiled": {"order": "desc"}},
         "dateFiled asc": {"dateFiled": {"order": "asc"}},
+        "entry_date_filed asc": {"entry_date_filed": {"order": "asc"}},
+        "entry_date_filed desc": {"entry_date_filed": {"order": "desc"}},
     }
 
     if cd["type"] == SEARCH_TYPES.PARENTHETICAL:
@@ -469,7 +471,7 @@ def build_es_base_query(search_query: Search, cd: CleanData) -> Search:
     """
 
     string_query = None
-    join_field_documents = [SEARCH_TYPES.PEOPLE]
+    join_field_documents = [SEARCH_TYPES.PEOPLE, SEARCH_TYPES.RECAP]
     if cd["type"] in join_field_documents:
         filters = build_join_es_filters(cd)
     else:
@@ -568,6 +570,11 @@ def build_es_base_query(search_query: Search, cd: CleanData) -> Search:
             # Only return Person documents.
             search_query = search_query.query(
                 Q("match", person_child="person")
+            )
+        elif cd["type"] == SEARCH_TYPES.RECAP:
+            # Only return Docket documents.
+            search_query = search_query.query(
+                Q("match", docket_child="docket")
             )
         else:
             search_query = search_query.query("match_all")
@@ -1048,6 +1055,33 @@ def build_has_child_filters(
             if appointer:
                 queries_list.extend(build_text_filter("appointer", appointer))
 
+    if cd["type"] == SEARCH_TYPES.RECAP:
+        if child_type == "recap_document":
+            available_only = cd.get("available_only", "")
+            description = cd.get("description", "")
+            document_number = cd.get("document_number", "")
+            attachment_number = cd.get("attachment_number", "")
+
+            if available_only:
+                queries_list.extend(
+                    build_term_query(
+                        "is_available",
+                        available_only,
+                    )
+                )
+            if description:
+                queries_list.extend(
+                    build_text_filter("description", description)
+                )
+            if document_number:
+                queries_list.extend(
+                    build_term_query("document_number", document_number)
+                )
+            if attachment_number:
+                queries_list.extend(
+                    build_term_query("attachment_number", attachment_number)
+                )
+
     if not queries_list:
         return []
 
@@ -1087,9 +1121,36 @@ def build_join_es_filters(cd: CleanData) -> List:
                 *build_text_filter("school", cd.get("school", "")),
             ]
         )
-
         # Build position has child filter:
         queries_list.extend(build_has_child_filters("position", cd))
+
+    if cd["type"] == SEARCH_TYPES.RECAP:
+        queries_list.extend(
+            [
+                *build_term_query(
+                    "court_id",
+                    cd.get("court", "").split(),
+                ),
+                *build_text_filter("caseName", cd.get("case_name", "")),
+                *build_term_query(
+                    "docketNumber",
+                    cd.get("docket_number", ""),
+                    make_phrase=True,
+                    slop=1,
+                ),
+                *build_text_filter("suitNature", cd.get("nature_of_suit", "")),
+                *build_text_filter("cause", cd.get("cause", "")),
+                *build_text_filter("assignedTo", cd.get("assigned_to", "")),
+                *build_text_filter("referredTo", cd.get("referred_to", "")),
+                *build_daterange_query(
+                    "dateFiled",
+                    cd.get("filed_before", ""),
+                    cd.get("filed_after", ""),
+                ),
+            ]
+        )
+        # Build position has child filter:
+        queries_list.extend(build_has_child_filters("recap_document", cd))
 
     return queries_list
 

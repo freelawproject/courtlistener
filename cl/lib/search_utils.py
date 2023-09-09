@@ -37,26 +37,24 @@ recap_boosts_qf = {
     # Docket fields
     "caseName": 4.0,
     "docketNumber": 3.0,
-    "case_name_full":1,
-    "suitNature":1,
-    "cause":1,
-    "juryDemand":1,
-    "dateArgued_text":1,
-    "dateFiled_text":1,
-    "dateTerminated_text":1,
-    "assignedTo":1,
-    "referredTo":1,
-    "court":1,
-    "court_id_text":1,
-    "court_citation_string":1,
-    "chapter":1,
-    "trustee_str":1,
-
+    "case_name_full": 1,
+    "suitNature": 1,
+    "cause": 1,
+    "juryDemand": 1,
+    "dateArgued_text": 1,
+    "dateFiled_text": 1,
+    "dateTerminated_text": 1,
+    "assignedTo": 1,
+    "referredTo": 1,
+    "court": 1,
+    "court_id_text": 1,
+    "court_citation_string": 1,
+    "chapter": 1,
+    "trustee_str": 1,
     # RECAPDocument fields:
     "description": 2.0,
-    "short_description":1,
-    "plain_text":1,
-
+    "short_description": 1,
+    "plain_text": 1,
 }
 recap_boosts_pf = {"text": 3.0, "caseName": 3.0, "description": 3.0}
 BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {

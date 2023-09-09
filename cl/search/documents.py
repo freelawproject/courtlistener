@@ -9,7 +9,7 @@ from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.command_utils import logger
 from cl.lib.elasticsearch_utils import build_es_base_query
-from cl.lib.fields import PercolatorField, JoinField
+from cl.lib.fields import JoinField, PercolatorField
 from cl.lib.search_index_utils import null_map
 from cl.lib.utils import deepgetattr
 from cl.people_db.models import Person, Position
@@ -755,7 +755,8 @@ class DocketDocument(DocketBaseDocument):
         },
         search_analyzer="search_analyzer",
     )
-    court_exact = fields.KeywordField(attr="court.pk")
+    court_exact = fields.KeywordField(attr="court.pk", index=False)
+    court_id = fields.KeywordField(attr="court.pk")
     court_id_text = fields.TextField(
         attr="court.pk",
         analyzer="text_en_splitting_cl",

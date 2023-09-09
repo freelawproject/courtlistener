@@ -14,10 +14,10 @@ from cl.search.api_serializers import (
     OpinionSerializer,
     OriginalCourtInformationSerializer,
     RECAPDocumentSerializer,
+    RECAPESResultSerializer,
     SearchResultSerializer,
     TagSerializer,
 )
-from cl.search.documents import AudioDocument, PersonDocument
 from cl.search.filters import (
     CourtFilter,
     DocketEntryFilter,
@@ -189,6 +189,10 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
             ):
                 serializer = ExtendedPersonESSerializer(result_page, many=True)
 
+            elif search_type == SEARCH_TYPES.RECAP and waffle.flag_is_active(
+                request, "r-es-active"
+            ):
+                serializer = RECAPESResultSerializer(result_page, many=True)
             else:
                 if cd["q"] == "":
                     cd["q"] = "*"  # Get everything

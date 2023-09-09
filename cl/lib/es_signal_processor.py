@@ -10,7 +10,11 @@ from cl.alerts.tasks import (
     send_or_schedule_alerts,
 )
 from cl.lib.elasticsearch_utils import elasticsearch_enabled
-from cl.search.documents import AudioDocument, ParentheticalGroupDocument, ESRECAPDocument
+from cl.search.documents import (
+    AudioDocument,
+    ESRECAPDocument,
+    ParentheticalGroupDocument,
+)
 from cl.search.tasks import save_document_in_es, update_document_in_es
 from cl.search.types import ESDocumentType, ESModelType
 
@@ -232,9 +236,7 @@ def update_reverse_related_documents(
 
         fields_to_update = {}
         for field in affected_fields:
-            prepare_method = getattr(
-                main_doc, f"prepare_{field}", None
-            )
+            prepare_method = getattr(main_doc, f"prepare_{field}", None)
             if prepare_method:
                 field_value = prepare_method(main_object)
             else:

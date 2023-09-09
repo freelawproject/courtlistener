@@ -3,10 +3,15 @@ import unittest
 
 from asgiref.sync import sync_to_async
 from django.urls import reverse
+from elasticsearch_dsl import Q
 from lxml import html
 from rest_framework.status import HTTP_200_OK
-from elasticsearch_dsl import Q
 
+from cl.lib.elasticsearch_utils import (
+    build_es_main_query,
+    build_join_es_filters,
+    build_join_fulltext_queries,
+)
 from cl.people_db.factories import (
     AttorneyFactory,
     AttorneyOrganizationFactory,
@@ -14,22 +19,17 @@ from cl.people_db.factories import (
     PartyTypeFactory,
     PersonFactory,
 )
-from cl.lib.elasticsearch_utils import (
-    build_es_main_query,
-    build_join_es_filters,
-    build_join_fulltext_queries,
-)
+from cl.search.documents import ES_CHILD_ID, DocketDocument, ESRECAPDocument
 from cl.search.factories import (
+    BankruptcyInformationFactory,
     CourtFactory,
     DocketEntryWithParentsFactory,
     DocketFactory,
     RECAPDocumentFactory,
-BankruptcyInformationFactory
 )
 from cl.search.models import SEARCH_TYPES, RECAPDocument
 from cl.search.tasks import add_docket_to_solr_by_rds
 from cl.tests.cases import ESIndexTestCase, TestCase
-from cl.search.documents import DocketDocument, ESRECAPDocument, ES_CHILD_ID
 
 
 class RECAPSearchTest(ESIndexTestCase, TestCase):
@@ -122,10 +122,9 @@ class RECAPSearchTest(ESIndexTestCase, TestCase):
             description="Leave to File",
             document_number="3",
             page_count=10,
-            plain_text="Maecenas nunc justo"
+            plain_text="Maecenas nunc justo",
         )
         super().setUpTestData()
-
 
     async def _test_article_count(self, params, expected_count, field_name):
         r = await self.async_client.get("/", params)
@@ -174,6 +173,22 @@ class RECAPSearchTest(ESIndexTestCase, TestCase):
             "     Got: %s\n\n" % (field_name, expected_count, got),
         )
 
+    def _test_main_es_query(self, cd, parent_expected, field_name):
+        search_query = DocketDocument.search()
+        s, total_query_results, top_hits_limit = build_es_main_query(
+            search_query, cd
+        )
+        self.assertEqual(
+            total_query_results,
+            parent_expected,
+            msg="Did not get the right number of parent documents %s\n"
+            "Expected: %s\n"
+            "     Got: %s\n\n"
+            % (field_name, parent_expected, total_query_results),
+        )
+
+        return s.execute().to_dict()
+
     def test_index_recap_parent_and_child_objects(self) -> None:
         """Confirm Dockets and RECAPDocuments are properly indexed in ES"""
 
@@ -188,11 +203,7 @@ class RECAPSearchTest(ESIndexTestCase, TestCase):
             self.rd_2.pk,
         ]
         for rd_pk in rd_pks:
-            self.assertTrue(
-                DocketDocument.exists(
-                    id=ES_CHILD_ID(rd_pk).RECAP
-                )
-            )
+            self.assertTrue(DocketDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP))
 
     def test_update_and_remove_parent_child_objects_in_es(self) -> None:
         """Confirm child documents can be updated and removed properly."""
@@ -211,7 +222,7 @@ class RECAPSearchTest(ESIndexTestCase, TestCase):
             ),
             date_filed=datetime.date(2015, 8, 19),
             description="MOTION for Leave to File Amicus Curiae Lorem",
-            )
+        )
         rd_1 = RECAPDocumentFactory(
             docket_entry=de_1,
             description="Leave to File",
@@ -224,9 +235,7 @@ class RECAPSearchTest(ESIndexTestCase, TestCase):
         rd_pk = rd_1.pk
         self.assertTrue(DocketDocument.exists(id=docket_pk))
 
-        self.assertTrue(
-            DocketDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP)
-        )
+        self.assertTrue(DocketDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP))
 
         # Update docket field:
         de_1.docket.case_name = "USA vs Bank"
@@ -234,7 +243,6 @@ class RECAPSearchTest(ESIndexTestCase, TestCase):
 
         docket_doc = DocketDocument.get(id=docket_pk)
         self.assertIn("USA vs Bank", docket_doc.caseName)
-
 
         # Update docket entry field:
 
@@ -262,7 +270,6 @@ class RECAPSearchTest(ESIndexTestCase, TestCase):
         self.assertEqual("97", docket_doc.chapter)
         self.assertEqual("Victoria, Sherline", docket_doc.trustee_str)
 
-
         # Add another RD:
         rd_2 = RECAPDocumentFactory(
             docket_entry=de_1,
@@ -273,38 +280,24 @@ class RECAPSearchTest(ESIndexTestCase, TestCase):
         )
 
         rd_2_pk = rd_2.pk
-        self.assertTrue(
-            DocketDocument.exists(id=ES_CHILD_ID(rd_2_pk).RECAP)
-        )
+        self.assertTrue(DocketDocument.exists(id=ES_CHILD_ID(rd_2_pk).RECAP))
         rd_2.delete()
-        self.assertFalse(
-            DocketDocument.exists(id=ES_CHILD_ID(rd_2_pk).RECAP)
-        )
+        self.assertFalse(DocketDocument.exists(id=ES_CHILD_ID(rd_2_pk).RECAP))
 
         self.assertTrue(DocketDocument.exists(id=docket_pk))
-        self.assertTrue(
-            DocketDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP)
-        )
+        self.assertTrue(DocketDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP))
 
         de_1.docket.delete()
         self.assertFalse(DocketDocument.exists(id=docket_pk))
-        self.assertFalse(
-            DocketDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP)
-        )
+        self.assertFalse(DocketDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP))
 
     def test_has_child_text_queries(self) -> None:
-        """Test the build_es_main_query method."""
+        """Test has_child text queries."""
         cd = {
             "type": SEARCH_TYPES.RECAP,
             "q": "Discharging Debtor",
         }
-        search_query = DocketDocument.search()
-        s, total_query_results, top_hits_limit = build_es_main_query(
-            search_query, cd
-        )
-
-        response = s.execute().to_dict()
-        self.assertEqual(s.count(), 1)
+        response = self._test_main_es_query(cd, 1, "q")
         self.assertEqual(
             1,
             len(
@@ -318,12 +311,7 @@ class RECAPSearchTest(ESIndexTestCase, TestCase):
             "type": SEARCH_TYPES.RECAP,
             "q": "Document attachment",
         }
-        search_query = DocketDocument.search()
-        s, total_query_results, top_hits_limit = build_es_main_query(
-            search_query, cd
-        )
-        response = s.execute().to_dict()
-        self.assertEqual(s.count(), 1)
+        response = self._test_main_es_query(cd, 1, "q")
         self.assertEqual(
             1,
             len(
@@ -334,22 +322,123 @@ class RECAPSearchTest(ESIndexTestCase, TestCase):
         )
         self.assertEqual(
             "Document attachment",
-                response["hits"]["hits"][0]["inner_hits"][
-                    "text_query_inner_recap_document"
-                ]["hits"]["hits"][0]["_source"]["short_description"]
-
+            response["hits"]["hits"][0]["inner_hits"][
+                "text_query_inner_recap_document"
+            ]["hits"]["hits"][0]["_source"]["short_description"],
         )
 
         cd = {
             "type": SEARCH_TYPES.RECAP,
             "q": "Maecenas nunc justo",
         }
-        search_query = DocketDocument.search()
-        s, total_query_results, top_hits_limit = build_es_main_query(
-            search_query, cd
+        response = self._test_main_es_query(cd, 1, "q")
+        self.assertEqual(
+            1,
+            len(
+                response["hits"]["hits"][0]["inner_hits"][
+                    "text_query_inner_recap_document"
+                ]["hits"]["hits"]
+            ),
         )
-        response = s.execute().to_dict()
-        self.assertEqual(s.count(), 1)
+        # Test Parent field
+
+    def test_child_and_parent_filter_queries(self) -> None:
+        """Test has_child filters method."""
+
+        # Filter by parent field, court.
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "court": "ca1",
+        }
+        response = self._test_main_es_query(cd, 1, "court")
+        # Querying by parent field doesn't return child documents.
+        self.assertNotIn("inner_hits", response["hits"]["hits"][0])
+
+        # Filter by parent field, caseName
+        cd = {"type": SEARCH_TYPES.RECAP, "case_name": "SUBPOENAS SERVED ON"}
+
+        response = self._test_main_es_query(cd, 1, "caseName")
+
+        # Querying by parent field doesn't return child documents.
+        self.assertNotIn("inner_hits", response["hits"]["hits"][0])
+
+        # Filter by child field, description
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "description": "Amicus Curiae Lorem",
+        }
+        response = self._test_main_es_query(cd, 1, "description")
+        # Querying by parent field doesn't return child documents.
+        self.assertEqual(
+            2,
+            len(
+                response["hits"]["hits"][0]["inner_hits"][
+                    "filter_inner_recap_document"
+                ]["hits"]["hits"]
+            ),
+        )
+
+        # Filter by child field, description
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "document_number": 3,
+        }
+        response = self._test_main_es_query(cd, 1, "document_number")
+        # Querying by parent field doesn't return child documents.
+        self.assertEqual(
+            1,
+            len(
+                response["hits"]["hits"][0]["inner_hits"][
+                    "filter_inner_recap_document"
+                ]["hits"]["hits"]
+            ),
+        )
+
+        # Combine child filters
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "description": "Amicus Curiae Lorem",
+            "available_only": True,
+        }
+        response = self._test_main_es_query(
+            cd, 1, "description +  available_only"
+        )
+        self.assertEqual(
+            1,
+            len(
+                response["hits"]["hits"][0]["inner_hits"][
+                    "filter_inner_recap_document"
+                ]["hits"]["hits"]
+            ),
+        )
+
+        # Combine parent-child filters
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "docket_number": "1:21-bk-1234",
+            "attachment_number": 2,
+        }
+        response = self._test_main_es_query(
+            cd, 1, "docket_number + attachment_number"
+        )
+        # self.assertEqual(1,4)
+        # Querying by parent field doesn't return child documents.
+        self.assertEqual(
+            1,
+            len(
+                response["hits"]["hits"][0]["inner_hits"][
+                    "filter_inner_recap_document"
+                ]["hits"]["hits"]
+            ),
+        )
+
+        # Combine parent filter and query.
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "docket_number": "1:21-bk-1234",
+            "q": "Document attachment",
+        }
+        response = self._test_main_es_query(cd, 1, "q")
         self.assertEqual(
             1,
             len(
@@ -359,6 +448,23 @@ class RECAPSearchTest(ESIndexTestCase, TestCase):
             ),
         )
 
+    def test_sorting(self) -> None:
+        """Can we do sorting on various fields?"""
+        sort_fields = [
+            "score desc",
+            "dateFiled desc",
+            "dateFiled asc",
+            "random_123 desc",
+        ]
+        for sort_field in sort_fields:
+            r = self.client.get(
+                "/", {"type": SEARCH_TYPES.RECAP, "order_by": sort_field}
+            )
+            self.assertNotIn(
+                "an error",
+                r.content.decode().lower(),
+                msg=f"Got an error when doing a judge search ordered by {sort_field}",
+            )
 
     async def test_phrase_plus_conjunction_search(self) -> None:
         """Confirm phrase + conjunction search works properly"""

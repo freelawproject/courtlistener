@@ -8,6 +8,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives, get_connection, send_mail
 from django.db import transaction
+from django.db.models import Prefetch
 from django.template import loader
 from django.utils.timezone import now
 from elasticsearch.exceptions import (
@@ -15,7 +16,6 @@ from elasticsearch.exceptions import (
     RequestError,
     TransportError,
 )
-from django.db.models import Prefetch
 
 from cl.alerts.models import Alert, DocketAlert, ScheduledAlertHit
 from cl.alerts.utils import percolate_document, user_has_donated_enough
@@ -37,10 +37,10 @@ from cl.search.constants import ALERTS_HL_TAG
 from cl.search.documents import (
     ES_CHILD_ID,
     AudioPercolator,
+    DocketDocument,
+    ESRECAPDocument,
     PersonDocument,
     PositionDocument,
-    ESRECAPDocument,
-    DocketDocument
 )
 from cl.search.models import Docket, DocketEntry
 from cl.search.types import (
@@ -731,15 +731,14 @@ def remove_doc_from_es_index(
         elif es_document is DocketDocument:
             instance = Docket.objects.get(pk=instance_id)
             # Prefetch the related RECAPDocument objects for each DocketEntry
-            docket_entries = (
-                instance.docket_entries
-                .prefetch_related(Prefetch('recap_documents'))
-                .all()
-            )
+            docket_entries = instance.docket_entries.prefetch_related(
+                Prefetch("recap_documents")
+            ).all()
             recap_documents = []
             for docket_entry in docket_entries:
                 recap_documents.extend(
-                    list(docket_entry.recap_documents.all()))
+                    list(docket_entry.recap_documents.all())
+                )
             for rd in recap_documents:
                 doc = ESRECAPDocument.get(id=ES_CHILD_ID(rd.pk).RECAP)
                 doc.delete(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)

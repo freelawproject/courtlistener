@@ -19,11 +19,7 @@ from cl.people_db.factories import (
     PositionFactory,
     SchoolFactory,
 )
-from cl.search.documents import (
-    ES_CHILD_ID,
-    PersonDocument,
-    PositionDocument,
-)
+from cl.search.documents import ES_CHILD_ID, PersonDocument, PositionDocument
 from cl.search.models import SEARCH_TYPES
 from cl.tests.cases import ESIndexTestCase, TestCase
 
@@ -103,9 +99,7 @@ class PeopleSearchTestElasticSearch(
         ]
         for position_pk in position_pks:
             self.assertTrue(
-                PersonDocument.exists(
-                    id=ES_CHILD_ID(position_pk).POSITION
-                )
+                PersonDocument.exists(id=ES_CHILD_ID(position_pk).POSITION)
             )
 
     def test_remove_parent_child_objects_from_index(self) -> None:
@@ -146,9 +140,7 @@ class PeopleSearchTestElasticSearch(
         person_doc = PersonDocument.get(id=person.pk)
         self.assertIn("Debbas", person_doc.name)
 
-        position_doc = PersonDocument.get(
-            id=ES_CHILD_ID(pos_1_pk).POSITION
-        )
+        position_doc = PersonDocument.get(id=ES_CHILD_ID(pos_1_pk).POSITION)
         self.assertEqual(self.court_2.pk, position_doc.court_exact)
 
         # Delete person instance; it should be removed from the index along
@@ -1158,9 +1150,7 @@ class PeopleSearchTestElasticSearch(
         )
 
         # Confirm initial values are properly indexed.
-        pos_doc = PositionDocument.get(
-            id=ES_CHILD_ID(position_6.pk).POSITION
-        )
+        pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         name_full_reverse = person.name_full_reverse
         self.assertEqual(name_full_reverse, pos_doc.supervisor)
         self.assertEqual(self.person_2.name_full_reverse, pos_doc.predecessor)
@@ -1172,9 +1162,7 @@ class PeopleSearchTestElasticSearch(
         position_6.supervisor = person_2
         position_6.save()
 
-        pos_doc = PositionDocument.get(
-            id=ES_CHILD_ID(position_6.pk).POSITION
-        )
+        pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         name_full_reverse = person_2.name_full_reverse
         self.assertEqual(name_full_reverse, pos_doc.supervisor)
 
@@ -1182,9 +1170,7 @@ class PeopleSearchTestElasticSearch(
         position_6.predecessor = person_2
         position_6.save()
 
-        pos_doc = PositionDocument.get(
-            id=ES_CHILD_ID(position_6.pk).POSITION
-        )
+        pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         name_full_reverse = person_2.name_full_reverse
         self.assertEqual(name_full_reverse, pos_doc.predecessor)
 
@@ -1192,9 +1178,7 @@ class PeopleSearchTestElasticSearch(
         position_6.appointer = position_5_1
         position_6.save()
 
-        pos_doc = PositionDocument.get(
-            id=ES_CHILD_ID(position_6.pk).POSITION
-        )
+        pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
 
         name_full_reverse = position_5_1.person.name_full_reverse
         self.assertEqual(name_full_reverse, pos_doc.appointer)
@@ -1203,8 +1187,6 @@ class PeopleSearchTestElasticSearch(
         person_2.name_first = "Sarah Miller"
         person_2.save()
 
-        pos_doc = PositionDocument.get(
-            id=ES_CHILD_ID(position_6.pk).POSITION
-        )
+        pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         name_full_reverse = person_2.name_full_reverse
         self.assertEqual(name_full_reverse, pos_doc.appointer)

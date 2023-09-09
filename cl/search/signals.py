@@ -9,23 +9,23 @@ from cl.people_db.models import (
 )
 from cl.search.documents import (
     AudioDocument,
+    DocketDocument,
+    ESRECAPDocument,
     ParentheticalGroupDocument,
     PersonDocument,
     PositionDocument,
-DocketDocument,
-ESRECAPDocument
 )
 from cl.search.models import (
+    BankruptcyInformation,
     Citation,
     Docket,
+    DocketEntry,
     Opinion,
     OpinionCluster,
     OpinionsCited,
     Parenthetical,
     ParentheticalGroup,
-    BankruptcyInformation,
-RECAPDocument,
-DocketEntry
+    RECAPDocument,
 )
 
 # This field mapping is used to define which fields should be updated in the
@@ -168,16 +168,18 @@ docket_field_mapping = {
     "delete": {Docket: {}},
     "m2m": {},
     "reverse": {
-        BankruptcyInformation: {"bankruptcy_information": {"all": ["chapter", "trustee_str"]}},
+        BankruptcyInformation: {
+            "bankruptcy_information": {"all": ["chapter", "trustee_str"]}
+        },
     },
 }
 
 recap_document_field_mapping = {
     "save": {
         RECAPDocument: {},
-        DocketEntry:{
-            "docket_entry":{
-                "description":["description"],
+        DocketEntry: {
+            "docket_entry": {
+                "description": ["description"],
                 "entry_number": ["entry_number"],
                 "date_filed": ["entry_date_filed", "entry_date_filed_text"],
             }

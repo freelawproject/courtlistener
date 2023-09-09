@@ -21,8 +21,8 @@ from cl.people_db.models import Person, Position
 from cl.search.documents import (
     ES_CHILD_ID,
     AudioDocument,
+    DocketDocument,
     PersonDocument,
-DocketDocument
 )
 from cl.search.models import Docket, OpinionCluster, RECAPDocument
 from cl.search.types import (

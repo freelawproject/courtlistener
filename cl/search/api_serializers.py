@@ -6,10 +6,10 @@ from rest_framework.serializers import ModelSerializer
 
 from cl.api.utils import HyperlinkedModelSerializerWithId
 from cl.audio.models import Audio
-from cl.lib.document_serializer import DocumentSerializer
+from cl.lib.document_serializer import DateOrDateTimeField, DocumentSerializer
 from cl.people_db.models import PartyType, Person
 from cl.recap.api_serializers import FjcIntegratedDatabaseSerializer
-from cl.search.documents import AudioDocument, PersonDocument
+from cl.search.documents import AudioDocument, DocketDocument, PersonDocument
 from cl.search.models import (
     Citation,
     Court,
@@ -348,3 +348,27 @@ class ExtendedPersonESSerializer(PersonESResultSerializer):
     selection_method = serializers.ListField(read_only=True)
     selection_method_id = serializers.ListField(read_only=True)
     termination_reason = serializers.ListField(read_only=True)
+
+
+class RECAPESResultSerializer(DocumentSerializer):
+    """The serializer for Person results."""
+
+    class Meta:
+        document = DocketDocument
+        exclude = ("text", "person_child")
+
+
+class ExtendedRECAPESResultSerializer(RECAPESResultSerializer):
+    """Extends the RECAP serializer with all the field we get from the db"""
+
+    description = serializers.CharField(read_only=True)
+    entry_number = serializers.IntegerField(read_only=True)
+    entry_date_filed = DateOrDateTimeField(read_only=True)
+    short_description = serializers.CharField(read_only=True)
+    document_type = serializers.CharField(read_only=True)
+    document_number = serializers.IntegerField(read_only=True)
+    pacer_doc_id = serializers.CharField(read_only=True)
+    attachment_number = serializers.IntegerField(read_only=True)
+    is_available = serializers.BooleanField(read_only=True)
+    page_count = serializers.IntegerField(read_only=True)
+    filepath_local = serializers.CharField(read_only=True)

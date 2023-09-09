@@ -55,6 +55,7 @@ from cl.lib.search_utils import (
 from cl.search.constants import RELATED_PATTERN
 from cl.search.documents import (
     AudioDocument,
+    DocketDocument,
     ParentheticalGroupDocument,
     PersonDocument,
 )
@@ -506,6 +507,14 @@ def show_results(request: HttpRequest) -> HttpResponse:
                         else:
                             search_results = do_search(request.GET.copy())
                         render_dict.update(search_results)
+                    case SEARCH_TYPES.RECAP:
+                        # TODO add Docket Type
+                        # Check if waffle flag is active.
+                        if waffle.flag_is_active(request, "r-es-active"):
+                            search_results = do_es_search(request.GET.copy())
+                        else:
+                            search_results = do_search(request.GET.copy())
+                        render_dict.update(search_results)
                     case _:
                         render_dict.update(do_search(request.GET.copy()))
 
@@ -633,6 +642,8 @@ def do_es_search(
             document_type = AudioDocument
         case SEARCH_TYPES.PEOPLE:
             document_type = PersonDocument
+        case SEARCH_TYPES.RECAP:
+            document_type = DocketDocument
 
     if search_form.is_valid() and es_index_exists(
         index_name=document_type._index._name
