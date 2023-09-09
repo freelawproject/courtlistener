@@ -163,5 +163,5 @@ def handle_recap_doc_change(
             RECAPDocument.OCR_UNNECESSARY,
         ):
             find_citations_and_parantheticals_for_recap_documents.apply_async(
-                args=([instance.pk])
+                args=([instance.pk],)
             )
