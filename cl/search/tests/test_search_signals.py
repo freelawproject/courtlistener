@@ -78,7 +78,7 @@ class RECAPDocumentReceiverTests(SimpleTestCase):
 
                     if test_case.expect_enqueue:
                         mock_apply.assert_called_once_with(
-                            args=([recap_doc.pk])
+                            args=([recap_doc.pk],)
                         )
                     else:
                         mock_apply.assert_not_called()
