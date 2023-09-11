@@ -42,7 +42,6 @@ class DocumentSerializer(serializers.Serializer):
         fields.IntegerField: serializers.IntegerField,
         fields.IpField: serializers.IPAddressField,
         fields.LongField: serializers.IntegerField,
-        fields.ListField: serializers.ListField,
         fields.ShortField: serializers.IntegerField,
         fields.KeywordField: serializers.CharField,
         fields.TextField: serializers.CharField,
@@ -143,9 +142,13 @@ class DocumentSerializer(serializers.Serializer):
             if field_type.__class__ not in self._field_mapping:
                 continue
 
-            field_mapping[field_name] = self._field_mapping[
-                field_type.__class__
-            ](**kwargs)
+            # check whether the field can contain array of values
+            if field_type._multi:
+                field_mapping[field_name] = serializers.ListField(**kwargs)
+            else:
+                field_mapping[field_name] = self._field_mapping[
+                    field_type.__class__
+                ](**kwargs)
 
         # Add any explicitly declared fields. They *will* override any index
         # fields in case of naming collision!.

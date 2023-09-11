@@ -492,7 +492,7 @@ class PersonDocument(PersonBaseDocument):
     id = fields.IntegerField(attr="pk")
     fjc_id = fields.TextField()
     alias_ids = fields.ListField(
-        fields.IntegerField(),
+        fields.IntegerField(multi=True),
     )
     alias = fields.ListField(
         fields.TextField(
@@ -501,10 +501,11 @@ class PersonDocument(PersonBaseDocument):
                 "exact": fields.TextField(analyzer="english_exact"),
             },
             search_analyzer="search_analyzer",
+            multi=True,
         )
     )
     races = fields.ListField(
-        fields.KeywordField(),
+        fields.KeywordField(multi=True),
     )
     gender = fields.TextField()
     religion = fields.TextField(attr="religion")
@@ -546,7 +547,7 @@ class PersonDocument(PersonBaseDocument):
     dob = fields.DateField(attr="date_dob")
     dod = fields.DateField(attr="date_dod")
     political_affiliation_id = fields.ListField(
-        fields.KeywordField(),
+        fields.KeywordField(multi=True),
     )
     political_affiliation = fields.ListField(
         fields.TextField(
@@ -555,6 +556,7 @@ class PersonDocument(PersonBaseDocument):
                 "exact": fields.TextField(analyzer="english_exact"),
             },
             search_analyzer="search_analyzer",
+            multi=True,
         )
     )
 
@@ -565,6 +567,7 @@ class PersonDocument(PersonBaseDocument):
                 "exact": fields.TextField(analyzer="english_exact"),
             },
             search_analyzer="search_analyzer",
+            multi=True,
         )
     )
     school = fields.ListField(
@@ -574,6 +577,7 @@ class PersonDocument(PersonBaseDocument):
                 "exact": fields.TextField(analyzer="english_exact"),
             },
             search_analyzer="search_analyzer",
+            multi=True,
         )
     )
 
