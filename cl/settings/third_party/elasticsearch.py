@@ -146,3 +146,8 @@ ELASTICSEARCH_DSL_AUTO_REFRESH = env(
 # Percolator batch size for Alerts #
 ####################################
 PERCOLATOR_PAGE_SIZE = 100
+
+###################################################
+# The maximum number of scheduled hits per alert. #
+###################################################
+SCHEDULED_ALERT_HITS_LIMIT = 30

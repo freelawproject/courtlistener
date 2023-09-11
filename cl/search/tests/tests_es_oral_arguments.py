@@ -1,4 +1,5 @@
 import datetime
+from unittest import mock
 
 from django.core.cache import cache
 from django.db import transaction
@@ -1106,7 +1107,11 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
                 msg=f"Key {key} not found in the result object.",
             )
 
-    def test_oa_results_pagination(self) -> None:
+    @mock.patch(
+        "cl.lib.es_signal_processor.avoid_es_audio_indexing",
+        side_effect=lambda x, y, z: False,
+    )
+    def test_oa_results_pagination(self, mock_abort_audio) -> None:
         created_audios = []
         audios_to_create = 20
         for i in range(audios_to_create):
@@ -1705,7 +1710,11 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         self.assertEqual(actual, expected)
         self.assertIn("Freedom of", r.content.decode())
 
-    def test_keep_in_sync_related_OA_objects(self) -> None:
+    @mock.patch(
+        "cl.lib.es_signal_processor.avoid_es_audio_indexing",
+        side_effect=lambda x, y, z: False,
+    )
+    def test_keep_in_sync_related_OA_objects(self, mock_abort_audio) -> None:
         """Test Audio documents are updated when related objects change."""
         with transaction.atomic():
             docket_5 = DocketFactory.create(
