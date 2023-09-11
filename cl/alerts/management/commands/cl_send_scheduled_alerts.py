@@ -3,6 +3,7 @@ from collections import defaultdict
 from typing import DefaultDict
 
 import waffle
+from django.http import QueryDict
 from django.utils.timezone import now
 
 from cl.alerts.models import (
@@ -11,8 +12,9 @@ from cl.alerts.models import (
     ScheduledAlertHit,
 )
 from cl.alerts.tasks import send_search_alert_emails
-from cl.alerts.utils import InvalidDateError
+from cl.alerts.utils import InvalidDateError, override_alert_query
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.search.models import SEARCH_TYPES
 from cl.stats.utils import tally_stat
 
 DAYS_TO_DELETE = 90
@@ -26,6 +28,28 @@ def json_date_parser(dct):
             except ValueError:
                 pass
     return dct
+
+
+def get_cut_off_date(rate: str, d: datetime.date) -> datetime.date | None:
+    """Given a rate of dly, wly or mly and a date, returns the date after for
+    building a daterange filter.
+    :param rate: The alert rate to send Alerts.
+    :param d: The date alerts are run.
+    :return: The cut-off date or None.
+    """
+    cut_off_date = None
+    if rate == Alert.DAILY:
+        cut_off_date = d
+    elif rate == Alert.WEEKLY:
+        cut_off_date = d - datetime.timedelta(days=7)
+    elif rate == Alert.MONTHLY:
+        # Get the first of the month of the previous month regardless of the
+        # current date
+        early_last_month = d - datetime.timedelta(days=28)
+        cut_off_date = datetime.datetime(
+            early_last_month.year, early_last_month.month, 1
+        ).date()
+    return cut_off_date
 
 
 def query_and_send_alerts_by_rate(rate: str) -> None:
@@ -62,6 +86,12 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
                 documents.append(json_date_parser(result.document_content))
 
             alerts_to_update.append(alert.pk)
+
+            # Override order_by to show the latest items when clicking the
+            # "View Full Results" button.
+            cut_off_date = get_cut_off_date(rate, now_time.date())
+            qd = override_alert_query(alert, cut_off_date)
+            alert.query_run = qd.urlencode()  # type: ignore
             hits.append(
                 (
                     alert,

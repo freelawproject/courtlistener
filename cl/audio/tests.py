@@ -1,3 +1,5 @@
+from unittest import mock
+
 from django.urls import reverse
 from lxml import etree
 
@@ -24,24 +26,28 @@ class PodcastTest(ESIndexTestCase, TestCase):
             jurisdiction="F",
             citation_string="Appeals. CA8.",
         )
-        cls.audio = AudioWithParentsFactory.create(
-            docket=DocketFactory(court=cls.court_1),
-            local_path_mp3__data=ONE_SECOND_MP3_BYTES,
-            local_path_original_file__data=ONE_SECOND_MP3_BYTES,
-            duration=1,
-        )
-        AudioWithParentsFactory.create(
-            docket=cls.audio.docket,
-            local_path_mp3__data=SMALL_WAV_BYTES,
-            local_path_original_file__data=SMALL_WAV_BYTES,
-            duration=0,
-        )
-        AudioWithParentsFactory.create(
-            docket=DocketFactory(court=cls.court_2),
-            local_path_mp3__data=SMALL_WAV_BYTES,
-            local_path_original_file__data=SMALL_WAV_BYTES,
-            duration=5,
-        )
+        with mock.patch(
+            "cl.lib.es_signal_processor.avoid_es_audio_indexing",
+            side_effect=lambda x, y, z: False,
+        ):
+            cls.audio = AudioWithParentsFactory.create(
+                docket=DocketFactory(court=cls.court_1),
+                local_path_mp3__data=ONE_SECOND_MP3_BYTES,
+                local_path_original_file__data=ONE_SECOND_MP3_BYTES,
+                duration=1,
+            )
+            AudioWithParentsFactory.create(
+                docket=cls.audio.docket,
+                local_path_mp3__data=SMALL_WAV_BYTES,
+                local_path_original_file__data=SMALL_WAV_BYTES,
+                duration=0,
+            )
+            AudioWithParentsFactory.create(
+                docket=DocketFactory(court=cls.court_2),
+                local_path_mp3__data=SMALL_WAV_BYTES,
+                local_path_original_file__data=SMALL_WAV_BYTES,
+                duration=5,
+            )
 
     def test_do_jurisdiction_podcasts_have_good_content(self) -> None:
         """Can we simply load a jurisdiction podcast page?"""

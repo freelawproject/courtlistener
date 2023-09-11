@@ -1,9 +1,11 @@
 import json
 from collections import defaultdict
-from datetime import timedelta
+from datetime import datetime, timedelta
 from unittest import mock
+from urllib.parse import parse_qs, urlparse
 
 import time_machine
+from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.core import mail
@@ -11,6 +13,7 @@ from django.core.management import call_command
 from django.test import Client, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
+from lxml import html
 from rest_framework.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
@@ -24,6 +27,7 @@ from waffle.testutils import override_switch
 from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
 from cl.alerts.management.commands.cl_send_scheduled_alerts import (
     DAYS_TO_DELETE,
+    get_cut_off_date,
 )
 from cl.alerts.management.commands.handle_old_docket_alerts import (
     build_user_report,
@@ -588,10 +592,17 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
                 cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
                 cluster__date_filed=now() - timedelta(hours=5),
             )
-            cls.dly_oral_argument = AudioWithParentsFactory.create(
-                case_name="Dly Test OA",
-                docket__date_argued=now() - timedelta(hours=5),
-            )
+            with mock.patch(
+                "cl.scrapers.tasks.microservice",
+                side_effect=lambda *args, **kwargs: MockResponse(200, b"10"),
+            ), mock.patch(
+                "cl.lib.es_signal_processor.avoid_es_audio_indexing",
+                side_effect=lambda x, y, z: False,
+            ):
+                cls.dly_oral_argument = AudioWithParentsFactory.create(
+                    case_name="Dly Test OA",
+                    docket__date_argued=now() - timedelta(hours=5),
+                )
 
             cls.wly_opinion = OpinionWithParentsFactory.create(
                 cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
@@ -1515,6 +1526,10 @@ class DocketAlertGetNotesTagsTests(TestCase):
 
 
 @override_switch("oa-es-alerts-active", active=True)
+@mock.patch(
+    "cl.lib.es_signal_processor.avoid_es_audio_indexing",
+    side_effect=lambda x, y, z: False,
+)
 class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
     """Test ES Search Alerts"""
 
@@ -1591,7 +1606,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         Audio.objects.all().delete()
         super().tearDownClass()
 
-    def test_alert_frequency_estimation(self):
+    def test_alert_frequency_estimation(self, mock_abort_audio):
         """Test alert frequency ES API endpoint."""
 
         search_params = {
@@ -1625,7 +1640,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         self.assertEqual(r.json()["count"], 1)
         rt_oral_argument.delete()
 
-    def test_send_oa_search_alert_webhooks(self):
+    def test_send_oa_search_alert_webhooks(self, mock_abort_audio):
         """Can we send RT OA search alerts?"""
 
         with mock.patch(
@@ -1691,6 +1706,13 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         self.assertIn("<strong>19-5735</strong>", html_content)
         self.assertIn("<strong>RT</strong>", html_content)
 
+        # Confirm that order_by is overridden in the 'View Full Results' URL by
+        # dateArgued+desc.
+        view_results_url = html.fromstring(str(html_content)).xpath(
+            '//a[text()="View Full Results / Edit this Alert"]/@href'
+        )
+        self.assertIn("order_by=dateArgued+desc", view_results_url[0])
+
         # The right alert type template is used.
         self.assertIn("oral argument", html_content)
 
@@ -1727,7 +1749,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         webhook_events.delete()
         rt_oral_argument.delete()
 
-    def test_send_alert_on_document_creation(self):
+    def test_send_alert_on_document_creation(self, mock_abort_audio):
         """Avoid sending Search Alerts on document updates."""
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -1778,7 +1800,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         self.assertEqual(len(webhook_events), 4)
         rt_oral_argument.delete()
 
-    def test_es_alert_update_and_delete(self):
+    def test_es_alert_update_and_delete(self, mock_abort_audio):
         """Can we update and delete an alert, and expect these changes to be
         properly reflected in Elasticsearch?"""
 
@@ -1846,10 +1868,6 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
 
         # Confirm Alert date_last_hit is updated.
         search_alert.refresh_from_db()
-        if previous_date:
-            self.assertEqual(search_alert.date_last_hit, previous_date)
-        else:
-            self.assertEqual(search_alert.date_last_hit, mock_date)
 
         # One OA search alert email should be sent
         self.assertEqual(len(mail.outbox), alert_count)
@@ -1859,6 +1877,36 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         # The right alert type template is used.
         self.assertIn("oral argument", text_content)
 
+        # Extract HTML version.
+        html_content = None
+        for content, content_type in mail.outbox[alert_count - 1].alternatives:
+            if content_type == "text/html":
+                html_content = content
+                break
+
+        # Confirm that order_by is overridden in the 'View Full Results'
+        # URL by dateArgued+desc.
+        view_results_url = html.fromstring(str(html_content)).xpath(
+            '//a[text()="View Full Results / Edit this Alert"]/@href'
+        )
+
+        parsed_url = urlparse(view_results_url[0])
+        params = parse_qs(parsed_url.query)
+        self.assertEqual("dateArgued desc", params["order_by"][0])
+
+        if previous_date:
+            self.assertEqual(search_alert.date_last_hit, previous_date)
+        else:
+            self.assertEqual(search_alert.date_last_hit, mock_date)
+
+            # Confirm that argued_after is properly set in the
+            # 'View Full Results' URL.
+            cut_off_date = get_cut_off_date(rate, mock_date.date())
+            date_in_query = datetime.strptime(
+                params["argued_after"][0], "%m/%d/%Y"
+            ).date()
+            self.assertEqual(cut_off_date, date_in_query)
+
         # Confirm stored alerts instances status is set to SENT.
         scheduled_hits = ScheduledAlertHit.objects.filter(alert__rate=rate)
         for scheduled_hit in scheduled_hits:
@@ -1866,7 +1914,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 scheduled_hit.hit_status, SCHEDULED_ALERT_HIT_STATUS.SENT
             )
 
-    def test_send_alert_multiple_alert_rates(self):
+    def test_send_alert_multiple_alert_rates(self, mock_abort_audio):
         """Confirm dly, wly and mly alerts are properly stored and sent
         according to their periodicity.
         """
@@ -1972,7 +2020,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
     @mock.patch(
         "cl.alerts.management.commands.cl_send_scheduled_alerts.logger"
     )
-    def test_group_alerts_and_hits(self, mock_logger):
+    def test_group_alerts_and_hits(self, mock_logger, mock_abort_audio):
         """"""
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -2075,7 +2123,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         rt_oral_argument_3.delete()
 
     @override_settings(PERCOLATOR_PAGE_SIZE=5)
-    def test_send_multiple_rt_alerts(self):
+    def test_send_multiple_rt_alerts(self, mock_abort_audio):
         """Confirm all RT alerts are properly sent if the percolator response
         contains more than PERCOLATOR_PAGE_SIZE results. So additional
         requests are performed in order to retrieve all the available results.
@@ -2167,7 +2215,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             alert.delete()
 
     @override_settings(PERCOLATOR_PAGE_SIZE=5)
-    def test_batched_alerts_match_documents_ingestion(self):
+    def test_batched_alerts_match_documents_ingestion(self, mock_abort_audio):
         """Confirm that batched alerts are properly stored according to
         document ingestion when percolated in real time.
         """
@@ -2251,7 +2299,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             alert.delete()
 
     @override_settings(PERCOLATOR_PAGE_SIZE=5)
-    def test_percolate_document_in_batches(self):
+    def test_percolate_document_in_batches(self, mock_abort_audio):
         """Confirm when getting alerts in batches and an alert previously
         retrieved is updated during this process. It's not returned again.
         """
@@ -2308,7 +2356,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             self.assertNotIn(result.id, ids_in_results)
             ids_in_results.append(result.id)
 
-    def test_avoid_sending_or_scheduling_disabled_alerts(self):
+    def test_avoid_sending_or_scheduling_disabled_alerts(
+        self, mock_abort_audio
+    ):
         """Can we avoid sending or_scheduling disabled search alerts?."""
 
         rt_alert_disabled = AlertFactory(
@@ -2351,7 +2401,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         dly_alert_disabled.delete()
         oral_argument.delete()
 
-    def test_avoid_re_sending_scheduled_sent_alerts(self):
+    def test_avoid_re_sending_scheduled_sent_alerts(self, mock_abort_audio):
         """Can we prevent re-sending scheduled alerts that have already been
         sent?"""
 
@@ -2493,6 +2543,87 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         oral_argument.delete()
         oral_argument_2.delete()
         oral_argument_3.delete()
+
+    @override_settings(SCHEDULED_ALERT_HITS_LIMIT=3)
+    def test_scheduled_hits_limit(self, mock_abort_audio):
+        """Confirm we only store the max number of alert hits set in settings."""
+
+        alert_1 = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert OA Daily 1",
+            query="q=USA+vs+Bank+&type=oa",
+        )
+        alert_2 = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert OA Daily 2",
+            query="q=Texas+vs+Corp&type=oa",
+        )
+        alert_3 = AlertFactory(
+            user=self.user_profile_2.user,
+            rate=Alert.DAILY,
+            name="Test Alert OA Daily 3",
+            query="q=Texas+vs+Corp&type=oa",
+        )
+
+        oa_created = []
+        for i in range(4):
+            oral_argument = AudioWithParentsFactory.create(
+                case_name="USA vs Bank",
+                docket__court=self.court_1,
+                docket__date_argued=now().date(),
+                docket__docket_number="19-5735",
+            )
+            oa_created.append(oral_argument)
+
+            if i in (1, 2):
+                # Only schedule two hits for this one.
+                oral_argument_2 = AudioWithParentsFactory.create(
+                    case_name="Texas vs Corp",
+                    docket__court=self.court_1,
+                    docket__date_argued=now().date(),
+                    docket__docket_number="20-5030",
+                )
+                oa_created.append(oral_argument_2)
+
+        # Call dly command
+        call_command("cl_send_scheduled_alerts", rate=Alert.DAILY)
+
+        # Two emails should be sent, one for user_profile and one for user_profile_2
+        self.assertEqual(len(mail.outbox), 2)
+
+        # Confirm emails contains the hits+ count.
+        self.assertIn(
+            f"had {settings.SCHEDULED_ALERT_HITS_LIMIT}+ hits",
+            mail.outbox[0].body,
+        )
+        # No "+" if hits do not reach the SCHEDULED_ALERT_HITS_LIMIT.
+        self.assertIn(
+            f"had 2 hits",
+            mail.outbox[1].body,
+        )
+
+        # Confirm each email contains the max number of hits for each alert.
+        self.assertEqual(
+            mail.outbox[0].body.count("USA vs Bank"),
+            settings.SCHEDULED_ALERT_HITS_LIMIT,
+        )
+        self.assertEqual(
+            mail.outbox[0].body.count("Texas vs Corp"),
+            2,
+        )
+        self.assertEqual(
+            mail.outbox[1].body.count("Texas vs Corp"),
+            2,
+        )
+
+        for oa in oa_created:
+            oa.delete()
+
+        alert_1.delete()
+        alert_2.delete()
+        alert_3.delete()
 
 
 @override_settings(ELASTICSEARCH_DISABLED=True)
