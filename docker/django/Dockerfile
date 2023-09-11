@@ -1,5 +1,3 @@
-ARG BUILD_ENV=prod
-
 FROM python:3.11-slim as build-base
 
 RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
@@ -40,35 +38,16 @@ RUN python -m venv $POETRY_HOME && \
     $POETRY_HOME/bin/pip install poetry==$POETRY_VERSION --quiet --upgrade && \
     ln -s $POETRY_HOME/bin/poetry "$(dirname $(which python))/poetry"  # make accessible via $PATH
 
-FROM build-base as build-dev
+ARG BUILD_ENV=prod
+FROM build-base as python-base
 
 WORKDIR $PYSETUP_PATH
 
 COPY poetry.lock pyproject.toml ./
-RUN poetry install --no-root
+RUN poetry install --no-root $(test "$BUILD_ENV" != "dev" && echo "--without dev")
 
 COPY . /opt/courtlistener
 
-
-FROM build-base as build-prod
-
-WORKDIR $PYSETUP_PATH
-
-# copy project requirement files here to ensure they will be cached.
-ADD https://raw.githubusercontent.com/freelawproject/courtlistener/main/poetry.lock /opt/poetry.lock
-ADD https://raw.githubusercontent.com/freelawproject/courtlistener/main/pyproject.toml /opt/pyproject.toml
-
-# install runtime deps - uses $POETRY_VIRTUALENVS_IN_PROJECT internally
-RUN poetry install --no-root --without dev
-
-ADD https://github.com/freelawproject/courtlistener/archive/main.tar.gz /opt/courtlistener.tar.gz
-WORKDIR /opt
-RUN tar xvfz courtlistener.tar.gz && \
-    mv /opt/courtlistener-main /opt/courtlistener && \
-    rm -r /opt/courtlistener.tar.gz
-
-# `python-base` sets up all our shared environment variables
-FROM build-${BUILD_ENV} as python-base
 
 # Collect compiled assets from webpack-build stage.
 # Note: Always produce production code and never produce source-maps
