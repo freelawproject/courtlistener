@@ -842,7 +842,10 @@ def update_matching_opinions(
                 op.author_str = author_str
         else:
             if author_str:
-                if find_just_name(op.author_str) != find_just_name(author_str):
+                if (
+                    find_just_name(op.author_str).lower()
+                    != find_just_name(author_str).lower()
+                ):
                     raise AuthorException(f"Authors don't match - log error")
                 elif any(s.isupper() for s in op.author_str.split(",")):
                     # Some names are uppercase, update with processed names
