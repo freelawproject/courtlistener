@@ -1,5 +1,6 @@
+from cl.audio.models import Audio
 from cl.lib.es_signal_processor import ESSignalProcessor
-from cl.search.documents import ParentheticalGroupDocument
+from cl.search.documents import AudioDocument, ParentheticalGroupDocument
 from cl.search.models import (
     Citation,
     Docket,
@@ -31,37 +32,39 @@ pa_field_mapping = {
     "save": {
         Docket: {
             "opinion__cluster__docket": {
-                "docket_number": "docketNumber",
-                "court_id": "court_id",
+                "docket_number": ["docketNumber"],
+                "court_id": ["court_id"],
             }
         },
         Opinion: {
             "opinion": {
-                "author_id": "author_id",
-                "cluster_id": "cluster_id",
-                "extracted_by_ocr": "opinion_extracted_by_ocr",
+                "author_id": ["author_id"],
+                "cluster_id": ["cluster_id"],
+                "extracted_by_ocr": ["opinion_extracted_by_ocr"],
             },
         },
         OpinionCluster: {
             "representative__describing_opinion__cluster": {
-                "slug": "describing_opinion_cluster_slug",
+                "slug": ["describing_opinion_cluster_slug"],
             },
             "opinion__cluster": {
-                "case_name": "caseName",
-                "citation_count": "citeCount",
-                "date_filed": "dateFiled",
-                "slug": "opinion_cluster_slug",
-                "docket_id": "docket_id",
-                "judges": "judge",
-                "nature_of_suit": "suitNature",
-                "get_precedential_status_display": "status",  # On fields where
+                "case_name": ["caseName"],
+                "citation_count": ["citeCount"],
+                "date_filed": ["dateFiled"],
+                "slug": ["opinion_cluster_slug"],
+                "docket_id": ["docket_id"],
+                "judges": ["judge"],
+                "nature_of_suit": ["suitNature"],
+                "get_precedential_status_display": [
+                    "status"
+                ],  # On fields where
                 # indexed values needs to be the display() value, use get_{field_name}_display as key.
             },
         },
         Parenthetical: {
             "representative": {
-                "score": "representative_score",
-                "text": "representative_text",
+                "score": ["representative_score"],
+                "text": ["representative_text"],
             },
         },
         ParentheticalGroup: {},  # For the main model, a field mapping is not
@@ -92,10 +95,38 @@ pa_field_mapping = {
     },
 }
 
+oa_field_mapping = {
+    "save": {
+        Docket: {
+            "docket": {
+                "date_argued": ["dateArgued", "dateArgued_text"],
+                "date_reargued": ["dateReargued", "dateReargued_text"],
+                "date_reargument_denied": [
+                    "dateReargumentDenied",
+                    "dateReargumentDenied_text",
+                ],
+                "docket_number": ["docketNumber"],
+                "slug": ["docket_slug"],
+            }
+        },
+        Audio: {},
+    },
+    "delete": {Audio: {}},
+    "m2m": {Audio.panel.through: {"audio": {"panel_ids": "panel_ids"}}},
+    "reverse": {},
+}
+
+
 # Instantiate a new ESSignalProcessor() for each Model/Document that needs to
 # be tracked. The arguments are: main model, ES document mapping, and field mapping dict.
 _pa_signal_processor = ESSignalProcessor(
     ParentheticalGroup,
     ParentheticalGroupDocument,
     pa_field_mapping,
+)
+
+_oa_signal_processor = ESSignalProcessor(
+    Audio,
+    AudioDocument,
+    oa_field_mapping,
 )

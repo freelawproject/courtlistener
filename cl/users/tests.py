@@ -57,6 +57,7 @@ from cl.search.factories import DocketFactory
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
     APITestCase,
+    ESIndexTestCase,
     LiveServerTestCase,
     RestartSentEmailQuotaMixin,
     TestCase,
@@ -2787,7 +2788,7 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
         )
 
 
-class EmailBrokenTest(TestCase):
+class EmailBrokenTest(ESIndexTestCase, TestCase):
     @classmethod
     def setUpTestData(cls):
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"

@@ -1,47 +1,42 @@
-from typing import Callable, Union
+from typing import Any
 
-from django.conf import settings
+from celery.canvas import chain
 from django.db.models.signals import m2m_changed, post_delete, post_save
 from elasticsearch.exceptions import NotFoundError
-from elasticsearch_dsl import Document
 
-from cl.lib.command_utils import logger
-from cl.search.documents import ParentheticalGroupDocument
-from cl.search.models import (
-    Citation,
-    Docket,
-    Opinion,
-    OpinionCluster,
-    Parenthetical,
-    ParentheticalGroup,
+from cl.alerts.tasks import (
+    process_percolator_response,
+    remove_doc_from_es_index,
+    send_or_schedule_alerts,
 )
-
-instance_typing = Union[
-    Citation,
-    Docket,
-    Opinion,
-    OpinionCluster,
-    Parenthetical,
-    ParentheticalGroup,
-]
-es_document_typing = Union[ParentheticalGroupDocument]
+from cl.lib.elasticsearch_utils import elasticsearch_enabled
+from cl.search.documents import AudioDocument
+from cl.search.tasks import save_document_in_es, update_document_in_es
+from cl.search.types import ESDocumentType, ESModelType
 
 
 def updated_fields(
-    instance: instance_typing,
+    instance: ESModelType, es_document: ESDocumentType
 ) -> list[str]:
     """Look for changes in the tracked fields of an instance.
     :param instance: The instance to check for changed fields.
+    :param es_document: The Elasticsearch document type.
     :return: A list of the names of fields that have changed in the instance.
     """
     # Get the field names being tracked
-    tracked_fields = instance.es_pa_field_tracker.fields
+
+    if es_document is AudioDocument:
+        tracked_set = getattr(instance, "es_oa_field_tracker", None)
+    else:
+        tracked_set = getattr(instance, "es_pa_field_tracker", None)
+    # Check the set before trying to get the fields
+    if not tracked_set:
+        return []
     # Check each tracked field to see if it has changed
     changed_fields = [
         field
-        for field in tracked_fields
-        if getattr(instance, field)
-        != instance.es_pa_field_tracker.previous(field)
+        for field in tracked_set.fields
+        if getattr(instance, field) != tracked_set.previous(field)
     ]
     return changed_fields
 
@@ -65,45 +60,44 @@ def get_fields_to_update(
 
 
 def document_fields_to_update(
-    field_list: list[str], instance: instance_typing, fields_map: dict
-) -> dict:
+    main_doc: ESDocumentType,
+    main_object: ESModelType,
+    field_list: list[str],
+    instance: ESModelType,
+    fields_map: dict,
+) -> dict[str, Any]:
     """Generate a dictionary of fields and values to update based on a
      provided map and an instance.
 
+    :param main_doc: A Elasticsearch DSL document.
+    :param main_object: The main object instance that changed.
     :param field_list: A list of field names that need to be updated.
     :param instance: The instance from which field values are to be extracted.
     :param fields_map: A map from which ES field names are to be extracted.
     :return: A dictionary with fields and values to update.
     """
 
-    return {
-        fields_map[field]: getattr(instance, field)()
-        if field.startswith("get_") and field.endswith("_display")
-        else getattr(instance, field)
-        for field in field_list
-    }
-
-
-def save_document_in_es(
-    instance: instance_typing, es_document: Callable
-) -> None:
-    """Save a document in Elasticsearch using a provided callable.
-    :param instance: The instance of the document to save.
-    :param es_document: A Elasticsearch DSL document.
-    :return: None
-    """
-    es_doc = es_document()
-    doc = es_doc.prepare(instance)
-    es_document(meta={"id": instance.pk}, **doc).save(
-        skip_empty=False,
-        return_doc_meta=True,
-        refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
-    )
+    fields_to_update = {}
+    for field in field_list:
+        document_fields = fields_map[field]
+        for doc_field in document_fields:
+            if field.startswith("get_") and field.endswith("_display"):
+                fields_to_update[doc_field] = getattr(instance, field)()
+            else:
+                prepare_method = getattr(
+                    main_doc, f"prepare_{doc_field}", None
+                )
+                if prepare_method:
+                    field_value = prepare_method(main_object)
+                else:
+                    field_value = getattr(instance, field)
+                fields_to_update[doc_field] = field_value
+    return fields_to_update
 
 
 def get_or_create_doc(
-    es_document: es_document_typing, instance: instance_typing
-) -> es_document_typing | None:
+    es_document: ESDocumentType, instance: ESModelType
+) -> ESDocumentType | None:
     """Get or create a document in Elasticsearch.
     :param es_document: The Elasticsearch document type.
     :param instance: The instance of the document to get or create.
@@ -112,35 +106,15 @@ def get_or_create_doc(
     try:
         main_doc = es_document.get(id=instance.pk)
     except NotFoundError:
-        save_document_in_es(instance, es_document)
+        save_document_in_es.delay(instance, es_document)
         return None
     return main_doc
 
 
-def remove_doc_from_es_index(
-    es_document: es_document_typing, instance_id: int
-) -> None:
-    """Remove a document from an Elasticsearch index.
-
-    :param es_document: The Elasticsearch document type.
-    :param instance_id: The ID of the instance to be removed from the
-    Elasticsearch index.
-    :return: None
-    """
-    try:
-        doc = es_document.get(id=instance_id)
-        doc.delete(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)
-    except NotFoundError:
-        logger.error(
-            f"The Audio with ID:{instance_id} can't be deleted from "
-            f"the ES index, it doesn't exists."
-        )
-
-
 def update_es_documents(
-    main_model: instance_typing,
-    es_document: es_document_typing,
-    instance: instance_typing,
+    main_model: ESModelType,
+    es_document: ESDocumentType,
+    instance: ESModelType,
     created: bool,
     mapping_fields: dict,
 ) -> None:
@@ -155,7 +129,7 @@ def update_es_documents(
     """
     if created:
         return
-    changed_fields = updated_fields(instance)
+    changed_fields = updated_fields(instance, es_document)
     if changed_fields:
         for query, fields_map in mapping_fields.items():
             main_objects = main_model.objects.filter(**{query: instance})
@@ -167,19 +141,22 @@ def update_es_documents(
                     changed_fields, fields_map
                 )
                 if fields_to_update:
-                    Document.update(
+                    update_document_in_es.delay(
                         main_doc,
-                        **document_fields_to_update(
-                            fields_to_update, instance, fields_map
+                        document_fields_to_update(
+                            main_doc,
+                            main_object,
+                            fields_to_update,
+                            instance,
+                            fields_map,
                         ),
-                        refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
                     )
 
 
 def update_remove_m2m_documents(
-    main_model: instance_typing,
-    es_document: es_document_typing,
-    instance: instance_typing,
+    main_model: ESModelType,
+    es_document: ESDocumentType,
+    instance: ESModelType,
     mapping_fields: dict,
     affected_field: str,
 ) -> None:
@@ -193,25 +170,43 @@ def update_remove_m2m_documents(
     :return: None
     """
     for key, fields_map in mapping_fields.items():
-        main_objects = main_model.objects.filter(**{key: instance})
-        for main_object in main_objects:
-            main_doc = get_or_create_doc(es_document, main_object)
-            if not main_doc:
-                return
-            get_m2m_value = getattr(main_doc, f"prepare_{affected_field}")(
-                main_object
+        if main_model.__name__.lower() != key:  # type: ignore
+            # The m2m relationship is not defined in the main model but
+            # we use the relationship to add data to the ES documents.
+            main_objects = main_model.objects.filter(**{key: instance})
+            for main_object in main_objects:
+                update_m2m_field_in_es_document(
+                    main_object, es_document, affected_field
+                )
+        else:
+            update_m2m_field_in_es_document(
+                instance, es_document, affected_field
             )
-            Document.update(
-                main_doc,
-                **{affected_field: get_m2m_value},
-                refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
-            )
+
+
+def update_m2m_field_in_es_document(
+    instance: ESModelType,
+    es_document: ESDocumentType,
+    affected_field: str,
+) -> None:
+    """Update a single field created using a many-to-many relationship.
+    :param instance: The instance of the document to update.
+    :param es_document: The Elasticsearch document type.
+    :param affected_field: The name of the field that has many-to-many
+    relationships with the instance.
+    :return: None
+    """
+    document = get_or_create_doc(es_document, instance)
+    if not document:
+        return
+    get_m2m_value = getattr(document, f"prepare_{affected_field}")(instance)
+    update_document_in_es.delay(document, {affected_field: get_m2m_value})
 
 
 def update_reverse_related_documents(
-    main_model: instance_typing,
-    es_document: es_document_typing,
-    instance: instance_typing,
+    main_model: ESModelType,
+    es_document: ESDocumentType,
+    instance: ESModelType,
     query_string: str,
     affected_fields: list[str],
 ) -> None:
@@ -230,13 +225,13 @@ def update_reverse_related_documents(
         main_doc = get_or_create_doc(es_document, main_object)
         if not main_doc:
             return
-        Document.update(
+
+        update_document_in_es.delay(
             main_doc,
-            **{
+            {
                 field: getattr(main_doc, f"prepare_{field}")(main_object)
                 for field in affected_fields
             },
-            refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
         )
 
 
@@ -251,8 +246,7 @@ class ESSignalProcessor(object):
         self.es_document = es_document
         self.documents_model_mapping = documents_model_mapping
 
-        if not settings.ELASTICSEARCH_DISABLED:
-            self.setup()
+        self.setup()
 
     def setup(self):
         models_save = list(self.documents_model_mapping["save"].keys())
@@ -304,6 +298,7 @@ class ESSignalProcessor(object):
                     weak=weak,
                 )
 
+    @elasticsearch_enabled
     def handle_save(self, sender, instance=None, created=False, **kwargs):
         """Receiver function that gets called after an object instance is saved"""
         mapping_fields = self.documents_model_mapping["save"][sender]
@@ -316,12 +311,18 @@ class ESSignalProcessor(object):
                 mapping_fields,
             )
         if not mapping_fields:
-            save_document_in_es(instance, self.es_document)
+            chain(
+                save_document_in_es.si(instance, self.es_document),
+                send_or_schedule_alerts.s(self.es_document._index._name),
+                process_percolator_response.s(),
+            ).apply_async()
 
+    @elasticsearch_enabled
     def handle_delete(self, sender, instance, **kwargs):
         """Receiver function that gets called after an object instance is deleted"""
-        remove_doc_from_es_index(self.es_document, instance.pk)
+        remove_doc_from_es_index.delay(self.es_document, instance.pk)
 
+    @elasticsearch_enabled
     def handle_m2m(self, sender, instance=None, action=None, **kwargs):
         """Receiver function that gets called after a m2m relation is modified"""
         if action == "post_add" or action == "post_remove":
@@ -336,6 +337,7 @@ class ESSignalProcessor(object):
                     affected_field,
                 )
 
+    @elasticsearch_enabled
     def handle_reverse_actions(self, sender, instance=None, **kwargs):
         """Receiver function that gets called after a reverse relation is
         created, updated or removed.
