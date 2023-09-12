@@ -11,11 +11,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    services:
-      registry:
-        image: registry:2
-        ports:
-          - 5000:5000
     strategy:
       fail-fast: false
       matrix:
@@ -66,11 +61,10 @@ jobs:
         with:
           context: ./courtlistener
           file: ./courtlistener/docker/django/Dockerfile
-          push: true
+          load: true
           target: web-dev
           build-args: |
             BUILD_ENV=dev
-          tags: localhost:5000/freelawproject/courtlistener:latest-web-dev-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Build latest docker celery image
@@ -78,30 +72,34 @@ jobs:
         with:
           context: ./courtlistener
           file: ./courtlistener/docker/django/Dockerfile
-          push: true
+          load: true
           target: celery
           build-args: |
             BUILD_ENV=dev
-          tags: localhost:5000/freelawproject/courtlistener:latest-celery-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Prepare Docker images
+      - name: Pull docker images
+        working-directory: courtlistener/docker/courtlistener
+        run: docker compose pull --quiet --ignore-buildable
+      - name: Build docker images
+        working-directory: courtlistener/docker/courtlistener
+        run: docker compose build
+      - name: List docker images
+        run: docker image ls -a --no-trunc
 
       # Docker images are ready. Start them up.
       - name: Create docker network
         run: docker network create -d bridge --attachable cl_net_overlay
-      - name: Start docker compose
+      - name: Start docker containers
         working-directory: courtlistener/docker/courtlistener
-        run: docker-compose -f docker-compose.yml -f docker-compose.tmpfs.yml up -d
-        env:
-          CELERY_DOCKER_IMAGE: "localhost:5000/freelawproject/courtlistener:latest-celery-${{ github.sha }}"
-          DJANGO_DOCKER_IMAGE: "localhost:5000/freelawproject/courtlistener:latest-web-dev-${{ github.sha }}"
-      - name: List docker images
-        run: docker image ls -a --no-trunc
-      - name: List docker container statuses
+        run: docker compose -f docker-compose.yml -f docker-compose.tmpfs.yml up -d --no-build --pull=never
+      - name: List docker containers
         run: docker ps -a --no-trunc
       - name: Show the docker startup logs
         working-directory: courtlistener/docker/courtlistener
-        run: docker-compose logs
+        run: docker compose logs
 
       # Run the checks and tests
       - name: Check if migrations are missing

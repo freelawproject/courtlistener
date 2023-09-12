@@ -10,9 +10,9 @@ CourtListener.com
 We have news regarding your alerts at CourtListener.com
 -------------------------------------------------------
 
-{% for alert, type, results, num_results in hits %}{% for result in results %}{% if forloop.first %}Your {{alert.get_rate_display|lower}} {% if type == 'o' %}opinion{% elif type == 'oa' %}oral argument{% endif %} alert -- {{alert.name}} -- had {{num_results}} hit{{results|pluralize}}:
+{% for alert, type, results, num_results in hits %}{% for result in results %}{% if forloop.first %}Your {{alert.get_rate_display|lower}} {% if type == 'o' %}opinion{% elif type == 'oa' %}oral argument{% endif %} alert -- {{alert.name}} -- had {{num_results}}{% if num_results >= hits_limit  %}+{% endif %} hit{{results|pluralize}}:
 -------------------------------------------------------
-Edit / Delete this Alert: https://www.courtlistener.com/alert/edit/{{ alert.pk }}/
+View Full Results / Edit this Alert: https://www.courtlistener.com/?{{ alert.query_run|safe }}&edit_alert={{ alert.pk }}/
 Disable this Alert (one click): https://www.courtlistener.com{% url "disable_alert" alert.secret_key %}{% endif %}
 
 {{forloop.counter}}. {{ result.caseName|safe|striptags }} ({% if result.court_id != 'scotus' %}{{ result.court_citation_string|striptags }} {% endif %}{% if type == 'o' %}{{ result.dateFiled|date:"Y" }}{% elif type == 'oa' %}{{ result.dateArgued|date:"Y" }}{% endif %})

@@ -43,7 +43,7 @@ jobs:
       # Do big complicated thing to get secrets into the image.
       # See: https://stackoverflow.com/a/52488906/64911
       run: |
-        kubectl run ${{ steps.vars.outputs.sha_short }} -it --rm -n ${{ env.EKS_NAMESPACE }} --image freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-web-prod --restart Never --overrides='
+        kubectl run ${{ steps.vars.outputs.sha_short }} -it --rm -n ${{ env.EKS_NAMESPACE }} --image freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-web-prod --restart Never --pod-running-timeout=120s --overrides='
         {
           "spec": {
             "containers": [

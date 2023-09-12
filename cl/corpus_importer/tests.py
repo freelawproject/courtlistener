@@ -495,10 +495,15 @@ class HarvardTests(TestCase):
             "cl.corpus_importer.management.commands.harvard_opinions.find_court"
         )
         self.find_court_func = self.find_court_patch.start()
+        self.get_fix_list_patch = patch(
+            "cl.corpus_importer.management.commands.harvard_opinions.get_fix_list"
+        )
+        self.get_fix_list = self.get_fix_list_patch.start()
 
         # Default values for Harvard Tests
         self.filepath_list_func.return_value = ["/one/fake/filepath.json"]
         self.find_court_func.return_value = ["harvard"]
+        self.get_fix_list.return_value = []
 
     @classmethod
     def setUpTestData(cls) -> None:
