@@ -26,7 +26,6 @@ REST_FRAMEWORK = {
         # Throttling down.
         # Didn't respond to emails, 2023-08-04
         "skalecorn12": "10/hour",
-        "vegn": "10/hour",
         # Didn't respond to emails; looks unsavory.
         "donier": "10/hour",
         # Doing a background check service, we told them we didn't want to work
