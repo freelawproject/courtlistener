@@ -8,11 +8,13 @@ from cl.alerts.models import Alert
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.command_utils import logger
+from cl.lib.date_time import midnight_pt
 from cl.lib.elasticsearch_utils import build_es_base_query
 from cl.lib.fields import JoinField, PercolatorField
 from cl.lib.utils import deepgetattr
 from cl.people_db.models import Person, Position
 from cl.search.es_indices import (
+    opinion_index,
     oral_arguments_index,
     oral_arguments_percolator_index,
     parenthetical_group_index,
@@ -24,6 +26,7 @@ from cl.search.models import (
     BankruptcyInformation,
     Citation,
     Docket,
+    OpinionCluster,
     ParentheticalGroup,
     RECAPDocument,
 )
@@ -1070,3 +1073,173 @@ class DocketDocument(DocketBaseDocument):
         data["firm_id"] = list(parties_prepared["firm_id"])
         data["firm"] = list(parties_prepared["firm"])
         return data
+
+
+# Opinions
+@opinion_index.document
+class OpinionDocument(Document):
+    id = fields.IntegerField(attr="pk")
+    docket_id = fields.IntegerField(attr="docket.pk")
+    docketNumber = fields.TextField(
+        attr="docket.docket_number",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="docket.docket_number", analyzer="english_exact"
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    court_id = fields.KeywordField(attr="docket.court.pk")
+    court = fields.TextField(
+        attr="docket.court.full_name",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="docket.court.full_name", analyzer="english_exact"
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    court_citation_string = fields.TextField(
+        attr="docket.court.citation_string",
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
+    )
+    absolute_url = fields.KeywordField()
+    attorney = fields.TextField(
+        attr="attorneys",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    caseName = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    caseNameShort = fields.TextField(
+        attr="case_name_short",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    caseNameFull = fields.TextField(
+        attr="case_name_full",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    sibling_ids = fields.ListField(
+        fields.IntegerField(multi=True),
+    )
+    panel_ids = fields.ListField(
+        fields.IntegerField(multi=True),
+    )
+    non_participating_judge_ids = fields.ListField(
+        fields.IntegerField(multi=True),
+    )
+    judge = fields.TextField(
+        attr="judges",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    citation = fields.ListField(
+        fields.TextField(
+            analyzer="text_en_splitting_cl",
+            search_analyzer="search_analyzer",
+            multi=True,
+        ),
+    )
+    neutralCite = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
+    )
+    scdb_id = fields.KeywordField(attr="scdb_id")
+    source = fields.TextField(
+        attr="source",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    suitNature = fields.TextField(
+        attr="nature_of_suit",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    citeCount = fields.IntegerField(attr="citation_count")
+    status = fields.KeywordField(
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+    )
+    dateFiled = fields.DateField()
+    dateFiled_text = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+
+    def prepare_dateFiled_text(self, instance):
+        if instance.docket.date_reargument_denied:
+            return instance.docket.date_reargument_denied.strftime("%-d %B %Y")
+
+    def prepare_absolute_url(self, instance):
+        return instance.get_absolute_url()
+
+    def prepare_caseName(self, instance):
+        return best_case_name(instance)
+
+    def prepare_sibling_ids(self, instance):
+        return [opinion.pk for opinion in instance.sub_opinions.all()]
+
+    def prepare_panel_ids(self, instance):
+        return [judge.pk for judge in instance.panel.all()]
+
+    def prepare_non_participating_judge_ids(self, instance):
+        return [judge.pk for judge in instance.non_participating_judges.all()]
+
+    def prepare_citation(self, instance):
+        return [str(cite) for cite in instance.citations.all()]
+
+    def prepare_neutralCite(self, instance):
+        neutral_citations = instance.citations.filter(type=Citation.NEUTRAL)
+        if len(neutral_citations):
+            return str(neutral_citations[0])
+        return ""
+
+    def prepare_status(self, instance):
+        return instance.get_precedential_status_display()
+
+    def prepare_dateFiled(self, instance):
+        if instance.date_filed is None:
+            return
+
+        if isinstance(instance.date_filed, str):
+            datetime_object = datetime.strptime(
+                instance.date_filed, "%Y-%m-%d"
+            )
+            return midnight_pt(datetime_object)
+
+        return midnight_pt(instance.date_filed)
+
+    class Django:
+        model = OpinionCluster
