@@ -323,9 +323,7 @@ def match_text_lists(
         # added to the opinion
         if cosine_sim < 0.60 and percent_match < 60:
             continue
-        #
-        # if percent_match < 60:
-        #     continue
+
         matches[i] = j
 
     # Key is opinion position from file, Value is opinion position from cl opinion
@@ -334,7 +332,9 @@ def match_text_lists(
     return matches
 
 
-def get_cl_opinion_content(cluster_id) -> tuple[str, list[dict]]:
+def get_cl_opinion_content(
+    cluster_id,
+) -> tuple[Optional[str], list[dict[Any, Any]]]:
     """Get the opinions content for a cluster object
     :param cluster_id: Cluster ID for a set of opinions
     :return: (xml path, list of extracted opinions)
@@ -719,14 +719,14 @@ def read_xml(xml_filepath: str) -> dict:
 
         if tag in ["attorneys", "posture"]:
             # Replace multiple line breaks in this specific fields
-            data[tag] = [re.sub("\n+", " ", c) for c in data.get(tag)]
+            data[tag] = [re.sub("\n+", " ", c) for c in data.get(tag, [])]
 
         if tag in ["reporter_caption"]:
             # Remove the last comma from the case name
-            data[tag] = [c.rstrip(",") for c in data.get(tag)]
+            data[tag] = [c.rstrip(",") for c in data.get(tag, [])]
 
         # Remove repeated spaces
-        data[tag] = [re.sub(" +", " ", c) for c in data.get(tag)]
+        data[tag] = [re.sub(" +", " ", c) for c in data.get(tag, [])]
 
         if tag == "citation":
             # Remove duplicated citations,
@@ -916,19 +916,17 @@ def convert_columbia_opinion(text: str, opinion_index: int) -> str:
 def update_matching_opinions(
     matches: dict, cl_cleaned_opinions: list, columbia_opinions: list
 ) -> None:
-    """Update matching opinions
+    """Store matching opinion content in html_columbia
     :param matches: dict with matching position from cl and columbia opinions
     :param cl_cleaned_opinions: list of cl opinions
     :param columbia_opinions: list of columbia opinions
     :return: None
     """
     for columbia_pos, cl_pos in matches.items():
-        # TODO verify order correct
         file_opinion = columbia_opinions[columbia_pos]  # type: dict
         file_byline = file_opinion.get("byline")
         cl_opinion = cl_cleaned_opinions[cl_pos]
         opinion_id_to_update = cl_opinion.get("id")
-        # opinion_id_byline = cl_opinion.get("byline")
 
         op = Opinion.objects.get(id=opinion_id_to_update)
         author_str = ""
@@ -995,7 +993,7 @@ def map_and_merge_opinions(
             author = op.get("byline")
 
             converted_text = convert_columbia_opinion(
-                op.get("opinion"), op.get("order")
+                op["opinion"], op["order"]
             )
 
             # TODO add order field
@@ -1021,10 +1019,8 @@ def parse_dates(
     raw_dates: list[str],
 ) -> list[list[tuple[Any, date] | tuple[None, date]]]:
     """Parses the dates from a list of string.
-
     Returns a list of lists of (string, datetime) tuples if there is a string
     before the date (or None).
-
     :param raw_dates: A list of (probably) date-containing strings
     """
     months = re.compile(
@@ -1101,7 +1097,6 @@ def combine_non_overlapping_data(
     cluster: OpinionCluster, columbia_data: dict
 ) -> dict[str, Tuple]:
     """Combine non overlapping data and return dictionary of data for merging
-
     :param cluster: Cluster to merge
     :param columbia_data: The columbia data as json
     :return: Optional dictionary of data to continue to merge
@@ -1480,7 +1475,7 @@ def process_cluster(
     logger.info(f"Processing cluster id: {cluster_id}")
 
     if not csv_file:
-        if "/home/mlissner/columbia/opinions/" in xml_path:
+        if xml_path and "/home/mlissner/columbia/opinions/" in xml_path:
             filepath = xml_path.replace(
                 "/home/mlissner/columbia/opinions/", ""
             )
