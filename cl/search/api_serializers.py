@@ -9,7 +9,7 @@ from cl.audio.models import Audio
 from cl.lib.document_serializer import DocumentSerializer
 from cl.people_db.models import PartyType, Person
 from cl.recap.api_serializers import FjcIntegratedDatabaseSerializer
-from cl.search.documents import AudioDocument, PersonDocument
+from cl.search.documents import AudioDocument, OpinionDocument, PersonDocument
 from cl.search.models import (
     Citation,
     Court,
@@ -351,3 +351,11 @@ class ExtendedPersonESSerializer(PersonESResultSerializer):
     selection_method = serializers.ListField(read_only=True)
     selection_method_id = serializers.ListField(read_only=True)
     termination_reason = serializers.ListField(read_only=True)
+
+
+class OpinionESResultSerializer(DocumentSerializer):
+    """The serializer for Opinion results."""
+
+    class Meta:
+        document = OpinionDocument
+        exclude = ("dateFiled_text",)
