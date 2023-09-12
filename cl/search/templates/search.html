@@ -323,6 +323,12 @@
               {% else %}
                 {% include "includes/search_result_solr.html" %}
               {% endflag %}
+            {% elif type == SEARCH_TYPES.OPINION %}
+              {% flag "o-es-active" %}
+                {% include "includes/search_result.html" %}
+              {% else %}
+                {% include "includes/search_result_solr.html" %}
+              {% endflag %}
             {% else %}
               {% include "includes/search_result_solr.html" %}
             {% endif %}
