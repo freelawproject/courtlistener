@@ -11,6 +11,7 @@ from cl.search.api_serializers import (
     ExtendedPersonESSerializer,
     OAESResultSerializer,
     OpinionClusterSerializer,
+    OpinionESResultSerializer,
     OpinionsCitedSerializer,
     OpinionSerializer,
     OriginalCourtInformationSerializer,
@@ -192,6 +193,10 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
                 request, "p-es-active"
             ):
                 serializer = ExtendedPersonESSerializer(result_page, many=True)
+            elif search_type == SEARCH_TYPES.OPINION and waffle.flag_is_active(
+                request, "o-es-activate"
+            ):
+                serializer = OpinionESResultSerializer(result_page, many=True)
             else:
                 if cd["q"] == "":
                     cd["q"] = "*"  # Get everything
