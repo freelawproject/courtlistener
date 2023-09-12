@@ -58,6 +58,7 @@ from cl.search.constants import RELATED_PATTERN
 from cl.search.documents import (
     AudioDocument,
     DocketDocument,
+    OpinionDocument,
     ParentheticalGroupDocument,
     PersonDocument,
 )
@@ -484,7 +485,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
                     initial={"query": get_string, "rate": "dly"},
                     user=request.user,
                 )
-            search_type = request.GET.get("type")
+            search_type = request.GET.get("type", SEARCH_TYPES.OPINION)
             match search_type:
                 case SEARCH_TYPES.PARENTHETICAL:
                     render_dict.update(do_es_search(request.GET.copy()))
@@ -495,7 +496,6 @@ def show_results(request: HttpRequest) -> HttpResponse:
                     else:
                         render_dict.update(do_search(request.GET.copy()))
                 case SEARCH_TYPES.PEOPLE:
-                    # Check if waffle flag is active.
                     if waffle.flag_is_active(request, "p-es-active"):
                         render_dict.update(do_es_search(request.GET.copy()))
                     else:
@@ -506,6 +506,11 @@ def show_results(request: HttpRequest) -> HttpResponse:
                     else:
                         search_results = do_search(request.GET.copy())
                     render_dict.update(search_results)
+                case SEARCH_TYPES.OPINION:
+                    if waffle.flag_is_active(request, "o-es-active"):
+                        render_dict.update(do_es_search(request.GET.copy()))
+                    else:
+                        render_dict.update(do_search(request.GET.copy()))
                 case _:
                     render_dict.update(do_search(request.GET.copy()))
 
@@ -627,7 +632,7 @@ def do_es_search(
     total_child_results = 0
 
     search_form = SearchForm(get_params)
-    match get_params.get("type"):
+    match get_params.get("type", SEARCH_TYPES.OPINION):
         case SEARCH_TYPES.PARENTHETICAL:
             document_type = ParentheticalGroupDocument
         case SEARCH_TYPES.ORAL_ARGUMENT:
@@ -636,6 +641,8 @@ def do_es_search(
             document_type = PersonDocument
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             document_type = DocketDocument
+        case SEARCH_TYPES.OPINION:
+            document_type = OpinionDocument
 
     if search_form.is_valid() and es_index_exists(
         index_name=document_type._index._name
