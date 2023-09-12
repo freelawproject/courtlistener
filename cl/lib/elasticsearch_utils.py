@@ -76,6 +76,37 @@ def es_index_exists(index_name: str) -> bool:
     return index_exists
 
 
+def build_numeric_range_query(
+    field: str,
+    lower_bound: int | float,
+    upper_bound: int | float,
+    relation: Literal["INTERSECTS", "CONTAINS", "WITHIN", None] = None,
+) -> list[Range]:
+    """Returns documents that contain terms within a provided range.
+
+    :param field: Elasticsearch fieldname
+    :param lower_bound: _description_
+    :param upper_bound: _description_
+    :param relation: Indicates how the range query matches values for range fields. Defaults to None.
+    :return: Empty list or list with DSL Range query
+    """
+
+    params = {}
+    if not any([lower_bound, upper_bound]):
+        return []
+
+    params["gte"] = lower_bound
+    params["lte"] = upper_bound
+    if relation is not None:
+        allowed_relations = ["INTERSECTS", "CONTAINS", "WITHIN"]
+        assert (
+            relation in allowed_relations
+        ), f"'{relation}' is not an allowed relation."
+        params["relation"] = relation
+
+    return [Q("range", **{field: params})]
+
+
 def build_daterange_query(
     field: str,
     before: date,
