@@ -31,7 +31,7 @@ jobs:
       id: vars
       run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
     - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v2
+      uses: aws-actions/configure-aws-credentials@v3
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -43,7 +43,7 @@ jobs:
       # Do big complicated thing to get secrets into the image.
       # See: https://stackoverflow.com/a/52488906/64911
       run: |
-        kubectl run ${{ steps.vars.outputs.sha_short }} -it --rm -n ${{ env.EKS_NAMESPACE }} --image freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-web-prod --restart Never --overrides='
+        kubectl run ${{ steps.vars.outputs.sha_short }} -it --rm -n ${{ env.EKS_NAMESPACE }} --image freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-web-prod --restart Never --timeout=120s --overrides='
         {
           "spec": {
             "containers": [

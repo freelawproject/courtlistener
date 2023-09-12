@@ -672,6 +672,15 @@ class Docket(AbstractDateTimeModel):
         default=False,
     )
     es_pa_field_tracker = FieldTracker(fields=["docket_number", "court_id"])
+    es_oa_field_tracker = FieldTracker(
+        fields=[
+            "date_argued",
+            "date_reargued",
+            "date_reargument_denied",
+            "docket_number",
+            "slug",
+        ]
+    )
 
     class Meta:
         unique_together = ("docket_number", "pacer_case_id", "court")

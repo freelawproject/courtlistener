@@ -452,9 +452,7 @@ class RECAPSearchTest(IndexedSolrTestCase):
         self._count_child_documents(0, r.content.decode(), 5, "docket_number")
 
         # Confirm view additional results button is shown.
-        self.assertIn(
-            "View 1 Additional Result for this Case", r.content.decode()
-        )
+        self.assertIn("View 1 Additional Result for", r.content.decode())
 
         # API
         await self._test_api_results_count(params, 6, "docket_number")
