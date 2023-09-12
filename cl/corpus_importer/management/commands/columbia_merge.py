@@ -499,8 +499,10 @@ def read_xml(xml_filepath: str) -> dict:
                         order = order + 1
 
                 else:
-                    # Content not inside _text tag, we store it
-                    untagged_content.append(str(content))
+                    if content.name not in SIMPLE_TAGS + ["syllabus"]:
+                        # We store content that is not inside _text tag and is not in
+                        # one of the known non-opinion tags
+                        untagged_content.append(str(content))
 
         if untagged_content:
             # default type
