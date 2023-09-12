@@ -392,19 +392,26 @@ def make_cite_count_query(cd: CleanData) -> str:
         return f"citeCount:[{start} TO {end}]"
 
 
+def get_array_of_selected_fields(cd: CleanData, prefix: str) -> list[str]:
+    """Gets the selected checkboxes from the form data, and puts it into
+    an array. Uses a prefix to know which items to pull out of the cleaned
+    data.Check forms.py to see how the prefixes are set up.
+    """
+    return [
+        k.replace(prefix, "")
+        for k, v in cd.items()
+        if (k.startswith(prefix) and v is True)
+    ]
+
+
 def get_selected_field_string(cd: CleanData, prefix: str) -> str:
-    """Pulls the selected checkboxes out of the form data, and puts it into
-    Solr strings. Uses a prefix to know which items to pull out of the cleaned
-    data. Check forms.py to see how the prefixes are set up.
+    """Pulls the selected checkboxes using the get_array_of_selected_fields
+    method, and puts it into Solr strings.
 
     Final strings are of the form "A" OR "B" OR "C", with quotes in case there
     are spaces in the values.
     """
-    selected_fields = [
-        f"\"{k.replace(prefix, '')}\""
-        for k, v in cd.items()
-        if (k.startswith(prefix) and v is True)
-    ]
+    selected_fields = get_array_of_selected_fields(cd, prefix)
     if len(selected_fields) == cd[f"_{prefix}count"]:
         # All the boxes are checked. No need for filtering.
         return ""
