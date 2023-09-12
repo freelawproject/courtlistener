@@ -443,6 +443,8 @@ def build_sort_results(cd: CleanData) -> Dict:
         "entry_date_filed asc": {"_score": {"order": "desc"}},
         "entry_date_filed desc": {"_score": {"order": "desc"}},
         "entry_date_filed_feed desc": {"entry_date_filed": {"order": "desc"}},
+        "citeCount desc": {"citeCount": {"order": "desc"}},
+        "citeCount asc": {"citeCount": {"order": "asc"}},
     }
 
     if cd["type"] == SEARCH_TYPES.PARENTHETICAL:
