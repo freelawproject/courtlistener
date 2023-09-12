@@ -21,7 +21,11 @@ from elasticsearch_dsl.response import Response
 from elasticsearch_dsl.utils import AttrDict
 
 from cl.lib.date_time import midnight_pt
-from cl.lib.search_utils import cleanup_main_query
+from cl.lib.search_utils import (
+    BOOSTS,
+    cleanup_main_query,
+    get_array_of_selected_fields,
+)
 from cl.lib.types import ApiPositionMapping, BasePositionMapping, CleanData
 from cl.people_db.models import Position
 from cl.search.constants import (
@@ -552,6 +556,43 @@ def build_es_filters(cd: CleanData) -> List:
         )
         # Build judge terms filter
         queries_list.extend(build_text_filter("judge", cd.get("judge", "")))
+
+    if cd["type"] == SEARCH_TYPES.OPINION:
+        selected_stats = get_array_of_selected_fields(cd, "stat_")
+        if len(selected_stats):
+            queries_list.extend(
+                build_term_query(
+                    "status",
+                    selected_stats,
+                )
+            )
+
+        queries_list.extend(
+            [
+                *build_text_filter("caseName", cd.get("case_name", "")),
+                *build_daterange_query(
+                    "dateFiled",
+                    cd.get("filed_before", ""),
+                    cd.get("filed_after", ""),
+                ),
+                *build_term_query(
+                    "docketNumber",
+                    cd.get("docket_number", ""),
+                    make_phrase=True,
+                    slop=1,
+                ),
+                *build_text_filter("citation", cd.get("citation", "")),
+                *build_text_filter("neutralCite", cd.get("neutral_cite", "")),
+                *build_numeric_range_query(
+                    "citeCount", cd.get("cited_gt", ""), cd.get("cited_lt", "")
+                ),
+                *build_text_filter(
+                    "judge",
+                    cd.get("judge", ""),
+                ),
+            ]
+        )
+
     return queries_list
 
 
