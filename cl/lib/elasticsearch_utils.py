@@ -835,6 +835,22 @@ def build_es_base_query(
             string_query, join_query = build_full_join_es_queries(
                 cd, child_query_fields, parent_query_fields
             )
+        case _:
+            fields = [
+                "court",
+                "citation",
+                "judge",
+                "caseName",
+                "docketNumber",
+                "caseNameFull",
+                "caseNameShort",
+                "status",
+            ]
+            string_query = build_fulltext_query(
+                fields,
+                cd.get("q", ""),
+            )
+
     search_query = get_search_query(cd, search_query, filters, string_query)
     return search_query, join_query
 
