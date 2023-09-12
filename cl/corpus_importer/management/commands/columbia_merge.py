@@ -1634,19 +1634,3 @@ class Command(VerboseCommand):
             process_cluster(
                 cluster_id=options["cluster_id"], xml_dir=options["xml_dir"]
             )
-
-        if not options["csv_file"] and not options["cluster_id"]:
-            cluster_ids = (
-                OpinionCluster.objects.filter(source__in=VALID_CLUSTER_SOURCES)
-                .exclude(
-                    Q(sub_opinions__local_path="")
-                    | Q(sub_opinions__local_path=None)
-                )
-                .distinct("id")
-                .values_list("id", flat=True)
-            )
-
-            for cluster_id in cluster_ids:
-                process_cluster(
-                    cluster_id=cluster_id, xml_dir=options["xml_dir"]
-                )
