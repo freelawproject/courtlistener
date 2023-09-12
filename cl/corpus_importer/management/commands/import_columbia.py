@@ -1,3 +1,16 @@
+"""
+Command to import opinions from columbia xlml file
+
+Import using a csv file with xml file path pointing to mounted directory and file path
+docker-compose -f docker/courtlistener/docker-compose.yml exec cl-django python manage.py import_columbia --csv /opt/courtlistener/cl/assets/media/testfile.csv
+
+Csv example:
+filepath
+/opt/columbia/michigan/supreme_court_opinions/documents/d5a484f1bad20ba0.xml
+
+Import specifying the mounted directory where the xml files are located
+docker-compose -f docker/courtlistener/docker-compose.yml exec cl-django python manage.py import_columbia  --dir /opt/courtlistener/cl/assets/media/columbia/alabama/
+"""
 import csv
 import fnmatch
 import os
@@ -246,8 +259,10 @@ def get_text(xml_filepath: str) -> dict:
                         order = order + 1
 
                 else:
-                    # Content not inside _text tag, we store it
-                    untagged_content.append(str(content))
+                    if content.name not in SIMPLE_TAGS + ["syllabus"]:
+                        # We store content that is not inside _text tag and is not in
+                        # one of the known non-opinion tags
+                        untagged_content.append(str(content))
 
         if untagged_content:
             # default type
@@ -420,25 +435,40 @@ def get_text(xml_filepath: str) -> dict:
     for tag in SIMPLE_TAGS:
         found_tags = soup.findAll(tag)
         for found_tag in found_tags:
-            # remove inner <citation> and <page-number> tags and content
+            # remove inner <citation> and <page_number> tags and content
             extra_tags_to_remove = found_tag.findAll(
-                re.compile("citation|page-number")
+                re.compile("citation|page_number")
             )
             if extra_tags_to_remove:
                 for r in extra_tags_to_remove:
-                    if r.next_sibling:
-                        if type(r.next_sibling) == NavigableString:
-                            # The element is not tagged, it is just a text
-                            # string
-                            r.next_sibling.extract()
+                    if tag == "reporter_caption":
+                        # The reporter_caption may contain the location, and we need
+                        # to remove it to make the name cleaner, e.g. Tex.App.-Ft.
+                        # Worth [2d Dist.] 2002
+                        if r.next_sibling:
+                            if type(r.next_sibling) == NavigableString:
+                                # The element is not tagged, it is just a text
+                                # string
+                                r.next_sibling.extract()
                     r.extract()
 
-        # We use space as a separator to add a space when we have one tag
-        # next to other without a space, ee try to remove double spaces
+        # We use space as a separator to add a space when we have one tag next to
+        # other without a space
         data[tag] = [
-            re.sub(" +", " ", found_tag.get_text(separator=" ").strip())
+            found_tag.get_text(separator=" ").strip()
             for found_tag in found_tags
         ]
+
+        if tag in ["attorneys", "posture"]:
+            # Replace multiple line breaks in this specific fields
+            data[tag] = [re.sub("\n+", " ", c) for c in data.get(tag, [])]
+
+        if tag in ["reporter_caption"]:
+            # Remove the last comma from the case name
+            data[tag] = [c.rstrip(",") for c in data.get(tag, [])]
+
+        # Remove repeated spaces
+        data[tag] = [re.sub(" +", " ", c) for c in data.get(tag, [])]
 
         if tag == "citation":
             # Sometimes we have multiple citation tags with same citation,
@@ -579,7 +609,7 @@ def process_csv_file(csv_path, debug):
         csv_reader = csv.DictReader(csv_file)
 
         for row in csv_reader:
-            xml_path = row.get("path")
+            xml_path = row.get("filepath")
             if xml_path and os.path.exists(xml_path):
                 try:
                     logger.info(f"Processing opinion at {xml_path}")
