@@ -1,22 +1,50 @@
+import copy
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Dict, List, Tuple, Union, cast
 
+from celery import Task
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives, get_connection, send_mail
 from django.db import transaction
 from django.template import loader
 from django.utils.timezone import now
+from elasticsearch.exceptions import (
+    NotFoundError,
+    RequestError,
+    TransportError,
+)
 
-from cl.alerts.models import DocketAlert
-from cl.api.tasks import send_docket_alert_webhook_events
+from cl.alerts.models import Alert, DocketAlert, ScheduledAlertHit
+from cl.alerts.utils import (
+    alert_hits_limit_reached,
+    override_alert_query,
+    percolate_document,
+    user_has_donated_enough,
+)
+from cl.api.models import WebhookEventType
+from cl.api.tasks import (
+    send_docket_alert_webhook_events,
+    send_es_search_alert_webhook,
+)
 from cl.celery_init import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.models import Note, UserTag
+from cl.lib.command_utils import logger
+from cl.lib.elasticsearch_utils import merge_highlights_into_result
 from cl.lib.redis_utils import create_redis_semaphore, delete_redis_semaphore
 from cl.lib.string_utils import trunc
 from cl.recap.constants import COURT_TIMEZONES
-from cl.search.models import Docket, DocketEntry
+from cl.search.constants import ALERTS_HL_TAG
+from cl.search.documents import AudioPercolator
+from cl.search.models import SEARCH_TYPES, Docket, DocketEntry
+from cl.search.types import (
+    ESDocumentClassType,
+    PercolatorResponseType,
+    SaveDocumentResponseType,
+    SearchAlertHitType,
+)
 from cl.stats.utils import tally_stat
 from cl.users.models import UserProfile
 
@@ -406,3 +434,298 @@ def send_recap_email_user_not_found(recap_email_recipients: list[str]) -> None:
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[a[1] for a in settings.MANAGERS],
     )
+
+
+def send_webhook_alert_hits(
+    alert_user: UserProfile.user, hits: list[SearchAlertHitType]
+) -> None:
+    """Send webhook alerts for search hits.
+
+    :param alert_user: The user profile object associated with the webhooks.
+    :param hits: A list of tuples, each containing information about an alert,
+    its associated search type, documents found, and the number of documents.
+    :return: None
+    """
+
+    for alert, search_type, documents, num_docs in hits:
+        user_webhooks = alert_user.webhooks.filter(
+            event_type=WebhookEventType.SEARCH_ALERT, enabled=True
+        )
+        for user_webhook in user_webhooks:
+            send_es_search_alert_webhook.delay(
+                documents,
+                user_webhook.pk,
+                alert,
+            )
+
+
+@app.task(ignore_result=True)
+def send_search_alert_emails(
+    email_alerts_to_send: list[tuple[int, list[SearchAlertHitType]]]
+) -> None:
+    """Send search alert emails for multiple users.
+
+    :param email_alerts_to_send: A list of two tuples containing the user to
+    whom the alerts should be sent. A list of tuples containing the Search
+    Alert, (Alert, search type, documents, and number of documents)
+    :return: None
+    """
+
+    messages = []
+    subject = "New hits for your alerts"
+    txt_template = loader.get_template("alert_email_es.txt")
+    html_template = loader.get_template("alert_email_es.html")
+
+    for email_to_send in email_alerts_to_send:
+        user_id, hits = email_to_send
+        if not len(hits) > 0:
+            continue
+
+        alert_user: UserProfile.user = User.objects.get(pk=user_id)
+        context = {
+            "hits": hits,
+            "hits_limit": settings.SCHEDULED_ALERT_HITS_LIMIT,
+        }
+        txt = txt_template.render(context)
+        html = html_template.render(context)
+        msg = EmailMultiAlternatives(
+            subject, txt, settings.DEFAULT_ALERTS_EMAIL, [alert_user.email]
+        )
+        msg.attach_alternative(html, "text/html")
+        messages.append(msg)
+
+    connection = get_connection()
+    connection.send_messages(messages)
+
+
+@app.task(ignore_result=True)
+def process_percolator_response(response: PercolatorResponseType) -> None:
+    """Process the response from the percolator and handle alerts triggered by
+     the percolator query.
+
+    :param response: A two tuple, a list of Alerts triggered and the document
+    data that triggered the alert.
+    :return: None
+    """
+
+    if not response:
+        return None
+
+    scheduled_hits_to_create = []
+    email_alerts_to_send = []
+    rt_alerts_to_send = []
+    alerts_triggered, document_content = response
+    for hit in alerts_triggered:
+        # Create a deep copy of the original 'document_content' to allow
+        # independent highlighting for each alert triggered.
+        document_content_copy = copy.deepcopy(document_content)
+
+        alert_triggered = (
+            Alert.objects.filter(pk=hit.meta.id).select_related("user").first()
+        )
+        if not alert_triggered:
+            continue
+
+        alert_user: UserProfile.user = alert_triggered.user
+        # Set highlight if available in response.
+        if hasattr(hit.meta, "highlight"):
+            merge_highlights_into_result(
+                hit.meta.highlight.to_dict(),
+                document_content_copy,
+                ALERTS_HL_TAG,
+            )
+
+        # Override order_by to show the latest items when clicking the
+        # "View Full Results" button.
+        qd = override_alert_query(alert_triggered)
+        alert_triggered.query_run = qd.urlencode()  # type: ignore
+
+        # Compose RT hit to send.
+        hits = [
+            (
+                alert_triggered,
+                alert_triggered.alert_type,
+                [document_content_copy],
+                1,
+            )
+        ]
+        # Send real time Webhooks for all users regardless of alert rate and
+        # user's donations.
+        send_webhook_alert_hits(alert_user, hits)
+
+        # Send RT Alerts
+        if alert_triggered.rate == Alert.REAL_TIME:
+            user_donated_enough = user_has_donated_enough(
+                alert_user, alerts_count=1
+            )
+            if not user_donated_enough:
+                continue
+
+            # Append alert RT email to be sent.
+            email_alerts_to_send.append((alert_user.pk, hits))
+            rt_alerts_to_send.append(alert_triggered.pk)
+
+        else:
+            # Schedule DAILY, WEEKLY and MONTHLY Alerts
+            if alert_hits_limit_reached(
+                alert_triggered.pk, alert_triggered.user.pk
+            ):
+                # Skip storing hits for this alert-user combination because
+                # the SCHEDULED_ALERT_HITS_LIMIT has been reached.
+                continue
+            scheduled_hits_to_create.append(
+                ScheduledAlertHit(
+                    user=alert_triggered.user,
+                    alert=alert_triggered,
+                    document_content=document_content_copy,
+                )
+            )
+
+    # Create scheduled DAILY, WEEKLY and MONTHLY Alerts in bulk.
+    if scheduled_hits_to_create:
+        ScheduledAlertHit.objects.bulk_create(scheduled_hits_to_create)
+    # Sent all the related document RT emails.
+    if email_alerts_to_send:
+        send_search_alert_emails.delay(email_alerts_to_send)
+
+    # Update RT Alerts date_last_hit, increase stats and log RT alerts sent.
+    if rt_alerts_to_send:
+        Alert.objects.filter(pk__in=rt_alerts_to_send).update(
+            date_last_hit=now()
+        )
+        alerts_sent = len(rt_alerts_to_send)
+        tally_stat(f"alerts.sent.{Alert.REAL_TIME}", inc=alerts_sent)
+        logger.info(f"Sent {alerts_sent} {Alert.REAL_TIME} email alerts.")
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(TransportError, ConnectionError, RequestError),
+    max_retries=3,
+    interval_start=5,
+)
+def send_or_schedule_alerts(
+    self: Task, response: SaveDocumentResponseType, document_index: str
+) -> PercolatorResponseType | None:
+    """Send real-time alerts based on the Elasticsearch search response.
+
+    Or schedule other rates alerts to send them later.
+
+    Iterates through each hit in the search response, checks if the alert rate
+    is real-time, and if the user has donated enough. If so it sends an email
+    alert and triggers webhooks.
+    The process begins with an initial percolator query and continues to fetch
+    additional results in chunks determined by settings.PERCOLATOR_PAGE_SIZE,
+    until all results are retrieved or no more results are available.
+
+    :param self: The celery task
+    :param response: A two tuple, the document ID to be percolated in
+    ES index and the document data that triggered the alert.
+    :param document_index: The ES document index where the document lives.
+    :return: A two tuple, a list of Alerts triggered and the document data that
+    triggered the alert.
+    """
+
+    if not response:
+        self.request.chain = None
+        return None
+
+    document_id, document_content = response
+    # Perform an initial percolator query and process its response.
+    alerts_triggered = []
+    percolator_response = percolate_document(document_id, document_index)
+    if not percolator_response:
+        self.request.chain = None
+        return None
+
+    alerts_triggered.extend(percolator_response.hits)
+
+    # Check if the query contains more documents than PERCOLATOR_PAGE_SIZE.
+    # If so, return additional results until there are not more.
+    # Remember, percolator results are alerts, not documents, so what you're
+    # paginating are user alerts that the document matched, not documents that
+    # an alert matched. 🙃.
+    batch_size = settings.PERCOLATOR_PAGE_SIZE
+    total_hits = percolator_response.hits.total.value
+    results_returned = len(percolator_response.hits.hits)
+    if total_hits > batch_size:
+        documents_retrieved = results_returned
+        search_after = percolator_response.hits[-1].meta.sort
+        while True:
+            percolator_response = percolate_document(
+                document_id, document_index, search_after=search_after
+            )
+            if not percolator_response:
+                break
+
+            alerts_triggered.extend(percolator_response.hits)
+            results_returned = len(percolator_response.hits.hits)
+            documents_retrieved += results_returned
+            # Check if all results have been retrieved. If so break the loop
+            # Otherwise, increase search_after.
+            if documents_retrieved >= total_hits or results_returned == 0:
+                break
+            else:
+                search_after = percolator_response.hits[-1].meta.sort
+
+    return alerts_triggered, document_content
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(TransportError, ConnectionError, RequestError),
+    max_retries=3,
+    interval_start=5,
+    ignore_result=True,
+)
+def index_alert_document(
+    self: Task, alert: Alert, es_document=AudioPercolator
+) -> None:
+    """Helper method to prepare and index an Alert object into Elasticsearch.
+
+    :param self: The celery task
+    :param alert: The Alert instance to be indexed.
+    :param es_document: The Elasticsearch document percolator used for indexing
+    the Alert instance.
+    :return: Bool, True if document was properly indexed, otherwise None.
+    """
+
+    document = es_document()
+    doc = document.prepare(alert)
+    if not doc["percolator_query"]:
+        return None
+    doc_indexed = es_document(meta={"id": alert.pk}, **doc).save(
+        skip_empty=True, refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH
+    )
+    if not doc_indexed in ["created", "updated"]:
+        logger.warning(f"Error indexing Alert ID: {alert.pk}")
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(TransportError, ConnectionError, RequestError),
+    max_retries=3,
+    interval_start=5,
+    ignore_result=True,
+)
+def remove_doc_from_es_index(
+    self: Task, es_document: ESDocumentClassType, instance_id: int
+) -> None:
+    """Remove a document from an Elasticsearch index.
+
+    :param self: The celery task
+    :param es_document: The Elasticsearch document type.
+    :param instance_id: The ID of the instance to be removed from the
+    Elasticsearch index.
+    :return: None
+    """
+
+    try:
+        doc = es_document.get(id=instance_id)
+        doc.delete(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)
+    except NotFoundError:
+        model_label = es_document.Django.model._meta.app_label.capitalize()
+        logger.error(
+            f"The {model_label} with ID:{instance_id} can't be deleted from "
+            f"the ES index, it doesn't exists."
+        )

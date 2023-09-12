@@ -10,11 +10,6 @@
   "eslintConfig": {
     "extends": "react-app"
   },
-  "scripts": {
-    "build": "NODE_ENV=production ./node_modules/.bin/webpack --config webpack.config.js",
-    "dev": "./node_modules/webpack-dev-server/bin/webpack-dev-server.js --hot",
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
   "author": "",
   "license": "ISC",
   "devDependencies": {
