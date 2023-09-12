@@ -13,6 +13,7 @@ It requires passing the mounted directory path to the columbia xml files
 docker-compose -f docker/courtlistener/docker-compose.yml exec cl-django python manage.py columbia_merge --cluster-id 2336478 --xml-dir /opt/columbia
 """
 import csv
+import itertools
 import os.path
 import re
 from datetime import date
@@ -30,7 +31,13 @@ from cl.corpus_importer.management.commands.harvard_opinions import (
 from cl.corpus_importer.utils import similarity_scores
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_diff import get_cosine_similarity
-from cl.people_db.lookup_utils import find_just_name
+from cl.people_db.lookup_utils import (
+    extract_judge_last_name,
+    find_all_judges,
+    find_just_name,
+    lookup_judges_by_last_name_list,
+)
+from cl.people_db.models import Person
 from cl.search.models import SOURCES, Docket, Opinion, OpinionCluster
 
 VALID_CLUSTER_SOURCES = [
@@ -244,6 +251,13 @@ class AuthorException(Exception):
         self.message = message
 
 
+class JudgeException(Exception):
+    """An exception for wrong judges"""
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+
 class OpinionTypeException(Exception):
     """An exception for incorrect opinion types"""
 
@@ -300,13 +314,18 @@ def match_text_lists(
         cosine_sim = get_cosine_similarity(
             file_opinions_list[i], cl_opinions_list[j]
         )
-        if cosine_sim < 0.60:
-            continue
         percent_match = compare_documents(
             file_opinions_list[i], cl_opinions_list[j]
         )
-        if percent_match < 60:
+
+        # Sometimes one algorithm performs better than the other, this is due to some
+        # additional text, such as editor's notes, or the author, page number or posture
+        # added to the opinion
+        if cosine_sim < 0.60 and percent_match < 60:
             continue
+        #
+        # if percent_match < 60:
+        #     continue
         matches[i] = j
 
     # Key is opinion position from file, Value is opinion position from cl opinion
@@ -651,11 +670,15 @@ def read_xml(xml_filepath: str) -> dict:
                     }
                     opinions.append(new_opinion)
 
+    data["judges"] = []
     # only first opinion with "opinion" type is a lead opinion, the next opinion with
     # "opinion" type is an addendum
     lead = False
     for op in opinions:
         op_type = op.get("type")
+        op_byline = op.get("byline")
+        if op_byline:
+            data["judges"].append(extract_judge_last_name(op_byline))
         if not lead and op_type and op_type == "opinion":
             lead = True
             op["type"] = "020lead"
@@ -677,7 +700,9 @@ def read_xml(xml_filepath: str) -> dict:
             if extra_tags_to_remove:
                 for r in extra_tags_to_remove:
                     if tag == "reporter_caption":
-                        # The reporter_caption
+                        # The reporter_caption may contain the location, and we need
+                        # to remove it to make the name cleaner, e.g. Tex.App.-Ft.
+                        # Worth [2d Dist.] 2002
                         if r.next_sibling:
                             if type(r.next_sibling) == NavigableString:
                                 # The element is not tagged, it is just a text
@@ -685,7 +710,8 @@ def read_xml(xml_filepath: str) -> dict:
                                 r.next_sibling.extract()
                     r.extract()
 
-        # We use space as a separator to add a space when we have one tag next to other without a space
+        # We use space as a separator to add a space when we have one tag next to
+        # other without a space
         data[tag] = [
             found_tag.get_text(separator=" ").strip()
             for found_tag in found_tags
@@ -753,7 +779,17 @@ def read_xml(xml_filepath: str) -> dict:
     if main_date is None:
         raise DateException(f"Failed to get a date for {xml_filepath}")
 
-    data["date_filed"] = date_filed
+    data["date_filed"] = main_date
+
+    panel_date = (
+        date_argued
+        or date_reargued
+        or date_reargument_denied
+        or date_filed
+        or unknown_date
+    )
+
+    data["panel_date"] = panel_date if panel_date else None
 
     # Get syllabus from file
     data["syllabus"] = "\n".join(
@@ -775,6 +811,9 @@ def read_xml(xml_filepath: str) -> dict:
     )
     data["case_name"] = (
         format_case_name("".join(data.get("reporter_caption", []))) or ""
+    )
+    data["panel"] = (
+        extract_judge_last_name("".join(data.get("panel", []))) or []
     )
 
     return data
@@ -903,8 +942,11 @@ def update_matching_opinions(
                 op.author_str = author_str
         else:
             if author_str:
-                if find_just_name(op.author_str) != find_just_name(author_str):
-                    raise AuthorException(f"Authors don't match - log error")
+                if (
+                    find_just_name(op.author_str).lower()
+                    != find_just_name(author_str).lower()
+                ):
+                    raise AuthorException(f"Authors don't match")
                 elif any(s.isupper() for s in op.author_str.split(",")):
                     # Some names are uppercase, update with processed names
                     op.author_str = author_str
@@ -965,6 +1007,8 @@ def map_and_merge_opinions(
                 if author
                 else "",
             )
+
+            logger.info(f"Opinion created for cluster: {cluster_id}")
 
     else:
         # Skip creating new opinion cluster due to differences between data
@@ -1037,14 +1081,18 @@ def fetch_columbia_metadata(columbia_data) -> Dict[str, Any]:
     """
     data = {}
 
-    fields = [
-        "syllabus",
-        "attorneys",
-        "posture",
-    ]
+    # List of fields that don't require any additional process
+    simple_fields = ["syllabus", "attorneys", "posture"]
+
+    # Convert list of lists to list and titlecase names
+    judge_list = list(
+        itertools.chain.from_iterable(columbia_data.get("judges", []))
+    )
+    judge_list = list(map(titlecase, judge_list))
+    data["judges"] = ", ".join(sorted(list(set(judge_list))))
 
     for k, v in columbia_data.items():
-        if k in fields:
+        if k in simple_fields:
             data[k] = v if v else ""
     return data
 
@@ -1236,6 +1284,39 @@ def merge_strings(
     return {}
 
 
+def merge_judges(
+    overlapping_data: Optional[Tuple[str, str]],
+) -> dict[str, Any]:
+    """Merge overlapping judge values
+    :param overlapping_data: data to compare from columbia and courtlistener
+    :return: None
+    """
+
+    if not overlapping_data:
+        return {}
+
+    columbia_data, cl_data = overlapping_data
+    # We check if any word in the string is uppercase
+    cl_data_upper = (
+        True if [s for s in cl_data.split(",") if s.isupper()] else False
+    )
+
+    # Get last names keeping case and cleaning the string (We could have
+    # the judge names in capital letters)
+    cl_clean = set(find_all_judges(cl_data))
+    # Get last names in lowercase and cleaned
+    columbia_clean = set(find_all_judges(columbia_data))
+    judges = titlecase(", ".join(find_all_judges(columbia_data)))
+    if (
+        columbia_clean.issuperset(cl_clean) or cl_data_upper
+    ) and columbia_clean != cl_clean:
+        return {"judges": judges}
+    elif not columbia_clean.intersection(set(find_all_judges(cl_data))):
+        raise JudgeException("Judges are completely different.")
+
+    return {}
+
+
 def merge_overlapping_data(
     cluster: OpinionCluster, changed_values_dictionary: dict
 ) -> dict[str, Any]:
@@ -1249,7 +1330,7 @@ def merge_overlapping_data(
         # Empty dictionary means that we don't have overlapping data
         return {}
 
-    long_fields = ["syllabus", "posture"]
+    long_fields = ["syllabus", "posture", "judges"]
 
     data_to_update = {}
 
@@ -1268,6 +1349,10 @@ def merge_overlapping_data(
                     field_name,
                     changed_values_dictionary.get(field_name, ""),
                 )
+            )
+        elif field_name == "judges":
+            data_to_update.update(
+                merge_judges(changed_values_dictionary.get(field_name, ""))
             )
         else:
             logger.info(f"Field not considered in the process: {field_name}")
@@ -1309,7 +1394,6 @@ def update_cluster_source(cluster: OpinionCluster) -> None:
     :return: None
     """
     new_cluster_source = SOURCES.COLUMBIA_ARCHIVE + cluster.source
-
     if new_cluster_source in [
         SOURCES.COLUMBIA_ARCHIVE,
         SOURCES.COLUMBIA_M_COURT,
@@ -1330,6 +1414,27 @@ def update_cluster_source(cluster: OpinionCluster) -> None:
         raise ClusterSourceException(
             f"Unexpected cluster source: {new_cluster_source}"
         )
+
+
+def update_panel(
+    cluster: OpinionCluster,
+    panel_list: list[str],
+    panel_date: Optional[date] = None,
+):
+    """Merge overlapping data
+    :param cluster: the cluster object
+    :param panel_list: list with people names
+    :param panel_date: date used to find people
+    """
+
+    panel_list = [titlecase(p) for p in panel_list]
+
+    panel = lookup_judges_by_last_name_list(
+        panel_list, cluster.docket.court.id, panel_date
+    )
+
+    if panel:
+        cluster.panel.add(*Person.objects.filter(id__in=[p.id for p in panel]))
 
 
 def process_cluster(
@@ -1389,7 +1494,13 @@ def process_cluster(
     else:
         new_xml_filepath = filepath
 
-    columbia_data = read_xml(new_xml_filepath)
+    try:
+        columbia_data = read_xml(new_xml_filepath)
+    except FileNotFoundError:
+        logger.warning(
+            f"File doesn't exist: {new_xml_filepath} to merge with cluster: {cluster_id}"
+        )
+        return
 
     try:
         with transaction.atomic():
@@ -1404,7 +1515,9 @@ def process_cluster(
             cluster.refresh_from_db()
 
             # docket number
-            merge_docket_numbers(cluster, columbia_data["docket"])
+            if columbia_data["docket"]:
+                merge_docket_numbers(cluster, columbia_data["docket"])
+
             # case names
             case_names_to_update = merge_case_names(cluster, columbia_data)
             # date filed
@@ -1413,7 +1526,14 @@ def process_cluster(
             overlapping_data_to_update = merge_overlapping_data(
                 cluster, changed_values_dictionary
             )
-            # TODO panel
+
+            # panel
+            if columbia_data["panel"]:
+                update_panel(
+                    cluster,
+                    columbia_data["panel"],
+                    columbia_data["panel_date"],
+                )
 
             # Merge results
             data_to_update = (
