@@ -656,13 +656,6 @@ class ESRECAPDocument(DocketBaseDocument):
     )
     entry_number = fields.IntegerField(attr="docket_entry.entry_number")
     entry_date_filed = fields.DateField(attr="docket_entry.date_filed")
-    entry_date_filed_text = fields.TextField(
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(analyzer="english_exact"),
-        },
-        search_analyzer="search_analyzer",
-    )
     short_description = fields.TextField(
         attr="description",
         analyzer="text_en_splitting_cl",
@@ -696,6 +689,7 @@ class ESRECAPDocument(DocketBaseDocument):
     is_available = fields.BooleanField(attr="is_available")
     page_count = fields.IntegerField(attr="page_count")
     filepath_local = fields.KeywordField(index=False)
+    absolute_url = fields.KeywordField(index=False)
 
     class Django:
         model = RECAPDocument
@@ -716,9 +710,8 @@ class ESRECAPDocument(DocketBaseDocument):
                 return None
             return deepgetattr(instance, "local_path_mp3.name", None)
 
-    def prepare_entry_date_filed_text(self, instance):
-        if instance.docket_entry.date_filed:
-            return instance.docket_entry.date_filed.strftime("%-d %B %Y")
+    def prepare_absolute_url(self, instance):
+        return instance.get_absolute_url()
 
     def prepare_docket_child(self, instance):
         parent_id = getattr(instance.docket_entry.docket, "pk", None)
@@ -789,28 +782,8 @@ class DocketDocument(DocketBaseDocument):
     dateArgued = fields.DateField(attr="date_argued")
     dateFiled = fields.DateField(attr="date_filed")
     dateTerminated = fields.DateField(attr="date_terminated")
-    dateArgued_text = fields.TextField(
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(analyzer="english_exact"),
-        },
-        search_analyzer="search_analyzer",
-    )
-    dateFiled_text = fields.TextField(
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(analyzer="english_exact"),
-        },
-        search_analyzer="search_analyzer",
-    )
-    dateTerminated_text = fields.TextField(
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(analyzer="english_exact"),
-        },
-        search_analyzer="search_analyzer",
-    )
     docket_slug = fields.KeywordField(attr="slug", index=False)
+    docket_absolute_url = fields.KeywordField(index=False)
     assignedTo = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
@@ -818,6 +791,7 @@ class DocketDocument(DocketBaseDocument):
         },
         search_analyzer="search_analyzer",
     )
+    assigned_to_id = fields.KeywordField(attr="assigned_to.pk")
     referredTo = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
@@ -825,6 +799,7 @@ class DocketDocument(DocketBaseDocument):
         },
         search_analyzer="search_analyzer",
     )
+    referred_to_id = fields.KeywordField(attr="referred_to.pk")
     court = fields.TextField(
         attr="court.full_name",
         analyzer="text_en_splitting_cl",
@@ -869,18 +844,6 @@ class DocketDocument(DocketBaseDocument):
     def prepare_caseName(self, instance):
         return best_case_name(instance)
 
-    def prepare_dateArgued_text(self, instance):
-        if instance.date_argued:
-            return instance.date_argued.strftime("%-d %B %Y")
-
-    def prepare_dateFiled_text(self, instance):
-        if instance.date_filed:
-            return instance.date_filed.strftime("%-d %B %Y")
-
-    def prepare_dateTerminated_text(self, instance):
-        if instance.date_terminated:
-            return instance.date_terminated.strftime("%-d %B %Y")
-
     def prepare_assignedTo(self, instance):
         if instance.assigned_to:
             return instance.assigned_to.name_full
@@ -895,6 +858,9 @@ class DocketDocument(DocketBaseDocument):
 
     def prepare_docket_child(self, instance):
         return "docket"
+
+    def prepare_docket_absolute_url(self, instance):
+        return instance.get_absolute_url()
 
     def prepare_text(self, instance):
         text_template = loader.get_template("indexes/dockets_text.txt")

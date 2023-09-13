@@ -35,6 +35,7 @@ from cl.lib.elasticsearch_utils import (
     es_index_exists,
     fetch_es_results,
     merge_courts_from_db,
+    merge_inner_hits,
     merge_unavailable_fields_on_parent_document,
     sanitize_unbalanced_parenthesis,
     set_results_highlights,
@@ -733,6 +734,7 @@ def fetch_and_paginate_results(
     set_results_highlights(results, search_type)
     convert_str_date_fields_to_date_objects(results, search_type)
     merge_courts_from_db(results, search_type)
+    merge_inner_hits(results, search_type)
     merge_unavailable_fields_on_parent_document(results, search_type)
 
     if cache_key is not None:

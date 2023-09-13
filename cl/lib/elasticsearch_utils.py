@@ -3,10 +3,11 @@ import operator
 import re
 import time
 import traceback
+from collections import defaultdict
 from dataclasses import fields
 from datetime import date, datetime
 from functools import reduce, wraps
-from typing import Any, Callable, Dict, List, Literal
+from typing import Any, Callable, DefaultDict, Dict, List, Literal
 
 from django.conf import settings
 from django.core.paginator import Page
@@ -236,12 +237,16 @@ def append_query_conjunctions(query: str) -> str:
     return " ".join(clean_q)
 
 
-def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
+def build_fulltext_query(
+    fields: list[str], value: str, only_queries=False
+) -> QueryString | List:
     """Given the cleaned data from a form, return a Elastic Search string query or []
     https://www.elastic.co/guide/en/elasticsearch/reference/current/full-text-queries.html
 
     :param fields: A list of name fields to search in.
     :param value: The string value to search for.
+    :param only_queries: If True return only the queries avoiding wrapping them
+    into a bool clause.
     :return: A Elasticsearch QueryString or [] if the "value" param is empty.
     """
     if value:
@@ -286,6 +291,8 @@ def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
                 type="phrase",
             ),
         ]
+        if only_queries:
+            return q_should
         return Q("bool", should=q_should)
 
     return []
@@ -336,7 +343,14 @@ def build_text_filter(field: str, value: str) -> List:
     :return: Empty list or list with DSL Phrase query
     """
     if value:
-        return [Q("match_phrase", **{field: value})]
+        return [
+            Q(
+                "query_string",
+                query=value,
+                fields=[field],
+                default_operator="AND",
+            )
+        ]
     return []
 
 
@@ -376,6 +390,11 @@ def build_sort_results(cd: CleanData) -> Dict:
     if cd["type"] == SEARCH_TYPES.PARENTHETICAL:
         order_by_map["score desc"] = {"score": {"order": "desc"}}
 
+    if cd["type"] == SEARCH_TYPES.RECAP:
+        random_order_field_id = "docket_id"
+    else:
+        random_order_field_id = "id"
+
     order_by = cd.get("order_by")
     if order_by and "random_" in order_by:
         # Return random sorting if available.
@@ -391,7 +410,7 @@ def build_sort_results(cd: CleanData) -> Dict:
             "_script": {
                 "type": "number",
                 "script": {
-                    "source": "Long.hashCode(doc['id'].value ^ params.seed)",
+                    "source": f"Long.hashCode(doc['{random_order_field_id}'].value ^ params.seed)",
                     "params": {"seed": seed},
                 },
                 "order": order,
@@ -471,7 +490,7 @@ def build_es_base_query(search_query: Search, cd: CleanData) -> Search:
     """
 
     string_query = None
-    join_field_documents = [SEARCH_TYPES.PEOPLE, SEARCH_TYPES.RECAP]
+    join_field_documents = [SEARCH_TYPES.PEOPLE]
     if cd["type"] in join_field_documents:
         filters = build_join_es_filters(cd)
     else:
@@ -553,9 +572,6 @@ def build_es_base_query(search_query: Search, cd: CleanData) -> Search:
                     "suitNature",
                     "cause",
                     "juryDemand",
-                    "dateArgued_text",
-                    "dateFiled_text",
-                    "dateTerminated_text",
                     "assignedTo",
                     "referredTo",
                     "court",
@@ -565,20 +581,23 @@ def build_es_base_query(search_query: Search, cd: CleanData) -> Search:
                     "trustee_str",
                 ],
             )
-            string_query = build_join_fulltext_queries(
-                child_query_fields,
-                parent_query_fields,
-                cd.get("q", ""),
+            string_query = build_full_join_es_queries(
+                cd, child_query_fields, parent_query_fields
             )
 
     if filters or string_query:
         # Apply filters first if there is at least one set.
-        if filters:
-            search_query = search_query.filter(reduce(operator.iand, filters))
-        # Apply string query after if is set, required to properly
-        # compute elasticsearch scores.
-        if string_query:
+        if cd["type"] == SEARCH_TYPES.RECAP:
             search_query = search_query.query(string_query)
+        else:
+            if filters:
+                search_query = search_query.filter(
+                    reduce(operator.iand, filters)
+                )
+            # Apply string query after if is set, required to properly
+            # compute elasticsearch scores.
+            if string_query:
+                search_query = search_query.query(string_query)
     else:
         if cd["type"] == SEARCH_TYPES.PEOPLE:
             # Only return Person documents.
@@ -623,6 +642,7 @@ def build_es_main_query(
         case _:
             search_query = add_es_highlighting(search_query, cd)
             search_query = search_query.sort(build_sort_results(cd))
+
     return search_query, total_query_results, top_hits_limit
 
 
@@ -1163,9 +1183,6 @@ def build_join_es_filters(cd: CleanData) -> List:
                 ),
             ]
         )
-        # Build position has child filter:
-        queries_list.extend(build_has_child_filters("recap_document", cd))
-
     return queries_list
 
 
@@ -1185,3 +1202,128 @@ def do_es_feed_query(
     s = build_es_base_query(search_query, cd)
     response = s.extra(from_=0, size=rows).execute()
     return response
+
+
+def merge_inner_hits(results: Page, search_type: str) -> None:
+    """Merge and deduplicate inner hits of Elasticsearch results.
+
+    :param results: The Page object containing search results.
+    :param search_type: The search type to perform.
+    :return: None, the function updates the results in place.
+    """
+
+    if search_type != SEARCH_TYPES.RECAP:
+        return
+
+    for result in results:
+        if "inner_hits" not in result.meta:
+            continue
+
+        unique_inner_hits: DefaultDict[str, dict[str, Any]] = defaultdict()
+
+        # Iterate over each type of inner hits
+        for inner_type in [
+            "text_query_inner_recap_document",
+            "filter_inner_recap_document",
+        ]:
+            # Check if the type exists in inner_hits
+            if inner_type not in result.meta.inner_hits:
+                continue
+
+            for hit in result.meta["inner_hits"][inner_type]["hits"]["hits"]:
+                unique_inner_hits[hit["_id"]] = hit["_source"]
+
+        result["child_docs"] = list(unique_inner_hits.values())
+
+
+def build_full_join_es_queries(
+    cd: CleanData,
+    child_query_fields: dict[str, list[str]],
+    parent_query_fields: list[str],
+) -> QueryString:
+    """Build a complete Elasticsearch query with both parent and child document
+      conditions.
+
+    :param cd: The query CleanedData
+    :param child_query_fields: A dictionary mapping child fields document type.
+    :param parent_query_fields: A list of fields for the parent document.
+    :return: An Elasticsearch QueryString object.
+    """
+
+    child_filters = []
+    q_should = []
+    child_type = "recap_document"
+    if cd["type"] == SEARCH_TYPES.RECAP:
+        # Build RECAP has child filter:
+        available_only = cd.get("available_only", "")
+        description = cd.get("description", "")
+        document_number = cd.get("document_number", "")
+        attachment_number = cd.get("attachment_number", "")
+
+        if available_only:
+            child_filters.extend(
+                build_term_query(
+                    "is_available",
+                    available_only,
+                )
+            )
+        if description:
+            child_filters.extend(build_text_filter("description", description))
+        if document_number:
+            child_filters.extend(
+                build_term_query("document_number", document_number)
+            )
+        if attachment_number:
+            child_filters.extend(
+                build_term_query("attachment_number", attachment_number)
+            )
+
+        # Build has_child query.
+        value = cd.get("q", "")
+        child_fields = child_query_fields["recap_document"]
+        child_text_query = build_fulltext_query(
+            child_fields, value, only_queries=True
+        )
+        if child_filters:
+            c_filters = reduce(operator.iand, child_filters)
+            join_query = Q(
+                "bool",
+                filter=c_filters,
+                should=child_text_query,
+                minimum_should_match=0,
+            )
+        else:
+            join_query = Q("bool", should=child_text_query)
+
+        query = Q(
+            "has_child",
+            type="recap_document",
+            score_mode="max",
+            query=join_query,
+            inner_hits={"name": f"text_query_inner_{child_type}", "size": 10},
+        )
+        q_should.append(query)
+
+    # Combine parent and child queries and filters.
+    parent_filters = build_join_es_filters(cd)
+    string_query = build_fulltext_query(
+        parent_query_fields, cd.get("q", ""), only_queries=True
+    )
+    if parent_filters:
+        p_filters = reduce(operator.iand, parent_filters)
+        join_query = Q(
+            "bool",
+            filter=p_filters,
+            should=string_query,
+            minimum_should_match=1,
+        )
+        q_should.append(join_query)
+    else:
+        if string_query:
+            join_query = Q("bool", should=string_query)
+            q_should.append(join_query)
+
+    return Q(
+        "bool",
+        should=q_should,
+    )

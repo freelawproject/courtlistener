@@ -116,11 +116,10 @@ oa_field_mapping = {
     "save": {
         Docket: {
             "docket": {
-                "date_argued": ["dateArgued", "dateArgued_text"],
-                "date_reargued": ["dateReargued", "dateReargued_text"],
+                "date_argued": ["dateArgued"],
+                "date_reargued": ["dateReargued"],
                 "date_reargument_denied": [
                     "dateReargumentDenied",
-                    "dateReargumentDenied_text",
                 ],
                 "docket_number": ["docketNumber"],
                 "slug": ["docket_slug"],
@@ -181,7 +180,7 @@ recap_document_field_mapping = {
             "docket_entry": {
                 "description": ["description"],
                 "entry_number": ["entry_number"],
-                "date_filed": ["entry_date_filed", "entry_date_filed_text"],
+                "date_filed": ["entry_date_filed"],
             }
         },
     },
