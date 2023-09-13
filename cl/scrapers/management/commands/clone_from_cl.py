@@ -33,10 +33,11 @@ manage.py clone_from_cl --type search.OpinionCluster --id 1814616 --clone-person
 manage.py clone_from_cl --type people_db.Person --id 4173 --clone-person-positions
 manage.py clone_from_cl --type search.Docket --id 5377675 --clone-person-positions
 
-Also, you can decide whether the cloned objects should be indexed in solr or not (In
-the future this will need to be replaced with elasticsearch), for example:
+Also, you can decide whether the cloned objects should be indexed in solr or not,
+this only applies for OpinionCluster and Docket objects (In the future this will need
+to be replaced with elasticsearch), for example:
 
-manage.py clone_from_cl --type search.OpinionCluster --id 1814616
+manage.py clone_from_cl --type search.OpinionCluster --id 1814616 --add-to-solr
 
 
 This is still work in progress, some data is not cloned yet.
