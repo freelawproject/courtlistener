@@ -504,14 +504,14 @@ def build_es_base_query(search_query: Search, cd: CleanData) -> Search:
                         "appointer",
                         "supervisor",
                         "predecessor",
-                        "position_type_text",
-                        "nomination_process_text",
-                        "judicial_committee_action_text",
-                        "selection_method_text",
-                        "termination_reason_text",
+                        "position_type",
+                        "nomination_process",
+                        "judicial_committee_action",
+                        "selection_method",
+                        "termination_reason",
                         "court_full_name",
                         "court_citation_string",
-                        "court_id_text",
+                        "court_exact",
                         "organization_name",
                         "job_title",
                     ],
@@ -1026,7 +1026,7 @@ def build_has_child_filters(
                     )
                 )
             if court:
-                queries_list.extend(build_term_query("court_exact", court))
+                queries_list.extend(build_term_query("court_exact.raw", court))
             if appointer:
                 queries_list.extend(build_text_filter("appointer", appointer))
 

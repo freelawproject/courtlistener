@@ -352,10 +352,10 @@ class PositionDocument(PersonBaseDocument):
         },
         search_analyzer="search_analyzer",
     )
-    court_exact = fields.KeywordField(attr="court.pk")
-    court_id_text = fields.TextField(
+    court_exact = fields.TextField(
         attr="court.pk",
         analyzer="text_en_splitting_cl",
+        fields={"raw": fields.KeywordField(attr="court.pk")},
         search_analyzer="search_analyzer",
     )
     court_citation_string = fields.TextField(
@@ -369,10 +369,10 @@ class PositionDocument(PersonBaseDocument):
         analyzer="text_en_splitting_cl",
         search_analyzer="search_analyzer",
     )
-    position_type = fields.KeywordField()
-    position_type_text = fields.TextField(
+    position_type = fields.TextField(
         analyzer="text_en_splitting_cl",
         search_analyzer="search_analyzer",
+        fields={"raw": fields.KeywordField()},
     )
     appointer = fields.TextField(
         attr="appointer.person.name_full_reverse",
@@ -423,29 +423,28 @@ class PositionDocument(PersonBaseDocument):
     date_granularity_termination = fields.KeywordField(
         attr="date_granularity_termination"
     )
-    judicial_committee_action = fields.KeywordField()
-    judicial_committee_action_text = fields.TextField(
+    judicial_committee_action = fields.TextField(
         analyzer="text_en_splitting_cl",
         search_analyzer="search_analyzer",
+        fields={"raw": fields.KeywordField()},
     )
 
-    nomination_process = fields.KeywordField()
-    nomination_process_text = fields.TextField(
+    nomination_process = fields.TextField(
         analyzer="text_en_splitting_cl",
         search_analyzer="search_analyzer",
+        fields={"raw": fields.KeywordField()},
     )
-
-    selection_method = fields.KeywordField()
-    selection_method_text = fields.TextField(
+    selection_method = fields.TextField(
         analyzer="text_en_splitting_cl",
         search_analyzer="search_analyzer",
+        fields={"raw": fields.KeywordField()},
     )
     selection_method_id = fields.KeywordField(attr="how_selected")
 
-    termination_reason = fields.KeywordField()
-    termination_reason_text = fields.TextField(
+    termination_reason = fields.TextField(
         analyzer="text_en_splitting_cl",
         search_analyzer="search_analyzer",
+        fields={"raw": fields.KeywordField()},
     )
 
     class Django:
@@ -455,31 +454,16 @@ class PositionDocument(PersonBaseDocument):
     def prepare_position_type(self, instance):
         return instance.get_position_type_display()
 
-    def prepare_position_type_text(self, instance):
-        return instance.get_position_type_display()
-
     def prepare_judicial_committee_action(self, instance):
-        return instance.get_judicial_committee_action_display()
-
-    def prepare_judicial_committee_action_text(self, instance):
         return instance.get_judicial_committee_action_display()
 
     def prepare_nomination_process(self, instance):
         return instance.get_nomination_process_display()
 
-    def prepare_nomination_process_text(self, instance):
-        return instance.get_nomination_process_display()
-
     def prepare_selection_method(self, instance):
         return instance.get_how_selected_display()
 
-    def prepare_selection_method_text(self, instance):
-        return instance.get_how_selected_display()
-
     def prepare_termination_reason(self, instance):
-        return instance.get_termination_reason_display()
-
-    def prepare_termination_reason_text(self, instance):
         return instance.get_termination_reason_display()
 
     def prepare_person_child(self, instance):
