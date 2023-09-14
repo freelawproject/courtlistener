@@ -994,6 +994,10 @@ class Command(VerboseCommand):
                         f"Cluster id: {cluster_ids[0][0]} already merged."
                     )
                     return
+            else:
+                logger.info(
+                    f"Cluster ID: {options['cluster_id']} doesn't exist"
+                )
 
         for cluster_id, filepath in cluster_ids:
             logger.info(msg=f"Merging {cluster_id} at {filepath}")
