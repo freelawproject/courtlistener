@@ -311,9 +311,16 @@ def match_text_lists(
     for i, row in enumerate(scores):
         j = row.argmax()  # type: ignore
         # Lower threshold for small opinions.
+        # NOTE: get_cosine_similarity works great when both texts are almost the same
+        # with small variations
         cosine_sim = get_cosine_similarity(
             file_opinions_list[i], cl_opinions_list[j]
         )
+        # NOTE: compare_documents works good when the opinion from the file is a
+        # subset of the opinion in CL (content in cl opinion can have other data in
+        # the body like posture, attorneys, etc. e.g. in cluster id: 7643871 we have
+        # the posture and the opinion text but in the xml file we only have the opinion
+        # text, cosine_sim: 0.1639075094124459 and percent_match: 73)
         percent_match = compare_documents(
             file_opinions_list[i], cl_opinions_list[j]
         )
@@ -330,6 +337,20 @@ def match_text_lists(
     # e.g. matches {0: 1, 1: 2} 0 is file opinion and 1 in cl opinion, 1 is file
     # opinion and 2 is cl opinion
     return matches
+
+
+def clean_opinion_content(content: str) -> str:
+    """Strip all non-alphanumeric characters
+    :param content: content from opinion
+    :return: cleaned content
+    """
+
+    soup = BeautifulSoup(content, features="html.parser")
+    prep_text = re.sub(
+        r"[^a-zA-Z0-9 ]", "", soup.getText(separator=" ").lower()
+    )
+    prep_text = re.sub(" +", " ", prep_text)
+    return prep_text
 
 
 def get_cl_opinion_content(
@@ -360,11 +381,7 @@ def get_cl_opinion_content(
         elif len(op.xml_harvard) > 1:
             content = op.xml_harvard
         if content:
-            soup = BeautifulSoup(content, features="html.parser")
-            prep_text = re.sub(
-                r"[^a-zA-Z0-9 ]", "", soup.getText(separator=" ").lower()
-            )
-            prep_text = re.sub(" +", " ", prep_text)
+            prep_text = clean_opinion_content(content)
             cl_cleaned_opinions.append(
                 {
                     "id": op.id,
@@ -970,8 +987,12 @@ def map_and_merge_opinions(
     """
 
     if len(columbia_opinions) == len(cl_cleaned_opinions):
+        # We need that both list to be cleaned, so we can have a more accurate match
         matches = match_text_lists(
-            [op.get("opinion") for op in columbia_opinions],
+            [
+                clean_opinion_content(op.get("opinion"))
+                for op in columbia_opinions
+            ],
             [op.get("opinion") for op in cl_cleaned_opinions],
         )
         if len(matches) == len(columbia_opinions):
@@ -1012,6 +1033,8 @@ def map_and_merge_opinions(
 
     else:
         # Skip creating new opinion cluster due to differences between data
+        # NOTE: this may happen because some opinions were incorrectly combined when
+        # imported with the old columbia importer
         logger.info(
             msg=f"Skip merging mismatched opinions on cluster: {cluster_id}"
         )
