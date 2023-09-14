@@ -12,6 +12,7 @@ from django.core import mail
 from django.core.management import call_command
 from django.test import Client, override_settings
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.timezone import now
 from lxml import html
 from rest_framework.status import (
@@ -1942,7 +1943,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         self.assertEqual(len(webhook_events), 3)
 
         # Send dly alerts and check assertions.
-        mock_date = now().replace(day=1, hour=0)
+        mock_date = timezone.localtime(timezone.now()).replace(day=1, hour=0)
         self.send_alerts_by_rate_and_confirm_assertions(
             Alert.DAILY,
             dly_oral_argument,
@@ -1954,7 +1955,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
 
         # Daily command is executed the next day again, it shouldn't send more
         # alerts. Since previous alerts have already been sent.
-        current_date = now().replace(day=2, hour=0)
+        current_date = timezone.localtime(timezone.now()).replace(
+            day=2, hour=0
+        )
         self.send_alerts_by_rate_and_confirm_assertions(
             Alert.DAILY,
             dly_oral_argument,
@@ -1973,7 +1976,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             docket__docket_number="19-5741",
         )
         # Send wly alerts and check assertions.
-        current_date = now().replace(day=7, hour=0)
+        current_date = timezone.localtime(timezone.now()).replace(
+            day=7, hour=0
+        )
         self.send_alerts_by_rate_and_confirm_assertions(
             Alert.WEEKLY,
             dly_oral_argument,
@@ -2003,7 +2008,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                     call_command("cl_send_scheduled_alerts", rate="mly")
 
         # Send mly alerts.
-        current_date = now().replace(day=28, hour=0)
+        current_date = timezone.localtime(timezone.now()).replace(
+            day=28, hour=0
+        )
         self.send_alerts_by_rate_and_confirm_assertions(
             Alert.MONTHLY,
             dly_oral_argument,

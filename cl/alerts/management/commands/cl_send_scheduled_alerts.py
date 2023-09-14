@@ -3,8 +3,6 @@ from collections import defaultdict
 from typing import DefaultDict
 
 import waffle
-from django.http import QueryDict
-from django.utils.timezone import now
 
 from cl.alerts.models import (
     SCHEDULED_ALERT_HIT_STATUS,
@@ -14,7 +12,6 @@ from cl.alerts.models import (
 from cl.alerts.tasks import send_search_alert_emails
 from cl.alerts.utils import InvalidDateError, override_alert_query
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.search.models import SEARCH_TYPES
 from cl.stats.utils import tally_stat
 
 DAYS_TO_DELETE = 90
@@ -60,7 +57,7 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
     """
 
     alerts_sent_count = 0
-    now_time = now()
+    now_time = datetime.datetime.now()
     alerts_to_update = []
     scheduled_hits_rate = ScheduledAlertHit.objects.filter(
         alert__rate=rate, hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED
@@ -143,14 +140,18 @@ def delete_old_scheduled_alerts() -> int:
     """
 
     # Delete SENT ScheduledAlertHits after DAYS_TO_DELETE
-    sent_older_than = now() - datetime.timedelta(days=DAYS_TO_DELETE)
+    sent_older_than = datetime.datetime.now() - datetime.timedelta(
+        days=DAYS_TO_DELETE
+    )
     scheduled_sent_hits_to_delete = ScheduledAlertHit.objects.filter(
         date_created__lt=sent_older_than,
         hit_status=SCHEDULED_ALERT_HIT_STATUS.SENT,
     ).delete()
 
     # Delete SCHEDULED ScheduledAlertHits after 2 * DAYS_TO_DELETE
-    unsent_older_than = now() - datetime.timedelta(days=2 * DAYS_TO_DELETE)
+    unsent_older_than = datetime.datetime.now() - datetime.timedelta(
+        days=2 * DAYS_TO_DELETE
+    )
     scheduled_unsent_hits_to_delete = ScheduledAlertHit.objects.filter(
         date_created__lt=unsent_older_than,
         hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
