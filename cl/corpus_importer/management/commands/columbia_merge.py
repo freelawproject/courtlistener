@@ -312,15 +312,17 @@ def match_text_lists(
         j = row.argmax()  # type: ignore
         # Lower threshold for small opinions.
         # NOTE: get_cosine_similarity works great when both texts are almost the same
-        # with small variations
+        # with very small variations
         cosine_sim = get_cosine_similarity(
             file_opinions_list[i], cl_opinions_list[j]
         )
         # NOTE: compare_documents works good when the opinion from the file is a
-        # subset of the opinion in CL (content in cl opinion can have other data in
-        # the body like posture, attorneys, etc. e.g. in cluster id: 7643871 we have
-        # the posture and the opinion text but in the xml file we only have the opinion
-        # text, cosine_sim: 0.1639075094124459 and percent_match: 73)
+        # subset of the opinion in CL, the percentage represents how much of the
+        # opinion of the file is in the opinion from cl (content in cl opinion can
+        # have other data in the body like posture, attorneys, etc. e.g. in cluster
+        # id: 7643871 we have the posture and the opinion text but in the xml file we
+        # only have the opinion text, cosine_sim: 0.1639075094124459 and
+        # percent_match: 73)
         percent_match = compare_documents(
             file_opinions_list[i], cl_opinions_list[j]
         )
@@ -989,10 +991,7 @@ def map_and_merge_opinions(
     if len(columbia_opinions) == len(cl_cleaned_opinions):
         # We need that both list to be cleaned, so we can have a more accurate match
         matches = match_text_lists(
-            [
-                clean_opinion_content(op.get("opinion"))
-                for op in columbia_opinions
-            ],
+            [clean_opinion_content(op["opinion"]) for op in columbia_opinions],
             [op.get("opinion") for op in cl_cleaned_opinions],
         )
         if len(matches) == len(columbia_opinions):
