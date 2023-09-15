@@ -635,13 +635,6 @@ def add_create_docket_entry_transaction(d, docket_entry):
                     )
                     de_created = True
             except DocketEntry.MultipleObjectsReturned:
-                logger.error(
-                    "Multiple docket entries found for document "
-                    "entry number '%s' seq '%s' while processing '%s'",
-                    docket_entry["document_number"],
-                    pacer_seq_no,
-                    d,
-                )
                 duplicate_de_queryset = DocketEntry.objects.filter(
                     docket=d,
                     entry_number=docket_entry["document_number"],
