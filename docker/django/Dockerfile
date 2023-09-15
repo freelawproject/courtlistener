@@ -68,8 +68,12 @@ RUN mkdir /var/log/courtlistener \
 
 WORKDIR /opt/courtlistener
 
+
 ## Needs to be two commands so second one can use variables from first.
 ENV PYTHONPATH="${PYTHONPATH}:/opt/courtlistener"
 
+USER root
+RUN chmod +x /opt/courtlistener/docker/django/docker-entrypoint.sh
+RUN chown www-data:www-data /opt/courtlistener/docker/django/docker-entrypoint.sh
 USER www-data
-ENTRYPOINT [ "./docker-entrypoint.sh" ]
+ENTRYPOINT ["/bin/sh", "/opt/courtlistener/docker/django/docker-entrypoint.sh"]
