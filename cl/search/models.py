@@ -944,8 +944,12 @@ class Docket(AbstractDateTimeModel):
         )
 
         # Parties, attorneys, firms
-        if self.pk != 6245245:
-            # Don't do parties for the J&J talcum powder case. It's too big.
+        if self.pk not in [
+            # Block mega cases that are too big
+            6245245,  # J&J Talcum Powder
+            4538381,  # Ethicon, Inc. Pelvic Repair System
+            4715020,  # Katrina Canal Breaches Litigation
+        ]:
             out.update(
                 {
                     "party_id": set(),
@@ -1562,9 +1566,13 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             }
         )
 
-        if docket.pk == 6245245:
-            # Skip the parties for the J&J talcum powder case, it's just too
-            # big to pull from the DB. Sorry folks.
+        if docket.pk not in [
+            6245245,  # J&J Talcum Powder
+            4538381,  # Ethicon, Inc. Pelvic Repair System
+            4715020,  # Katrina Canal Breaches Litigation
+        ]:
+            # Skip the parties for mega cases that are too big to
+            # pull from the DB. Sorry folks.
             return out
 
         for p in docket.prefetched_parties:
