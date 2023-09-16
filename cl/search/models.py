@@ -1566,7 +1566,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             }
         )
 
-        if docket.pk not in [
+        if docket.pk in [
             6245245,  # J&J Talcum Powder
             4538381,  # Ethicon, Inc. Pelvic Repair System
             4715020,  # Katrina Canal Breaches Litigation
