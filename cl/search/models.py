@@ -2146,8 +2146,10 @@ class Courthouse(models.Model):
         related_name="courts",
         on_delete=models.CASCADE,
     )
-    court_seat = models.NullBooleanField(
+    court_seat = models.BooleanField(
         help_text="Is this the seat of the Court",
+        default=False,
+        null=True,
     )
     building_name = models.CharField(
         verbose_name="Courthouse Name",
