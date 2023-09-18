@@ -2138,7 +2138,7 @@ class Court(models.Model):
 
 
 class Courthouse(models.Model):
-    """A class to represent the physcial location of a court."""
+    """A class to represent the physical location of a court."""
 
     court = models.ForeignKey(
         Court,
