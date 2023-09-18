@@ -2150,27 +2150,29 @@ class Courthouse(models.Model):
         help_text="Is this the seat of the Court",
     )
     building_name = models.CharField(
-        max_length=255,
         verbose_name="Courthouse Name",
         help_text="Ex. John Adams Courthouse",
+        max_length=255,
         null=True,
         blank=True,
     )
     address_line_1 = models.CharField(
-        max_length=255,
         verbose_name="Address Line 1",
+        max_length=255,
         blank=True,
         null=True,
     )
     address_line_2 = models.CharField(
+        verbose_name="Address Line 2",
         max_length=255,
         null=True,
         blank=True,
-        verbose_name="Address Line 2",
     )
     city = models.CharField(
         help_text="The city/town where the court resides.",
         max_length=255,
+        blank=True,
+        null=True,
     )
     county = models.CharField(
         max_length=255,
