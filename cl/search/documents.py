@@ -447,6 +447,72 @@ class PositionDocument(PersonBaseDocument):
         fields={"raw": fields.KeywordField()},
     )
 
+    # Parent fields
+    name = fields.TextField(
+        attr="person.name_full",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="person.name_full", analyzer="english_exact"
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    gender = fields.TextField()
+    alias = fields.ListField(
+        fields.TextField(
+            analyzer="text_en_splitting_cl",
+            fields={
+                "exact": fields.TextField(analyzer="english_exact"),
+            },
+            search_analyzer="search_analyzer",
+            multi=True,
+        )
+    )
+    dob_city = fields.TextField(
+        attr="person.dob_city",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="person.dob_city", analyzer="english_exact"
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+
+    political_affiliation = fields.ListField(
+        fields.TextField(
+            analyzer="text_en_splitting_cl",
+            fields={
+                "exact": fields.TextField(analyzer="english_exact"),
+            },
+            search_analyzer="search_analyzer",
+            multi=True,
+        )
+    )
+    religion = fields.TextField(attr="person.religion")
+    fjc_id = fields.TextField()
+    aba_rating = fields.ListField(
+        fields.TextField(
+            analyzer="text_en_splitting_cl",
+            fields={
+                "exact": fields.TextField(analyzer="english_exact"),
+            },
+            search_analyzer="search_analyzer",
+            multi=True,
+        )
+    )
+    school = fields.ListField(
+        fields.TextField(
+            analyzer="text_en_splitting_cl",
+            fields={
+                "exact": fields.TextField(analyzer="english_exact"),
+            },
+            search_analyzer="search_analyzer",
+            multi=True,
+        )
+    )
+
     class Django:
         model = Position
         ignore_signals = True
@@ -469,6 +535,34 @@ class PositionDocument(PersonBaseDocument):
     def prepare_person_child(self, instance):
         parent_id = getattr(instance.person, "pk", None)
         return {"name": "position", "parent": parent_id}
+
+    def prepare_gender(self, instance):
+        return instance.person.get_gender_display()
+
+    def prepare_fjc_id(self, instance):
+        return str(instance.person.fjc_id)
+
+    def prepare_political_affiliation(self, instance):
+        return [
+            pa.get_political_party_display()
+            for pa in instance.person.political_affiliations.all()
+            if pa
+        ] or None
+
+    def prepare_alias(self, instance):
+        return [r.name_full for r in instance.person.aliases.all()] or None
+
+    def prepare_aba_rating(self, instance):
+        return [
+            r.get_rating_display()
+            for r in instance.person.aba_ratings.all()
+            if r
+        ] or None
+
+    def prepare_school(self, instance):
+        return [
+            e.school.name for e in instance.person.educations.all()
+        ] or None
 
 
 @people_db_index.document

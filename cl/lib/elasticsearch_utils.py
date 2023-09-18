@@ -997,7 +997,7 @@ def build_join_fulltext_queries(
         q_should.append(build_fulltext_query(parent_fields, value))
 
     if q_should:
-        return Q("bool", should=q_should)
+        return Q("bool", should=q_should, minimum_should_match=1)
     return []
 
 
@@ -1056,6 +1056,7 @@ def build_join_es_filters(cd: CleanData) -> List:
         # Build parent document filters.
         queries_list.extend(
             [
+                Q("match", person_child="person"),
                 *build_term_query("dob_state_id", cd.get("dob_state", "")),
                 *build_term_query(
                     "political_affiliation_id",
