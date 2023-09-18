@@ -196,10 +196,11 @@ class DocketEntryFilter(NoEmptyFilterSet):
         model = DocketEntry
         fields = {
             "id": ["exact"],
-            "entry_number": INTEGER_LOOKUPS,
+            "entry_number": INTEGER_LOOKUPS + ["isnull"],
             "date_created": DATETIME_LOOKUPS,
             "date_modified": DATETIME_LOOKUPS,
             "date_filed": DATE_LOOKUPS,
+            "pacer_sequence_number": INTEGER_LOOKUPS + ["isnull"],
         }
 
 
