@@ -104,6 +104,7 @@ services:
       - cl-es
     ports:
       - "8000:8000"
+    user: root
     volumes:
       - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
       - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
