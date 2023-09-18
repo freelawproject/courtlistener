@@ -117,19 +117,20 @@ class PodcastTest(ESIndexTestCase, TestCase):
         Search podcasts are a subclass of the Jurisdiction podcasts, so a
         simple test is all that's needed here.
         """
+
+        params = {
+            "q": f"court_id:{self.audio.docket.court.pk}",
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+        }
         response = self.client.get(
             reverse("search_podcast", args=["search"]),
-            {
-                "q": f"court_id:{self.audio.docket.court.pk}",
-                "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            },
+            params,
         )
         self.assertEqual(
             200, response.status_code, msg="Did not get a 200 OK status code."
         )
         xml_tree = etree.fromstring(response.content)
         node_count = len(xml_tree.xpath("//channel/item"))  # type: ignore
-
         expected_item_count = 2
         self.assertEqual(
             node_count,
@@ -139,6 +140,27 @@ class PodcastTest(ESIndexTestCase, TestCase):
                 expected=expected_item_count, actual=node_count
             ),
         )
+        # pubDate key must be present in Audios with date_argued.
+        pubdate_present = xml_tree.xpath(
+            "count(//item[pubDate]) = count(//item)"
+        )
+        self.assertTrue(pubdate_present)
+
+        # pubDate key must be omitted in Audios without date_argued.
+        self.audio.docket.date_argued = None
+        self.audio.docket.save()
+        response = self.client.get(
+            reverse("search_podcast", args=["search"]),
+            params,
+        )
+        self.assertEqual(
+            200, response.status_code, msg="Did not get a 200 OK status code."
+        )
+        xml_tree = etree.fromstring(response.content)
+        pubdate_not_present = xml_tree.xpath(
+            "count(//item[not(pubDate)]) = count(//item)"
+        )
+        self.assertTrue(pubdate_not_present)
 
 
 class AudioSitemapTest(SitemapTest):
