@@ -15,6 +15,7 @@ from django.urls import NoReverseMatch, reverse
 from django.utils.encoding import force_str
 from django.utils.text import slugify
 from eyecite import get_citations
+from localflavor.us.us_states import USPS_CHOICES
 from model_utils import FieldTracker
 
 from cl.citations.utils import get_citation_depth_between_clusters
@@ -2134,6 +2135,62 @@ class Court(models.Model):
 
     class Meta:
         ordering = ["position"]
+
+
+class Courthouse(models.Model):
+    """A class to represent the physcial location of a court."""
+
+    court = models.ForeignKey(
+        Court,
+        help_text="The court object associated with this Courthouse",
+        related_name="courts",
+        on_delete=models.CASCADE,
+    )
+    court_seat = models.NullBooleanField(
+        help_text="Is this the seat of the Court",
+    )
+    building_name = models.CharField(
+        max_length=255,
+        verbose_name="Courthouse Name",
+        help_text="Ex. John Adams Courthouse",
+        null=True,
+        blank=True,
+    )
+    address_line_1 = models.CharField(
+        max_length=255, verbose_name="Address Line 1", blank=True, null=True
+    )
+    address_line_2 = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="Address Line 2",
+        null=True,
+    )
+    city = models.CharField(max_length=255, verbose_name="City")
+    county = models.CharField(
+        max_length=255,
+        help_text="The county, if any, where the court resides.",
+        blank=True,
+        null=True,
+    )
+    state = models.CharField(
+        max_length=2,
+        verbose_name="State",
+        choices=USPS_CHOICES,
+        help_text="Enter the state abbreviation (e.g., CA for California)",
+        null=True,
+    )
+    country = models.CharField(
+        max_length=2, verbose_name="Country Code", default="us"
+    )
+    zip_code = models.CharField(
+        max_length=10, verbose_name="ZIP Code", blank=True, null=True
+    )
+
+    def __str__(self):
+        return f"{self.court.short_name} Courthouse"
+
+    class Meta:
+        verbose_name_plural = "Courthouses"
 
 
 class ClusterCitationQuerySet(models.query.QuerySet):
