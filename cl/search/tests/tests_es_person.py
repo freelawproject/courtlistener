@@ -512,12 +512,27 @@ class PeopleSearchTestElasticSearch(
         # API
         self._test_api_results_count(params, 2, "q")
 
-        # Combine fields in advanced search.
+        # Combine fields of the parent document in advanced search.
         params = {
             "type": SEARCH_TYPES.PEOPLE,
             "q": "name:Judith Sheindlin AND dob_city:Queens",
         }
         # Frontend
+        r = self._test_article_count(
+            params,
+            1,
+            "q",
+        )
+        self.assertIn("Olivia", r.content.decode())
+        # API
+        r = self._test_api_results_count(params, 1, "q")
+        self.assertIn("Olivia", r.content.decode())
+
+        # Combine fields from the parent and the child mapping in advanced search.
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "appointer:Clinton AND dob_city:Queens",
+        }
         r = self._test_article_count(
             params,
             1,
