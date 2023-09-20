@@ -159,7 +159,7 @@ p_field_mapping = {
 
 position_field_mapping = {
     "save": {
-        Person: {"appointer__person": {"name_full_reverse": "appointer"}},
+        Person: {"appointer__person": {"name_full_reverse": ["appointer"]}},
         Position: {},
     },
     "delete": {Position: {}},
@@ -260,6 +260,7 @@ _docket_signal_processor = ESSignalProcessor(
 _recap_document_signal_processor = ESSignalProcessor(
     RECAPDocument, ESRECAPDocument, recap_document_field_mapping
 )
+
 
 @receiver(
     post_save,

@@ -714,65 +714,6 @@ class DocketBaseDocument(Document):
     docket_child = JoinField(relations={"docket": ["recap_document"]})
     timestamp = fields.DateField()
 
-    class Django:
-        model = Docket
-        ignore_signals = True
-
-    def prepare_timestamp(self, instance):
-        return datetime.utcnow()
-
-
-@recap_index.document
-class ESRECAPDocument(DocketBaseDocument):
-    id = fields.IntegerField(attr="pk")
-    docket_entry_id = fields.IntegerField(attr="docket_entry.pk")
-    description = fields.TextField(
-        attr="docket_entry.description",
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(
-                attr="docket_entry.description", analyzer="english_exact"
-            ),
-        },
-        search_analyzer="search_analyzer",
-    )
-    entry_number = fields.IntegerField(attr="docket_entry.entry_number")
-    entry_date_filed = fields.DateField(attr="docket_entry.date_filed")
-    short_description = fields.TextField(
-        attr="description",
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(
-                attr="description", analyzer="english_exact"
-            ),
-        },
-        search_analyzer="search_analyzer",
-    )
-    document_type = fields.TextField(
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(analyzer="english_exact"),
-        },
-        search_analyzer="search_analyzer",
-    )
-    document_number = fields.IntegerField(attr="document_number")
-    pacer_doc_id = fields.KeywordField(attr="pacer_doc_id")
-    plain_text = fields.TextField(
-        attr="plain_text",
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(
-                attr="plain_text", analyzer="english_exact"
-            ),
-        },
-        search_analyzer="search_analyzer",
-    )
-    attachment_number = fields.IntegerField(attr="attachment_number")
-    is_available = fields.BooleanField(attr="is_available")
-    page_count = fields.IntegerField(attr="page_count")
-    filepath_local = fields.KeywordField(index=False)
-    absolute_url = fields.KeywordField(index=False)
-
     # Docket Fields
     docket_id = fields.IntegerField(attr="docket_entry.docket.pk")
     caseName = fields.TextField(
@@ -901,6 +842,65 @@ class ESRECAPDocument(DocketBaseDocument):
     )
 
     class Django:
+        model = Docket
+        ignore_signals = True
+
+    def prepare_timestamp(self, instance):
+        return datetime.utcnow()
+
+
+@recap_index.document
+class ESRECAPDocument(DocketBaseDocument):
+    id = fields.IntegerField(attr="pk")
+    docket_entry_id = fields.IntegerField(attr="docket_entry.pk")
+    description = fields.TextField(
+        attr="docket_entry.description",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="docket_entry.description", analyzer="english_exact"
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    entry_number = fields.IntegerField(attr="docket_entry.entry_number")
+    entry_date_filed = fields.DateField(attr="docket_entry.date_filed")
+    short_description = fields.TextField(
+        attr="description",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="description", analyzer="english_exact"
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    document_type = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    document_number = fields.IntegerField(attr="document_number")
+    pacer_doc_id = fields.KeywordField(attr="pacer_doc_id")
+    plain_text = fields.TextField(
+        attr="plain_text",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="plain_text", analyzer="english_exact"
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    attachment_number = fields.IntegerField(attr="attachment_number")
+    is_available = fields.BooleanField(attr="is_available")
+    page_count = fields.IntegerField(attr="page_count")
+    filepath_local = fields.KeywordField(index=False)
+    absolute_url = fields.KeywordField(index=False)
+
+    class Django:
         model = RECAPDocument
         ignore_signals = True
 
@@ -954,121 +954,9 @@ class ESRECAPDocument(DocketBaseDocument):
 
 @recap_index.document
 class DocketDocument(DocketBaseDocument):
-    docket_id = fields.IntegerField(attr="pk")
-    docketNumber = fields.TextField(
-        attr="docket_number",
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(
-                attr="docket_number", analyzer="english_exact"
-            ),
-        },
-        search_analyzer="search_analyzer",
-    )
-    caseName = fields.TextField(
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(analyzer="english_exact"),
-        },
-        search_analyzer="search_analyzer",
-    )
-    case_name_full = fields.TextField(
-        attr="case_name_full",
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(
-                attr="case_name_full", analyzer="english_exact"
-            ),
-        },
-        search_analyzer="search_analyzer",
-    )
-    suitNature = fields.TextField(
-        attr="nature_of_suit",
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(
-                attr="nature_of_suit", analyzer="english_exact"
-            ),
-        },
-        search_analyzer="search_analyzer",
-    )
-    cause = fields.TextField(
-        attr="cause",
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(attr="cause", analyzer="english_exact"),
-        },
-        search_analyzer="search_analyzer",
-    )
-    juryDemand = fields.TextField(
-        attr="jury_demand",
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(
-                attr="jury_demand", analyzer="english_exact"
-            ),
-        },
-        search_analyzer="search_analyzer",
-    )
-    jurisdictionType = fields.TextField(
-        attr="jurisdiction_type",
-    )
-    dateArgued = fields.DateField(attr="date_argued")
-    dateFiled = fields.DateField(attr="date_filed")
-    dateTerminated = fields.DateField(attr="date_terminated")
     docket_slug = fields.KeywordField(attr="slug", index=False)
     docket_absolute_url = fields.KeywordField(index=False)
-    assignedTo = fields.TextField(
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(analyzer="english_exact"),
-        },
-        search_analyzer="search_analyzer",
-    )
-    assigned_to_id = fields.KeywordField(attr="assigned_to.pk")
-    referredTo = fields.TextField(
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(analyzer="english_exact"),
-        },
-        search_analyzer="search_analyzer",
-    )
-    referred_to_id = fields.KeywordField(attr="referred_to.pk")
-    court = fields.TextField(
-        attr="court.full_name",
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(
-                attr="court.full_name", analyzer="english_exact"
-            ),
-        },
-        search_analyzer="search_analyzer",
-    )
     court_exact = fields.KeywordField(attr="court.pk", index=False)
-    court_id = fields.KeywordField(attr="court.pk")
-    court_id_text = fields.TextField(
-        attr="court.pk",
-        analyzer="text_en_splitting_cl",
-        search_analyzer="search_analyzer",
-    )
-    court_citation_string = fields.TextField(
-        attr="court.citation_string",
-        analyzer="text_en_splitting_cl",
-        search_analyzer="search_analyzer",
-    )
-    chapter = fields.TextField(
-        analyzer="text_en_splitting_cl",
-        search_analyzer="search_analyzer",
-    )
-    trustee_str = fields.TextField(
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(
-                analyzer="english_exact",
-            ),
-        },
-        search_analyzer="search_analyzer",
-    )
     text = fields.TextField(index=False)
     # Parties
 

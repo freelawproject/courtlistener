@@ -45,7 +45,7 @@ def updated_fields(
         tracked_set = getattr(instance, "es_pa_field_tracker", None)
     elif es_document is ESRECAPDocument:
         tracked_set = getattr(instance, "es_rd_field_tracker", None)
-    elif es_document is PersonDocument:
+    elif es_document is PositionDocument:
         tracked_set = getattr(instance, "es_p_field_tracker", None)
 
     # Check the set before trying to get the fields
@@ -202,6 +202,8 @@ def update_es_documents(
                         )
                     continue
 
+            # Update or create main objects like OA when their related docket
+            # changes or RECAPDocuments when their related DocketEntry changes.
             main_objects = main_model.objects.filter(**{query: instance})
             for main_object in main_objects:
                 main_doc = get_or_create_doc(es_document, main_object)
