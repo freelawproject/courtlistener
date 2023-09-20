@@ -11,14 +11,18 @@ from cl.alerts.tasks import (
     send_or_schedule_alerts,
 )
 from cl.lib.elasticsearch_utils import elasticsearch_enabled
+from cl.people_db.models import Person
 from cl.search.documents import (
     ES_CHILD_ID,
     AudioDocument,
     ParentheticalGroupDocument,
-    PersonDocument,
     PositionDocument,
 )
-from cl.search.tasks import save_document_in_es, update_document_in_es
+from cl.search.tasks import (
+    save_document_in_es,
+    update_child_documents_by_query,
+    update_document_in_es,
+)
 from cl.search.types import ESDocumentType, ESModelType
 
 
@@ -166,26 +170,40 @@ def update_es_documents(
     """
     if created:
         return
+
     changed_fields = updated_fields(instance, es_document)
-    if changed_fields:
-        for query, fields_map in mapping_fields.items():
-            fields_to_update = get_fields_to_update(changed_fields, fields_map)
-            main_objects = main_model.objects.filter(**{query: instance})
-            for main_object in main_objects:
-                main_doc = get_or_create_doc(es_document, main_object)
-                if not main_doc:
-                    continue
-                if fields_to_update:
-                    update_document_in_es.delay(
+    if not changed_fields:
+        return
+
+    for query, fields_map in mapping_fields.items():
+        fields_to_update = get_fields_to_update(changed_fields, fields_map)
+
+        if (
+            es_document is PositionDocument
+            and isinstance(instance, Person)
+            and query == "person"
+        ):
+            update_child_documents_by_query.delay(
+                es_document, instance, fields_to_update, fields_map
+            )
+            continue
+
+        main_objects = main_model.objects.filter(**{query: instance})
+        for main_object in main_objects:
+            main_doc = get_or_create_doc(es_document, main_object)
+            if not main_doc:
+                continue
+            if fields_to_update:
+                update_document_in_es.delay(
+                    main_doc,
+                    document_fields_to_update(
                         main_doc,
-                        document_fields_to_update(
-                            main_doc,
-                            main_object,
-                            fields_to_update,
-                            instance,
-                            fields_map,
-                        ),
-                    )
+                        main_object,
+                        fields_to_update,
+                        instance,
+                        fields_map,
+                    ),
+                )
 
 
 def update_remove_m2m_documents(
