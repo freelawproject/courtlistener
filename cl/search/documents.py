@@ -674,7 +674,7 @@ class DocketBaseDocument(Document):
     timestamp = fields.DateField()
 
     # Docket Fields
-    docket_id = fields.IntegerField(attr="docket_entry.docket.pk")
+    docket_id = fields.IntegerField(attr="pk")
     caseName = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
@@ -683,67 +683,63 @@ class DocketBaseDocument(Document):
         search_analyzer="search_analyzer",
     )
     case_name_full = fields.TextField(
-        attr="docket_entry.docket.case_name_full",
+        attr="case_name_full",
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(
-                attr="docket_entry.docket.case_name_full",
+                attr="case_name_full",
                 analyzer="english_exact",
             ),
         },
         search_analyzer="search_analyzer",
     )
     docketNumber = fields.TextField(
-        attr="docket_entry.docket.docket_number",
+        attr="docket_number",
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(
-                attr="docket_entry.docket.docket_number",
+                attr="docket_number",
                 analyzer="english_exact",
             ),
         },
         search_analyzer="search_analyzer",
     )
     suitNature = fields.TextField(
-        attr="docket_entry.docket.nature_of_suit",
+        attr="nature_of_suit",
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(
-                attr="docket_entry.docket.nature_of_suit",
+                attr="nature_of_suit",
                 analyzer="english_exact",
             ),
         },
         search_analyzer="search_analyzer",
     )
     cause = fields.TextField(
-        attr="docket_entry.docket.cause",
+        attr="cause",
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(
-                attr="docket_entry.docket.cause", analyzer="english_exact"
-            ),
+            "exact": fields.TextField(attr="cause", analyzer="english_exact"),
         },
         search_analyzer="search_analyzer",
     )
     juryDemand = fields.TextField(
-        attr="docket_entry.docket.jury_demand",
+        attr="jury_demand",
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(
-                attr="docket_entry.docket.jury_demand",
+                attr="jury_demand",
                 analyzer="english_exact",
             ),
         },
         search_analyzer="search_analyzer",
     )
     jurisdictionType = fields.TextField(
-        attr="docket_entry.docket.jurisdiction_type",
+        attr="jurisdiction_type",
     )
-    dateArgued = fields.DateField(attr="docket_entry.docket.date_argued")
-    dateFiled = fields.DateField(attr="docket_entry.docket.date_filed")
-    dateTerminated = fields.DateField(
-        attr="docket_entry.docket.date_terminated"
-    )
+    dateArgued = fields.DateField(attr="date_argued")
+    dateFiled = fields.DateField(attr="date_filed")
+    dateTerminated = fields.DateField(attr="date_terminated")
     assignedTo = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
@@ -751,9 +747,7 @@ class DocketBaseDocument(Document):
         },
         search_analyzer="search_analyzer",
     )
-    assigned_to_id = fields.KeywordField(
-        attr="docket_entry.docket.assigned_to.pk"
-    )
+    assigned_to_id = fields.KeywordField(attr="assigned_to.pk")
     referredTo = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
@@ -761,28 +755,26 @@ class DocketBaseDocument(Document):
         },
         search_analyzer="search_analyzer",
     )
-    referred_to_id = fields.KeywordField(
-        attr="docket_entry.docket.referred_to.pk"
-    )
+    referred_to_id = fields.KeywordField(attr="referred_to.pk")
     court = fields.TextField(
-        attr="docket_entry.docket.court.full_name",
+        attr="court.full_name",
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(
-                attr="docket_entry.docket.court.full_name",
+                attr="court.full_name",
                 analyzer="english_exact",
             ),
         },
         search_analyzer="search_analyzer",
     )
-    court_id = fields.KeywordField(attr="docket_entry.docket.court.pk")
+    court_id = fields.KeywordField(attr="court.pk")
     court_id_text = fields.TextField(
-        attr="docket_entry.docket.court.pk",
+        attr="court.pk",
         analyzer="text_en_splitting_cl",
         search_analyzer="search_analyzer",
     )
     court_citation_string = fields.TextField(
-        attr="docket_entry.docket.court.citation_string",
+        attr="court.citation_string",
         analyzer="text_en_splitting_cl",
         search_analyzer="search_analyzer",
     )
@@ -899,6 +891,54 @@ class ESRECAPDocument(DocketBaseDocument):
             return instance.docket_entry.docket.referred_to.name_full
         elif instance.docket_entry.docket.referred_to_str:
             return instance.docket_entry.docket.referred_to_str
+
+    def prepare_docket_id(self, instance):
+        return instance.docket_entry.docket.pk
+
+    def prepare_case_name_full(self, instance):
+        return instance.docket_entry.docket.case_name_full
+
+    def prepare_docketNumber(self, instance):
+        return instance.docket_entry.docket.docket_number
+
+    def prepare_suitNature(self, instance):
+        return instance.docket_entry.docket.nature_of_suit
+
+    def prepare_cause(self, instance):
+        return instance.docket_entry.docket.cause
+
+    def prepare_juryDemand(self, instance):
+        return instance.docket_entry.docket.jury_demand
+
+    def prepare_jurisdictionType(self, instance):
+        return instance.docket_entry.docket.jurisdiction_type
+
+    def prepare_dateArgued(self, instance):
+        return instance.docket_entry.docket.date_argued
+
+    def prepare_dateFiled(self, instance):
+        return instance.docket_entry.docket.date_filed
+
+    def prepare_dateTerminated(self, instance):
+        return instance.docket_entry.docket.date_terminated
+
+    def prepare_assigned_to_id(self, instance):
+        return instance.docket_entry.docket.assigned_to.pk
+
+    def prepare_referred_to_id(self, instance):
+        return instance.docket_entry.docket.referred_to.pk
+
+    def prepare_court(self, instance):
+        return instance.docket_entry.docket.court.full_name
+
+    def prepare_court_id(self, instance):
+        return instance.docket_entry.docket.court.pk
+
+    def prepare_court_id_text(self, instance):
+        return instance.docket_entry.docket.court.pk
+
+    def prepare_court_citation_string(self, instance):
+        return instance.docket_entry.docket.court.citation_string
 
     def prepare_chapter(self, instance):
         if hasattr(instance.docket_entry.docket, "bankruptcy_information"):
