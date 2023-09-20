@@ -1,4 +1,10 @@
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
 from cl.audio.models import Audio
+from cl.citations.tasks import (
+    find_citations_and_parantheticals_for_recap_documents,
+)
 from cl.lib.es_signal_processor import ESSignalProcessor
 from cl.people_db.models import (
     ABARating,
@@ -254,3 +260,30 @@ _docket_signal_processor = ESSignalProcessor(
 _recap_document_signal_processor = ESSignalProcessor(
     RECAPDocument, ESRECAPDocument, recap_document_field_mapping
 )
+
+@receiver(
+    post_save,
+    sender=RECAPDocument,
+    dispatch_uid="handle_recap_doc_change_uid",
+)
+def handle_recap_doc_change(
+    sender, instance: RECAPDocument, update_fields=None, **kwargs
+):
+    """
+    Right now, this receiver exists to enqueue the task to parse RECAPDocuments for caselaw citations.
+    More functionality can be put here later. There may be things currently in the save function
+    of RECAPDocument that would be better placed here for reasons of maintainability and testability.
+    """
+
+    # Whenever pdf text is processed, it will update the plain_text field.
+    # When we get updated text for a doc, we want to parse it for citations.
+    if update_fields is not None and "plain_text" in update_fields:
+        # Even though the task itself filters for qualifying ocr_status,
+        # we don't want to clog the TQ with unncessary items.
+        if instance.ocr_status in (
+            RECAPDocument.OCR_COMPLETE,
+            RECAPDocument.OCR_UNNECESSARY,
+        ):
+            find_citations_and_parantheticals_for_recap_documents.apply_async(
+                args=([instance.pk],)
+            )

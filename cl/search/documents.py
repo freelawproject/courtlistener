@@ -358,10 +358,10 @@ class PositionDocument(PersonBaseDocument):
         },
         search_analyzer="search_analyzer",
     )
-    court_exact = fields.KeywordField(attr="court.pk")
-    court_id_text = fields.TextField(
+    court_exact = fields.TextField(
         attr="court.pk",
         analyzer="text_en_splitting_cl",
+        fields={"raw": fields.KeywordField(attr="court.pk")},
         search_analyzer="search_analyzer",
     )
     court_citation_string = fields.TextField(
@@ -375,10 +375,10 @@ class PositionDocument(PersonBaseDocument):
         analyzer="text_en_splitting_cl",
         search_analyzer="search_analyzer",
     )
-    position_type = fields.KeywordField()
-    position_type_text = fields.TextField(
+    position_type = fields.TextField(
         analyzer="text_en_splitting_cl",
         search_analyzer="search_analyzer",
+        fields={"raw": fields.KeywordField()},
     )
     appointer = fields.TextField(
         attr="appointer.person.name_full_reverse",
@@ -429,29 +429,94 @@ class PositionDocument(PersonBaseDocument):
     date_granularity_termination = fields.KeywordField(
         attr="date_granularity_termination"
     )
-    judicial_committee_action = fields.KeywordField()
-    judicial_committee_action_text = fields.TextField(
+    judicial_committee_action = fields.TextField(
         analyzer="text_en_splitting_cl",
         search_analyzer="search_analyzer",
+        fields={"raw": fields.KeywordField()},
     )
 
-    nomination_process = fields.KeywordField()
-    nomination_process_text = fields.TextField(
+    nomination_process = fields.TextField(
         analyzer="text_en_splitting_cl",
         search_analyzer="search_analyzer",
+        fields={"raw": fields.KeywordField()},
     )
-
-    selection_method = fields.KeywordField()
-    selection_method_text = fields.TextField(
+    selection_method = fields.TextField(
         analyzer="text_en_splitting_cl",
         search_analyzer="search_analyzer",
+        fields={"raw": fields.KeywordField()},
     )
     selection_method_id = fields.KeywordField(attr="how_selected")
 
-    termination_reason = fields.KeywordField()
-    termination_reason_text = fields.TextField(
+    termination_reason = fields.TextField(
         analyzer="text_en_splitting_cl",
         search_analyzer="search_analyzer",
+        fields={"raw": fields.KeywordField()},
+    )
+
+    # Parent fields
+    name = fields.TextField(
+        attr="person.name_full",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="person.name_full", analyzer="english_exact"
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    gender = fields.TextField()
+    alias = fields.ListField(
+        fields.TextField(
+            analyzer="text_en_splitting_cl",
+            fields={
+                "exact": fields.TextField(analyzer="english_exact"),
+            },
+            search_analyzer="search_analyzer",
+            multi=True,
+        )
+    )
+    dob_city = fields.TextField(
+        attr="person.dob_city",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="person.dob_city", analyzer="english_exact"
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+
+    political_affiliation = fields.ListField(
+        fields.TextField(
+            analyzer="text_en_splitting_cl",
+            fields={
+                "exact": fields.TextField(analyzer="english_exact"),
+            },
+            search_analyzer="search_analyzer",
+            multi=True,
+        )
+    )
+    religion = fields.TextField(attr="person.religion")
+    fjc_id = fields.TextField()
+    aba_rating = fields.ListField(
+        fields.TextField(
+            analyzer="text_en_splitting_cl",
+            fields={
+                "exact": fields.TextField(analyzer="english_exact"),
+            },
+            search_analyzer="search_analyzer",
+            multi=True,
+        )
+    )
+    school = fields.ListField(
+        fields.TextField(
+            analyzer="text_en_splitting_cl",
+            fields={
+                "exact": fields.TextField(analyzer="english_exact"),
+            },
+            search_analyzer="search_analyzer",
+            multi=True,
+        )
     )
 
     class Django:
@@ -461,36 +526,49 @@ class PositionDocument(PersonBaseDocument):
     def prepare_position_type(self, instance):
         return instance.get_position_type_display()
 
-    def prepare_position_type_text(self, instance):
-        return instance.get_position_type_display()
-
     def prepare_judicial_committee_action(self, instance):
-        return instance.get_judicial_committee_action_display()
-
-    def prepare_judicial_committee_action_text(self, instance):
         return instance.get_judicial_committee_action_display()
 
     def prepare_nomination_process(self, instance):
         return instance.get_nomination_process_display()
 
-    def prepare_nomination_process_text(self, instance):
-        return instance.get_nomination_process_display()
-
     def prepare_selection_method(self, instance):
-        return instance.get_how_selected_display()
-
-    def prepare_selection_method_text(self, instance):
         return instance.get_how_selected_display()
 
     def prepare_termination_reason(self, instance):
         return instance.get_termination_reason_display()
 
-    def prepare_termination_reason_text(self, instance):
-        return instance.get_termination_reason_display()
-
     def prepare_person_child(self, instance):
         parent_id = getattr(instance.person, "pk", None)
         return {"name": "position", "parent": parent_id}
+
+    def prepare_gender(self, instance):
+        return instance.person.get_gender_display()
+
+    def prepare_fjc_id(self, instance):
+        return str(instance.person.fjc_id)
+
+    def prepare_political_affiliation(self, instance):
+        return [
+            pa.get_political_party_display()
+            for pa in instance.person.political_affiliations.all()
+            if pa
+        ] or None
+
+    def prepare_alias(self, instance):
+        return [r.name_full for r in instance.person.aliases.all()] or None
+
+    def prepare_aba_rating(self, instance):
+        return [
+            r.get_rating_display()
+            for r in instance.person.aba_ratings.all()
+            if r
+        ] or None
+
+    def prepare_school(self, instance):
+        return [
+            e.school.name for e in instance.person.educations.all()
+        ] or None
 
 
 @people_db_index.document
@@ -498,7 +576,7 @@ class PersonDocument(PersonBaseDocument):
     id = fields.IntegerField(attr="pk")
     fjc_id = fields.TextField()
     alias_ids = fields.ListField(
-        fields.IntegerField(),
+        fields.IntegerField(multi=True),
     )
     alias = fields.ListField(
         fields.TextField(
@@ -507,10 +585,11 @@ class PersonDocument(PersonBaseDocument):
                 "exact": fields.TextField(analyzer="english_exact"),
             },
             search_analyzer="search_analyzer",
+            multi=True,
         )
     )
     races = fields.ListField(
-        fields.KeywordField(),
+        fields.KeywordField(multi=True),
     )
     gender = fields.TextField()
     religion = fields.TextField(attr="religion")
@@ -552,7 +631,7 @@ class PersonDocument(PersonBaseDocument):
     dob = fields.DateField(attr="date_dob")
     dod = fields.DateField(attr="date_dod")
     political_affiliation_id = fields.ListField(
-        fields.KeywordField(),
+        fields.KeywordField(multi=True),
     )
     political_affiliation = fields.ListField(
         fields.TextField(
@@ -561,6 +640,7 @@ class PersonDocument(PersonBaseDocument):
                 "exact": fields.TextField(analyzer="english_exact"),
             },
             search_analyzer="search_analyzer",
+            multi=True,
         )
     )
 
@@ -571,6 +651,7 @@ class PersonDocument(PersonBaseDocument):
                 "exact": fields.TextField(analyzer="english_exact"),
             },
             search_analyzer="search_analyzer",
+            multi=True,
         )
     )
     school = fields.ListField(
@@ -580,6 +661,7 @@ class PersonDocument(PersonBaseDocument):
                 "exact": fields.TextField(analyzer="english_exact"),
             },
             search_analyzer="search_analyzer",
+            multi=True,
         )
     )
 
