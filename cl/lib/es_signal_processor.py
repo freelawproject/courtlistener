@@ -36,7 +36,7 @@ def updated_fields(
         tracked_set = getattr(instance, "es_oa_field_tracker", None)
     elif es_document is ParentheticalGroupDocument:
         tracked_set = getattr(instance, "es_pa_field_tracker", None)
-    elif es_document is PersonDocument:
+    elif es_document is PositionDocument:
         tracked_set = getattr(instance, "es_p_field_tracker", None)
 
     # Check the set before trying to get the fields
