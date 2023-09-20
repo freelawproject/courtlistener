@@ -318,15 +318,9 @@ def update_child_documents_by_query(
     """
 
     s = es_document.search()
-    main_doc = None
     if es_document is PositionDocument:
-        s = s.query(
-            "parent_id", type="position_document", id=parent_instance.pk
-        )
+        s = s.query("parent_id", type="position", id=parent_instance.pk)
         main_doc = PersonDocument.get(id=parent_instance.pk)
-    elif es_document is ESRECAPDocument:
-        s = s.query("parent_id", type="recap_document", id=parent_instance.pk)
-        main_doc = DocketDocument.get(id=parent_instance.pk)
 
     if not main_doc:
         return
@@ -346,8 +340,6 @@ def update_child_documents_by_query(
 
             prepare_method = getattr(main_doc, f"prepare_{field_name}", None)
             if prepare_method:
-                # It needs to be ES doc no the class.
-                # we could get the docket es doc and use their prepare methods...
                 params[field_to_update] = prepare_method(parent_instance)
             else:
                 params[field_to_update] = getattr(

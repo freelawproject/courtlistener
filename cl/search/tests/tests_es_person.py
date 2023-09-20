@@ -14,6 +14,8 @@ from cl.lib.elasticsearch_utils import (
 from cl.lib.search_index_utils import solr_list
 from cl.lib.test_helpers import CourtTestCase, PeopleTestCase
 from cl.people_db.factories import (
+    ABARatingFactory,
+    EducationFactory,
     PersonFactory,
     PoliticalAffiliationFactory,
     PositionFactory,
@@ -1208,26 +1210,75 @@ class PeopleSearchTestElasticSearch(
         self.assertEqual(name_full_reverse, pos_doc.supervisor)
         self.assertEqual(name_full_reverse, pos_doc.predecessor)
 
+        # The following changes should update the child document.
+        # Update dob_city field in the parent record.
         self.person_3.dob_city = "Brookyln"
         self.person_3.save()
 
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         self.assertEqual("Brookyln", pos_doc.dob_city)
 
-        self.person_3.dob_city = "Brookyln"
-        self.person_3.save()
-
-        pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
-        self.assertEqual("Brookyln", pos_doc.dob_city)
-
+        # Update the dob_state field in the parent record.
         self.person_3.dob_state = "AL"
         self.person_3.save()
 
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         self.assertEqual("Alabama", pos_doc.dob_state)
 
+        # Update the gender field in the parent record.
         self.person_3.gender = "m"
         self.person_3.save()
 
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         self.assertEqual("Male", pos_doc.gender)
+
+        # Update the religion field in the parent record
+        self.person_3.religion = "je"
+        self.person_3.save()
+
+        pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
+        self.assertEqual("je", pos_doc.religion)
+
+        # Update the fjc_id field in the parent record
+        self.person_3.fjc_id = 39
+        self.person_3.save()
+
+        pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
+        self.assertEqual("39", pos_doc.fjc_id)
+
+        # Update education for the parent object
+        EducationFactory(
+            degree_level="ba",
+            person=self.person_3,
+            school=self.school_2,
+        )
+
+        pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
+        for education in self.person_3.educations.all():
+            self.assertIn(education.school.name, pos_doc.school)
+
+        # Update political affiliation for the parent object
+        PoliticalAffiliationFactory(
+            political_party="d",
+            source="b",
+            date_start=datetime.date(2015, 12, 14),
+            person=self.person_3,
+            date_granularity_start="%Y-%m-%d",
+        )
+
+        pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
+        for affiliation in self.person_3.political_affiliations.all():
+            self.assertIn(
+                affiliation.get_political_party_display(),
+                pos_doc.political_affiliation,
+            )
+
+        # Update aba_rating for the parent object
+        ABARatingFactory(
+            rating="nq",
+            person=self.person_3,
+            year_rated="2015",
+        )
+        pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
+        for r in self.person_3.aba_ratings.all():
+            self.assertIn(r.get_rating_display(), pos_doc.aba_rating)
