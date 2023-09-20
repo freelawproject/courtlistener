@@ -8,7 +8,11 @@ from celery import Task
 from django.apps import apps
 from django.conf import settings
 from django.utils.timezone import now
-from elasticsearch.exceptions import RequestError, TransportError
+from elasticsearch.exceptions import (
+    NotFoundError,
+    RequestError,
+    TransportError,
+)
 from elasticsearch_dsl import Document, UpdateByQuery, connections
 from requests import Session
 from scorched.exc import SolrError
@@ -274,7 +278,12 @@ def update_document_in_es(
 
 @app.task(
     bind=True,
-    autoretry_for=(TransportError, ConnectionError, RequestError),
+    autoretry_for=(
+        TransportError,
+        ConnectionError,
+        RequestError,
+        NotFoundError,
+    ),
     max_retries=3,
     interval_start=5,
 )
@@ -297,10 +306,14 @@ def update_child_documents_by_query(
     """
 
     s = es_document.search()
+    main_doc = None
     if es_document is PositionDocument:
         s = s.query("parent_id", type="position", id=parent_instance.pk)
         main_doc = PersonDocument.get(id=parent_instance.pk)
 
+    if not main_doc:
+        # Abort bulk update for a not supported document.
+        return
     client = connections.get_connection()
     ubq = UpdateByQuery(using=client, index=es_document._index._name).query(
         s.to_dict()["query"]
