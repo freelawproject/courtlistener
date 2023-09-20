@@ -1223,3 +1223,37 @@ class PeopleSearchTestElasticSearch(
         )
         name_full_reverse = person_2.name_full_reverse
         self.assertEqual(name_full_reverse, pos_doc.appointer)
+        self.assertEqual(name_full_reverse, pos_doc.supervisor)
+        self.assertEqual(name_full_reverse, pos_doc.predecessor)
+
+        self.person_3.dob_city = "Brookyln"
+        self.person_3.save()
+
+        pos_doc = PositionDocument.get(
+            id=PEOPLE_DOCS_TYPE_ID(position_6.pk).POSITION
+        )
+        self.assertEqual("Brookyln", pos_doc.dob_city)
+
+        self.person_3.dob_city = "Brookyln"
+        self.person_3.save()
+
+        pos_doc = PositionDocument.get(
+            id=PEOPLE_DOCS_TYPE_ID(position_6.pk).POSITION
+        )
+        self.assertEqual("Brookyln", pos_doc.dob_city)
+
+        self.person_3.dob_state = "AL"
+        self.person_3.save()
+
+        pos_doc = PositionDocument.get(
+            id=PEOPLE_DOCS_TYPE_ID(position_6.pk).POSITION
+        )
+        self.assertEqual("Alabama", pos_doc.dob_state)
+
+        self.person_3.gender = "m"
+        self.person_3.save()
+
+        pos_doc = PositionDocument.get(
+            id=PEOPLE_DOCS_TYPE_ID(position_6.pk).POSITION
+        )
+        self.assertEqual("Male", pos_doc.gender)
