@@ -560,7 +560,13 @@ def build_es_base_query(search_query: Search, cd: CleanData) -> Search:
         case SEARCH_TYPES.RECAP:
             child_query_fields = {
                 "recap_document": add_fields_boosting(
-                    cd, ["description", "short_description", "plain_text"]
+                    cd,
+                    [
+                        "description",
+                        "short_description",
+                        "plain_text",
+                        "caseName",
+                    ],
                 ),
             }
             parent_query_fields = add_fields_boosting(
@@ -1290,7 +1296,7 @@ def build_full_join_es_queries(
                 "bool",
                 filter=c_filters,
                 should=child_text_query,
-                minimum_should_match=0,
+                minimum_should_match=1,
             )
         else:
             join_query = Q("bool", should=child_text_query)
@@ -1320,7 +1326,12 @@ def build_full_join_es_queries(
         q_should.append(join_query)
     else:
         if string_query:
-            join_query = Q("bool", should=string_query)
+            join_query = Q(
+                "bool",
+                filter=Q("match", docket_child="docket"),
+                should=string_query,
+                minimum_should_match=1,
+            )
             q_should.append(join_query)
 
     return Q(

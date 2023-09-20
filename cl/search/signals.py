@@ -116,10 +116,11 @@ oa_field_mapping = {
     "save": {
         Docket: {
             "docket": {
-                "date_argued": ["dateArgued"],
-                "date_reargued": ["dateReargued"],
+                "date_argued": ["dateArgued", "dateArgued_text"],
+                "date_reargued": ["dateReargued", "dateReargued_text"],
                 "date_reargument_denied": [
                     "dateReargumentDenied",
+                    "dateReargumentDenied_text",
                 ],
                 "docket_number": ["docketNumber"],
                 "slug": ["docket_slug"],
@@ -181,6 +182,40 @@ recap_document_field_mapping = {
                 "description": ["description"],
                 "entry_number": ["entry_number"],
                 "date_filed": ["entry_date_filed"],
+            }
+        },
+        Docket: {
+            "docket_entry__docket": {
+                "case_name": ["caseName"],
+                "case_name_full": ["case_name_full"],
+                "docket_number": ["docketNumber"],
+                "nature_of_suit": ["suitNature"],
+                "cause": ["cause"],
+                "jury_demand": ["juryDemand"],
+                "jurisdiction_type": ["jurisdictionType"],
+                "date_argued": ["dateArgued"],
+                "date_filed": ["dateFiled"],
+                "date_terminated": ["dateTerminated"],
+                "assigned_to": ["assignedTo"],
+                "referred_to": ["referredTo"],
+                "assigned_to_id": ["assigned_to_id"],
+                "referred_to_id": ["referred_to_id"],
+                "assigned_to_str": ["assignedTo"],
+                "referred_to_str": ["referredTo"],
+            }
+        },
+        Person: {
+            "assigned_to": {
+                "name_full": ["assignedTo"],
+            },
+            "referred_to": {
+                "name_full": ["referredTo"],
+            },
+        },
+        BankruptcyInformation: {
+            "bankruptcy_information": {
+                "chapter": ["chapter"],
+                "trustee_str": ["trustee_str"],
             }
         },
     },
