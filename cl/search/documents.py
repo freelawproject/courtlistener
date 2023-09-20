@@ -319,6 +319,72 @@ class JoinField(DEDField, Join):
 
 
 class PersonBaseDocument(Document):
+    fjc_id = fields.TextField()
+    name = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    gender = fields.TextField()
+    religion = fields.TextField()
+    alias = fields.ListField(
+        fields.TextField(
+            analyzer="text_en_splitting_cl",
+            fields={
+                "exact": fields.TextField(analyzer="english_exact"),
+            },
+            search_analyzer="search_analyzer",
+            multi=True,
+        )
+    )
+    dob_city = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="person.dob_city", analyzer="english_exact"
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    dob_state = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    political_affiliation = fields.ListField(
+        fields.TextField(
+            analyzer="text_en_splitting_cl",
+            fields={
+                "exact": fields.TextField(analyzer="english_exact"),
+            },
+            search_analyzer="search_analyzer",
+            multi=True,
+        )
+    )
+    aba_rating = fields.ListField(
+        fields.TextField(
+            analyzer="text_en_splitting_cl",
+            fields={
+                "exact": fields.TextField(analyzer="english_exact"),
+            },
+            search_analyzer="search_analyzer",
+            multi=True,
+        )
+    )
+    school = fields.ListField(
+        fields.TextField(
+            analyzer="text_en_splitting_cl",
+            fields={
+                "exact": fields.TextField(analyzer="english_exact"),
+            },
+            search_analyzer="search_analyzer",
+            multi=True,
+        )
+    )
     person_child = JoinField(relations={"person": ["position"]})
     timestamp = fields.DateField()
 
@@ -328,6 +394,42 @@ class PersonBaseDocument(Document):
 
     def prepare_timestamp(self, instance):
         return datetime.utcnow()
+
+    def prepare_name(self, instance):
+        return instance.name_full
+
+    def prepare_religion(self, instance):
+        return instance.religion
+
+    def prepare_gender(self, instance):
+        return instance.get_gender_display()
+
+    def prepare_dob_city(self, instance):
+        return instance.dob_city
+
+    def prepare_fjc_id(self, instance):
+        return str(instance.fjc_id)
+
+    def prepare_political_affiliation(self, instance):
+        return [
+            pa.get_political_party_display()
+            for pa in instance.political_affiliations.all()
+            if pa
+        ] or None
+
+    def prepare_dob_state(self, instance):
+        return instance.get_dob_state_display()
+
+    def prepare_alias(self, instance):
+        return [r.name_full for r in instance.aliases.all()] or None
+
+    def prepare_aba_rating(self, instance):
+        return [
+            r.get_rating_display() for r in instance.aba_ratings.all() if r
+        ] or None
+
+    def prepare_school(self, instance):
+        return [e.school.name for e in instance.educations.all()] or None
 
 
 @people_db_index.document
@@ -447,72 +549,6 @@ class PositionDocument(PersonBaseDocument):
         fields={"raw": fields.KeywordField()},
     )
 
-    # Parent fields
-    name = fields.TextField(
-        attr="person.name_full",
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(
-                attr="person.name_full", analyzer="english_exact"
-            ),
-        },
-        search_analyzer="search_analyzer",
-    )
-    gender = fields.TextField()
-    alias = fields.ListField(
-        fields.TextField(
-            analyzer="text_en_splitting_cl",
-            fields={
-                "exact": fields.TextField(analyzer="english_exact"),
-            },
-            search_analyzer="search_analyzer",
-            multi=True,
-        )
-    )
-    dob_city = fields.TextField(
-        attr="person.dob_city",
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(
-                attr="person.dob_city", analyzer="english_exact"
-            ),
-        },
-        search_analyzer="search_analyzer",
-    )
-
-    political_affiliation = fields.ListField(
-        fields.TextField(
-            analyzer="text_en_splitting_cl",
-            fields={
-                "exact": fields.TextField(analyzer="english_exact"),
-            },
-            search_analyzer="search_analyzer",
-            multi=True,
-        )
-    )
-    religion = fields.TextField(attr="person.religion")
-    fjc_id = fields.TextField()
-    aba_rating = fields.ListField(
-        fields.TextField(
-            analyzer="text_en_splitting_cl",
-            fields={
-                "exact": fields.TextField(analyzer="english_exact"),
-            },
-            search_analyzer="search_analyzer",
-            multi=True,
-        )
-    )
-    school = fields.ListField(
-        fields.TextField(
-            analyzer="text_en_splitting_cl",
-            fields={
-                "exact": fields.TextField(analyzer="english_exact"),
-            },
-            search_analyzer="search_analyzer",
-            multi=True,
-        )
-    )
-
     class Django:
         model = Position
         ignore_signals = True
@@ -536,11 +572,23 @@ class PositionDocument(PersonBaseDocument):
         parent_id = getattr(instance.person, "pk", None)
         return {"name": "position", "parent": parent_id}
 
+    def prepare_name(self, instance):
+        return instance.person.name_full
+
+    def prepare_religion(self, instance):
+        return instance.person.religion
+
+    def prepare_dob_city(self, instance):
+        return instance.person.dob_city
+
     def prepare_gender(self, instance):
         return instance.person.get_gender_display()
 
     def prepare_fjc_id(self, instance):
         return str(instance.person.fjc_id)
+
+    def prepare_dob_state(self, instance):
+        return instance.person.get_dob_state_display()
 
     def prepare_political_affiliation(self, instance):
         return [
@@ -568,34 +616,11 @@ class PositionDocument(PersonBaseDocument):
 @people_db_index.document
 class PersonDocument(PersonBaseDocument):
     id = fields.IntegerField(attr="pk")
-    fjc_id = fields.TextField()
     alias_ids = fields.ListField(
         fields.IntegerField(multi=True),
     )
-    alias = fields.ListField(
-        fields.TextField(
-            analyzer="text_en_splitting_cl",
-            fields={
-                "exact": fields.TextField(analyzer="english_exact"),
-            },
-            search_analyzer="search_analyzer",
-            multi=True,
-        )
-    )
     races = fields.ListField(
         fields.KeywordField(multi=True),
-    )
-    gender = fields.TextField()
-    religion = fields.TextField(attr="religion")
-    name = fields.TextField(
-        attr="name_full",
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(
-                attr="name_full", analyzer="english_exact"
-            ),
-        },
-        search_analyzer="search_analyzer",
     )
     name_reverse = fields.KeywordField(
         attr="name_full_reverse",
@@ -603,60 +628,12 @@ class PersonDocument(PersonBaseDocument):
 
     date_granularity_dob = fields.KeywordField(attr="date_granularity_dob")
     date_granularity_dod = fields.KeywordField(attr="date_granularity_dod")
-    dob_city = fields.TextField(
-        attr="dob_city",
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(
-                attr="dob_city", analyzer="english_exact"
-            ),
-        },
-        search_analyzer="search_analyzer",
-    )
-    dob_state = fields.TextField(
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(analyzer="english_exact"),
-        },
-        search_analyzer="search_analyzer",
-    )
     dob_state_id = fields.KeywordField(attr="dob_state")
     absolute_url = fields.KeywordField(attr="get_absolute_url")
     dob = fields.DateField(attr="date_dob")
     dod = fields.DateField(attr="date_dod")
     political_affiliation_id = fields.ListField(
         fields.KeywordField(multi=True),
-    )
-    political_affiliation = fields.ListField(
-        fields.TextField(
-            analyzer="text_en_splitting_cl",
-            fields={
-                "exact": fields.TextField(analyzer="english_exact"),
-            },
-            search_analyzer="search_analyzer",
-            multi=True,
-        )
-    )
-
-    aba_rating = fields.ListField(
-        fields.TextField(
-            analyzer="text_en_splitting_cl",
-            fields={
-                "exact": fields.TextField(analyzer="english_exact"),
-            },
-            search_analyzer="search_analyzer",
-            multi=True,
-        )
-    )
-    school = fields.ListField(
-        fields.TextField(
-            analyzer="text_en_splitting_cl",
-            fields={
-                "exact": fields.TextField(analyzer="english_exact"),
-            },
-            search_analyzer="search_analyzer",
-            multi=True,
-        )
     )
 
     def prepare_fjc_id(self, instance):
@@ -671,29 +648,11 @@ class PersonDocument(PersonBaseDocument):
     def prepare_alias_ids(self, instance):
         return [alias.pk for alias in instance.aliases.all()] or None
 
-    def prepare_gender(self, instance):
-        return instance.get_gender_display()
-
-    def prepare_dob_state(self, instance):
-        return instance.get_dob_state_display()
-
-    def prepare_political_affiliation(self, instance):
-        return [
-            pa.get_political_party_display()
-            for pa in instance.political_affiliations.all()
-            if pa
-        ] or None
-
     def prepare_political_affiliation_id(self, instance):
         return [
             pa.political_party
             for pa in instance.political_affiliations.all()
             if pa
-        ] or None
-
-    def prepare_aba_rating(self, instance):
-        return [
-            r.get_rating_display() for r in instance.aba_ratings.all() if r
         ] or None
 
     def prepare_person_child(self, instance):
