@@ -22,6 +22,7 @@ from cl.search.documents import (
     ES_CHILD_ID,
     AudioDocument,
     DocketDocument,
+    ESRECAPDocument,
     PersonDocument,
     PositionDocument,
 )
@@ -317,13 +318,18 @@ def update_child_documents_by_query(
     """
 
     s = es_document.search()
-    match es_document:
-        case PositionDocument:
-            s = s.query(
-                "parent_id", type="position_document", id=parent_instance.pk
-            )
-            main_doc = PersonDocument.get(id=parent_instance.pk)
+    main_doc = None
+    if es_document is PositionDocument:
+        s = s.query(
+            "parent_id", type="position_document", id=parent_instance.pk
+        )
+        main_doc = PersonDocument.get(id=parent_instance.pk)
+    elif es_document is ESRECAPDocument:
+        s = s.query("parent_id", type="recap_document", id=parent_instance.pk)
+        main_doc = DocketDocument.get(id=parent_instance.pk)
 
+    if not main_doc:
+        return
     client = connections.get_connection()
     ubq = UpdateByQuery(using=client, index=es_document._index._name).query(
         s.to_dict()["query"]
