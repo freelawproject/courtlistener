@@ -1,6 +1,7 @@
 from typing import Any
 
 from celery.canvas import chain
+from django.core.exceptions import FieldDoesNotExist
 from django.db.models.signals import m2m_changed, post_delete, post_save
 from elasticsearch.exceptions import NotFoundError
 
@@ -11,12 +12,16 @@ from cl.alerts.tasks import (
 )
 from cl.lib.elasticsearch_utils import elasticsearch_enabled
 from cl.search.documents import (
-    PEOPLE_DOCS_TYPE_ID,
+    ES_CHILD_ID,
     AudioDocument,
     ParentheticalGroupDocument,
+    PersonDocument,
     PositionDocument,
 )
-from cl.search.tasks import save_document_in_es, update_document_in_es
+from cl.search.tasks import (
+    save_document_in_es,
+    update_document_in_es,
+)
 from cl.search.types import ESDocumentType, ESModelType
 
 
@@ -29,22 +34,43 @@ def updated_fields(
     :return: A list of the names of fields that have changed in the instance.
     """
     # Get the field names being tracked
+    tracked_set = None
     if es_document is AudioDocument:
         tracked_set = getattr(instance, "es_oa_field_tracker", None)
     elif es_document is ParentheticalGroupDocument:
         tracked_set = getattr(instance, "es_pa_field_tracker", None)
-    else:
+    elif es_document is PersonDocument:
         tracked_set = getattr(instance, "es_p_field_tracker", None)
 
     # Check the set before trying to get the fields
     if not tracked_set:
         return []
+
     # Check each tracked field to see if it has changed
-    changed_fields = [
-        field
-        for field in tracked_set.fields
-        if getattr(instance, field) != tracked_set.previous(field)
-    ]
+    changed_fields = []
+    for field in tracked_set.fields:
+        current_value = getattr(instance, field)
+        try:
+            # If field is a ForeignKey relation, the current value is the
+            # related object, while the previous value is the ID, get the id.
+            # See https://django-model-utils.readthedocs.io/en/latest/utilities.html#field-tracker
+            field_type = instance.__class__._meta.get_field(field)
+            if (
+                field_type.get_internal_type() == "ForeignKey"
+                and current_value
+                and "_id" not in field
+            ):
+                current_value = current_value.pk
+        except FieldDoesNotExist:
+            # Support tracking for properties, only abort if it's not a model
+            # property
+            if not hasattr(instance, field) and not isinstance(
+                getattr(instance.__class__, field, None), property
+            ):
+                continue
+
+        if current_value != tracked_set.previous(field):
+            changed_fields.append(field)
     return changed_fields
 
 
@@ -110,8 +136,10 @@ def get_or_create_doc(
     :param instance: The instance of the document to get or create.
     :return: An Elasticsearch document if found, otherwise None.
     """
+
+    # Get doc_id for parent-child documents.
     if es_document is PositionDocument:
-        doc_id = PEOPLE_DOCS_TYPE_ID(instance.pk).POSITION
+        doc_id = ES_CHILD_ID(instance.pk).POSITION
     else:
         doc_id = instance.pk
 
@@ -144,14 +172,12 @@ def update_es_documents(
     changed_fields = updated_fields(instance, es_document)
     if changed_fields:
         for query, fields_map in mapping_fields.items():
+            fields_to_update = get_fields_to_update(changed_fields, fields_map)
             main_objects = main_model.objects.filter(**{query: instance})
             for main_object in main_objects:
                 main_doc = get_or_create_doc(es_document, main_object)
                 if not main_doc:
-                    return
-                fields_to_update = get_fields_to_update(
-                    changed_fields, fields_map
-                )
+                    continue
                 if fields_to_update:
                     update_document_in_es.delay(
                         main_doc,
@@ -238,12 +264,18 @@ def update_reverse_related_documents(
         if not main_doc:
             return
 
+        fields_to_update = {}
+        for field in affected_fields:
+            prepare_method = getattr(main_doc, f"prepare_{field}", None)
+            if prepare_method:
+                field_value = prepare_method(main_object)
+            else:
+                field_value = getattr(instance, field)
+            fields_to_update[field] = field_value
+
         update_document_in_es.delay(
             main_doc,
-            {
-                field: getattr(main_doc, f"prepare_{field}")(main_object)
-                for field in affected_fields
-            },
+            fields_to_update,
         )
 
 
