@@ -23,6 +23,7 @@ from cl.search.documents import (
     AudioDocument,
     DocketDocument,
     PersonDocument,
+    PositionDocument,
 )
 from cl.search.models import Docket, OpinionCluster, RECAPDocument
 from cl.search.types import (
@@ -316,9 +317,13 @@ def update_child_documents_by_query(
     """
 
     s = es_document.search()
-    s = s.query("parent_id", type="recap_document", id=parent_instance.pk)
+    match es_document:
+        case PositionDocument:
+            s = s.query(
+                "parent_id", type="position_document", id=parent_instance.pk
+            )
+            main_doc = PersonDocument.get(id=parent_instance.pk)
 
-    main_doc = DocketDocument.get(id=parent_instance.pk)
     client = connections.get_connection()
     ubq = UpdateByQuery(using=client, index=es_document._index._name).query(
         s.to_dict()["query"]

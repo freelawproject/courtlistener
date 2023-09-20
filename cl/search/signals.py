@@ -159,12 +159,38 @@ p_field_mapping = {
 
 position_field_mapping = {
     "save": {
-        Person: {"appointer__person": {"name_full_reverse": ["appointer"]}},
+        Person: {
+            "appointer__person": {
+                "name_full_reverse": ["appointer"],
+            },
+            "predecessor": {
+                "name_full_reverse": ["predecessor"],
+            },
+            "supervisor": {
+                "name_full_reverse": ["supervisor"],
+            },
+            "person": {
+                "name_full": ["name"],
+                "religion": ["religion"],
+                "gender": ["gender"],
+                "dob_city": ["dob_city"],
+                "dob_state": ["dob_state"],
+                "fjc_id": ["fjc_id"],
+            },
+        },
         Position: {},
     },
     "delete": {Position: {}},
     "m2m": {},
-    "reverse": {},
+    "reverse": {
+        Education: {"person__educations": {"all": ["school"]}},
+        ABARating: {"person__aba_ratings": {"all": ["aba_rating"]}},
+        PoliticalAffiliation: {
+            "person__political_affiliations": {
+                "all": ["political_affiliation"]
+            }
+        },
+    },
 }
 
 docket_field_mapping = {
