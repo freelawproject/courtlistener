@@ -50,11 +50,11 @@ urlpatterns = [
     ),
     path("opinion/<int:pk>/<blank-slug:_>/", view_opinion, name="view_case"),
     path(
-        "docket/<int:pk>/<blank-slug:slug>/", view_docket, name="view_docket"
+        "docket/<int:pk>/<blank-slug:slug>/", view_docket, name="view_docket"  # type: ignore[arg-type]
     ),
     path(
         "recap/gov.uscourts.<str:court>.<str:pacer_case_id>/",
-        redirect_docket_recap,
+        redirect_docket_recap,  # type: ignore[arg-type]
         name="redirect_docket_recap",
     ),
     path(

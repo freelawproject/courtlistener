@@ -14,7 +14,7 @@ apt install -y awscli gnupg
 echo "deb http://apt.postgresql.org/pub/repos/apt bullseye-pgdg main" > /etc/apt/sources.list.d/pgdg.list
 curl --silent 'https://www.postgresql.org/media/keys/ACCC4CF8.asc' |  apt-key add -
 apt-get update
-apt-get install -y postgresql-client-14
+apt-get install -y postgresql-client
 
 # Stream to S3
 
@@ -23,11 +23,12 @@ PGPASSWORD=$DB_PASSWORD psql \
 	--command \
 	  'set statement_timeout to 0;
 	   COPY search_court (
-	       id, pacer_court_id, pacer_has_rss_feed, fjc_court_id, date_modified,
-	       in_use, has_opinion_scraper, has_oral_argument_scraper, position,
+	       id, pacer_court_id, pacer_has_rss_feed, pacer_rss_entry_types, fjc_court_id,
+	       date_modified, in_use, has_opinion_scraper, has_oral_argument_scraper, position,
 	       citation_string, short_name, full_name, url, start_date, end_date,
-	       jurisdiction
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
+	       jurisdiction, notes
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
+	--quiet \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
@@ -40,17 +41,18 @@ PGPASSWORD=$DB_PASSWORD psql \
 	  'set statement_timeout to 0;
 	   COPY search_docket (
 	       id, date_created, date_modified, source, appeal_from_str,
-	       assigned_to_str, referred_to_str, panel_str, date_cert_granted,
+	       assigned_to_str, referred_to_str, panel_str, date_last_index, date_cert_granted,
 	       date_cert_denied, date_argued, date_reargued,
 	       date_reargument_denied, date_filed, date_terminated,
 	       date_last_filing, case_name_short, case_name, case_name_full, slug,
 	       docket_number, docket_number_core, pacer_case_id, cause,
 	       nature_of_suit, jury_demand, jurisdiction_type,
 	       appellate_fee_status, appellate_case_type_information, mdl_status,
-	       filepath_ia, filepath_ia_json, date_blocked, blocked,
-	       appeal_from_id, assigned_to_id, court_id, idb_data_id,
-	       originating_court_information_id, referred_to_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
+	       filepath_local, filepath_ia, filepath_ia_json, ia_upload_failure_count, ia_needs_upload,
+	       ia_date_first_change, view_count, date_blocked, blocked, appeal_from_id, assigned_to_id,
+	       court_id, idb_data_id, originating_court_information_id, referred_to_id
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
+	--quiet \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
@@ -62,7 +64,7 @@ PGPASSWORD=$DB_PASSWORD psql \
 	--command \
 	  'set statement_timeout to 0;
 	   COPY recap_fjcintegrateddatabase (
-	       id, dataset_source, date_created, date_modified, office,
+	       id, date_created, date_modified, dataset_source, office,
 	       docket_number, origin, date_filed, jurisdiction, nature_of_suit,
 	       title, section, subsection, diversity_of_residence, class_action,
 	       monetary_demand, county_of_residence, arbitration_at_filing,
@@ -71,8 +73,9 @@ PGPASSWORD=$DB_PASSWORD psql \
 	       transfer_docket_number, transfer_origin, date_terminated,
 	       termination_class_action_status, procedural_progress, disposition,
 	       nature_of_judgement, amount_received, judgment, pro_se,
-	       year_of_tape, circuit_id, district_id, nature_of_offense, version
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
+	       year_of_tape, nature_of_offense, version, circuit_id, district_id
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
+	--quiet \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
@@ -90,8 +93,10 @@ PGPASSWORD=$DB_PASSWORD psql \
 	       scdb_votes_minority, source, procedural_history, attorneys,
 	       nature_of_suit, posture, syllabus, headnotes, summary, disposition,
 	       history, other_dates, cross_reference, correction, citation_count,
-	       precedential_status, date_blocked, blocked, docket_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
+	       precedential_status, date_blocked, blocked, filepath_json_harvard, docket_id,
+	       arguments, headmatter
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
+	--quiet \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
@@ -107,7 +112,8 @@ PGPASSWORD=$DB_PASSWORD psql \
 	       type, sha1, page_count, download_url, local_path, plain_text, html,
 	       html_lawbox, html_columbia, html_anon_2020, xml_harvard,
 	       html_with_citations, extracted_by_ocr, author_id, cluster_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
+	--quiet \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
@@ -120,7 +126,8 @@ PGPASSWORD=$DB_PASSWORD psql \
 	  'set statement_timeout to 0;
 	   COPY search_opinionscited (
 	       id, depth, cited_opinion_id, citing_opinion_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
+	--quiet \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
@@ -133,7 +140,8 @@ PGPASSWORD=$DB_PASSWORD psql \
 	  'set statement_timeout to 0;
 	   COPY search_citation (
 	       id, volume, reporter, page, type, cluster_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
+	--quiet \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
@@ -146,7 +154,8 @@ PGPASSWORD=$DB_PASSWORD psql \
 	  'set statement_timeout to 0;
 	   COPY search_parenthetical (
 	       id, text, score, described_opinion_id, describing_opinion_id, group_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
+	--quiet \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
@@ -160,9 +169,11 @@ PGPASSWORD=$DB_PASSWORD psql \
 	   COPY audio_audio (
 	       id, date_created, date_modified, source, case_name_short,
 	       case_name, case_name_full, judges, sha1, download_url, local_path_mp3,
-	       local_path_original_file, filepath_ia, duration, date_blocked,
-	       blocked, docket_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
+	       local_path_original_file, filepath_ia, ia_upload_failure_count, duration,
+	       processing_complete, date_blocked, blocked, stt_status, stt_google_response,
+	       docket_id
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
+	--quiet \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
@@ -174,12 +185,13 @@ PGPASSWORD=$DB_PASSWORD psql \
 	--command \
 	  'set statement_timeout to 0;
 	   COPY people_db_person (
-	       id, date_created, date_modified, fjc_id, slug, name_first,
+	       id, date_created, date_modified, date_completed, fjc_id, slug, name_first,
 	       name_middle, name_last, name_suffix, date_dob, date_granularity_dob,
 	       date_dod, date_granularity_dod, dob_city, dob_state, dob_country,
 	       dod_city, dod_state, dod_country, gender, religion, ftm_total_received,
 	       ftm_eid, has_photo, is_alias_of_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
+	--quiet \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
@@ -192,7 +204,8 @@ PGPASSWORD=$DB_PASSWORD psql \
 	  'set statement_timeout to 0;
 	   COPY people_db_school (
 	       id, date_created, date_modified, name, ein, is_alias_of_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
+	--quiet \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
@@ -208,13 +221,14 @@ PGPASSWORD=$DB_PASSWORD psql \
 	       sector, organization_name, location_city, location_state,
 	       date_nominated, date_elected, date_recess_appointment,
 	       date_referred_to_judicial_committee, date_judicial_committee_action,
-	       date_hearing, date_confirmation, date_start, date_granularity_start,
-	       date_termination, date_granularity_termination, date_retirement,
-	       nomination_process, vote_type, voice_vote, votes_yes, votes_no,
-	       votes_yes_percent, votes_no_percent, how_selected, has_inferred_values,
-	       appointer_id, court_id, person_id, predecessor_id, school_id,
+	       judicial_committee_action, date_hearing, date_confirmation, date_start,
+	       date_granularity_start, date_termination, termination_reason,
+	       date_granularity_termination, date_retirement, nomination_process, vote_type,
+	       voice_vote, votes_yes, votes_no, votes_yes_percent, votes_no_percent, how_selected,
+	       has_inferred_values, appointer_id, court_id, person_id, predecessor_id, school_id,
 	       supervisor_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
+	--quiet \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
@@ -229,7 +243,8 @@ PGPASSWORD=$DB_PASSWORD psql \
 	       id, date_created, date_modified, retention_type, date_retention,
 	       votes_yes, votes_no, votes_yes_percent, votes_no_percent, unopposed,
 	       won, position_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
+	--quiet \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
@@ -243,7 +258,8 @@ PGPASSWORD=$DB_PASSWORD psql \
 	   COPY people_db_education (
 	       id, date_created, date_modified, degree_level, degree_detail,
 	       degree_year, person_id, school_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
+	--quiet \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
@@ -258,7 +274,8 @@ PGPASSWORD=$DB_PASSWORD psql \
 	       id, date_created, date_modified, political_party, source,
 	       date_start, date_granularity_start, date_end,
 	       date_granularity_end, person_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
+	--quiet \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
@@ -270,10 +287,11 @@ PGPASSWORD=$DB_PASSWORD psql \
 	--command \
 	  'set statement_timeout to 0;
 	   COPY disclosures_financialdisclosure (
-	       id, date_created, date_modified, year, filepath, page_count, sha1,
-	       report_type, is_amended, addendum_content_raw, addendum_redacted,
-	       has_been_extracted, person_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
+	       id, date_created, date_modified, year, download_filepath, filepath, thumbnail,
+	       thumbnail_status, page_count, sha1, report_type, is_amended, addendum_content_raw,
+	       addendum_redacted, has_been_extracted, person_id
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
+	--quiet \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
@@ -291,7 +309,8 @@ PGPASSWORD=$DB_PASSWORD psql \
 	       transaction_during_reporting_period, transaction_date_raw,
 	       transaction_date, transaction_value_code, transaction_gain_code,
 	       transaction_partner, has_inferred_values, financial_disclosure_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
+	--quiet \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
@@ -305,7 +324,8 @@ PGPASSWORD=$DB_PASSWORD psql \
 	   COPY disclosures_position (
 	       id, date_created, date_modified, position, organization_name,
 	       redacted, financial_disclosure_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
+	--quiet \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
@@ -319,7 +339,8 @@ PGPASSWORD=$DB_PASSWORD psql \
 	   COPY disclosures_agreement (
 	       id, date_created, date_modified, date_raw, parties_and_terms,
 	       redacted, financial_disclosure_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
+	--quiet \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
@@ -333,7 +354,8 @@ PGPASSWORD=$DB_PASSWORD psql \
 	   COPY disclosures_noninvestmentincome (
 	       id, date_created, date_modified, date_raw, source_type,
 	       income_amount, redacted, financial_disclosure_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
+	--quiet \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
@@ -347,7 +369,8 @@ PGPASSWORD=$DB_PASSWORD psql \
 	   COPY disclosures_spouseincome (
 	       id, date_created, date_modified, source_type, date_raw, redacted,
 	       financial_disclosure_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
+	--quiet \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
@@ -361,7 +384,8 @@ PGPASSWORD=$DB_PASSWORD psql \
 	   COPY disclosures_reimbursement (
 	       id, date_created, date_modified, source, date_raw, location,
 	       purpose, items_paid_or_provided, redacted, financial_disclosure_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
+	--quiet \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
@@ -375,7 +399,8 @@ PGPASSWORD=$DB_PASSWORD psql \
 	   COPY disclosures_gift (
 	       id, date_created, date_modified, source, description, value,
 	       redacted, financial_disclosure_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
+	--quiet \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
@@ -389,7 +414,8 @@ PGPASSWORD=$DB_PASSWORD psql \
 	   COPY disclosures_debt (
 	       id, date_created, date_modified, creditor_name, description,
 	       value_code, redacted, financial_disclosure_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
+	--quiet \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \

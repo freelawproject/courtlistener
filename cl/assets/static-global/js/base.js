@@ -230,7 +230,7 @@ $(document).ready(function () {
     let date = new Date();
     date.setTime(date.getTime() + (duration * 24 * 60 * 60 * 1000));
     let expires = "; expires=" + date.toGMTString();
-    document.cookie = cookie_name + "=" + 'true' + expires + "; path=/";
+    document.cookie = cookie_name + "=" + 'true' + expires + "; samesite=lax; path=/";
     that.closest('.alert-dismissible').addClass('hidden');
   });
 
@@ -279,7 +279,7 @@ $(document).ready(function () {
       let date = new Date();
       date.setTime(date.getTime() + (7 * 24 * 60 * 60 * 1000)); // 7 days
       let expires = "; expires=" + date.toGMTString();
-      document.cookie = "recap_install_plea" + "=" + 'true' + expires + "; path=/";
+      document.cookie = "recap_install_plea" + "=" + 'true' + expires + "; samesite=lax; path=/";
     }
   });
 
@@ -331,13 +331,30 @@ function debounce(func, wait, immediate) {
 };
 
 /*
-  Method to copy the content from a textarea to the clipboard.
+  Register event handler for copy-to-clipboard buttons.
 */
-function copy_text(selector_id) {
-  let text_area = document.getElementById(selector_id).closest('textarea');
-  text_area.select();
-  navigator.clipboard.writeText(text_area.value);
-}
+function handleClipboardCopyClick(event) {
+  let clipboardCopySource = event.target.closest("[data-clipboard-copy-target]")
+  let clipboardCopyTargetId = clipboardCopySource && clipboardCopySource.dataset.clipboardCopyTarget;
+  let clipboardCopyTarget = clipboardCopyTargetId && document.getElementById(clipboardCopyTargetId);
+  if (clipboardCopyTarget) {
+    clipboardCopyTarget.select();
+    if (navigator.clipboard) { //
+      navigator.clipboard.writeText(clipboardCopyTarget.value);
+    }
+  }
+};
+document.addEventListener('click', handleClipboardCopyClick);
+
+/*
+  Register event handler for copy-to-clipboard inputs.
+*/
+function handleClipboardTextClick(event) {
+  if (event.target.classList.contains("click-select")) {
+    event.target.select();
+  }
+};
+document.addEventListener('click', handleClipboardTextClick);
 
 /*
   Disable the signup form submit button on submit to avoid repeated submissions.

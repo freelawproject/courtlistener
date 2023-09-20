@@ -3,12 +3,19 @@ from datetime import datetime, timedelta
 from http import HTTPStatus
 from pathlib import Path
 
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.utils.timezone import now
 
+from cl.alerts.factories import AlertFactory
+from cl.alerts.models import Alert
+from cl.api.factories import WebhookFactory
+from cl.api.models import WebhookEvent, WebhookEventType
 from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
+from cl.donate.factories import DonationFactory
+from cl.donate.models import Donation
 from cl.lib.microservice_utils import microservice
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.management.commands import (
@@ -23,17 +30,37 @@ from cl.scrapers.utils import get_extension
 from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.models import Court, Docket, Opinion
 from cl.settings import MEDIA_ROOT
-from cl.tests.cases import SimpleTestCase, TestCase
+from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
 from cl.tests.fixtures import ONE_SECOND_MP3_BYTES, SMALL_WAV_BYTES
+from cl.users.factories import UserProfileWithParentsFactory
 
 
-class ScraperIngestionTest(TestCase):
+class ScraperIngestionTest(ESIndexTestCase, TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         cls.court = CourtFactory(id="test", jurisdiction="F")
+        cls.user_profile = UserProfileWithParentsFactory()
+        cls.donation = DonationFactory(
+            donor=cls.user_profile.user,
+            amount=20,
+            status=Donation.PROCESSED,
+            send_annual_reminder=True,
+        )
+        cls.webhook_enabled = WebhookFactory(
+            user=cls.user_profile.user,
+            event_type=WebhookEventType.SEARCH_ALERT,
+            url="https://example.com/",
+            enabled=True,
+        )
+        cls.search_alert_oa = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert OA",
+            query="type=oa",
+        )
 
     def test_extension(self):
-        r = microservice(
+        r = async_to_sync(microservice)(
             service="buffer-extension",
             params={"mime": True},
         )
@@ -126,6 +153,32 @@ class ScraperIngestionTest(TestCase):
         )
         d_1.refresh_from_db()
         self.assertEqual(d_1.case_name, "Jeremy v. Julian")
+
+        # Confirm that OA Search Alerts are properly triggered after an OA is
+        # scraped and its MP3 file is processed.
+        # Two webhook events should be sent, both of them to user_profile user
+        webhook_events = WebhookEvent.objects.all()
+        self.assertEqual(len(webhook_events), 2)
+
+        cases_names = ["Jeremy v. Julian", "Ander v. Leo"]
+        for webhook_sent in webhook_events:
+            self.assertEqual(
+                webhook_sent.webhook.user,
+                self.user_profile.user,
+            )
+            content = webhook_sent.content
+            # Check if the webhook event payload is correct.
+            self.assertEqual(
+                content["webhook"]["event_type"],
+                WebhookEventType.SEARCH_ALERT,
+            )
+            self.assertIn(
+                content["payload"]["results"][0]["caseName"], cases_names
+            )
+            self.assertIsNotNone(content["payload"]["results"][0]["duration"])
+            self.assertIsNotNone(
+                content["payload"]["results"][0]["local_path"]
+            )
 
     def test_parsing_xml_opinion_site_to_site_object(self) -> None:
         """Does a basic parse of a site reveal the right number of items?"""
@@ -512,7 +565,7 @@ class AudioFileTaskTest(TestCase):
             "case_name_short": audio_obj.case_name_short,
             "download_url": audio_obj.download_url,
         }
-        audio_response = microservice(
+        audio_response = async_to_sync(microservice)(
             service="convert-audio",
             item=audio_obj,
             params=audio_data,

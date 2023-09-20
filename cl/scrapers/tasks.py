@@ -3,10 +3,13 @@ import random
 import traceback
 from typing import List, Optional, Tuple, Union
 
+import httpx
 import requests
+from asgiref.sync import async_to_sync, sync_to_async
 from django.apps import apps
 from django.conf import settings
 from django.core.files.base import ContentFile
+from httpx import Response
 from juriscraper.lib.exceptions import PacerLoginException
 from juriscraper.pacer import CaseQuery, PacerSession
 from redis import ConnectionError as RedisConnectionError
@@ -121,11 +124,11 @@ def extract_doc_content(
     opinion = Opinion.objects.get(pk=pk)
 
     # Try to extract opinion content without using OCR.
-    response = microservice(
+    response = async_to_sync(microservice)(
         service="document-extract",
         item=opinion,
     )
-    if not response.ok:
+    if not response.is_success:
         logging.warning(
             f"Error from document-extract microservice: {response.status_code}"
         )
@@ -140,12 +143,12 @@ def extract_doc_content(
         and needs_ocr(content)
         and ".pdf" in str(opinion.local_path)
     ):
-        response = microservice(
+        response = async_to_sync(microservice)(
             service="document-extract-ocr",
             item=opinion,
             params={"ocr_available": ocr_available},
         )
-        if response.ok:
+        if response.is_success:
             content = response.json()["content"]
             extracted_by_ocr = True
 
@@ -197,7 +200,11 @@ def extract_doc_content(
 
 @app.task(
     bind=True,
-    autoretry_for=(requests.ConnectionError, requests.ReadTimeout),
+    autoretry_for=(
+        httpx.ConnectError,
+        httpx.ConnectTimeout,
+        httpx.ReadTimeout,
+    ),
     max_retries=3,
     retry_backoff=10,
 )
@@ -232,10 +239,12 @@ def extract_recap_pdf(
     :return: A list of processed RECAPDocument
     """
 
-    return extract_recap_pdf_base(pks, ocr_available, check_if_needed)
+    return async_to_sync(extract_recap_pdf_base)(
+        pks, ocr_available, check_if_needed
+    )
 
 
-def extract_recap_pdf_base(
+async def extract_recap_pdf_base(
     pks: Union[int, List[int]],
     ocr_available: bool = True,
     check_if_needed: bool = True,
@@ -253,32 +262,32 @@ def extract_recap_pdf_base(
     if not is_iter(pks):
         pks = [pks]
 
-    processed = []
+    processed: List[int] = []
     for pk in pks:
-        rd = RECAPDocument.objects.get(pk=pk)
+        rd = await RECAPDocument.objects.aget(pk=pk)
         if check_if_needed and not rd.needs_extraction:
             # Early abort if the item doesn't need extraction and the user
             # hasn't disabled early abortion.
             processed.append(pk)
             continue
 
-        response = microservice(
+        response = await microservice(
             service="document-extract",
             item=rd,
         )
-        if not response.ok:
+        if not response.is_success:
             continue
 
         content = response.json()["content"]
         extracted_by_ocr = response.json()["extracted_by_ocr"]
         ocr_needed = needs_ocr(content)
         if ocr_available and ocr_needed:
-            response = microservice(
+            response = await microservice(
                 service="document-extract-ocr",
                 item=rd,
                 params={"ocr_available": ocr_available},
             )
-            if response.ok:
+            if response.is_success:
                 content = response.json()["content"]
                 extracted_by_ocr = True
 
@@ -296,7 +305,11 @@ def extract_recap_pdf_base(
 
         rd.plain_text, _ = anonymize(content)
         # Do not do indexing here. Creates race condition in celery.
-        rd.save(index=False, do_extraction=False)
+        await rd.asave(
+            index=False,
+            do_extraction=False,
+            update_fields=["ocr_status", "plain_text"],
+        )
         processed.append(pk)
 
     return processed
@@ -337,7 +350,7 @@ def process_audio_file(self, pk) -> None:
         "case_name_short": audio_obj.case_name_short,
         "download_url": audio_obj.download_url,
     }
-    audio_response = microservice(
+    audio_response: Response = async_to_sync(microservice)(
         service="convert-audio",
         item=audio_obj,
         params=audio_data,
@@ -348,14 +361,20 @@ def process_audio_file(self, pk) -> None:
     audio_obj.file_with_date = audio_obj.docket.date_argued
     audio_obj.local_path_mp3.save(file_name, cf, save=False)
     audio_obj.duration = float(
-        microservice(
+        async_to_sync(microservice)(
             service="audio-duration",
             file=audio_response.content,
             file_type="mp3",
         ).text
     )
     audio_obj.processing_complete = True
-    audio_obj.save()
+    audio_obj.save(
+        update_fields=[
+            "duration",
+            "local_path_mp3",
+            "processing_complete",
+        ]
+    )
 
 
 @app.task(

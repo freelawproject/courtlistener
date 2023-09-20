@@ -5,6 +5,7 @@ from copy import deepcopy
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+from asgiref.sync import async_to_sync, sync_to_async
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, OperationalError, transaction
@@ -80,7 +81,7 @@ def confirm_docket_number_core_lookup_match(
     return docket
 
 
-def find_docket_object(
+async def find_docket_object(
     court_id: str,
     pacer_case_id: str | None,
     docket_number: str,
@@ -134,11 +135,11 @@ def find_docket_object(
 
     for kwargs in lookups:
         ds = Docket.objects.filter(court_id=court_id, **kwargs).using(using)
-        count = ds.count()
+        count = await ds.acount()
         if count == 0:
             continue  # Try a looser lookup.
         if count == 1:
-            d = ds[0]
+            d = await ds.afirst()
             if kwargs.get("pacer_case_id") is None and kwargs.get(
                 "docket_number_core"
             ):
@@ -147,7 +148,7 @@ def find_docket_object(
                 break  # Nailed it!
         elif count > 1:
             # Choose the oldest one and live with it.
-            d = ds.earliest("date_created")
+            d = await ds.aearliest("date_created")
             if kwargs.get("pacer_case_id") is None and kwargs.get(
                 "docket_number_core"
             ):
@@ -164,7 +165,7 @@ def find_docket_object(
 
     if using != "default":
         # Get the item from the default DB
-        d = Docket.objects.get(pk=d.pk)
+        d = await Docket.objects.aget(pk=d.pk)
 
     return d
 
@@ -555,7 +556,9 @@ def normalize_long_description(docket_entry):
     docket_entry["description"] = desc
 
 
-def merge_unnumbered_docket_entries(des):
+async def merge_unnumbered_docket_entries(
+    des: QuerySet, docket_entry: dict[str, any]
+) -> DocketEntry:
     """Unnumbered docket entries come from many sources, with different data.
     This sometimes results in two docket entries when there should be one. The
     docket history report is the one source that sometimes has the long and
@@ -563,15 +566,91 @@ def merge_unnumbered_docket_entries(des):
     them back together again, deleting the duplicate items.
 
     :param des: A QuerySet of DocketEntries that we believe are the same.
+    :param docket_entry: The scraped dict from Juriscraper for the docket
+    entry.
     :return The winning DocketEntry
     """
-    # Choose the earliest as the winner; delete the rest
-    winner = des.earliest("date_created")
-    des.exclude(pk=winner.pk).delete()
+
+    # Look for docket entries that match by equal long description or if the
+    # long description is not set.
+    matched_entries_queryset = des.filter(
+        Q(description=docket_entry["description"]) | Q(description="")
+    )
+    if await matched_entries_queryset.aexists():
+        # Return the entry that matches the long description and remove the
+        # rest if there are any duplicates.
+        winner = await matched_entries_queryset.aearliest("date_created")
+        await matched_entries_queryset.exclude(pk=winner.pk).adelete()
+        return winner
+
+    # No duplicates found by long description, choose the earliest as the
+    # winner; delete the rest
+    winner = await des.aearliest("date_created")
+    await des.exclude(pk=winner.pk).adelete()
     return winner
 
 
-def get_or_make_docket_entry(d, docket_entry):
+@sync_to_async
+def add_create_docket_entry_transaction(d, docket_entry):
+    with transaction.atomic():
+        Docket.objects.select_for_update().get(pk=d.pk)
+        try:
+            de, de_created = DocketEntry.objects.get_or_create(
+                docket=d, entry_number=docket_entry["document_number"]
+            )
+        except DocketEntry.MultipleObjectsReturned:
+            pacer_seq_no = docket_entry.get("pacer_seq_no")
+            if pacer_seq_no is None:
+                logger.error(
+                    "Multiple docket entries found for document "
+                    "entry number '%s' while processing '%s'",
+                    docket_entry["document_number"],
+                    d,
+                )
+                return None
+
+            null_de_queryset = DocketEntry.objects.filter(
+                docket=d,
+                entry_number=docket_entry["document_number"],
+                pacer_sequence_number__isnull=True,
+            )
+            try:
+                de = DocketEntry.objects.get(
+                    docket=d,
+                    entry_number=docket_entry["document_number"],
+                    pacer_sequence_number=pacer_seq_no,
+                )
+                de_created = False
+                null_de_queryset.delete()
+            except DocketEntry.DoesNotExist:
+                if null_de_queryset.exists():
+                    de = null_de_queryset.latest("date_created")
+                    null_de_queryset.exclude(pk=de.pk).delete()
+                    de_created = False
+                else:
+                    de = DocketEntry.objects.create(
+                        docket=d,
+                        entry_number=docket_entry["document_number"],
+                        pacer_sequence_number=pacer_seq_no,
+                    )
+                    de_created = True
+            except DocketEntry.MultipleObjectsReturned:
+                duplicate_de_queryset = DocketEntry.objects.filter(
+                    docket=d,
+                    entry_number=docket_entry["document_number"],
+                    pacer_sequence_number=pacer_seq_no,
+                )
+                de = duplicate_de_queryset.latest("date_created")
+                duplicate_de_queryset.exclude(pk=de.pk).delete()
+                null_de_queryset.delete()
+                de_created = False
+
+        return de, de_created
+
+
+async def get_or_make_docket_entry(
+    d: Docket, docket_entry: dict[str, any]
+) -> Optional[tuple[DocketEntry, bool]]:
     """Lookup or create a docket entry to match the one that was scraped.
 
     :param d: The docket we expect to find it in.
@@ -583,28 +662,10 @@ def get_or_make_docket_entry(d, docket_entry):
      - None is returned when things fail.
     """
     if docket_entry["document_number"]:
-        with transaction.atomic():
-            # In order to create a lock, we need to retrieve the docket using
-            # select_for_update
-            docket = Docket.objects.select_for_update().get(pk=d.pk)
-            try:
-                de = DocketEntry.objects.get(
-                    docket=docket, entry_number=docket_entry["document_number"]
-                )
-                de_created = False
-            except DocketEntry.DoesNotExist:
-                de = DocketEntry.objects.create(
-                    docket=docket, entry_number=docket_entry["document_number"]
-                )
-                de_created = True
-            except DocketEntry.MultipleObjectsReturned:
-                logger.error(
-                    "Multiple docket entries found for document "
-                    "entry number '%s' while processing '%s'",
-                    docket_entry["document_number"],
-                    d,
-                )
-                return None
+        response = await add_create_docket_entry_transaction(d, docket_entry)
+        if response is None:
+            return None
+        de, de_created = response[0], response[1]
     else:
         # Unnumbered entry. The only thing we can be sure we have is a
         # date. Try to find it by date and description (short or long)
@@ -623,14 +684,14 @@ def get_or_make_docket_entry(d, docket_entry):
             date_filed=docket_entry["date_filed"],
             entry_number=docket_entry["document_number"],
         )
-        count = des.count()
+        count = await des.acount()
         if count == 0:
             de = DocketEntry(
                 docket=d, entry_number=docket_entry["document_number"]
             )
             de_created = True
         elif count == 1:
-            de = des[0]
+            de = await des.afirst()
             de_created = False
         else:
             logger.warning(
@@ -641,12 +702,12 @@ def get_or_make_docket_entry(d, docket_entry):
             )
             # There's so little metadata with unnumbered des that if there's
             # more than one match, we can just select the oldest as canonical.
-            de = merge_unnumbered_docket_entries(des)
+            de = await merge_unnumbered_docket_entries(des, docket_entry)
             de_created = False
     return de, de_created
 
 
-def add_docket_entries(
+async def add_docket_entries(
     d, docket_entries, tags=None, do_not_update_existing=False
 ):
     """Update or create the docket entries and documents.
@@ -670,7 +731,7 @@ def add_docket_entries(
     calculate_recap_sequence_numbers(docket_entries, d.court_id)
     known_filing_dates = [d.date_last_filing]
     for docket_entry in docket_entries:
-        response = get_or_make_docket_entry(d, docket_entry)
+        response = await get_or_make_docket_entry(d, docket_entry)
         if response is None:
             continue
         else:
@@ -678,7 +739,7 @@ def add_docket_entries(
 
         de.description = docket_entry["description"] or de.description
         date_filed, time_filed = localize_date_and_time(
-            de.docket.court.pk, docket_entry["date_filed"]
+            d.court_id, docket_entry["date_filed"]
         )
         if not time_filed:
             # If not time data is available, compare if date_filed changed if
@@ -695,7 +756,7 @@ def add_docket_entries(
         des_returned.append(de)
         if do_not_update_existing and not de_created:
             return des_returned, rds_created, content_updated
-        de.save()
+        await de.asave()
         if tags:
             for tag in tags:
                 tag.tag_object(de)
@@ -725,11 +786,7 @@ def add_docket_entries(
         else:
             params["document_type"] = RECAPDocument.PACER_DOCUMENT
 
-        appellate_court_ids = (
-            Court.federal_courts.appellate_pacer_courts().values_list(
-                "pk", flat=True
-            )
-        )
+        appellate_court_ids = Court.federal_courts.appellate_pacer_courts()
 
         # Unlike district and bankr. dockets, where you always have a main
         # RD and can optionally have attachments to the main RD, Appellate
@@ -742,17 +799,20 @@ def add_docket_entries(
         # RDs. The check here ensures that if that happens for a particular
         # entry, we avoid creating the main RD a second+ time when we get the
         # docket sheet a second+ time.
-        if de_created is False and d.court.pk in appellate_court_ids:
-            appellate_rd_att_exists = de.recap_documents.filter(
+        appelate_court_id_exists = await appellate_court_ids.filter(
+            pk=d.court_id
+        ).aexists()
+        if de_created is False and appelate_court_id_exists:
+            appellate_rd_att_exists = await de.recap_documents.filter(
                 document_type=RECAPDocument.ATTACHMENT
-            ).exists()
+            ).aexists()
             if appellate_rd_att_exists:
                 params["document_type"] = RECAPDocument.ATTACHMENT
         try:
-            rd = RECAPDocument.objects.get(**params)
+            rd = await RECAPDocument.objects.aget(**params)
         except RECAPDocument.DoesNotExist:
             try:
-                rd = RECAPDocument.objects.create(
+                rd = await RECAPDocument.objects.acreate(
                     pacer_doc_id=docket_entry["pacer_doc_id"],
                     is_available=False,
                     **params,
@@ -773,7 +833,7 @@ def add_docket_entries(
             docket_entry.get("short_description") or rd.description
         )
         try:
-            rd.save()
+            await rd.asave()
         except ValidationError:
             # Happens from race conditions.
             continue
@@ -783,7 +843,7 @@ def add_docket_entries(
 
     known_filing_dates = set(filter(None, known_filing_dates))
     if known_filing_dates:
-        Docket.objects.filter(pk=d.pk).update(
+        await Docket.objects.filter(pk=d.pk).aupdate(
             date_last_filing=max(known_filing_dates)
         )
 
@@ -1262,7 +1322,7 @@ def get_data_from_appellate_att_report(
     return att_data
 
 
-def add_tags_to_objs(tag_names: List[str], objs: Any) -> QuerySet:
+async def add_tags_to_objs(tag_names: List[str], objs: Any) -> QuerySet:
     """Add tags by name to objects
 
     :param tag_names: A list of tag name strings
@@ -1276,7 +1336,7 @@ def add_tags_to_objs(tag_names: List[str], objs: Any) -> QuerySet:
 
     tags = []
     for tag_name in tag_names:
-        tag, _ = Tag.objects.get_or_create(name=tag_name)
+        tag, _ = await Tag.objects.aget_or_create(name=tag_name)
         tags.append(tag)
 
     for tag in tags:
@@ -1306,7 +1366,7 @@ def merge_pacer_docket_into_cl_docket(
             og_info.save()
             d.originating_court_information = og_info
 
-    tags = add_tags_to_objs(tag_names, [d])
+    tags = async_to_sync(add_tags_to_objs)(tag_names, [d])
 
     # Add the HTML to the docket in case we need it someday.
     upload_type = (
@@ -1318,9 +1378,9 @@ def merge_pacer_docket_into_cl_docket(
         ContentFile(report.response.text.encode()),
     )
 
-    des_returned, rds_created, content_updated = add_docket_entries(
-        d, docket_data["docket_entries"], tags=tags
-    )
+    des_returned, rds_created, content_updated = async_to_sync(
+        add_docket_entries
+    )(d, docket_data["docket_entries"], tags=tags)
     add_parties_and_attorneys(d, docket_data["parties"])
     process_orphan_documents(rds_created, d.court_id, d.date_filed)
     logger.info(f"Created/updated docket: {d}")
@@ -1526,7 +1586,7 @@ def process_orphan_documents(
         try:
             from cl.recap.tasks import process_recap_pdf
 
-            process_recap_pdf(pq)
+            async_to_sync(process_recap_pdf)(pq)
         except:
             # We can ignore this. If we don't, we get all of the
             # exceptions that were previously raised for the

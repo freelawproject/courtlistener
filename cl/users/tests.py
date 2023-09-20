@@ -3,14 +3,21 @@ import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 from unittest import mock
+from unittest.mock import MagicMock, patch
 
 import time_machine
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
-from django.core.mail import EmailMessage, EmailMultiAlternatives, send_mail
+from django.core.mail import (
+    EmailMessage,
+    EmailMultiAlternatives,
+    get_connection,
+    send_mail,
+)
 from django.test import Client
 from django.test.utils import override_settings
 from django.urls import reverse
@@ -43,10 +50,18 @@ from cl.favorites.models import (
     UserTag,
     UserTagEvent,
 )
+from cl.lib.email_backends import get_email_count
+from cl.lib.redis_utils import make_redis_interface
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.search.factories import DocketFactory
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
-from cl.tests.cases import APITestCase, LiveServerTestCase, TestCase
+from cl.tests.cases import (
+    APITestCase,
+    ESIndexTestCase,
+    LiveServerTestCase,
+    RestartSentEmailQuotaMixin,
+    TestCase,
+)
 from cl.tests.utils import MockResponse as MockPostResponse
 from cl.tests.utils import make_client
 from cl.users.email_handlers import (
@@ -79,7 +94,7 @@ from cl.users.tasks import update_moosend_subscription
 
 
 class UserTest(LiveServerTestCase):
-    def test_simple_auth_urls_GET(self) -> None:
+    async def test_simple_auth_urls_GET(self) -> None:
         """Can we at least GET all the basic auth URLs?"""
         reverse_names = [
             "sign-in",
@@ -91,7 +106,7 @@ class UserTest(LiveServerTestCase):
         ]
         for reverse_name in reverse_names:
             path = reverse(reverse_name)
-            r = self.client.get(path)
+            r = await self.async_client.get(path)
             self.assertEqual(
                 r.status_code,
                 HTTP_200_OK,
@@ -99,7 +114,8 @@ class UserTest(LiveServerTestCase):
                 "Status Code: {code}".format(path=path, code=r.status_code),
             )
 
-    def test_creating_a_new_user(self) -> None:
+    @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
+    async def test_creating_a_new_user(self, mock: MagicMock) -> None:
         """Can we register a new user in the front end?"""
         params = {
             "username": "pan",
@@ -111,7 +127,7 @@ class UserTest(LiveServerTestCase):
             "skip_me_if_alive": "",
             "consent": True,
         }
-        response = self.client.post(
+        response = await sync_to_async(self.client.post)(
             f"{self.live_server_url}{reverse('register')}",
             params,
             follow=True,
@@ -122,7 +138,7 @@ class UserTest(LiveServerTestCase):
             f"?next=/&email=pan%40courtlistener.com",
         )
 
-    def test_redirects(self) -> None:
+    async def test_redirects(self) -> None:
         """Do we allow good redirects while banning bad ones?"""
         next_params = [
             # No open redirects (to a domain outside CL)
@@ -150,7 +166,7 @@ class UserTest(LiveServerTestCase):
                 path=reverse("register_success"),
                 next=next_param,
             )
-            response = self.client.get(bad_url)
+            response = await self.async_client.get(bad_url)
             with self.subTest("Checking redirect", url=bad_url):
                 if is_evil:
                     self.assertNotIn(
@@ -171,24 +187,30 @@ class UserTest(LiveServerTestCase):
 
 
 class UserDataTest(LiveServerTestCase):
-    def test_signing_in(self) -> None:
+    async def test_signing_in(self) -> None:
         """Can we create a user on the backend then sign them in"""
         params = {"username": "pandora", "password": "password"}
-        UserProfileWithParentsFactory.create(
+        await sync_to_async(UserProfileWithParentsFactory.create)(
             user__username=params["username"],
             user__password=make_password(params["password"]),
         )
-        r = self.client.post(reverse("sign-in"), params, follow=True)
+        r = await sync_to_async(self.client.post)(
+            reverse("sign-in"), params, follow=True
+        )
         self.assertRedirects(r, "/")
 
-    def test_confirming_an_email_address(self) -> None:
+    async def test_confirming_an_email_address(self) -> None:
         """Tests whether we can confirm the case where an email is associated
         with a single account.
         """
         # Update the expiration since the fixture has one some time ago.
-        up = UserProfileWithParentsFactory.create(email_confirmed=False)
+        up = await sync_to_async(UserProfileWithParentsFactory.create)(
+            email_confirmed=False
+        )
 
-        r = self.client.get(reverse("email_confirm", args=[up.activation_key]))
+        r = await self.async_client.get(
+            reverse("email_confirm", args=[up.activation_key])
+        )
         self.assertEqual(
             200,
             r.status_code,
@@ -201,18 +223,18 @@ class UserDataTest(LiveServerTestCase):
             msg="Test string not found in response.content",
         )
 
-    def test_confirming_an_email_when_it_is_associated_with_multiple_accounts(
+    async def test_confirming_an_email_when_it_is_associated_with_multiple_accounts(
         self,
     ) -> None:
         """Test the trickier case when an email is associated with many accounts"""
         # Update the accounts to have keys that are not expired.
-        ups = UserProfileWithParentsFactory.create_batch(
+        ups = await sync_to_async(UserProfileWithParentsFactory.create_batch)(
             3,
             activation_key="a" * 40,  # Note length has to be correct
             email_confirmed=False,
         )
 
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("email_confirm", args=[ups[0].activation_key])
         )
         self.assertIn(
@@ -227,7 +249,7 @@ class UserDataTest(LiveServerTestCase):
             "Instead got %s" % r.status_code,
         )
         ups = UserProfile.objects.filter(pk__in=[up.pk for up in ups])
-        for up in ups:
+        async for up in ups:
             self.assertTrue(up.email_confirmed)
 
     def test_get_welcome_email_recipients(self) -> None:
@@ -251,27 +273,35 @@ class UserDataTest(LiveServerTestCase):
 
 
 class ProfileTest(SimpleUserDataMixin, TestCase):
-    def test_api_page_with_data(self) -> None:
+    async def test_api_page_with_data(self) -> None:
         """Can we access the API stats page after the API has been used?"""
         # Get the page anonymously to populate the stats with anon data
-        self.client.get(reverse("audio-list", kwargs={"version": "v3"}))
+        await self.async_client.get(
+            reverse("audio-list", kwargs={"version": "v3"})
+        )
 
         # Log in, get the API again, and then load the profile page
         self.assertTrue(
-            self.client.login(username="pandora", password="password")
+            await sync_to_async(self.async_client.login)(
+                username="pandora", password="password"
+            )
         )
-        self.client.get(reverse("audio-list", kwargs={"version": "v3"}))
+        await self.async_client.get(
+            reverse("audio-list", kwargs={"version": "v3"})
+        )
 
         # Now get the API page
-        r = self.client.get(reverse("view_api"))
+        r = await self.async_client.get(reverse("view_api"))
         self.assertEqual(r.status_code, HTTP_200_OK)
 
-    def test_deleting_your_account(self) -> None:
+    async def test_deleting_your_account(self) -> None:
         """Can we delete an account properly?"""
         self.assertTrue(
-            self.client.login(username="pandora", password="password")
+            await sync_to_async(self.client.login)(
+                username="pandora", password="password"
+            )
         )
-        response = self.client.post(
+        response = await sync_to_async(self.client.post)(
             reverse("delete_account"),
             {"password": "password"},
             follow=True,
@@ -294,42 +324,50 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         up = UserProfileWithParentsFactory(user__username="Test.User")
         self.assertEqual(up.recap_email, "test.user@recap.email")
 
-    def test_nuke_user_history_objects_assets_deleting_account(self) -> None:
+    async def test_nuke_user_history_objects_assets_deleting_account(
+        self,
+    ) -> None:
         """Are user related history objects properly removed when deleting the
         user account?
         """
 
-        user_1 = UserProfileWithParentsFactory()
-        user_2 = UserProfileWithParentsFactory()
-        docket = DocketFactory()
-        docket_2 = DocketFactory()
-        docket_alert = DocketAlertFactory(docket=docket, user=user_1.user)
-        docket_alert_2 = DocketAlertFactory(docket=docket_2, user=user_1.user)
-        docket_alert_3 = DocketAlertFactory(docket=docket_2, user=user_2.user)
+        user_1 = await sync_to_async(UserProfileWithParentsFactory)()
+        user_2 = await sync_to_async(UserProfileWithParentsFactory)()
+        docket = await sync_to_async(DocketFactory)()
+        docket_2 = await sync_to_async(DocketFactory)()
+        docket_alert = await sync_to_async(DocketAlertFactory)(
+            docket=docket, user=user_1.user
+        )
+        docket_alert_2 = await sync_to_async(DocketAlertFactory)(
+            docket=docket_2, user=user_1.user
+        )
+        docket_alert_3 = await sync_to_async(DocketAlertFactory)(
+            docket=docket_2, user=user_2.user
+        )
 
         # Confirm docket alert objects are created.
         docket_alerts = DocketAlert.objects.all()
-        self.assertEqual(docket_alerts.count(), 3)
+        self.assertEqual(await docket_alerts.acount(), 3)
 
         # Trigger a change for docket alert objects.
         docket_alert.alert_type = DocketAlert.UNSUBSCRIPTION
-        docket_alert.save()
+        await docket_alert.asave()
         docket_alert_2.alert_type = DocketAlert.UNSUBSCRIPTION
-        docket_alert_2.save()
+        await docket_alert_2.asave()
         docket_alert_3.alert_type = DocketAlert.UNSUBSCRIPTION
-        docket_alert_3.save()
+        await docket_alert_3.asave()
 
         docket_alert_events = DocketAlertEvent.objects.all()
         # More docket alert history objects should be created.
-        self.assertEqual(docket_alert_events.count(), 3)
+        self.assertEqual(await docket_alert_events.acount(), 3)
 
         # Delete user account.
         self.assertTrue(
-            self.client.login(
+            await sync_to_async(self.client.login)(
                 username=user_1.user.username, password="password"
             )
         )
-        self.client.post(
+        await sync_to_async(self.client.post)(
             reverse("delete_account"),
             {"password": "password"},
             follow=True,
@@ -337,51 +375,55 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
 
         # Confirm that only history events objects related to the user deleted
         # are removed from the events table.
-        self.assertEqual(docket_alerts.count(), 1)
-        self.assertEqual(docket_alert_events.count(), 1)
+        self.assertEqual(await docket_alerts.acount(), 1)
+        self.assertEqual(await docket_alert_events.acount(), 1)
 
-    def test_nuke_user_tag_and_docket_tag_history_objects(self) -> None:
+    async def test_nuke_user_tag_and_docket_tag_history_objects(self) -> None:
         """Are user_tag and docket_tag history objects properly removed when
         deleting the user account?  This is different from the previous test
         since docket_tag is no directly related to the user.
         """
 
-        docket_1 = DocketFactory()
-        docket_2 = DocketFactory()
-        user_1 = UserProfileWithParentsFactory()
-        user_2 = UserProfileWithParentsFactory()
+        docket_1 = await sync_to_async(DocketFactory)()
+        docket_2 = await sync_to_async(DocketFactory)()
+        user_1 = await sync_to_async(UserProfileWithParentsFactory)()
+        user_2 = await sync_to_async(UserProfileWithParentsFactory)()
 
-        tag_1_user_1 = UserTagFactory(user=user_1.user, name="tag_1_user_1")
-        tag_1_user_1.dockets.add(docket_1.pk)
-        tag_1_user_2 = UserTagFactory(user=user_2.user, name="tag_1_user_2")
-        tag_1_user_2.dockets.add(docket_1.pk)
+        tag_1_user_1 = await sync_to_async(UserTagFactory)(
+            user=user_1.user, name="tag_1_user_1"
+        )
+        await tag_1_user_1.dockets.aadd(docket_1.pk)
+        tag_1_user_2 = await sync_to_async(UserTagFactory)(
+            user=user_2.user, name="tag_1_user_2"
+        )
+        await tag_1_user_2.dockets.aadd(docket_1.pk)
 
         # Confirm user tags and docket tags are created.
         user_tags = UserTag.objects.all()
         docket_tags = DocketTag.objects.all()
-        self.assertEqual(user_tags.count(), 2)
-        self.assertEqual(docket_tags.count(), 2)
+        self.assertEqual(await user_tags.acount(), 2)
+        self.assertEqual(await docket_tags.acount(), 2)
 
         # Confirm user tags and docket tags history objects are created.
         tag_1_user_1.name = "tag_1_user_1_1"
-        tag_1_user_1.save()
+        await tag_1_user_1.asave()
         tag_1_user_2.name = "tag_1_user_2_2"
-        tag_1_user_2.save()
+        await tag_1_user_2.asave()
         user_tag_events = UserTagEvent.objects.all()
-        self.assertEqual(user_tag_events.count(), 2)
+        self.assertEqual(await user_tag_events.acount(), 2)
 
-        tag_1_user_1.docket_tags.all().update(docket=docket_2)
-        tag_1_user_2.docket_tags.all().update(docket=docket_2)
+        await tag_1_user_1.docket_tags.all().aupdate(docket=docket_2)
+        await tag_1_user_2.docket_tags.all().aupdate(docket=docket_2)
         docket_tag_events = DocketTagEvent.objects.all()
-        self.assertEqual(docket_tag_events.count(), 2)
+        self.assertEqual(await docket_tag_events.acount(), 2)
 
         # Delete user account.
         self.assertTrue(
-            self.client.login(
+            await sync_to_async(self.client.login)(
                 username=user_1.user.username, password="password"
             )
         )
-        self.client.post(
+        await sync_to_async(self.client.post)(
             reverse("delete_account"),
             {"password": "password"},
             follow=True,
@@ -389,12 +431,14 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
 
         # Confirm that only history events objects related to the user deleted
         # are removed from the events table.
-        self.assertEqual(user_tags.count(), 1)
-        self.assertEqual(docket_tags.count(), 1)
-        self.assertEqual(user_tag_events.count(), 1)
-        self.assertEqual(docket_tag_events.count(), 1)
-        self.assertEqual(user_tag_events[0].name, "tag_1_user_2")
-        self.assertEqual(docket_tag_events[0].tag_id, tag_1_user_2.pk)
+        self.assertEqual(await user_tags.acount(), 1)
+        self.assertEqual(await docket_tags.acount(), 1)
+        self.assertEqual(await user_tag_events.acount(), 1)
+        self.assertEqual(await docket_tag_events.acount(), 1)
+        user_tag_events_first = await user_tag_events.afirst()
+        self.assertEqual(user_tag_events_first.name, "tag_1_user_2")
+        docket_tag_events_first = await docket_tag_events.afirst()
+        self.assertEqual(docket_tag_events_first.tag_id, tag_1_user_2.pk)
 
 
 class DisposableEmailTest(SimpleUserDataMixin, TestCase):
@@ -411,9 +455,9 @@ class DisposableEmailTest(SimpleUserDataMixin, TestCase):
     def setUp(self) -> None:
         self.client = Client()
 
-    def test_can_i_create_account_with_bad_email_address(self) -> None:
+    async def test_can_i_create_account_with_bad_email_address(self) -> None:
         """Is an error thrown if we try to use a banned email address?"""
-        r = self.client.post(
+        r = await self.async_client.post(
             reverse("register"),
             {
                 "username": "aamon",
@@ -430,12 +474,14 @@ class DisposableEmailTest(SimpleUserDataMixin, TestCase):
             r.content.decode(),
         )
 
-    def test_can_i_change_to_bad_email_address(self) -> None:
+    async def test_can_i_change_to_bad_email_address(self) -> None:
         """Is an error thrown if we try to change to a bad email address?"""
         self.assertTrue(
-            self.client.login(username="pandora", password="password")
+            await sync_to_async(self.client.login)(
+                username="pandora", password="password"
+            )
         )
-        r = self.client.post(
+        r = await sync_to_async(self.client.post)(
             reverse("view_settings"),
             {"email": self.bad_email},
             follow=True,
@@ -1146,7 +1192,7 @@ class SNSWebhookTest(TestCase):
     BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
     EMAIL_BCC_COPY_RATE=0,
 )
-class CustomBackendEmailTest(TestCase):
+class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = UserFactory()
@@ -1174,6 +1220,7 @@ class CustomBackendEmailTest(TestCase):
 
         cls.attachment_150 = test_dir / "file_sample_150kB.pdf"
         cls.attachment_500 = test_dir / "file_example_500kB.pdf"
+        cls.restart_sent_email_quota()
 
     def send_signal(self, test_asset, event_name, signal) -> None:
         """Function to dispatch signal that mocks a SNS notification event
@@ -2064,6 +2111,105 @@ class CustomBackendEmailTest(TestCase):
             stored_email[1].bcc, ["bcc@example.com", "bcc@example.com"]
         )
 
+    @override_settings(EMAIL_MAX_TEMP_COUNTER=5)
+    def test_redis_email_counter(self) -> None:
+        """Test logic to count the number of emails sent by the app"""
+        for i in range(23):
+            email = EmailMessage(
+                f"This is the subject {i}",
+                "Body goes here",
+                "testing@courtlistener.com",
+                ["bounce@simulator.amazonses.com"],
+            )
+            email.send()
+
+        r = make_redis_interface("CACHE")
+        self.assertEqual(int(r.get("email:temp_counter")), 3)
+        self.assertEqual(r.zcard("email:delivery_attempts"), 4)
+        email_counter = get_email_count(r)
+        self.assertEqual(email_counter, 23)
+
+    @override_settings(
+        EMAIL_EMERGENCY_THRESHOLD=5,
+    )
+    def test_daily_quota_emergency_brake(self) -> None:
+        """Test email daily quota emergency brake"""
+
+        # Send 5 emails independently.
+        for i in range(5):
+            email = EmailMessage(
+                f"This is the subject {i}",
+                "Body goes here",
+                "testing@courtlistener.com",
+                ["bounce@simulator.amazonses.com"],
+            )
+            email.send()
+
+        # Confirm emails went out and were stored.
+        self.assertEqual(len(mail.outbox), 5)
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 5)
+
+        r = make_redis_interface("CACHE")
+        email_counter = get_email_count(r)
+        self.assertEqual(email_counter, 5)
+
+        # Send an additional email that exceeds the quota.
+        email = EmailMessage(
+            f"This is the subject 6",
+            "Body goes here",
+            "testing@courtlistener.com",
+            ["bounce@simulator.amazonses.com"],
+        )
+        # The Emergency brake error should be triggered.
+        with self.assertRaisesMessage(ValueError, "Emergency brake engaged"):
+            email.send()
+        # No additional messsage should be stored.
+        self.assertEqual(stored_email.count(), 5)
+
+    @override_settings(
+        EMAIL_EMERGENCY_THRESHOLD=5,
+    )
+    def test_daily_quota_emergency_brake_mass_mail(self) -> None:
+        """Test email daily quota emergency brake sending mass email."""
+
+        # Send 5 emails at once.
+        messages = []
+        for i in range(5):
+            email = EmailMessage(
+                f"This is the subject {i}",
+                "Body goes here",
+                "testing@courtlistener.com",
+                ["bounce@simulator.amazonses.com"],
+            )
+            messages.append(email)
+        connection = get_connection()
+        connection.send_messages(messages)
+
+        # Confirm emails went out and were stored.
+        self.assertEqual(len(mail.outbox), 5)
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 5)
+        r = make_redis_interface("CACHE")
+        email_counter = get_email_count(r)
+        self.assertEqual(email_counter, 5)
+
+        # Send an additional email that exceeds the quota.
+        email = EmailMessage(
+            f"This is the subject 6",
+            "Body goes here",
+            "testing@courtlistener.com",
+            ["bounce@simulator.amazonses.com"],
+        )
+        # The Emergency brake error should be triggered.
+        with self.assertRaisesMessage(
+            ValueError,
+            "Emergency brake engaged to prevent email quota exhaustion",
+        ):
+            email.send()
+        # No additional messsage should be stored.
+        self.assertEqual(stored_email.count(), 5)
+
 
 class DeleteOldEmailsTest(TestCase):
     @classmethod
@@ -2100,7 +2246,7 @@ class DeleteOldEmailsTest(TestCase):
     BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
     EMAIL_BCC_COPY_RATE=0,
 )
-class RetryFailedEmailTest(TestCase):
+class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = UserFactory()
@@ -2115,6 +2261,7 @@ class RetryFailedEmailTest(TestCase):
         ):
             cls.soft_bounce_asset = json.load(soft_bounce)
             cls.soft_bounce_with_id_asset = json.load(soft_bounce_with_id)
+        cls.restart_sent_email_quota()
 
     def send_signal(self, test_asset, event_name, signal) -> None:
         """Function to dispatch signal that mocks a SNS notification event
@@ -2641,7 +2788,7 @@ class RetryFailedEmailTest(TestCase):
         )
 
 
-class EmailBrokenTest(TestCase):
+class EmailBrokenTest(ESIndexTestCase, TestCase):
     @classmethod
     def setUpTestData(cls):
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
@@ -2669,7 +2816,7 @@ class EmailBrokenTest(TestCase):
             cls.msg_large_bounce_asset = json.load(msg_large_bounce)
         cls.user = UserFactory()
 
-    def send_signal(self, test_asset, event_name, signal) -> None:
+    async def send_signal(self, test_asset, event_name, signal) -> None:
         """Function to dispatch signal that mocks a SNS notification event
         :param test_asset: the json object that contains notification
         :param event_name: the signal event name
@@ -2688,43 +2835,43 @@ class EmailBrokenTest(TestCase):
             raw_message=test_asset,
         )
         signal_kwargs[f"{event_name}_obj"] = event_obj
-        signal.send(**signal_kwargs)
+        await sync_to_async(signal.send)(**signal_kwargs)
 
-    def test_multiple_bounce_subtypes(self) -> None:
+    async def test_multiple_bounce_subtypes(self) -> None:
         """This test checks if we can assign properly the bounce subtype for
         EmailFlag objects
         """
 
         # Trigger a hard bounce notification event
-        self.send_signal(
+        await self.send_signal(
             self.no_email_hard_bounce_asset, "bounce", signals.bounce_received
         )
-        email_ban = EmailFlag.objects.filter(
+        email_ban = await EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
             flag_type=FLAG_TYPES.BAN,
-        )
+        ).afirst()
         # The bounce subtype should be NOEMAIL
         self.assertEqual(
-            email_ban[0].notification_subtype, EMAIL_NOTIFICATIONS.NO_EMAIL
+            email_ban.notification_subtype, EMAIL_NOTIFICATIONS.NO_EMAIL
         )
 
         # Trigger a soft bounce notification event
-        self.send_signal(
+        await self.send_signal(
             self.mail_box_full_soft_bounce_asset,
             "bounce",
             signals.bounce_received,
         )
-        backoff_event = EmailFlag.objects.filter(
+        backoff_event = await EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
             flag_type=FLAG_TYPES.BACKOFF,
-        )
+        ).afirst()
         # The bounce subtype should be MAILBOXFULL
         self.assertEqual(
-            backoff_event[0].notification_subtype,
+            backoff_event.notification_subtype,
             EMAIL_NOTIFICATIONS.MAILBOX_FULL,
         )
 
-    def test_broken_email_address_banner(self) -> None:
+    async def test_broken_email_address_banner(self) -> None:
         """This test checks if soft and hard bounces events properly trigger a
         broken email address banner, a Permanent broken email address banner
         overrides a previous Transient broken banner.
@@ -2732,22 +2879,24 @@ class EmailBrokenTest(TestCase):
 
         path = reverse("show_results")
         # An anonymous user should never see the broken email banner.
-        r = self.client.get(path)
+        r = await self.async_client.get(path)
         self.assertEqual(r.context.get("EMAIL_BAN_REASON"), None)
 
         user = self.user
         user.email = "bounce@simulator.amazonses.com"
         user.password = make_password("password")
-        user.save()
+        await user.asave()
         # Authenticate user
-        login = self.client.login(username=user.username, password="password")
-        r = self.client.get(path)
+        login = await sync_to_async(self.async_client.login)(
+            username=user.username, password="password"
+        )
+        r = await self.async_client.get(path)
 
         # The user's email has no problems, no banner showed
         self.assertEqual(r.context.get("EMAIL_BAN_REASON"), None)
 
         # Trigger a soft bounce notification event
-        self.send_signal(
+        await self.send_signal(
             self.mail_box_full_soft_bounce_asset,
             "bounce",
             signals.bounce_received,
@@ -2756,8 +2905,8 @@ class EmailBrokenTest(TestCase):
             email_address="bounce@simulator.amazonses.com",
             flag_type=FLAG_TYPES.BACKOFF,
         )
-        self.assertEqual(backoff_event.count(), 1)
-        r = self.client.get(path)
+        self.assertEqual(await backoff_event.acount(), 1)
+        r = await self.async_client.get(path)
 
         # A mail_box_full soft bounce event should trigger a Transient broken
         # email banner, we have a msg and no EMAIL_BAN_PERMANENT
@@ -2765,21 +2914,21 @@ class EmailBrokenTest(TestCase):
         self.assertNotEqual(r.context.get("EMAIL_BAN_REASON"), None)
 
         # Trigger a hard bounce notification event
-        self.send_signal(
+        await self.send_signal(
             self.hard_bounce_asset, "bounce", signals.bounce_received
         )
         email_ban = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
             flag_type=FLAG_TYPES.BAN,
         )
-        self.assertEqual(email_ban.count(), 1)
-        r = self.client.get(path)
+        self.assertEqual(await email_ban.acount(), 1)
+        r = await self.async_client.get(path)
         # A hard bounce event should trigger a Permanent broken
         # email banner, we have a msg and EMAIL_BAN_PERMANENT
         self.assertNotEqual(r.context.get("EMAIL_BAN_REASON"), None)
         self.assertEqual(r.context.get("EMAIL_BAN_PERMANENT"), True)
 
-    def test_broken_email_banner_complaint(self) -> None:
+    async def test_broken_email_banner_complaint(self) -> None:
         """This test checks if a complaint notification properly triggers a
         Permanent broken email banner.
         """
@@ -2788,27 +2937,29 @@ class EmailBrokenTest(TestCase):
         user = self.user
         user.email = "complaint@simulator.amazonses.com"
         user.password = make_password("password")
-        user.save()
-        login = self.client.login(username=user.username, password="password")
-        r = self.client.get(path)
+        await user.asave()
+        login = await sync_to_async(self.async_client.login)(
+            username=user.username, password="password"
+        )
+        r = await self.async_client.get(path)
         self.assertEqual(r.context.get("EMAIL_BAN_REASON"), None)
 
         # Trigger a complaint notification event
-        self.send_signal(
+        await self.send_signal(
             self.complaint_asset, "complaint", signals.complaint_received
         )
         email_ban = EmailFlag.objects.filter(
             email_address="complaint@simulator.amazonses.com",
             flag_type=FLAG_TYPES.BAN,
         )
-        self.assertEqual(email_ban.count(), 1)
-        r = self.client.get(path)
+        self.assertEqual(await email_ban.acount(), 1)
+        r = await self.async_client.get(path)
         # A complaint event should trigger a Permanent broken
         # email banner, we have a msg and EMAIL_BAN_PERMANENT
         self.assertNotEqual(r.context.get("EMAIL_BAN_REASON"), None)
         self.assertEqual(r.context.get("EMAIL_BAN_PERMANENT"), True)
 
-    def test_broken_email_address_banner_first_permanent(self) -> None:
+    async def test_broken_email_address_banner_first_permanent(self) -> None:
         """This test checks if a Permanent broken email event comes first than
         Transient broken email event, Permanent banner will be prioritized,
         also checks if users change their email address the email broken banner
@@ -2819,30 +2970,32 @@ class EmailBrokenTest(TestCase):
         user = self.user
         user.email = "bounce@simulator.amazonses.com"
         user.password = make_password("password")
-        user.save()
+        await user.asave()
         # Authenticate user
-        login = self.client.login(username=user.username, password="password")
-        r = self.client.get(path)
+        login = await sync_to_async(self.async_client.login)(
+            username=user.username, password="password"
+        )
+        r = await self.async_client.get(path)
         # The user's email has no problems, no banner showed
         self.assertEqual(r.context.get("EMAIL_BAN_REASON"), None)
 
         # Trigger a hard bounce notification event
-        self.send_signal(
+        await self.send_signal(
             self.hard_bounce_asset, "bounce", signals.bounce_received
         )
         email_ban = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
             flag_type=FLAG_TYPES.BAN,
         )
-        self.assertEqual(email_ban.count(), 1)
-        r = self.client.get(path)
+        self.assertEqual(await email_ban.acount(), 1)
+        r = await self.async_client.get(path)
         # A hard bounce event should trigger a Permanent broken
         # email banner, we have a msg and EMAIL_BAN_PERMANENT
         self.assertNotEqual(r.context.get("EMAIL_BAN_REASON"), None)
         self.assertEqual(r.context.get("EMAIL_BAN_PERMANENT"), True)
 
         # Trigger a soft bounce notification event
-        self.send_signal(
+        await self.send_signal(
             self.mail_box_full_soft_bounce_asset,
             "bounce",
             signals.bounce_received,
@@ -2851,8 +3004,8 @@ class EmailBrokenTest(TestCase):
             email_address="bounce@simulator.amazonses.com",
             flag_type=FLAG_TYPES.BACKOFF,
         )
-        self.assertEqual(backoff_event.count(), 1)
-        r = self.client.get(path)
+        self.assertEqual(await backoff_event.acount(), 1)
+        r = await self.async_client.get(path)
         # A backoff event is created but the Permanent broken email banner is
         # prioritized
         self.assertNotEqual(r.context.get("EMAIL_BAN_REASON"), None)
@@ -2861,14 +3014,16 @@ class EmailBrokenTest(TestCase):
         # Simulate user changes their email address to solve the Permanent
         # email error.
         user.email = "new@simulator.amazonses.com"
-        user.save()
-        login = self.client.login(username=user.username, password="password")
+        await user.asave()
+        login = await sync_to_async(self.async_client.login)(
+            username=user.username, password="password"
+        )
 
-        r = self.client.get(path)
+        r = await self.async_client.get(path)
         # The broken email banner is gone
         self.assertEqual(r.context.get("EMAIL_BAN_REASON"), None)
 
-    def test_broken_email_banner_backoff_expired(self) -> None:
+    async def test_broken_email_banner_backoff_expired(self) -> None:
         """This test checks if once a backoff event expires it deactivates the
         Transient broken email banner.
         """
@@ -2877,13 +3032,15 @@ class EmailBrokenTest(TestCase):
         user = self.user
         user.email = "bounce@simulator.amazonses.com"
         user.password = make_password("password")
-        user.save()
-        self.client.login(username=user.username, password="password")
-        r = self.client.get(path)
+        await user.asave()
+        await sync_to_async(self.async_client.login)(
+            username=user.username, password="password"
+        )
+        r = await self.async_client.get(path)
         self.assertEqual(r.context.get("EMAIL_BAN_REASON"), None)
 
         # Trigger a soft bounce notification event
-        self.send_signal(
+        await self.send_signal(
             self.mail_box_full_soft_bounce_asset,
             "bounce",
             signals.bounce_received,
@@ -2892,8 +3049,8 @@ class EmailBrokenTest(TestCase):
             email_address="bounce@simulator.amazonses.com",
             flag_type=FLAG_TYPES.BACKOFF,
         )
-        self.assertEqual(backoff_event.count(), 1)
-        r = self.client.get(path)
+        self.assertEqual(await backoff_event.acount(), 1)
+        r = await self.async_client.get(path)
 
         # A mail_box_full soft bounce event should trigger a Transient broken
         # email banner, we have a msg and no EMAIL_BAN_PERMANENT
@@ -2902,9 +3059,9 @@ class EmailBrokenTest(TestCase):
 
         # Update next_retry_date two hours behind to simulate backoff event is
         # expired
-        backoff_event.update(next_retry_date=now() - timedelta(hours=2))
+        await backoff_event.aupdate(next_retry_date=now() - timedelta(hours=2))
 
-        r = self.client.get(path)
+        r = await self.async_client.get(path)
         # The broken email banner is gone
         self.assertEqual(r.context.get("EMAIL_BAN_REASON"), None)
 
@@ -3019,13 +3176,13 @@ class WebhooksHTMXTests(APITestCase):
         }
         return client.post(self.webhook_path, data)
 
-    def test_make_an_webhook(self) -> None:
+    async def test_make_an_webhook(self) -> None:
         """Can we make a webhook?"""
 
         # Make a webhook
         webhooks = Webhook.objects.all()
-        response = self.make_a_webhook(self.client)
-        self.assertEqual(webhooks.count(), 1)
+        response = await sync_to_async(self.make_a_webhook)(self.client)
+        self.assertEqual(await webhooks.acount(), 1)
         self.assertEqual(response.status_code, HTTP_201_CREATED)
 
         # New or updated webhook notification for admins should go out
@@ -3033,134 +3190,150 @@ class WebhooksHTMXTests(APITestCase):
         message_sent = mail.outbox[0]
         self.assertIn("A webhook was created", message_sent.subject)
 
-    def test_make_an_http_webhook_fails(self) -> None:
+    async def test_make_an_http_webhook_fails(self) -> None:
         """Can we avoid creating an HTTP webhook endpoint?"""
 
         # Make a webhook
         webhooks = Webhook.objects.all()
-        response = self.make_a_webhook(self.client, url="http://example.com")
+        response = await sync_to_async(self.make_a_webhook)(
+            self.client, url="http://example.com"
+        )
         # No webhook should be created since we don't allow HTTP endpoints.
-        self.assertEqual(webhooks.count(), 0)
+        self.assertEqual(await webhooks.acount(), 0)
         self.assertEqual(response.status_code, HTTP_200_OK)
 
-    def test_list_users_webhooks(self) -> None:
+    async def test_list_users_webhooks(self) -> None:
         """Can we list user's own webhooks?"""
 
         # Make a webhook for user_1
-        self.make_a_webhook(self.client)
+        await sync_to_async(self.make_a_webhook)(self.client)
 
         webhook_path_list = reverse(
             "webhooks-list",
             kwargs={"format": "html"},
         )
         # Get the webhooks for user_1
-        response = self.client.get(webhook_path_list)
+        response = await sync_to_async(self.client.get)(webhook_path_list)
         self.assertEqual(response.status_code, HTTP_200_OK)
 
-    def test_delete_webhook(self) -> None:
+    async def test_delete_webhook(self) -> None:
         """Can we delete a webhook?
         Avoid users from deleting other users' webhooks.
         """
 
         # Make two webhooks for user_1
-        self.make_a_webhook(
+        await sync_to_async(self.make_a_webhook)(
             self.client, event_type=WebhookEventType.DOCKET_ALERT
         )
-        self.make_a_webhook(
+        await sync_to_async(self.make_a_webhook)(
             self.client, event_type=WebhookEventType.SEARCH_ALERT
         )
 
         webhooks = Webhook.objects.all()
-        self.assertEqual(webhooks.count(), 2)
+        self.assertEqual(await webhooks.acount(), 2)
 
+        webhooks_first = await webhooks.afirst()
         webhook_1_path_detail = reverse(
             "webhooks-detail",
-            kwargs={"pk": webhooks[0].pk, "format": "json"},
+            kwargs={"pk": webhooks_first.pk, "format": "json"},
         )
 
         # Delete the webhook for user_1
-        response = self.client.delete(webhook_1_path_detail)
+        response = await sync_to_async(self.client.delete)(
+            webhook_1_path_detail
+        )
         self.assertEqual(response.status_code, HTTP_204_NO_CONTENT)
-        self.assertEqual(webhooks.count(), 1)
+        self.assertEqual(await webhooks.acount(), 1)
 
+        webhooks_first = await webhooks.afirst()
         webhook_2_path_detail = reverse(
             "webhooks-detail",
-            kwargs={"pk": webhooks[0].pk, "format": "json"},
+            kwargs={"pk": webhooks_first.pk, "format": "json"},
         )
 
         # user_2 tries to delete a user_1 webhook, it should fail
-        response = self.client_2.delete(webhook_2_path_detail)
+        response = await sync_to_async(self.client_2.delete)(
+            webhook_2_path_detail
+        )
         self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
-        self.assertEqual(webhooks.count(), 1)
+        self.assertEqual(await webhooks.acount(), 1)
 
-    def test_webhook_detail(self) -> None:
+    async def test_webhook_detail(self) -> None:
         """Can we get the details of a webhook?
         Avoid users from getting other users' webhooks.
         """
 
         # Make one webhook for user_1
-        self.make_a_webhook(self.client)
+        await sync_to_async(self.make_a_webhook)(self.client)
         webhooks = Webhook.objects.all()
-        self.assertEqual(webhooks.count(), 1)
+        self.assertEqual(await webhooks.acount(), 1)
+        webhooks_first = await webhooks.afirst()
         webhook_1_path_detail = reverse(
             "webhooks-detail",
-            kwargs={"pk": webhooks[0].pk, "format": "html"},
+            kwargs={"pk": webhooks_first.pk, "format": "html"},
         )
 
         # Get the webhook detail for user_1
-        response = self.client.get(webhook_1_path_detail)
+        response = await sync_to_async(self.client.get)(webhook_1_path_detail)
         self.assertEqual(response.status_code, HTTP_200_OK)
 
         # user_2 tries to get user_1 webhook, it should fail
-        response = self.client_2.get(webhook_1_path_detail)
+        response = await sync_to_async(self.client_2.get)(
+            webhook_1_path_detail
+        )
         self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
 
-    def test_webhook_update(self) -> None:
+    async def test_webhook_update(self) -> None:
         """Can we update a webhook?"""
 
         # Make one webhook for user_1
-        self.make_a_webhook(self.client)
+        await sync_to_async(self.make_a_webhook)(self.client)
         webhooks = Webhook.objects.all()
-        self.assertEqual(webhooks.count(), 1)
+        self.assertEqual(await webhooks.acount(), 1)
 
         # New or updated webhook notification for admins should go out
         self.assertEqual(len(mail.outbox), 1)
         message_sent = mail.outbox[0]
         self.assertIn("A webhook was created", message_sent.subject)
 
+        webhooks_first = await webhooks.afirst()
         webhook_1_path_detail = reverse(
             "webhooks-detail",
-            kwargs={"pk": webhooks[0].pk, "format": "json"},
+            kwargs={"pk": webhooks_first.pk, "format": "json"},
         )
 
         # Update the webhook
         data_updated = {
             "url": "https://example.com/updated",
-            "event_type": webhooks[0].event_type,
-            "enabled": webhooks[0].enabled,
+            "event_type": webhooks_first.event_type,
+            "enabled": webhooks_first.enabled,
         }
-        response = self.client.put(webhook_1_path_detail, data_updated)
+        response = await sync_to_async(self.client.put)(
+            webhook_1_path_detail, data_updated
+        )
 
         # Check that the webhook was updated
         self.assertEqual(response.status_code, HTTP_200_OK)
-        self.assertEqual(webhooks[0].url, "https://example.com/updated")
+        webhooks_first = await webhooks.afirst()
+        self.assertEqual(webhooks_first.url, "https://example.com/updated")
 
         # New or updated webhook notification for admins should go out
         self.assertEqual(len(mail.outbox), 2)
         message_sent = mail.outbox[1]
         self.assertIn("A webhook was updated", message_sent.subject)
 
-    def test_send_webhook_test(self) -> None:
+    async def test_send_webhook_test(self) -> None:
         """Can we send a test webhook event?"""
 
         # Make one webhook for user_1
-        self.make_a_webhook(self.client)
+        await sync_to_async(self.make_a_webhook)(self.client)
         webhooks = Webhook.objects.all()
-        self.assertEqual(webhooks.count(), 1)
+        self.assertEqual(await webhooks.acount(), 1)
 
+        webhooks_first = await webhooks.afirst()
         webhook_1_path_test = reverse(
             "webhooks-test-webhook",
-            kwargs={"pk": webhooks[0].pk, "format": "json"},
+            kwargs={"pk": webhooks_first.pk, "format": "json"},
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -3168,14 +3341,18 @@ class WebhooksHTMXTests(APITestCase):
                 200, mock_raw=True
             ),
         ):
-            response = self.client.post(webhook_1_path_test, {})
+            response = await sync_to_async(self.client.post)(
+                webhook_1_path_test, {}
+            )
         # Compare the test webhook event data.
         self.assertEqual(response.status_code, HTTP_200_OK)
         webhook_event = WebhookEvent.objects.all().order_by("date_created")
-        self.assertEqual(webhook_event[0].status_code, HTTP_200_OK)
-        self.assertEqual(webhook_event[0].debug, True)
+        webhook_event_first = await webhook_event.afirst()
+        self.assertEqual(webhook_event_first.status_code, HTTP_200_OK)
+        self.assertEqual(webhook_event_first.debug, True)
         self.assertEqual(
-            webhook_event[0].content["payload"]["results"][0]["id"], 2208776613
+            webhook_event_first.content["payload"]["results"][0]["id"],
+            2208776613,
         )
 
         with mock.patch(
@@ -3184,29 +3361,35 @@ class WebhooksHTMXTests(APITestCase):
                 500, mock_raw=True
             ),
         ):
-            response = self.client.post(webhook_1_path_test, {})
+            response = await sync_to_async(self.client.post)(
+                webhook_1_path_test, {}
+            )
         # Compare the test webhook event data.
-        self.assertEqual(len(webhook_event), 2)
+        self.assertEqual(await webhook_event.acount(), 2)
+        webhook_event_last = await webhook_event.select_related(
+            "webhook"
+        ).alast()
         self.assertEqual(
-            webhook_event[1].status_code, HTTP_500_INTERNAL_SERVER_ERROR
+            webhook_event_last.status_code, HTTP_500_INTERNAL_SERVER_ERROR
         )
-        self.assertEqual(webhook_event[1].debug, True)
+        self.assertEqual(webhook_event_last.debug, True)
         self.assertEqual(
-            webhook_event[1].content["payload"]["results"][0]["id"], 2208776613
+            webhook_event_last.content["payload"]["results"][0]["id"],
+            2208776613,
         )
         # Webhook failure count shouldn't be increased by a webhook test event
-        self.assertEqual(webhook_event[1].webhook.failure_count, 0)
+        self.assertEqual(webhook_event_last.webhook.failure_count, 0)
 
-    def test_list_webhook_events(self) -> None:
+    async def test_list_webhook_events(self) -> None:
         """Can we list the user's webhook events?"""
 
-        da_webhook = WebhookFactory(
+        da_webhook = await sync_to_async(WebhookFactory)(
             user=self.user_2,
             event_type=WebhookEventType.DOCKET_ALERT,
             url="https://example.com/",
             enabled=True,
         )
-        WebhookEventFactory(
+        await sync_to_async(WebhookEventFactory)(
             webhook=da_webhook,
         )
 
@@ -3216,28 +3399,32 @@ class WebhooksHTMXTests(APITestCase):
         )
 
         webhooks = Webhook.objects.all()
-        self.assertEqual(webhooks.count(), 1)
+        self.assertEqual(await webhooks.acount(), 1)
 
         # Get the webhooks for user_1
-        response = self.client.get(webhook_event_path_list)
+        response = await sync_to_async(self.client.get)(
+            webhook_event_path_list
+        )
         self.assertEqual(response.status_code, HTTP_200_OK)
         # There shouldn't be results for user_1
         self.assertEqual(response.content, b"\n\n")
 
-        sa_webhook = WebhookFactory(
+        sa_webhook = await sync_to_async(WebhookFactory)(
             user=self.user_1,
             event_type=WebhookEventType.SEARCH_ALERT,
             url="https://example.com/",
             enabled=True,
         )
-        WebhookEventFactory(
+        await sync_to_async(WebhookEventFactory)(
             webhook=sa_webhook,
         )
 
-        self.assertEqual(webhooks.count(), 2)
+        self.assertEqual(await webhooks.acount(), 2)
 
         # Get the webhooks for user_1
-        response = self.client.get(webhook_event_path_list)
+        response = await sync_to_async(self.client.get)(
+            webhook_event_path_list
+        )
         self.assertEqual(response.status_code, HTTP_200_OK)
         # There should be results for user_1
         self.assertNotEqual(response.content, b"\n\n")

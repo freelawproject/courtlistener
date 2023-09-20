@@ -25,7 +25,7 @@ In general, we're looking for all kinds of help. Get in touch if you think you h
 
 ## Contributing code
 
-See the [developer guide][developing].
+See the [developer guide][developing] to get started.
 
 
 ## Copyright
@@ -62,5 +62,5 @@ https://free.law/contact/
 [hw]: https://github.com/freelawproject/courtlistener/labels/help%20wanted
 [dq]: https://github.com/freelawproject/courtlistener/labels/data-quality
 [flp]: https://free.law/
-[developing]: https://github.com/freelawproject/courtlistener/blob/main/DEVELOPING.md
+[developing]: https://github.com/freelawproject/courtlistener/wiki/Getting-Started-Developing-CourtListener
 [me]: https://github.com/freelawproject/courtlistener/commit/90db0eb433990a7fd5e8cbe5b0fffef5fbf8e4f6

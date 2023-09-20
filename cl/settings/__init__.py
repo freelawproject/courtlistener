@@ -10,6 +10,7 @@ from .project.security import *
 from .project.testing import *
 from .third_party.aws import *
 from .third_party.celery import *
+from .third_party.elasticsearch import *
 from .third_party.hcaptcha import *
 from .third_party.markdown import *
 from .third_party.moosend import *
