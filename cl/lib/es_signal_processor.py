@@ -10,7 +10,12 @@ from cl.alerts.tasks import (
     send_or_schedule_alerts,
 )
 from cl.lib.elasticsearch_utils import elasticsearch_enabled
-from cl.search.documents import AudioDocument, ParentheticalGroupDocument
+from cl.search.documents import (
+    PEOPLE_DOCS_TYPE_ID,
+    AudioDocument,
+    ParentheticalGroupDocument,
+    PositionDocument,
+)
 from cl.search.tasks import save_document_in_es, update_document_in_es
 from cl.search.types import ESDocumentType, ESModelType
 
@@ -105,8 +110,13 @@ def get_or_create_doc(
     :param instance: The instance of the document to get or create.
     :return: An Elasticsearch document if found, otherwise None.
     """
+    if es_document is PositionDocument:
+        doc_id = PEOPLE_DOCS_TYPE_ID(instance.pk).POSITION
+    else:
+        doc_id = instance.pk
+
     try:
-        main_doc = es_document.get(id=instance.pk)
+        main_doc = es_document.get(id=doc_id)
     except NotFoundError:
         save_document_in_es.delay(instance, es_document)
         return None

@@ -208,7 +208,17 @@ class Person(AbstractDateTimeModel):
         "the judge pics project.",
         default=False,
     )
-    es_p_field_tracker = FieldTracker(fields=["name_full"])
+    es_p_field_tracker = FieldTracker(
+        fields=[
+            "name_full",
+            "name_full_reverse",
+            "religion",
+            "gender",
+            "dob_city",
+            "dob_state",
+            "fjc_id",
+        ]
+    )
 
     def __str__(self) -> str:
         return f"{self.pk}: {self.name_full}"
