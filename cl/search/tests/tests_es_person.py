@@ -19,11 +19,7 @@ from cl.people_db.factories import (
     PositionFactory,
     SchoolFactory,
 )
-from cl.search.documents import (
-    PEOPLE_DOCS_TYPE_ID,
-    PersonDocument,
-    PositionDocument,
-)
+from cl.search.documents import ES_CHILD_ID, PersonDocument, PositionDocument
 from cl.search.models import SEARCH_TYPES
 from cl.tests.cases import ESIndexTestCase, TestCase
 
@@ -103,9 +99,7 @@ class PeopleSearchTestElasticSearch(
         ]
         for position_pk in position_pks:
             self.assertTrue(
-                PersonDocument.exists(
-                    id=PEOPLE_DOCS_TYPE_ID(position_pk).POSITION
-                )
+                PersonDocument.exists(id=ES_CHILD_ID(position_pk).POSITION)
             )
 
     def test_remove_parent_child_objects_from_index(self) -> None:
@@ -133,7 +127,7 @@ class PeopleSearchTestElasticSearch(
         self.assertTrue(PersonDocument.exists(id=person_pk))
         # Position instance is indexed.
         self.assertTrue(
-            PersonDocument.exists(id=PEOPLE_DOCS_TYPE_ID(pos_1_pk).POSITION)
+            PersonDocument.exists(id=ES_CHILD_ID(pos_1_pk).POSITION)
         )
 
         # Confirm documents can be updated in the ES index.
@@ -146,9 +140,7 @@ class PeopleSearchTestElasticSearch(
         person_doc = PersonDocument.get(id=person.pk)
         self.assertIn("Debbas", person_doc.name)
 
-        position_doc = PersonDocument.get(
-            id=PEOPLE_DOCS_TYPE_ID(pos_1_pk).POSITION
-        )
+        position_doc = PersonDocument.get(id=ES_CHILD_ID(pos_1_pk).POSITION)
         self.assertEqual(self.court_2.pk, position_doc.court_exact)
 
         # Delete person instance; it should be removed from the index along
@@ -159,7 +151,7 @@ class PeopleSearchTestElasticSearch(
         self.assertFalse(PersonDocument.exists(id=person_pk))
         # Position document is removed.
         self.assertFalse(
-            PersonDocument.exists(id=PEOPLE_DOCS_TYPE_ID(pos_1_pk).POSITION)
+            PersonDocument.exists(id=ES_CHILD_ID(pos_1_pk).POSITION)
         )
 
     def test_remove_nested_objects_from_index(self) -> None:
@@ -187,7 +179,7 @@ class PeopleSearchTestElasticSearch(
         self.assertTrue(PersonDocument.exists(id=person_pk))
         # Position instance is indexed.
         self.assertTrue(
-            PersonDocument.exists(id=PEOPLE_DOCS_TYPE_ID(pos_1_pk).POSITION)
+            PersonDocument.exists(id=ES_CHILD_ID(pos_1_pk).POSITION)
         )
 
         # Delete pos_1 and education, keep the parent person instance.
@@ -198,7 +190,7 @@ class PeopleSearchTestElasticSearch(
 
         # Position object is removed
         self.assertFalse(
-            PersonDocument.exists(id=PEOPLE_DOCS_TYPE_ID(pos_1_pk).POSITION)
+            PersonDocument.exists(id=ES_CHILD_ID(pos_1_pk).POSITION)
         )
         person.delete()
 
@@ -1173,9 +1165,7 @@ class PeopleSearchTestElasticSearch(
         )
 
         # Confirm initial values are properly indexed.
-        pos_doc = PositionDocument.get(
-            id=PEOPLE_DOCS_TYPE_ID(position_6.pk).POSITION
-        )
+        pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         name_full_reverse = person.name_full_reverse
         self.assertEqual(name_full_reverse, pos_doc.supervisor)
         self.assertEqual(self.person_2.name_full_reverse, pos_doc.predecessor)
@@ -1187,9 +1177,7 @@ class PeopleSearchTestElasticSearch(
         position_6.supervisor = person_2
         position_6.save()
 
-        pos_doc = PositionDocument.get(
-            id=PEOPLE_DOCS_TYPE_ID(position_6.pk).POSITION
-        )
+        pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         name_full_reverse = person_2.name_full_reverse
         self.assertEqual(name_full_reverse, pos_doc.supervisor)
 
@@ -1197,9 +1185,7 @@ class PeopleSearchTestElasticSearch(
         position_6.predecessor = person_2
         position_6.save()
 
-        pos_doc = PositionDocument.get(
-            id=PEOPLE_DOCS_TYPE_ID(position_6.pk).POSITION
-        )
+        pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         name_full_reverse = person_2.name_full_reverse
         self.assertEqual(name_full_reverse, pos_doc.predecessor)
 
@@ -1207,9 +1193,7 @@ class PeopleSearchTestElasticSearch(
         position_6.appointer = position_5_1
         position_6.save()
 
-        pos_doc = PositionDocument.get(
-            id=PEOPLE_DOCS_TYPE_ID(position_6.pk).POSITION
-        )
+        pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
 
         name_full_reverse = position_5_1.person.name_full_reverse
         self.assertEqual(name_full_reverse, pos_doc.appointer)
@@ -1218,9 +1202,7 @@ class PeopleSearchTestElasticSearch(
         person_2.name_first = "Sarah Miller"
         person_2.save()
 
-        pos_doc = PositionDocument.get(
-            id=PEOPLE_DOCS_TYPE_ID(position_6.pk).POSITION
-        )
+        pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         name_full_reverse = person_2.name_full_reverse
         self.assertEqual(name_full_reverse, pos_doc.appointer)
         self.assertEqual(name_full_reverse, pos_doc.supervisor)
@@ -1229,31 +1211,23 @@ class PeopleSearchTestElasticSearch(
         self.person_3.dob_city = "Brookyln"
         self.person_3.save()
 
-        pos_doc = PositionDocument.get(
-            id=PEOPLE_DOCS_TYPE_ID(position_6.pk).POSITION
-        )
+        pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         self.assertEqual("Brookyln", pos_doc.dob_city)
 
         self.person_3.dob_city = "Brookyln"
         self.person_3.save()
 
-        pos_doc = PositionDocument.get(
-            id=PEOPLE_DOCS_TYPE_ID(position_6.pk).POSITION
-        )
+        pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         self.assertEqual("Brookyln", pos_doc.dob_city)
 
         self.person_3.dob_state = "AL"
         self.person_3.save()
 
-        pos_doc = PositionDocument.get(
-            id=PEOPLE_DOCS_TYPE_ID(position_6.pk).POSITION
-        )
+        pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         self.assertEqual("Alabama", pos_doc.dob_state)
 
         self.person_3.gender = "m"
         self.person_3.save()
 
-        pos_doc = PositionDocument.get(
-            id=PEOPLE_DOCS_TYPE_ID(position_6.pk).POSITION
-        )
+        pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         self.assertEqual("Male", pos_doc.gender)

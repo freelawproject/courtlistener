@@ -34,7 +34,7 @@ from cl.people_db.models import Person
 from cl.recap.constants import COURT_TIMEZONES
 from cl.search.constants import ALERTS_HL_TAG
 from cl.search.documents import (
-    PEOPLE_DOCS_TYPE_ID,
+    ES_CHILD_ID,
     AudioPercolator,
     PersonDocument,
     PositionDocument,
@@ -708,7 +708,7 @@ def remove_doc_from_es_index(
     """
 
     doc_id = (
-        PEOPLE_DOCS_TYPE_ID(instance_id).POSITION
+        ES_CHILD_ID(instance_id).POSITION
         if es_document is PositionDocument
         else instance_id
     )
@@ -720,7 +720,7 @@ def remove_doc_from_es_index(
             instance = Person.objects.get(pk=instance_id)
             position_objects = instance.positions.all()
             for position in position_objects:
-                doc_id = PEOPLE_DOCS_TYPE_ID(position.pk).POSITION
+                doc_id = ES_CHILD_ID(position.pk).POSITION
                 if PositionDocument.exists(id=doc_id):
                     doc = PositionDocument.get(id=doc_id)
                     doc.delete(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)
