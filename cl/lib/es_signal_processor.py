@@ -18,10 +18,7 @@ from cl.search.documents import (
     PersonDocument,
     PositionDocument,
 )
-from cl.search.tasks import (
-    save_document_in_es,
-    update_document_in_es,
-)
+from cl.search.tasks import save_document_in_es, update_document_in_es
 from cl.search.types import ESDocumentType, ESModelType
 
 
