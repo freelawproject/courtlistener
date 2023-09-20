@@ -8,6 +8,7 @@ from typing import Mapping, Optional, TypedDict
 
 import requests
 import usaddress
+from asgiref.sync import async_to_sync
 from dateutil import parser
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
@@ -267,7 +268,7 @@ def process_docket_data(
             d.originating_court_information = og_info
         d.save()
         if data.get("docket_entries"):
-            add_docket_entries(d, data["docket_entries"])
+            async_to_sync(add_docket_entries)(d, data["docket_entries"])
     if report_type in (
         UPLOAD_TYPE.DOCKET,
         UPLOAD_TYPE.APPELLATE_DOCKET,

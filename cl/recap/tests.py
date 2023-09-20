@@ -424,7 +424,7 @@ class RecapUploadsTest(TestCase):
             court=self.court_appellate,
             pacer_case_id="104490",
         )
-        add_docket_entries(d, self.de_data["docket_entries"])
+        async_to_sync(add_docket_entries)(d, self.de_data["docket_entries"])
         pq = ProcessingQueue.objects.create(
             court=self.court_appellate,
             uploader=self.user,
@@ -494,7 +494,7 @@ class RecapUploadsTest(TestCase):
             pacer_case_id="104490",
         )
         # Merge docket entries
-        add_docket_entries(d, self.de_data["docket_entries"])
+        async_to_sync(add_docket_entries)(d, self.de_data["docket_entries"])
 
         pq = ProcessingQueue.objects.create(
             court=self.court_appellate,
@@ -527,7 +527,7 @@ class RecapUploadsTest(TestCase):
         )
 
         # Merge docket entries data again
-        add_docket_entries(d, self.de_data["docket_entries"])
+        async_to_sync(add_docket_entries)(d, self.de_data["docket_entries"])
 
         # No new main recap document should be created
         self.assertEqual(recap_documents.count(), 2)
@@ -1794,9 +1794,9 @@ class RecapMinuteEntriesTest(TestCase):
         d.save()
 
         expected_count = 1
-        add_docket_entries(d, docket["docket_entries"])
+        async_to_sync(add_docket_entries)(d, docket["docket_entries"])
         self.assertEqual(d.docket_entries.count(), expected_count)
-        add_docket_entries(d, docket["docket_entries"])
+        async_to_sync(add_docket_entries)(d, docket["docket_entries"])
         self.assertEqual(d.docket_entries.count(), expected_count)
 
     def test_dhr_merges_separate_docket_entries(self) -> None:
@@ -1834,7 +1834,7 @@ class RecapMinuteEntriesTest(TestCase):
         )
         # Add a docket entry that spans the two above. Same date, same short
         # and long description. This should trigger a merge.
-        add_docket_entries(
+        async_to_sync(add_docket_entries)(
             d,
             [
                 {
@@ -6187,7 +6187,7 @@ class CalculateRecapsSequenceNumbersTest(TestCase):
         court timezone when time is available?
         """
 
-        add_docket_entries(
+        async_to_sync(add_docket_entries)(
             self.d_nyed, self.de_datetime_desc["docket_entries"]
         )
         docket_entries_nyed = DocketEntry.objects.filter(
@@ -6202,7 +6202,9 @@ class CalculateRecapsSequenceNumbersTest(TestCase):
             )
             entry_number += 1
 
-        add_docket_entries(self.d_cand, self.de_date_asc["docket_entries"])
+        async_to_sync(add_docket_entries)(
+            self.d_cand, self.de_date_asc["docket_entries"]
+        )
         docket_entries_cand = DocketEntry.objects.filter(
             docket__court=self.cand
         ).order_by("recap_sequence_number")
@@ -6215,7 +6217,7 @@ class CalculateRecapsSequenceNumbersTest(TestCase):
             )
             entry_number += 1
 
-        add_docket_entries(
+        async_to_sync(add_docket_entries)(
             self.d_nysd, self.de_datetime_prev_differs["docket_entries"]
         )
         docket_entries_nysd = DocketEntry.objects.filter(
@@ -6633,7 +6635,7 @@ class RemoveDuplicatedMinuteEntries(TestCase):
 
         # Add initial docket entries with only long descriptions.
         data = deepcopy(docket_data)
-        add_docket_entries(self.d, data["docket_entries"])
+        async_to_sync(add_docket_entries)(self.d, data["docket_entries"])
         # 3 entries should be created.
         self.assertEqual(docket_entries.count(), 3)
 
@@ -6649,7 +6651,9 @@ class RemoveDuplicatedMinuteEntries(TestCase):
             "short_description"
         ] = "Set/Reset Deadlines"
         # Merge docket history report entries.
-        add_docket_entries(self.d, data_history["docket_entries"])
+        async_to_sync(add_docket_entries)(
+            self.d, data_history["docket_entries"]
+        )
         # Entries are properly merged without removing non duplicated entries.
         self.assertEqual(docket_entries.count(), 3)
         # Confirm entries were properly merged.
@@ -6708,7 +6712,7 @@ class RemoveDuplicatedMinuteEntries(TestCase):
 
         # Add initial docket entries.
         data = deepcopy(docket_data)
-        add_docket_entries(self.d, data["docket_entries"])
+        async_to_sync(add_docket_entries)(self.d, data["docket_entries"])
         # 4 entries should be created.
         self.assertEqual(docket_entries.count(), 4)
 
@@ -6724,7 +6728,7 @@ class RemoveDuplicatedMinuteEntries(TestCase):
         ] = "Set/Reset Deadlines: Expert Discovery due by 6/11/2021. (cf) (Entered: 10/15/2020)"
         docket_entries_history[2]["short_description"] = "Set/Reset Deadlines"
         # Merge docket history report entries.
-        add_docket_entries(self.d, docket_entries_history)
+        async_to_sync(add_docket_entries)(self.d, docket_entries_history)
         # Entries are properly merged removing the duplicated one.
         self.assertEqual(docket_entries.count(), 3)
         # Confirm entries were properly merged.
