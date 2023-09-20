@@ -193,6 +193,22 @@ def update_es_documents(
                 es_document, instance, fields_to_update, fields_map
             )
             continue
+        elif es_document is ESRECAPDocument:
+            if isinstance(instance, Docket):
+                update_child_documents_by_query.delay(
+                    es_document, instance, fields_to_update, fields_map
+                )
+                continue
+            elif isinstance(instance, (Person, BankruptcyInformation)):
+                related_dockets = Docket.objects.filter(**{query: instance})
+                for rel_docket in related_dockets:
+                    update_child_documents_by_query.delay(
+                        es_document,
+                        rel_docket,
+                        fields_to_update,
+                        fields_map,
+                    )
+                continue
 
         main_objects = main_model.objects.filter(**{query: instance})
         for main_object in main_objects:
