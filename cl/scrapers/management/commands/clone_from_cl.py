@@ -728,6 +728,7 @@ def clone_person(
     session: Session,
     people_ids: list,
     positions=False,
+    add_to_solr: bool = False,
     object_type="people_db.Person",
 ):
     """Download person data from courtlistener.com and add it to local
@@ -735,6 +736,7 @@ def clone_person(
     :param session: a Requests session
     :param people_ids: a list of person ids
     :param positions: True if we should clone person positions
+    :param add_to_solr: True if we should add objects to solr
     :param object_type: Person app name with model name
     :return: list of person objects
     """
@@ -788,6 +790,15 @@ def clone_person(
             person_data["date_dob"] = parse_date(person_data["date_dob"])
         if person_data["date_dod"]:
             person_data["date_dod"] = parse_date(person_data["date_dod"])
+        if person_data["religion"]:
+            person_data["religion"] = next(
+                (
+                    item[0]
+                    for item in model.RELIGIONS
+                    if item[1] == person_data["religion"]
+                ),
+                "",
+            )
 
         try:
             person, created = model.objects.get_or_create(**person_data)
@@ -809,10 +820,11 @@ def clone_person(
             with transaction.atomic():
                 clone_position(session, position_ids, person_id)
 
-    # Add people to search engine
-    add_items_to_solr.delay(
-        [person.pk for person in people], "people_db.Person"
-    )
+    if add_to_solr:
+        # Add people to search engine
+        add_items_to_solr.delay(
+            [person.pk for person in people], "people_db.Person"
+        )
 
     return people
 
@@ -969,12 +981,17 @@ class Command(BaseCommand):
                     self.s,
                     self.ids,
                     self.add_docket_entries,
+                    self.clone_person_positions,
                     self.add_to_solr,
                     self.type,
                 )
             case "people_db.Person":
                 clone_person(
-                    self.s, self.ids, self.clone_person_positions, self.type
+                    self.s,
+                    self.ids,
+                    self.clone_person_positions,
+                    self.add_to_solr,
+                    self.type,
                 )
             case "search.Court":
                 clone_court(self.s, self.ids, self.type)
