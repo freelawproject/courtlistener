@@ -12,6 +12,7 @@ from cl.people_db.models import (
     Person,
     PoliticalAffiliation,
     Position,
+    School,
 )
 from cl.search.documents import (
     AudioDocument,
@@ -174,6 +175,13 @@ position_field_mapping = {
                 "fjc_id": ["fjc_id"],
             },
         },
+        School: {"educations__school": {"name": ["school"]}},
+        PoliticalAffiliation: {
+            "political_affiliations": {
+                "political_party": ["political_affiliation"]
+            }
+        },
+        ABARating: {"aba_ratings": {"rating": ["aba_rating"]}},
         Position: {},
     },
     "delete": {Position: {}},

@@ -11,7 +11,13 @@ from cl.alerts.tasks import (
     send_or_schedule_alerts,
 )
 from cl.lib.elasticsearch_utils import elasticsearch_enabled
-from cl.people_db.models import Person
+from cl.people_db.models import (
+    ABARating,
+    Education,
+    Person,
+    PoliticalAffiliation,
+    School,
+)
 from cl.search.documents import (
     ES_CHILD_ID,
     AudioDocument,
@@ -186,6 +192,19 @@ def update_es_documents(
             update_child_documents_by_query.delay(
                 es_document, instance, fields_to_update, fields_map
             )
+            continue
+
+        if es_document is PositionDocument and isinstance(
+            instance, (ABARating, PoliticalAffiliation, School)
+        ):
+            related_record = Person.objects.filter(**{query: instance})
+            for person in related_record:
+                update_child_documents_by_query.delay(
+                    es_document,
+                    person,
+                    fields_to_update,
+                    fields_map,
+                )
             continue
 
         main_objects = main_model.objects.filter(**{query: instance})
