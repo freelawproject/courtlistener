@@ -1,0 +1,25 @@
+    {# Show cases this case cites #}
+        {% if total_authorities_count > 0  %}
+            <div id="authorities" class="sidebar-section">
+                <h3><span>Authorities ({{ total_authorities_count|intcomma }})</span></h3>
+                <p class="bottom">This opinion cites:</p>
+                <ul>
+                    {% for authority in top_authorities %}
+                        <li>
+                            <a href="{{ authority.url }}">
+                                {{ authority.caption|safe|truncatewords:10|v_wrapper }}
+                            </a>
+                            {% if authority.count%}
+                              <span class="small gray">({{ authority.count}}&nbsp;time{{ authority.count|pluralize }})</span>
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+                <h4>
+                    <a href="{{ view_all_authorities_url }}"
+                       class="btn btn-default">
+                        View All Authorities
+                    </a>
+                </h4>
+            </div>
+        {% endif %}

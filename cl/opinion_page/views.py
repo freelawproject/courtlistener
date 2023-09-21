@@ -1,7 +1,8 @@
 import datetime
 from collections import OrderedDict, defaultdict
+from dataclasses import dataclass
 from itertools import groupby
-from typing import Dict, Union
+from typing import Dict, List, Tuple, Union
 from urllib.parse import urlencode
 
 import eyecite
@@ -54,6 +55,7 @@ from cl.opinion_page.forms import (
     CourtUploadForm,
     DocketEntryFilterForm,
 )
+from cl.opinion_page.types import RECAPCitationViewData
 from cl.opinion_page.utils import core_docket_data, get_case_title
 from cl.people_db.models import AttorneyOrganization, CriminalCount, Role
 from cl.recap.constants import COURT_TIMEZONES
@@ -66,6 +68,62 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.search.views import do_search
+
+
+@dataclass
+class ViewAuthority:
+    caption: str
+    count: int
+    url: str
+
+    @classmethod
+    def from_cluster_authority(cls, auth: OpinionCluster, query_string: str):
+        opinion_url = f"{auth.get_absolute_url()}?{query_string}"
+        citation_count = auth.citation_depth
+        opinion_caption = auth.caption
+        return cls(
+            caption=opinion_caption, count=citation_count, url=opinion_url
+        )
+
+    @classmethod
+    def from_recap_view_data(
+        cls, data: RECAPCitationViewData, query_string: str
+    ):
+        count = data.depth
+        # caption =
+
+
+# reverse("view_case", args=[self.cluster.pk, self.cluster.slug])
+
+
+@dataclass
+class AuthoritiesContext:
+    # are we actually only counting caselaw or all?
+    # in the find func?
+    total_authorities_count: int
+    top_authorities: List[ViewAuthority]
+    view_all_url: str
+
+    @classmethod
+    def from_opinion_cluster(
+        cls, cluster: OpinionCluster, request_query_string: str
+    ):
+        top_authorities = [
+            ViewAuthority.from_cluster_authority(ca, request_query_string)
+            for ca in cluster.authorities_with_data[:5]
+        ]
+        view_all_url_base = reverse(
+            "view_authorities", args=[cluster.pk, cluster.slug]
+        )
+        return cls(
+            top_authorities=top_authorities,
+            view_all_url=f"{view_all_url_base}?{request_query_string}",
+        )
+
+    @classmethod
+    def from_recap_document(cls, cits: List[RECAPCitationViewData]):
+        total_authorities_count = len(cits)
+        # top_authorities =
 
 
 def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
@@ -479,6 +537,7 @@ def view_recap_document(
                 rd.docket_entry.docket.court_id, "US/Eastern"
             ),
             "redirect_to_pacer_modal": redirect_to_pacer_modal,
+            # "total_authorities_count":
         },
     )
 
@@ -546,6 +605,10 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     ):
         sponsored = True
 
+    authorities_context = AuthoritiesContext.from_opinion_cluster(
+        cluster, request.META["QUERY_STRING"]
+    )
+
     return TemplateResponse(
         request,
         "opinion.html",
@@ -558,8 +621,8 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
             "private": cluster.blocked,
             "citing_clusters": citing_clusters,
             "citing_cluster_count": citing_cluster_count,
-            "top_authorities": cluster.authorities_with_data[:5],
-            "authorities_count": len(cluster.authorities_with_data),
+            "top_authorities": authorities_context.top_authorities,
+            "authorities_count": authorities_context.total_authorities_count,
             "top_parenthetical_groups": parenthetical_groups,
             "summaries_count": cluster.parentheticals.count(),
             "sub_opinion_ids": sub_opinion_ids,
