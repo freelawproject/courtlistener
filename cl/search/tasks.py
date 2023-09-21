@@ -292,7 +292,7 @@ def update_child_documents_by_query(
     es_document: ESDocumentType,
     parent_instance: ESModelType,
     fields_to_update: list[str],
-    fields_map: dict[str, str],
+    fields_map: dict[str, str] | None = None,
 ) -> None:
     """Update child documents in Elasticsearch in bulk using the UpdateByQuery
     API.
@@ -322,7 +322,9 @@ def update_child_documents_by_query(
     script_lines = []
     params = {}
     for field_to_update in fields_to_update:
-        field_list = fields_map[field_to_update]
+        field_list = (
+            fields_map[field_to_update] if fields_map else [field_to_update]
+        )
         for field_name in field_list:
             script_lines.append(
                 f"ctx._source.{field_name} = params.{field_to_update};"

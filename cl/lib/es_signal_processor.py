@@ -292,6 +292,17 @@ def update_reverse_related_documents(
     the instance.
     :return: None
     """
+    # bulk update position documents when a new reverse related record is created/deleted
+    if es_document is PositionDocument and isinstance(
+        instance, (ABARating, PoliticalAffiliation, Education)
+    ):
+        related_record = Person.objects.filter(**{query_string: instance})
+        for person in related_record:
+            update_child_documents_by_query.delay(
+                es_document, person, affected_fields
+            )
+        return
+
     main_objects = main_model.objects.filter(**{query_string: instance})
     for main_object in main_objects:
         main_doc = get_or_create_doc(es_document, main_object)

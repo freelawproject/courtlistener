@@ -187,12 +187,10 @@ position_field_mapping = {
     "delete": {Position: {}},
     "m2m": {},
     "reverse": {
-        Education: {"person__educations": {"all": ["school"]}},
-        ABARating: {"person__aba_ratings": {"all": ["aba_rating"]}},
+        Education: {"educations": {"all": ["school"]}},
+        ABARating: {"aba_ratings": {"all": ["aba_rating"]}},
         PoliticalAffiliation: {
-            "person__political_affiliations": {
-                "all": ["political_affiliation"]
-            }
+            "political_affiliations": {"all": ["political_affiliation"]}
         },
     },
 }
