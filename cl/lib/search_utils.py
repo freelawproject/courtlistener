@@ -52,6 +52,7 @@ recap_boosts_qf = {
     "description": 2.0,
     "short_description": 1,
     "plain_text": 1,
+    "document_type": 1,
 }
 recap_boosts_pf = {"text": 3.0, "caseName": 3.0, "description": 3.0}
 BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {

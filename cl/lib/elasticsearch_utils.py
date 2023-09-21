@@ -566,6 +566,9 @@ def build_es_base_query(search_query: Search, cd: CleanData) -> Search:
                         "short_description",
                         "plain_text",
                         "caseName",
+                        "case_name_full",
+                        "document_type",
+                        "assignedTo",
                     ],
                 ),
             }
@@ -1230,8 +1233,7 @@ def merge_inner_hits(results: Page, search_type: str) -> None:
 
         # Iterate over each type of inner hits
         for inner_type in [
-            "text_query_inner_recap_document",
-            "filter_inner_recap_document",
+            "filter_query_inner_recap_document",
         ]:
             # Check if the type exists in inner_hits
             if inner_type not in result.meta.inner_hits:
@@ -1267,6 +1269,7 @@ def build_full_join_es_queries(
         document_number = cd.get("document_number", "")
         attachment_number = cd.get("attachment_number", "")
 
+        # use a single statement to extend
         if available_only:
             child_filters.extend(
                 build_term_query(
@@ -1288,6 +1291,7 @@ def build_full_join_es_queries(
         # Build has_child query.
         value = cd.get("q", "")
         child_fields = child_query_fields["recap_document"]
+
         child_text_query = build_fulltext_query(
             child_fields, value, only_queries=True
         )
@@ -1297,26 +1301,49 @@ def build_full_join_es_queries(
                 "bool",
                 filter=c_filters,
                 should=child_text_query,
-                minimum_should_match=1,
             )
         else:
             join_query = Q("bool", should=child_text_query)
 
-        query = Q(
-            "has_child",
-            type="recap_document",
-            score_mode="max",
-            query=join_query,
-            inner_hits={"name": f"text_query_inner_{child_type}", "size": 10},
-        )
-        q_should.append(query)
+        if child_text_query or child_filters:
+            query = Q(
+                "has_child",
+                type="recap_document",
+                score_mode="max",
+                query=join_query,
+                inner_hits={
+                    "name": f"filter_query_inner_{child_type}",
+                    "size": 10,
+                },
+            )
+            q_should.append(query)
 
     # Combine parent and child queries and filters.
     parent_filters = build_join_es_filters(cd)
     string_query = build_fulltext_query(
         parent_query_fields, cd.get("q", ""), only_queries=True
     )
-    if parent_filters:
+
+    if parent_filters and not string_query:
+        parent_filters.extend([Q("match", docket_child="docket")])
+        p_filters = reduce(operator.iand, parent_filters)
+        join_query = Q(
+            "bool",
+            filter=p_filters,
+        )
+        q_should.append(join_query)
+
+    elif not parent_filters and string_query:
+        join_query = Q(
+            "bool",
+            filter=Q("match", docket_child="docket"),
+            should=string_query,
+            minimum_should_match=1,
+        )
+        q_should.append(join_query)
+
+    elif parent_filters and string_query:
+        parent_filters.extend([Q("match", docket_child="docket")])
         p_filters = reduce(operator.iand, parent_filters)
         join_query = Q(
             "bool",
@@ -1325,15 +1352,6 @@ def build_full_join_es_queries(
             minimum_should_match=1,
         )
         q_should.append(join_query)
-    else:
-        if string_query:
-            join_query = Q(
-                "bool",
-                filter=Q("match", docket_child="docket"),
-                should=string_query,
-                minimum_should_match=1,
-            )
-            q_should.append(join_query)
 
     return Q(
         "bool",
