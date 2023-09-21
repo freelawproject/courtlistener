@@ -303,7 +303,7 @@ class AudioPercolator(AudioDocumentBase):
         return query.to_dict()["query"]
 
 
-class PEOPLE_DOCS_TYPE_ID:
+class ES_CHILD_ID:
     """Returns an ID for its use in people_db_index child documents"""
 
     def __init__(self, instance_id: int):

@@ -8,8 +8,12 @@ from celery import Task
 from django.apps import apps
 from django.conf import settings
 from django.utils.timezone import now
-from elasticsearch.exceptions import RequestError, TransportError
-from elasticsearch_dsl import Document
+from elasticsearch.exceptions import (
+    NotFoundError,
+    RequestError,
+    TransportError,
+)
+from elasticsearch_dsl import Document, UpdateByQuery, connections
 from requests import Session
 from scorched.exc import SolrError
 
@@ -19,9 +23,10 @@ from cl.lib.elasticsearch_utils import es_index_exists
 from cl.lib.search_index_utils import InvalidDocumentError
 from cl.people_db.models import Person, Position
 from cl.search.documents import (
-    PEOPLE_DOCS_TYPE_ID,
+    ES_CHILD_ID,
     AudioDocument,
     PersonDocument,
+    PositionDocument,
 )
 from cl.search.models import Docket, OpinionCluster, RECAPDocument
 from cl.search.types import (
@@ -205,16 +210,15 @@ def save_document_in_es(
             ]
         ):
             return
-
         if not PersonDocument.exists(id=parent_id):
-            # create the parent document if it does not exists in ES
+            # create the parent document if it does not exist in ES
             person_doc = PersonDocument()
             doc = person_doc.prepare(instance.person)
             PersonDocument(meta={"id": parent_id}, **doc).save(
                 skip_empty=False, return_doc_meta=True
             )
 
-        doc_id = PEOPLE_DOCS_TYPE_ID(instance.pk).POSITION
+        doc_id = ES_CHILD_ID(instance.pk).POSITION
         es_args["_routing"] = parent_id
     elif isinstance(instance, Person):
         # index person records only if they were ever a judge.
@@ -270,3 +274,75 @@ def update_document_in_es(
         **fields_values_to_update,
         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
     )
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(
+        TransportError,
+        ConnectionError,
+        RequestError,
+        NotFoundError,
+    ),
+    max_retries=3,
+    interval_start=5,
+)
+def update_child_documents_by_query(
+    self: Task,
+    es_document: ESDocumentType,
+    parent_instance: ESModelType,
+    fields_to_update: list[str],
+    fields_map: dict[str, str] | None = None,
+) -> None:
+    """Update child documents in Elasticsearch in bulk using the UpdateByQuery
+    API.
+
+    :param self: The celery task
+    :param es_document: The Elasticsearch Document type to update.
+    :param parent_instance: The parent instance containing the fields to update.
+    :param fields_to_update: List of field names to be updated.
+    :param fields_map: A mapping from model fields to Elasticsearch document fields.
+    :return: None
+    """
+
+    s = es_document.search()
+    main_doc = None
+    if es_document is PositionDocument:
+        s = s.query("parent_id", type="position", id=parent_instance.pk)
+        main_doc = PersonDocument.get(id=parent_instance.pk)
+
+    if not main_doc:
+        # Abort bulk update for a not supported document.
+        return
+    client = connections.get_connection()
+    ubq = UpdateByQuery(using=client, index=es_document._index._name).query(
+        s.to_dict()["query"]
+    )
+
+    script_lines = []
+    params = {}
+    for field_to_update in fields_to_update:
+        field_list = (
+            fields_map[field_to_update] if fields_map else [field_to_update]
+        )
+        for field_name in field_list:
+            script_lines.append(
+                f"ctx._source.{field_name} = params.{field_to_update};"
+            )
+
+            prepare_method = getattr(main_doc, f"prepare_{field_name}", None)
+            if prepare_method:
+                params[field_to_update] = prepare_method(parent_instance)
+            else:
+                params[field_to_update] = getattr(
+                    parent_instance, field_to_update
+                )
+
+    script_source = "\n".join(script_lines)
+    # Build the UpdateByQuery script and execute it
+    ubq = ubq.script(source=script_source, params=params)
+    ubq.execute()
+
+    if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
+        # Set auto-refresh, used for testing.
+        es_document._index.refresh()

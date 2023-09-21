@@ -426,6 +426,7 @@ class School(AbstractDateTimeModel):
         blank=True,
         db_index=True,
     )
+    es_p_field_tracker = FieldTracker(fields=["name"])
 
     def __str__(self) -> str:
         if self.is_alias_of:
@@ -1306,6 +1307,7 @@ class PoliticalAffiliation(AbstractDateTimeModel):
         max_length=15,
         blank=True,
     )
+    es_p_field_tracker = FieldTracker(fields=["political_party"])
 
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -1368,6 +1370,7 @@ class ABARating(AbstractDateTimeModel):
         choices=ABA_RATINGS,
         max_length=5,
     )
+    es_p_field_tracker = FieldTracker(fields=["rating"])
 
     class Meta:
         verbose_name = "American Bar Association Rating"
