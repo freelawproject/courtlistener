@@ -65,7 +65,7 @@ def updated_fields(
             if (
                 field_type.get_internal_type() == "ForeignKey"
                 and current_value
-                and "_id" not in field
+                and not field.endswith("_id")
             ):
                 current_value = current_value.pk
         except FieldDoesNotExist:
@@ -183,46 +183,48 @@ def update_es_documents(
 
     for query, fields_map in mapping_fields.items():
         fields_to_update = get_fields_to_update(changed_fields, fields_map)
-
-        if (
-            es_document is PositionDocument
-            and isinstance(instance, Person)
-            and query == "person"
-        ):
-            update_child_documents_by_query.delay(
-                es_document, instance, fields_to_update, fields_map
-            )
-            continue
-
-        if es_document is PositionDocument and isinstance(
-            instance, (ABARating, PoliticalAffiliation, School)
-        ):
-            related_record = Person.objects.filter(**{query: instance})
-            for person in related_record:
+        match instance:
+            case Person() if es_document is PositionDocument and query == "person":  # type: ignore
+                """
+                This case handles the update of one or more fields that belongs to
+                the parent model(The person model).
+                """
                 update_child_documents_by_query.delay(
-                    es_document,
-                    person,
-                    fields_to_update,
-                    fields_map,
+                    es_document, instance, fields_to_update, fields_map
                 )
-            continue
+            case ABARating() | PoliticalAffiliation() | School() if es_document is PositionDocument:  # type: ignore
+                """
+                This code handles the update of fields that belongs to records associated with
+                the parent document using ForeignKeys.
 
-        main_objects = main_model.objects.filter(**{query: instance})
-        for main_object in main_objects:
-            main_doc = get_or_create_doc(es_document, main_object)
-            if not main_doc:
-                continue
-            if fields_to_update:
-                update_document_in_es.delay(
-                    main_doc,
-                    document_fields_to_update(
-                        main_doc,
-                        main_object,
+                First, we get the list of all the Person objects related to the instance object
+                and then we use the update_child_documents_by_query method to update their positions.
+                """
+                related_record = Person.objects.filter(**{query: instance})
+                for person in related_record:
+                    update_child_documents_by_query.delay(
+                        es_document,
+                        person,
                         fields_to_update,
-                        instance,
                         fields_map,
-                    ),
-                )
+                    )
+            case _:
+                main_objects = main_model.objects.filter(**{query: instance})
+                for main_object in main_objects:
+                    main_doc = get_or_create_doc(es_document, main_object)
+                    if not main_doc:
+                        continue
+                    if fields_to_update:
+                        update_document_in_es.delay(
+                            main_doc,
+                            document_fields_to_update(
+                                main_doc,
+                                main_object,
+                                fields_to_update,
+                                instance,
+                                fields_map,
+                            ),
+                        )
 
 
 def update_remove_m2m_documents(
