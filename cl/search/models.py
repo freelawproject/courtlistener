@@ -670,6 +670,15 @@ class Docket(AbstractDateTimeModel):
         default=False,
     )
     es_pa_field_tracker = FieldTracker(fields=["docket_number", "court_id"])
+    es_oa_field_tracker = FieldTracker(
+        fields=[
+            "date_argued",
+            "date_reargued",
+            "date_reargument_denied",
+            "docket_number",
+            "slug",
+        ]
+    )
 
     class Meta:
         unique_together = ("docket_number", "pacer_case_id", "court")
@@ -936,8 +945,12 @@ class Docket(AbstractDateTimeModel):
         )
 
         # Parties, attorneys, firms
-        if self.pk != 6245245:
-            # Don't do parties for the J&J talcum powder case. It's too big.
+        if self.pk not in [
+            # Block mega cases that are too big
+            6245245,  # J&J Talcum Powder
+            4538381,  # Ethicon, Inc. Pelvic Repair System
+            4715020,  # Katrina Canal Breaches Litigation
+        ]:
             out.update(
                 {
                     "party_id": set(),
@@ -1554,9 +1567,13 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             }
         )
 
-        if docket.pk == 6245245:
-            # Skip the parties for the J&J talcum powder case, it's just too
-            # big to pull from the DB. Sorry folks.
+        if docket.pk in [
+            6245245,  # J&J Talcum Powder
+            4538381,  # Ethicon, Inc. Pelvic Repair System
+            4715020,  # Katrina Canal Breaches Litigation
+        ]:
+            # Skip the parties for mega cases that are too big to
+            # pull from the DB. Sorry folks.
             return out
 
         for p in docket.prefetched_parties:

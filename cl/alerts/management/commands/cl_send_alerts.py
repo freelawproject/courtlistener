@@ -2,6 +2,7 @@ import datetime
 import traceback
 import warnings
 
+import waffle
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives
@@ -11,6 +12,7 @@ from django.template import loader
 from django.utils.timezone import now
 
 from cl.alerts.models import Alert, RealTimeQueue
+from cl.alerts.utils import InvalidDateError, user_has_donated_enough
 from cl.api.models import WebhookEventType
 from cl.api.webhooks import send_search_alert_webhook
 from cl.lib import search_utils
@@ -24,10 +26,6 @@ from cl.stats.utils import tally_stat
 # Only do this number of RT items at a time. If there are more, they will be
 # handled in the next run of this script.
 MAX_RT_ITEM_QUERY = 1000
-
-
-class InvalidDateError(Exception):
-    pass
 
 
 def get_cut_off_date(rate, d=datetime.date.today()):
@@ -137,6 +135,11 @@ class Command(VerboseCommand):
             qd["filed_after"] = cut_off_date
         elif query_type == SEARCH_TYPES.ORAL_ARGUMENT:
             qd["argued_after"] = cut_off_date
+            if waffle.switch_is_active("oa-es-alerts-active"):
+                # Return empty results for OA alerts. They are now handled
+                # by Elasticsearch.
+                return query_type, results
+
         logger.info(f"Data sent to SearchForm is: {qd}\n")
         search_form = SearchForm(qd)
         if search_form.is_valid():
@@ -196,16 +199,12 @@ class Command(VerboseCommand):
             alerts = user.alerts.filter(rate=rate)
             logger.info(f"Running alerts for user '{user}': {alerts}")
 
-            not_donated_enough = (
-                user.profile.total_donated_last_year
-                < settings.MIN_DONATION["rt_alerts"]
-            )
-            if not_donated_enough and rate == Alert.REAL_TIME:
-                logger.info(
-                    "User: %s has not donated enough for their %s "
-                    "RT alerts to be sent.\n" % (user, alerts.count())
+            if rate == Alert.REAL_TIME:
+                user_donated_enough = user_has_donated_enough(
+                    user, alerts.count()
                 )
-                continue
+                if not user_donated_enough:
+                    continue
 
             hits = []
             for alert in alerts:

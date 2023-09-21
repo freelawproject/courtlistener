@@ -5,7 +5,7 @@ import shutil
 from unittest import mock
 from unittest.mock import MagicMock
 
-from asgiref.sync import sync_to_async
+from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -104,7 +104,9 @@ class DocumentPageRedirection(TestCase):
                 )
             ],
         )
-        add_docket_entries(cls.docket, cls.de_data["docket_entries"])
+        async_to_sync(add_docket_entries)(
+            cls.docket, cls.de_data["docket_entries"]
+        )
 
         cls.att_data = AppellateAttachmentPageFactory(
             attachments=[

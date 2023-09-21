@@ -1,5 +1,12 @@
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+from cl.audio.models import Audio
+from cl.citations.tasks import (
+    find_citations_and_parantheticals_for_recap_documents,
+)
 from cl.lib.es_signal_processor import ESSignalProcessor
-from cl.search.documents import ParentheticalGroupDocument
+from cl.search.documents import AudioDocument, ParentheticalGroupDocument
 from cl.search.models import (
     Citation,
     Docket,
@@ -8,6 +15,7 @@ from cl.search.models import (
     OpinionsCited,
     Parenthetical,
     ParentheticalGroup,
+    RECAPDocument,
 )
 
 # This field mapping is used to define which fields should be updated in the
@@ -31,37 +39,39 @@ pa_field_mapping = {
     "save": {
         Docket: {
             "opinion__cluster__docket": {
-                "docket_number": "docketNumber",
-                "court_id": "court_id",
+                "docket_number": ["docketNumber"],
+                "court_id": ["court_id"],
             }
         },
         Opinion: {
             "opinion": {
-                "author_id": "author_id",
-                "cluster_id": "cluster_id",
-                "extracted_by_ocr": "opinion_extracted_by_ocr",
+                "author_id": ["author_id"],
+                "cluster_id": ["cluster_id"],
+                "extracted_by_ocr": ["opinion_extracted_by_ocr"],
             },
         },
         OpinionCluster: {
             "representative__describing_opinion__cluster": {
-                "slug": "describing_opinion_cluster_slug",
+                "slug": ["describing_opinion_cluster_slug"],
             },
             "opinion__cluster": {
-                "case_name": "caseName",
-                "citation_count": "citeCount",
-                "date_filed": "dateFiled",
-                "slug": "opinion_cluster_slug",
-                "docket_id": "docket_id",
-                "judges": "judge",
-                "nature_of_suit": "suitNature",
-                "get_precedential_status_display": "status",  # On fields where
+                "case_name": ["caseName"],
+                "citation_count": ["citeCount"],
+                "date_filed": ["dateFiled"],
+                "slug": ["opinion_cluster_slug"],
+                "docket_id": ["docket_id"],
+                "judges": ["judge"],
+                "nature_of_suit": ["suitNature"],
+                "get_precedential_status_display": [
+                    "status"
+                ],  # On fields where
                 # indexed values needs to be the display() value, use get_{field_name}_display as key.
             },
         },
         Parenthetical: {
             "representative": {
-                "score": "representative_score",
-                "text": "representative_text",
+                "score": ["representative_score"],
+                "text": ["representative_text"],
             },
         },
         ParentheticalGroup: {},  # For the main model, a field mapping is not
@@ -92,6 +102,28 @@ pa_field_mapping = {
     },
 }
 
+oa_field_mapping = {
+    "save": {
+        Docket: {
+            "docket": {
+                "date_argued": ["dateArgued", "dateArgued_text"],
+                "date_reargued": ["dateReargued", "dateReargued_text"],
+                "date_reargument_denied": [
+                    "dateReargumentDenied",
+                    "dateReargumentDenied_text",
+                ],
+                "docket_number": ["docketNumber"],
+                "slug": ["docket_slug"],
+            }
+        },
+        Audio: {},
+    },
+    "delete": {Audio: {}},
+    "m2m": {Audio.panel.through: {"audio": {"panel_ids": "panel_ids"}}},
+    "reverse": {},
+}
+
+
 # Instantiate a new ESSignalProcessor() for each Model/Document that needs to
 # be tracked. The arguments are: main model, ES document mapping, and field mapping dict.
 _pa_signal_processor = ESSignalProcessor(
@@ -99,3 +131,37 @@ _pa_signal_processor = ESSignalProcessor(
     ParentheticalGroupDocument,
     pa_field_mapping,
 )
+
+_oa_signal_processor = ESSignalProcessor(
+    Audio,
+    AudioDocument,
+    oa_field_mapping,
+)
+
+
+@receiver(
+    post_save,
+    sender=RECAPDocument,
+    dispatch_uid="handle_recap_doc_change_uid",
+)
+def handle_recap_doc_change(
+    sender, instance: RECAPDocument, update_fields=None, **kwargs
+):
+    """
+    Right now, this receiver exists to enqueue the task to parse RECAPDocuments for caselaw citations.
+    More functionality can be put here later. There may be things currently in the save function
+    of RECAPDocument that would be better placed here for reasons of maintainability and testability.
+    """
+
+    # Whenever pdf text is processed, it will update the plain_text field.
+    # When we get updated text for a doc, we want to parse it for citations.
+    if update_fields is not None and "plain_text" in update_fields:
+        # Even though the task itself filters for qualifying ocr_status,
+        # we don't want to clog the TQ with unncessary items.
+        if instance.ocr_status in (
+            RECAPDocument.OCR_COMPLETE,
+            RECAPDocument.OCR_UNNECESSARY,
+        ):
+            find_citations_and_parantheticals_for_recap_documents.apply_async(
+                args=([instance.pk],)
+            )

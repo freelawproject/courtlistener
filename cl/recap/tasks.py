@@ -108,17 +108,17 @@ async def process_recap_upload(pq: ProcessingQueue) -> None:
     """
     if pq.upload_type == UPLOAD_TYPE.DOCKET:
         docket = await process_recap_docket(pq.pk)
-        await sync_to_async(add_or_update_recap_docket)(docket)
+        await sync_to_async(add_or_update_recap_docket.delay)(docket)
     elif pq.upload_type == UPLOAD_TYPE.ATTACHMENT_PAGE:
         await process_recap_attachment(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.PDF:
         await process_recap_pdf(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.DOCKET_HISTORY_REPORT:
         docket = await process_recap_docket_history_report(pq.pk)
-        await sync_to_async(add_or_update_recap_docket)(docket)
+        await sync_to_async(add_or_update_recap_docket.delay)(docket)
     elif pq.upload_type == UPLOAD_TYPE.APPELLATE_DOCKET:
         docket = await process_recap_appellate_docket(pq.pk)
-        await sync_to_async(add_or_update_recap_docket)(docket)
+        await sync_to_async(add_or_update_recap_docket.delay)(docket)
     elif pq.upload_type == UPLOAD_TYPE.APPELLATE_ATTACHMENT_PAGE:
         await process_recap_appellate_attachment(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.CLAIMS_REGISTER:
@@ -127,7 +127,7 @@ async def process_recap_upload(pq: ProcessingQueue) -> None:
         await process_recap_zip(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.CASE_QUERY_PAGE:
         docket = await process_case_query_page(pq.pk)
-        await sync_to_async(add_or_update_recap_docket)(docket)
+        await sync_to_async(add_or_update_recap_docket.delay)(docket)
     elif pq.upload_type == UPLOAD_TYPE.APPELLATE_CASE_QUERY_PAGE:
         await sync_to_async(process_recap_appellate_case_query_page)(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.CASE_QUERY_RESULT_PAGE:
@@ -559,9 +559,9 @@ async def process_recap_docket(pk):
         ContentFile(text.encode()),
     )
 
-    des_returned, rds_created, content_updated = await sync_to_async(
-        add_docket_entries
-    )(d, data["docket_entries"])
+    des_returned, rds_created, content_updated = await add_docket_entries(
+        d, data["docket_entries"]
+    )
     await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
     await sync_to_async(process_orphan_documents)(
         rds_created, pq.court_id, d.date_filed
@@ -569,7 +569,7 @@ async def process_recap_docket(pk):
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
-            await sync_to_async(send_alert_and_webhook)(d.pk, start_time)
+            await sync_to_async(send_alert_and_webhook.delay)(d.pk, start_time)
     await mark_pq_successful(pq, d_id=d.pk)
     return {
         "docket_pk": d.pk,
@@ -842,16 +842,16 @@ async def process_recap_docket_history_report(pk):
         ContentFile(text.encode()),
     )
 
-    des_returned, rds_created, content_updated = await sync_to_async(
-        add_docket_entries
-    )(d, data["docket_entries"])
+    des_returned, rds_created, content_updated = await add_docket_entries(
+        d, data["docket_entries"]
+    )
     await sync_to_async(process_orphan_documents)(
         rds_created, pq.court_id, d.date_filed
     )
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
-            await sync_to_async(send_alert_and_webhook)(d.pk, start_time)
+            await sync_to_async(send_alert_and_webhook.delay)(d.pk, start_time)
     await mark_pq_successful(pq, d_id=d.pk)
     return {
         "docket_pk": d.pk,
@@ -1047,9 +1047,9 @@ async def process_recap_appellate_docket(pk):
         ContentFile(text.encode()),
     )
 
-    des_returned, rds_created, content_updated = await sync_to_async(
-        add_docket_entries
-    )(d, data["docket_entries"])
+    des_returned, rds_created, content_updated = await add_docket_entries(
+        d, data["docket_entries"]
+    )
     await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
     await sync_to_async(process_orphan_documents)(
         rds_created, pq.court_id, d.date_filed
@@ -1057,7 +1057,7 @@ async def process_recap_appellate_docket(pk):
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
-            await sync_to_async(send_alert_and_webhook)(d.pk, start_time)
+            await sync_to_async(send_alert_and_webhook.delay)(d.pk, start_time)
     await mark_pq_successful(pq, d_id=d.pk)
     return {
         "docket_pk": d.pk,
@@ -2275,9 +2275,9 @@ def process_recap_email(
                 ContentFile(body.encode()),
             )
             # Add docket entries for each docket
-            des_returned, rds_created, content_updated = add_docket_entries(
-                docket, docket_data["docket_entries"]
-            )
+            des_returned, rds_created, content_updated = async_to_sync(
+                add_docket_entries
+            )(docket, docket_data["docket_entries"])
             d_updated = DocketUpdatedData(
                 docket=docket,
                 des_returned=des_returned,
