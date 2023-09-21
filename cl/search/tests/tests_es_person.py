@@ -1212,6 +1212,13 @@ class PeopleSearchTestElasticSearch(
 
         # The following changes should update the child document.
         # Update dob_city field in the parent record.
+        self.person_3.name_first = "William"
+        self.person_3.save()
+        name_full = self.person_3.name_full
+
+        pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
+        self.assertEqual(name_full, pos_doc.name)
+
         self.person_3.dob_city = "Brookyln"
         self.person_3.save()
 
@@ -1246,7 +1253,7 @@ class PeopleSearchTestElasticSearch(
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         self.assertEqual("39", pos_doc.fjc_id)
 
-        # Update education for the parent object
+        # Add education to the parent object
         EducationFactory(
             degree_level="ba",
             person=self.person_3,
@@ -1257,7 +1264,14 @@ class PeopleSearchTestElasticSearch(
         for education in self.person_3.educations.all():
             self.assertIn(education.school.name, pos_doc.school)
 
-        # Update political affiliation for the parent object
+        # Update existing education record in the parent object
+        self.school_1.name = "New school updated"
+        self.school_1.save()
+
+        pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
+        self.assertIn("New school updated", pos_doc.school)
+
+        # Add political affiliation to the parent object
         PoliticalAffiliationFactory(
             political_party="d",
             source="b",
@@ -1273,8 +1287,15 @@ class PeopleSearchTestElasticSearch(
                 pos_doc.political_affiliation,
             )
 
-        # Update aba_rating for the parent object
-        ABARatingFactory(
+        # Update existing political affiliation in the parent document
+        self.political_affiliation_3.political_party = "f"
+        self.political_affiliation_3.save()
+
+        pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
+        self.assertIn("Federalist", pos_doc.political_affiliation)
+
+        # Add aba_rating to the parent object
+        rating = ABARatingFactory(
             rating="nq",
             person=self.person_3,
             year_rated="2015",
@@ -1282,3 +1303,9 @@ class PeopleSearchTestElasticSearch(
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         for r in self.person_3.aba_ratings.all():
             self.assertIn(r.get_rating_display(), pos_doc.aba_rating)
+
+        # Update existing rating in the parent object
+        rating.rating = "ewq"
+        rating.save()
+        pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
+        self.assertIn("Exceptionally Well Qualified", pos_doc.aba_rating)

@@ -8,7 +8,11 @@ from celery import Task
 from django.apps import apps
 from django.conf import settings
 from django.utils.timezone import now
-from elasticsearch.exceptions import RequestError, TransportError
+from elasticsearch.exceptions import (
+    NotFoundError,
+    RequestError,
+    TransportError,
+)
 from elasticsearch_dsl import Document, UpdateByQuery, connections
 from requests import Session
 from scorched.exc import SolrError
@@ -295,7 +299,12 @@ def update_document_in_es(
 
 @app.task(
     bind=True,
-    autoretry_for=(TransportError, ConnectionError, RequestError),
+    autoretry_for=(
+        TransportError,
+        ConnectionError,
+        RequestError,
+        NotFoundError,
+    ),
     max_retries=3,
     interval_start=5,
 )
@@ -304,7 +313,7 @@ def update_child_documents_by_query(
     es_document: ESDocumentType,
     parent_instance: ESModelType,
     fields_to_update: list[str],
-    fields_map: dict[str, str],
+    fields_map: dict[str, str] | None = None,
 ) -> None:
     """Update child documents in Elasticsearch in bulk using the UpdateByQuery
     API.
@@ -329,6 +338,9 @@ def update_child_documents_by_query(
     if not main_doc:
         return
 
+    if not main_doc:
+        # Abort bulk update for a not supported document.
+        return
     client = connections.get_connection()
     ubq = UpdateByQuery(using=client, index=es_document._index._name).query(
         s.to_dict()["query"]
@@ -337,7 +349,9 @@ def update_child_documents_by_query(
     script_lines = []
     params = {}
     for field_to_update in fields_to_update:
-        field_list = fields_map[field_to_update]
+        field_list = (
+            fields_map[field_to_update] if fields_map else [field_to_update]
+        )
         for field_name in field_list:
             script_lines.append(
                 f"ctx._source.{field_name} = params.{field_to_update};"
