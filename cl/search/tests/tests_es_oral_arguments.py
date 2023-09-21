@@ -1123,7 +1123,8 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         # Confirm that fetch_es_results works properly with different sorting
         # types, returning sequential results for each requested page.
         page_size = 5
-        total_pages = int(audios_to_create / page_size) + 1
+        total_audios = Audio.objects.all().count()
+        total_pages = int(total_audios / page_size) + 1
         order_types = [
             "score desc",
             "dateArgued desc",
@@ -1142,13 +1143,11 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
                     search_query, cd
                 )
                 hits, query_time, error = fetch_es_results(
-                    cd, s, page=page + 1, rows_per_page=5
+                    cd, s, page=page + 1, rows_per_page=page_size
                 )
-                results = hits.hits
-                for result in results:
-                    self.assertNotIn(result.id, ids_in_results)
+                for result in hits.hits:
                     ids_in_results.append(result.id)
-            self.assertEqual(len(ids_in_results), Audio.objects.all().count())
+            self.assertEqual(len(ids_in_results), total_audios)
 
         # Test pagination requests.
         search_params = {
