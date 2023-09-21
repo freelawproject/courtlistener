@@ -1,5 +1,5 @@
 from http.client import ResponseNotReady
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Set, Tuple, Union
 
 from django.db import transaction
 from django.db.models import F
@@ -21,6 +21,7 @@ from cl.citations.match_citations import (
     do_resolve_citations,
 )
 from cl.citations.parenthetical_utils import create_parenthetical_groups
+from cl.citations.recap_citations import store_recap_citations
 from cl.citations.score_parentheticals import parenthetical_score
 from cl.lib.types import MatchedResourceType, SupportedCitationType
 from cl.opinion_page.types import RECAPCitationViewData
@@ -252,69 +253,3 @@ def store_opinion_citations_and_update_parentheticals(
 
         # Save all the changes to the citing opinion (send to solr later)
         opinion.save(index=False)
-
-
-def store_recap_citations(document: RECAPDocument) -> None:
-    """
-    Identify citations from federal filings to opinions.
-
-    :param document: A search.RECAPDocument object.
-
-    :return: None
-    """
-
-    get_and_clean_opinion_text(
-        document
-    )  # even though this function assumes the input is an opinion, it will work for RECAP documents.
-
-    # Extract the citations from the document's text
-    citations: List[CitationBase] = get_citations(document.cleaned_text)
-
-    # If no citations are found, then there is nothing else to do for now.
-    if not citations:
-        return
-
-    # Resolve all those different citation objects to Opinion objects,
-    # using a variety of heuristics.
-    citation_resolutions: Dict[
-        MatchedResourceType, List[SupportedCitationType]
-    ] = do_resolve_citations(citations, document)
-
-    # Delete the unmatched citations
-    citation_resolutions.pop(NO_MATCH_RESOURCE, None)
-
-    with transaction.atomic():
-        # delete existing citation entries
-        OpinionsCitedByRECAPDocument.objects.filter(
-            citing_document=document.pk
-        ).delete()
-
-        objects_to_create = [
-            OpinionsCitedByRECAPDocument(
-                citing_document_id=document.pk,
-                cited_opinion_id=opinion_object.pk,
-                depth=len(cits),
-            )
-            for opinion_object, cits in citation_resolutions.items()
-        ]
-
-        OpinionsCitedByRECAPDocument.objects.bulk_create(objects_to_create)
-
-
-def get_citations_from(
-    recap_doc_id: int, top_k: int = None
-) -> List[RECAPCitationViewData]:
-    """
-    This method retrieves the caselaw citations within a given RECAPDocument
-    along with related info that is needed for display on front-end.
-    If top_k is provided -> returns the k most-cited opinions.
-    """
-
-    query = OpinionsCitedByRECAPDocument.objects.filter(
-        citing_document_id=recap_doc_id
-    ).select_related("cited_opinion__cluster")
-
-    if top_k is not None:
-        query = query.order_by("-depth")[:top_k]
-
-    return [RECAPCitationViewData(**result) for result in query.all()]
