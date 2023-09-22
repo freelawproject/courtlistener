@@ -89,12 +89,12 @@ class PodcastTest(ESIndexTestCase, TestCase):
 
         # Confirm items are ordered by dateArgued desc
         pub_date_format = "%a, %d %b %Y %H:%M:%S %z"
-        first_item_pub_date_str = xml_tree.xpath("//channel/item[1]/pubDate")[
-            0
-        ].text
-        second_item_pub_date_str = xml_tree.xpath("//channel/item[2]/pubDate")[
-            0
-        ].text
+        first_item_pub_date_str = str(
+            xml_tree.xpath("//channel/item[1]/pubDate")[0].text  # type: ignore
+        )
+        second_item_pub_date_str = str(
+            xml_tree.xpath("//channel/item[2]/pubDate")[0].text  # type: ignore
+        )
         first_item_pub_date_dt = datetime.datetime.strptime(
             first_item_pub_date_str, pub_date_format
         )
