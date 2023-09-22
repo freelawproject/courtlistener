@@ -8,7 +8,7 @@ import pgtrigger.migrations
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("search", "0018_update_cluster_model"),
+        ("search", "0019_add_docket_source_noop"),
     ]
 
     operations = [
