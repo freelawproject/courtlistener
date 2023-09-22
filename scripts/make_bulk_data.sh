@@ -59,6 +59,23 @@ PGPASSWORD=$DB_PASSWORD psql \
 	bzip2 | \
 	aws s3 cp - s3://com-courtlistener-storage/bulk-data/dockets-`date -I`.csv.bz2 --acl public-read
 
+echo "Streaming search_originatingcourtinformation to S3"
+PGPASSWORD=$DB_PASSWORD psql \
+	--command \
+	  'set statement_timeout to 0;
+	   COPY search_originatingcourtinformation (
+	       id, date_created, date_modified, docket_number, assigned_to_str,
+	       ordering_judge_str, court_reporter, date_disposed, date_filed, date_judgment,
+	       date_judgment_eod, date_filed_noa, date_received_coa, assigned_to_id,
+	       ordering_judge_id
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
+	--quiet \
+	--host $DB_HOST \
+	--username $DB_USER \
+	--dbname courtlistener | \
+	bzip2 | \
+	aws s3 cp - s3://com-courtlistener-storage/bulk-data/originating-court-information-`date -I`.csv.bz2 --acl public-read
+
 echo "Streaming recap_fjcintegrateddatabase to S3"
 PGPASSWORD=$DB_PASSWORD psql \
 	--command \
