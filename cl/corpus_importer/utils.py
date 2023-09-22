@@ -1,8 +1,10 @@
 from datetime import date
-from typing import Optional
+from typing import Any, Optional
 
+import bs4
 from django.utils.timezone import now
 
+from cl.lib.string_diff import get_cosine_similarity
 from cl.search.models import Docket
 
 
@@ -42,3 +44,97 @@ def get_start_of_quarter(d: Optional[date] = None) -> date:
         date(d_year, 10, 1),
     ]
     return max([q for q in quarter_dates if q <= d])
+
+
+def similarity_scores(
+    texts_to_compare_1: list[str], texts_to_compare_2: list[str]
+) -> list[list[float]]:
+    """Get similarity scores between two sets of lists
+
+    Using TF-IDF/Term Frequency-Inverse Document Frequency
+    we use word frequency to generate a similarity score between the corpora
+
+    :param texts_to_compare_1: List of text to compare
+    :param texts_to_compare_2: List of text to compare
+    :return: Return similarity scores
+    """
+
+    # We import the library inside the function to avoid loading it if it is
+    # not required
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.metrics.pairwise import cosine_similarity
+
+    # Weights the word counts by a measure of how often they appear in the
+    # documents, and it returns a sparse matrix
+    X = TfidfVectorizer().fit_transform(
+        texts_to_compare_1 + texts_to_compare_2
+    )
+
+    # Calculate cosine similarity between weight of words for each text in list
+    scores = cosine_similarity(
+        X[: len(texts_to_compare_1)], X[len(texts_to_compare_1) :]
+    )
+    return scores
+
+
+def match_lists(
+    harvard_opinions_list: list[bs4.element.Tag], cl_opinions_list: list[str]
+) -> dict[int, Any]:
+    """Generate matching lists above threshold
+
+    :param harvard_opinions_list: Harvard Opinions
+    :param cl_opinions_list: CL opinions
+    :return: Matches if found or False
+    """
+    # We import this here to avoid a circular import
+    from cl.corpus_importer.management.commands.harvard_opinions import (
+        compare_documents,
+    )
+
+    # Convert harvard HTML to Text to compare
+    harvard_opinions_list = [h.getText() for h in harvard_opinions_list]
+    scores = similarity_scores(harvard_opinions_list, cl_opinions_list)
+
+    matches = {}
+    for i, row in enumerate(scores):
+        j = row.argmax()  # type: ignore
+        # Lower threshold for small opinions.
+        cosine_sim = get_cosine_similarity(
+            harvard_opinions_list[i], cl_opinions_list[j]
+        )
+        percent_match = compare_documents(
+            harvard_opinions_list[i], cl_opinions_list[j]
+        )
+
+        # Sometimes cosine similarity fails when there are small variations in text,
+        # such as parties, attorneys, case name, or court that are included in the
+        # content of the opinion, compare_documents() checks the percentage of the
+        # harvard opinion text that it is in courtlistener opinion, having a large
+        # percentage means that almost all the harvard opinion is in courtlistener
+        # opinion, but there is a possibility that the courtlistener opinion contains
+        # some additional data in que opinion content (such as case name, parties, etc.)
+        if cosine_sim < 0.60 and percent_match < 60:
+            continue
+
+        matches[i] = j
+
+    return matches
+
+
+def wrap_text(length, text):
+    """Wrap text to specified length without cutting words
+    :param length: max length to wrap
+    :param text: text to wrap
+    :return: text wrapped
+    """
+    words = text.split(" ")
+    if words:
+        lines = [words[0]]
+        for word in words[1:]:
+            if len(lines[-1]) + len(word) < length:
+                lines[-1] += f" {word}"
+            else:
+                lines.append(word)
+                break
+        return " ".join(lines)
+    return ""

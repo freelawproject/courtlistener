@@ -3,6 +3,7 @@ from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 from urllib.parse import parse_qs, urlencode
 
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.cache import cache, caches
 from django.http import HttpRequest, QueryDict
@@ -18,8 +19,8 @@ from cl.lib.model_helpers import clean_docket_number, is_docket_number
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.types import CleanData, SearchParam
 from cl.search.constants import (
+    SEARCH_ORAL_ARGUMENT_HL_FIELDS,
     SOLR_OPINION_HL_FIELDS,
-    SOLR_ORAL_ARGUMENT_HL_FIELDS,
     SOLR_PEOPLE_HL_FIELDS,
     SOLR_RECAP_HL_FIELDS,
 )
@@ -231,6 +232,7 @@ def merge_form_with_courts(
     requires manual adjustment here.
     """
     # Are any of the checkboxes checked?
+
     checked_statuses = [
         field.value()
         for field in search_form
@@ -599,7 +601,7 @@ def add_highlighting(
             "dateArgued",
             "duration",
         ]
-        hlfl = SOLR_ORAL_ARGUMENT_HL_FIELDS
+        hlfl = SEARCH_ORAL_ARGUMENT_HL_FIELDS
     elif cd["type"] == SEARCH_TYPES.PEOPLE:
         fl = [
             "id",
@@ -849,7 +851,6 @@ def print_params(params: SearchParam) -> None:
             "Params sent to search are:\n%s"
             % " &\n".join(["  %s = %s" % (k, v) for k, v in params.items()])
         )
-        # print results_si.execute()
 
 
 def cleanup_main_query(query_string: str) -> str:
@@ -1283,7 +1284,7 @@ def get_mlt_query(
     return si.mlt_query(hl_fields).add_extra(**q)
 
 
-def clean_up_recap_document_file(item: RECAPDocument) -> None:
+async def clean_up_recap_document_file(item: RECAPDocument) -> None:
     """Clean up the RecapDocument file-related fields after detecting the file
     doesn't exist in the storage.
 
@@ -1292,10 +1293,10 @@ def clean_up_recap_document_file(item: RECAPDocument) -> None:
     """
 
     if type(item) == RECAPDocument:
-        item.filepath_local.delete()
+        await sync_to_async(item.filepath_local.delete)()
         item.sha1 = ""
         item.date_upload = None
         item.file_size = None
         item.page_count = None
         item.is_available = False
-        item.save()
+        await item.asave()

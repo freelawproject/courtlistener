@@ -1,7 +1,9 @@
 import logging
+from datetime import date, timedelta
 
+import waffle
+from asgiref.sync import sync_to_async
 from django.conf import settings
-from django.contrib import messages
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.template import TemplateDoesNotExist
@@ -9,6 +11,7 @@ from requests import Session
 from rest_framework import status
 from rest_framework.status import HTTP_400_BAD_REQUEST
 
+from cl.lib.elasticsearch_utils import build_es_base_query
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import (
     build_alert_estimation_query,
@@ -16,8 +19,9 @@ from cl.lib.search_utils import (
     build_coverage_query,
     get_solr_interface,
 )
+from cl.search.documents import AudioDocument
 from cl.search.forms import SearchForm
-from cl.search.models import Court
+from cl.search.models import SEARCH_TYPES, Court
 from cl.simple_pages.views import get_coverage_data_fds
 
 logger = logging.getLogger(__name__)
@@ -159,7 +163,7 @@ def coverage_data(request, version, court):
     )
 
 
-def get_result_count(request, version, day_count):
+async def get_result_count(request, version, day_count):
     """Get the count of results for the past `day_count` number of days
 
     GET parameters will be a complete search string
@@ -171,35 +175,50 @@ def get_result_count(request, version, day_count):
     :return: A JSON object with the number of hits during the last day_range
     period.
     """
-    search_form = SearchForm(request.GET.copy())
+
+    search_form = await sync_to_async(SearchForm)(request.GET.copy())
     if not search_form.is_valid():
         return JsonResponse(
             {"error": "Invalid SearchForm"},
             safe=True,
             status=HTTP_400_BAD_REQUEST,
         )
-
     cd = search_form.cleaned_data
-    with Session() as session:
-        try:
-            si = get_solr_interface(cd, http_connection=session)
-        except NotImplementedError:
-            logger.error(
-                "Tried getting solr connection for %s, but it's not "
-                "implemented yet",
-                cd["type"],
+    search_type = cd["type"]
+    es_flag_for_oa = await sync_to_async(waffle.flag_is_active)(
+        request, "oa-es-active"
+    )
+    if (
+        search_type == SEARCH_TYPES.ORAL_ARGUMENT and es_flag_for_oa
+    ):  # Elasticsearch version for OA
+        document_type = AudioDocument
+        cd["argued_after"] = date.today() - timedelta(days=int(day_count))
+        cd["argued_before"] = None
+        search_query = document_type.search()
+        s = build_es_base_query(search_query, cd)
+        total_query_results = s.count()
+    else:
+        with Session() as session:
+            try:
+                si = get_solr_interface(cd, http_connection=session)
+            except NotImplementedError:
+                logger.error(
+                    "Tried getting solr connection for %s, but it's not "
+                    "implemented yet",
+                    cd["type"],
+                )
+                raise
+
+            response = (
+                si.query()
+                .add_extra(**build_alert_estimation_query(cd, int(day_count)))
+                .execute()
             )
-            raise
-
-        response = (
-            si.query()
-            .add_extra(**build_alert_estimation_query(cd, int(day_count)))
-            .execute()
-        )
-    return JsonResponse({"count": response.result.numFound}, safe=True)
+            total_query_results = response.result.numFound
+    return JsonResponse({"count": total_query_results}, safe=True)
 
 
-def deprecated_api(request, v):
+async def deprecated_api(request, v):
     return JsonResponse(
         {
             "meta": {
@@ -211,6 +230,11 @@ def deprecated_api(request, v):
         safe=False,
         status=status.HTTP_410_GONE,
     )
+
+
+def rest_change_log(request):
+    context = {"private": False}
+    return render(request, "rest-change-log.html", context)
 
 
 def webhooks_getting_started(request):

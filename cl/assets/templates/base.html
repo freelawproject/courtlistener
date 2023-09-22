@@ -32,15 +32,15 @@
   <meta property="og:title" content="{% block og_title %}CourtListener{% endblock %}"/>
   <meta property="og:description"
         content="{% block og_description %}Create alerts, search for and browse the latest court opinions, PACER documents, judges, and oral arguments. Updated automatically with the latest court documents. An initiative of Free Law Project.{% endblock %}">
-  <meta property="og:url" content="{% get_full_host %}{{ request.path }}"/>
+  <meta property="og:url" content="{% block og_url %}{% get_full_host %}{{ request.path }}{% endblock %}"/>
   <meta property="og:site_name" content="CourtListener"/>
   <meta property="og:image"
-        content="{% block og_image %}{% static "png/og-image-300x300.png" %}{% endblock %}"/>
+        content="{% block og_image %}{% static "png/og-image-1280x640.png" %}{% endblock %}"/>
   <meta property="og:image:type" content="{% block og_image_type %}image/png{% endblock %}"/>
   <meta property="twitter:image:alt"
         content="{% block og_image_alt %}The CourtListener logo{% endblock %}"/>
-  <meta property="og:image:width" content="{% block og_image_width %}300{% endblock %}"/>
-  <meta property="og:image:height" content="{% block og_image_height %}300{% endblock %}"/>
+  <meta property="og:image:width" content="{% block og_image_width %}1280{% endblock %}"/>
+  <meta property="og:image:height" content="{% block og_image_height %}640{% endblock %}"/>
   {% endblock %}
 
   {% block icons %}
@@ -175,16 +175,14 @@
             <span class="icon-bar"></span>
           </button>
           <a class="navbar-brand hidden-xs" href="/">
-            <img src="{% static "png/logo-large.png" %}"
-                 alt="CourtListener logo"
-                 width="364"
+            <img src="{% static "svg/logo-full.svg" %}"
+                 alt="CourtListener"
                  height="40"
                  tabindex="1"/>
           </a>
           <a class="navbar-brand visible-xs-block" href="/">
-            <img src="{% static "png/logo-initials-only.png" %}"
-                 alt="CourtListener Logo"
-                 width="67"
+            <img src="{% static "svg/logo-initials-only.svg" %}"
+                 alt="CourtListener"
                  height="40"
                  tabindex="1"/>
           </a>
@@ -252,8 +250,13 @@
               </a>
               <ul class="dropdown-menu" role="menu">
                 <li>
-                  <a href="{% url "advanced_o" %}" tabindex="101">Advanced Search</a>
+                  <a href="{% url "advanced_o" %}" tabindex="101">Opinions Search</a>
                 </li>
+                {% flag "parenthetical-search" %}
+                  <li>
+                    <a href="{% url "advanced_pa" %}" tabindex="101">Parentheticals Search</a>
+                  </li>
+                {% endflag %}
                 <li>
                   <a href="{% url "citation_homepage" %}"
                      tabindex="102">Citation Look Up</a>
@@ -460,7 +463,7 @@
   <script type="text/javascript" src="{% static "js/bootstrap.min.js" %}"></script>
 {% endif %}
 <script type="text/javascript" src="{% static "js/base.js" %}"></script>
-<script type="text/javascript">
+<script type="text/javascript" nonce="{{ request.csp_nonce }}">
   {# Default values are to ensure JS parsing even if 500 error thrown #}
   var totalDonatedLastYear = parseFloat({{ user.profile.total_donated_last_year|safe|default:0}}),
       userAlertCount = {{ user.docket_alerts.subscriptions.count|default:"0" }},

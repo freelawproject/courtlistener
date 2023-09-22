@@ -16,7 +16,7 @@
 
 
 {% block footer-scripts %}
-<script type="text/javascript">
+<script type="text/javascript" nonce="{{ request.csp_nonce }}">
 $(document).ready(function(){
   $(".show-all-appointments").on("click", function (event) {
     var button = $(this);

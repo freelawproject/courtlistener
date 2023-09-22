@@ -33,42 +33,6 @@ OPINION_ORDER_BY_CHOICES = (
 )
 
 
-def _clean_form(get_params, cd, courts):
-    """Returns cleaned up values as a Form object."""
-    # Send the user the cleaned up query
-    get_params["q"] = cd["q"]
-
-    # Clean up the date formats. This is probably no longer needed since we do
-    # date cleanup on the client side via our datepickers, but it's probably
-    # fine to leave it here until there's a reason to remove it. It could be
-    # helpful if somebody finds a way not to use the datepickers (js off, say)
-    for date_field in SearchForm().get_date_field_names():
-        for time in ("before", "after"):
-            field = f"{date_field}_{time}"
-            if get_params.get(field) and cd.get(field) is not None:
-                # Don't use strftime. It'll fail before 1900
-                before = cd[field]
-                get_params[field] = "%02d/%02d/%s" % (
-                    before.month,
-                    before.day,
-                    before.year,
-                )
-
-    get_params["order_by"] = cd["order_by"]
-    get_params["type"] = cd["type"]
-
-    for court in courts:
-        get_params[f"court_{court.pk}"] = cd[f"court_{court.pk}"]
-
-    for status in PRECEDENTIAL_STATUS.NAMES:
-        get_params[f"stat_{status[1]}"] = cd[f"stat_{status[1]}"]
-
-    # Ensure that we have the cleaned_data and other related attributes set.
-    form = SearchForm(get_params)
-    form.is_valid()
-    return form
-
-
 class SearchForm(forms.Form):
     #
     # Blended fields
@@ -142,6 +106,7 @@ class SearchForm(forms.Form):
         SEARCH_TYPES.OPINION,
         SEARCH_TYPES.RECAP,
         SEARCH_TYPES.ORAL_ARGUMENT,
+        SEARCH_TYPES.PARENTHETICAL,
     ]
 
     #
@@ -298,7 +263,11 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    filed_after.as_str_types = [SEARCH_TYPES.OPINION, SEARCH_TYPES.RECAP]
+    filed_after.as_str_types = [
+        SEARCH_TYPES.OPINION,
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.PARENTHETICAL,
+    ]
     filed_before = CeilingDateField(
         required=False,
         label="Filed Before",
@@ -310,7 +279,11 @@ class SearchForm(forms.Form):
             }
         ),
     )
-    filed_before.as_str_types = [SEARCH_TYPES.OPINION, SEARCH_TYPES.RECAP]
+    filed_before.as_str_types = [
+        SEARCH_TYPES.OPINION,
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.PARENTHETICAL,
+    ]
     citation = forms.CharField(
         required=False,
         label="Citation",
@@ -462,7 +435,8 @@ class SearchForm(forms.Form):
         }
 
     def __init__(self, *args, **kwargs):
-        super(SearchForm, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
+
         """
         Normally we wouldn't need to use __init__ in a form object like
         this, however, since we are generating checkbox fields with dynamic
@@ -681,3 +655,53 @@ class SearchForm(forms.Form):
         for label, value in self.as_display_dict(court_count_human).items():
             crumbs.append(f"{label}: {value}")
         return " › ".join(crumbs)
+
+
+def clean_up_date_formats(
+    cd: dict[str, any], date_field: str, get_params: dict[str, any]
+) -> None:
+    """Clean up date formats in a given params dictionary.
+
+    :param cd: The cleaned data dict.
+    :param date_field: The name of the date field to be cleaned up.
+    :param get_params: The query request params.
+    :return: None
+    """
+
+    for time in ("before", "after"):
+        field = f"{date_field}_{time}"
+        if get_params.get(field) and cd.get(field) is not None:
+            # Don't use strftime. It'll fail before 1900
+            before = cd[field]
+            get_params[field] = "%02d/%02d/%s" % (
+                before.month,
+                before.day,
+                before.year,
+            )
+
+
+def _clean_form(get_params, cd, courts):
+    """Returns cleaned up values as a Form object."""
+    # Send the user the cleaned up query
+    get_params["q"] = cd["q"]
+
+    # Clean up the date formats. This is probably no longer needed since we do
+    # date cleanup on the client side via our datepickers, but it's probably
+    # fine to leave it here until there's a reason to remove it. It could be
+    # helpful if somebody finds a way not to use the datepickers (js off, say)
+    for date_field in SearchForm().get_date_field_names():
+        clean_up_date_formats(cd, date_field, get_params)
+
+    get_params["order_by"] = cd["order_by"]
+    get_params["type"] = cd["type"]
+
+    for court in courts:
+        get_params[f"court_{court.pk}"] = cd[f"court_{court.pk}"]
+
+    for status in PRECEDENTIAL_STATUS.NAMES:
+        get_params[f"stat_{status[1]}"] = cd[f"stat_{status[1]}"]
+
+    # Ensure that we have the cleaned_data and other related attributes set.
+    form = SearchForm(get_params)
+    form.is_valid()
+    return form
