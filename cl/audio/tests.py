@@ -171,6 +171,26 @@ class PodcastTest(ESIndexTestCase, TestCase):
         )
         self.assertTrue(pubdate_present)
 
+        # Confirm items are ordered by dateArgued desc
+        pub_date_format = "%a, %d %b %Y %H:%M:%S %z"
+        first_item_pub_date_str = str(
+            xml_tree.xpath("//channel/item[1]/pubDate")[0].text  # type: ignore
+        )
+        second_item_pub_date_str = str(
+            xml_tree.xpath("//channel/item[2]/pubDate")[0].text  # type: ignore
+        )
+        first_item_pub_date_dt = datetime.datetime.strptime(
+            first_item_pub_date_str, pub_date_format
+        )
+        second_item_pub_date_dt = datetime.datetime.strptime(
+            second_item_pub_date_str, pub_date_format
+        )
+        self.assertGreater(
+            first_item_pub_date_dt,
+            second_item_pub_date_dt,
+            msg="The first item should be newer than the second item.",
+        )
+
         # pubDate key must be omitted in Audios without date_argued.
         self.audio.docket.date_argued = None
         self.audio.docket.save()
