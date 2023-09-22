@@ -162,7 +162,9 @@ def get_first_missing_de_date(d):
     return date(1960, 1, 1)
 
 
-def get_blocked_status(docket: Docket, count_override: int | None = None):
+async def get_blocked_status(
+    docket: Docket, count_override: int | None = None
+):
     """Set the blocked status for the Docket.
 
     Dockets are public (blocked is False) when:
@@ -193,14 +195,14 @@ def get_blocked_status(docket: Docket, count_override: int | None = None):
     if count_override is not None:
         count = count_override
     elif docket.pk:
-        count = docket.docket_entries.all().count()
+        count = await docket.docket_entries.all().acount()
     else:
         count = 0
     small_case = count <= bankruptcy_privacy_threshold
-    bankruptcy_court = (
-        docket.court.jurisdiction in Court.BANKRUPTCY_JURISDICTIONS
-    )
-    if all([small_case, bankruptcy_court]):
+    bankruptcy_court = await Court.objects.filter(
+        pk=docket.court_id, jurisdiction__in=Court.BANKRUPTCY_JURISDICTIONS
+    ).aexists()
+    if small_case and bankruptcy_court:
         return True, date.today()
     return False, None
 
@@ -261,8 +263,8 @@ def process_docket_data(
         add_bankruptcy_data_to_docket(d, data)
         add_claims_to_docket(d, data["claims"])
     else:
-        update_docket_metadata(d, data)
-        d, og_info = update_docket_appellate_metadata(d, data)
+        async_to_sync(update_docket_metadata)(d, data)
+        d, og_info = async_to_sync(update_docket_appellate_metadata)(d, data)
         if og_info is not None:
             og_info.save()
             d.originating_court_information = og_info

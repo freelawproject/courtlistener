@@ -447,8 +447,8 @@ def process_free_opinion_result(
                 result.save()
                 self.request.chain = None
                 return None
-            d.blocked, d.date_blocked = get_blocked_status(d)
-            mark_ia_upload_needed(d, save_docket=False)
+            d.blocked, d.date_blocked = async_to_sync(get_blocked_status)(d)
+            async_to_sync(mark_ia_upload_needed)(d, save_docket=False)
             d.save()
 
             try:
@@ -1064,7 +1064,7 @@ def do_case_query_by_pacer_case_id(
         )
 
     d.add_recap_source()
-    update_docket_metadata(d, docket_data)
+    async_to_sync(update_docket_metadata)(d, docket_data)
     d.save()
 
     add_tags_to_objs(tag_names, [d])
@@ -1799,7 +1799,9 @@ def update_rd_metadata(
     rd.save()
 
     # Make sure we mark the docket as needing upload
-    mark_ia_upload_needed(rd.docket_entry.docket, save_docket=True)
+    async_to_sync(mark_ia_upload_needed)(
+        rd.docket_entry.docket, save_docket=True
+    )
     return True, "Saved item successfully"
 
 
