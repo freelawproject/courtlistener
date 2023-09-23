@@ -48,9 +48,12 @@ def get_object_list(request, cd, paginator):
             if is_oral_argument_active
             else PersonDocument.search()
         )
-        main_query, total_query_results, top_hits_limit = build_es_main_query(
-            search_query, cd
-        )
+        (
+            main_query,
+            total_query_results,
+            top_hits_limit,
+            total_child_results,
+        ) = build_es_main_query(search_query, cd)
     else:
         main_query = search_utils.build_main_query(
             cd, highlight="text", facet=False, group=group

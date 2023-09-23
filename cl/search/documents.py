@@ -305,7 +305,7 @@ class AudioPercolator(AudioDocumentBase):
 
         cd = search_form.cleaned_data
         search_query = AudioDocument.search()
-        query = build_es_base_query(search_query, cd)
+        query, _ = build_es_base_query(search_query, cd)
         return query.to_dict()["query"]
 
 
