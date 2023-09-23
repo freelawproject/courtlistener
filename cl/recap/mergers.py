@@ -1462,6 +1462,9 @@ async def merge_attachment_page_data(
     rds_created = []
     rds_affected = []
     appellate_court_ids = Court.federal_courts.appellate_pacer_courts()
+    court_is_appellate = await appellate_court_ids.filter(
+        pk=court.pk
+    ).aexists()
     for attachment in attachment_dicts:
         sanity_checks = [
             attachment["attachment_number"],
@@ -1477,7 +1480,7 @@ async def merge_attachment_page_data(
         # Appellate entries with attachments don't have a main RD, transform it
         # to an attachment.
         if (
-            await appellate_court_ids.filter(pk=court.pk).aexists()
+            court_is_appellate
             and attachment["pacer_doc_id"] == main_rd.pacer_doc_id
         ):
             main_rd.document_type = RECAPDocument.ATTACHMENT
