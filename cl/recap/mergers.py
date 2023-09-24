@@ -1399,7 +1399,8 @@ async def clean_duplicate_attachment_entries(
     attachment_dicts: List[Dict[str, Union[int, str]]],
 ):
     """Remove attachment page entries with duplicate pacer_doc_id's that
-    have incorrect attachment numbers.
+    have incorrect attachment numbers. This is needed because older attachment
+    pages were incorrectly parsed. See: freelawproject/juriscraper#721
 
     :param de: A DocketEntry object
     :param document_number: The docket entry number
