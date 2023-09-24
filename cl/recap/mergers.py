@@ -9,7 +9,7 @@ from asgiref.sync import async_to_sync, sync_to_async
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, OperationalError, transaction
-from django.db.models import Prefetch, Q, QuerySet
+from django.db.models import Count, Prefetch, Q, QuerySet
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer import AppellateAttachmentPage, AttachmentPage
@@ -289,14 +289,16 @@ def update_case_names(d, new_case_name):
     return d
 
 
-def update_docket_metadata(d: Docket, docket_data: Dict[str, Any]) -> Docket:
+async def update_docket_metadata(
+    d: Docket, docket_data: Dict[str, Any]
+) -> Docket:
     """Update the Docket object with the data from Juriscraper.
 
     Works on either docket history report or docket report (appellate
     or district) results.
     """
     d = update_case_names(d, docket_data["case_name"])
-    mark_ia_upload_needed(d, save_docket=False)
+    await mark_ia_upload_needed(d, save_docket=False)
     d.docket_number = docket_data["docket_number"] or d.docket_number
     d.date_filed = docket_data.get("date_filed") or d.date_filed
     d.date_last_filing = (
@@ -310,7 +312,7 @@ def update_docket_metadata(d: Docket, docket_data: Dict[str, Any]) -> Docket:
         docket_data.get("jurisdiction") or d.jurisdiction_type
     )
     d.mdl_status = docket_data.get("mdl_status") or d.mdl_status
-    lookup_judge_by_full_name_and_set_attr(
+    await lookup_judge_by_full_name_and_set_attr(
         d,
         "assigned_to",
         docket_data.get("assigned_to_str"),
@@ -318,7 +320,7 @@ def update_docket_metadata(d: Docket, docket_data: Dict[str, Any]) -> Docket:
         docket_data.get("date_filed"),
     )
     d.assigned_to_str = docket_data.get("assigned_to_str") or ""
-    lookup_judge_by_full_name_and_set_attr(
+    await lookup_judge_by_full_name_and_set_attr(
         d,
         "referred_to",
         docket_data.get("referred_to_str"),
@@ -326,12 +328,12 @@ def update_docket_metadata(d: Docket, docket_data: Dict[str, Any]) -> Docket:
         docket_data.get("date_filed"),
     )
     d.referred_to_str = docket_data.get("referred_to_str") or ""
-    d.blocked, d.date_blocked = get_blocked_status(d)
+    d.blocked, d.date_blocked = await get_blocked_status(d)
 
     return d
 
 
-def update_docket_appellate_metadata(d, docket_data):
+async def update_docket_appellate_metadata(d, docket_data):
     """Update the metadata specific to appellate cases."""
     if not any(
         [
@@ -360,7 +362,7 @@ def update_docket_appellate_metadata(d, docket_data):
 
     if og_info.get("court_id"):
         cl_id = map_pacer_to_cl_id(og_info["court_id"])
-        if Court.objects.filter(pk=cl_id).exists():
+        if await Court.objects.filter(pk=cl_id).aexists():
             # Ensure the court exists. Sometimes PACER does weird things,
             # like in 14-1743 in CA3, where it says the court_id is 'uspci'.
             # If we don't do this check, the court ID could be invalid, and
@@ -407,14 +409,14 @@ def update_docket_appellate_metadata(d, docket_data):
         # Can't do judge lookups. Call it quits.
         return d, d_og_info
 
-    lookup_judge_by_full_name_and_set_attr(
+    await lookup_judge_by_full_name_and_set_attr(
         d_og_info,
         "assigned_to",
         og_info.get("assigned_to"),
         d.appeal_from_id,
         d_og_info.date_filed,
     )
-    lookup_judge_by_full_name_and_set_attr(
+    await lookup_judge_by_full_name_and_set_attr(
         d_og_info,
         "ordering_judge",
         og_info.get("ordering_judge"),
@@ -1357,11 +1359,13 @@ def merge_pacer_docket_into_cl_docket(
         d.pacer_case_id = pacer_case_id
 
     d.add_recap_source()
-    update_docket_metadata(d, docket_data)
+    async_to_sync(update_docket_metadata)(d, docket_data)
     d.save()
 
     if appellate:
-        d, og_info = update_docket_appellate_metadata(d, docket_data)
+        d, og_info = async_to_sync(update_docket_appellate_metadata)(
+            d, docket_data
+        )
         if og_info is not None:
             og_info.save()
             d.originating_court_information = og_info
@@ -1382,13 +1386,54 @@ def merge_pacer_docket_into_cl_docket(
         add_docket_entries
     )(d, docket_data["docket_entries"], tags=tags)
     add_parties_and_attorneys(d, docket_data["parties"])
-    process_orphan_documents(rds_created, d.court_id, d.date_filed)
+    async_to_sync(process_orphan_documents)(
+        rds_created, d.court_id, d.date_filed
+    )
     logger.info(f"Created/updated docket: {d}")
     return rds_created, content_updated
 
 
-@transaction.atomic
-def merge_attachment_page_data(
+async def clean_duplicate_attachment_entries(
+    de: DocketEntry,
+    document_number: int,
+    attachment_dicts: List[Dict[str, Union[int, str]]],
+):
+    """Remove attachment page entries with duplicate pacer_doc_id's that
+    have incorrect attachment numbers. This is needed because older attachment
+    pages were incorrectly parsed. See: freelawproject/juriscraper#721
+
+    :param de: A DocketEntry object
+    :param document_number: The docket entry number
+    :param attachment_dicts: A list of Juriscraper-parsed dicts for each
+    attachment.
+    """
+    rds = RECAPDocument.objects.filter(
+        docket_entry=de,
+        document_number=document_number,
+    )
+
+    dupe_doc_ids = (
+        rds.values("pacer_doc_id")
+        .annotate(Count("id"))
+        .order_by()
+        .filter(id__count__gt=1)
+    )
+
+    if not await dupe_doc_ids.aexists():
+        return
+    dupes = rds.filter(
+        pacer_doc_id__in=[i["pacer_doc_id"] for i in dupe_doc_ids]
+    )
+    for dupe in dupes.aiterator():
+        for attachment in attachment_dicts:
+            attachment_number = attachment["attachment_number"]
+            pacer_doc_id = attachment["pacer_doc_id"]
+            if dupe.pacer_doc_id == pacer_doc_id:
+                if dupe.attachment_number != attachment_number:
+                    await dupe.adelete()
+
+
+async def merge_attachment_page_data(
     court: Court,
     pacer_case_id: int,
     pacer_doc_id: int,
@@ -1418,7 +1463,9 @@ def merge_attachment_page_data(
         }
         if pacer_case_id:
             params["docket_entry__docket__pacer_case_id"] = pacer_case_id
-        main_rd = RECAPDocument.objects.get(**params)
+        main_rd = await RECAPDocument.objects.select_related(
+            "docket_entry", "docket_entry__docket"
+        ).aget(**params)
     except RECAPDocument.MultipleObjectsReturned as exc:
         # Unclear how to proceed and we don't want to associate this data with
         # the wrong case. We must punt.
@@ -1443,10 +1490,10 @@ def merge_attachment_page_data(
         return [], de
 
     # Save the old HTML to the docket entry.
-    pacer_file = PacerHtmlFiles(
+    pacer_file = await sync_to_async(PacerHtmlFiles)(
         content_object=de, upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE
     )
-    pacer_file.filepath.save(
+    await sync_to_async(pacer_file.filepath.save)(
         "attachment_page.html",  # Irrelevant b/c S3PrivateUUIDStorageTest
         ContentFile(text.encode()),
     )
@@ -1454,11 +1501,10 @@ def merge_attachment_page_data(
     # Create/update the attachment items.
     rds_created = []
     rds_affected = []
-    appellate_court_ids = (
-        Court.federal_courts.appellate_pacer_courts().values_list(
-            "pk", flat=True
-        )
-    )
+    appellate_court_ids = Court.federal_courts.appellate_pacer_courts()
+    court_is_appellate = await appellate_court_ids.filter(
+        pk=court.pk
+    ).aexists()
     for attachment in attachment_dicts:
         sanity_checks = [
             attachment["attachment_number"],
@@ -1474,7 +1520,7 @@ def merge_attachment_page_data(
         # Appellate entries with attachments don't have a main RD, transform it
         # to an attachment.
         if (
-            court.pk in appellate_court_ids
+            court_is_appellate
             and attachment["pacer_doc_id"] == main_rd.pacer_doc_id
         ):
             main_rd.document_type = RECAPDocument.ATTACHMENT
@@ -1482,7 +1528,7 @@ def merge_attachment_page_data(
             rd = main_rd
             created = False
         else:
-            rd, created = RECAPDocument.objects.update_or_create(
+            rd, created = await RECAPDocument.objects.aupdate_or_create(
                 docket_entry=de,
                 document_number=document_number,
                 attachment_number=attachment["attachment_number"],
@@ -1508,13 +1554,16 @@ def merge_attachment_page_data(
                 )
             except ValueError:
                 pass
-        rd.save()
+        await rd.asave()
 
         # Do *not* do this async — that can cause race conditions.
-        add_items_to_solr([rd.pk], "search.RECAPDocument")
+        await sync_to_async(add_items_to_solr)([rd.pk], "search.RECAPDocument")
 
-    mark_ia_upload_needed(de.docket, save_docket=True)
-    process_orphan_documents(
+    await clean_duplicate_attachment_entries(
+        de, document_number, attachment_dicts
+    )
+    await mark_ia_upload_needed(de.docket, save_docket=True)
+    await process_orphan_documents(
         rds_created, court.pk, main_rd.docket_entry.docket.date_filed
     )
     return rds_affected, de
@@ -1536,7 +1585,7 @@ def save_iquery_to_docket(
     :param add_to_solr: Whether to save the completed docket to solr
     :return: The pk of the docket if successful. Else, None.
     """
-    d = update_docket_metadata(d, iquery_data)
+    d = async_to_sync(update_docket_metadata)(d, iquery_data)
     try:
         d.save()
         add_bankruptcy_data_to_docket(d, iquery_data)
@@ -1548,14 +1597,14 @@ def save_iquery_to_docket(
         logger.info("%s Retrying.", msg)
         raise self.retry(exc=exc)
 
-    add_tags_to_objs(tag_names, [d])
+    async_to_sync(add_tags_to_objs)(tag_names, [d])
     if add_to_solr:
         add_items_to_solr([d.pk], "search.Docket")
     logger.info(f"Created/updated docket: {d}")
     return d.pk
 
 
-def process_orphan_documents(
+async def process_orphan_documents(
     rds_created: List[RECAPDocument],
     court_id: int,
     docket_date: date,
@@ -1582,11 +1631,11 @@ def process_orphan_documents(
         debug=False,
         date_modified__gt=cutoff_date,
     ).values_list("pk", flat=True)
-    for pq in pqs:
+    async for pq in pqs.aiterator():
         try:
             from cl.recap.tasks import process_recap_pdf
 
-            async_to_sync(process_recap_pdf)(pq)
+            await process_recap_pdf(pq)
         except:
             # We can ignore this. If we don't, we get all of the
             # exceptions that were previously raised for the
