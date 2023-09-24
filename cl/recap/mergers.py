@@ -1393,6 +1393,44 @@ def merge_pacer_docket_into_cl_docket(
     return rds_created, content_updated
 
 
+async def clean_duplicate_attachment_entries(
+    de: DocketEntry,
+    document_number: int,
+    attachment_dicts: List[Dict[str, Union[int, str]]],
+):
+    """Remove attachment page entries with duplicate pacer_doc_id's that
+    have incorrect attachment numbers.
+
+    :param de: A DocketEntry object
+    :param document_number: The docket entry number
+    :param attachment_dicts: A list of Juriscraper-parsed dicts for each
+    attachment.
+    """
+    rds = RECAPDocument.objects.filter(
+        docket_entry=de,
+        document_number=document_number,
+    )
+
+    dupe_doc_ids = (
+        rds.values("pacer_doc_id")
+        .annotate(Count("id"))
+        .order_by()
+        .filter(id__count__gt=1)
+    )
+
+    if await dupe_doc_ids.aexists():
+        dupes = rds.filter(
+            pacer_doc_id__in=[i["pacer_doc_id"] for i in dupe_doc_ids]
+        )
+        for dupe in dupes.aiterator():
+            for attachment in attachment_dicts:
+                attachment_number = attachment["attachment_number"]
+                pacer_doc_id = attachment["pacer_doc_id"]
+                if dupe.pacer_doc_id == pacer_doc_id:
+                    if dupe.attachment_number != attachment_number:
+                        await dupe.adelete()
+
+
 async def merge_attachment_page_data(
     court: Court,
     pacer_case_id: int,
@@ -1519,31 +1557,9 @@ async def merge_attachment_page_data(
         # Do *not* do this async — that can cause race conditions.
         await sync_to_async(add_items_to_solr)([rd.pk], "search.RECAPDocument")
 
-    de_query = RECAPDocument.objects.filter(
-        docket_entry=de,
-        document_number=document_number,
+    await clean_duplicate_attachment_entries(
+        de, document_number, attachment_dicts
     )
-
-    dupe_doc_ids = (
-        de_query.values("pacer_doc_id")
-        .filter()
-        .annotate(Count("id"))
-        .order_by()
-        .filter(id__count__gt=1)
-    )
-
-    if await dupe_doc_ids.aexists():
-        dupes = de_query.filter(
-            pacer_doc_id__in=[i["pacer_doc_id"] for i in dupe_doc_ids]
-        )
-        for dupe in dupes.aiterator():
-            for attachment in attachment_dicts:
-                attachment_number = attachment["attachment_number"]
-                pacer_doc_id = attachment["pacer_doc_id"]
-                if dupe.pacer_doc_id == pacer_doc_id:
-                    if dupe.attachment_number != attachment_number:
-                        await dupe.adelete()
-
     await mark_ia_upload_needed(de.docket, save_docket=True)
     await process_orphan_documents(
         rds_created, court.pk, main_rd.docket_entry.docket.date_filed
