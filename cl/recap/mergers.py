@@ -1418,17 +1418,18 @@ async def clean_duplicate_attachment_entries(
         .filter(id__count__gt=1)
     )
 
-    if await dupe_doc_ids.aexists():
-        dupes = rds.filter(
-            pacer_doc_id__in=[i["pacer_doc_id"] for i in dupe_doc_ids]
-        )
-        for dupe in dupes.aiterator():
-            for attachment in attachment_dicts:
-                attachment_number = attachment["attachment_number"]
-                pacer_doc_id = attachment["pacer_doc_id"]
-                if dupe.pacer_doc_id == pacer_doc_id:
-                    if dupe.attachment_number != attachment_number:
-                        await dupe.adelete()
+    if not await dupe_doc_ids.aexists():
+        return
+    dupes = rds.filter(
+        pacer_doc_id__in=[i["pacer_doc_id"] for i in dupe_doc_ids]
+    )
+    for dupe in dupes.aiterator():
+        for attachment in attachment_dicts:
+            attachment_number = attachment["attachment_number"]
+            pacer_doc_id = attachment["pacer_doc_id"]
+            if dupe.pacer_doc_id == pacer_doc_id:
+                if dupe.attachment_number != attachment_number:
+                    await dupe.adelete()
 
 
 async def merge_attachment_page_data(
