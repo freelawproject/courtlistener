@@ -369,9 +369,9 @@ async def update_docket_appellate_metadata(d, docket_data):
             # our whole save of the docket fails.
             d.appeal_from_id = cl_id
 
-    if d.originating_court_information:
-        d_og_info = d.originating_court_information
-    else:
+    try:
+        d_og_info = await OriginatingCourtInformation.objects.aget(docket=d)
+    except OriginatingCourtInformation.DoesNotExist:
         d_og_info = OriginatingCourtInformation()
 
     # Ensure we don't share A-Numbers, which can sometimes be in the docket
