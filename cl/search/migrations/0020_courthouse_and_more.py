@@ -76,6 +76,7 @@ class Migration(migrations.Migration):
                     "state",
                     localflavor.us.models.USPostalCodeField(
                         blank=True,
+                        null=True,
                         db_index=True,
                         help_text="The two-letter USPS postal abbreviation for the organization w/ obsolete state options.",
                         max_length=2,
@@ -84,6 +85,7 @@ class Migration(migrations.Migration):
                 (
                     "zip_code",
                     localflavor.us.models.USZipCodeField(
+                        null=True,
                         blank=True,
                         db_index=True,
                         help_text="The zip code for the organization, XXXXX or XXXXX-XXXX work.",

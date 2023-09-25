@@ -2214,6 +2214,7 @@ class Courthouse(models.Model):
         "organization w/ obsolete state options.",
         db_index=True,
         choices=USPS_CHOICES + OBSOLETE_STATES,
+        null=True,
         blank=True,
     )
     zip_code = USZipCodeField(
@@ -2221,6 +2222,7 @@ class Courthouse(models.Model):
         "work.",
         db_index=True,
         blank=True,
+        null=True,
     )
     country_code = models.CharField(
         help_text="The two letter country code",
