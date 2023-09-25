@@ -15,7 +15,8 @@ from django.urls import NoReverseMatch, reverse
 from django.utils.encoding import force_str
 from django.utils.text import slugify
 from eyecite import get_citations
-from localflavor.us.us_states import USPS_CHOICES
+from localflavor.us.models import USPostalCodeField, USZipCodeField
+from localflavor.us.us_states import OBSOLETE_STATES, USPS_CHOICES
 from model_utils import FieldTracker
 
 from cl.citations.utils import get_citation_depth_between_clusters
@@ -1933,7 +1934,7 @@ class FederalCourtsQuerySet(models.QuerySet):
         return self.filter(jurisdictions__in=Court.TERRITORY_JURISDICTIONS)
 
     def military_courts(self) -> models.QuerySet:
-        return self.filter(jurisdictions__in=Court.MIL)
+        return self.filter(jurisdictions__in=Court.MILITARY_JURISDICTIONS)
 
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot())
@@ -2043,7 +2044,7 @@ class Court(models.Model):
         "self",
         blank=True,
         symmetrical=False,
-        related_name="appellate_courts_from",
+        related_name="appellate_courts_to",
         help_text="Appellate courts for this court",
     )
     # Pacer fields
@@ -2175,63 +2176,56 @@ class Courthouse(models.Model):
 
     court = models.ForeignKey(
         Court,
-        help_text="The court object associated with this Courthouse",
+        help_text="The court object associated with this Courthouse.",
         related_name="courts",
         on_delete=models.CASCADE,
     )
     court_seat = models.BooleanField(
-        help_text="Is this the seat of the Court",
+        help_text="Is this the seat of the Court.",
         default=False,
         null=True,
     )
-    building_name = models.CharField(
-        verbose_name="Courthouse Name",
+    building_name = models.TextField(
+        verbose_name="Courthouse building name.",
         help_text="Ex. John Adams Courthouse",
-        max_length=255,
-        null=True,
         blank=True,
     )
-    address_line_1 = models.CharField(
-        verbose_name="Address Line 1",
-        max_length=255,
-        blank=True,
-        null=True,
-    )
-    address_line_2 = models.CharField(
-        verbose_name="Address Line 2",
-        max_length=255,
-        null=True,
+    address1 = models.TextField(
+        help_text="The normalized address1 of the courthouse.",
+        db_index=True,
         blank=True,
     )
-    city = models.CharField(
-        help_text="The city/town where the courthouse is.",
-        max_length=255,
+    address2 = models.TextField(
+        help_text="The normalized address2 of the courthouse.",
+        db_index=True,
         blank=True,
-        null=True,
     )
-    county = models.CharField(
-        max_length=255,
+    city = models.TextField(
+        help_text="The normalized city of the organization.",
+        db_index=True,
+        blank=True,
+    )
+    county = models.TextField(
         help_text="The county, if any, where the court resides.",
         blank=True,
-        null=True,
     )
-    state = models.CharField(
-        max_length=2,
-        verbose_name="State",
-        choices=USPS_CHOICES,
-        help_text="Enter the state abbreviation (e.g., CA for California)",
-        null=True,
-    )
-    country = models.CharField(
-        max_length=2,
-        verbose_name="Two digit country code",
-        default="US",
-    )
-    zip_code = models.CharField(
-        max_length=10,
-        verbose_name="ZIP Code",
+    state = USPostalCodeField(
+        help_text="The two-letter USPS postal abbreviation for the "
+        "organization w/ obsolete state options.",
+        db_index=True,
+        choices=USPS_CHOICES + OBSOLETE_STATES,
         blank=True,
-        null=True,
+    )
+    zip_code = USZipCodeField(
+        help_text="The zip code for the organization, XXXXX or XXXXX-XXXX "
+        "work.",
+        db_index=True,
+        blank=True,
+    )
+    country_code = models.CharField(
+        help_text="The two letter country code",
+        max_length=2,
+        default="US",
     )
 
     def __str__(self):
