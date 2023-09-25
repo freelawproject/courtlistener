@@ -644,6 +644,19 @@ class RECAPSearchTest(ESIndexTestCase, TestCase):
             0, r, 1, "docket_number + Document attachment"
         )
 
+    def test_match_all_query(self) -> None:
+        """Test match all documents in the system."""
+
+        # Filter by parent field, court.
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+        }
+        # Show all the dockets.
+        r = self._test_main_es_query(cd, 2, "match_all")
+        # Each docket should contain all their related RDs. Max 5 hits per case
+        self._count_child_documents_dict(0, r, 2, "match_all")
+        self._count_child_documents_dict(1, r, 1, "match_all")
+
     def test_sorting(self) -> None:
         """Can we do sorting on various fields?"""
         sort_fields = [

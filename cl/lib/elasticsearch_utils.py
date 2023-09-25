@@ -715,6 +715,12 @@ def build_es_main_query(
                 cd,
                 build_sort_results(cd),
             )
+            return (
+                search_query,
+                total_query_results,
+                top_hits_limit,
+                total_child_results,
+            )
         case SEARCH_TYPES.RECAP:
             child_docs_count_query = build_child_docs_count_query(join_query)
             if child_docs_count_query:
@@ -724,12 +730,11 @@ def build_es_main_query(
                 )
                 total_child_results = search_query_base.count()
 
-            search_query = add_es_highlighting(search_query, cd)
-            search_query = search_query.sort(build_sort_results(cd))
-
         case _:
-            search_query = add_es_highlighting(search_query, cd)
-            search_query = search_query.sort(build_sort_results(cd))
+            pass
+
+    search_query = add_es_highlighting(search_query, cd)
+    search_query = search_query.sort(build_sort_results(cd))
 
     return (
         search_query,
@@ -1326,13 +1331,14 @@ def build_full_join_es_queries(
             child_fields, value, only_queries=True
         )
         parent_filters = build_join_es_filters(cd)
-
         # If parent filters, extend into child_filters.
         if parent_filters:
             child_filters.extend(parent_filters)
 
         # Build the child filter and text queries.
         match child_filters, child_text_query:
+            case[], []:
+                pass
             case [], _:
                 join_query = Q(
                     "bool",
@@ -1365,6 +1371,8 @@ def build_full_join_es_queries(
             parent_query_fields, cd.get("q", ""), only_queries=True
         )
         match parent_filters, string_query:
+            case[], []:
+                pass
             case [], _:
                 parent_query = Q(
                     "bool",
