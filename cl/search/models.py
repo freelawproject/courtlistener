@@ -1932,6 +1932,9 @@ class FederalCourtsQuerySet(models.QuerySet):
     def territorial_courts(self) -> models.QuerySet:
         return self.filter(jurisdictions__in=Court.TERRITORY_JURISDICTIONS)
 
+    def military_courts(self) -> models.QuerySet:
+        return self.filter(jurisdictions__in=Court.MIL)
+
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Court(models.Model):
@@ -1958,6 +1961,8 @@ class Court(models.Model):
     TERRITORY_APPELLATE = "TA"
     TERRITORY_TRIAL = "TT"
     TERRITORY_SPECIAL = "TSP"
+    MILITARY_APPELLATE = "MA"
+    MILITARY_TRIAL = "MT"
     COMMITTEE = "C"
     INTERNATIONAL = "I"
     TESTING_COURT = "T"
@@ -1980,6 +1985,8 @@ class Court(models.Model):
         (TERRITORY_TRIAL, "Territory Trial"),
         (TERRITORY_SPECIAL, "Territory Special"),
         (STATE_ATTORNEY_GENERAL, "State Attorney General"),
+        (MILITARY_APPELLATE, "Military Appellate"),
+        (MILITARY_TRIAL, "Military Trial"),
         (COMMITTEE, "Committee"),
         (INTERNATIONAL, "International"),
         (TESTING_COURT, "Testing"),
@@ -2014,13 +2021,31 @@ class Court(models.Model):
         TERRITORY_TRIAL,
         TERRITORY_SPECIAL,
     ]
+    MILITARY_JURISDICTIONS = [
+        MILITARY_APPELLATE,
+        MILITARY_TRIAL,
+    ]
 
     id = models.CharField(
         help_text="a unique ID for each court as used in URLs",
         max_length=15,  # Changes here will require updates in urls.py
         primary_key=True,
     )
-
+    parent_court = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="subcourts",
+        help_text="Parent court for subdivisions",
+    )
+    appellate_courts = models.ManyToManyField(
+        "self",
+        blank=True,
+        symmetrical=False,
+        related_name="appellate_courts_from",
+        help_text="Appellate courts for this court",
+    )
     # Pacer fields
     pacer_court_id = models.PositiveSmallIntegerField(
         help_text=(
