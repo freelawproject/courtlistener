@@ -1790,7 +1790,7 @@ class RecapMinuteEntriesTest(TestCase):
         d = async_to_sync(find_docket_object)(
             court_id, docket["pacer_case_id"], docket["docket_number"]
         )
-        update_docket_metadata(d, docket)
+        async_to_sync(update_docket_metadata)(d, docket)
         d.save()
 
         expected_count = 1
@@ -6296,7 +6296,7 @@ class LookupDocketsTest(TestCase):
         d = async_to_sync(find_docket_object)(
             self.court.pk, "12345", self.docket_data["docket_number"]
         )
-        update_docket_metadata(d, self.docket_data)
+        async_to_sync(update_docket_metadata)(d, self.docket_data)
         d.save()
 
         # Successful lookup, dockets matched
@@ -6311,7 +6311,7 @@ class LookupDocketsTest(TestCase):
         d = async_to_sync(find_docket_object)(
             self.court.pk, "54321", self.docket_data["docket_number"]
         )
-        update_docket_metadata(d, self.docket_data)
+        async_to_sync(update_docket_metadata)(d, self.docket_data)
         d.save()
 
         # Successful lookup, dockets matched
@@ -6328,7 +6328,7 @@ class LookupDocketsTest(TestCase):
             self.docket_core_data["docket_entries"][0]["pacer_case_id"],
             self.docket_core_data["docket_number"],
         )
-        update_docket_metadata(d, self.docket_core_data)
+        async_to_sync(update_docket_metadata)(d, self.docket_core_data)
         d.save()
 
         # Successful lookup, dockets matched
@@ -6345,7 +6345,7 @@ class LookupDocketsTest(TestCase):
             self.docket_no_core_data["docket_entries"][0]["pacer_case_id"],
             self.docket_no_core_data["docket_number"],
         )
-        update_docket_metadata(d, self.docket_no_core_data)
+        async_to_sync(update_docket_metadata)(d, self.docket_no_core_data)
         d.save()
 
         # Successful lookup, dockets matched
@@ -6365,7 +6365,7 @@ class LookupDocketsTest(TestCase):
             self.docket_data["docket_number"],
         )
 
-        update_docket_metadata(d, self.docket_data)
+        async_to_sync(update_docket_metadata)(d, self.docket_data)
         d.save()
 
         # Docket is not overwritten a new one is created instead.
@@ -6393,7 +6393,7 @@ class LookupDocketsTest(TestCase):
             self.docket_data["docket_number"],
         )
 
-        update_docket_metadata(d, self.docket_data)
+        async_to_sync(update_docket_metadata)(d, self.docket_data)
         d.save()
 
         # Docket is not overwritten a new one is created instead.
@@ -6426,7 +6426,7 @@ class LookupDocketsTest(TestCase):
             docket_data_lower_number["docket_entries"][0]["pacer_case_id"],
             docket_data_lower_number["docket_number"],
         )
-        update_docket_metadata(new_d, docket_data_lower_number)
+        async_to_sync(update_docket_metadata)(new_d, docket_data_lower_number)
         new_d.save()
         # The existing docket is matched instead of creating a new one.
         self.assertEqual(new_d.pk, d.pk)

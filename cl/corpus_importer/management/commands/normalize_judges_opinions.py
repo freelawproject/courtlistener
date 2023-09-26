@@ -1,3 +1,4 @@
+from asgiref.sync import async_to_sync
 from juriscraper.lib.string_utils import titlecase
 
 from cl.lib.command_utils import VerboseCommand, logger
@@ -20,7 +21,7 @@ def normalize_authors_in_opinions():
         date_filed = opinion.cluster.docket.date_filed
         court_id = opinion.cluster.docket.court_id
         # Search for person, living or deceased
-        person = lookup_judge_by_last_name(
+        person = async_to_sync(lookup_judge_by_last_name)(
             opinion.author_str, court_id, date_filed, False
         )
 
@@ -58,7 +59,7 @@ def normalize_panel_in_opinioncluster():
         ]
 
         # Search for judges as Person objects
-        people = lookup_judges_by_last_name_list(
+        people = async_to_sync(lookup_judges_by_last_name_list)(
             prepared_last_name_list, court_id, date_filed, False
         )
 

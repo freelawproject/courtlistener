@@ -345,7 +345,7 @@ def merge_rss_feed_contents(self, feed_data, court_pk, metadata_only=False):
             )
 
             d.add_recap_source()
-            update_docket_metadata(d, docket)
+            async_to_sync(update_docket_metadata)(d, docket)
             if not d.pacer_case_id:
                 d.pacer_case_id = docket["pacer_case_id"]
             try:

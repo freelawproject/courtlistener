@@ -8,7 +8,7 @@ from cl.lib.string_diff import get_cosine_similarity
 from cl.search.models import Docket
 
 
-def mark_ia_upload_needed(d: Docket, save_docket: bool) -> None:
+async def mark_ia_upload_needed(d: Docket, save_docket: bool) -> None:
     """Mark the docket as needing upload if it's not already marked.
 
     The point here is that we need to know the first time an item was updated,
@@ -24,7 +24,7 @@ def mark_ia_upload_needed(d: Docket, save_docket: bool) -> None:
         d.ia_needs_upload = True
         d.ia_date_first_change = now()
     if save_docket:
-        d.save()
+        await d.asave()
 
 
 def get_start_of_quarter(d: Optional[date] = None) -> date:
