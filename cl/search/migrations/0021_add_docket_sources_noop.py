@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("search", "0019_add_docket_source_noop"),
+        ("search", "0020_courthouse_and_more"),
     ]
 
     operations = [
