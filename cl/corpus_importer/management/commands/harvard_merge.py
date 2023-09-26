@@ -79,6 +79,14 @@ class OpinionTypeException(Exception):
         self.message = message
 
 
+class EmptyOpinionException(Exception):
+    """An exception for opinions that raise a ZeroDivisionError Exception due empty
+    opinion tag"""
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+
 def find_data_fields(soup: BeautifulSoup, field_name: str) -> list:
     """Find field by tag name or data-type attribute
     :param soup: parsed document
@@ -575,6 +583,10 @@ def update_docket_source(cluster: OpinionCluster) -> None:
         Docket.RECAP_AND_SCRAPER_AND_HARVARD,
         Docket.HARVARD_AND_COLUMBIA,
         Docket.DIRECT_INPUT_AND_HARVARD,
+        Docket.IDB_AND_HARVARD,
+        Docket.RECAP_AND_IDB_AND_HARVARD,
+        Docket.SCRAPER_AND_IDB_AND_HARVARD,
+        Docket.RECAP_AND_SCRAPER_AND_IDB_HARVARD,
         Docket.ANON_2020_AND_HARVARD,
         Docket.ANON_2020_AND_SCRAPER_AND_HARVARD,
     ]:
@@ -724,6 +736,10 @@ def merge_opinion_clusters(
         logger.warning(
             msg=f"Opinion type not found in xml file for cluster id: {cluster_id}"
         )
+    except EmptyOpinionException:
+        logger.warning(
+            msg=f"Opinion tag probably empty in json file from cluster id: {cluster_id}"
+        )
 
 
 def fetch_cl_opinion_content(sub_opinions: list[Opinion]) -> list[str]:
@@ -846,7 +862,7 @@ def update_matching_opinions(
                     find_just_name(op.author_str).lower()
                     != find_just_name(author_str).lower()
                 ):
-                    raise AuthorException(f"Authors don't match - log error")
+                    raise AuthorException(f"Authors don't match")
                 elif any(s.isupper() for s in op.author_str.split(",")):
                     # Some names are uppercase, update with processed names
                     op.author_str = author_str
@@ -879,10 +895,15 @@ def map_and_merge_opinions(
     harvard_opinions = find_data_fields(soup, "opinion")
 
     if len(harvard_opinions) == len(cl_opinions):
-        matches = match_lists(
-            [op for op in harvard_opinions],
-            fetch_cl_opinion_content(sub_opinions=cl_opinions),
-        )
+        try:
+            matches = match_lists(
+                [op for op in harvard_opinions],
+                fetch_cl_opinion_content(sub_opinions=cl_opinions),
+            )
+        except ZeroDivisionError:
+            raise EmptyOpinionException(
+                "Opinion tag probably empty in harvard data"
+            )
         if len(matches) == len(harvard_opinions):
             update_matching_opinions(matches, cl_opinions, harvard_opinions)
         else:
