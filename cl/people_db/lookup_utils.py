@@ -274,6 +274,9 @@ def find_all_judges(judge_text: str) -> [str]:
     cleaned_text = cleaned_text.replace("By the Court", "")
     cleaned_text = cleaned_text.replace(" and", ", and").replace(",,", ",")
 
+    if "PER CURIAM" in cleaned_text.upper():
+        return ["PER CURIAM"]
+
     if len(cleaned_text.split()) == 1:
         # You have only one name
         return [cleaned_text]
