@@ -369,10 +369,15 @@ async def update_docket_appellate_metadata(d, docket_data):
             # our whole save of the docket fails.
             d.appeal_from_id = cl_id
 
-    try:
-        d_og_info = await OriginatingCourtInformation.objects.aget(docket=d)
-    except OriginatingCourtInformation.DoesNotExist:
+    if d.pk is None:
         d_og_info = OriginatingCourtInformation()
+    else:
+        try:
+            d_og_info = await OriginatingCourtInformation.objects.aget(
+                docket=d
+            )
+        except OriginatingCourtInformation.DoesNotExist:
+            d_og_info = OriginatingCourtInformation()
 
     # Ensure we don't share A-Numbers, which can sometimes be in the docket
     # number field.
@@ -842,6 +847,18 @@ async def add_docket_entries(
         if tags:
             for tag in tags:
                 tag.tag_object(rd)
+
+        attachments = docket_entry.get("attachments")
+        if attachments is not None:
+            await merge_attachment_page_data(
+                d.court,
+                d.pacer_case_id,
+                rd.pacer_doc_id,
+                docket_entry["document_number"],
+                None,
+                attachments,
+                False,
+            )
 
     known_filing_dates = set(filter(None, known_filing_dates))
     if known_filing_dates:
@@ -1438,7 +1455,7 @@ async def merge_attachment_page_data(
     pacer_case_id: int,
     pacer_doc_id: int,
     document_number: int | None,
-    text: str,
+    text: str | None,
     attachment_dicts: List[Dict[str, Union[int, str]]],
     debug: bool = False,
 ) -> Tuple[List[RECAPDocument], DocketEntry]:
@@ -1490,13 +1507,15 @@ async def merge_attachment_page_data(
         return [], de
 
     # Save the old HTML to the docket entry.
-    pacer_file = await sync_to_async(PacerHtmlFiles)(
-        content_object=de, upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE
-    )
-    await sync_to_async(pacer_file.filepath.save)(
-        "attachment_page.html",  # Irrelevant b/c S3PrivateUUIDStorageTest
-        ContentFile(text.encode()),
-    )
+    # We won't have text if attachments are from docket page.
+    if text is not None:
+        pacer_file = await sync_to_async(PacerHtmlFiles)(
+            content_object=de, upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE
+        )
+        await sync_to_async(pacer_file.filepath.save)(
+            "attachment_page.html",  # Irrelevant b/c S3PrivateUUIDStorageTest
+            ContentFile(text.encode()),
+        )
 
     # Create/update the attachment items.
     rds_created = []
@@ -1547,7 +1566,11 @@ async def merge_attachment_page_data(
         # we got the real value by measuring.
         if rd.page_count is None:
             rd.page_count = attachment["page_count"]
-        if rd.file_size is None and attachment.get("file_size_str", None):
+        # If we have file_size_bytes it should have max precision.
+        file_size_bytes = attachment.get("file_size_bytes")
+        if file_size_bytes is not None:
+            rd.file_size = file_size_bytes
+        elif rd.file_size is None and attachment.get("file_size_str", None):
             try:
                 rd.file_size = convert_size_to_bytes(
                     attachment["file_size_str"]
