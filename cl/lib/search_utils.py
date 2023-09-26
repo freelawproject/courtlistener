@@ -295,6 +295,8 @@ def merge_form_with_courts(
             Court.FEDERAL_SPECIAL,
             Court.COMMITTEE,
             Court.INTERNATIONAL,
+            Court.MILITARY_APPELLATE,
+            Court.MILITARY_TRIAL,
         ]:
             court_tabs["special"].append(court)
 
