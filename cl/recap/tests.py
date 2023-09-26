@@ -1003,7 +1003,7 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.court = CourtFactory(id="txwd", jurisdiction="FB")
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
         with open(
             test_dir / "recap_mail_custom_receipt.json",
@@ -2066,6 +2066,51 @@ class RecapDocketTaskTest(TestCase):
         async_to_sync(process_recap_docket)(self.pq.pk)
         pq.refresh_from_db()
         self.assertEqual(pq.status, PROCESSING_STATUS.SUCCESSFUL)
+
+
+@mock.patch("cl.recap.tasks.add_items_to_solr")
+class RecapDocketAttachmentTaskTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        CourtFactory(id="cand", jurisdiction="FD")
+
+    def setUp(self) -> None:
+        self.user = User.objects.get(username="recap")
+        self.filename = "cand_7.html"
+        path = os.path.join(
+            settings.INSTALL_ROOT, "cl", "recap", "test_assets", self.filename
+        )
+        with open(path, "rb") as f:
+            f = SimpleUploadedFile(self.filename, f.read())
+        self.pq = ProcessingQueue.objects.create(
+            court_id="cand",
+            uploader=self.user,
+            pacer_case_id="417880",
+            filepath_local=f,
+            upload_type=UPLOAD_TYPE.DOCKET,
+        )
+
+    def tearDown(self) -> None:
+        self.pq.filepath_local.delete()
+        self.pq.delete()
+        Docket.objects.all().delete()
+        RECAPDocument.objects.filter(
+            document_type=RECAPDocument.ATTACHMENT,
+        ).delete()
+
+    def test_attachments_get_created(self, mock):
+        """Do attachments get created if we have a RECAPDocument to match
+        on?"""
+        async_to_sync(process_recap_docket)(self.pq.pk)
+        num_attachments_to_create = 3
+        self.assertEqual(
+            RECAPDocument.objects.filter(
+                document_type=RECAPDocument.ATTACHMENT
+            ).count(),
+            num_attachments_to_create,
+        )
+        self.pq.refresh_from_db()
+        self.assertEqual(self.pq.status, PROCESSING_STATUS.SUCCESSFUL)
 
 
 class ClaimsRegistryTaskTest(TestCase):
