@@ -188,11 +188,6 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
                 request, "p-es-activate"
             ):
                 serializer = ExtendedPersonESSerializer(result_page, many=True)
-
-            elif search_type == SEARCH_TYPES.RECAP and waffle.flag_is_active(
-                request, "r-es-active"
-            ):
-                serializer = RECAPESResultSerializer(result_page, many=True)
             else:
                 if cd["q"] == "":
                     cd["q"] = "*"  # Get everything

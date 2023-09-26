@@ -1320,6 +1320,8 @@ def build_join_es_filters(cd: CleanData) -> List:
                 *build_text_filter("cause", cd.get("cause", "")),
                 *build_text_filter("assignedTo", cd.get("assigned_to", "")),
                 *build_text_filter("referredTo", cd.get("referred_to", "")),
+                *build_text_filter("party", cd.get("party_name", "")),
+                *build_text_filter("attorney", cd.get("atty_name", "")),
                 *build_daterange_query(
                     "dateFiled",
                     cd.get("filed_before", ""),

@@ -957,7 +957,41 @@ class DocketDocument(DocketBaseDocument):
     docket_absolute_url = fields.KeywordField(index=False)
     court_exact = fields.KeywordField(attr="court.pk", index=False)
     text = fields.TextField(index=False)
+
     # Parties
+    party_id = fields.ListField(fields.IntegerField(multi=True))
+    party = fields.ListField(
+        fields.TextField(
+            analyzer="text_en_splitting_cl",
+            fields={
+                "exact": fields.TextField(analyzer="english_exact"),
+            },
+            search_analyzer="search_analyzer",
+            multi=True,
+        )
+    )
+    attorney_id = fields.ListField(fields.IntegerField(multi=True))
+    attorney = fields.ListField(
+        fields.TextField(
+            analyzer="text_en_splitting_cl",
+            fields={
+                "exact": fields.TextField(analyzer="english_exact"),
+            },
+            search_analyzer="search_analyzer",
+            multi=True,
+        )
+    )
+    firm_id = fields.ListField(fields.IntegerField(multi=True))
+    firm = fields.ListField(
+        fields.TextField(
+            analyzer="text_en_splitting_cl",
+            fields={
+                "exact": fields.TextField(analyzer="english_exact"),
+            },
+            search_analyzer="search_analyzer",
+            multi=True,
+        )
+    )
 
     def prepare_caseName(self, instance):
         return best_case_name(instance)
@@ -991,3 +1025,34 @@ class DocketDocument(DocketBaseDocument):
     def prepare_text(self, instance):
         text_template = loader.get_template("indexes/dockets_text.txt")
         return text_template.render({"item": instance}).translate(null_map)
+
+    def prepare_parties(self, instance):
+        out = {
+            "party_id": set(),
+            "party": set(),
+            "attorney_id": set(),
+            "attorney": set(),
+            "firm_id": set(),
+            "firm": set(),
+        }
+        for p in instance.prefetched_parties:
+            out["party_id"].add(p.pk)
+            out["party"].add(p.name)
+            for a in p.attys_in_docket:
+                out["attorney_id"].add(a.pk)
+                out["attorney"].add(a.name)
+                for f in a.firms_in_docket:
+                    out["firm_id"].add(f.pk)
+                    out["firm"].add(f.name)
+        return out
+
+    def prepare(self, instance):
+        data = super().prepare(instance)
+        parties_prepared = self.prepare_parties(instance)
+        data["party_id"] = list(parties_prepared["party_id"])
+        data["party"] = list(parties_prepared["party"])
+        data["attorney_id"] = list(parties_prepared["attorney_id"])
+        data["attorney"] = list(parties_prepared["attorney"])
+        data["firm_id"] = list(parties_prepared["firm_id"])
+        data["firm"] = list(parties_prepared["firm"])
+        return data

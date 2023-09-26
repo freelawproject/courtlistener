@@ -373,3 +373,39 @@ def update_child_documents_by_query(
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
         es_document._index.refresh()
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(
+        TransportError,
+        ConnectionError,
+        RequestError,
+        NotFoundError,
+    ),
+    max_retries=3,
+    interval_start=5,
+)
+def index_docket_parties_in_es(
+    self: Task,
+    docket_id: int,
+) -> None:
+    """Update a document in Elasticsearch.
+    :param self: The celery task
+    :param docket_id: The docket ID to update in ES.
+    :param fields_values_to_update: A dictionary with fields and values to update.
+    :return: None
+    """
+
+    docket_document = DocketDocument.get(id=docket_id)
+    docket = Docket.objects.get(id=docket_id)
+    parties_prepared = docket_document.prepare_parties(docket)
+
+    fields_to_update = {
+        key: list(set_values) for key, set_values in parties_prepared.items()
+    }
+    Document.update(
+        docket_document,
+        **fields_to_update,
+        refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
+    )

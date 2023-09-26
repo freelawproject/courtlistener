@@ -14,7 +14,11 @@ from cl.audio.factories import AudioFactory
 from cl.audio.models import Audio
 from cl.people_db.factories import (
     ABARatingFactory,
+    AttorneyFactory,
+    AttorneyOrganizationFactory,
     EducationFactory,
+    PartyFactory,
+    PartyTypeFactory,
     PersonFactory,
     PoliticalAffiliationFactory,
     PositionFactory,
@@ -24,12 +28,14 @@ from cl.people_db.models import Person, Race
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
+    DocketEntryWithParentsFactory,
     DocketFactory,
     OpinionClusterFactory,
     OpinionFactory,
     OpinionsCitedWithParentsFactory,
+    RECAPDocumentFactory,
 )
-from cl.search.models import Court, Opinion
+from cl.search.models import Court, Opinion, RECAPDocument
 from cl.search.tasks import add_items_to_solr
 from cl.tests.cases import SimpleTestCase, TestCase
 from cl.users.factories import UserProfileWithParentsFactory
@@ -400,6 +406,97 @@ class SearchTestCase(SimpleTestCase):
         cls.opinion_cited_4 = OpinionsCitedWithParentsFactory.create(
             cited_opinion=cls.opinion_1,
             citing_opinion=cls.opinion_3,
+        )
+        super().setUpTestData()
+
+
+class RECAPSearchTestCase(SimpleTestCase):
+    """RECAP Search test case factories"""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.court_2 = CourtFactory(id="ca1", jurisdiction="F")
+        cls.judge = PersonFactory.create(
+            name_first="Thalassa", name_last="Miller"
+        )
+        cls.judge_2 = PersonFactory.create(
+            name_first="Persephone", name_last="Sinclair"
+        )
+        cls.de = DocketEntryWithParentsFactory(
+            docket=DocketFactory(
+                court=cls.court,
+                case_name="SUBPOENAS SERVED ON",
+                case_name_full="Jackson & Sons Holdings vs. Bank",
+                date_filed=datetime.date(2015, 8, 16),
+                date_argued=datetime.date(2013, 5, 20),
+                docket_number="1:21-bk-1234",
+                assigned_to=cls.judge,
+                referred_to=cls.judge_2,
+                nature_of_suit="440",
+            ),
+            date_filed=datetime.date(2015, 8, 19),
+            description="MOTION for Leave to File Amicus Curiae Lorem",
+        )
+        cls.firm = AttorneyOrganizationFactory(name="Associates LLP")
+        cls.attorney = AttorneyFactory(
+            name="Debbie Russell",
+            organizations=[cls.firm],
+            docket=cls.de.docket,
+        )
+        cls.party_type = PartyTypeFactory.create(
+            party=PartyFactory(
+                name="Defendant Jane Roe",
+                docket=cls.de.docket,
+                attorneys=[cls.attorney],
+            ),
+            docket=cls.de.docket,
+        )
+
+        cls.rd = RECAPDocumentFactory(
+            docket_entry=cls.de,
+            description="Leave to File",
+            document_number="1",
+            is_available=True,
+            page_count=5,
+        )
+
+        cls.rd_att = RECAPDocumentFactory(
+            docket_entry=cls.de,
+            description="Document attachment",
+            document_type=RECAPDocument.ATTACHMENT,
+            document_number="1",
+            attachment_number=2,
+            is_available=False,
+            page_count=7,
+        )
+
+        cls.judge_3 = PersonFactory.create(
+            name_first="Seraphina", name_last="Hawthorne"
+        )
+        cls.judge_4 = PersonFactory.create(
+            name_first="Leopold", name_last="Featherstone"
+        )
+        cls.de_1 = DocketEntryWithParentsFactory(
+            docket=DocketFactory(
+                docket_number="12-1235",
+                court=cls.court_2,
+                case_name="SUBPOENAS SERVED OFF",
+                case_name_full="The State of Franklin v. Solutions LLC",
+                date_filed=datetime.date(2016, 8, 16),
+                date_argued=datetime.date(2012, 6, 23),
+                assigned_to=cls.judge_3,
+                referred_to=cls.judge_4,
+            ),
+            date_filed=datetime.date(2014, 7, 19),
+            description="MOTION for Leave to File Amicus Discharging Debtor",
+        )
+        cls.rd_2 = RECAPDocumentFactory(
+            docket_entry=cls.de_1,
+            description="Leave to File",
+            document_number="3",
+            page_count=10,
+            plain_text="Maecenas nunc justo",
         )
         super().setUpTestData()
 

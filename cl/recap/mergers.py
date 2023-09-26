@@ -56,7 +56,7 @@ from cl.search.models import (
     RECAPDocument,
     Tag,
 )
-from cl.search.tasks import add_items_to_solr
+from cl.search.tasks import add_items_to_solr, index_docket_parties_in_es
 
 logger = logging.getLogger(__name__)
 
@@ -1346,6 +1346,7 @@ def merge_pacer_docket_into_cl_docket(
         d, docket_data["docket_entries"], tags=tags
     )
     add_parties_and_attorneys(d, docket_data["parties"])
+    index_docket_parties_in_es.delay(d.pk)
     process_orphan_documents(rds_created, d.court_id, d.date_filed)
     logger.info(f"Created/updated docket: {d}")
     return rds_created, content_updated
