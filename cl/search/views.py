@@ -741,10 +741,10 @@ def fetch_and_paginate_results(
     search_type = get_params.get("type")
     # Set highlights in results.
 
-    set_results_highlights(results, search_type)
     convert_str_date_fields_to_date_objects(results, search_type)
     merge_courts_from_db(results, search_type)
     limit_inner_hits(get_params, results, search_type)
+    set_results_highlights(results, search_type)
     merge_unavailable_fields_on_parent_document(results, search_type)
 
     if cache_key is not None:

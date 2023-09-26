@@ -20,9 +20,9 @@ from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.types import CleanData, SearchParam
 from cl.search.constants import (
     SEARCH_ORAL_ARGUMENT_HL_FIELDS,
+    SEARCH_RECAP_HL_FIELDS,
     SOLR_OPINION_HL_FIELDS,
     SOLR_PEOPLE_HL_FIELDS,
-    SOLR_RECAP_HL_FIELDS,
 )
 from cl.search.forms import SearchForm
 from cl.search.models import (
@@ -621,7 +621,7 @@ def add_highlighting(
             "party",
             "referred_to_id",
         ]
-        hlfl = SOLR_RECAP_HL_FIELDS
+        hlfl = SEARCH_RECAP_HL_FIELDS
     elif cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
         fl = [
             "id",

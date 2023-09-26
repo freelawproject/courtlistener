@@ -31,6 +31,8 @@ from cl.search.constants import (
     SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS,
     SEARCH_HL_TAG,
     SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS,
+    SEARCH_RECAP_CHILD_HL_FIELDS,
+    SEARCH_RECAP_HL_FIELDS,
     SOLR_PEOPLE_ES_HL_FIELDS,
 )
 from cl.search.exception import UnbalancedQuery
@@ -481,25 +483,44 @@ def build_es_filters(cd: CleanData) -> List:
 
 
 def build_has_child_query(
-    query: QueryString | str, child_type: str, child_hits_limit: int
+    query: QueryString | str,
+    child_type: str,
+    child_hits_limit: int,
+    highlighting_fields: list[str] = None,
 ) -> QueryString:
     """Build a 'has_child' query.
 
     :param query: The Elasticsearch query string or QueryString object.
     :param child_type: The type of the child document.
     :param child_hits_limit: The maximum number of child hits to be returned.
+    :param highlighting_fields: List of fields to highlight in child docs.
     :return: The 'has_child' query.
     """
+
+    if highlighting_fields is None:
+        highlighting_fields = []
+    highlight_options = {"fields": {}}
+    for field in highlighting_fields:
+        highlight_options["fields"][field] = {
+            "number_of_fragments": 0,
+            "pre_tags": ["<mark>"],
+            "post_tags": ["</mark>"],
+        }
+
+    inner_hits = {
+        "name": f"filter_query_inner_{child_type}",
+        "size": child_hits_limit,
+    }
+
+    if highlight_options:
+        inner_hits["highlight"] = highlight_options
 
     return Q(
         "has_child",
         type=child_type,
         score_mode="max",
         query=query,
-        inner_hits={
-            "name": f"filter_query_inner_{child_type}",
-            "size": child_hits_limit,
-        },
+        inner_hits=inner_hits,
     )
 
 
@@ -630,10 +651,21 @@ def build_es_base_query(
                         "description",
                         "short_description",
                         "plain_text",
+                        "document_type",
+                        # Docket Fields
+                        "docketNumber",
                         "caseName",
                         "case_name_full",
-                        "document_type",
+                        "suitNature",
+                        "cause",
+                        "juryDemand",
                         "assignedTo",
+                        "referredTo",
+                        "court",
+                        "court_id_text",
+                        "court_citation_string",
+                        "chapter",
+                        "trustee_str",
                     ],
                 ),
             }
@@ -768,6 +800,8 @@ def add_es_highlighting(
             fields_to_exclude = ["sha1"]
         case SEARCH_TYPES.PEOPLE:
             highlighting_fields = SOLR_PEOPLE_ES_HL_FIELDS
+        case SEARCH_TYPES.RECAP:
+            highlighting_fields = SEARCH_RECAP_HL_FIELDS
 
     search_query = search_query.source(excludes=fields_to_exclude)
     for field in highlighting_fields:
@@ -872,15 +906,25 @@ def set_results_highlights(results: Page, search_type: str) -> None:
                     highlight = hit.highlight[highlighted_field][0]
                     hit["_source"][highlighted_field] = highlight
         else:
-            if not hasattr(result.meta, "highlight"):
-                continue
+            if hasattr(result.meta, "highlight"):
+                highlights = result.meta.highlight.to_dict()
+                merge_highlights_into_result(
+                    highlights,
+                    result,
+                    SEARCH_HL_TAG,
+                )
 
-            highlights = result.meta.highlight.to_dict()
-            merge_highlights_into_result(
-                highlights,
-                result,
-                SEARCH_HL_TAG,
-            )
+            # Merge child document highlights
+            if not hasattr(result, "child_docs"):
+                continue
+            for child_doc in result.child_docs:
+                if hasattr(child_doc, "highlight"):
+                    highlights = child_doc.highlight.to_dict()
+                    merge_highlights_into_result(
+                        highlights,
+                        child_doc["_source"],
+                        SEARCH_HL_TAG,
+                    )
 
 
 def group_search_results(
@@ -1337,7 +1381,7 @@ def build_full_join_es_queries(
 
         # Build the child filter and text queries.
         match child_filters, child_text_query:
-            case[], []:
+            case [], []:
                 pass
             case [], _:
                 join_query = Q(
@@ -1362,7 +1406,10 @@ def build_full_join_es_queries(
 
         if child_text_query or child_filters:
             query = build_has_child_query(
-                join_query, "recap_document", query_hits_limit
+                join_query,
+                "recap_document",
+                query_hits_limit,
+                SEARCH_RECAP_CHILD_HL_FIELDS,
             )
             q_should.append(query)
 
@@ -1371,7 +1418,7 @@ def build_full_join_es_queries(
             parent_query_fields, cd.get("q", ""), only_queries=True
         )
         match parent_filters, string_query:
-            case[], []:
+            case [], []:
                 pass
             case [], _:
                 parent_query = Q(
@@ -1435,7 +1482,7 @@ def limit_inner_hits(
     for result in results:
         try:
             inner_hits = [
-                hit["_source"]
+                hit
                 for hit in result.meta["inner_hits"][
                     f"filter_query_inner_{child_type}"
                 ]["hits"]["hits"]

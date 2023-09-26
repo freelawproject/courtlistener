@@ -12,17 +12,34 @@ SOLR_OPINION_HL_FIELDS = [
     "suitNature",
     "text",
 ]
-SOLR_RECAP_HL_FIELDS = [
+SEARCH_RECAP_HL_FIELDS = [
     "assignedTo",
+    "assignedTo.exact",
     "caseName",
+    "caseName.exact",
     "cause",
+    "cause.exact",
     "court_citation_string",
     "docketNumber",
+    "docketNumber.exact",
     "juryDemand",
+    "juryDemand.exact",
     "referredTo",
+    "referredTo.exact",
     "short_description",
     "suitNature",
+    "suitNature.exact",
     "text",
+]
+SEARCH_RECAP_CHILD_HL_FIELDS = [
+    "short_description",
+    "short_description.exact",
+    "description",
+    "description.exact",
+    "document_type",
+    "document_type.exact",
+    "document_number",
+    "attachment_number",
 ]
 SEARCH_ORAL_ARGUMENT_HL_FIELDS = [
     "text",

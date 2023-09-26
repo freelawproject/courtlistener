@@ -129,7 +129,7 @@
         </span>
       </div>
     {% endif %}
-    {% if result.solr_highlights.referredTo %}
+    {% if result.referredTo %}
       <div class="inline-block">
         <span class="meta-data-header">Referred To:</span>
         <span class="meta-data-value">
@@ -138,7 +138,7 @@
                 {{ result.referredTo|safe }}
             </a>
           {% else %}
-            <a href="?type=r&referred_to=&quot;{{ result.referredTo.0|striptags|urlencode }}&quot;">
+            <a href="?type=r&referred_to=&quot;{{ result.referredTo|striptags|urlencode }}&quot;">
                 {{ result.referredTo|safe }}
             </a>
           {% endif %}
@@ -163,28 +163,38 @@
     {% endif %}
 
     {% for doc in result.child_docs %}
-    <div class="col-md-offset-half">
-      <h4>
-        <a href="{{ doc.absolute_url }}" class="visitable">{% if doc.short_description %}{{ doc.short_description|safe }}<span class="gray">&nbsp;&mdash;&nbsp;</span>{% endif %}Document #{{ doc.document_number }}{% if doc.attachment_number %}, Attachment #{{ doc.attachment_number }}{% endif %}
-        </a>
-        {% if not doc.is_available %}
-          <i class="fa fa-ban gray"
-             data-toggle="tooltip"
-             data-placement="right"
-             title="Item not yet in RECAP archive."></i>
-        {% else %}
-          {% if doc.page_count %}
-          <span class="small gray">({{ doc.page_count }} page{{ doc.page_count|pluralize }})</span>
+      {% with doc=doc|get_attrdict:"_source" %}
+        <div class="col-md-offset-half">
+          <h4>
+            <a href="{{ doc.absolute_url }}" class="visitable">{% if doc.short_description %}{{ doc.short_description|safe }}<span class="gray">&nbsp;&mdash;&nbsp;</span>{% endif %}Document #{{ doc.document_number }}{% if doc.attachment_number %}, Attachment #{{ doc.attachment_number }}{% endif %}
+            </a>
+            {% if not doc.is_available %}
+              <i class="fa fa-ban gray"
+                 data-toggle="tooltip"
+                 data-placement="right"
+                 title="Item not yet in RECAP archive."></i>
+            {% else %}
+              {% if doc.page_count %}
+              <span class="small gray">({{ doc.page_count }} page{{ doc.page_count|pluralize }})</span>
+              {% endif %}
+            {% endif %}
+          </h4>
+          {% if doc.description %}
+            <div class="inline-block">
+              <span class="meta-data-header">Description:</span>
+              <span class="meta-data-value">
+                  {{ doc.description|safe }}
+              </span>
+            </div>
           {% endif %}
-        {% endif %}
-      </h4>
-      <p>
-        {% if request.GET.q %}&hellip;{% endif %}
-        {% for frag in doc.solr_highlights.text %}
-          {{ frag|safe|underscore_to_space }}&hellip;
-        {% endfor %}
-      </p>
-    </div>
+          <p>
+            {% if request.GET.q %}&hellip;{% endif %}
+            {% for frag in doc.solr_highlights.text %}
+              {{ frag|safe|underscore_to_space }}
+            {% endfor %}
+          </p>
+        </div>
+      {% endwith %}
     {% endfor %}
     <div class="col-md-offset-half">
       {% if result.child_remaining %}

@@ -1175,7 +1175,7 @@ class RECAPSearchTest(ESIndexTestCase, TestCase):
         )
 
         self.assertIn("<mark>Thalassa</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>Thalassa</mark>"), 3)
+        self.assertEqual(r.content.decode().count("<mark>Thalassa</mark>"), 1)
 
         # Highlight referred_to.
         params = {"type": SEARCH_TYPES.RECAP, "q": "Persephone Sinclair"}
@@ -1188,7 +1188,7 @@ class RECAPSearchTest(ESIndexTestCase, TestCase):
 
         self.assertIn("<mark>Persephone</mark>", r.content.decode())
         self.assertEqual(
-            r.content.decode().count("<mark>Persephone</mark>"), 3
+            r.content.decode().count("<mark>Persephone</mark>"), 1
         )
 
         # Highlight docketNumber.
@@ -1202,10 +1202,8 @@ class RECAPSearchTest(ESIndexTestCase, TestCase):
             0, r.content.decode(), 2, "highlights docketNumber"
         )
 
-        self.assertIn("<mark>1:21-bk-1234</mark>", r.content.decode())
-        self.assertEqual(
-            r.content.decode().count("<mark>1:21-bk-1234</mark>"), 3
-        )
+        self.assertIn("<mark>1:21", r.content.decode())
+        self.assertEqual(r.content.decode().count("<mark>1:21</mark>"), 1)
 
         # Highlight description.
         params = {"type": SEARCH_TYPES.RECAP, "q": "Discharging Debtor"}
@@ -1229,10 +1227,77 @@ class RECAPSearchTest(ESIndexTestCase, TestCase):
         self._count_child_documents(
             0, r.content.decode(), 2, "highlights suitNature"
         )
-        self.assertIn("<mark>440</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>440</mark>"), 3)
+        self.assertIn("<mark>Lorem</mark>", r.content.decode())
+        self.assertEqual(r.content.decode().count("<mark>Lorem</mark>"), 2)
 
         # TODO Filter highlights don't work in Solr. Fix it in ES and add tests
+
+        # Highlight filter: caseName
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "SUBPOENAS SERVED ON",
+        }
+        r = await self._test_article_count(params, 1, "highlights caseName")
+        # Count child documents under docket.
+        self.assertIn("<mark>SUBPOENAS</mark>", r.content.decode())
+        self.assertIn("<mark>SERVED</mark>", r.content.decode())
+        self.assertIn("<mark>ON</mark>", r.content.decode())
+
+        # Highlight filter: description
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "description": "Amicus Curiae Lorem",
+        }
+        r = await self._test_article_count(params, 1, "highlights description")
+        self.assertIn("<mark>Amicus</mark>", r.content.decode())
+        self.assertEqual(r.content.decode().count("<mark>Amicus</mark>"), 2)
+
+        # Highlight filter: docket number
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "docket_number": "1:21-bk-1234",
+        }
+        r = await self._test_article_count(
+            params, 1, "highlights docket number"
+        )
+        self.assertIn("<mark>1:21", r.content.decode())
+        self.assertEqual(r.content.decode().count("<mark>1:21</mark>"), 1)
+
+        # Highlight filter: Nature of Suit
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "nature_of_suit": "440",
+        }
+        r = await self._test_article_count(
+            params, 1, "highlights Nature of Suit"
+        )
+        self.assertIn("<mark>440</mark>", r.content.decode())
+
+        # Highlight filter: Assigned to
+        params = {"type": SEARCH_TYPES.RECAP, "assigned_to": "Thalassa Miller"}
+        r = await self._test_article_count(
+            params, 1, "highlights Nature of Suit"
+        )
+        self.assertIn("<mark>Thalassa</mark>", r.content.decode())
+
+        # Highlight filter: Referred to
+        params = {"type": SEARCH_TYPES.RECAP, "referred_to": "Persephone"}
+        r = await self._test_article_count(params, 1, "highlights Referred to")
+        self.assertIn("<mark>Persephone</mark>", r.content.decode())
+
+        # Highlight filter + query
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "description": "Amicus Curiae Lorem",
+            "q": "Document attachment",
+        }
+        r = await self._test_article_count(params, 1, "filter + query")
+        self.assertIn("<mark>Amicus</mark>", r.content.decode())
+        self.assertEqual(r.content.decode().count("<mark>Amicus</mark>"), 1)
+        self.assertIn("<mark>attachment</mark>", r.content.decode())
+        self.assertEqual(
+            r.content.decode().count("<mark>attachment</mark>"), 1
+        )
 
     async def test_results_api_fields(self) -> None:
         """Confirm fields in RECAP Search API results."""
