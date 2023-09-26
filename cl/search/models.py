@@ -2034,18 +2034,18 @@ class Court(models.Model):
     )
     parent_court = models.ForeignKey(
         "self",
+        help_text="Parent court for subdivisions",
         on_delete=models.SET_NULL,
         blank=True,
         null=True,
-        related_name="subcourts",
-        help_text="Parent court for subdivisions",
+        related_name="child_courts",
     )
-    appellate_courts = models.ManyToManyField(
+    appeals_to = models.ManyToManyField(
         "self",
+        help_text="Appellate courts for this court",
         blank=True,
         symmetrical=False,
-        related_name="appellate_courts_to",
-        help_text="Appellate courts for this court",
+        related_name="appeals_from",
     )
     # Pacer fields
     pacer_court_id = models.PositiveSmallIntegerField(
@@ -2174,59 +2174,53 @@ class Court(models.Model):
 class Courthouse(models.Model):
     """A class to represent the physical location of a court."""
 
+    COUNTRY_CHOICES = (("GB", "United Kingdom"), ("US", "United States"))
+
     court = models.ForeignKey(
         Court,
-        help_text="The court object associated with this Courthouse.",
+        help_text="The court object associated with this courthouse.",
         related_name="courts",
         on_delete=models.CASCADE,
     )
     court_seat = models.BooleanField(
-        help_text="Is this the seat of the Court.",
+        help_text="Is this the seat of the Court?",
         default=False,
         null=True,
     )
     building_name = models.TextField(
-        verbose_name="Courthouse building name.",
-        help_text="Ex. John Adams Courthouse",
+        help_text="Ex. John Adams Courthouse.",
         blank=True,
     )
     address1 = models.TextField(
         help_text="The normalized address1 of the courthouse.",
-        db_index=True,
         blank=True,
     )
     address2 = models.TextField(
         help_text="The normalized address2 of the courthouse.",
-        db_index=True,
         blank=True,
     )
     city = models.TextField(
-        help_text="The normalized city of the organization.",
-        db_index=True,
+        help_text="The normalized city of the courthouse.",
         blank=True,
     )
     county = models.TextField(
-        help_text="The county, if any, where the court resides.",
+        help_text="The county, if any, where the courthouse resides.",
         blank=True,
     )
     state = USPostalCodeField(
         help_text="The two-letter USPS postal abbreviation for the "
         "organization w/ obsolete state options.",
-        db_index=True,
         choices=USPS_CHOICES + OBSOLETE_STATES,
-        null=True,
         blank=True,
     )
     zip_code = USZipCodeField(
         help_text="The zip code for the organization, XXXXX or XXXXX-XXXX "
         "work.",
-        db_index=True,
         blank=True,
-        null=True,
     )
-    country_code = models.CharField(
-        help_text="The two letter country code",
-        max_length=2,
+    country_code = models.TextField(
+        help_text="The two letter country code.",
+        choices=COUNTRY_CHOICES,
         default="US",
     )
 
