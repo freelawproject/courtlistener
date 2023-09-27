@@ -330,6 +330,14 @@ class ES_CHILD_ID:
     def RECAP(self) -> str:
         return f"rd_{self.instance_id}"
 
+    @property
+    def OPINION(self) -> str:
+        return f"o_{self.instance_id}"
+
+
+class JoinField(DEDField, Join):
+    pass
+
 
 class PersonBaseDocument(Document):
     id = fields.IntegerField(attr="pk")
