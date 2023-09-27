@@ -188,10 +188,9 @@
             </div>
           {% endif %}
           <p>
-            {% if request.GET.q %}&hellip;{% endif %}
-            {% for frag in doc.solr_highlights.text %}
-              {{ frag|safe|underscore_to_space }}
-            {% endfor %}
+            {% if doc.plain_text %}
+              &hellip;{{ doc.plain_text|safe }}&hellip;
+            {% endif %}
           </p>
         </div>
       {% endwith %}

@@ -31,16 +31,24 @@ SEARCH_RECAP_HL_FIELDS = [
     "suitNature.exact",
     "text",
 ]
-SEARCH_RECAP_CHILD_HL_FIELDS = [
-    "short_description",
-    "short_description.exact",
-    "description",
-    "description.exact",
-    "document_type",
-    "document_type.exact",
-    "document_number",
-    "attachment_number",
-]
+
+# In RECAP Search, it is necessary to display 'plain_text' as a truncated snippet,
+# where the snippet length is determined by 'fragment_size'.
+# For all other fields, the complete content should be returned.
+# To specify the 'fragment_size', set its value to 0 for no truncation,
+# or provide a different integer to limit the snippet length.
+SEARCH_RECAP_CHILD_HL_FIELDS = {
+    "short_description": 0,
+    "short_description.exact": 0,
+    "description": 0,
+    "description.exact": 0,
+    "document_type": 0,
+    "document_type.exact": 0,
+    "document_number": 0,
+    "attachment_number": 0,
+    "plain_text": 100,
+    "plain_text.exact": 100,
+}
 SEARCH_ORAL_ARGUMENT_HL_FIELDS = [
     "text",
     "caseName",

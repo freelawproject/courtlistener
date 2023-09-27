@@ -956,7 +956,6 @@ class DocketDocument(DocketBaseDocument):
     docket_slug = fields.KeywordField(attr="slug", index=False)
     docket_absolute_url = fields.KeywordField(index=False)
     court_exact = fields.KeywordField(attr="court.pk", index=False)
-    text = fields.TextField(index=False)
 
     # Parties
     party_id = fields.ListField(fields.IntegerField(multi=True))
@@ -1021,10 +1020,6 @@ class DocketDocument(DocketBaseDocument):
 
     def prepare_docket_absolute_url(self, instance):
         return instance.get_absolute_url()
-
-    def prepare_text(self, instance):
-        text_template = loader.get_template("indexes/dockets_text.txt")
-        return text_template.render({"item": instance}).translate(null_map)
 
     def prepare_parties(self, instance):
         out = {

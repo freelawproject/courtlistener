@@ -497,7 +497,7 @@ def build_has_child_query(
     query: QueryString | str,
     child_type: str,
     child_hits_limit: int,
-    highlighting_fields: list[str] = None,
+    highlighting_fields: dict[str, int] = None,
     order_by: str | None = None,
 ) -> QueryString:
     """Build a 'has_child' query.
@@ -523,11 +523,17 @@ def build_has_child_query(
         )
 
     if highlighting_fields is None:
-        highlighting_fields = []
+        highlighting_fields = {}
     highlight_options = {"fields": {}}
-    for field in highlighting_fields:
+
+    for field, fragment_size in highlighting_fields.items():
+        number_of_fragments = 0
+        if fragment_size:
+            number_of_fragments = 1
         highlight_options["fields"][field] = {
-            "number_of_fragments": 0,
+            "type": "plain",
+            "fragment_size": fragment_size,
+            "number_of_fragments": number_of_fragments,
             "pre_tags": ["<mark>"],
             "post_tags": ["</mark>"],
         }

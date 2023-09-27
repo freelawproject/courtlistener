@@ -459,6 +459,7 @@ class RECAPSearchTestCase(SimpleTestCase):
             document_number="1",
             is_available=True,
             page_count=5,
+            pacer_doc_id="018036652435",
         )
 
         cls.rd_att = RECAPDocumentFactory(
@@ -469,6 +470,7 @@ class RECAPSearchTestCase(SimpleTestCase):
             attachment_number=2,
             is_available=False,
             page_count=7,
+            pacer_doc_id="018036652436",
         )
 
         cls.judge_3 = PersonFactory.create(
@@ -496,7 +498,8 @@ class RECAPSearchTestCase(SimpleTestCase):
             description="Leave to File",
             document_number="3",
             page_count=10,
-            plain_text="Maecenas nunc justo",
+            plain_text="Mauris iaculis, leo sit amet hendrerit vehicula, arcu lorem auctor erat, non fermentum mauris lectus id ante. Integer varius sapien arcu, quis laoreet lacus consequat vel. Maecenas nunc justo Pellentesque ac arcu lacus. Donec ultricies odio justo, vitae scelerisque magna eleifend eu. Vestibulum venenatis volutpat mi a pulvinar.",
+            pacer_doc_id="016156723121",
         )
         super().setUpTestData()
 

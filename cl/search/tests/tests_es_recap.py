@@ -956,6 +956,14 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             0, r.content.decode(), 2, '"SUBPOENAS SERVED" NOT "OFF"'
         )
 
+        # Advanced query string, pacer_doc_id
+        params = {"type": SEARCH_TYPES.RECAP, "q": "pacer_doc_id:018036652436"}
+
+        # Frontend
+        r = await self._test_article_count(params, 1, '"pacer_doc_id"')
+        # Count child documents under docket.
+        self._count_child_documents(0, r.content.decode(), 1, '"pacer_doc_id"')
+
     async def test_text_queries(self) -> None:
         """Confirm text queries works properly"""
         # Text query case name.
@@ -1080,7 +1088,17 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIn("<mark>Lorem</mark>", r.content.decode())
         self.assertEqual(r.content.decode().count("<mark>Lorem</mark>"), 2)
 
-        # TODO Filter highlights don't work in Solr. Fix it in ES and add tests
+        # Highlight plain_text snippet.
+        params = {"type": SEARCH_TYPES.RECAP, "q": 'Maecenas nunc "justo"'}
+
+        r = await self._test_article_count(params, 1, "highlights plain_text")
+        # Count child documents under docket.
+        self._count_child_documents(
+            0, r.content.decode(), 1, "highlights plain_text"
+        )
+        self.assertEqual(r.content.decode().count("<mark>Maecenas</mark>"), 1)
+        self.assertEqual(r.content.decode().count("<mark>nunc</mark>"), 1)
+        self.assertEqual(r.content.decode().count("<mark>justo</mark>"), 1)
 
         # Highlight filter: caseName
         params = {
