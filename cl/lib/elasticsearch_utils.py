@@ -1731,6 +1731,8 @@ def limit_inner_hits(
 
     hits_limit, _ = get_child_top_hits_limit(get_params, search_type)
     match search_type:
+        case SEARCH_TYPES.OPINION:
+            child_type = "opinion"
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             child_type = "recap_document"
         case _:
@@ -1810,3 +1812,24 @@ def do_count_query(
         logger.warning(f"Error was: {e}")
         total_results = None
     return total_results
+
+
+def merge_opinion_and_cluster(results: Page | dict) -> None:
+    """Merges the fields from the opinion document with the best score into
+    the search results.
+    :param results: A Page object containing the search results to be modified.
+    :return: None, the function modifies the search results object in place.
+    """
+    for result in results:
+        opinion = result["child_hits"][0]
+        result["id"] = opinion["id"]
+        result["author_id"] = opinion["author_id"]
+        result["type"] = opinion["type"]
+        result["download_url"] = opinion["download_url"]
+        result["local_path"] = opinion["local_path"]
+        result["text"] = opinion["text"]
+        result["per_curiam"] = opinion["per_curiam"]
+        result["cites"] = opinion["cites"]
+        result["joined_by_ids"] = opinion["joined_by_ids"]
+        result["court_exact"] = opinion["joined_by_ids"]
+        result["status_exact"] = result["status"]
