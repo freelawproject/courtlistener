@@ -348,27 +348,3 @@ class ExtendedPersonESSerializer(PersonESResultSerializer):
     selection_method = serializers.ListField(read_only=True)
     selection_method_id = serializers.ListField(read_only=True)
     termination_reason = serializers.ListField(read_only=True)
-
-
-class RECAPESResultSerializer(DocumentSerializer):
-    """The serializer for Person results."""
-
-    class Meta:
-        document = DocketDocument
-        exclude = ("text", "person_child")
-
-
-class ExtendedRECAPESResultSerializer(RECAPESResultSerializer):
-    """Extends the RECAP serializer with all the field we get from the db"""
-
-    description = serializers.CharField(read_only=True)
-    entry_number = serializers.IntegerField(read_only=True)
-    entry_date_filed = DateOrDateTimeField(read_only=True)
-    short_description = serializers.CharField(read_only=True)
-    document_type = serializers.CharField(read_only=True)
-    document_number = serializers.IntegerField(read_only=True)
-    pacer_doc_id = serializers.CharField(read_only=True)
-    attachment_number = serializers.IntegerField(read_only=True)
-    is_available = serializers.BooleanField(read_only=True)
-    page_count = serializers.IntegerField(read_only=True)
-    filepath_local = serializers.CharField(read_only=True)

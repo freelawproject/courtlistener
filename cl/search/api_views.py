@@ -14,7 +14,6 @@ from cl.search.api_serializers import (
     OpinionSerializer,
     OriginalCourtInformationSerializer,
     RECAPDocumentSerializer,
-    RECAPESResultSerializer,
     SearchResultSerializer,
     TagSerializer,
 )

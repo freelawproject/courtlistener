@@ -124,8 +124,19 @@ def add_fields_boosting(
     :return: A list of Elasticsearch fields with their respective boost values.
     """
     # Apply standard qf parameters
-    qf = BOOSTS["qf"][cd["type"]].copy()
-    if cd["type"] in [SEARCH_TYPES.ORAL_ARGUMENT]:
+    if cd["type"] in [
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.DOCKETS,
+    ]:
+        qf = BOOSTS["qf"][cd["type"]]["es"].copy()
+    else:
+        qf = BOOSTS["qf"][cd["type"]].copy()
+
+    if cd["type"] in [
+        SEARCH_TYPES.ORAL_ARGUMENT,
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.DOCKETS,
+    ]:
         # Give a boost on the case_name field if it's obviously a case_name
         # query.
         query = cd.get("q", "")
@@ -385,8 +396,8 @@ def build_sort_results(cd: CleanData) -> Dict:
         },
         "dateFiled desc": {"dateFiled": {"order": "desc"}},
         "dateFiled asc": {"dateFiled": {"order": "asc"}},
-        "entry_date_filed asc": {"entry_date_filed": {"order": "asc"}},
-        "entry_date_filed desc": {"entry_date_filed": {"order": "desc"}},
+        "entry_date_filed asc": {"_score": {"order": "asc"}},
+        "entry_date_filed desc": {"_score": {"order": "desc"}},
     }
 
     if cd["type"] == SEARCH_TYPES.PARENTHETICAL:
@@ -487,6 +498,7 @@ def build_has_child_query(
     child_type: str,
     child_hits_limit: int,
     highlighting_fields: list[str] = None,
+    order_by: str | None = None,
 ) -> QueryString:
     """Build a 'has_child' query.
 
@@ -494,8 +506,21 @@ def build_has_child_query(
     :param child_type: The type of the child document.
     :param child_hits_limit: The maximum number of child hits to be returned.
     :param highlighting_fields: List of fields to highlight in child docs.
+    :param order_by: If provided the field to use to compute score for sorting
+    results based on a child document field.
     :return: The 'has_child' query.
     """
+
+    if order_by:
+        query = Q(
+            "function_score",
+            query=query,
+            script_score={
+                "script": {
+                    "source": f"doc['{order_by}'].value.toInstant().toEpochMilli()"
+                }
+            },
+        )
 
     if highlighting_fields is None:
         highlighting_fields = []
@@ -1406,12 +1431,18 @@ def build_full_join_es_queries(
                     minimum_should_match=1,
                 )
 
+        order_by_map_child = {
+            "entry_date_filed asc": "entry_date_filed",
+            "entry_date_filed desc": "entry_date_filed",
+        }
+        order_by = cd.get("order_by")
         if child_text_query or child_filters:
             query = build_has_child_query(
                 join_query,
                 "recap_document",
                 query_hits_limit,
                 SEARCH_RECAP_CHILD_HL_FIELDS,
+                order_by_map_child.get(order_by, None),
             )
             q_should.append(query)
 

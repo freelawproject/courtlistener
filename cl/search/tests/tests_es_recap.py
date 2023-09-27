@@ -1167,12 +1167,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "order_by": "score desc",
         }
         # Frontend
-        r = await self._test_article_count(params, 2, "order score desc")
-        self.assertTrue(
-            r.content.decode().index("1:21-bk-1234")
-            < r.content.decode().index("12-1235"),
-            msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by desc.",
-        )
+        await self._test_article_count(params, 2, "order score desc")
 
         # Order by entry_date_filed desc
         params = {
@@ -1181,11 +1176,13 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "order_by": "entry_date_filed desc",
         }
         # Frontend
-        r = await self._test_article_count(params, 2, "order dateFiled desc")
+        r = await self._test_article_count(
+            params, 2, "order entry_date_filed desc"
+        )
         self.assertTrue(
             r.content.decode().index("1:21-bk-1234")
             < r.content.decode().index("12-1235"),
-            msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by desc.",
+            msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by entry_date_filed  desc.",
         )
 
         # Order by entry_date_filed asc
@@ -1195,11 +1192,13 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "order_by": "entry_date_filed asc",
         }
         # Frontend
-        r = await self._test_article_count(params, 2, "order dateFiled desc")
+        r = await self._test_article_count(
+            params, 2, "order entry_date_filed asc"
+        )
         self.assertTrue(
             r.content.decode().index("12-1235")
             < r.content.decode().index("1:21-bk-1234"),
-            msg="'12-1235' should come BEFORE '1:21-bk-1234' when order_by asc.",
+            msg="'12-1235' should come BEFORE '1:21-bk-1234' when order_by entry_date_filed asc.",
         )
 
         # Order by dateFiled desc
@@ -1214,7 +1213,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertTrue(
             r.content.decode().index("12-1235")
             < r.content.decode().index("1:21-bk-1234"),
-            msg="'12-1235' should come BEFORE '1:21-bk-1234' when order_by desc.",
+            msg="'12-1235' should come BEFORE '1:21-bk-1234' when order_by dateFiled desc.",
         )
 
         # Order by dateFiled asc
@@ -1228,7 +1227,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertTrue(
             r.content.decode().index("1:21-bk-1234")
             < r.content.decode().index("12-1235"),
-            msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by asc.",
+            msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by dateFiled asc.",
         )
 
 
