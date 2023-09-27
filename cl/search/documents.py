@@ -1089,7 +1089,9 @@ class DocketDocument(DocketBaseDocument):
 
 # Opinions
 class OpinionBaseDocument(Document):
-    cluster_id = fields.KeywordField(attr="pk")
+    cluster_id = fields.IntegerField(
+        attr="pk", fields={"raw": fields.KeywordField(attr="pk")}
+    )
     docketNumber = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
@@ -1304,7 +1306,12 @@ class OpinionBaseDocument(Document):
 
 @opinion_index.document
 class OpinionDocument(OpinionBaseDocument):
-    id = fields.KeywordField(attr="pk")
+    id = fields.IntegerField(
+        attr="pk",
+        fields={
+            "raw": fields.KeywordField(attr="pk"),
+        },
+    )
     author_id = fields.IntegerField()
     type = fields.KeywordField(attr="type")
     per_curiam = fields.BooleanField(attr="per_curiam")

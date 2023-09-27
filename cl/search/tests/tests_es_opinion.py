@@ -9,11 +9,14 @@ from django.urls import reverse
 from factory import RelatedFactory
 from lxml import html
 from rest_framework.status import HTTP_200_OK
+from waffle.testutils import override_flag
 
 from cl.lib.test_helpers import (
+    CourtTestCase,
     EmptySolrTestCase,
     IndexedSolrTestCase,
-    SolrTestCase,
+    PeopleTestCase,
+    SearchTestCase,
 )
 from cl.search.factories import (
     CourtFactory,
@@ -24,14 +27,18 @@ from cl.search.factories import (
     OpinionWithChildrenFactory,
 )
 from cl.search.models import PRECEDENTIAL_STATUS, SEARCH_TYPES
-from cl.search.tests.tests import SearchTest
 from cl.search.views import do_search
+from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.users.factories import UserProfileWithParentsFactory
 
 
-class OpinionsSearchTest(IndexedSolrTestCase):
+class OpinionsSearchTest(
+    ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
+):
     @classmethod
     def setUpTestData(cls):
+        cls.rebuild_index("search.OpinionCluster")
+        super().setUpTestData()
         court = CourtFactory(id="canb", jurisdiction="FB")
         OpinionClusterFactoryWithChildrenAndParents(
             case_name="Strickland v. Washington.",
@@ -70,7 +77,6 @@ class OpinionsSearchTest(IndexedSolrTestCase):
             scdb_votes_minority=3,
             scdb_votes_majority=6,
         )
-        super().setUpTestData()
 
     async def _test_article_count(self, params, expected_count, field_name):
         r = await self.async_client.get("/", params)
@@ -116,6 +122,28 @@ class OpinionsSearchTest(IndexedSolrTestCase):
         # API
         r = await self._test_api_results_count(search_params, 1, "text_query")
         self.assertIn("Honda", r.content.decode())
+
+    async def test_homepage(self) -> None:
+        """Is the homepage loaded when no GET parameters are provided?"""
+        response = await self.async_client.get(reverse("show_results"))
+        self.assertIn(
+            'id="homepage"',
+            response.content.decode(),
+            msg="Did not find the #homepage id when attempting to "
+            "load the homepage",
+        )
+
+    async def test_fail_gracefully(self) -> None:
+        """Do we fail gracefully when an invalid search is created?"""
+        response = await self.async_client.get(
+            reverse("show_results"), {"filed_after": "-"}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            "an error",
+            response.content.decode(),
+            msg="Invalid search did not result in an error.",
+        )
 
     async def test_can_search_with_white_spaces_only(self) -> None:
         """Does everything work when whitespace is in various fields?"""
@@ -587,7 +615,7 @@ class OpinionsSearchTest(IndexedSolrTestCase):
 
     async def test_proximity_query(self) -> None:
         """Does a proximity query work"""
-        search_params = {"q": "'Testing Court'~3"}
+        search_params = {"q": '"Testing Court"~3'}
         r = await self._test_article_count(search_params, 1, "proximity query")
         self.assertIn("docket number 2", r.content.decode())
         self.assertIn("1 Opinion", r.content.decode())
@@ -656,7 +684,6 @@ class OpinionsSearchTest(IndexedSolrTestCase):
             "local_path",
             "neutralCite",
             "non_participating_judge_ids",
-            "pagerank",
             "panel_ids",
             "per_curiam",
             "scdb_id",
@@ -681,11 +708,14 @@ class OpinionsSearchTest(IndexedSolrTestCase):
         """Confirm highlights are shown properly"""
 
         # Highlight case name.
-        params = {"q": "Supreme"}
+        params = {"q": "'Howard v. Honda'"}
 
         r = await self._test_article_count(params, 1, "highlights case name")
-        self.assertIn("<mark>Supreme</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>Supreme</mark>"), 1)
+        self.assertIn("<mark>Howard</mark>", r.content.decode())
+        self.assertEqual(r.content.decode().count("<mark>Howard</mark>"), 1)
+
+        self.assertIn("<mark>Honda</mark>", r.content.decode())
+        self.assertEqual(r.content.decode().count("<mark>Honda</mark>"), 1)
 
 
 @override_settings(
@@ -711,7 +741,12 @@ class RelatedSearchTest(IndexedSolrTestCase):
 
         super(RelatedSearchTest, self).setUp()
 
-    async def test_more_like_this_opinion(self) -> None:
+    def get_article_count(self, r):
+        """Get the article count in a query response"""
+        return len(html.fromstring(r.content.decode()).xpath("//article"))
+
+    @override_flag("o-es-active", False)
+    def test_more_like_this_opinion(self) -> None:
         """Does the MoreLikeThis query return the correct number and order of
         articles."""
         seed_pk = self.opinion_1.pk  # Paul Debbas v. Franklin
@@ -729,12 +764,10 @@ class RelatedSearchTest(IndexedSolrTestCase):
             {f"stat_{v}": "on" for s, v in PRECEDENTIAL_STATUS.NAMES}
         )
 
-        r = await self.async_client.get(reverse("show_results"), params)
+        r = self.client.get(reverse("show_results"), params)
         self.assertEqual(r.status_code, HTTP_200_OK)
 
-        self.assertEqual(
-            expected_article_count, SearchTest.get_article_count(r)
-        )
+        self.assertEqual(expected_article_count, self.get_article_count(r))
         self.assertTrue(
             r.content.decode().index("/opinion/%i/" % expected_first_pk)
             < r.content.decode().index("/opinion/%i/" % expected_second_pk),

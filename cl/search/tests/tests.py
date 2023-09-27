@@ -501,28 +501,6 @@ class SearchTest(ESIndexTestCase, IndexedSolrTestCase):
         """Get the article count in a query response"""
         return len(html.fromstring(r.content.decode()).xpath("//article"))
 
-    async def test_homepage(self) -> None:
-        """Is the homepage loaded when no GET parameters are provided?"""
-        response = await self.async_client.get(reverse("show_results"))
-        self.assertIn(
-            'id="homepage"',
-            response.content.decode(),
-            msg="Did not find the #homepage id when attempting to "
-            "load the homepage",
-        )
-
-    async def test_fail_gracefully(self) -> None:
-        """Do we fail gracefully when an invalid search is created?"""
-        response = await self.async_client.get(
-            reverse("show_results"), {"neutral_cite": "-"}
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(
-            "an error",
-            response.content.decode(),
-            msg="Invalid search did not result in an error.",
-        )
-
     async def test_issue_727_doc_att_numbers(self) -> None:
         """Can we send integers to the document number and attachment number
         fields?
