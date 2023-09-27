@@ -94,13 +94,10 @@ def build_numeric_range_query(
     :param relation: Indicates how the range query matches values for range fields. Defaults to None.
     :return: Empty list or list with DSL Range query
     """
-
-    params = {}
     if not any([lower_bound, upper_bound]):
         return []
 
-    params["gte"] = lower_bound
-    params["lte"] = upper_bound
+    params = {"gte": lower_bound, "lte": upper_bound}
     if relation is not None:
         allowed_relations = ["INTERSECTS", "CONTAINS", "WITHIN"]
         assert (
@@ -736,6 +733,18 @@ def get_search_query(
                         should=[match_all_child_query, match_all_parent_query],
                     )
                 )
+            case SEARCH_TYPES.OPINION:
+                # Only return Opinion clusters.
+                q_should = Q(
+                    "has_child",
+                    type="opinion",
+                    score_mode="max",
+                    query=Q("match_all"),
+                    inner_hits={"name": f"text_query_inner_opinion", "size": 10},
+                )
+                search_query = search_query.query(
+                    Q("bool", should=q_should, minimum_should_match=1)
+                )
             case _:
                 return search_query.query("match_all")
 
@@ -761,7 +770,7 @@ def build_es_base_query(
 
     string_query = None
     join_query = None
-    join_field_documents = [SEARCH_TYPES.PEOPLE]
+    join_field_documents = [SEARCH_TYPES.PEOPLE, SEARCH_TYPES.OPINION]
     if cd["type"] in join_field_documents:
         filters = build_join_es_filters(cd)
     else:
@@ -835,19 +844,41 @@ def build_es_base_query(
             string_query, join_query = build_full_join_es_queries(
                 cd, child_query_fields, parent_query_fields
             )
-        case _:
-            fields = [
-                "court",
-                "citation",
-                "judge",
-                "caseName",
-                "docketNumber",
-                "caseNameFull",
-                "caseNameShort",
-                "status",
-            ]
-            string_query = build_fulltext_query(
-                fields,
+        case SEARCH_TYPES.OPINION:
+            child_query_fields = {
+                "opinion": add_fields_boosting(
+                    cd,
+                    [
+                        "type",
+                        "text",
+                        # Cluster fields
+                        "court",
+                        "citation",
+                        "judge",
+                        "caseName",
+                        "docketNumber",
+                        "caseNameFull",
+                        "caseNameShort",
+                        "status",
+                    ],
+                ),
+            }
+            parent_query_fields = add_fields_boosting(
+                cd,
+                [
+                    "court",
+                    "citation",
+                    "judge",
+                    "caseName",
+                    "docketNumber",
+                    "caseNameFull",
+                    "caseNameShort",
+                    "status",
+                ],
+            )
+            string_query = build_join_fulltext_queries(
+                child_query_fields,
+                parent_query_fields,
                 cd.get("q", ""),
             )
 
