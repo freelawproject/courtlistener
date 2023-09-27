@@ -693,7 +693,7 @@ def build_es_base_query(
                         "assignedTo",
                         "referredTo",
                         "court",
-                        "court_id_text",
+                        "court_id",
                         "court_citation_string",
                         "chapter",
                         "trustee_str",
@@ -712,7 +712,7 @@ def build_es_base_query(
                     "assignedTo",
                     "referredTo",
                     "court",
-                    "court_id_text",
+                    "court_id",
                     "court_citation_string",
                     "chapter",
                     "trustee_str",
@@ -1337,7 +1337,7 @@ def build_join_es_filters(cd: CleanData) -> List:
         queries_list.extend(
             [
                 *build_term_query(
-                    "court_id",
+                    "court_id.raw",
                     cd.get("court", "").split(),
                 ),
                 *build_text_filter("caseName", cd.get("case_name", "")),

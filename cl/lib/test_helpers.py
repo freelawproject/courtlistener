@@ -498,7 +498,7 @@ class RECAPSearchTestCase(SimpleTestCase):
             description="Leave to File",
             document_number="3",
             page_count=10,
-            plain_text="Mauris iaculis, leo sit amet hendrerit vehicula, arcu lorem auctor erat, non fermentum mauris lectus id ante. Integer varius sapien arcu, quis laoreet lacus consequat vel. Maecenas nunc justo Pellentesque ac arcu lacus. Donec ultricies odio justo, vitae scelerisque magna eleifend eu. Vestibulum venenatis volutpat mi a pulvinar.",
+            plain_text="Mauris iaculis, leo sit amet hendrerit vehicula, Maecenas nunc justo. Integer varius sapien arcu, quis laoreet lacus consequat vel.",
             pacer_doc_id="016156723121",
         )
         super().setUpTestData()

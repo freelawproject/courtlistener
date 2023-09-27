@@ -767,10 +767,10 @@ class DocketBaseDocument(Document):
         },
         search_analyzer="search_analyzer",
     )
-    court_id = fields.KeywordField(attr="court.pk")
-    court_id_text = fields.TextField(
+    court_id = fields.TextField(
         attr="court.pk",
         analyzer="text_en_splitting_cl",
+        fields={"raw": fields.KeywordField(attr="court.pk")},
         search_analyzer="search_analyzer",
     )
     court_citation_string = fields.TextField(
@@ -932,9 +932,6 @@ class ESRECAPDocument(DocketBaseDocument):
         return instance.docket_entry.docket.court.full_name
 
     def prepare_court_id(self, instance):
-        return instance.docket_entry.docket.court.pk
-
-    def prepare_court_id_text(self, instance):
         return instance.docket_entry.docket.court.pk
 
     def prepare_court_citation_string(self, instance):
