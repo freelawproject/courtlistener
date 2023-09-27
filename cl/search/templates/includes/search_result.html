@@ -383,13 +383,6 @@
     {% endif %}
   {% endif %}
   {% if simple != True %}
-    {% if type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION %}
-      <p>
-        {% if request.GET.q %}&hellip;{% endif %}{% for frag in result.text %}
-          {{ frag|safe|underscore_to_space }}&hellip;
-        {% endfor %}
-      </p>
-    {% endif %}
     {% if type == SEARCH_TYPES.ORAL_ARGUMENT or type_override == SEARCH_TYPES.ORAL_ARGUMENT %}
       <p>
         {% if result.text %}
@@ -399,5 +392,34 @@
     {% endif %}
   {% endif %}
   {% endwith %}
+
+  {% if type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION %}
+    {% if result.child_docs|length > 1%}
+      {% for doc in result.child_docs %}
+        <div class="col-md-offset-half">
+          <h4>
+            <p>{{ doc.type_text }}</p>
+          </h4>
+          <p>
+            {{ doc.text| truncatechars:300}}
+          </p>
+        </div>
+      {% endfor %}
+    {% else %}
+      {% with doc=result.child_docs.0 %}
+        <div class="col-md-offset-half">
+          {% if doc.type != '010combined' %}
+            <h4>
+              <p>{{ doc.type_text }}</p>
+            </h4>
+          {% endif %}
+          <p class="representation">
+            {{ doc.text| truncatechars:300}}
+          </p>
+        </div>
+      {% endwith %}
+    {% endif %}
+
+  {% endif %}
 </article>
 {% endfor %}

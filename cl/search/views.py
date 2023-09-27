@@ -53,12 +53,11 @@ from cl.lib.search_utils import (
     merge_form_with_courts,
     regroup_snippets,
 )
-from cl.lib.types import CleanData
 from cl.search.constants import RELATED_PATTERN
 from cl.search.documents import (
     AudioDocument,
     DocketDocument,
-    OpinionDocument,
+    OpinionClusterDocument,
     ParentheticalGroupDocument,
     PersonDocument,
 )
@@ -642,7 +641,7 @@ def do_es_search(
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             document_type = DocketDocument
         case SEARCH_TYPES.OPINION:
-            document_type = OpinionDocument
+            document_type = OpinionClusterDocument
 
     if search_form.is_valid() and es_index_exists(
         index_name=document_type._index._name
@@ -745,9 +744,8 @@ def fetch_and_paginate_results(
     except EmptyPage:
         results = paginator.page(paginator.num_pages)
 
-    search_type = get_params.get("type")
+    search_type = get_params.get("type", SEARCH_TYPES.OPINION)
     # Set highlights in results.
-
     convert_str_date_fields_to_date_objects(results, search_type)
     merge_courts_from_db(results, search_type)
     limit_inner_hits(get_params, results, search_type)
