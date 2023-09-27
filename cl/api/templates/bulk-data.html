@@ -32,7 +32,7 @@
         <ul>
           <li><a href="#schedule">Data Generation Schedule</a></li>
           <li><a href="#contributing">Contributions</a></li>
-          <li><a href="#old">Old Formats</a></li>
+          <li><a href="#old">Release Notes</a></li>
           <li><a herf="#copyright">Copyright</a></li>
         </ul>
       </ul>
@@ -160,6 +160,9 @@
     </p>
 
     <h3 id="old">Release Notes</h3>
+	<p>
+      <strong>2023-09-26</strong>: Courthouse table added to bulk script. Court appeals_to through table added to bulk script.
+    </p>
     <p>
       <strong>2023-07-07</strong>: We added the <code>FORCE_QUOTE *</code> option to our export script so that null can be distinguished from blank values. In the past, both appeared in the CSVs as commas with nothing between them (<code>,,</code>). With this change, blanks will use quotes: (<code>,"",</code>), while nulls will remain as before. This should make the <code>COPY TO</code> commands work better. In addition, several missing columns are added to the bulk data to align our exports more closely with our database.
     </p>

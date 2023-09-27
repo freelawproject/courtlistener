@@ -23,10 +23,10 @@ PGPASSWORD=$DB_PASSWORD psql \
 	--command \
 	  'set statement_timeout to 0;
 	   COPY search_court (
-	       id, pacer_court_id, pacer_has_rss_feed, pacer_rss_entry_types, fjc_court_id,
-	       date_modified, in_use, has_opinion_scraper, has_oral_argument_scraper, position,
-	       citation_string, short_name, full_name, url, start_date, end_date,
-	       jurisdiction, notes
+	       id, pacer_court_id, pacer_has_rss_feed, pacer_rss_entry_types, date_last_pacer_contact,
+	       fjc_court_id, date_modified, in_use, has_opinion_scraper,
+	       has_oral_argument_scraper, position, citation_string, short_name, full_name,
+	       url, start_date, end_date, jurisdiction, notes, parent_court_id
 	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
 	--quiet \
 	--host $DB_HOST \
@@ -34,6 +34,36 @@ PGPASSWORD=$DB_PASSWORD psql \
 	--dbname courtlistener | \
 	bzip2 | \
 	aws s3 cp - s3://com-courtlistener-storage/bulk-data/courts-`date -I`.csv.bz2 --acl public-read
+
+echo "Streaming search_courthouse to S3"
+PGPASSWORD=$DB_PASSWORD psql \
+	--command \
+	  'set statement_timeout to 0;
+	   COPY search_courthouse (
+	       id, court_seat, building_name, address1, address2, city, county, state,
+	       zip_code, country_code, court_id
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
+	--quiet \
+	--host $DB_HOST \
+	--username $DB_USER \
+	--dbname courtlistener | \
+	bzip2 | \
+	aws s3 cp - s3://com-courtlistener-storage/bulk-data/courthouses-`date -I`.csv.bz2 --acl public-read
+
+# Through table for courts m2m field: appeals_to
+echo "Streaming search_court_appeals_to to S3"
+PGPASSWORD=$DB_PASSWORD psql \
+	--command \
+	  'set statement_timeout to 0;
+	   COPY search_court_appeals_to (
+	       id, from_court_id, to_court_id
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
+	--quiet \
+	--host $DB_HOST \
+	--username $DB_USER \
+	--dbname courtlistener | \
+	bzip2 | \
+	aws s3 cp - s3://com-courtlistener-storage/bulk-data/court-appeals-to-`date -I`.csv.bz2 --acl public-read
 
 echo "Streaming search_docket to S3"
 PGPASSWORD=$DB_PASSWORD psql \
