@@ -5,11 +5,17 @@ from rest_framework.exceptions import ParseError
 from cl.lib import search_utils
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
+    expose_inner_hits,
+    merge_opinion_and_cluster,
     merge_unavailable_fields_on_parent_document,
 )
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import map_to_docket_entry_sorting
-from cl.search.documents import AudioDocument, OpinionDocument, PersonDocument
+from cl.search.documents import (
+    AudioDocument,
+    OpinionClusterDocument,
+    PersonDocument,
+)
 from cl.search.models import SEARCH_TYPES
 
 
@@ -51,7 +57,7 @@ def get_object_list(request, cd, paginator):
     elif is_people_active:
         search_query = PersonDocument.search()
     elif is_opinion_active:
-        search_query = OpinionDocument.search()
+        search_query = OpinionClusterDocument.search()
     else:
         search_query = None
 
@@ -123,7 +129,14 @@ class ESList(object):
 
         # Merge unavailable fields in ES by pulling data from the DB to make
         # the API backwards compatible
-        merge_unavailable_fields_on_parent_document(results, self.type, "api")
+        if self.type == SEARCH_TYPES.PEOPLE:
+            merge_unavailable_fields_on_parent_document(
+                results, self.type, "api"
+            )
+
+        if self.type == SEARCH_TYPES.OPINION:
+            expose_inner_hits(results, self.type)
+            merge_opinion_and_cluster(results)
         # Pull the text snippet up a level
         for result in results:
             if hasattr(result.meta, "highlight") and hasattr(
