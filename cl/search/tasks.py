@@ -33,12 +33,14 @@ from cl.search.documents import (
     AudioDocument,
     DocketDocument,
     ESRECAPDocument,
+    OpinionClusterDocument,
     PersonDocument,
     PositionDocument,
 )
 from cl.search.models import (
     SEARCH_TYPES,
     Docket,
+    Opinion,
     OpinionCluster,
     RECAPDocument,
 )
@@ -341,6 +343,27 @@ def es_save_document(
                     skip_empty=False, return_doc_meta=True
                 )
             doc_id = ES_CHILD_ID(instance.pk).RECAP
+            es_args["_routing"] = parent_id
+        case "search.Opinion":
+            parent_id = getattr(instance.cluster, "pk", None)
+            if not all(
+                [
+                    es_index_exists(es_document._index._name),
+                    parent_id,
+                ]
+            ):
+                self.request.chain = None
+                return None
+
+            if not OpinionClusterDocument.exists(id=parent_id):
+                # create the parent document if it does not exist in ES
+                cluster_doc = OpinionClusterDocument()
+                doc = cluster_doc.prepare(instance.cluster)
+                OpinionClusterDocument(meta={"id": parent_id}, **doc).save(
+                    skip_empty=False, return_doc_meta=True
+                )
+
+            doc_id = ES_CHILD_ID(instance.pk).OPINION
             es_args["_routing"] = parent_id
         case _:
             doc_id = instance_id
