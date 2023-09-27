@@ -41,6 +41,7 @@ from cl.search.constants import (
     SEARCH_RECAP_CHILD_QUERY_FIELDS,
     SEARCH_RECAP_HL_FIELDS,
     SEARCH_RECAP_PARENT_QUERY_FIELDS,
+    SOLR_OPINION_HL_FIELDS,
     SOLR_PEOPLE_ES_HL_FIELDS,
 )
 from cl.search.exception import UnbalancedQuery
@@ -980,6 +981,8 @@ def add_es_highlighting(
             highlighting_fields = SOLR_PEOPLE_ES_HL_FIELDS
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             highlighting_fields = SEARCH_RECAP_HL_FIELDS
+        case SEARCH_TYPES.OPINION:
+            highlighting_fields = SOLR_OPINION_HL_FIELDS
 
     search_query = search_query.source(excludes=fields_to_exclude)
     for field in highlighting_fields:
