@@ -1077,7 +1077,7 @@ class DocketDocument(DocketBaseDocument):
 
 # Opinions
 @opinion_index.document
-class OpinionDocument(Document):
+class OpinionClusterDocument(Document):
     id = fields.IntegerField(attr="pk")
     docket_id = fields.IntegerField(attr="docket.pk")
     docketNumber = fields.TextField(
