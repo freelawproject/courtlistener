@@ -189,8 +189,18 @@ BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
     "qf": {
         SEARCH_TYPES.OPINION: {
             "text": 1.0,
+            "type": 1.0,
+            # Cluster fields
             "caseName": 4.0,
             "docketNumber": 2.0,
+            "court": 1.0,
+            "citation": 1.0,
+            "judge": 1.0,
+            "caseName": 1.0,
+            "docketNumber": 1.0,
+            "caseNameFull": 1.0,
+            "caseNameShort": 1.0,
+            "status": 1.0,
         },
         SEARCH_TYPES.RECAP: recap_boosts_qf,
         SEARCH_TYPES.DOCKETS: recap_boosts_qf,
