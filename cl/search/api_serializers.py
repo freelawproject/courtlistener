@@ -360,6 +360,7 @@ class ExtendedPersonESSerializer(PersonESResultSerializer):
 class OpinionESResultSerializer(DocumentSerializer):
     """The serializer for Opinion results."""
 
+    cluster_id = serializers.IntegerField(read_only=True)
     status_exact = serializers.CharField(read_only=True)
 
     # Fields from the opinion child

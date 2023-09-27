@@ -1822,6 +1822,7 @@ def merge_opinion_and_cluster(results: Page | dict) -> None:
     """
     for result in results:
         opinion = result["child_hits"][0]
+        result["cluster_id"] = result["id"]
         result["id"] = opinion["id"]
         result["author_id"] = opinion["author_id"]
         result["type"] = opinion["type"]
