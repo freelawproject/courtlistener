@@ -19,6 +19,8 @@ from cl.search.documents import (
     AudioDocument,
     DocketDocument,
     ESRECAPDocument,
+    OpinionClusterDocument,
+    OpinionDocument,
     ParentheticalGroupDocument,
     PersonDocument,
     PositionDocument,
@@ -177,7 +179,6 @@ p_field_mapping = {
     },
 }
 
-
 position_field_mapping = {
     "save": {
         Person: {
@@ -289,6 +290,28 @@ recap_document_field_mapping = {
     "reverse-delete": {},
 }
 
+o_field_mapping = {
+    "save": {
+        Opinion: {},
+    },
+    "delete": {Opinion: {}},
+    "m2m": {},
+    "reverse": {},
+}
+
+o_cluster_field_mapping = {
+    "save": {
+        OpinionCluster: {},
+    },
+    "delete": {OpinionCluster: {}},
+    "m2m": {},
+    "reverse": {
+        Citation: {
+            "citations": {"all": ["citation", "neutralCite", "lexisCite"]}
+        },
+    },
+}
+
 
 # Instantiate a new ESSignalProcessor() for each Model/Document that needs to
 # be tracked. The arguments are: main model, ES document mapping, and field mapping dict.
@@ -318,6 +341,14 @@ _docket_signal_processor = ESSignalProcessor(
 
 _recap_document_signal_processor = ESSignalProcessor(
     RECAPDocument, ESRECAPDocument, recap_document_field_mapping
+)
+
+_o_signal_processor = ESSignalProcessor(
+    Opinion, OpinionDocument, o_field_mapping
+)
+
+_o_cluster_signal_processor = ESSignalProcessor(
+    OpinionCluster, OpinionClusterDocument, o_cluster_field_mapping
 )
 
 
