@@ -554,42 +554,6 @@ def build_es_filters(cd: CleanData) -> List:
         # Build judge terms filter
         queries_list.extend(build_text_filter("judge", cd.get("judge", "")))
 
-    if cd["type"] == SEARCH_TYPES.OPINION:
-        selected_stats = get_array_of_selected_fields(cd, "stat_")
-        if len(selected_stats):
-            queries_list.extend(
-                build_term_query(
-                    "status",
-                    selected_stats,
-                )
-            )
-
-        queries_list.extend(
-            [
-                *build_text_filter("caseName", cd.get("case_name", "")),
-                *build_daterange_query(
-                    "dateFiled",
-                    cd.get("filed_before", ""),
-                    cd.get("filed_after", ""),
-                ),
-                *build_term_query(
-                    "docketNumber",
-                    cd.get("docket_number", ""),
-                    make_phrase=True,
-                    slop=1,
-                ),
-                *build_text_filter("citation", cd.get("citation", "")),
-                *build_text_filter("neutralCite", cd.get("neutral_cite", "")),
-                *build_numeric_range_query(
-                    "citeCount", cd.get("cited_gt", ""), cd.get("cited_lt", "")
-                ),
-                *build_text_filter(
-                    "judge",
-                    cd.get("judge", ""),
-                ),
-            ]
-        )
-
     return queries_list
 
 
@@ -740,7 +704,10 @@ def get_search_query(
                     type="opinion",
                     score_mode="max",
                     query=Q("match_all"),
-                    inner_hits={"name": f"text_query_inner_opinion", "size": 10},
+                    inner_hits={
+                        "name": f"text_query_inner_opinion",
+                        "size": 10,
+                    },
                 )
                 search_query = search_query.query(
                     Q("bool", should=q_should, minimum_should_match=1)
@@ -1544,6 +1511,46 @@ def build_join_es_filters(cd: CleanData) -> List:
                 ),
             ]
         )
+
+    if cd["type"] == SEARCH_TYPES.OPINION:
+        selected_stats = get_array_of_selected_fields(cd, "stat_")
+        if len(selected_stats):
+            queries_list.extend(
+                build_term_query(
+                    "status.raw",
+                    selected_stats,
+                )
+            )
+
+        queries_list.extend(
+            [
+                Q("match", cluster_child="opinion_cluster"),
+                *build_text_filter("caseName", cd.get("case_name", "")),
+                *build_daterange_query(
+                    "dateFiled",
+                    cd.get("filed_before", ""),
+                    cd.get("filed_after", ""),
+                ),
+                *build_term_query(
+                    "docketNumber",
+                    cd.get("docket_number", ""),
+                    make_phrase=True,
+                    slop=1,
+                ),
+                *build_text_filter("citation", cd.get("citation", "")),
+                *build_text_filter("neutralCite", cd.get("neutral_cite", "")),
+                *build_numeric_range_query(
+                    "citeCount",
+                    cd.get("cited_gt", ""),
+                    cd.get("cited_lt", ""),
+                ),
+                *build_text_filter(
+                    "judge",
+                    cd.get("judge", ""),
+                ),
+            ]
+        )
+
     return queries_list
 
 
