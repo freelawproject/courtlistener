@@ -1076,39 +1076,8 @@ class DocketDocument(DocketBaseDocument):
 
 
 # Opinions
-@opinion_index.document
-class OpinionClusterDocument(Document):
-    id = fields.IntegerField(attr="pk")
-    docket_id = fields.IntegerField(attr="docket.pk")
+class OpinionBaseDocument(Document):
     docketNumber = fields.TextField(
-        attr="docket.docket_number",
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(
-                attr="docket.docket_number", analyzer="english_exact"
-            ),
-        },
-        search_analyzer="search_analyzer",
-    )
-    court_id = fields.KeywordField(attr="docket.court.pk")
-    court = fields.TextField(
-        attr="docket.court.full_name",
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(
-                attr="docket.court.full_name", analyzer="english_exact"
-            ),
-        },
-        search_analyzer="search_analyzer",
-    )
-    court_citation_string = fields.TextField(
-        attr="docket.court.citation_string",
-        analyzer="text_en_splitting_cl",
-        search_analyzer="search_analyzer",
-    )
-    absolute_url = fields.KeywordField()
-    attorney = fields.TextField(
-        attr="attorneys",
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(analyzer="english_exact"),
@@ -1122,16 +1091,212 @@ class OpinionClusterDocument(Document):
         },
         search_analyzer="search_analyzer",
     )
-    caseNameShort = fields.TextField(
-        attr="case_name_short",
+    caseNameFull = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(analyzer="english_exact"),
         },
         search_analyzer="search_analyzer",
     )
-    caseNameFull = fields.TextField(
-        attr="case_name_full",
+    dateFiled_text = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    dateArgued_text = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    dateReargued_text = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    dateReargumentDenied_text = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    court_id = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+            "raw": fields.KeywordField(),
+        },
+    )
+    court = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    court_citation_string = fields.TextField(
+        attr="docket.court.citation_string",
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
+    )
+    judge = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    panel_names = fields.ListField(
+        fields.TextField(
+            analyzer="text_en_splitting_cl",
+            search_analyzer="search_analyzer",
+            multi=True,
+        ),
+    )
+    attorney = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    suitNature = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    citation = fields.ListField(
+        fields.TextField(
+            analyzer="text_en_splitting_cl",
+            search_analyzer="search_analyzer",
+            multi=True,
+        ),
+    )
+    status = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+            "raw": fields.KeywordField(),
+        },
+    )
+    proceduralHistory = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    posture = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    syllabus = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    cluster_child = JoinField(relations={"opinion_cluster": ["opinion"]})
+    timestamp = fields.DateField()
+
+    class Django:
+        model = OpinionCluster
+        ignore_signals = True
+
+    def prepare_docketNumber(self, instance):
+        return instance.docket.docket_number
+
+    def prepare_caseName(self, instance):
+        return best_case_name(instance)
+
+    def prepare_caseNameFull(self, instance):
+        return instance.case_name_full
+
+    def prepare_dateFiled_text(self, instance):
+        if not instance.date_filed:
+            return
+
+        if isinstance(instance.date_filed, str):
+            return datetime.strptime(instance.date_filed, "%Y-%m-%d").strftime(
+                "%-d %B %Y"
+            )
+
+        return instance.date_filed.strftime("%-d %B %Y")
+
+    def prepare_dateArgued_text(self, instance):
+        if instance.docket.date_argued:
+            return instance.docket.date_argued.strftime("%-d %B %Y")
+
+    def prepare_dateReargued_text(self, instance):
+        if instance.docket.date_reargued:
+            return instance.docket.date_reargued.strftime("%-d %B %Y")
+
+    def prepare_dateReargumentDenied_text(self, instance):
+        if instance.docket.date_reargument_denied:
+            return instance.docket.date_reargument_denied.strftime("%-d %B %Y")
+
+    def prepare_court_id(self, instance):
+        return instance.docket.court.pk
+
+    def prepare_court(self, instance):
+        return instance.docket.court.full_name
+
+    def prepare_court_citation_string(self, instance):
+        return instance.docket.court.citation_string
+
+    def prepare_judge(self, instance):
+        return instance.judges
+
+    def prepare_panel_names(self, instance):
+        return [judge.name_full for judge in instance.panel.all()]
+
+    def prepare_citation(self, instance):
+        return [str(cite) for cite in instance.citations.all()]
+
+    def prepare_attorney(self, instance):
+        return instance.attorneys
+
+    def prepare_suitNature(self, instance):
+        return instance.nature_of_suit
+
+    def prepare_status(self, instance):
+        return instance.get_precedential_status_display()
+
+    def prepare_proceduralHistory(self, instance):
+        return instance.procedural_history
+
+    def prepare_posture(self, instance):
+        return instance.posture
+
+    def prepare_syllabus(self, instance):
+        return instance.syllabus
+
+    def prepare_timestamp(self, instance):
+        return datetime.utcnow()
+
+
+@opinion_index.document
+class OpinionClusterDocument(Document):
+    id = fields.IntegerField(attr="pk")
+    docket_id = fields.IntegerField(attr="docket.pk")
+    court_exact = fields.KeywordField(attr="docket.court_id")
+    absolute_url = fields.KeywordField()
+    caseNameShort = fields.TextField(
+        attr="case_name_short",
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(analyzer="english_exact"),
@@ -1147,22 +1312,11 @@ class OpinionClusterDocument(Document):
     non_participating_judge_ids = fields.ListField(
         fields.IntegerField(multi=True),
     )
-    judge = fields.TextField(
-        attr="judges",
+    neutralCite = fields.TextField(
         analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(analyzer="english_exact"),
-        },
         search_analyzer="search_analyzer",
     )
-    citation = fields.ListField(
-        fields.TextField(
-            analyzer="text_en_splitting_cl",
-            search_analyzer="search_analyzer",
-            multi=True,
-        ),
-    )
-    neutralCite = fields.TextField(
+    lexisCite = fields.TextField(
         analyzer="text_en_splitting_cl",
         search_analyzer="search_analyzer",
     )
@@ -1175,28 +1329,11 @@ class OpinionClusterDocument(Document):
         },
         search_analyzer="search_analyzer",
     )
-    suitNature = fields.TextField(
-        attr="nature_of_suit",
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(analyzer="english_exact"),
-        },
-        search_analyzer="search_analyzer",
-    )
     citeCount = fields.IntegerField(attr="citation_count")
-    status = fields.KeywordField(
-        fields={
-            "exact": fields.TextField(analyzer="english_exact"),
-        },
-    )
     dateFiled = fields.DateField()
-    dateFiled_text = fields.TextField(
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(analyzer="english_exact"),
-        },
-        search_analyzer="search_analyzer",
-    )
+    dateArgued = fields.DateField()
+    dateReargued = fields.DateField()
+    dateReargumentDenied = fields.DateField()
 
     def prepare_dateFiled_text(self, instance):
         if instance.docket.date_reargument_denied:
@@ -1204,9 +1341,6 @@ class OpinionClusterDocument(Document):
 
     def prepare_absolute_url(self, instance):
         return instance.get_absolute_url()
-
-    def prepare_caseName(self, instance):
-        return best_case_name(instance)
 
     def prepare_sibling_ids(self, instance):
         return [opinion.pk for opinion in instance.sub_opinions.all()]
@@ -1217,17 +1351,17 @@ class OpinionClusterDocument(Document):
     def prepare_non_participating_judge_ids(self, instance):
         return [judge.pk for judge in instance.non_participating_judges.all()]
 
-    def prepare_citation(self, instance):
-        return [str(cite) for cite in instance.citations.all()]
-
     def prepare_neutralCite(self, instance):
         neutral_citations = instance.citations.filter(type=Citation.NEUTRAL)
-        if len(neutral_citations):
+        if neutral_citations.count():
             return str(neutral_citations[0])
         return ""
 
-    def prepare_status(self, instance):
-        return instance.get_precedential_status_display()
+    def prepare_lexisCite(self, instance):
+        lexis_citations = instance.citations.filter(type=Citation.LEXIS)
+        if lexis_citations.count():
+            return str(lexis_citations[0])
+        return ""
 
     def prepare_dateFiled(self, instance):
         if instance.date_filed is None:
@@ -1241,5 +1375,41 @@ class OpinionClusterDocument(Document):
 
         return midnight_pt(instance.date_filed)
 
-    class Django:
-        model = OpinionCluster
+    def prepare_dateArgued(self, instance):
+        if instance.docket.date_argued is None:
+            return
+
+        if isinstance(instance.docket.date_argued, str):
+            datetime_object = datetime.strptime(
+                instance.docket.date_argued, "%Y-%m-%d"
+            )
+            return midnight_pt(datetime_object)
+
+        return midnight_pt(instance.docket.date_argued)
+
+    def prepare_dateReargued(self, instance):
+        if instance.docket.date_reargued is None:
+            return
+
+        if isinstance(instance.docket.date_reargued, str):
+            datetime_object = datetime.strptime(
+                instance.docket.date_reargued, "%Y-%m-%d"
+            )
+            return midnight_pt(datetime_object)
+
+        return midnight_pt(instance.docket.date_reargued)
+
+    def prepare_dateReargumentDenied(self, instance):
+        if instance.docket.date_reargument_denied is None:
+            return
+
+        if isinstance(instance.docket.date_reargument_denied, str):
+            datetime_object = datetime.strptime(
+                instance.docket.date_reargument_denied, "%Y-%m-%d"
+            )
+            return midnight_pt(datetime_object)
+
+        return midnight_pt(instance.docket.date_reargument_denied)
+
+    def prepare_cluster_child(self, instance):
+        return "opinion_cluster"
