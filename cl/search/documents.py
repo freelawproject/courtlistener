@@ -1,12 +1,15 @@
 from datetime import datetime
 
 from django.http import QueryDict
-from django.utils.html import escape
+from django.utils.html import escape, strip_tags
 from django_elasticsearch_dsl import Document, fields
 
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
-from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.custom_filters.templatetags.text_filters import (
+    best_case_name,
+    html_decode,
+)
 from cl.lib.command_utils import logger
 from cl.lib.date_time import midnight_pt
 from cl.lib.elasticsearch_utils import build_es_base_query
@@ -26,6 +29,7 @@ from cl.search.models import (
     BankruptcyInformation,
     Citation,
     Docket,
+    Opinion,
     OpinionCluster,
     ParentheticalGroup,
     RECAPDocument,
@@ -1077,6 +1081,7 @@ class DocketDocument(DocketBaseDocument):
 
 # Opinions
 class OpinionBaseDocument(Document):
+    cluster_id = fields.KeywordField(attr="pk")
     docketNumber = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
@@ -1290,8 +1295,155 @@ class OpinionBaseDocument(Document):
 
 
 @opinion_index.document
-class OpinionClusterDocument(Document):
-    id = fields.IntegerField(attr="pk")
+class OpinionDocument(OpinionBaseDocument):
+    id = fields.KeywordField(attr="pk")
+    author_id = fields.IntegerField()
+    type = fields.KeywordField(attr="type")
+    per_curiam = fields.BooleanField(attr="per_curiam")
+    type_text = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    download_url = fields.KeywordField(attr="download_url", index=False)
+    local_path = fields.KeywordField(index=False)
+    text = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(analyzer="english_exact"),
+        },
+        search_analyzer="search_analyzer",
+    )
+    sha1 = fields.TextField(attr="sha1")
+    cites = fields.ListField(
+        fields.IntegerField(multi=True),
+    )
+    joined_by_ids = fields.ListField(
+        fields.IntegerField(multi=True),
+    )
+
+    class Django:
+        model = Opinion
+        ignore_signals = True
+
+    def prepare_author_id(self, instance):
+        return getattr(instance.author, "pk", None)
+
+    def prepare_type_text(self, instance):
+        return instance.get_type_display()
+
+    def prepare_local_path(self, instance):
+        if instance.local_path:
+            if not instance.local_path.storage.exists(
+                instance.local_path.name
+            ):
+                logger.warning(
+                    f"The file {instance.local_path.name} associated with "
+                    f"Opinion ID {instance.pk} not found in S3. "
+                )
+                return None
+
+            return deepgetattr(self, "local_path.name", None)
+
+    def prepare_cites(self, instance):
+        return [opinion.pk for opinion in instance.opinions_cited.all()]
+
+    def prepare_joined_by_ids(self, instance):
+        return [judge.pk for judge in instance.joined_by.all()]
+
+    def prepare_text(self, instance):
+        if instance.html_columbia:
+            return html_decode(strip_tags(instance.html_columbia))
+        elif instance.html_lawbox:
+            return html_decode(strip_tags(instance.html_lawbox))
+        elif instance.xml_harvard:
+            return html_decode(strip_tags(instance.xml_harvard))
+        elif instance.html_anon_2020:
+            return html_decode(strip_tags(instance.html_anon_2020))
+        elif instance.html:
+            return html_decode(strip_tags(instance.html))
+        else:
+            return instance.plain_text
+
+    def prepare_docketNumber(self, instance):
+        return instance.cluster.docket.docket_number
+
+    def prepare_caseName(self, instance):
+        return best_case_name(instance.cluster)
+
+    def prepare_caseNameFull(self, instance):
+        return instance.cluster.case_name_full
+
+    def prepare_dateFiled_text(self, instance):
+        if not instance.cluster.date_filed:
+            return
+
+        if isinstance(instance.cluster.date_filed, str):
+            return datetime.strptime(
+                instance.cluster.date_filed, "%Y-%m-%d"
+            ).strftime("%-d %B %Y")
+
+        return instance.cluster.date_filed.strftime("%-d %B %Y")
+
+    def prepare_dateArgued_text(self, instance):
+        if instance.cluster.docket.date_argued:
+            return instance.cluster.docket.date_argued.strftime("%-d %B %Y")
+
+    def prepare_dateReargued_text(self, instance):
+        if instance.cluster.docket.date_reargued:
+            return instance.cluster.docket.date_reargued.strftime("%-d %B %Y")
+
+    def prepare_dateReargumentDenied_text(self, instance):
+        if instance.cluster.docket.date_reargument_denied:
+            return instance.cluster.docket.date_reargument_denied.strftime(
+                "%-d %B %Y"
+            )
+
+    def prepare_court_id(self, instance):
+        return instance.cluster.docket.court.pk
+
+    def prepare_court(self, instance):
+        return instance.cluster.docket.court.full_name
+
+    def prepare_court_citation_string(self, instance):
+        return instance.cluster.docket.court.citation_string
+
+    def prepare_judge(self, instance):
+        return instance.cluster.judges
+
+    def prepare_panel_names(self, instance):
+        return [judge.name_full for judge in instance.cluster.panel.all()]
+
+    def prepare_citation(self, instance):
+        return [str(cite) for cite in instance.cluster.citations.all()]
+
+    def prepare_attorney(self, instance):
+        return instance.cluster.attorneys
+
+    def prepare_suitNature(self, instance):
+        return instance.cluster.nature_of_suit
+
+    def prepare_status(self, instance):
+        return instance.cluster.get_precedential_status_display()
+
+    def prepare_proceduralHistory(self, instance):
+        return instance.cluster.procedural_history
+
+    def prepare_posture(self, instance):
+        return instance.cluster.posture
+
+    def prepare_syllabus(self, instance):
+        return instance.cluster.syllabus
+
+    def prepare_cluster_child(self, instance):
+        parent_id = getattr(instance.cluster, "pk", None)
+        return {"name": "opinion", "parent": parent_id}
+
+
+@opinion_index.document
+class OpinionClusterDocument(OpinionBaseDocument):
     docket_id = fields.IntegerField(attr="docket.pk")
     court_exact = fields.KeywordField(attr="docket.court_id")
     absolute_url = fields.KeywordField()
