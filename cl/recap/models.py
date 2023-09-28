@@ -9,6 +9,10 @@ from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
 
 
 class UPLOAD_TYPE:
+    """This enumeration of upload types should be in sync with
+    recap-chrome/src/pacer.js: UPLOAD_TYPES [plural, sic]
+    """
+
     DOCKET = 1
     ATTACHMENT_PAGE = 2
     PDF = 3
