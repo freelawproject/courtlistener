@@ -8,7 +8,7 @@ from cl.lib.string_diff import get_cosine_similarity
 from cl.search.models import Docket
 
 
-def mark_ia_upload_needed(d: Docket, save_docket: bool) -> None:
+async def mark_ia_upload_needed(d: Docket, save_docket: bool) -> None:
     """Mark the docket as needing upload if it's not already marked.
 
     The point here is that we need to know the first time an item was updated,
@@ -24,7 +24,7 @@ def mark_ia_upload_needed(d: Docket, save_docket: bool) -> None:
         d.ia_needs_upload = True
         d.ia_date_first_change = now()
     if save_docket:
-        d.save()
+        await d.asave()
 
 
 def get_start_of_quarter(d: Optional[date] = None) -> date:
@@ -99,18 +99,23 @@ def match_lists(
     for i, row in enumerate(scores):
         j = row.argmax()  # type: ignore
         # Lower threshold for small opinions.
-        if (
-            get_cosine_similarity(
-                harvard_opinions_list[i], cl_opinions_list[j]
-            )
-            < 0.60
-        ):
-            continue
+        cosine_sim = get_cosine_similarity(
+            harvard_opinions_list[i], cl_opinions_list[j]
+        )
         percent_match = compare_documents(
             harvard_opinions_list[i], cl_opinions_list[j]
         )
-        if percent_match < 60:
+
+        # Sometimes cosine similarity fails when there are small variations in text,
+        # such as parties, attorneys, case name, or court that are included in the
+        # content of the opinion, compare_documents() checks the percentage of the
+        # harvard opinion text that it is in courtlistener opinion, having a large
+        # percentage means that almost all the harvard opinion is in courtlistener
+        # opinion, but there is a possibility that the courtlistener opinion contains
+        # some additional data in que opinion content (such as case name, parties, etc.)
+        if cosine_sim < 0.60 and percent_match < 60:
             continue
+
         matches[i] = j
 
     return matches

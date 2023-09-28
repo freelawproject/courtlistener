@@ -102,6 +102,8 @@ class JurisdictionPodcast(JurisdictionFeed):
 
     def item_pubdate(self, item):
         pub_date = get_item(item)["dateArgued"]
+        if not pub_date:
+            return None
         if is_naive(pub_date):
             pub_date = localize_naive_datetime_to_court_timezone(
                 get_item(item)["court"], pub_date

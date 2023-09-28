@@ -1,4 +1,4 @@
-from typing import Any, Union
+from typing import Any, Type, Union
 
 from elasticsearch_dsl.response import Hit
 
@@ -34,7 +34,8 @@ ESModelType = Union[
     Position,
     Education,
 ]
-ESDocumentType = Union[
+
+ESDocumentInstanceType = Union[
     AudioDocument,
     ParentheticalGroupDocument,
     AudioPercolator,
@@ -42,6 +43,13 @@ ESDocumentType = Union[
     PositionDocument,
     EducationDocument,
 ]
+
+ESDocumentClassType = Union[
+    Type[AudioDocument],
+    Type[ParentheticalGroupDocument],
+    Type[AudioPercolator],
+]
+
 
 ESDictDocument = dict[str, Any]
 

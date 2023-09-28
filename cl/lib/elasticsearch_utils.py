@@ -805,5 +805,6 @@ def do_es_feed_query(
     """
 
     s = build_es_base_query(search_query, cd)
+    s = s.sort(build_sort_results(cd))
     response = s.extra(from_=0, size=rows).execute()
     return response
