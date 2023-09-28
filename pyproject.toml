@@ -109,7 +109,7 @@ types-dateparser = "^1.1.4.6"
 uvicorn = {extras = ["standard"], version = "^0.23.2"}
 daphne = "^4.0.0"
 psycopg2 = "^2.9.7"
-juriscraper = "^2.5.51"
+juriscraper = "^2.5.53"
 httpx = {extras = ["http2"], version = "^0.24.1"}
 django-model-utils = "^4.3.1"
 inflection = "^0.5.1"  # necessary for DRF schema generation - remove after drf-spectacular

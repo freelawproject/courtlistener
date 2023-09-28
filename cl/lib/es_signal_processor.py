@@ -10,6 +10,7 @@ from cl.alerts.tasks import (
     remove_doc_from_es_index,
     send_or_schedule_alerts,
 )
+from cl.audio.models import Audio
 from cl.lib.elasticsearch_utils import elasticsearch_enabled
 from cl.people_db.models import (
     ABARating,
@@ -31,11 +32,15 @@ from cl.search.tasks import (
     update_child_documents_by_query,
     update_document_in_es,
 )
-from cl.search.types import ESDocumentType, ESModelType
+from cl.search.types import (
+    ESDocumentClassType,
+    ESDocumentInstanceType,
+    ESModelType,
+)
 
 
 def updated_fields(
-    instance: ESModelType, es_document: ESDocumentType
+    instance: ESModelType, es_document: ESDocumentClassType
 ) -> list[str]:
     """Look for changes in the tracked fields of an instance.
     :param instance: The instance to check for changed fields.
@@ -69,7 +74,7 @@ def updated_fields(
             if (
                 field_type.get_internal_type() == "ForeignKey"
                 and current_value
-                and "_id" not in field
+                and not field.endswith("_id")
             ):
                 current_value = current_value.pk
         except FieldDoesNotExist:
@@ -104,7 +109,7 @@ def get_fields_to_update(
 
 
 def document_fields_to_update(
-    main_doc: ESDocumentType,
+    main_doc: ESDocumentInstanceType,
     main_object: ESModelType,
     field_list: list[str],
     instance: ESModelType,
@@ -140,8 +145,8 @@ def document_fields_to_update(
 
 
 def get_or_create_doc(
-    es_document: ESDocumentType, instance: ESModelType
-) -> ESDocumentType | None:
+    es_document: ESDocumentClassType, instance: ESModelType
+) -> ESDocumentInstanceType | None:
     """Get or create a document in Elasticsearch.
     :param es_document: The Elasticsearch document type.
     :param instance: The instance of the document to get or create.
@@ -166,7 +171,7 @@ def get_or_create_doc(
 
 def update_es_documents(
     main_model: ESModelType,
-    es_document: ESDocumentType,
+    es_document: ESDocumentClassType,
     instance: ESModelType,
     created: bool,
     mapping_fields: dict,
@@ -189,67 +194,53 @@ def update_es_documents(
 
     for query, fields_map in mapping_fields.items():
         fields_to_update = get_fields_to_update(changed_fields, fields_map)
-
-        if (
-            es_document is PositionDocument
-            and isinstance(instance, Person)
-            and query == "person"
-        ):
-            update_child_documents_by_query.delay(
-                es_document, instance, fields_to_update, fields_map
-            )
-            continue
-        elif es_document is ESRECAPDocument:
-            if isinstance(instance, Docket):
+        match instance:
+            case Person() if es_document is PositionDocument and query == "person":  # type: ignore
+                """
+                This case handles the update of one or more fields that belongs to
+                the parent model(The person model).
+                """
                 update_child_documents_by_query.delay(
                     es_document, instance, fields_to_update, fields_map
                 )
-                continue
-            elif isinstance(instance, (Person, BankruptcyInformation)):
-                related_dockets = Docket.objects.filter(**{query: instance})
-                for rel_docket in related_dockets:
+            case ABARating() | PoliticalAffiliation() | School() if es_document is PositionDocument:  # type: ignore
+                """
+                This code handles the update of fields that belongs to records associated with
+                the parent document using ForeignKeys.
+
+                First, we get the list of all the Person objects related to the instance object
+                and then we use the update_child_documents_by_query method to update their positions.
+                """
+                related_record = Person.objects.filter(**{query: instance})
+                for person in related_record:
                     update_child_documents_by_query.delay(
                         es_document,
-                        rel_docket,
+                        person,
                         fields_to_update,
                         fields_map,
                     )
-                continue
-
-        if es_document is PositionDocument and isinstance(
-            instance, (ABARating, PoliticalAffiliation, School)
-        ):
-            related_record = Person.objects.filter(**{query: instance})
-            for person in related_record:
-                update_child_documents_by_query.delay(
-                    es_document,
-                    person,
-                    fields_to_update,
-                    fields_map,
-                )
-            continue
-
-        main_objects = main_model.objects.filter(**{query: instance})
-        for main_object in main_objects:
-            main_doc = get_or_create_doc(es_document, main_object)
-            if not main_doc:
-                continue
-            if fields_to_update:
-                update_document_in_es.delay(
-                    main_doc,
-                    document_fields_to_update(
-                        main_doc,
-                        main_object,
-                        fields_to_update,
-                        instance,
-                        fields_map,
-                    ),
-                )
+            case _:
+                main_objects = main_model.objects.filter(**{query: instance})
+                for main_object in main_objects:
+                    main_doc = get_or_create_doc(es_document, main_object)
+                    if not main_doc:
+                        continue
+                    if fields_to_update:
+                        update_document_in_es.delay(
+                            main_doc,
+                            document_fields_to_update(
+                                main_doc,
+                                main_object,
+                                fields_to_update,
+                                instance,
+                                fields_map,
+                            ),
+                        )
 
 
 def update_remove_m2m_documents(
     main_model: ESModelType,
-    es_document: ESDocumentType,
+    es_document: ESDocumentClassType,
     instance: ESModelType,
     mapping_fields: dict,
     affected_field: str,
@@ -280,7 +271,7 @@ def update_remove_m2m_documents(
 
 def update_m2m_field_in_es_document(
     instance: ESModelType,
-    es_document: ESDocumentType,
+    es_document: ESDocumentClassType,
     affected_field: str,
 ) -> None:
     """Update a single field created using a many-to-many relationship.
@@ -299,7 +290,7 @@ def update_m2m_field_in_es_document(
 
 def update_reverse_related_documents(
     main_model: ESModelType,
-    es_document: ESDocumentType,
+    es_document: ESDocumentClassType,
     instance: ESModelType,
     query_string: str,
     affected_fields: list[str],
@@ -344,6 +335,35 @@ def update_reverse_related_documents(
             main_doc,
             fields_to_update,
         )
+
+
+def avoid_es_audio_indexing(
+    instance: ESModelType,
+    es_document: ESDocumentClassType,
+    update_fields: list[str] | None,
+):
+    """Check conditions to abort Elasticsearch indexing for Audio instances.
+    Avoid indexing for Audio instances which their mp3 file has not been
+    processed yet by process_audio_file.
+
+    :param instance: The Audio instance to evaluate for Elasticsearch indexing.
+    :param es_document: The Elasticsearch document class.
+    :param update_fields: List of fields being updated, or None.
+    :return: True if indexing should be avoided, False otherwise.
+    """
+
+    if (
+        type(instance) == Audio
+        and not es_document.exists(instance.pk)
+        and (
+            not update_fields
+            or (update_fields and "processing_complete" not in update_fields)
+        )
+    ):
+        # Avoid indexing Audio instances that haven't been previously indexed
+        # in ES and for which 'processing_complete' is not present in update_fields.
+        return True
+    return False
 
 
 class ESSignalProcessor(object):
@@ -410,7 +430,14 @@ class ESSignalProcessor(object):
                 )
 
     @elasticsearch_enabled
-    def handle_save(self, sender, instance=None, created=False, **kwargs):
+    def handle_save(
+        self,
+        sender,
+        instance=None,
+        created=False,
+        update_fields=None,
+        **kwargs,
+    ):
         """Receiver function that gets called after an object instance is saved"""
         mapping_fields = self.documents_model_mapping["save"][sender]
         if not created:
@@ -422,6 +449,13 @@ class ESSignalProcessor(object):
                 mapping_fields,
             )
         if not mapping_fields:
+            if avoid_es_audio_indexing(
+                instance, self.es_document, update_fields
+            ):
+                # This check is required to avoid indexing and triggering
+                # search alerts for Audio instances whose MP3 files have not
+                # yet been processed by process_audio_file.
+                return None
             chain(
                 save_document_in_es.si(instance, self.es_document),
                 send_or_schedule_alerts.s(self.es_document._index._name),

@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 import pytz
-from asgiref.sync import sync_to_async
+from asgiref.sync import async_to_sync, sync_to_async
 from dateutil.tz import tzoffset, tzutc
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
@@ -1854,7 +1854,9 @@ class DocketEntriesTimezone(TestCase):
         ingesting docket entries with no time info?
         """
 
-        add_docket_entries(self.d_cand, self.de_date_data["docket_entries"])
+        async_to_sync(add_docket_entries)(
+            self.d_cand, self.de_date_data["docket_entries"]
+        )
         de_cand_date = DocketEntry.objects.get(
             docket__court=self.cand, entry_number=1
         )
@@ -1869,10 +1871,14 @@ class DocketEntriesTimezone(TestCase):
         """
 
         # Add docket entries with UTC datetime for CAND
-        add_docket_entries(self.d_cand, self.de_utc_data["docket_entries"])
+        async_to_sync(add_docket_entries)(
+            self.d_cand, self.de_utc_data["docket_entries"]
+        )
 
         # Add docket entries with a different time offset than UTC datetime
-        add_docket_entries(self.d_cand, self.de_pdt_data["docket_entries"])
+        async_to_sync(add_docket_entries)(
+            self.d_cand, self.de_pdt_data["docket_entries"]
+        )
 
         de_cand_utc = DocketEntry.objects.get(
             docket__court=self.cand, entry_number=1
@@ -1888,10 +1894,14 @@ class DocketEntriesTimezone(TestCase):
         self.assertEqual(de_cand_pdt.time_filed, datetime.time(2, 46, 51))
 
         # Add docket entries with UTC datetime for NYED
-        add_docket_entries(self.d_nyed, self.de_utc_data["docket_entries"])
+        async_to_sync(add_docket_entries)(
+            self.d_nyed, self.de_utc_data["docket_entries"]
+        )
 
         # Add docket entries with a different time offset than UTC datetime
-        add_docket_entries(self.d_nyed, self.de_pdt_data["docket_entries"])
+        async_to_sync(add_docket_entries)(
+            self.d_nyed, self.de_pdt_data["docket_entries"]
+        )
 
         de_nyed_utc = DocketEntry.objects.get(
             docket__court=self.nyed, entry_number=1
@@ -1912,7 +1922,9 @@ class DocketEntriesTimezone(TestCase):
         """
 
         # Add docket entries with UTC datetime for CAND
-        add_docket_entries(self.d_cand, self.de_utc_data["docket_entries"])
+        async_to_sync(add_docket_entries)(
+            self.d_cand, self.de_utc_data["docket_entries"]
+        )
 
         de_cand = DocketEntry.objects.get(
             docket__court=self.cand, entry_number=1
@@ -1922,7 +1934,9 @@ class DocketEntriesTimezone(TestCase):
         self.assertEqual(de_cand.time_filed, datetime.time(19, 46, 51))
 
         # Add docket entries with null date_filed
-        add_docket_entries(self.d_cand, self.de_no_date["docket_entries"])
+        async_to_sync(add_docket_entries)(
+            self.d_cand, self.de_no_date["docket_entries"]
+        )
         de_cand.refresh_from_db()
         # Docket entry date_filed and time_filed are remain the same
         self.assertEqual(de_cand.date_filed, datetime.date(2021, 10, 15))
@@ -1934,7 +1948,9 @@ class DocketEntriesTimezone(TestCase):
         """
 
         # Add docket entries with UTC datetime for CAND
-        add_docket_entries(self.d_cand, self.de_utc_data["docket_entries"])
+        async_to_sync(add_docket_entries)(
+            self.d_cand, self.de_utc_data["docket_entries"]
+        )
 
         de_cand = DocketEntry.objects.get(
             docket__court=self.cand, entry_number=1
@@ -1944,14 +1960,16 @@ class DocketEntriesTimezone(TestCase):
         self.assertEqual(de_cand.time_filed, datetime.time(19, 46, 51))
 
         # Add docket entries without time data but same date
-        add_docket_entries(self.d_cand, self.de_date_data["docket_entries"])
+        async_to_sync(add_docket_entries)(
+            self.d_cand, self.de_date_data["docket_entries"]
+        )
         de_cand.refresh_from_db()
         # Avoid updating date-time if the date doesn't change
         self.assertEqual(de_cand.date_filed, datetime.date(2021, 10, 15))
         self.assertEqual(de_cand.time_filed, datetime.time(19, 46, 51))
 
         # Add docket entries without time data but different date
-        add_docket_entries(
+        async_to_sync(add_docket_entries)(
             self.d_cand, self.de_date_data_changes["docket_entries"]
         )
         de_cand.refresh_from_db()
@@ -1966,7 +1984,9 @@ class DocketEntriesTimezone(TestCase):
         """
 
         # Add docket entries with UTC datetime for CAND
-        add_docket_entries(self.d_cand, self.de_utc_data["docket_entries"])
+        async_to_sync(add_docket_entries)(
+            self.d_cand, self.de_utc_data["docket_entries"]
+        )
 
         de_cand = DocketEntry.objects.get(
             docket__court=self.cand, entry_number=1
@@ -1977,7 +1997,7 @@ class DocketEntriesTimezone(TestCase):
 
         # Add docket entries with UTC datetime for CAND, time changes,
         # date remains the same
-        add_docket_entries(
+        async_to_sync(add_docket_entries)(
             self.d_cand, self.de_utc_changes_time["docket_entries"]
         )
         de_cand.refresh_from_db()
@@ -1986,7 +2006,7 @@ class DocketEntriesTimezone(TestCase):
         self.assertEqual(de_cand.time_filed, datetime.time(19, 50, 11))
 
         # Add docket entries with UTC datetime for CAND, date and time change.
-        add_docket_entries(
+        async_to_sync(add_docket_entries)(
             self.d_cand, self.de_utc_data_not_dst["docket_entries"]
         )
         de_cand.refresh_from_db()
@@ -2001,8 +2021,12 @@ class DocketEntriesTimezone(TestCase):
 
         # Add docket entries for CAND US/Pacific filed in DST, in UTC and a
         # different time offset.
-        add_docket_entries(self.d_cand, self.de_utc_data["docket_entries"])
-        add_docket_entries(self.d_cand, self.de_pdt_data["docket_entries"])
+        async_to_sync(add_docket_entries)(
+            self.d_cand, self.de_utc_data["docket_entries"]
+        )
+        async_to_sync(add_docket_entries)(
+            self.d_cand, self.de_pdt_data["docket_entries"]
+        )
 
         de_cand_utc = DocketEntry.objects.get(
             docket__court=self.cand, entry_number=1
@@ -2030,8 +2054,12 @@ class DocketEntriesTimezone(TestCase):
 
         # Add docket entries for NYED US/Eastern filed in DST, in UTC and a
         # different time offset.
-        add_docket_entries(self.d_nyed, self.de_utc_data["docket_entries"])
-        add_docket_entries(self.d_nyed, self.de_pdt_data["docket_entries"])
+        async_to_sync(add_docket_entries)(
+            self.d_nyed, self.de_utc_data["docket_entries"]
+        )
+        async_to_sync(add_docket_entries)(
+            self.d_nyed, self.de_pdt_data["docket_entries"]
+        )
 
         de_nyed_utc = DocketEntry.objects.get(
             docket__court=self.nyed, entry_number=1
@@ -2062,7 +2090,7 @@ class DocketEntriesTimezone(TestCase):
         """
 
         # Add docket entries for CAND filed in not DST time. US/Pacific
-        add_docket_entries(
+        async_to_sync(add_docket_entries)(
             self.d_cand, self.de_utc_data_not_dst["docket_entries"]
         )
         de_cand_utc = DocketEntry.objects.get(
@@ -2079,7 +2107,7 @@ class DocketEntriesTimezone(TestCase):
         self.assertEqual(de_cand_utc.datetime_filed, target_date_aware)
 
         # Add docket entries for NYED filed in not DST time. US/Eastern
-        add_docket_entries(
+        async_to_sync(add_docket_entries)(
             self.d_nyed, self.de_utc_data_not_dst["docket_entries"]
         )
         de_nyed_utc = DocketEntry.objects.get(

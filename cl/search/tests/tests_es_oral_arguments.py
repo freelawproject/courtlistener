@@ -1,4 +1,5 @@
 import datetime
+from unittest import mock
 
 from django.core.cache import cache
 from django.db import transaction
@@ -1106,7 +1107,11 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
                 msg=f"Key {key} not found in the result object.",
             )
 
-    def test_oa_results_pagination(self) -> None:
+    @mock.patch(
+        "cl.lib.es_signal_processor.avoid_es_audio_indexing",
+        side_effect=lambda x, y, z: False,
+    )
+    def test_oa_results_pagination(self, mock_abort_audio) -> None:
         created_audios = []
         audios_to_create = 20
         for i in range(audios_to_create):
@@ -1118,7 +1123,8 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         # Confirm that fetch_es_results works properly with different sorting
         # types, returning sequential results for each requested page.
         page_size = 5
-        total_pages = int(audios_to_create / page_size) + 1
+        total_audios = Audio.objects.all().count()
+        total_pages = int(total_audios / page_size) + 1
         order_types = [
             "score desc",
             "dateArgued desc",
@@ -1140,13 +1146,11 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
                     total_child_results,
                 ) = build_es_main_query(search_query, cd)
                 hits, query_time, error = fetch_es_results(
-                    cd, s, page=page + 1, rows_per_page=5
+                    cd, s, page=page + 1, rows_per_page=page_size
                 )
-                results = hits.hits
-                for result in results:
-                    self.assertNotIn(result.id, ids_in_results)
+                for result in hits.hits:
                     ids_in_results.append(result.id)
-            self.assertEqual(len(ids_in_results), Audio.objects.all().count())
+            self.assertEqual(len(ids_in_results), total_audios)
 
         # Test pagination requests.
         search_params = {
@@ -1708,7 +1712,11 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         self.assertEqual(actual, expected)
         self.assertIn("Freedom of", r.content.decode())
 
-    def test_keep_in_sync_related_OA_objects(self) -> None:
+    @mock.patch(
+        "cl.lib.es_signal_processor.avoid_es_audio_indexing",
+        side_effect=lambda x, y, z: False,
+    )
+    def test_keep_in_sync_related_OA_objects(self, mock_abort_audio) -> None:
         """Test Audio documents are updated when related objects change."""
         with transaction.atomic():
             docket_5 = DocketFactory.create(

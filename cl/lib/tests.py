@@ -1,6 +1,7 @@
 import datetime
 from typing import Tuple, TypedDict, cast
 
+from asgiref.sync import async_to_sync
 from django.contrib.auth.hashers import make_password
 from django.core.files.base import ContentFile
 from django.db.models import F
@@ -48,12 +49,14 @@ class TestPacerUtils(TestCase):
         """Do we properly set small bankruptcy dockets to private?"""
         d = Docket()
         d.court = Court.objects.get(pk="akb")
-        blocked, date_blocked = get_blocked_status(d)
+        blocked, date_blocked = async_to_sync(get_blocked_status)(d)
         self.assertTrue(
             blocked,
             msg="Bankruptcy dockets with few entries should be blocked.",
         )
-        blocked, date_blocked = get_blocked_status(d, count_override=501)
+        blocked, date_blocked = async_to_sync(get_blocked_status)(
+            d, count_override=501
+        )
         self.assertFalse(
             blocked,
             msg="Bankruptcy dockets with many entries "
@@ -61,7 +64,9 @@ class TestPacerUtils(TestCase):
         )
         # This should stay blocked even though it's a big bankruptcy docket.
         d.blocked = True
-        blocked, date_blocked = get_blocked_status(d, count_override=501)
+        blocked, date_blocked = async_to_sync(get_blocked_status)(
+            d, count_override=501
+        )
         self.assertTrue(
             blocked,
             msg="Bankruptcy dockets that start blocked "

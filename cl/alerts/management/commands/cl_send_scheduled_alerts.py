@@ -3,7 +3,6 @@ from collections import defaultdict
 from typing import DefaultDict
 
 import waffle
-from django.utils.timezone import now
 
 from cl.alerts.models import (
     SCHEDULED_ALERT_HIT_STATUS,
@@ -11,7 +10,7 @@ from cl.alerts.models import (
     ScheduledAlertHit,
 )
 from cl.alerts.tasks import send_search_alert_emails
-from cl.alerts.utils import InvalidDateError
+from cl.alerts.utils import InvalidDateError, override_alert_query
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.stats.utils import tally_stat
 
@@ -28,6 +27,28 @@ def json_date_parser(dct):
     return dct
 
 
+def get_cut_off_date(rate: str, d: datetime.date) -> datetime.date | None:
+    """Given a rate of dly, wly or mly and a date, returns the date after for
+    building a daterange filter.
+    :param rate: The alert rate to send Alerts.
+    :param d: The date alerts are run.
+    :return: The cut-off date or None.
+    """
+    cut_off_date = None
+    if rate == Alert.DAILY:
+        cut_off_date = d
+    elif rate == Alert.WEEKLY:
+        cut_off_date = d - datetime.timedelta(days=7)
+    elif rate == Alert.MONTHLY:
+        # Get the first of the month of the previous month regardless of the
+        # current date
+        early_last_month = d - datetime.timedelta(days=28)
+        cut_off_date = datetime.datetime(
+            early_last_month.year, early_last_month.month, 1
+        ).date()
+    return cut_off_date
+
+
 def query_and_send_alerts_by_rate(rate: str) -> None:
     """Query and send alerts per user.
 
@@ -36,7 +57,7 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
     """
 
     alerts_sent_count = 0
-    now_time = now()
+    now_time = datetime.datetime.now()
     alerts_to_update = []
     scheduled_hits_rate = ScheduledAlertHit.objects.filter(
         alert__rate=rate, hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED
@@ -62,6 +83,12 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
                 documents.append(json_date_parser(result.document_content))
 
             alerts_to_update.append(alert.pk)
+
+            # Override order_by to show the latest items when clicking the
+            # "View Full Results" button.
+            cut_off_date = get_cut_off_date(rate, now_time.date())
+            qd = override_alert_query(alert, cut_off_date)
+            alert.query_run = qd.urlencode()  # type: ignore
             hits.append(
                 (
                     alert,
@@ -113,14 +140,18 @@ def delete_old_scheduled_alerts() -> int:
     """
 
     # Delete SENT ScheduledAlertHits after DAYS_TO_DELETE
-    sent_older_than = now() - datetime.timedelta(days=DAYS_TO_DELETE)
+    sent_older_than = datetime.datetime.now() - datetime.timedelta(
+        days=DAYS_TO_DELETE
+    )
     scheduled_sent_hits_to_delete = ScheduledAlertHit.objects.filter(
         date_created__lt=sent_older_than,
         hit_status=SCHEDULED_ALERT_HIT_STATUS.SENT,
     ).delete()
 
     # Delete SCHEDULED ScheduledAlertHits after 2 * DAYS_TO_DELETE
-    unsent_older_than = now() - datetime.timedelta(days=2 * DAYS_TO_DELETE)
+    unsent_older_than = datetime.datetime.now() - datetime.timedelta(
+        days=2 * DAYS_TO_DELETE
+    )
     scheduled_unsent_hits_to_delete = ScheduledAlertHit.objects.filter(
         date_created__lt=unsent_older_than,
         hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,

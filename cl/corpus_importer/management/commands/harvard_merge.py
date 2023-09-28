@@ -2,6 +2,7 @@ import itertools
 import json
 import logging
 from datetime import date
+from difflib import SequenceMatcher
 from typing import Any, Dict, Optional, Tuple
 
 import requests
@@ -299,15 +300,42 @@ def merge_judges(
     # Get last names keeping case and cleaning the string (We could have
     # the judge names in capital letters)
     cl_clean = set(find_all_judges(cl_data))
+    # Lowercase courtlistener judge names for set operations
+    temp_cl_clean = set([c.lower() for c in cl_clean])
     # Get last names in lowercase and cleaned
     harvard_clean = set(find_all_judges(harvard_data))
+    # Lowercase harvard judge names for set operations
+    temp_harvard_clean = set([h.lower() for h in harvard_clean])
+    # Prepare judges string
     judges = titlecase(", ".join(find_all_judges(harvard_data)))
     if (
-        harvard_clean.issuperset(cl_clean) or cl_data_upper
+        temp_harvard_clean.issuperset(temp_cl_clean) or cl_data_upper
     ) and harvard_clean != cl_clean:
         return {"judges": judges}
-    elif not harvard_clean.intersection(set(find_all_judges(cl_data))):
-        raise JudgeException("Judges are completely different.")
+    elif not temp_harvard_clean.intersection(temp_cl_clean):
+        # Last resort, use distance between words to solve typos
+        cl_clean_list = list(cl_clean)
+        harvard_clean_list = list(harvard_clean)
+        judge_pairs = list(
+            itertools.product(cl_clean_list, harvard_clean_list)
+        )
+        success = False
+        for pair in judge_pairs:
+            s = SequenceMatcher(None, pair[0].lower(), pair[1].lower())
+            if s.ratio() >= 0.7:
+                # We found a match, we assume that the data in CL is better, we keep
+                # the one from CL and remove the one from harvard
+                harvard_clean_list.remove(pair[1])
+                success = True
+        if success:
+            # At least one success that matches the names, we can create a new judges
+            # list
+            new_judges_list = sorted(
+                list(set(cl_clean_list + harvard_clean_list))
+            )
+            return {"judges": titlecase(", ".join(new_judges_list))}
+        else:
+            raise JudgeException("Judges are completely different.")
 
     return {}
 
@@ -544,6 +572,7 @@ def update_docket_source(cluster: OpinionCluster) -> None:
         Docket.HARVARD,
         Docket.HARVARD_AND_RECAP,
         Docket.SCRAPER_AND_HARVARD,
+        Docket.RECAP_AND_SCRAPER_AND_HARVARD,
         Docket.HARVARD_AND_COLUMBIA,
         Docket.DIRECT_INPUT_AND_HARVARD,
         Docket.ANON_2020_AND_HARVARD,
@@ -691,6 +720,10 @@ def merge_opinion_clusters(
         logger.warning(
             msg=f"Cluster source exception for cluster id: {cluster_id}"
         )
+    except OpinionTypeException:
+        logger.warning(
+            msg=f"Opinion type not found in xml file for cluster id: {cluster_id}"
+        )
 
 
 def fetch_cl_opinion_content(sub_opinions: list[Opinion]) -> list[str]:
@@ -809,7 +842,10 @@ def update_matching_opinions(
                 op.author_str = author_str
         else:
             if author_str:
-                if find_just_name(op.author_str) != find_just_name(author_str):
+                if (
+                    find_just_name(op.author_str).lower()
+                    != find_just_name(author_str).lower()
+                ):
                     raise AuthorException(f"Authors don't match - log error")
                 elif any(s.isupper() for s in op.author_str.split(",")):
                     # Some names are uppercase, update with processed names
@@ -958,6 +994,10 @@ class Command(VerboseCommand):
                         f"Cluster id: {cluster_ids[0][0]} already merged."
                     )
                     return
+            else:
+                logger.info(
+                    f"Cluster ID: {options['cluster_id']} doesn't exist"
+                )
 
         for cluster_id, filepath in cluster_ids:
             logger.info(msg=f"Merging {cluster_id} at {filepath}")

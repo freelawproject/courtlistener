@@ -865,10 +865,11 @@ def citation_handler(
         cluster_count = clusters.count()
 
     if cluster_count == 0:
-        # We didn't get an exact match on the volume/reporter/page. Perhaps it's a pincite.
-        # Try to find the citation immediately *before* this one in the same book. To do so,
-        # Get all the opinions from the book, sort them by page number (in Python, b/c pages
-        # can have letters), then find the citation just before the requested one.
+        # We didn't get an exact match on the volume/reporter/page. Perhaps
+        # it's a pincite. Try to find the citation immediately *before* this
+        # one in the same book. To do so, get all the opinions from the book,
+        # sort them by page number (in Python, b/c pages can have letters),
+        # then find the citation just before the requested one.
 
         possible_match = None
 

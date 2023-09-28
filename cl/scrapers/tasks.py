@@ -368,7 +368,13 @@ def process_audio_file(self, pk) -> None:
         ).text
     )
     audio_obj.processing_complete = True
-    audio_obj.save()
+    audio_obj.save(
+        update_fields=[
+            "duration",
+            "local_path_mp3",
+            "processing_complete",
+        ]
+    )
 
 
 @app.task(
