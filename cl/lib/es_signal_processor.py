@@ -30,7 +30,11 @@ from cl.search.tasks import (
     update_child_documents_by_query,
     update_document_in_es,
 )
-from cl.search.types import ESDocumentInstanceType, ESDocumentClassType, ESModelType
+from cl.search.types import (
+    ESDocumentClassType,
+    ESDocumentInstanceType,
+    ESModelType,
+)
 
 
 def updated_fields(

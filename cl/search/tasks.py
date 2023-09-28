@@ -293,7 +293,7 @@ def update_document_in_es(
 )
 def update_child_documents_by_query(
     self: Task,
-    es_document: ESDocumentType,
+    es_document: ESDocumentInstanceType,
     parent_instance: ESModelType,
     fields_to_update: list[str],
     fields_map: dict[str, str] | None = None,
