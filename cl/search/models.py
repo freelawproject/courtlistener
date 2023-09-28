@@ -2182,6 +2182,15 @@ class Court(models.Model):
         ordering = ["position"]
 
 
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
+class CourtAppealsTo(Court.appeals_to.through):
+    """A model class to track court appeals_to m2m relation"""
+
+    class Meta:
+        proxy = True
+
+
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Courthouse(models.Model):
     """A class to represent the physical location of a court."""
 
