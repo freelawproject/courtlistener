@@ -1003,7 +1003,7 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.court = CourtFactory(id="txwd", jurisdiction="FB")
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
         with open(
             test_dir / "recap_mail_custom_receipt.json",

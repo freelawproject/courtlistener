@@ -62,15 +62,15 @@ recap_boosts_es = {
     "document_type": 1,
 }
 recap_boosts_pf = {"text": 3.0, "caseName": 3.0, "description": 3.0}
-BOOSTS: Dict[str, Dict[str, Dict[str, float | Dict[str, float]]]] = {
+BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
     "qf": {
         SEARCH_TYPES.OPINION: {
             "text": 1.0,
             "caseName": 4.0,
             "docketNumber": 2.0,
         },
-        SEARCH_TYPES.RECAP: {"solr": recap_boosts_qf, "es": recap_boosts_es},
-        SEARCH_TYPES.DOCKETS: {"solr": recap_boosts_qf, "es": recap_boosts_es},
+        SEARCH_TYPES.RECAP: recap_boosts_qf,
+        SEARCH_TYPES.DOCKETS: recap_boosts_qf,
         SEARCH_TYPES.ORAL_ARGUMENT: {
             "text": 1.0,
             "caseName": 4.0,
@@ -105,6 +105,10 @@ BOOSTS: Dict[str, Dict[str, Dict[str, float | Dict[str, float]]]] = {
             "organization_name": 1,
             "job_title": 1,
         },
+    },
+    "es": {
+        SEARCH_TYPES.RECAP: recap_boosts_es,
+        SEARCH_TYPES.DOCKETS: recap_boosts_es,
     },
     # Phrase-based boosts.
     "pf": {
@@ -510,13 +514,7 @@ def add_boosts(main_params: SearchParam, cd: CleanData) -> None:
         main_params["boost"] = "pagerank"
 
     # Apply standard qf parameters
-    if cd["type"] in [
-        SEARCH_TYPES.RECAP,
-        SEARCH_TYPES.DOCKETS,
-    ]:
-        qf = BOOSTS["qf"][cd["type"]]["solr"].copy()
-    else:
-        qf = BOOSTS["qf"][cd["type"]].copy()
+    qf = BOOSTS["qf"][cd["type"]].copy()
     main_params["qf"] = make_boost_string(qf)
 
     if cd["type"] in [

@@ -500,7 +500,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
                         render_dict.update(do_es_search(request.GET.copy()))
                     else:
                         render_dict.update(do_search(request.GET.copy()))
-                case SEARCH_TYPES.RECAP:
+                case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
                     if waffle.flag_is_active(request, "r-es-active"):
                         search_results = do_es_search(request.GET.copy())
                     else:
@@ -634,7 +634,7 @@ def do_es_search(
             document_type = AudioDocument
         case SEARCH_TYPES.PEOPLE:
             document_type = PersonDocument
-        case SEARCH_TYPES.RECAP:
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             document_type = DocketDocument
 
     if search_form.is_valid() and es_index_exists(

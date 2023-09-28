@@ -60,8 +60,16 @@ def es_index_exists(index_name: str) -> bool:
     :param index_name: The index name to check.
     :return: True if the index exists, otherwise False.
     """
-    es = connections.get_connection()
-    return es.indices.exists(index=index_name)
+    try:
+        es = connections.get_connection()
+        index_exists = es.indices.exists(index=index_name)
+    except (TransportError, ConnectionError) as e:
+        logger.warning(
+            f"Error in ES connection when checking index existence: {index_name}"
+        )
+        logger.warning(f"Error was: {e}")
+        index_exists = False
+    return index_exists
 
 
 def build_daterange_query(
@@ -124,13 +132,12 @@ def add_fields_boosting(
     :return: A list of Elasticsearch fields with their respective boost values.
     """
     # Apply standard qf parameters
+    qf = BOOSTS["qf"][cd["type"]].copy()
     if cd["type"] in [
         SEARCH_TYPES.RECAP,
         SEARCH_TYPES.DOCKETS,
     ]:
-        qf = BOOSTS["qf"][cd["type"]]["es"].copy()
-    else:
-        qf = BOOSTS["qf"][cd["type"]].copy()
+        qf = BOOSTS["es"][cd["type"]].copy()
 
     if cd["type"] in [
         SEARCH_TYPES.ORAL_ARGUMENT,
@@ -403,7 +410,7 @@ def build_sort_results(cd: CleanData) -> Dict:
     if cd["type"] == SEARCH_TYPES.PARENTHETICAL:
         order_by_map["score desc"] = {"score": {"order": "desc"}}
 
-    if cd["type"] == SEARCH_TYPES.RECAP:
+    if cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
         random_order_field_id = "docket_id"
     else:
         random_order_field_id = "id"
@@ -497,7 +504,7 @@ def build_has_child_query(
     query: QueryString | str,
     child_type: str,
     child_hits_limit: int,
-    highlighting_fields: dict[str, int] = None,
+    highlighting_fields: dict[str, int] | None = None,
     order_by: str | None = None,
 ) -> QueryString:
     """Build a 'has_child' query.
@@ -511,7 +518,7 @@ def build_has_child_query(
     :return: The 'has_child' query.
     """
 
-    if order_by:
+    if order_by is not None:
         query = Q(
             "function_score",
             query=query,
@@ -524,7 +531,7 @@ def build_has_child_query(
 
     if highlighting_fields is None:
         highlighting_fields = {}
-    highlight_options = {"fields": {}}
+    highlight_options: dict[str, dict[str, Any]] = {"fields": {}}
 
     for field, fragment_size in highlighting_fields.items():
         number_of_fragments = 0
@@ -571,7 +578,7 @@ def get_search_query(
     """
 
     if filters or string_query:
-        if cd["type"] == SEARCH_TYPES.RECAP:
+        if cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
             return search_query.query(string_query)
 
         if filters:
@@ -585,7 +592,7 @@ def get_search_query(
     if cd["type"] == SEARCH_TYPES.PEOPLE:
         return search_query.query(Q("match", person_child="person"))
 
-    if cd["type"] == SEARCH_TYPES.RECAP:
+    if cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
         query = build_has_child_query(
             "match_all", "recap_document", settings.CHILD_HITS_PER_RESULT
         )
@@ -674,7 +681,7 @@ def build_es_base_query(
                 parent_query_fields,
                 cd.get("q", ""),
             )
-        case SEARCH_TYPES.RECAP:
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             child_query_fields = {
                 "recap_document": add_fields_boosting(
                     cd,
@@ -766,7 +773,7 @@ def build_es_main_query(
     """
     search_query_base = search_query
     search_query, join_query = build_es_base_query(search_query, cd)
-    total_query_results = search_query.count()
+    total_query_results = do_count_query(search_query)
     top_hits_limit = 5
     total_child_results = 0
     match cd["type"]:
@@ -784,15 +791,14 @@ def build_es_main_query(
                 top_hits_limit,
                 total_child_results,
             )
-        case SEARCH_TYPES.RECAP:
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             child_docs_count_query = build_child_docs_count_query(join_query)
             if child_docs_count_query:
                 # Get the total RECAP Documents count.
                 search_query_base = search_query_base.query(
                     child_docs_count_query
                 )
-                total_child_results = search_query_base.count()
-
+                total_child_results = do_count_query(search_query_base)
         case _:
             pass
 
@@ -831,7 +837,7 @@ def add_es_highlighting(
             fields_to_exclude = ["sha1"]
         case SEARCH_TYPES.PEOPLE:
             highlighting_fields = SOLR_PEOPLE_ES_HL_FIELDS
-        case SEARCH_TYPES.RECAP:
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             highlighting_fields = SEARCH_RECAP_HL_FIELDS
 
     search_query = search_query.source(excludes=fields_to_exclude)
@@ -1262,7 +1268,7 @@ def build_has_child_filters(
             if appointer:
                 queries_list.extend(build_text_filter("appointer", appointer))
 
-    if cd["type"] == SEARCH_TYPES.RECAP:
+    if cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
         if child_type == "recap_document":
             available_only = cd.get("available_only", "")
             description = cd.get("description", "")
@@ -1333,7 +1339,7 @@ def build_join_es_filters(cd: CleanData) -> List:
         # Build position has child filter:
         queries_list.extend(build_has_child_filters("position", cd))
 
-    if cd["type"] == SEARCH_TYPES.RECAP:
+    if cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
         queries_list.extend(
             [
                 *build_term_query(
@@ -1398,7 +1404,7 @@ def build_full_join_es_queries(
     q_should = []
     child_type = "recap_document"
     join_query = None
-    if cd["type"] == SEARCH_TYPES.RECAP:
+    if cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
         child_filters = build_has_child_filters(child_type, cd)
         _, query_hits_limit = get_child_top_hits_limit(cd, cd["type"])
 
@@ -1441,7 +1447,7 @@ def build_full_join_es_queries(
             "entry_date_filed asc": "entry_date_filed",
             "entry_date_filed desc": "entry_date_filed",
         }
-        order_by = cd.get("order_by")
+        order_by = cd.get("order_by", "")
         if child_text_query or child_filters:
             query = build_has_child_query(
                 join_query,
@@ -1513,7 +1519,7 @@ def limit_inner_hits(
 
     hits_limit, _ = get_child_top_hits_limit(get_params, search_type)
     match search_type:
-        case SEARCH_TYPES.RECAP:
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             child_type = "recap_document"
         case _:
             return
@@ -1565,7 +1571,33 @@ def get_child_top_hits_limit(
             if docket_id_query:
                 frontend_hits_limit = settings.VIEW_MORE_CHILD_HITS
                 query_hits_limit = settings.VIEW_MORE_CHILD_HITS
+        case SEARCH_TYPES.DOCKETS:
+            frontend_hits_limit = 1
+            docket_id_query = re.search(
+                r"docket_id:\d+", search_params.get("q", "")
+            )
+            if docket_id_query:
+                frontend_hits_limit = settings.VIEW_MORE_CHILD_HITS
+                query_hits_limit = settings.VIEW_MORE_CHILD_HITS
         case _:
             pass
 
     return frontend_hits_limit, query_hits_limit
+
+
+def do_count_query(
+    search_query: Search,
+) -> int:
+    """Execute an Elasticsearch count query and catch errors.
+    :param search_query: Elasticsearch DSL Search object.
+    :return: The results count.
+    """
+    try:
+        total_results = search_query.count()
+    except (TransportError, ConnectionError, RequestError) as e:
+        logger.warning(
+            f"Error on count query request: {search_query.to_dict()}"
+        )
+        logger.warning(f"Error was: {e}")
+        total_results = 0
+    return total_results

@@ -295,7 +295,7 @@
               {% else %}
                 {% include "includes/search_result_solr.html" %}
               {% endflag %}
-            {% elif type == SEARCH_TYPES.RECAP %}
+            {% elif type == SEARCH_TYPES.RECAP or type == SEARCH_TYPES.DOCKETS%}
               {% flag "r-es-active" %}
                 {% include "includes/search_result.html" %}
               {% else %}

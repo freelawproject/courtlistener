@@ -234,10 +234,8 @@ recap_document_field_mapping = {
                 "date_argued": ["dateArgued"],
                 "date_filed": ["dateFiled"],
                 "date_terminated": ["dateTerminated"],
-                "assigned_to": ["assignedTo"],
-                "referred_to": ["referredTo"],
-                "assigned_to_id": ["assigned_to_id"],
-                "referred_to_id": ["referred_to_id"],
+                "assigned_to_id": ["assigned_to_id", "assignedTo"],
+                "referred_to_id": ["referred_to_id", "referredTo"],
                 "assigned_to_str": ["assignedTo"],
                 "referred_to_str": ["referredTo"],
             }

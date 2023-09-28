@@ -860,15 +860,7 @@ class ESRECAPDocument(DocketBaseDocument):
 
     def prepare_filepath_local(self, instance):
         if instance.filepath_local:
-            if not instance.filepath_local.storage.exists(
-                instance.filepath_local.name
-            ):
-                logger.warning(
-                    f"The file {instance.filepath_local.name} associated with "
-                    f"RECAPDocument ID {instance.pk} not found in S3. "
-                )
-                return None
-            return deepgetattr(instance, "local_path_mp3.name", None)
+            return instance.filepath_local.name
 
     def prepare_absolute_url(self, instance):
         return instance.get_absolute_url()
@@ -923,10 +915,12 @@ class ESRECAPDocument(DocketBaseDocument):
         return instance.docket_entry.docket.date_terminated
 
     def prepare_assigned_to_id(self, instance):
-        return instance.docket_entry.docket.assigned_to.pk
+        if instance.docket_entry.docket.assigned_to:
+            return instance.docket_entry.docket.assigned_to.pk
 
     def prepare_referred_to_id(self, instance):
-        return instance.docket_entry.docket.referred_to.pk
+        if instance.docket_entry.docket.referred_to:
+            return instance.docket_entry.docket.referred_to.pk
 
     def prepare_court(self, instance):
         return instance.docket_entry.docket.court.full_name

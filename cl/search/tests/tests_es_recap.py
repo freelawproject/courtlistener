@@ -293,7 +293,6 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 date_argued=datetime.date(2013, 5, 20),
                 docket_number="1:21-bk-1234",
                 assigned_to=judge,
-                referred_to=judge_2,
                 nature_of_suit="440",
             ),
             date_filed=datetime.date(2015, 8, 19),
@@ -604,6 +603,48 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # Each docket should contain all their related RDs. Max 5 hits per case
         self._count_child_documents_dict(0, r, 2, "match_all")
         self._count_child_documents_dict(1, r, 1, "match_all")
+
+    async def test_recap_dockets_search_type(self) -> None:
+        """Confirm dockets search type works properly"""
+
+        # Perform a RECAP search type.
+        params = {"type": SEARCH_TYPES.RECAP, "q": "Amicus Curiae Lorem"}
+        # Frontend
+        r = await self._test_article_count(params, 1, "text query description")
+        # Two child documents are shown.
+        self._count_child_documents(
+            0, r.content.decode(), 2, "text query description"
+        )
+        # No View Additional Results button is shown.
+        self.assertNotIn("View Additional Results for", r.content.decode())
+
+        # Perform the same query with DOCKETS search type.
+        params["type"] = SEARCH_TYPES.DOCKETS
+        # Frontend
+        r = await self._test_article_count(params, 1, "text query description")
+        # Only 1 child document is shown.
+        self._count_child_documents(
+            0, r.content.decode(), 1, "text query description"
+        )
+        # The View Additional Results button is shown.
+        self.assertIn("View Additional Results for", r.content.decode())
+
+    async def test_match_all_query_and_docket_entries_count(self) -> None:
+        """Confirm a RECAP search with no params return a match all query.
+        The case and docket entries count is available.
+        """
+
+        # Perform a RECAP match all search.
+        params = {"type": SEARCH_TYPES.RECAP}
+        # Frontend
+        r = await self._test_article_count(params, 2, "match all query")
+        self._count_child_documents(
+            0, r.content.decode(), 2, "match all query"
+        )
+        # Two cases are returned.
+        self.assertIn("2 Cases", r.content.decode())
+        # Two child documents are returned.
+        self.assertIn("3 Docket", r.content.decode())
 
     def test_sorting(self) -> None:
         """Can we do sorting on various fields?"""
@@ -963,6 +1004,14 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = await self._test_article_count(params, 1, '"pacer_doc_id"')
         # Count child documents under docket.
         self._count_child_documents(0, r.content.decode(), 1, '"pacer_doc_id"')
+
+        # Advanced query string, entry_number
+        params = {"type": SEARCH_TYPES.RECAP, "q": "entry_number:1"}
+
+        # Frontend
+        r = await self._test_article_count(params, 1, '"pacer_doc_id"')
+        # Count child documents under docket.
+        self._count_child_documents(0, r.content.decode(), 2, '"pacer_doc_id"')
 
     async def test_text_queries(self) -> None:
         """Confirm text queries works properly"""

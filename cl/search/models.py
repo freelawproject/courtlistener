@@ -690,10 +690,8 @@ class Docket(AbstractDateTimeModel):
             "date_argued",
             "date_filed",
             "date_terminated",
-            "assigned_to",
             "assigned_to_id",
             "assigned_to_str",
-            "referred_to",
             "referred_to_id",
             "referred_to_str",
         ]

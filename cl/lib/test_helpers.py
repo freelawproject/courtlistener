@@ -435,6 +435,7 @@ class RECAPSearchTestCase(SimpleTestCase):
                 referred_to=cls.judge_2,
                 nature_of_suit="440",
             ),
+            entry_number=1,
             date_filed=datetime.date(2015, 8, 19),
             description="MOTION for Leave to File Amicus Curiae Lorem",
         )
@@ -490,6 +491,7 @@ class RECAPSearchTestCase(SimpleTestCase):
                 assigned_to=cls.judge_3,
                 referred_to=cls.judge_4,
             ),
+            entry_number=3,
             date_filed=datetime.date(2014, 7, 19),
             description="MOTION for Leave to File Amicus Discharging Debtor",
         )
