@@ -445,6 +445,21 @@ def build_sort_results(cd: CleanData) -> Dict:
     return order_by_map[order_by]
 
 
+def get_child_sorting_key(cd: CleanData) -> str:
+    """Given cleaned data, find order_by value and return dict to use with
+    in a has_child query.
+
+    :param cd: The user input CleanedData
+    :return: The short dict.
+    """
+    order_by_map_child = {
+        "entry_date_filed asc": "entry_date_filed",
+        "entry_date_filed desc": "entry_date_filed",
+    }
+    order_by = cd.get("order_by", "")
+    return order_by_map_child.get(order_by, "")
+
+
 def build_es_filters(cd: CleanData) -> List:
     """Builds elasticsearch filters based on the CleanData object.
 
@@ -505,7 +520,7 @@ def build_has_child_query(
     child_type: str,
     child_hits_limit: int,
     highlighting_fields: dict[str, int] | None = None,
-    order_by: str | None = None,
+    order_by: str = "",
 ) -> QueryString:
     """Build a 'has_child' query.
 
@@ -518,7 +533,7 @@ def build_has_child_query(
     :return: The 'has_child' query.
     """
 
-    if order_by is not None:
+    if order_by:
         query = Q(
             "function_score",
             query=query,
@@ -549,7 +564,6 @@ def build_has_child_query(
         "name": f"filter_query_inner_{child_type}",
         "size": child_hits_limit,
     }
-
     if highlight_options:
         inner_hits["highlight"] = highlight_options
 
@@ -1405,20 +1419,23 @@ def build_full_join_es_queries(
     child_type = "recap_document"
     join_query = None
     if cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
+        # Build child filters.
         child_filters = build_has_child_filters(child_type, cd)
-        _, query_hits_limit = get_child_top_hits_limit(cd, cd["type"])
 
-        value = cd.get("q", "")
+        # Build child text query.
         child_fields = child_query_fields["recap_document"]
         child_text_query = build_fulltext_query(
-            child_fields, value, only_queries=True
+            child_fields, cd.get("q", ""), only_queries=True
         )
+
+        # Build parent filters.
         parent_filters = build_join_es_filters(cd)
         # If parent filters, extend into child_filters.
         if parent_filters:
             child_filters.extend(parent_filters)
-
-        # Build the child filter and text queries.
+        if child_filters:
+            child_filters = reduce(operator.iand, child_filters)
+        # Build the child query based on child_filters and child child_text_query
         match child_filters, child_text_query:
             case [], []:
                 pass
@@ -1429,32 +1446,26 @@ def build_full_join_es_queries(
                     minimum_should_match=1,
                 )
             case _, []:
-                c_filters = reduce(operator.iand, child_filters)
                 join_query = Q(
                     "bool",
-                    filter=c_filters,
+                    filter=child_filters,
                 )
             case _, _:
-                c_filters = reduce(operator.iand, child_filters)
                 join_query = Q(
                     "bool",
-                    filter=c_filters,
+                    filter=child_filters,
                     should=child_text_query,
                     minimum_should_match=1,
                 )
 
-        order_by_map_child = {
-            "entry_date_filed asc": "entry_date_filed",
-            "entry_date_filed desc": "entry_date_filed",
-        }
-        order_by = cd.get("order_by", "")
         if child_text_query or child_filters:
+            _, query_hits_limit = get_child_top_hits_limit(cd, cd["type"])
             query = build_has_child_query(
                 join_query,
                 "recap_document",
                 query_hits_limit,
                 SEARCH_RECAP_CHILD_HL_FIELDS,
-                order_by_map_child.get(order_by, None),
+                get_child_sorting_key(cd),
             )
             q_should.append(query)
 
@@ -1494,16 +1505,16 @@ def build_full_join_es_queries(
                 )
                 q_should.append(parent_query)
 
-        if not q_should:
-            return [], join_query
+    if not q_should:
+        return [], join_query
 
-        return (
-            Q(
-                "bool",
-                should=q_should,
-            ),
-            join_query,
-        )
+    return (
+        Q(
+            "bool",
+            should=q_should,
+        ),
+        join_query,
+    )
 
 
 def limit_inner_hits(
