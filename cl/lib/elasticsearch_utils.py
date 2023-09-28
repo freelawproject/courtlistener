@@ -26,7 +26,12 @@ from cl.lib.search_utils import (
     cleanup_main_query,
     get_array_of_selected_fields,
 )
-from cl.lib.types import ApiPositionMapping, BasePositionMapping, CleanData
+from cl.lib.types import (
+    ApiPositionMapping,
+    BasePositionMapping,
+    CleanData,
+    ESRangeQueryParams,
+)
 from cl.people_db.models import Position
 from cl.search.constants import (
     ALERTS_HL_TAG,
@@ -98,7 +103,7 @@ def build_numeric_range_query(
     if not any([lower_bound, upper_bound]):
         return []
 
-    params = {"gte": lower_bound, "lte": upper_bound}
+    params: ESRangeQueryParams = {"gte": lower_bound, "lte": upper_bound}
     if relation is not None:
         allowed_relations = ["INTERSECTS", "CONTAINS", "WITHIN"]
         assert (
