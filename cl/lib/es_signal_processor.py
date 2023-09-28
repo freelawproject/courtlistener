@@ -219,6 +219,19 @@ def update_es_documents(
                         fields_to_update,
                         fields_map,
                     )
+            case Docket() if es_document is ESRECAPDocument:
+                update_child_documents_by_query.delay(
+                    es_document, instance, fields_to_update, fields_map
+                )
+            case Person() | BankruptcyInformation() if es_document is ESRECAPDocument:
+                related_dockets = Docket.objects.filter(**{query: instance})
+                for rel_docket in related_dockets:
+                    update_child_documents_by_query.delay(
+                        es_document,
+                        rel_docket,
+                        fields_to_update,
+                        fields_map,
+                    )
             case _:
                 main_objects = main_model.objects.filter(**{query: instance})
                 for main_object in main_objects:
