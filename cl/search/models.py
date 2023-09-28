@@ -735,6 +735,7 @@ class Docket(AbstractDateTimeModel):
             "referred_to_str",
         ]
     )
+    es_o_field_tracker = FieldTracker(fields=["court_id"])
 
     class Meta:
         unique_together = ("docket_number", "pacer_case_id", "court")
@@ -3190,6 +3191,7 @@ class Opinion(AbstractDateTimeModel):
     es_pa_field_tracker = FieldTracker(
         fields=["extracted_by_ocr", "cluster_id", "author_id"]
     )
+    es_o_field_tracker = FieldTracker(fields=["cluster_id"])
 
     @property
     def siblings(self) -> QuerySet:

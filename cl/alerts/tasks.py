@@ -39,7 +39,12 @@ from cl.lib.redis_utils import create_redis_semaphore, delete_redis_semaphore
 from cl.lib.string_utils import trunc
 from cl.recap.constants import COURT_TIMEZONES
 from cl.search.constants import ALERTS_HL_TAG
-from cl.search.documents import ES_CHILD_ID, ESRECAPDocument, PositionDocument
+from cl.search.documents import (
+    ES_CHILD_ID,
+    AudioPercolator,
+    ESRECAPDocument,
+    PositionDocument,
+)
 from cl.search.models import Docket, DocketEntry
 from cl.search.types import (
     AudioPercolator,

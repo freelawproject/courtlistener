@@ -295,17 +295,46 @@ o_field_mapping = {
         Opinion: {},
     },
     "delete": {Opinion: {}},
-    "m2m": {},
+    "m2m": {
+        OpinionsCited: {
+            "opinion": {
+                "cites": "cites",
+            },
+        },
+        Opinion.joined_by.through: {
+            "opinion": {
+                "joined_by_ids": "joined_by_ids",
+            },
+        },
+    },
     "reverse": {},
 }
 
 o_cluster_field_mapping = {
     "save": {
+        Docket: {
+            "docket": {
+                "court_id": ["court_exact"],
+            }
+        },
+        Opinion: {"sub_opinions": {"cluster_id": ["sibling_ids"]}},
         OpinionCluster: {},
     },
     "delete": {OpinionCluster: {}},
-    "m2m": {},
+    "m2m": {
+        OpinionCluster.panel.through: {
+            "opinioncluster": {
+                "panel_ids": "panel_ids",
+            },
+        },
+        OpinionCluster.non_participating_judges.through: {
+            "opinioncluster": {
+                "non_participating_judge_ids": "non_participating_judge_ids",
+            },
+        },
+    },
     "reverse": {
+        Opinion: {"sub_opinions": {"all": ["sibling_ids"]}},
         Citation: {
             "citations": {"all": ["citation", "neutralCite", "lexisCite"]}
         },

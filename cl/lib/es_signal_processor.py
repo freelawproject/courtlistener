@@ -1,5 +1,4 @@
 from functools import partial
-from typing import Any
 
 from celery.canvas import chain
 from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist
@@ -24,6 +23,8 @@ from cl.search.documents import (
     AudioDocument,
     DocketDocument,
     ESRECAPDocument,
+    OpinionClusterDocument,
+    OpinionDocument,
     ParentheticalGroupDocument,
     PersonDocument,
     PositionDocument,
@@ -65,6 +66,8 @@ def updated_fields(
         tracked_set = getattr(instance, "es_rd_field_tracker", None)
     elif es_document is PositionDocument:
         tracked_set = getattr(instance, "es_p_field_tracker", None)
+    elif es_document is OpinionClusterDocument:
+        tracked_set = getattr(instance, "es_o_field_tracker", None)
 
     # Check the set before trying to get the fields
     if not tracked_set:
@@ -134,6 +137,8 @@ def exists_or_create_doc(
         doc_id = ES_CHILD_ID(instance.pk).POSITION
     elif es_document is ESRECAPDocument:
         doc_id = ES_CHILD_ID(instance.pk).RECAP
+    elif es_document is OpinionDocument:
+        doc_id = ES_CHILD_ID(instance.pk).OPINION
     else:
         doc_id = instance.pk
 

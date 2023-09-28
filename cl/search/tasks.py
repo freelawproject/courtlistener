@@ -34,6 +34,7 @@ from cl.search.documents import (
     DocketDocument,
     ESRECAPDocument,
     OpinionClusterDocument,
+    OpinionDocument,
     PersonDocument,
     PositionDocument,
 )
@@ -919,6 +920,8 @@ def remove_document_from_es_index(
         doc_id = ES_CHILD_ID(instance_id).POSITION
     elif es_document is ESRECAPDocument:
         doc_id = ES_CHILD_ID(instance_id).RECAP
+    elif es_document is OpinionDocument:
+        doc_id = ES_CHILD_ID(instance_id).OPINION
     else:
         doc_id = instance_id
 
