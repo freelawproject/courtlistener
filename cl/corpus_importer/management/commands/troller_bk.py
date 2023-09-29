@@ -96,7 +96,7 @@ def add_new_docket_from_rss(
     date_filed, time_filed = localize_date_and_time(
         court_id, docket["docket_entries"][0]["date_filed"]
     )
-    update_docket_metadata(d, docket)
+    async_to_sync(update_docket_metadata)(d, docket)
     d.pacer_case_id = docket["pacer_case_id"]
     d.slug = slugify(trunc(best_case_name(d), 75))
     d.date_last_filing = date_filed

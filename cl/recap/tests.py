@@ -1003,7 +1003,7 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.court = CourtFactory(id="txwd", jurisdiction="FB")
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
         with open(
             test_dir / "recap_mail_custom_receipt.json",
@@ -1790,7 +1790,7 @@ class RecapMinuteEntriesTest(TestCase):
         d = async_to_sync(find_docket_object)(
             court_id, docket["pacer_case_id"], docket["docket_number"]
         )
-        update_docket_metadata(d, docket)
+        async_to_sync(update_docket_metadata)(d, docket)
         d.save()
 
         expected_count = 1
@@ -2066,6 +2066,51 @@ class RecapDocketTaskTest(TestCase):
         async_to_sync(process_recap_docket)(self.pq.pk)
         pq.refresh_from_db()
         self.assertEqual(pq.status, PROCESSING_STATUS.SUCCESSFUL)
+
+
+@mock.patch("cl.recap.tasks.add_items_to_solr")
+class RecapDocketAttachmentTaskTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        CourtFactory(id="cand", jurisdiction="FD")
+
+    def setUp(self) -> None:
+        self.user = User.objects.get(username="recap")
+        self.filename = "cand_7.html"
+        path = os.path.join(
+            settings.INSTALL_ROOT, "cl", "recap", "test_assets", self.filename
+        )
+        with open(path, "rb") as f:
+            f = SimpleUploadedFile(self.filename, f.read())
+        self.pq = ProcessingQueue.objects.create(
+            court_id="cand",
+            uploader=self.user,
+            pacer_case_id="417880",
+            filepath_local=f,
+            upload_type=UPLOAD_TYPE.DOCKET,
+        )
+
+    def tearDown(self) -> None:
+        self.pq.filepath_local.delete()
+        self.pq.delete()
+        Docket.objects.all().delete()
+        RECAPDocument.objects.filter(
+            document_type=RECAPDocument.ATTACHMENT,
+        ).delete()
+
+    def test_attachments_get_created(self, mock):
+        """Do attachments get created if we have a RECAPDocument to match
+        on?"""
+        async_to_sync(process_recap_docket)(self.pq.pk)
+        num_attachments_to_create = 3
+        self.assertEqual(
+            RECAPDocument.objects.filter(
+                document_type=RECAPDocument.ATTACHMENT
+            ).count(),
+            num_attachments_to_create,
+        )
+        self.pq.refresh_from_db()
+        self.assertEqual(self.pq.status, PROCESSING_STATUS.SUCCESSFUL)
 
 
 class ClaimsRegistryTaskTest(TestCase):
@@ -6296,7 +6341,7 @@ class LookupDocketsTest(TestCase):
         d = async_to_sync(find_docket_object)(
             self.court.pk, "12345", self.docket_data["docket_number"]
         )
-        update_docket_metadata(d, self.docket_data)
+        async_to_sync(update_docket_metadata)(d, self.docket_data)
         d.save()
 
         # Successful lookup, dockets matched
@@ -6311,7 +6356,7 @@ class LookupDocketsTest(TestCase):
         d = async_to_sync(find_docket_object)(
             self.court.pk, "54321", self.docket_data["docket_number"]
         )
-        update_docket_metadata(d, self.docket_data)
+        async_to_sync(update_docket_metadata)(d, self.docket_data)
         d.save()
 
         # Successful lookup, dockets matched
@@ -6328,7 +6373,7 @@ class LookupDocketsTest(TestCase):
             self.docket_core_data["docket_entries"][0]["pacer_case_id"],
             self.docket_core_data["docket_number"],
         )
-        update_docket_metadata(d, self.docket_core_data)
+        async_to_sync(update_docket_metadata)(d, self.docket_core_data)
         d.save()
 
         # Successful lookup, dockets matched
@@ -6345,7 +6390,7 @@ class LookupDocketsTest(TestCase):
             self.docket_no_core_data["docket_entries"][0]["pacer_case_id"],
             self.docket_no_core_data["docket_number"],
         )
-        update_docket_metadata(d, self.docket_no_core_data)
+        async_to_sync(update_docket_metadata)(d, self.docket_no_core_data)
         d.save()
 
         # Successful lookup, dockets matched
@@ -6365,7 +6410,7 @@ class LookupDocketsTest(TestCase):
             self.docket_data["docket_number"],
         )
 
-        update_docket_metadata(d, self.docket_data)
+        async_to_sync(update_docket_metadata)(d, self.docket_data)
         d.save()
 
         # Docket is not overwritten a new one is created instead.
@@ -6393,7 +6438,7 @@ class LookupDocketsTest(TestCase):
             self.docket_data["docket_number"],
         )
 
-        update_docket_metadata(d, self.docket_data)
+        async_to_sync(update_docket_metadata)(d, self.docket_data)
         d.save()
 
         # Docket is not overwritten a new one is created instead.
@@ -6426,7 +6471,7 @@ class LookupDocketsTest(TestCase):
             docket_data_lower_number["docket_entries"][0]["pacer_case_id"],
             docket_data_lower_number["docket_number"],
         )
-        update_docket_metadata(new_d, docket_data_lower_number)
+        async_to_sync(update_docket_metadata)(new_d, docket_data_lower_number)
         new_d.save()
         # The existing docket is matched instead of creating a new one.
         self.assertEqual(new_d.pk, d.pk)
