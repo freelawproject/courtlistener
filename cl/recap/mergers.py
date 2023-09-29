@@ -1439,7 +1439,9 @@ async def clean_duplicate_attachment_entries(
     if not await dupe_doc_ids.aexists():
         return
     dupes = rds.filter(
-        pacer_doc_id__in=[i["pacer_doc_id"] for i in dupe_doc_ids]
+        pacer_doc_id__in=[
+            i["pacer_doc_id"] async for i in dupe_doc_ids.aiterator()
+        ]
     )
     async for dupe in dupes.aiterator():
         for attachment in attachment_dicts:
