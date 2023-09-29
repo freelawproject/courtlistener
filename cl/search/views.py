@@ -227,7 +227,9 @@ def do_search(
     search_summary_str = search_form.as_text(court_count_human)
     search_summary_dict = search_form.as_display_dict(court_count_human)
     related_cluster = (
-        OpinionCluster.objects.get(sub_opinions__pk__in=related_cluster_pks).distinct()
+        OpinionCluster.objects.get(
+            sub_opinions__pk__in=related_cluster_pks
+        ).distinct()
         if related_cluster_pks
         else None
     )
