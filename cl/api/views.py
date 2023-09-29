@@ -200,12 +200,12 @@ def coverage_data_opinions(request: HttpRequest):
     """
 
     if request.method == "GET":
-        chart_json = defaultdict(dict)
+        chart_json: dict[str, object] = defaultdict(dict)
         query_parameters = request.GET.items()
         data = []
         if query_parameters:
             for court_name, value in query_parameters:
-                group, court_id = value.split("_")
+                group, court_id = value.split("_")  # type: ignore
 
                 if group in dict(Court.JURISDICTIONS).keys():
                     group = dict(Court.JURISDICTIONS)[group]
@@ -214,9 +214,9 @@ def coverage_data_opinions(request: HttpRequest):
                     court_id=court_id, court_name=court_name
                 )
                 if court_data:
-                    chart_json["data"].setdefault(group, []).append(court_data)
+                    chart_json["data"].setdefault(group, []).append(court_data)  # type: ignore
 
-            for key, value in chart_json["data"].items():
+            for key, value in chart_json["data"].items():  # type: ignore
                 data.append({"group": key, "data": value})
         return JsonResponse({"r": data}, safe=True)
     return JsonResponse({"r": []}, safe=True)
