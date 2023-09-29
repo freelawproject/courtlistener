@@ -16,8 +16,10 @@ curl --silent 'https://www.postgresql.org/media/keys/ACCC4CF8.asc' |  apt-key ad
 apt-get update
 apt-get install -y postgresql-client
 
-# Stream to S3
+# We only need to set PGPASSWORD once
+export PGPASSWORD=$DB_PASSWORD
 
+# Stream to S3
 echo "Streaming search_court to S3"
 court_fields='(
 	       id, pacer_court_id, pacer_has_rss_feed, pacer_rss_entry_types, date_last_pacer_contact,
@@ -26,7 +28,7 @@ court_fields='(
 	       url, start_date, end_date, jurisdiction, notes, parent_court_id
 	       )'
 court_csv_filename="courts-$(date -I).csv"
-PGPASSWORD=$DB_PASSWORD psql \
+psql \
 	--command \
 	  "set statement_timeout to 0;
 	   COPY search_court $court_fields TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)" \
@@ -41,7 +43,7 @@ echo "Streaming search_courthouse to S3"
 courthouse_fields='(id, court_seat, building_name, address1, address2, city, county,
 state, zip_code, country_code, court_id)'
 courthouse_csv_filename="courthouses-$(date -I).csv"
-PGPASSWORD=$DB_PASSWORD psql \
+psql \
 	--command \
 	  "set statement_timeout to 0;
 	   COPY search_courthouse $courthouse_fields TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)" \
@@ -56,7 +58,7 @@ PGPASSWORD=$DB_PASSWORD psql \
 echo "Streaming search_court_appeals_to to S3"
 court_appeals_to_fields='(id, from_court_id, to_court_id)'
 court_appeals_to_csv_filename="court-appeals-to-$(date -I).csv"
-PGPASSWORD=$DB_PASSWORD psql \
+psql \
 	--command \
 	  "set statement_timeout to 0;
 	   COPY search_court_appeals_to $court_appeals_to_fields TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)" \
@@ -81,7 +83,7 @@ docket_fields='(id, date_created, date_modified, source, appeal_from_str,
 	       court_id, idb_data_id, originating_court_information_id, referred_to_id
 	       )'
 dockets_csv_filename="dockets-$(date -I).csv"
-PGPASSWORD=$DB_PASSWORD psql \
+psql \
 	--command \
 	  "set statement_timeout to 0;
 	   COPY search_docket $docket_fields TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)" \
@@ -100,7 +102,7 @@ originatingcourtinformation_fields='(
 	       ordering_judge_id
 	       )'
 originatingcourtinformation_csv_filename="originating-court-information-$(date -I).csv"
-PGPASSWORD=$DB_PASSWORD psql \
+psql \
 	--command \
 	  "set statement_timeout to 0;
 	   COPY search_originatingcourtinformation $originatingcourtinformation_fields TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)" \
@@ -125,7 +127,7 @@ fjcintegrateddatabase_fields='(
 	       year_of_tape, nature_of_offense, version, circuit_id, district_id
 	   )'
 fjcintegrateddatabase_csv_filename="fjc-integrated-database-$(date -I).csv"
-PGPASSWORD=$DB_PASSWORD psql \
+psql \
 	--command \
 	  "set statement_timeout to 0;
 	   COPY recap_fjcintegrateddatabase $fjcintegrateddatabase_fields TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)" \
@@ -148,7 +150,7 @@ opinioncluster_fields='(
 	       arguments, headmatter
 	   )'
 opinioncluster_csv_filename="opinion-clusters-$(date -I).csv"
-PGPASSWORD=$DB_PASSWORD psql \
+psql \
 	--command \
 	  "set statement_timeout to 0;
 	   COPY search_opinioncluster $opinioncluster_fields TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)" \
@@ -167,7 +169,7 @@ opinion_fields='(
 	       html_with_citations, extracted_by_ocr, author_id, cluster_id
 	   )'
 opinions_csv_filename="opinions-$(date -I).csv"
-PGPASSWORD=$DB_PASSWORD psql \
+psql \
 	--command \
 	  "set statement_timeout to 0;
 	   COPY search_opinion $opinion_fields TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)" \
@@ -183,7 +185,7 @@ opinionscited_fields='(
 	       id, depth, cited_opinion_id, citing_opinion_id
 	   )'
 opinionscited_csv_filename="citation-map-$(date -I).csv"
-PGPASSWORD=$DB_PASSWORD psql \
+psql \
 	--command \
 	  "set statement_timeout to 0;
 	   COPY search_opinionscited $opinionscited_fields TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)" \
@@ -199,7 +201,7 @@ citation_fields='(
 	       id, volume, reporter, page, type, cluster_id
 	   )'
 citations_csv_filename="citations-$(date -I).csv"
-PGPASSWORD=$DB_PASSWORD psql \
+psql \
 	--command \
 	  "set statement_timeout to 0;
 	   COPY search_citation $citation_fields TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)" \
@@ -215,7 +217,7 @@ parentheticals_fields='(
 	       id, text, score, described_opinion_id, describing_opinion_id, group_id
 	   )'
 parentheticals_csv_filename="parentheticals-$(date -I).csv"
-PGPASSWORD=$DB_PASSWORD psql \
+psql \
 	--command \
 	  "set statement_timeout to 0;
 	   COPY search_parenthetical $parentheticals_fields TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)" \
@@ -235,7 +237,7 @@ oralarguments_fields='(
 	       docket_id
 	   )'
 oralarguments_csv_filename="oral-arguments-$(date -I).csv"
-PGPASSWORD=$DB_PASSWORD psql \
+psql \
 	--command \
 	  "set statement_timeout to 0;
 	   COPY audio_audio $oralarguments_fields TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)" \
@@ -255,7 +257,7 @@ people_db_person_fields='(
 	       ftm_eid, has_photo, is_alias_of_id
 	   )'
 people_db_person_csv_filename="people-db-people-$(date -I).csv"
-PGPASSWORD=$DB_PASSWORD psql \
+psql \
 	--command \
 	  "set statement_timeout to 0;
 	   COPY people_db_person $people_db_person_fields TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)" \
@@ -271,7 +273,7 @@ people_db_school_fields='(
 	       id, date_created, date_modified, name, ein, is_alias_of_id
 	   )'
 people_db_school_csv_filename="people-db-schools-$(date -I).csv"
-PGPASSWORD=$DB_PASSWORD psql \
+psql \
 	--command \
 	  "set statement_timeout to 0;
 	   COPY people_db_school $people_db_school_fields TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)" \
@@ -296,7 +298,7 @@ people_db_position_fields='(
 	       supervisor_id
 	   )'
 people_db_position_csv_filename="people-db-positions-$(date -I).csv"
-PGPASSWORD=$DB_PASSWORD psql \
+psql \
 	--command \
 	  "set statement_timeout to 0;
 	   COPY people_db_position $people_db_position_fields TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)" \
@@ -314,7 +316,7 @@ people_db_retentionevent_fields='(
 	       won, position_id
 	   )'
 people_db_retentionevent_csv_filename="people-db-retention-events-$(date -I).csv"
-PGPASSWORD=$DB_PASSWORD psql \
+psql \
 	--command \
 	  "set statement_timeout to 0;
 	   COPY people_db_retentionevent $people_db_retentionevent_fields TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)" \
@@ -331,7 +333,7 @@ people_db_education_fields='(
 	       degree_year, person_id, school_id
 	   )'
 people_db_education_csv_filename="people-db-educations-$(date -I).csv"
-PGPASSWORD=$DB_PASSWORD psql \
+psql \
 	--command \
 	  "set statement_timeout to 0;
 	   COPY people_db_education $people_db_education_fields TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)" \
@@ -349,7 +351,7 @@ politicalaffiliation_fields='(
 	       date_granularity_end, person_id
 	   )'
 politicalaffiliation_csv_filename="people-db-political-affiliations-$(date -I).csv"
-PGPASSWORD=$DB_PASSWORD psql \
+psql \
 	--command \
 	  "set statement_timeout to 0;
 	   COPY people_db_politicalaffiliation $politicalaffiliation_fields TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)" \
@@ -367,7 +369,7 @@ financialdisclosure_fields='(
 	       addendum_redacted, has_been_extracted, person_id
 	   )'
 financialdisclosure_csv_filename="financial-disclosures-$(date -I).csv"
-PGPASSWORD=$DB_PASSWORD psql \
+psql \
 	--command \
 	  "set statement_timeout to 0;
 	   COPY disclosures_financialdisclosure $financialdisclosure_fields TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)" \
@@ -388,7 +390,7 @@ investment_fields='(
 	       transaction_partner, has_inferred_values, financial_disclosure_id
 	   )'
 investment_csv_filename="financial-disclosure-investments-$(date -I).csv"
-PGPASSWORD=$DB_PASSWORD psql \
+psql \
 	--command \
 	  "set statement_timeout to 0;
 	   COPY disclosures_investment $investment_fields TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)" \
@@ -405,7 +407,7 @@ disclosures_position_fields='(
 	       redacted, financial_disclosure_id
 	   )'
 disclosures_position_csv_filename="financial-disclosures-positions-$(date -I).csv"
-PGPASSWORD=$DB_PASSWORD psql \
+psql \
 	--command \
 	  "set statement_timeout to 0;
 	   COPY disclosures_position $disclosures_position_fields TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)" \
@@ -422,7 +424,7 @@ disclosures_agreement_fields='(
 	       redacted, financial_disclosure_id
 	   )'
 disclosures_agreement_csv_filename="financial-disclosures-agreements-$(date -I).csv"
-PGPASSWORD=$DB_PASSWORD psql \
+psql \
 	--command \
 	  "set statement_timeout to 0;
 	   COPY disclosures_agreement $disclosures_agreement_fields TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)" \
@@ -439,7 +441,7 @@ noninvestmentincome_fields='(
 	       income_amount, redacted, financial_disclosure_id
 	   )'
 noninvestmentincome_csv_filename="financial-disclosures-non-investment-income-$(date -I).csv"
-PGPASSWORD=$DB_PASSWORD psql \
+psql \
 	--command \
 	  "set statement_timeout to 0;
 	   COPY disclosures_noninvestmentincome $noninvestmentincome_fields TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)" \
@@ -456,7 +458,7 @@ spouseincome_fields='(
 	       financial_disclosure_id
 	   )'
 spouseincome_csv_filename="financial-disclosures-spousal-income-$(date -I).csv"
-PGPASSWORD=$DB_PASSWORD psql \
+psql \
 	--command \
 	  "set statement_timeout to 0;
 	   COPY disclosures_spouseincome $spouseincome_fields TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)" \
@@ -473,7 +475,7 @@ disclosures_reimbursement_fields='(
 	       purpose, items_paid_or_provided, redacted, financial_disclosure_id
 	   )'
 disclosures_reimbursement_csv_filename="financial-disclosures-reimbursements-$(date -I).csv"
-PGPASSWORD=$DB_PASSWORD psql \
+psql \
 	--command \
 	  "set statement_timeout to 0;
 	   COPY disclosures_reimbursement $disclosures_reimbursement_fields TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)" \
@@ -490,7 +492,7 @@ disclosures_gift_fields='(
 	       redacted, financial_disclosure_id
 	   )'
 disclosures_gift_csv_filename="financial-disclosures-gifts-$(date -I).csv"
-PGPASSWORD=$DB_PASSWORD psql \
+psql \
 	--command \
 	  "set statement_timeout to 0;
 	   COPY disclosures_gift $disclosures_gift_fields TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)" \
@@ -507,7 +509,7 @@ disclosures_debt_fields='(
 	       value_code, redacted, financial_disclosure_id
 	   )'
 disclosures_debt_csv_filename="financial-disclosures-debts-$(date -I).csv"
-PGPASSWORD=$DB_PASSWORD psql \
+psql \
 	--command \
 	  "set statement_timeout to 0;
 	   COPY disclosures_debt $disclosures_debt_fields TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)" \
@@ -520,7 +522,7 @@ PGPASSWORD=$DB_PASSWORD psql \
 
 echo "Exporting schema to S3"
 schema_filename="schema-$(date -I).sql"
-PGPASSWORD=$DB_PASSWORD pg_dump \
+pg_dump \
     --host "$DB_HOST" \
     --username "$DB_USER" \
     --create \
@@ -532,5 +534,241 @@ PGPASSWORD=$DB_PASSWORD pg_dump \
     --no-publications \
     --no-subscriptions courtlistener | \
 	aws s3 cp - s3://com-courtlistener-storage/bulk-data/"$schema_filename" --acl public-read
+
+
+echo "Generating and streaming load bulk data script to S3"
+BULK_SCRIPT_FILENAME="load-bulk-data-$(date -I).sh"
+cat <<- EOF | aws s3 cp - s3://com-courtlistener-storage/bulk-data/"$BULK_SCRIPT_FILENAME" --acl public-read
+#!/bin/bash
+set -e
+# You must place all uncompressed bulk files in the same directory and set
+# environment variable BULK_DIR, BULK_DB_HOST, BULK_DB_USER, BULK_DB_PASSWORD
+# NOTES:
+# 1. If you have your postgresql instance on a docker service, you need to mount
+# the directory where the bulk files are, otherwise you will get this error:
+# ERROR:  could not open file No such file or directory
+# 2. You may need to grant execute permissions to this file
+
+if [[ -z \${BULK_DIR} ]];
+then
+echo "Variable having name 'BULK_DIR' is not set. BULK_DIR is where all the unzipped files are."
+exit
+fi
+
+if [[ -z \${BULK_DB_HOST} ]];
+then
+echo "Variable having name 'BULK_DB_HOST' is not set."
+exit
+fi
+
+if [[ -z \${BULK_DB_USER} ]];
+then
+echo "Variable having name 'BULK_DB_USER' is not set."
+exit
+fi
+
+if [[ -z \${BULK_DB_PASSWORD} ]];
+then
+echo "Variable having name 'BULK_DB_PASSWORD' is not set."
+exit
+fi
+
+# Default from schema is 'courtlistener'
+export BULK_DB_NAME=courtlistener
+export PGPASSWORD=\$BULK_DB_PASSWORD
+
+echo "Loading schema to database: $schema_filename"
+psql -f "\$BULK_DIR"/$schema_filename --host "\$BULK_DB_HOST" --username "\$BULK_DB_USER"
+
+echo "Loading $court_csv_filename to database"
+psql --command \
+"COPY public.search_court $court_fields FROM '\$BULK_DIR/$court_csv_filename' WITH (FORMAT csv, ENCODING utf8, HEADER)" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
+echo "Loading $courthouse_csv_filename to database"
+psql --command \
+"COPY public.search_courthouse $courthouse_fields FROM '\$BULK_DIR/$courthouse_csv_filename' WITH (FORMAT csv, ENCODING utf8, HEADER)" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
+echo "Loading $court_appeals_to_csv_filename to database"
+psql --command \
+"COPY public.search_court_appeals_to $court_appeals_to_fields FROM '\$BULK_DIR/$court_appeals_to_csv_filename' WITH (FORMAT csv, ENCODING utf8, HEADER)" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
+echo "Loading $dockets_csv_filename to database"
+psql --command \
+"COPY public.search_docket $docket_fields FROM '\$BULK_DIR/$dockets_csv_filename' WITH (FORMAT csv, ENCODING utf8, HEADER)" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
+echo "Loading $originatingcourtinformation_csv_filename to database"
+psql --command \
+"COPY public.search_originatingcourtinformation $originatingcourtinformation_fields FROM '\$BULK_DIR/$originatingcourtinformation_csv_filename' WITH (FORMAT csv, ENCODING utf8, HEADER)" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
+echo "Loading $fjcintegrateddatabase_csv_filename to database"
+psql --command \
+"COPY public.recap_fjcintegrateddatabase $fjcintegrateddatabase_fields FROM '\$BULK_DIR/$fjcintegrateddatabase_csv_filename' WITH (FORMAT csv, ENCODING utf8, HEADER)" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
+echo "Loading $opinioncluster_csv_filename to database"
+psql --command \
+"COPY public.search_opinioncluster $opinioncluster_fields FROM '\$BULK_DIR/$opinioncluster_csv_filename' WITH (FORMAT csv, ENCODING utf8, HEADER)" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
+echo "Loading $opinions_csv_filename to database"
+psql --command \
+"COPY public.search_opinion $opinion_fields FROM '\$BULK_DIR/$opinions_csv_filename' WITH (FORMAT csv, ENCODING utf8, HEADER)" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
+echo "Loading $opinionscited_csv_filename to database"
+psql --command \
+"COPY public.search_opinionscited $opinionscited_fields FROM '\$BULK_DIR/$opinionscited_csv_filename' WITH (FORMAT csv, ENCODING utf8, HEADER)" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
+echo "Loading $citations_csv_filename to database"
+psql --command \
+"COPY public.search_citation $citation_fields FROM '\$BULK_DIR/$citations_csv_filename' WITH (FORMAT csv, ENCODING utf8, HEADER)" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
+echo "Loading $parentheticals_csv_filename to database"
+psql --command \
+"COPY public.search_parenthetical $parentheticals_fields FROM '\$BULK_DIR/$parentheticals_csv_filename' WITH (FORMAT csv, ENCODING utf8, HEADER)" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
+echo "Loading $oralarguments_csv_filename to database"
+psql --command \
+"COPY public.audio_audio $oralarguments_fields FROM '\$BULK_DIR/$oralarguments_csv_filename' WITH (FORMAT csv, ENCODING utf8, HEADER)" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
+echo "Loading $people_db_person_csv_filename to database"
+psql --command \
+"COPY public.people_db_person $people_db_person_fields FROM '\$BULK_DIR/$people_db_person_csv_filename' WITH (FORMAT csv, ENCODING utf8, HEADER)" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
+echo "Loading $people_db_school_csv_filename to database"
+psql --command \
+"COPY public.people_db_school $people_db_school_fields FROM '\$BULK_DIR/$people_db_school_csv_filename' WITH (FORMAT csv, ENCODING utf8, HEADER)" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
+echo "Loading $people_db_position_csv_filename to database"
+psql --command \
+"COPY public.people_db_position $people_db_position_fields FROM '\$BULK_DIR/$people_db_position_csv_filename' WITH (FORMAT csv, ENCODING utf8, HEADER)" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
+echo "Loading $people_db_retentionevent_csv_filename to database"
+psql --command \
+"COPY public.people_db_retentionevent $people_db_retentionevent_fields FROM '\$BULK_DIR/$people_db_retentionevent_csv_filename' WITH (FORMAT csv, ENCODING utf8, HEADER)" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
+echo "Loading $people_db_education_csv_filename to database"
+psql --command \
+"COPY public.people_db_education $people_db_education_fields FROM '\$BULK_DIR/$people_db_education_csv_filename' WITH (FORMAT csv, ENCODING utf8, HEADER)" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
+echo "Loading $politicalaffiliation_csv_filename to database"
+psql --command \
+"COPY public.people_db_politicalaffiliation $politicalaffiliation_fields FROM '\$BULK_DIR/$politicalaffiliation_csv_filename' WITH (FORMAT csv, ENCODING utf8, HEADER)" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
+echo "Loading $financialdisclosure_csv_filename to database"
+psql --command \
+"COPY public.disclosures_financialdisclosure $financialdisclosure_fields FROM '\$BULK_DIR/$financialdisclosure_csv_filename' WITH (FORMAT csv, ENCODING utf8, HEADER)" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
+echo "Loading $investment_csv_filename to database"
+psql --command \
+"COPY public.disclosures_investment $investment_fields FROM '\$BULK_DIR/$investment_csv_filename' WITH (FORMAT csv, ENCODING utf8, HEADER)" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
+echo "Loading $disclosures_position_csv_filename to database"
+psql --command \
+"COPY public.disclosures_position $disclosures_position_fields FROM '\$BULK_DIR/$disclosures_position_csv_filename' WITH (FORMAT csv, ENCODING utf8, HEADER)" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
+echo "Loading $disclosures_agreement_csv_filename to database"
+psql --command \
+"COPY public.disclosures_agreement $disclosures_agreement_fields FROM '\$BULK_DIR/$disclosures_agreement_csv_filename' WITH (FORMAT csv, ENCODING utf8, HEADER)" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
+echo "Loading $noninvestmentincome_csv_filename to database"
+psql --command \
+"COPY public.disclosures_noninvestmentincome $noninvestmentincome_fields FROM '\$BULK_DIR/$noninvestmentincome_csv_filename' WITH (FORMAT csv, ENCODING utf8, HEADER)" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
+echo "Loading $spouseincome_csv_filename to database"
+psql --command \
+"COPY public.disclosures_spouseincome $spouseincome_fields FROM '\$BULK_DIR/$spouseincome_csv_filename' WITH (FORMAT csv, ENCODING utf8, HEADER)" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
+echo "Loading $disclosures_reimbursement_csv_filename to database"
+psql --command \
+"COPY public.disclosures_reimbursement $disclosures_reimbursement_fields FROM '\$BULK_DIR/$disclosures_reimbursement_csv_filename' WITH (FORMAT csv, ENCODING utf8, HEADER)" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
+echo "Loading $disclosures_gift_csv_filename to database"
+psql --command \
+"COPY public.disclosures_gift $disclosures_gift_fields FROM '\$BULK_DIR/$disclosures_gift_csv_filename' WITH (FORMAT csv, ENCODING utf8, HEADER)" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
+echo "Loading $disclosures_debt_csv_filename to database"
+psql --command \
+"COPY public.disclosures_debt $disclosures_debt_fields FROM '\$BULK_DIR/$disclosures_debt_csv_filename' WITH (FORMAT csv, ENCODING utf8, HEADER)" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
+EOF
 
 echo "Done."
