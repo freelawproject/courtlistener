@@ -54,6 +54,29 @@
 
 
   <div class="col-md-9" role="main">
+    <h1>Data Coverage — Presidential Cases in CourtListener</h1>
+
+    <p>We are thrilled to announce the successful completion of the import of all presidential cases into CourtListener's extensive database of legal information. This landmark achievement represents a significant milestone in our ongoing efforts to provide comprehensive and accessible legal data to our users.</p>
+
+    <p>Our collection of presidential.....</p>
+
+    <h2>Key highlights of our presidential case data coverage:</h2>
+
+    <ul>
+        <li><strong>Complete Collection</strong>: We have meticulously curated and imported a comprehensive collection of .....</li>
+
+        <li><strong>Accessible and Searchable</strong>: All precedential cases in our database are easily accessible and searchable, allowing users to retrieve specific cases or conduct in-depth research on presidential legal matters. Our user-friendly interface ensures a seamless experience when exploring this valuable dataset.</li>
+
+        <li><strong>Historical Perspective</strong>: By offering a comprehensive collection of presidential cases, we provide a historical perspective on the legal challenges and decisions that have shaped the role of the executive branch in the United States. This historical context is essential for understanding the evolution of presidential powers and responsibilities.</li>
+    </ul>
+
+    <p>We believe that our complete coverage of presidential cases significantly enhances CourtListener's value as a legal research tool......</p>
+
+    <p>As we continue to expand and improve our legal data resources, we remain committed to providing open access to legal information and supporting transparency in the legal system. We welcome your feedback and inquiries about our presidential case data and encourage you to explore this valuable resource.</p>
+
+    <p>If you have any questions or require further information about our presidential case coverage or any other aspect of CourtListener, please do not hesitate to....</p>
+
+
       <h1 id="federal">Federal Courts</h1>
         {% for id, circuit in federal.items %}
             <h3 id="{{ id }}">{{ circuit.name }}</h3>
@@ -137,7 +160,7 @@
                             </ul>
                               <div class="btn-group" role="group">
                                 <button class="btn btn-default" hx-boost="false" type="submit">
-                                   Chart {{ state }}
+                                   Chart {% if state != "NONE" %} {{ state }} {% else %} {{ section | title }} Courts {% endif %}
                                 </button>
                             </div>
                           </form>

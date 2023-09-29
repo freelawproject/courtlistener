@@ -449,11 +449,13 @@ def coverage_opinions(request: HttpRequest) -> HttpResponse:
         "tribal",
         "military",
         "special",
+        "international",
     ]
 
     coverage_data_op["items"] = {
         "state": fetch_state_data_or_cache(),
         "territory": fetch_data(Court.TERRITORY_JURISDICTIONS),
+        "international": fetch_data(Court.INTERNATIONAL, group_by_state=False),
         "tribal": fetch_data(Court.TRIBAL_JURISDICTIONS, group_by_state=False),
         "special": fetch_data([Court.FEDERAL_SPECIAL], group_by_state=False),
         "military": fetch_data(
