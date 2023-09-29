@@ -441,7 +441,7 @@ def coverage_opinions(request: HttpRequest) -> HttpResponse:
     :param request: A django request
     :return: The page requested
     """
-    coverage_data_op = {"private": False}
+    coverage_data_op: dict[str, object] = {"private": False}
     coverage_data_op["federal"] = fetch_federal_data()
     coverage_data_op["sections"] = [
         "state",
