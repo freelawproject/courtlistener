@@ -1,0 +1,389 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+{% load partition_util %}
+{% load text_filters %}
+{% load waffle_tags %}
+{% load extras %}
+
+
+{% block title %}Coverage – CourtListener.com{% endblock %}
+{% block sidebar %}
+{#     <div id="toc-container" class="col-md-3">#}
+     <div id="toc-container" class="hidden-xs hidden-sm col-md-3">
+
+        <div id="toc">
+            <h1>TOC</h1>
+            <ul>
+                <li><a href="#federal">Federal Courts</a>
+                <a class="collapse-header" data-toggle="collapse"
+                   href="#federal_courts" role="button"
+                   data-target="#federal_courts"
+                   aria-expanded="true"
+                   aria-controls="federal_courts"> [-] </a>
+                </li>
+
+                <ul id="federal_courts" class="collapse in">
+                    {% for id, circuit in federal.items %}
+                        <li><a href="#{{ id }}">{{ circuit.name }}</a></li>
+                    {% endfor %}
+                </ul>
+                <li><a href="#state">State Courts</a>
+                    <a class="collapse-header" data-toggle="collapse"
+                   href="#state_courts" role="button"
+                   data-target="#state_courts"
+                   aria-expanded="true"
+                   aria-controls="state_courts"> [-] </a>
+                </li>
+                <ul id="state_courts" class="collapse in">
+                    {% for id, state in items.state.items %}
+                         <li><a href="#{{ id }}">{{ id }}</a></li>
+                    {% endfor %}
+                </ul>
+                <li><a href="#territory">Territory Courts</a></li>
+                <li><a href="#military">Military Courts</a></li>
+                <li><a href="#special">Federal Special Courts</a></li>
+                <li><a href="#tribal">Tribal Courts</a></li>
+            </ul>
+        </div>
+    </div>
+
+{% endblock %}
+
+
+{% block content %}
+
+
+  <div class="col-md-9" role="main">
+      <h1 id="federal">Federal Courts</h1>
+        {% for id, circuit in federal.items %}
+            <h3 id="{{ id }}">{{ circuit.name }}</h3>
+            <form hx-get="/api/rest/v4/coverage/opinions/" hx-swap="none" hx-boost="true">
+            <ul>
+                <li>{{ circuit.full_name }}</li>
+                {% if circuit.id != "scotus" and circuit.id != "cafc" %}
+                 <input type="hidden" value="F_{{ circuit.id }}" name="{{ circuit.full_name }}"/>
+                    <li>U.S. Circuit Courts - Pre 1911</li>
+                    <ul>
+                        {% for court in circuit.circuit %}
+                        <li>{{ court.full_name }} {% if court.start_date__year %} ({{ court.start_date__year }} -
+                            {{ court.end_date__year }}){% endif %}</li>
+                        <input type="hidden" value="{{ court.jurisdiction }}_{{ court.id }}" name="{{ court.full_name }}"/>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+
+                {% if circuit.id != "scotus" and circuit.id != "cafc" %}
+                <li>Federal District Court</li>
+                <ul>
+                    {% for court in circuit.district %}
+                        <li>{{ court.full_name }}</li>
+                        <input type="hidden" value="{{ court.jurisdiction }}_{{ court.id }}" name="{{ court.full_name }}"/>
+                    {% endfor %}
+                </ul>
+                <li>Federal Bankruptcy Court</li>
+                <ul>
+                    {% for court in circuit.bankruptcy %}
+                        <li>{{ court.full_name }}</li>
+                        <input type="hidden" value="{{ court.jurisdiction }}_{{ court.id }}" name="{{ court.full_name }}"/>
+                    {% endfor %}
+                </ul>
+
+            {% elif circuit.id == "cafc" %}
+                <li>Article I & III Tribunals</li>
+                <ul>
+                    {% for court_id, court in circuit.appeals_from.items %}
+                        <li> {{ court.full_name }} </li>
+                        <input value="F_{{ court.id }}" name="{{ court.full_name }}" type="hidden"/>
+                    {% endfor %}
+                </ul>
+            {% elif circuit.id == "scotus" %}
+                <input type="hidden" value="F_scotus" name="U.S. Supreme Court"/>
+            {% endif %}
+            </ul>
+                <div class="btn-group" role="group">
+                    <button class="btn btn-default" type="submit" hx-boost="false">
+                       {{ circuit.name }} Timeline
+                    </button>
+                </div>
+            </form>
+        {% endfor %}
+
+
+      {% for section in sections %}
+          <hr>
+            <h1 id="{{ section | lower}}"> {{ section | title }} Courts</h1>
+          {% with variable_name=items|get:section %}
+            <!-- Use the variable here -->
+              {% for state, courts in variable_name.items %}
+                  {% if state != "NONE" %} <h3 id="{{ state }}"> {{ state }} </h3> {% endif %}
+                          <form hx-get="/api/rest/v4/coverage/opinions/" hx-swap="none" hx-boost="true">
+                            <ul>
+                            {% for court_object in courts %}
+                                <li>{{ court_object.court.short_name }}</li>
+                                <input value="{{ court_object.court.jurisdiction }}_{{ court_object.court.id }}" name="{{ court_object.court.full_name }}" type="hidden"/>
+                                <ul>
+                                    {% for child_object in court_object.descendants %}
+                                        <li>{{ child_object.court.short_name }} </li>
+                                        <input value="{{ child_object.court.jurisdiction }}_{{ child_object.court.id }}" name="{{ child_object.court.full_name }}" type="hidden"/>
+                                        <ul>
+                                            {% for sub_court_object in child_object.descendants %}
+                                                <li>{{ sub_court_object.court.short_name }} </li>
+                                                <input value="{{ sub_court_object.court.jurisdiction }}_{{ sub_court_object.court.id }}" name="{{ sub_court_object.court.full_name }}" type="hidden"/>
+                                            {% endfor %}
+                                        </ul>
+                                    {% endfor %}
+                                </ul>
+                            {% endfor %}
+                            </ul>
+                              <div class="btn-group" role="group">
+                                <button class="btn btn-default" hx-boost="false" type="submit">
+                                   Chart {{ state }}
+                                </button>
+                            </div>
+                          </form>
+              {% endfor %}
+        {% endwith %}
+{#          {% for state_abbreviation, courts in items|get:section %}#}
+{#            <h3 id="{{ state_abbreviation }}"> {{ state_abbreviation }}</h3>#}
+{#            <form hx-get="/api/rest/v4/coverage/opinions/" hx-swap="none" hx-boost="true">#}
+{#            <ul>#}
+{#            {% for court_object in courts %}#}
+{#                <li>{{ court_object.court.short_name }}</li>#}
+{#                <input value="{{ court_object.court.jurisdiction }}_{{ court_object.court.id }}" name="{{ court_object.court.full_name }}" type="hidden"/>#}
+{#                <ul>#}
+{#                    {% for child_object in court_object.descendants %}#}
+{#                        <li>{{ child_object.court.short_name }} </li>#}
+{#                        <input value="{{ child_object.court.jurisdiction }}_{{ child_object.court.id }}" name="{{ child_object.court.full_name }}" type="hidden"/>#}
+{#                        <ul>#}
+{#                            {% for sub_court_object in child_object.descendants %}#}
+{#                                <li>{{ sub_court_object.court.short_name }} </li>#}
+{#                                <input value="{{ sub_court_object.court.jurisdiction }}_{{ sub_court_object.court.id }}" name="{{ sub_court_object.court.full_name }}" type="hidden"/>#}
+{#                            {% endfor %}#}
+{#                        </ul>#}
+{#                    {% endfor %}#}
+{#                </ul>#}
+{#            {% endfor %}#}
+{#            </ul>#}
+{#              <div class="btn-group" role="group">#}
+{#                <button class="btn btn-default" hx-boost="false" type="submit">#}
+{#                   Chart {{ state_abbreviation }}#}
+{#                </button>#}
+{#            </div>#}
+{#          </form>#}
+{#        {% endfor %}#}
+    {% endfor %}
+
+          <hr>
+
+{#      <h1 id="state">State Courts</h1>#}
+{#        {% for state_abbreviation, courts in state.items %}#}
+{#            <h3 id="{{ state_abbreviation }}"> {{ state_abbreviation }}</h3>#}
+{#            <form hx-get="/api/rest/v4/coverage/opinions/" hx-swap="none" hx-boost="true">#}
+{#            <ul>#}
+{#            {% for court_object in courts %}#}
+{#                <li>{{ court_object.court.short_name }}</li>#}
+{#                <input value="{{ court_object.court.jurisdiction }}_{{ court_object.court.id }}" name="{{ court_object.court.full_name }}" type="hidden"/>#}
+{#                <ul>#}
+{#                    {% for child_object in court_object.descendants %}#}
+{#                        <li>{{ child_object.court.short_name }} </li>#}
+{#                        <input value="{{ child_object.court.jurisdiction }}_{{ child_object.court.id }}" name="{{ child_object.court.full_name }}" type="hidden"/>#}
+{#                        <ul>#}
+{#                            {% for sub_court_object in child_object.descendants %}#}
+{#                                <li>{{ sub_court_object.court.short_name }} </li>#}
+{#                                <input value="{{ sub_court_object.court.jurisdiction }}_{{ sub_court_object.court.id }}" name="{{ sub_court_object.court.full_name }}" type="hidden"/>#}
+{#                            {% endfor %}#}
+{#                        </ul>#}
+{#                    {% endfor %}#}
+{#                </ul>#}
+{#            {% endfor %}#}
+{#            </ul>#}
+{#              <div class="btn-group" role="group">#}
+{#                <button class="btn btn-default" hx-boost="false" type="submit">#}
+{#                   Chart {{ state_abbreviation }}#}
+{#                </button>#}
+{#            </div>#}
+{#          </form>#}
+{#        {% endfor %}#}
+
+        <hr>
+
+{#        <h1 id="territory">Territorial Courts</h1>#}
+{##}
+{#        {% for state_abbreviation, courts in territory.items %}#}
+{#            <h3 id="{{ state_abbreviation }}"> {{ state_abbreviation }}</h3>#}
+{#            <form hx-get="/api/rest/v4/coverage/opinions/" hx-swap="none" hx-boost="true">#}
+{#            <ul>#}
+{#            {% for court_object in courts %}#}
+{#                <li>{{ court_object.court.short_name }} - {{ court_object.court.id }}</li>#}
+{#                <li>{{ court_object.court.short_name }} </li>#}
+{#                <input value="{{ court_object.court.jurisdiction }}_{{ court_object.court.id }}" name="{{ court_object.court.full_name }}" type="hidden"/>#}
+{#                <ul>#}
+{#                    {% for child_object in court_object.descendants %}#}
+{#                        <li>{{ child_object.court.short_name }} -#}
+{#                            {{ child_object.court.id }} </li>#}
+{#                        <li>{{ child_object.court.short_name }} </li>#}
+{#                        <input value="{{ child_object.court.jurisdiction }}_{{ child_object.court.id }}" name="{{ child_object.court.full_name }}" type="hidden"/>#}
+{##}
+{#                        <ul>#}
+{#                            {% for sub_court_object in child_object.descendants %}#}
+{#                                <li>{{ sub_court_object.court.short_name }} - {{ sub_court_object.court.id }}</li>#}
+{#                                <li>{{ sub_court_object.court.short_name }} </li>#}
+{#                                <input value="{{ sub_court_object.court.jurisdiction }}_{{ sub_court_object.court.id }}" name="{{ sub_court_object.court.full_name }}" type="hidden"/>#}
+{#                            {% endfor %}#}
+{#                        </ul>#}
+{#                    {% endfor %}#}
+{#                </ul>#}
+{#            {% endfor %}#}
+{#            </ul>#}
+{##}
+{#              <div class="btn-group" role="group">#}
+{#                <button class="btn btn-default" hx-boost="false" type="submit">#}
+{#                   Chart {{ state_abbreviation }}#}
+{#                </button>#}
+{#            </div>#}
+{#          </form>#}
+{##}
+{#        {% endfor %}#}
+{#        <hr>#}
+{##}
+{#        <h1 id="military">Military Courts</h1>#}
+{#        {% for state_abbreviation, courts in military.items %}#}
+{#            <form hx-get="/api/rest/v4/coverage/opinions/" hx-swap="none" hx-boost="true">#}
+{##}
+{#            <ul>#}
+{#            {% for court_object in courts %}#}
+{#                <li>{{ court_object.court.full_name }} </li>#}
+{#                <input value="{{ court_object.court.jurisdiction }}_{{ court_object.court.id }}" name="{{ court_object.court.full_name }}" type="hidden"/>#}
+{##}
+{#                <ul>#}
+{#                    {% for child_object in court_object.descendants %}#}
+{#                        <li>{{ child_object.court.full_name }} </li>#}
+{#                        <input value="{{ child_object.court.jurisdiction }}_{{ child_object.court.id }}" name="{{ child_object.court.full_name }}" type="hidden"/>#}
+{##}
+{#                        <ul>#}
+{#                            {% for sub_court_object in child_object.descendants %}#}
+{#                                <li>{{ sub_court_object.court.full_name }}</li>#}
+{#                                <input value="{{ sub_court_object.court.jurisdiction }}_{{ sub_court_object.court.id }}" name="{{ sub_court_object.court.full_name }}" type="hidden"/>#}
+{##}
+{#                            {% endfor %}#}
+{#                        </ul>#}
+{#                    {% endfor %}#}
+{#                </ul>#}
+{#            {% endfor %}#}
+{#            </ul>#}
+{##}
+{#          <div class="btn-group" role="group">#}
+{#            <button class="btn btn-default" hx-boost="false" type="submit">#}
+{#               Chart Military#}
+{#            </button>#}
+{#          </div>#}
+{#          </form>#}
+{##}
+{#        {% endfor %}#}
+{##}
+{#        <hr>#}
+{#        <h1 id="special">Federal Special Courts</h1>#}
+{#        {% for state_abbreviation, courts in special.items %}#}
+{#            <form hx-get="/api/rest/v4/coverage/opinions/" hx-swap="none" hx-boost="true">#}
+{##}
+{#            <ul>#}
+{#            {% for court_object in courts %}#}
+{#                <li>{{ court_object.court.full_name }} </li>#}
+{#                <input value="{{ court_object.court.jurisdiction }}_{{ court_object.court.id }}" name="{{ court_object.court.full_name }}" type="hidden"/>#}
+{##}
+{#                <ul>#}
+{#                    {% for child_object in court_object.descendants %}#}
+{#                        <li>{{ child_object.court.full_name }} </li>#}
+{#                        <input value="{{ child_object.court.jurisdiction }}_{{ child_object.court.id }}" name="{{ child_object.court.full_name }}" type="hidden"/>#}
+{##}
+{#                        <ul>#}
+{#                            {% for sub_court_object in child_object.descendants %}#}
+{#                                <li>{{ sub_court_object.court.full_name }}</li>#}
+{#                                <input value="{{ sub_court_object.court.jurisdiction }}_{{ sub_court_object.court.id }}" name="{{ sub_court_object.court.full_name }}" type="hidden"/>#}
+{##}
+{#                            {% endfor %}#}
+{#                        </ul>#}
+{#                    {% endfor %}#}
+{#                </ul>#}
+{#            {% endfor %}#}
+{#            </ul>#}
+{#              <div class="btn-group" role="group">#}
+{#                <button class="btn btn-default" hx-boost="false" type="submit">#}
+{#                   Chart Federal Special#}
+{#                </button>#}
+{#              </div>#}
+{##}
+{#          </form>#}
+{#        {% endfor %}#}
+{#        <hr>#}
+{##}
+{#        <h1 id="tribal">Tribal Courts</h1>#}
+{#        {% for state_abbreviation, courts in tribal.items %}#}
+{##}
+{#            <form hx-get="/api/rest/v4/coverage/opinions/" hx-swap="none" hx-boost="true">#}
+{#            <ul>#}
+{#            {% for court_object in courts %}#}
+{#                <li>{{ court_object.court.full_name }}</li>#}
+{#                <input value="{{ court_object.court.jurisdiction }}_{{ court_object.court.id }}" name="{{ court_object.court.full_name }}" type="hidden"/>#}
+{#                <ul>#}
+{#                    {% for child_object in court_object.descendants %}#}
+{#                        <li>{{ child_object.court.full_name }} </li>#}
+{#                        <input value="{{ child_object.court.jurisdiction }}_{{ child_object.court.id }}" name="{{ child_object.court.full_name }}" type="hidden"/>#}
+{#                        <ul>#}
+{#                            {% for sub_court_object in child_object.descendants %}#}
+{#                                <li>{{ sub_court_object.court.full_name }}</li>#}
+{#                                <input value="{{ sub_court_object.court.jurisdiction }}_{{ sub_court_object.court.id }}" name="{{ sub_court_object.court.full_name }}" type="hidden"/>#}
+{#                            {% endfor %}#}
+{#                        </ul>#}
+{#                    {% endfor %}#}
+{#                </ul>#}
+{#            {% endfor %}#}
+{#            </ul>#}
+{#            <div class="btn-group" role="group">#}
+{#                <button class="btn btn-default" hx-boost="false" type="submit">#}
+{#                   Chart Tribal Courts#}
+{#                </button>#}
+{#            </div>#}
+{##}
+{#          </form>#}
+{#        {% endfor %}#}
+
+    </div>
+
+<!-- Modal -->
+<div class="modal fade" id="fullScreenModal" tabindex="-1" role="dialog" aria-labelledby="fullScreenModalLabel" style="width: 100vw;">
+    <div class="modal-dialog modal-lg" role="document" style="width: 95vw;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="modalLabel">Court Timeline</h4>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div id="timeline-body" class="modal-body">
+                <!-- SVG Chart goes here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+
+{% block footer-scripts %}
+    <script src="{% static "js/htmx.min.js" %}"></script>
+    <script src="{% static "js/timelines-chart.js" %}"></script>
+    <script src="{% static "js/coverage-op.js" %}"></script>
+    <style>
+        .legendG {
+            display: None;
+        }
+        *:target {
+          background-color: white;
+        }
+    </style>
+{% endblock %}

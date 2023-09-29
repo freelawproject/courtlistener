@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+from collections import defaultdict
 from datetime import timedelta
 from typing import Any
 
@@ -15,6 +16,7 @@ from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.timezone import now
 from django.views.decorators.cache import cache_page
+from localflavor.us.us_states import OBSOLETE_STATES, USPS_CHOICES
 from rest_framework.status import HTTP_429_TOO_MANY_REQUESTS
 
 from cl.audio.models import Audio
@@ -36,6 +38,7 @@ from cl.search.forms import SearchForm
 from cl.search.models import (
     SOURCES,
     Court,
+    Courthouse,
     Docket,
     OpinionCluster,
     RECAPDocument,
@@ -277,6 +280,249 @@ def get_coverage_data_o(request: HttpRequest) -> dict[str, Any]:
 def coverage_graph(request: HttpRequest) -> HttpResponse:
     coverage_data_o = get_coverage_data_o(request)
     return TemplateResponse(request, "help/coverage.html", coverage_data_o)
+
+
+def fetch_data(jurisdictions, group_by_state=True):
+    """Fetch Court Data
+
+    Fetch data and organize it to group courts
+
+    :param jurisdictions: The jurisdiction to query for
+    :param group_by_state: Do we group by states
+    :return: Ordered court data
+    """
+    courts = defaultdict(dict)
+    for court in Court.objects.filter(
+        jurisdiction__in=jurisdictions,
+        parent_court__isnull=True,
+    ):
+        if "FS" in jurisdictions:
+            if "cafc" in [ct.id for ct in court.appeals_to.all()]:
+                continue
+        yes_no = Docket.objects.filter(court=court).exists()
+        descendant_json = get_descendants_dict(court)
+        # Dont add any courts without a docket associated with it or
+        # a descendant court
+        if yes_no == False and descendant_json == []:
+            continue
+        # This is just a fail safe that should probably not be tripped.
+        if group_by_state:
+            try:
+                state = Courthouse.objects.filter(court=court)[0].state
+                state = dict(OBSOLETE_STATES + USPS_CHOICES)[state]
+            except:
+                state = "FAIL"
+        else:
+            state = "NONE"
+
+        courts["data"].setdefault(state, []).append(
+            {
+                "court": court,
+                "descendants": descendant_json,
+                "display": yes_no,
+            }
+        )
+    return courts["data"]
+
+
+def fetch_state_data_or_cache():
+    """Fetch State Data
+
+    Generate state data - around a cache or grab the cache
+    :return: State data
+    """
+    from django.core.cache import caches
+
+    cache_key = "state_courts"
+    cache = caches["db_cache"]
+    cached_results = cache.get(cache_key)
+    if cached_results is not None:
+        return cached_results
+    state_data = fetch_data(Court.STATE_JURISDICTIONS)
+    cache_length = 60 * 10
+    cache.set(cache_key, state_data, cache_length)
+    return state_data
+
+
+def get_descendants_dict(court):
+    """Get descendants (if any) of court
+
+    A simple method to help recsuively iterate for child courts
+
+    :param court: Court object
+    :return: Descendant courts
+    """
+    descendants = []
+    for child_court in court.child_courts.all():
+        child_descendants = get_descendants_dict(child_court)
+        yes_no = Docket.objects.filter(court=child_court).exists()
+        if yes_no == False and child_descendants == []:
+            continue
+        descendants.append(
+            {
+                "court": child_court,
+                "descendants": child_descendants,
+                "display": yes_no,
+            }
+        )
+    return descendants
+
+
+def fetch_federal_data():
+    """Organize court data by circuits
+
+    :return: Federal court data
+    """
+
+    feds = defaultdict(dict)
+    for court in Court.objects.filter(jurisdiction__in=["F"]):
+        feds["feds"][court.id] = {
+            "name": court.short_name,
+            "id": court.id,
+            "full_name": court.full_name,
+        }
+        if court.id == "scotus":
+            pass
+        elif court.id == "cafc":
+            # Add Special Article I and III tribunals
+            # that appeal cleanly to Federal Circuit
+            af = {}
+            for ct in court.appeals_from.all():
+                af[ct.id] = ct
+            feds["feds"][court.id]["appeals_from"] = af
+        else:
+            # Build our traditional circuit data
+            states = Courthouse.objects.filter(court=court).values_list(
+                "state", flat=True
+            )
+            filter_conditions = [
+                {
+                    "court__jurisdiction": "FD",  # district
+                    "court__parent_court": Court.objects.get(id="usdistct"),
+                },
+                {"court__jurisdiction": "FB"},  # bankruptcy
+                {
+                    "court__parent_court": Court.objects.get(id="uscirct")
+                },  # Old circuits
+            ]
+
+            # Create a dictionary to store the results
+            fields = [
+                "court__id",
+                "court__short_name",
+                "court__full_name",
+                "court__jurisdiction",
+                "court__start_date__year",
+                "court__end_date__year",
+            ]
+
+            # Iterate over the filter conditions
+            for label, condition in zip(
+                ["district", "bankruptcy", "circuit"], filter_conditions
+            ):
+                data = Courthouse.objects.filter(
+                    state__in=states, **condition
+                ).values(*fields)
+                data = [
+                    {
+                        key.replace("court__", ""): value
+                        for key, value in item.items()
+                    }
+                    for item in data
+                ]
+                feds["feds"][court.id][label] = data
+
+    return feds["feds"]
+
+
+def coverage_opinions(request: HttpRequest) -> HttpResponse:
+    """Generate Coverage Opinion Page
+
+    :param request: A django request
+    :return: The page requested
+    """
+    coverage_data_op = {"private": False}
+    coverage_data_op["federal"] = fetch_federal_data()
+    coverage_data_op["sections"] = [
+        "state",
+        "territory",
+        "tribal",
+        "military",
+        "special",
+    ]
+
+    coverage_data_op["items"] = {
+        "state": fetch_state_data_or_cache(),
+        "territory": fetch_data(Court.TERRITORY_JURISDICTIONS),
+        "tribal": fetch_data(Court.TRIBAL_JURISDICTIONS, group_by_state=False),
+        "special": fetch_data([Court.FEDERAL_SPECIAL], group_by_state=False),
+        "military": fetch_data(
+            Court.MILITARY_JURISDICTIONS, group_by_state=False
+        ),
+    }
+    return TemplateResponse(
+        request, "help/coverage_opinions.html", coverage_data_op
+    )
+
+
+# def fetch_start_end_dates_for_court(court_id: str, court_name: str):
+#     """Fetch start and end dates for court
+#
+#     :param court_id: Court ID
+#     :param court_name: The Name of the Court we use as a label
+#     :return: Timechart data formatted for the court
+#     """
+#     dates = OpinionCluster.objects.filter(docket__court=court_id).order_by(
+#         "date_filed"
+#     )
+#     if dates:
+#         return {
+#             "id": court_id,
+#             "label": court_name,
+#             "data": [
+#                 {
+#                     "val": court_id,
+#                     "timeRange": [
+#                         dates.first().date_filed,
+#                         dates.last().date_filed,
+#                     ],
+#                 }
+#             ],
+#         }
+#
+#
+# def coverage_page_chart_data(request: HttpRequest):
+#     """Generate Coverage Chart Data
+#
+#     Accept Post to query court data for timelines-chart on coverage page
+#
+#     :param request:
+#     :return: TimeChart data if any
+#     """
+#
+#     if request.method == "GET":
+#         chart_json = defaultdict(dict)
+#         query_parameters = request.GET.items()
+#         data = []
+#
+#         if query_parameters:
+#
+#             for court_name, value in query_parameters:
+#                 group, court_id = value.split("_")
+#
+#                 if group in dict(Court.JURISDICTIONS).keys():
+#                     group = dict(Court.JURISDICTIONS)[group]
+#
+#                 court_data = fetch_start_end_dates_for_court(
+#                     court_id=court_id, court_name=court_name
+#                 )
+#                 if court_data:
+#                     chart_json["data"].setdefault(group, []).append(court_data)
+#
+#             for key, value in chart_json["data"].items():
+#                 data.append({"group": key, "data": value})
+#         return JsonResponse({"r": data}, safe=True)
+#     return JsonResponse({"r": []}, safe=True)
 
 
 def feeds(request: HttpRequest) -> HttpResponse:

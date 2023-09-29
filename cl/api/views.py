@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict
 from datetime import date, timedelta
 
 import waffle
@@ -21,7 +22,7 @@ from cl.lib.search_utils import (
 )
 from cl.search.documents import AudioDocument
 from cl.search.forms import SearchForm
-from cl.search.models import SEARCH_TYPES, Court
+from cl.search.models import SEARCH_TYPES, Court, OpinionCluster
 from cl.simple_pages.views import get_coverage_data_fds
 
 logger = logging.getLogger(__name__)
@@ -161,6 +162,64 @@ def coverage_data(request, version, court):
     return JsonResponse(
         {"annual_counts": annual_counts, "total": total_docs}, safe=True
     )
+
+
+def fetch_start_end_dates_for_court(court_id: str, court_name: str):
+    """Fetch start and end dates for court
+
+    :param court_id: Court ID
+    :param court_name: The Name of the Court we use as a label
+    :return: Timechart data formatted for the court
+    """
+    dates = OpinionCluster.objects.filter(docket__court=court_id).order_by(
+        "date_filed"
+    )
+    if dates:
+        return {
+            "id": court_id,
+            "label": court_name,
+            "data": [
+                {
+                    "val": court_id,
+                    "timeRange": [
+                        dates.first().date_filed,
+                        dates.last().date_filed,
+                    ],
+                }
+            ],
+        }
+
+
+def coverage_data_opinions(request: HttpRequest):
+    """Generate Coverage Chart Data
+
+    Accept Post to query court data for timelines-chart on coverage page
+
+    :param request:
+    :return: TimeChart data if any
+    """
+
+    if request.method == "GET":
+        chart_json = defaultdict(dict)
+        query_parameters = request.GET.items()
+        data = []
+        if query_parameters:
+            for court_name, value in query_parameters:
+                group, court_id = value.split("_")
+
+                if group in dict(Court.JURISDICTIONS).keys():
+                    group = dict(Court.JURISDICTIONS)[group]
+
+                court_data = fetch_start_end_dates_for_court(
+                    court_id=court_id, court_name=court_name
+                )
+                if court_data:
+                    chart_json["data"].setdefault(group, []).append(court_data)
+
+            for key, value in chart_json["data"].items():
+                data.append({"group": key, "data": value})
+        return JsonResponse({"r": data}, safe=True)
+    return JsonResponse({"r": []}, safe=True)
 
 
 async def get_result_count(request, version, day_count):
