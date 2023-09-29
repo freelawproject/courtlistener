@@ -607,8 +607,9 @@ def get_search_query(
         return search_query.query(Q("match", person_child="person"))
 
     if cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
+        _, query_hits_limit = get_child_top_hits_limit(cd, cd["type"])
         query = build_has_child_query(
-            "match_all", "recap_document", settings.CHILD_HITS_PER_RESULT
+            "match_all", "recap_document", query_hits_limit
         )
         return search_query.query(query)
 
