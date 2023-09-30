@@ -12,7 +12,7 @@ document.body.addEventListener('htmx:afterSettle', function (event) {
     .maxHeight(function (d) {
       return 8000;
     })
-    .data(results['r'])
+    .data(results)
     .enableAnimations(false)
     .timeFormat('%Y-%m-%d')
     .sortChrono(false)
