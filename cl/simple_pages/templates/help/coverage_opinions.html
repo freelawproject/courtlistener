@@ -3,207 +3,182 @@
 {% load humanize %}
 {% load partition_util %}
 {% load text_filters %}
-{% load waffle_tags %}
 {% load extras %}
 
+{% block title %}Opinion Coverage — CourtListener.com{% endblock %}
+{% block og_title %}Opinion Coverage — CourtListener.com{% endblock %}
+{% block description %}Opinion Coverage for Free Law Project, a 501(c)(3) nonprofit.{% endblock %}
+{% block og_description %}Opinion Coverage for Free Law Project, a 501(c)(3) nonprofit.{% endblock %}
 
-{% block title %}Coverage – CourtListener.com{% endblock %}
 {% block sidebar %}
-     <div id="toc-container" class="hidden-xs hidden-sm col-md-3">
-
-        <div id="toc">
-            <h1>TOC</h1>
-            <ul>
-                <li><a href="#federal">Federal Courts</a>
-                <a class="collapse-header" data-toggle="collapse"
-                   href="#federal_courts" role="button"
-                   data-target="#federal_courts"
-                   aria-expanded="true"
-                   aria-controls="federal_courts"> [-] </a>
-                </li>
-
-                <ul id="federal_courts" class="collapse in">
-                    {% for id, circuit in federal.items %}
-                        <li><a href="#{{ id }}">{{ circuit.name }}</a></li>
-                    {% endfor %}
-                </ul>
-                <li><a href="#state">State Courts</a>
-                    <a class="collapse-header" data-toggle="collapse"
-                   href="#state_courts" role="button"
-                   data-target="#state_courts"
-                   aria-expanded="true"
-                   aria-controls="state_courts"> [-] </a>
-                </li>
-                <ul id="state_courts" class="collapse in">
-                    {% for id, state in items.state.items %}
-                         <li><a href="#{{ id }}">{{ id }}</a></li>
-                    {% endfor %}
-                </ul>
-                <li><a href="#territory">Territory Courts</a></li>
-                <li><a href="#military">Military Courts</a></li>
-                <li><a href="#special">Federal Special Courts</a></li>
-                <li><a href="#tribal">Tribal Courts</a></li>
+  <div id="toc-container" class="hidden-xs hidden-sm col-md-3">
+    <div id="toc">
+      <h3>Table of Contents</h3>
+      <ul>
+        <li>
+          <a href="#federal">Federal Courts</a>
+          <a class="collapse-header"
+             data-toggle="collapse"
+             href="#federal_courts"
+             role="button"
+             data-target="#federal_courts"
+             aria-expanded="true"
+             aria-controls="federal_courts"> [–] </a>
+        </li>
+        <ul id="federal_courts" class="collapse in">
+          {% for id, circuit in federal.items %}
+          <li><a href="#{{ id }}">{{ circuit.name }}</a></li>
+          {% endfor %}
+        </ul>
+          {% for section in sections %}
+            {% with section_data=sections|get:section %}
+            <li>
+            <a href="#{{ section }}">{{ section | title }} Courts</a>
+            {% if section_data|length > 1 %}
+            <a class="collapse-header" data-toggle="collapse"
+              href="#{{ section }}_courts"
+              role="button"
+              data-target="#{{ section }}_courts"
+              aria-expanded="true"
+              aria-controls="{{ section }}_courts"> [–]
+            </a>
+            {% endif %}
+            </li>
+            <ul id="{{ section }}_courts" class="collapse in">
+              {% for header in section_data %}
+                {% if header != "NONE" %}
+                  <li><a href="#{{ header }}">{{ header }}</a></li>
+                {% endif %}
+              {% endfor %}
             </ul>
-        </div>
+            {% endwith %}
+          {% endfor %}
+      </ul>
     </div>
-
+  </div>
 {% endblock %}
-
 
 {% block content %}
-
-
   <div class="col-md-9" role="main">
-    <h1>Data Coverage — Precedential Cases in CourtListener</h1>
-
-    <p>We are thrilled to announce the successful completion of the import of all precedential cases into CourtListener's extensive database of legal information. This landmark achievement represents a significant milestone in our ongoing efforts to provide comprehensive and accessible legal data to our users.</p>
-
-    <p>Our collection of precedential.....</p>
-
-    <h2>Key highlights of our precedential case data coverage:</h2>
-
-    <ul>
-        <li><strong>Complete Collection</strong>: We have meticulously curated and imported a comprehensive collection of .....</li>
-
-        <li><strong>Accessible and Searchable</strong>: All precedential cases in our database are easily accessible and searchable, allowing users to retrieve specific cases or conduct in-depth research on precedential legal matters. Our user-friendly interface ensures a seamless experience when exploring this valuable dataset.</li>
-
-        <li><strong>Historical Perspective</strong>: By offering a comprehensive collection of precedential cases, we provide a historical perspective on the legal challenges and decisions that have shaped the role of the executive branch in the United States. This historical context is essential for understanding the evolution of precedential powers and responsibilities.</li>
-    </ul>
-
-    <p>We believe that our complete coverage of precedential cases significantly enhances CourtListener's value as a legal research tool......</p>
-
-    <p>As we continue to expand and improve our legal data resources, we remain committed to providing open access to legal information and supporting transparency in the legal system. We welcome your feedback and inquiries about our precedential case data and encourage you to explore this valuable resource.</p>
-
-    <p>If you have any questions or require further information about our precedential case coverage or any other aspect of CourtListener, please do not hesitate to....</p>
-
-
-      <h1 id="federal">Federal Courts</h1>
-        {% for id, circuit in federal.items %}
-            <h3 id="{{ id }}">{{ circuit.name }}</h3>
-            <form hx-get="/api/rest/v4/coverage/opinions/" hx-swap="none" hx-boost="true">
+    <h1>Opinion Coverage in CourtListener</h1>
+    <h1 id="federal">Federal Courts</h1>
+    {% for id, circuit in federal.items %}
+      <h3 id="{{ id }}">{{ circuit.name }}</h3>
+      <form hx-get="{% url "coverage_data_opinions" %}" hx-swap="none" hx-boost="true">
+        <ul>
+          <li>{{ circuit.full_name }}</li>
+          {% if circuit.id == "scotus" %}
+            <input type="hidden" value="{{ circuit.id }}" name="{{ circuit.full_name}}"/>
+          {% elif circuit.id == "cafc" %}
+            <li>Article I & III Tribunals</li>
             <ul>
-                <li>{{ circuit.full_name }}</li>
-                {% if circuit.id != "scotus" and circuit.id != "cafc" %}
-                 <input type="hidden" value="F_{{ circuit.id }}" name="{{ circuit.full_name }}"/>
-                    <li>U.S. Circuit Courts - Pre 1911</li>
-                    <ul>
-                        {% for court in circuit.circuit %}
-                        <li>{{ court.full_name }} {% if court.start_date__year %} ({{ court.start_date__year }} -
-                            {{ court.end_date__year }}){% endif %}</li>
-                        <input type="hidden" value="{{ court.jurisdiction }}_{{ court.id }}" name="{{ court.full_name }}"/>
-                        {% endfor %}
-                    </ul>
-                {% endif %}
-
-                {% if circuit.id != "scotus" and circuit.id != "cafc" %}
-                <li>Federal District Court</li>
-                <ul>
-                    {% for court in circuit.district %}
-                        <li>{{ court.full_name }}</li>
-                        <input type="hidden" value="{{ court.jurisdiction }}_{{ court.id }}" name="{{ court.full_name }}"/>
-                    {% endfor %}
-                </ul>
-                <li>Federal Bankruptcy Court</li>
-                <ul>
-                    {% for court in circuit.bankruptcy %}
-                        <li>{{ court.full_name }}</li>
-                        <input type="hidden" value="{{ court.jurisdiction }}_{{ court.id }}" name="{{ court.full_name }}"/>
-                    {% endfor %}
-                </ul>
-
-            {% elif circuit.id == "cafc" %}
-                <li>Article I & III Tribunals</li>
-                <ul>
-                    {% for court_id, court in circuit.appeals_from.items %}
-                        <li> {{ court.full_name }} </li>
-                        <input value="F_{{ court.id }}" name="{{ court.full_name }}" type="hidden"/>
-                    {% endfor %}
-                </ul>
-            {% elif circuit.id == "scotus" %}
-                <input type="hidden" value="F_scotus" name="U.S. Supreme Court"/>
-            {% endif %}
-            </ul>
-                <div class="btn-group" role="group">
-                    <button class="btn btn-default" type="submit" hx-boost="false">
-                       {{ circuit.name }} Timeline
-                    </button>
-                </div>
-            </form>
-        {% endfor %}
-
-
-      {% for section in sections %}
-          <hr>
-            <h1 id="{{ section | lower}}"> {{ section | title }} Courts</h1>
-          {% with variable_name=items|get:section %}
-            <!-- Use the variable here -->
-              {% for state, courts in variable_name.items %}
-                  {% if state != "NONE" %} <h3 id="{{ state }}"> {{ state }} </h3> {% endif %}
-                          <form hx-get="/api/rest/v4/coverage/opinions/" hx-swap="none" hx-boost="true">
-                            <ul>
-                            {% for court_object in courts %}
-                                <li>{{ court_object.court.short_name }}</li>
-                                <input value="{{ court_object.court.jurisdiction }}_{{ court_object.court.id }}" name="{{ court_object.court.full_name }}" type="hidden"/>
-                                <ul>
-                                    {% for child_object in court_object.descendants %}
-                                        <li>{{ child_object.court.short_name }} </li>
-                                        <input value="{{ child_object.court.jurisdiction }}_{{ child_object.court.id }}" name="{{ child_object.court.full_name }}" type="hidden"/>
-                                        <ul>
-                                            {% for sub_court_object in child_object.descendants %}
-                                                <li>{{ sub_court_object.court.short_name }} </li>
-                                                <input value="{{ sub_court_object.court.jurisdiction }}_{{ sub_court_object.court.id }}" name="{{ sub_court_object.court.full_name }}" type="hidden"/>
-                                            {% endfor %}
-                                        </ul>
-                                    {% endfor %}
-                                </ul>
-                            {% endfor %}
-                            </ul>
-                              <div class="btn-group" role="group">
-                                <button class="btn btn-default" hx-boost="false" type="submit">
-                                   Chart {% if state != "NONE" %} {{ state }} {% else %} {{ section | title }} Courts {% endif %}
-                                </button>
-                            </div>
-                          </form>
+              {% for court_id, court in circuit.appeals_from.items %}
+                <li> {{ court.full_name }} </li>
+                <input value="{{ court.id }}" name="{{ court.full_name }}" type="hidden"/>
               {% endfor %}
-        {% endwith %}
-
+            </ul>
+          {% else %}
+            <input type="hidden" value="{{ circuit.id }}" name="{{ circuit.full_name }}"/>
+            <li>U.S. Circuit Courts — Pre 1911</li>
+            <ul>
+              {% for court in circuit.circuit %}
+                <li>{{ court.full_name }} </li>
+                <input type="hidden" value="{{ court.id }}" name="{{ court.full_name }}"/>
+              {% endfor %}
+            </ul>
+            <li>Federal District Court</li>
+            <ul>
+              {% for court in circuit.district %}
+                <li>{{ court.full_name }}
+                {% if court.end_date %}
+                <i>(Terminated {{ court.end_date }})</i>
+                {% endif %}</li>
+                <input type="hidden" value="{{ court.id }}" name="{{ court.full_name }}"/>
+              {% endfor %}
+            </ul>
+            <li>Federal Bankruptcy Court</li>
+            <ul>
+              {% for court in circuit.bankruptcy %}
+                <li>{{ court.full_name }}
+                {% if court.end_date %}
+                ({{ court.start_date }} - {{ court.end_date }})
+                {% endif %}
+                </li>
+                <input type="hidden" value="{{ court.id }}" name="{{ court.full_name }}"/>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        </ul>
+        <div class="btn-group" role="group">
+          <button class="btn btn-default" type="submit" hx-boost="false">
+            {{ circuit.name }} Timeline
+          </button>
+        </div>
+      </form>
     {% endfor %}
 
-    </div>
+    <!-- Non Federal Sections -->
+    {% for section in sections %}
+      <hr>
+      <h1 id="{{ section }}">{{ section | title }} Courts</h1>
+      {% with section_data=sections|get:section %}
+        {% for header in section_data %}
+          {% if header != "NONE" %}
+            <h3 id="{{ header }}">{{ header }}</h3>
+          {% endif %}
+          <form hx-get="{% url "coverage_data_opinions" %}" hx-swap="none" hx-boost="true">
+          <ul>
+            {% for court in section_data|get:header %}
+              <li>{{ court.court.short_name }}</li>
+              <input type="hidden" value="{{ court.court.id }}" name="{{ court.court.full_name }}"/>
+              <ul>
+                {% for sub_court in court.descendants %}
+                  <li>{{ sub_court.court.short_name }}</li>
+                  <input type="hidden" value="{{ sub_court.court.id }}" name="{{ sub_court.court.full_name }}"/>
+                  <ul>
+                    {% for local_court in sub_court.descendants %}
+                      <li>{{ local_court.court.short_name }}</li>
+                      <input type="hidden" value="{{ local_court.court.id }}" name="{{ local_court.court.full_name }}"/>
+                    {% endfor %}
+                  </ul>
+                {% endfor %}
+              </ul>
+            {% endfor %}
+          </ul>
+          <div class="btn-group" role="group">
+            <button class="btn btn-default" type="submit" hx-boost="false">
+            {% if header != "NONE" %} {{ header }} {% else %} {{ section | title }} Courts {% endif %} Timeline
+            </button>
+          </div>
+          </form>
+        {% endfor %}
+      {% endwith %}
+    {% endfor %}
+  </div>
 
-<!-- Modal -->
-<div class="modal fade" id="fullScreenModal" tabindex="-1" role="dialog" aria-labelledby="fullScreenModalLabel" style="width: 100vw;">
-    <div class="modal-dialog modal-lg" role="document" style="width: 95vw;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h4 class="modal-title" id="modalLabel">Court Timeline</h4>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div id="timeline-body" class="modal-body">
-                <!-- SVG Chart goes here -->
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-            </div>
+  <!-- Modal -->
+  <div class="modal fade" id="fullScreenModal" tabindex="-1" role="dialog" aria-labelledby="fullScreenModalLabel">
+    <div class="modal-dialog modal-lg timelines-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h4 class="modal-title" id="modalLabel">Court Timeline</h4>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
         </div>
+        <div id="timeline-body" class="modal-body">
+          <!-- SVG Chart goes here -->
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+        </div>
+      </div>
     </div>
-</div>
-
+  </div>
 {% endblock %}
 
-
 {% block footer-scripts %}
-    <script src="{% static "js/htmx.min.js" %}"></script>
-    <script src="{% static "js/timelines-chart.js" %}"></script>
-    <script src="{% static "js/coverage-op.js" %}"></script>
-    <style>
-        .legendG {
-            display: None;
-        }
-        *:target {
-          background-color: white;
-        }
-    </style>
+  <script src="{% static "js/htmx.min.js" %}"></script>
+  <script src="{% static "js/timelines-chart.js" %}"></script>
+  <script src="{% static "js/coverage-op.js" %}"></script>
 {% endblock %}
