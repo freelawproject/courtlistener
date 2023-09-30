@@ -296,7 +296,7 @@ def coverage_opinions(request: HttpRequest) -> HttpResponse:
     coverage_cache = cache.get(key)
     if coverage_cache:
         # If cached - just pass private to the template and load the page.
-        coverage_data_op = {"private": False}
+        coverage_data_op: dict[str, Any] = {"private": False}
     else:
         # Generate our page
         coverage_data_op = {
