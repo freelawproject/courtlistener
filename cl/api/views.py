@@ -193,7 +193,7 @@ def fetch_start_end_dates_for_court(court_id: str, court_name: str):
 def coverage_data_opinions(request: HttpRequest):
     """Generate Coverage Chart Data
 
-    Accept Post to query court data for timelines-chart on coverage page
+    Accept GET to query court data for timelines-chart on coverage page
 
     :param request:
     :return: TimeChart data if any
