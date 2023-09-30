@@ -1546,3 +1546,33 @@ textarea {
     float: right !important;
   }
 }
+
+/* Custom CSS for opinion coverage page */
+.timelines-dialog {
+    width: 95vw;
+}
+
+.legendG {
+    display: None;
+}
+
+#fullScreenModal {
+  width: 100vw;
+}
+
+#toc-container {
+  overflow-y: scroll;
+  height: 100vh;
+}
+
+#toc > ul > *:target {
+    background-color: white;
+}
+
+#toc > * > *:target {
+    background-color: white;
+}
+
+#toc-container {
+  overflow-y: auto;
+}
