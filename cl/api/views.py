@@ -1,5 +1,4 @@
 import logging
-from collections import defaultdict
 from datetime import date, timedelta
 
 import waffle
@@ -164,30 +163,17 @@ def coverage_data(request, version, court):
     )
 
 
-def fetch_start_end_dates_for_court(court_id: str, court_name: str):
-    """Fetch start and end dates for court
+def fetch_start_end_dates_for_court(court_id: str):
+    """Fetch date and jurisdiction data for a court
 
-    :param court_id: Court ID
-    :param court_name: The Name of the Court we use as a label
-    :return: Timechart data formatted for the court
+    :param court_id: Court object id
+    :return: date and jurisdiction data for a particular court
     """
-    dates = OpinionCluster.objects.filter(docket__court=court_id).order_by(
-        "date_filed"
+    return (
+        OpinionCluster.objects.filter(docket__court=court_id)
+        .order_by("date_filed")
+        .values_list("date_filed", "docket__court__jurisdiction")
     )
-    if dates:
-        return {
-            "id": court_id,
-            "label": court_name,
-            "data": [
-                {
-                    "val": court_id,
-                    "timeRange": [
-                        dates.first().date_filed,
-                        dates.last().date_filed,
-                    ],
-                }
-            ],
-        }
 
 
 def coverage_data_opinions(request: HttpRequest):
@@ -195,31 +181,43 @@ def coverage_data_opinions(request: HttpRequest):
 
     Accept GET to query court data for timelines-chart on coverage page
 
-    :param request:
-    :return: TimeChart data if any
+    :param request: The HTTP request
+    :return: Timeline data for court(s)
     """
-
+    data = []
     if request.method == "GET":
-        chart_json: dict[str, object] = defaultdict(dict)
         query_parameters = request.GET.items()
-        data = []
+        grouped_data = {}
+        group_dict = dict(Court.JURISDICTIONS)
         if query_parameters:
-            for court_name, value in query_parameters:
-                group, court_id = value.split("_")  # type: ignore
-
-                if group in dict(Court.JURISDICTIONS).keys():
-                    group = dict(Court.JURISDICTIONS)[group]
-
-                court_data = fetch_start_end_dates_for_court(
-                    court_id=court_id, court_name=court_name
+            for court_name, court_id in query_parameters:
+                dates = fetch_start_end_dates_for_court(
+                    court_id=court_id,
                 )
-                if court_data:
-                    chart_json["data"].setdefault(group, []).append(court_data)  # type: ignore
-
-            for key, value in chart_json["data"].items():  # type: ignore
-                data.append({"group": key, "data": value})
-        return JsonResponse({"r": data}, safe=True)
-    return JsonResponse({"r": []}, safe=True)
+                if not dates:
+                    continue
+                group = dates.first()[1]
+                court_data = {
+                    "id": court_id,
+                    "label": court_name,
+                    "data": [
+                        {
+                            "val": court_id,
+                            "timeRange": [
+                                dates.first()[0],
+                                dates.last()[0],
+                            ],
+                        }
+                    ],
+                }
+                grouped_data.setdefault(group, []).append(court_data)
+            # Convert data to format for timeline chart and
+            # change jurisdiction from code to string
+            data = [
+                {"group": group_dict[key], "data": value}
+                for key, value in grouped_data.items()
+            ]
+    return JsonResponse(data, safe=False)
 
 
 async def get_result_count(request, version, day_count):
