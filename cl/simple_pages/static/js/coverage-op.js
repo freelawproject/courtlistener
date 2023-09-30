@@ -4,7 +4,6 @@ document.body.addEventListener('htmx:afterRequest', function (event) {
 
 document.body.addEventListener('htmx:afterSettle', function (event) {
   var results = JSON.parse(event.detail.xhr.response);
-  console.log(results);
   TimelinesChart()(`#timeline-body`)
     .zQualitative(false)
     .enableOverview(true)
@@ -22,7 +21,6 @@ document.body.addEventListener('htmx:afterSettle', function (event) {
       const year = inputDate.getFullYear();
       const inputDate2 = new Date(d.timeRange[1]);
       const year2 = inputDate2.getFullYear();
-      // ${d.val} Opinion(s)
       return `${year} - ${year2}`;
     })
     .onSegmentClick(function (d) {
