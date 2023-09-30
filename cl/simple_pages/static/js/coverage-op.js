@@ -26,7 +26,7 @@ document.body.addEventListener('htmx:afterSettle', function (event) {
       return `${year} - ${year2}`;
     })
     .onSegmentClick(function (d) {
-      window.open(`https://www.courtlistener.com/?court=${d.val}`);
+      window.open(`/?court=${d.val}`);
     })
     .refresh();
 
