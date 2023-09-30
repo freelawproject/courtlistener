@@ -8,6 +8,7 @@ from typing import Any
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
+from django.core.cache.utils import make_template_fragment_key
 from django.core.mail import EmailMessage
 from django.db.models import Count, QuerySet, Sum
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
@@ -43,11 +44,7 @@ from cl.search.models import (
     OpinionCluster,
     RECAPDocument,
 )
-from cl.simple_pages.coverage_utils import (
-    fetch_data,
-    fetch_federal_data,
-    fetch_state_data_or_cache,
-)
+from cl.simple_pages.coverage_utils import fetch_data, fetch_federal_data
 from cl.simple_pages.forms import ContactForm
 
 logger = logging.getLogger(__name__)
@@ -293,26 +290,35 @@ def coverage_opinions(request: HttpRequest) -> HttpResponse:
     :param request: A django request
     :return: The page requested
     """
-    coverage_data_op = {
-        "private": False,
-        "federal": fetch_federal_data(),
-        "sections": {
-            "state": fetch_state_data_or_cache(),
-            "territory": fetch_data(Court.TERRITORY_JURISDICTIONS),
-            "international": fetch_data(
-                Court.INTERNATIONAL, group_by_state=False
-            ),
-            "tribal": fetch_data(
-                Court.TRIBAL_JURISDICTIONS, group_by_state=False
-            ),
-            "special": fetch_data(
-                [Court.FEDERAL_SPECIAL], group_by_state=False
-            ),
-            "military": fetch_data(
-                Court.MILITARY_JURISDICTIONS, group_by_state=False
-            ),
-        },
-    }
+
+    # Find cache key if any and check for cached fragment.
+    key = make_template_fragment_key("coverage")
+    coverage_cache = cache.get(key)
+    if coverage_cache:
+        # If cached - just pass private to the template and load the page.
+        coverage_data_op = {"private": False}
+    else:
+        # Generate our page
+        coverage_data_op = {
+            "private": False,
+            "federal": fetch_federal_data(),
+            "sections": {
+                "state": fetch_data(Court.STATE_JURISDICTIONS),
+                "territory": fetch_data(Court.TERRITORY_JURISDICTIONS),
+                "international": fetch_data(
+                    Court.INTERNATIONAL, group_by_state=False
+                ),
+                "tribal": fetch_data(
+                    Court.TRIBAL_JURISDICTIONS, group_by_state=False
+                ),
+                "special": fetch_data(
+                    [Court.FEDERAL_SPECIAL], group_by_state=False
+                ),
+                "military": fetch_data(
+                    Court.MILITARY_JURISDICTIONS, group_by_state=False
+                ),
+            },
+        }
     return TemplateResponse(
         request, "help/coverage_opinions.html", coverage_data_op
     )

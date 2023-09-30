@@ -2,6 +2,7 @@
 {% load static %}
 {% load humanize %}
 {% load partition_util %}
+{% load cache %}
 {% load text_filters %}
 {% load extras %}
 
@@ -11,6 +12,7 @@
 {% block og_description %}Opinion Coverage for Free Law Project, a 501(c)(3) nonprofit.{% endblock %}
 
 {% block sidebar %}
+  {% cache 86400 sidebar %}
   <div id="toc-container" class="hidden-xs hidden-sm col-md-3">
     <div id="toc">
       <h3>Table of Contents</h3>
@@ -56,11 +58,15 @@
       </ul>
     </div>
   </div>
+  {% endcache %}
 {% endblock %}
 
 {% block content %}
+  {% cache 86400 coverage %}
   <div class="col-xs-12 col-sm-12 col-md-9" role="main">
     <h1>Opinion Coverage in CourtListener</h1>
+    <p>Content to come later...</p>
+
     <h1 id="federal">Federal Courts</h1>
     {% for id, circuit in federal.items %}
       <h3 id="{{ id }}">{{ circuit.name }}</h3>
@@ -175,6 +181,7 @@
       </div>
     </div>
   </div>
+  {% endcache %}
 {% endblock %}
 
 {% block footer-scripts %}

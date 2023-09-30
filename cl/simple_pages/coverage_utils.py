@@ -34,25 +34,6 @@ def fetch_data(jurisdictions, group_by_state=True):
     return courts
 
 
-def fetch_state_data_or_cache():
-    """Fetch State Data
-
-    Generate state data - around a cache or grab the cache
-    :return: State data
-    """
-    from django.core.cache import caches
-
-    cache_key = "state_courts"
-    cache = caches["db_cache"]
-    cached_results = cache.get(cache_key)
-    if cached_results is not None:
-        return cached_results
-    state_data = fetch_data(Court.STATE_JURISDICTIONS)
-    cache_length = 60 * 10
-    cache.set(cache_key, state_data, cache_length)
-    return state_data
-
-
 def get_descendants_dict(court):
     """Get descendants (if any) of court
 
