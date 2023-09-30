@@ -1568,7 +1568,3 @@ textarea {
 #toc > ul > *:target {
     background-color: white;
 }
-
-#toc > * > *:target {
-    background-color: white;
-}
