@@ -1,5 +1,6 @@
 import logging
 from datetime import date, timedelta
+from typing import Any
 
 import waffle
 from asgiref.sync import sync_to_async
@@ -187,12 +188,12 @@ def coverage_data_opinions(request: HttpRequest):
     data = []
     if request.method == "GET":
         query_parameters = request.GET.items()
-        grouped_data = {}
+        grouped_data: dict[str, Any] = {}
         group_dict = dict(Court.JURISDICTIONS)
         if query_parameters:
             for court_name, court_id in query_parameters:
                 dates = fetch_start_end_dates_for_court(
-                    court_id=court_id,
+                    court_id=str(court_id),
                 )
                 if not dates:
                     continue
@@ -210,7 +211,7 @@ def coverage_data_opinions(request: HttpRequest):
                         }
                     ],
                 }
-                grouped_data.setdefault(group, []).append(court_data)
+                grouped_data.setdefault(group, []).append(court_data)  # type: ignore
             # Convert data to format for timeline chart and
             # change jurisdiction from code to string
             data = [
