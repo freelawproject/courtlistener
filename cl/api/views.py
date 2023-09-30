@@ -207,8 +207,7 @@ def coverage_data_opinions(request: HttpRequest):
             for court_name, value in query_parameters:
                 group, court_id = value.split("_")  # type: ignore
 
-                if group in dict(Court.JURISDICTIONS).keys():
-                    group = dict(Court.JURISDICTIONS)[group]
+                group = jurisdictions_dict.get(group)
 
                 court_data = fetch_start_end_dates_for_court(
                     court_id=court_id, court_name=court_name
