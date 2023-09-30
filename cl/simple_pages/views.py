@@ -43,6 +43,11 @@ from cl.search.models import (
     OpinionCluster,
     RECAPDocument,
 )
+from cl.simple_pages.coverage_utils import (
+    fetch_data,
+    fetch_federal_data,
+    fetch_state_data_or_cache,
+)
 from cl.simple_pages.forms import ContactForm
 
 logger = logging.getLogger(__name__)
@@ -282,185 +287,31 @@ def coverage_graph(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "help/coverage.html", coverage_data_o)
 
 
-def fetch_data(jurisdictions, group_by_state=True):
-    """Fetch Court Data
-
-    Fetch data and organize it to group courts
-
-    :param jurisdictions: The jurisdiction to query for
-    :param group_by_state: Do we group by states
-    :return: Ordered court data
-    """
-    courts = defaultdict(dict)
-    for court in Court.objects.filter(
-        jurisdiction__in=jurisdictions,
-        parent_court__isnull=True,
-    ):
-        if "FS" in jurisdictions:
-            if "cafc" in [ct.id for ct in court.appeals_to.all()]:
-                continue
-        yes_no = Docket.objects.filter(court=court).exists()
-        descendant_json = get_descendants_dict(court)
-        # Dont add any courts without a docket associated with it or
-        # a descendant court
-        if yes_no == False and descendant_json == []:
-            continue
-        # This is just a fail safe that should probably not be tripped.
-        if group_by_state:
-            try:
-                state = Courthouse.objects.filter(court=court)[0].state
-                state = dict(OBSOLETE_STATES + USPS_CHOICES)[state]
-            except:
-                state = "FAIL"
-        else:
-            state = "NONE"
-
-        courts["data"].setdefault(state, []).append(
-            {
-                "court": court,
-                "descendants": descendant_json,
-                "display": yes_no,
-            }
-        )
-    return courts["data"]
-
-
-def fetch_state_data_or_cache():
-    """Fetch State Data
-
-    Generate state data - around a cache or grab the cache
-    :return: State data
-    """
-    from django.core.cache import caches
-
-    cache_key = "state_courts"
-    cache = caches["db_cache"]
-    cached_results = cache.get(cache_key)
-    if cached_results is not None:
-        return cached_results
-    state_data = fetch_data(Court.STATE_JURISDICTIONS)
-    cache_length = 60 * 10
-    cache.set(cache_key, state_data, cache_length)
-    return state_data
-
-
-def get_descendants_dict(court):
-    """Get descendants (if any) of court
-
-    A simple method to help recsuively iterate for child courts
-
-    :param court: Court object
-    :return: Descendant courts
-    """
-    descendants = []
-    for child_court in court.child_courts.all():
-        child_descendants = get_descendants_dict(child_court)
-        yes_no = Docket.objects.filter(court=child_court).exists()
-        if yes_no == False and child_descendants == []:
-            continue
-        descendants.append(
-            {
-                "court": child_court,
-                "descendants": child_descendants,
-                "display": yes_no,
-            }
-        )
-    return descendants
-
-
-def fetch_federal_data():
-    """Organize court data by circuits
-
-    :return: Federal court data
-    """
-
-    feds = defaultdict(dict)
-    for court in Court.objects.filter(jurisdiction__in=["F"]):
-        feds["feds"][court.id] = {
-            "name": court.short_name,
-            "id": court.id,
-            "full_name": court.full_name,
-        }
-        if court.id == "scotus":
-            pass
-        elif court.id == "cafc":
-            # Add Special Article I and III tribunals
-            # that appeal cleanly to Federal Circuit
-            af = {}
-            for ct in court.appeals_from.all():
-                af[ct.id] = ct
-            feds["feds"][court.id]["appeals_from"] = af
-        else:
-            # Build our traditional circuit data
-            states = Courthouse.objects.filter(court=court).values_list(
-                "state", flat=True
-            )
-            filter_conditions = [
-                {
-                    "court__jurisdiction": "FD",  # district
-                    "court__parent_court": Court.objects.get(id="usdistct"),
-                },
-                {"court__jurisdiction": "FB"},  # bankruptcy
-                {
-                    "court__parent_court": Court.objects.get(id="uscirct")
-                },  # Old circuits
-            ]
-
-            # Create a dictionary to store the results
-            fields = [
-                "court__id",
-                "court__short_name",
-                "court__full_name",
-                "court__jurisdiction",
-                "court__start_date__year",
-                "court__end_date__year",
-            ]
-
-            # Iterate over the filter conditions
-            for label, condition in zip(
-                ["district", "bankruptcy", "circuit"], filter_conditions
-            ):
-                data = Courthouse.objects.filter(
-                    state__in=states, **condition
-                ).values(*fields)
-                data = [
-                    {
-                        key.replace("court__", ""): value
-                        for key, value in item.items()
-                    }
-                    for item in data
-                ]
-                feds["feds"][court.id][label] = data
-
-    return feds["feds"]
-
-
 def coverage_opinions(request: HttpRequest) -> HttpResponse:
     """Generate Coverage Opinion Page
 
     :param request: A django request
     :return: The page requested
     """
-    coverage_data_op: dict[str, object] = {"private": False}
-    coverage_data_op["federal"] = fetch_federal_data()
-    coverage_data_op["sections"] = [
-        "state",
-        "territory",
-        "tribal",
-        "military",
-        "special",
-        "international",
-    ]
-
-    coverage_data_op["items"] = {
-        "state": fetch_state_data_or_cache(),
-        "territory": fetch_data(Court.TERRITORY_JURISDICTIONS),
-        "international": fetch_data(Court.INTERNATIONAL, group_by_state=False),
-        "tribal": fetch_data(Court.TRIBAL_JURISDICTIONS, group_by_state=False),
-        "special": fetch_data([Court.FEDERAL_SPECIAL], group_by_state=False),
-        "military": fetch_data(
-            Court.MILITARY_JURISDICTIONS, group_by_state=False
-        ),
+    coverage_data_op = {
+        "private": False,
+        "federal": fetch_federal_data(),
+        "sections": {
+            "state": fetch_state_data_or_cache(),
+            "territory": fetch_data(Court.TERRITORY_JURISDICTIONS),
+            "international": fetch_data(
+                Court.INTERNATIONAL, group_by_state=False
+            ),
+            "tribal": fetch_data(
+                Court.TRIBAL_JURISDICTIONS, group_by_state=False
+            ),
+            "special": fetch_data(
+                [Court.FEDERAL_SPECIAL], group_by_state=False
+            ),
+            "military": fetch_data(
+                Court.MILITARY_JURISDICTIONS, group_by_state=False
+            ),
+        },
     }
     return TemplateResponse(
         request, "help/coverage_opinions.html", coverage_data_op
