@@ -1561,7 +1561,7 @@ textarea {
 }
 
 #toc-container {
-  overflow-y: scroll;
+  overflow-y: auto;
   height: 100vh;
 }
 
@@ -1571,8 +1571,4 @@ textarea {
 
 #toc > * > *:target {
     background-color: white;
-}
-
-#toc-container {
-  overflow-y: auto;
 }
