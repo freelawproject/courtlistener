@@ -170,11 +170,10 @@ def fetch_start_end_dates_for_court(court_id: str):
     :param court_id: Court object id
     :return: date and jurisdiction data for a particular court
     """
-    return (
-        OpinionCluster.objects.filter(docket__court=court_id)
-        .order_by("date_filed")
-        .values_list("date_filed", "docket__court__jurisdiction")
+    query = OpinionCluster.objects.filter(docket__court=court_id).order_by(
+        "date_filed"
     )
+    return query.first(), query.last()
 
 
 def coverage_data_opinions(request: HttpRequest):
@@ -192,12 +191,10 @@ def coverage_data_opinions(request: HttpRequest):
         group_dict = dict(Court.JURISDICTIONS)
         if query_parameters:
             for court_name, court_id in query_parameters:
-                dates = fetch_start_end_dates_for_court(
-                    court_id=str(court_id),
-                )
-                if not dates:
+                first, last = fetch_start_end_dates_for_court(str(court_id))
+                if not first:
                     continue
-                group = dates.first()[1]
+                group = group_dict[Court.objects.get(id=court_id).jurisdiction]
                 court_data = {
                     "id": court_id,
                     "label": court_name,
@@ -205,8 +202,8 @@ def coverage_data_opinions(request: HttpRequest):
                         {
                             "val": court_id,
                             "timeRange": [
-                                dates.first()[0],
-                                dates.last()[0],
+                                first.date_filed,
+                                last.date_filed,
                             ],
                         }
                     ],
@@ -215,7 +212,7 @@ def coverage_data_opinions(request: HttpRequest):
             # Convert data to format for timeline chart and
             # change jurisdiction from code to string
             data = [
-                {"group": group_dict[key], "data": value}
+                {"group": key, "data": value}
                 for key, value in grouped_data.items()
             ]
     return JsonResponse(data, safe=False)

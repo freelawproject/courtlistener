@@ -1,7 +1,6 @@
 import json
 import logging
 import re
-from collections import defaultdict
 from datetime import timedelta
 from typing import Any
 
@@ -17,7 +16,6 @@ from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.timezone import now
 from django.views.decorators.cache import cache_page
-from localflavor.us.us_states import OBSOLETE_STATES, USPS_CHOICES
 from rest_framework.status import HTTP_429_TOO_MANY_REQUESTS
 
 from cl.audio.models import Audio
