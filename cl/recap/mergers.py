@@ -850,8 +850,9 @@ async def add_docket_entries(
 
         attachments = docket_entry.get("attachments")
         if attachments is not None:
+            court = await Court.objects.aget(pk=d.court_id)
             await merge_attachment_page_data(
-                d.court,
+                court,
                 d.pacer_case_id,
                 rd.pacer_doc_id,
                 docket_entry["document_number"],
