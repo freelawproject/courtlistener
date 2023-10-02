@@ -289,10 +289,14 @@ def merge_long_fields(
 
 def merge_judges(
     overlapping_data: Optional[Tuple[str, str]],
+    cluster_id: int,
+    skip_judge_merger: bool = False,
 ) -> dict[str, Any]:
     """Merge overlapping judge values
 
     :param overlapping_data: data to compare from harvard and courtlistener
+    :param cluster_id: opinion cluster id
+    :param skip_judge_merger: skip judge merger instead of raise exception
     :return: None
     """
 
@@ -343,7 +347,15 @@ def merge_judges(
             )
             return {"judges": titlecase(", ".join(new_judges_list))}
         else:
-            raise JudgeException("Judges are completely different.")
+            if skip_judge_merger:
+                # Fail silently but continue to merge
+                logger.info(
+                    f"Can't merge judges, something failed, cluster id: {cluster_id}"
+                )
+                return {}
+            else:
+                # Stop merge raising an exception
+                raise JudgeException("Judges are completely different.")
 
     return {}
 
@@ -554,14 +566,13 @@ def merge_overlapping_data(
                 )
             )
         elif field_name == "judges":
-            if skip_judge_merger:
-                logger.info(
-                    f"Can't merge judges, option disabled, cluster id: {cluster.id}"
+            data_to_update.update(
+                merge_judges(
+                    changed_values_dictionary.get(field_name),
+                    cluster.id,
+                    skip_judge_merger,
                 )
-            else:
-                data_to_update.update(
-                    merge_judges(changed_values_dictionary.get(field_name))
-                )
+            )
         elif field_name == "attorneys":
             data_to_update.update(
                 merge_strings(
@@ -974,7 +985,7 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--skip-judge-merger",
             action="store_true",
-            help="Set flag to skip judge merger",
+            help="Set flag to skip judge merger if the judges do not match",
         )
         parser.add_argument(
             "--offset",
