@@ -161,9 +161,11 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
                     "uploads."
                 )
 
-            if "-" in attrs.get("pacer_case_id"):
+            dashes = attrs.get("pacer_case_id").count("-")
+            if dashes == 1:
                 raise ValidationError(
-                    "PACER case ID can not contains dashes -"
+                    "PACER case ID can not contain a single (-); "
+                    "that looks like a docket number."
                 )
 
         return attrs

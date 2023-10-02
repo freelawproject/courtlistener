@@ -605,7 +605,26 @@ class RecapUploadsTest(TestCase):
         j = json.loads(r.content)
         self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
         self.assertIn(
-            "PACER case ID can not contains dashes -", j["non_field_errors"][0]
+            "PACER case ID can not contain a single (-); looks like a docket number.",
+            j["non_field_errors"][0],
+        )
+
+    def test_recap_upload_validate_acms_pacer_case_id(self, mock):
+        """Can we properly validate the pacer_case_id doesn't contain a dash -?"""
+        self.data.update(
+            {
+                "upload_type": UPLOAD_TYPE.ACMS_DOCKET_JSON,
+                "document_number": "",
+                "pacer_case_id": "34cacf7f-52d5-4d1f-b4f0-0542b429f674",
+            }
+        )
+        del self.data["pacer_doc_id"]
+        r = self.client.post(self.path, self.data)
+        j = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertIn(
+            "PACER case ID can not contain a single (-); looks like a docket number.",
+            j["non_field_errors"][0],
         )
 
 
@@ -759,7 +778,7 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
         serialized_fq.is_valid()
         self.assertIn(
             serialized_fq.errors["non_field_errors"][0],
-            "PACER case ID can not contains dashes -",
+            "PACER case ID can not contain a single (-); looks like a docket number.",
         )
 
     def test_key_serialization_with_client_code(self, mock) -> None:
