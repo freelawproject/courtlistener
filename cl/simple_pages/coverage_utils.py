@@ -81,7 +81,12 @@ def fetch_federal_data():
                 "district": {
                     "jurisdiction": Court.FEDERAL_DISTRICT,
                 },
-                "bankruptcy": {"jurisdiction": Court.FEDERAL_BANKRUPTCY},
+                "bankruptcy": {
+                    "jurisdiction__in": [
+                        Court.FEDERAL_BANKRUPTCY,
+                        Court.FEDERAL_BANKRUPTCY_PANEL,
+                    ]
+                },
                 # Old circuit courts
                 "circuit": {"parent_court__id": "uscirct"},
             }
@@ -98,5 +103,5 @@ def fetch_federal_data():
                 court_data[court.id][label] = Court.objects.filter(
                     courthouses__state__in=states_in_circuit,
                     **filters,
-                )
+                ).distinct()
     return court_data
