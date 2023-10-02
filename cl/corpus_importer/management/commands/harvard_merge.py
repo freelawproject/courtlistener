@@ -510,12 +510,12 @@ def merge_date_filed(
 def merge_overlapping_data(
     cluster: OpinionCluster,
     changed_values_dictionary: dict,
-    enable_merge_judges: bool = False,
+    skip_judge_merger: bool = False,
 ) -> dict[str, Any]:
     """Merge overlapping data
     :param cluster: the cluster object
     :param changed_values_dictionary: the dictionary of data to merge
-    :param enable_merge_judges: enable merge judges
+    :param skip_judge_merger: skip judge merger
     :return: None
     """
 
@@ -554,15 +554,13 @@ def merge_overlapping_data(
                 )
             )
         elif field_name == "judges":
-            if enable_merge_judges:
-                data_to_update.update(
-                    merge_judges(
-                        changed_values_dictionary.get(field_name),
-                    )
-                )
-            else:
+            if skip_judge_merger:
                 logger.info(
                     f"Can't merge judges, option disabled, cluster id: {cluster.id}"
+                )
+            else:
+                data_to_update.update(
+                    merge_judges(changed_values_dictionary.get(field_name))
                 )
         elif field_name == "attorneys":
             data_to_update.update(
@@ -658,13 +656,13 @@ def save_headmatter(harvard_data: Dict[str, Any]) -> dict[str, Any]:
 def merge_opinion_clusters(
     cluster_id: int,
     only_fastcase: bool = False,
-    enable_merge_judges: bool = False,
+    skip_judge_merger: bool = False,
 ) -> None:
     """Merge opinion cluster, docket and opinion data from Harvard
 
     :param cluster_id: The cluster ID to merger
     :param only_fastcase: Only process fastcase data
-    :param enable_merge_judges: enable merge judges
+    :param skip_judge_merger: skip judge merger
     :return: None
     """
     opinion_cluster = OpinionCluster.objects.get(id=cluster_id)
@@ -702,7 +700,7 @@ def merge_opinion_clusters(
                 opinion_cluster, harvard_data
             )
             overlapping_data_to_update = merge_overlapping_data(
-                opinion_cluster, changed_values_dictionary, enable_merge_judges
+                opinion_cluster, changed_values_dictionary, skip_judge_merger
             )
             headmatter_data = save_headmatter(harvard_data)
 
@@ -974,9 +972,9 @@ class Command(VerboseCommand):
             help="A flag to choose to merge only fastcase opinions",
         )
         parser.add_argument(
-            "--merge-judges",
+            "--skip-judge-merger",
             action="store_true",
-            help="Set flag to merge judges",
+            help="Set flag to skip judge merger",
         )
         parser.add_argument(
             "--offset",
@@ -1041,5 +1039,5 @@ class Command(VerboseCommand):
             merge_opinion_clusters(
                 cluster_id=cluster_id,
                 only_fastcase=options["fastcase"],
-                enable_merge_judges=options["merge_judges"],
+                skip_judge_merger=options["skip_judge_merger"],
             )

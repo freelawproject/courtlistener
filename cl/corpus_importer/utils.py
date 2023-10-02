@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Any, Iterator, List, Optional
+from typing import Any, Iterator, Optional
 
 import bs4
 from django.utils.timezone import now
@@ -46,7 +46,7 @@ def get_start_of_quarter(d: Optional[date] = None) -> date:
     return max([q for q in quarter_dates if q <= d])
 
 
-def make_subset_range(cl_characters: str, max_string: str) -> List[int]:
+def make_subset_range(cl_characters: str, max_string: str) -> list[int]:
     """Find indices for matching max_string in CL opinion
 
     :param cl_characters: The stripped down CL characters
@@ -58,7 +58,7 @@ def make_subset_range(cl_characters: str, max_string: str) -> List[int]:
     return list(range(string_index_start, string_index_end))
 
 
-def filter_subsets(lists: List[List[int]]) -> Iterator[List[int]]:
+def filter_subsets(lists: list[list[int]]) -> Iterator[list[int]]:
     """Filter subsets from matches
 
     Given list of lists, return new list of lists without subsets
@@ -76,7 +76,7 @@ def filter_subsets(lists: List[List[int]]) -> Iterator[List[int]]:
             yield match
 
 
-def is_subset(match: List[int], other_match: List[int]) -> bool:
+def is_subset(match: list[int], other_match: list[int]) -> bool:
     """Check if match is a subset of other matches
 
     Check if needle is ordered subset of haystack in O(n)
@@ -197,10 +197,6 @@ def match_lists(
     :param cl_opinions_list: CL opinions
     :return: Matches if found or False
     """
-    # We import this here to avoid a circular import
-    # from cl.corpus_importer.management.commands.harvard_opinions import (
-    #     compare_documents,
-    # )
 
     # Convert harvard HTML to Text to compare
     harvard_opinions_list = [h.getText() for h in harvard_opinions_list]
