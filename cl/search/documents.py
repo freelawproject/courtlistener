@@ -833,7 +833,7 @@ class ESRECAPDocument(DocketBaseDocument):
         },
         search_analyzer="search_analyzer",
     )
-    document_number = fields.IntegerField(attr="document_number")
+    document_number = fields.TextField(attr="document_number")
     pacer_doc_id = fields.KeywordField(attr="pacer_doc_id")
     plain_text = fields.TextField(
         attr="plain_text",

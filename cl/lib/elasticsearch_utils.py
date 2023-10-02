@@ -775,7 +775,7 @@ def build_child_docs_count_query(
 
 def build_es_main_query(
     search_query: Search, cd: CleanData
-) -> tuple[Search, int, int | None, int]:
+) -> tuple[Search, int | None, int, int | None]:
     """Builds and returns an elasticsearch query based on the given cleaned
      data, also performs grouping if required, add highlighting and returns
      additional query related metrics.
@@ -790,7 +790,7 @@ def build_es_main_query(
     search_query, join_query = build_es_base_query(search_query, cd)
     total_query_results = do_count_query(search_query)
     top_hits_limit = 5
-    total_child_results = 0
+    total_child_results: int | None = None
     match cd["type"]:
         case SEARCH_TYPES.PARENTHETICAL:
             # Create groups aggregation, add highlight and
@@ -1600,7 +1600,7 @@ def get_child_top_hits_limit(
 
 def do_count_query(
     search_query: Search,
-) -> int:
+) -> int | None:
     """Execute an Elasticsearch count query and catch errors.
     :param search_query: Elasticsearch DSL Search object.
     :return: The results count.
@@ -1612,5 +1612,5 @@ def do_count_query(
             f"Error on count query request: {search_query.to_dict()}"
         )
         logger.warning(f"Error was: {e}")
-        total_results = 0
+        total_results = None
     return total_results

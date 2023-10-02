@@ -250,7 +250,9 @@
                         {% elif type == SEARCH_TYPES.RECAP or type == SEARCH_TYPES.DOCKETS %}
                             {% with matches=results_details.3 count=results.paginator.count %}
                             {{ count|intcomma }} Case{{ count|pluralize }} <span class="gray">&mdash;</span>
-                            {{ matches|intcomma }} Docket&nbsp;Entr{{ matches|pluralize:"y,ies" }}
+                            {% if matches %}
+                              {{ matches|intcomma }} Docket&nbsp;Entr{{ matches|pluralize:"y,ies" }}
+                            {% endif %}
                             {% endwith %}
                         {% elif type == SEARCH_TYPES.ORAL_ARGUMENT %}
                             {% flag "oa-es-active" %}

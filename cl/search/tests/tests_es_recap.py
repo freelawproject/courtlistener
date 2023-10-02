@@ -144,6 +144,28 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "     Got: %s\n\n" % (field_name, expected_count, got),
         )
 
+    def test_minute_entry_indexing(self) -> None:
+        """Confirm child documents can be updated and removed properly."""
+
+        de_1 = DocketEntryWithParentsFactory(
+            docket=DocketFactory(
+                court=self.court,
+            ),
+            date_filed=datetime.date(2015, 8, 19),
+            description="MOTION for Leave to File Amicus Curiae Lorem",
+            entry_number=None,
+        )
+        rd_1 = RECAPDocumentFactory(
+            docket_entry=de_1,
+            description="Leave to File",
+            document_number="",
+            is_available=True,
+            page_count=5,
+        )
+
+        self.assertTrue(DocketDocument.exists(id=ES_CHILD_ID(rd_1.pk).RECAP))
+        de_1.docket.delete()
+
     def test_index_recap_parent_and_child_objects(self) -> None:
         """Confirm Dockets and RECAPDocuments are properly indexed in ES"""
 
@@ -521,7 +543,6 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 ]["hits"]["hits"]
             ),
         )
-        # Test Parent field
 
     def test_child_and_parent_filter_queries(self) -> None:
         """Test has_child filters method."""
