@@ -735,7 +735,15 @@ class Docket(AbstractDateTimeModel):
             "referred_to_str",
         ]
     )
-    es_o_field_tracker = FieldTracker(fields=["court_id"])
+    es_o_field_tracker = FieldTracker(
+        fields=[
+            "court_id",
+            "docket_number",
+            "date_argued",
+            "date_reargued",
+            "date_reargument_denied",
+        ]
+    )
 
     class Meta:
         unique_together = ("docket_number", "pacer_case_id", "court")
@@ -2621,6 +2629,22 @@ class OpinionCluster(AbstractDateTimeModel):
             "judges",
             "nature_of_suit",
             "precedential_status",
+        ]
+    )
+    es_o_field_tracker = FieldTracker(
+        fields=[
+            "case_name",
+            "case_name_short",
+            "case_name_full",
+            "date_filed",
+            "judges",
+            "attorneys",
+            "nature_of_suit",
+            "attorneys",
+            "precedential_status",
+            "procedural_history",
+            "posture",
+            "syllabus",
         ]
     )
 

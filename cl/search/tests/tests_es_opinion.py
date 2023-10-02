@@ -6,6 +6,7 @@ from django.contrib.auth.hashers import make_password
 from django.core.management import call_command
 from django.test import AsyncRequestFactory, override_settings
 from django.urls import reverse
+from django.utils.timezone import now
 from factory import RelatedFactory
 from lxml import html
 from rest_framework.status import HTTP_200_OK
@@ -387,6 +388,185 @@ class OpinionsSearchTest(
 
         es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         self.assertEqual(es_doc.citeCount, 8)
+
+    def test_update_shared_fields_related_documents(self) -> None:
+        """Confirm that related document are properly update using bulk approach"""
+        docket = DocketFactory(
+            court_id=self.court_2.pk,
+        )
+        opinion_cluster = OpinionClusterFactory.create(
+            case_name_full="Paul test v. Franklin",
+            case_name_short="Debbas",
+            syllabus="some rando syllabus",
+            date_filed=datetime.date(2015, 8, 14),
+            procedural_history="some rando history",
+            source="C",
+            case_name="Debbas v. Franklin",
+            attorneys="a bunch of crooks!",
+            slug="case-name-cluster",
+            precedential_status="Errata",
+            citation_count=4,
+            docket=docket,
+        )
+        opinion = OpinionFactory.create(
+            extracted_by_ocr=False,
+            author=self.person_1,
+            plain_text="my plain text secret word for queries",
+            cluster=opinion_cluster,
+            local_path="test/search/opinion_doc.doc",
+            per_curiam=False,
+            type="020lead",
+        )
+
+        # update docket number in parent document
+        docket.docket_number = "005"
+        docket.save()
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.docketNumber, "005")
+        self.assertEqual(opinion_doc.docketNumber, "005")
+
+        # update the case name in the opinion cluster record
+        opinion_cluster.case_name = "Debbas v. Franklin2"
+        opinion_cluster.save()
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.caseName, "Debbas v. Franklin2")
+        self.assertEqual(opinion_doc.caseName, "Debbas v. Franklin2")
+
+        opinion_cluster.case_name = ""
+        opinion_cluster.case_name_full = "Franklin v. Debbas"
+        opinion_cluster.case_name_short = "Franklin"
+        opinion_cluster.save()
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.caseName, "Franklin v. Debbas")
+        self.assertEqual(cluster_doc.caseNameFull, "Franklin v. Debbas")
+        self.assertEqual(opinion_doc.caseName, "Franklin v. Debbas")
+        self.assertEqual(opinion_doc.caseNameFull, "Franklin v. Debbas")
+
+        opinion_cluster.case_name_full = ""
+        opinion_cluster.case_name_short = "Franklin50"
+        opinion_cluster.save()
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.caseName, "Franklin50")
+        self.assertEqual(opinion_doc.caseName, "Franklin50")
+
+        # update the date_field field in the cluster record
+        opinion_cluster.date_filed = now().date()
+        opinion_cluster.save()
+
+        date_text = opinion_cluster.date_filed.strftime("%-d %B %Y")
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.dateFiled_text, date_text)
+        self.assertEqual(opinion_doc.dateFiled_text, date_text)
+
+        # update the date_argued field in the docket record
+        docket.date_argued = now().date()
+        docket.save()
+
+        date_text = docket.date_argued.strftime("%-d %B %Y")
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.dateArgued_text, date_text)
+        self.assertEqual(opinion_doc.dateArgued_text, date_text)
+
+        # update the date_reargued field in the docket record
+        docket.date_reargued = now().date()
+        docket.save()
+
+        date_text = docket.date_reargued.strftime("%-d %B %Y")
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.dateReargued_text, date_text)
+        self.assertEqual(opinion_doc.dateReargued_text, date_text)
+
+        # update the date_reargument_denied field in the docket record
+        docket.date_reargument_denied = now().date()
+        docket.save()
+
+        date_text = docket.date_reargument_denied.strftime("%-d %B %Y")
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.dateReargumentDenied_text, date_text)
+        self.assertEqual(opinion_doc.dateReargumentDenied_text, date_text)
+
+        # update the attorneys field in the cluster record
+        opinion_cluster.judges = "first judge, second judge"
+        opinion_cluster.save()
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.judge, "first judge, second judge")
+        self.assertEqual(opinion_doc.judge, "first judge, second judge")
+
+        # update the attorneys field in the cluster record
+        opinion_cluster.attorneys = "first attorney, second attorney"
+        opinion_cluster.save()
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(
+            cluster_doc.attorney, "first attorney, second attorney"
+        )
+        self.assertEqual(
+            opinion_doc.attorney, "first attorney, second attorney"
+        )
+
+        # update the nature_of_suit field in the cluster record
+        opinion_cluster.nature_of_suit = "test nature"
+        opinion_cluster.save()
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.suitNature, "test nature")
+        self.assertEqual(opinion_doc.suitNature, "test nature")
+
+        # update the precedential_status field in the cluster record
+        opinion_cluster.precedential_status = "Separate"
+        opinion_cluster.save()
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.status, "Separate Opinion")
+        self.assertEqual(opinion_doc.status, "Separate Opinion")
+
+        # update the procedural_history field in the cluster record
+        opinion_cluster.procedural_history = "random history"
+        opinion_cluster.save()
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.proceduralHistory, "random history")
+        self.assertEqual(opinion_doc.proceduralHistory, "random history")
+
+        # update the posture in the opinion cluster record
+        opinion_cluster.posture = "random procedural posture"
+        opinion_cluster.save()
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.posture, "random procedural posture")
+        self.assertEqual(opinion_doc.posture, "random procedural posture")
+
+        # update the syllabus in the opinion cluster record
+        opinion_cluster.syllabus = "random text for test"
+        opinion_cluster.save()
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.syllabus, "random text for test")
+        self.assertEqual(opinion_doc.syllabus, "random text for test")
 
     async def test_can_perform_a_regular_text_query(self) -> None:
         # Frontend

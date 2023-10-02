@@ -1502,10 +1502,6 @@ class OpinionClusterDocument(OpinionBaseDocument):
     dateReargued = fields.DateField()
     dateReargumentDenied = fields.DateField()
 
-    def prepare_dateFiled_text(self, instance):
-        if instance.docket.date_reargument_denied:
-            return instance.docket.date_reargument_denied.strftime("%-d %B %Y")
-
     def prepare_absolute_url(self, instance):
         return instance.get_absolute_url()
 

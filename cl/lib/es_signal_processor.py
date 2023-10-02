@@ -29,7 +29,7 @@ from cl.search.documents import (
     PersonDocument,
     PositionDocument,
 )
-from cl.search.models import BankruptcyInformation, Docket
+from cl.search.models import BankruptcyInformation, Docket, OpinionCluster
 from cl.search.tasks import (
     es_save_document,
     remove_document_from_es_index,
@@ -66,7 +66,9 @@ def updated_fields(
         tracked_set = getattr(instance, "es_rd_field_tracker", None)
     elif es_document is PositionDocument:
         tracked_set = getattr(instance, "es_p_field_tracker", None)
-    elif es_document is OpinionClusterDocument:
+    elif (
+        es_document is OpinionClusterDocument or es_document is OpinionDocument
+    ):
         tracked_set = getattr(instance, "es_o_field_tracker", None)
 
     # Check the set before trying to get the fields
@@ -184,6 +186,42 @@ def update_es_documents(
     for query, fields_map in mapping_fields.items():
         fields_to_update = get_fields_to_update(changed_fields, fields_map)
         match instance:
+            case OpinionCluster() if es_document is OpinionDocument:  # type: ignore
+                main_doc = exists_or_create_doc(
+                    OpinionClusterDocument, instance, avoid_creation=True
+                )
+                if not main_doc:
+                    # Abort bulk update for a non-existing parent document in ES.
+                    return
+                transaction.on_commit(
+                    partial(
+                        update_children_docs_by_query.delay,
+                        es_document.__name__,
+                        instance.pk,
+                        fields_to_update,
+                        fields_map,
+                    )
+                )
+            case Docket() if es_document is OpinionDocument:  # type: ignore
+                related_record = OpinionCluster.objects.filter(
+                    **{query: instance}
+                )
+                for cluster in related_record:
+                    main_doc = exists_or_create_doc(
+                        OpinionClusterDocument, cluster, avoid_creation=True
+                    )
+                    if not main_doc:
+                        # Abort bulk update for a non-existing parent document in ES.
+                        return
+                    transaction.on_commit(
+                        partial(
+                            update_children_docs_by_query.delay,
+                            es_document.__name__,
+                            cluster.pk,
+                            fields_to_update,
+                            fields_map,
+                        )
+                    )
             case Person() if es_document is PositionDocument and query == "person":  # type: ignore
                 """
                 This case handles the update of one or more fields that belongs to

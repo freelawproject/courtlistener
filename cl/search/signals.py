@@ -28,6 +28,7 @@ from cl.search.documents import (
 from cl.search.models import (
     BankruptcyInformation,
     Citation,
+    Court,
     Docket,
     DocketEntry,
     Opinion,
@@ -292,6 +293,29 @@ recap_document_field_mapping = {
 
 o_field_mapping = {
     "save": {
+        Docket: {
+            "docket": {
+                "docket_number": ["docketNumber"],
+                "date_argued": ["dateArgued_text"],
+                "date_reargued": ["dateReargued_text"],
+                "date_reargument_denied": ["dateReargumentDenied_text"],
+            }
+        },
+        OpinionCluster: {
+            "sub_opinions": {
+                "case_name": ["caseName"],
+                "case_name_full": ["caseName", "caseNameFull"],
+                "case_name_short": ["caseName"],
+                "date_filed": ["dateFiled_text"],
+                "judges": ["judge"],
+                "attorneys": ["attorney"],
+                "nature_of_suit": ["suitNature"],
+                "precedential_status": ["status"],
+                "procedural_history": ["proceduralHistory"],
+                "posture": ["posture"],
+                "syllabus": ["syllabus"],
+            }
+        },
         Opinion: {},
     },
     "delete": {Opinion: {}},
@@ -315,6 +339,10 @@ o_cluster_field_mapping = {
         Docket: {
             "docket": {
                 "court_id": ["court_exact"],
+                "docket_number": ["docketNumber"],
+                "date_argued": ["dateArgued_text"],
+                "date_reargued": ["dateReargued_text"],
+                "date_reargument_denied": ["dateReargumentDenied_text"],
             }
         },
         Opinion: {"sub_opinions": {"cluster_id": ["sibling_ids"]}},
