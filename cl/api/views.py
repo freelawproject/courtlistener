@@ -1,6 +1,6 @@
 import logging
 from datetime import date, timedelta
-from typing import Any
+from typing import Any, Optional
 
 import waffle
 from asgiref.sync import sync_to_async
@@ -164,16 +164,20 @@ def coverage_data(request, version, court):
     )
 
 
-def fetch_start_end_dates_for_court(court_id: str):
-    """Fetch date and jurisdiction data for a court
+def fetch_first_last_date_filed(
+    court_id: str,
+) -> tuple[Optional[int], Optional[int]]:
+    """Fetch first and last date for court
 
     :param court_id: Court object id
-    :return: date and jurisdiction data for a particular court
+    :return: First/last date filed, if any
     """
     query = OpinionCluster.objects.filter(docket__court=court_id).order_by(
         "date_filed"
     )
-    return query.first(), query.last()
+    if query:
+        return query.first().date_filed, query.last().date_filed
+    return None, None
 
 
 def coverage_data_opinions(request: HttpRequest):
@@ -191,8 +195,10 @@ def coverage_data_opinions(request: HttpRequest):
         group_dict = dict(Court.JURISDICTIONS)
         if query_parameters:
             for court_name, court_id in query_parameters:
-                first, last = fetch_start_end_dates_for_court(str(court_id))
-                if not first:
+                first_date, last_date = fetch_first_last_date_filed(
+                    str(court_id)
+                )
+                if not first_date:
                     continue
                 group = group_dict[Court.objects.get(id=court_id).jurisdiction]
                 court_data = {
@@ -201,10 +207,7 @@ def coverage_data_opinions(request: HttpRequest):
                     "data": [
                         {
                             "val": court_id,
-                            "timeRange": [
-                                first.date_filed,
-                                last.date_filed,
-                            ],
+                            "timeRange": [first_date, last_date],
                         }
                     ],
                 }
