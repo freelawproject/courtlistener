@@ -288,15 +288,8 @@ def coverage_opinions(request: HttpRequest) -> HttpResponse:
     :param request: A django request
     :return: The page requested
     """
-
-    # Find cache key if any and check for cached fragment.
-    key = make_template_fragment_key("coverage")
-    coverage_cache = cache.get(key)
-    if coverage_cache:
-        # If cached - just pass private to the template and load the page.
-        coverage_data_op: dict[str, Any] = {"private": False}
-    else:
-        # Generate our page
+    coverage_data_op = cache.get("coverage_data_op")
+    if coverage_data_op is None:
         coverage_data_op = {
             "private": False,
             "federal": fetch_federal_data(),
@@ -317,6 +310,9 @@ def coverage_opinions(request: HttpRequest) -> HttpResponse:
                 ),
             },
         }
+        one_day = 60 * 60 * 24
+        cache.set("coverage_data_op", coverage_data_op, one_day)
+
     return TemplateResponse(
         request, "help/coverage_opinions.html", coverage_data_op
     )

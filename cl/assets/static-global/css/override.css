@@ -1564,7 +1564,3 @@ textarea {
   overflow-y: auto;
   height: 100vh;
 }
-
-#toc > ul > *:target {
-    background-color: white;
-}
