@@ -636,6 +636,10 @@ def update_children_docs_by_query(
         if not parent_instance:
             return
 
+    if es_document is OpinionDocument:
+        s = s.query("parent_id", type="opinion", id=parent_instance.pk)
+        main_doc = OpinionClusterDocument.get(id=parent_instance.pk)
+
     if not main_doc:
         # Abort bulk update for a not supported document or non-existing parent
         # document in ES.
@@ -751,6 +755,7 @@ def update_children_documents_by_query(
                 params[field_name] = prepare_method(parent_instance)
             else:
                 params[field_name] = getattr(parent_instance, field_to_update)
+
     script_source = "\n".join(script_lines)
     # Build the UpdateByQuery script and execute it
     ubq = ubq.script(source=script_source, params=params)
