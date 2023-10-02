@@ -166,7 +166,7 @@ def coverage_data(request, version, court):
 
 def fetch_first_last_date_filed(
     court_id: str,
-) -> tuple[Optional[int], Optional[int]]:
+) -> tuple[Optional[date], Optional[date]]:
     """Fetch first and last date for court
 
     :param court_id: Court object id
