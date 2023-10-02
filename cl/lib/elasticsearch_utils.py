@@ -3,11 +3,10 @@ import operator
 import re
 import time
 import traceback
-from collections import defaultdict
 from dataclasses import fields
 from datetime import date, datetime
 from functools import reduce, wraps
-from typing import Any, Callable, DefaultDict, Dict, List, Literal
+from typing import Any, Callable, Dict, List, Literal
 
 from django.conf import settings
 from django.core.paginator import Page
@@ -20,7 +19,6 @@ from elasticsearch_dsl.connections import connections
 from elasticsearch_dsl.query import QueryString, Range
 from elasticsearch_dsl.response import Response
 from elasticsearch_dsl.utils import AttrDict
-from localflavor.us.us_states import STATE_CHOICES
 
 from cl.lib.date_time import midnight_pt
 from cl.lib.search_utils import BOOSTS, cleanup_main_query
@@ -607,11 +605,7 @@ def get_search_query(
         return search_query.query(Q("match", person_child="person"))
 
     if cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
-        _, query_hits_limit = get_child_top_hits_limit(cd, cd["type"])
-        query = build_has_child_query(
-            "match_all", "recap_document", query_hits_limit
-        )
-        return search_query.query(query)
+        return search_query.query(Q("match", docket_child="docket"))
 
     return search_query.query("match_all")
 

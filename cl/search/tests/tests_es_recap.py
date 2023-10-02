@@ -612,19 +612,6 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             0, r, 1, "docket_number + Document attachment"
         )
 
-    def test_match_all_query(self) -> None:
-        """Test match all documents in the system."""
-
-        # Filter by parent field, court.
-        cd = {
-            "type": SEARCH_TYPES.RECAP,
-        }
-        # Show all the dockets.
-        r = self._test_main_es_query(cd, 2, "match_all")
-        # Each docket should contain all their related RDs. Max 5 hits per case
-        self._count_child_documents_dict(0, r, 2, "match_all")
-        self._count_child_documents_dict(1, r, 1, "match_all")
-
     async def test_recap_dockets_search_type(self) -> None:
         """Confirm dockets search type works properly"""
 
@@ -659,13 +646,25 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         params = {"type": SEARCH_TYPES.RECAP}
         # Frontend
         r = await self._test_article_count(params, 2, "match all query")
-        self._count_child_documents(
-            0, r.content.decode(), 2, "match all query"
-        )
         # Two cases are returned.
         self.assertIn("2 Cases", r.content.decode())
-        # Two child documents are returned.
+        # 3 Docket entries in count.
         self.assertIn("3 Docket", r.content.decode())
+
+        # Confirm an empty docket is shown in a match_all query.
+        empty_docket = await sync_to_async(DocketFactory)(
+            court=self.court,
+            case_name="America vs Ipsum",
+            date_filed=datetime.date(2015, 8, 16),
+            date_argued=datetime.date(2013, 5, 20),
+            docket_number="1:21-bk-1235",
+        )
+        r = await self._test_article_count(params, 3, "match all query")
+        # 3 cases are returned.
+        self.assertIn("3 Cases", r.content.decode())
+        # 3 Docket entries in count.
+        self.assertIn("3 Docket", r.content.decode())
+        await empty_docket.adelete()
 
     def test_sorting(self) -> None:
         """Can we do sorting on various fields?"""
