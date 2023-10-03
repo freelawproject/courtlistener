@@ -4,6 +4,7 @@ import environ
 
 env = environ.FileAwareEnv()
 
+SOLR_DISABLED = env("SOLR_DISABLED", default=False)
 SOLR_HOST = env("SOLR_HOST", default="http://cl-solr:8983")
 SOLR_RECAP_HOST = env("SOLR_RECAP_HOST", default="http://cl-solr:8983")
 SOLR_PAGERANK_DEST_DIR = env("SOLR_PAGERANK_DEST_DIR", default="/tmp/")
