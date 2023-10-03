@@ -393,7 +393,7 @@
   {% endif %}
   {% endwith %}
 
-  {% if type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION %}
+  {% if type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION and simple == False %}
     {% if result.child_hits|length > 1%}
       {% for doc in result.child_hits %}
         {% with doc=doc|get_attrdict:"_source" %}
@@ -408,7 +408,7 @@
         {% endwith %}
       {% endfor %}
     {% else %}
-      {% with doc=result.child_hits.0|get_attrdict:"_source" %}
+      {% with doc=result.child_hits.0 %}
         <div class="col-md-offset-half">
           {% if doc.type != '010combined' %}
             <h4>

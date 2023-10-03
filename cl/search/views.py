@@ -396,15 +396,36 @@ def show_results(request: HttpRequest) -> HttpResponse:
 
             # Load the render_dict with good results that can be shown in the
             # "Latest Cases" section
-            render_dict.update(
-                do_search(
-                    mutable_GET,
-                    rows=5,
-                    override_params={"order_by": "dateFiled desc"},
-                    facet=False,
-                    cache_key="homepage-data-o",
+            if not waffle.flag_is_active(request, "o-es-active"):
+                render_dict.update(
+                    {
+                        "results_o": do_search(
+                            mutable_GET,
+                            rows=5,
+                            override_params={"order_by": "dateFiled desc"},
+                            facet=False,
+                            cache_key="homepage-data-o",
+                        )["results"]
+                    }
                 )
-            )
+            else:
+                mutable_GET.update(
+                    {
+                        "order_by": "dateArgued desc",
+                        "type": SEARCH_TYPES.OPINION,
+                    }
+                )
+                render_dict.update(
+                    {
+                        "results_o": do_es_search(
+                            mutable_GET,
+                            rows=5,
+                            facet=False,
+                            cache_key="homepage-data-o-es",
+                        )["results"]
+                    }
+                )
+
             # Get the results from the oral arguments as well
             # Check if waffle flag is active.
             if not waffle.flag_is_active(request, "oa-es-active"):

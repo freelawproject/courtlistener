@@ -104,7 +104,11 @@
             <h3>Latest Opinions&nbsp;<i class="gray fa fa-file-text-o"></i></h3>
             <p>We download opinions from many jurisdictions on an ongoing basis. Here are the most recent ones.
             </p>
-            {% include "includes/search_result.html" with results=results type_override=SEARCH_TYPES.OPINION simple=True %}
+            {% flag "o-es-active" %}
+              {% include "includes/search_result.html" with results=results_o type_override=SEARCH_TYPES.OPINION simple=True %}
+            {% else %}
+              {% include "includes/search_result_solr.html" with results=results_o type_override=SEARCH_TYPES.OPINION simple=True %}
+            {% endflag %}
             <p class="right">
                 <a href="/?order_by=dateFiled+desc"
                    rel="nofollow"
