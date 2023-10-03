@@ -1407,7 +1407,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         blank=True,
     )
     acms_document_guid = models.CharField(
-        help_text="The ID of the document in PACER.",
+        help_text="The GUID of the document in ACMS.",
         max_length=64,
         blank=True,
     )
