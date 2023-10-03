@@ -2188,7 +2188,7 @@ class Courthouse(models.Model):
     court = models.ForeignKey(
         Court,
         help_text="The court object associated with this courthouse.",
-        related_name="courts",
+        related_name="courthouses",
         on_delete=models.CASCADE,
     )
     court_seat = models.BooleanField(
