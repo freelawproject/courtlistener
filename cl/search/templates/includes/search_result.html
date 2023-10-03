@@ -394,34 +394,20 @@
   {% endwith %}
 
   {% if type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION and simple == False %}
-    {% if result.child_hits|length > 1%}
-      {% for doc in result.child_hits %}
-        {% with doc=doc|get_attrdict:"_source" %}
-          <div class="col-md-offset-half">
-            <h4>
-              <p>{{ doc.type_text }}</p>
-            </h4>
-            <p>
-              {{ doc.text| truncatechars:300 |safe }}
-            </p>
-          </div>
-        {% endwith %}
-      {% endfor %}
-    {% else %}
-      {% with doc=result.child_hits.0 %}
+    {% for doc in result.child_hits %}
+      {% with doc=doc|get_attrdict:"_source" %}
         <div class="col-md-offset-half">
-          {% if doc.type != '010combined' %}
+          {% if result.child_hits|length > 1 or doc.type != '010combined' %}
             <h4>
               <p>{{ doc.type_text }}</p>
             </h4>
           {% endif %}
-          <p class="representation">
+          <p {% if result.child_hits|length == 1 and doc.type == '010combined' %} class="representation" {% endif %}>
             {{ doc.text| truncatechars:300 |safe }}
           </p>
         </div>
       {% endwith %}
-    {% endif %}
-
+    {% endfor %}
   {% endif %}
 </article>
 {% endfor %}

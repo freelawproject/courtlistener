@@ -1387,6 +1387,13 @@ def build_join_fulltext_queries(
                     "pre_tags": ["<mark>"],
                     "post_tags": ["</mark>"],
                 }
+                highlight_options["fields"]["text.exact"] = {
+                    "type": "plain",
+                    "fragment_size": 100,
+                    "number_of_fragments": 100,
+                    "pre_tags": ["<mark>"],
+                    "post_tags": ["</mark>"],
+                }
 
         inner_hits = {"name": f"text_query_inner_{child_type}", "size": 10}
 
