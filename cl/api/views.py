@@ -175,8 +175,9 @@ def fetch_first_last_date_filed(
     query = OpinionCluster.objects.filter(docket__court=court_id).order_by(
         "date_filed"
     )
-    if query:
-        return query.first().date_filed, query.last().date_filed
+    first, last = query.first(), query.last()
+    if first:
+        return first.date_filed, last.date_filed
     return None, None
 
 
