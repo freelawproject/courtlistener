@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("search", "0021_add_pghistory_courthouse"),
+        ("search", "0022_alter_courthouse_court_noop"),
     ]
 
     operations = [
