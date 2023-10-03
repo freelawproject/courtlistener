@@ -118,7 +118,7 @@ class DocumentPageRedirection(TestCase):
             pacer_doc_id="288651",
             pacer_case_id="104490",
         )
-        merge_attachment_page_data(
+        async_to_sync(merge_attachment_page_data)(
             cls.court,
             cls.att_data["pacer_case_id"],
             cls.att_data["pacer_doc_id"],
@@ -557,11 +557,9 @@ class NewDocketAlertTest(SimpleUserDataMixin, TestCase):
         "test_court.json",
     ]
 
-    async def setUp(self) -> None:
+    def setUp(self) -> None:
         self.assertTrue(
-            await sync_to_async(self.async_client.login)(
-                username="pandora", password="password"
-            )
+            self.async_client.login(username="pandora", password="password")
         )
 
     async def test_bad_parameters(self) -> None:

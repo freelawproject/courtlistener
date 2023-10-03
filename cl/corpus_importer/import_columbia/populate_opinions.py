@@ -4,6 +4,7 @@ import string
 from datetime import date
 from typing import List, Optional
 
+from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup
 from django.conf import settings
 from django.db import transaction
@@ -563,7 +564,7 @@ def add_new_case(
         if item.get("syllabus")
         else "",
     )
-    panel = lookup_judges_by_last_name_list(
+    panel = async_to_sync(lookup_judges_by_last_name_list)(
         item["panel"], item["court_id"], panel_date
     )
 
@@ -573,7 +574,7 @@ def add_new_case(
             author = None
             author_str = ""
         else:
-            author = lookup_judge_by_last_name(
+            author = async_to_sync(lookup_judge_by_last_name)(
                 opinion_info["author"], item["court_id"], panel_date
             )
             author_str = opinion_info["author"]
@@ -599,7 +600,7 @@ def add_new_case(
             local_path=opinion_info["local_path"],
         )
 
-        joined_by = lookup_judges_by_last_name_list(
+        joined_by = async_to_sync(lookup_judges_by_last_name_list)(
             item.get("joining", ""), item.get("court_id", ""), panel_date
         )
 
