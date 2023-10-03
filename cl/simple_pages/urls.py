@@ -10,6 +10,7 @@ from cl.simple_pages.views import (
     contribute,
     coverage_fds,
     coverage_graph,
+    coverage_opinions,
     delete_help,
     donation_help,
     faq,
@@ -36,6 +37,9 @@ urlpatterns = [
     # Help pages
     path("help/", help_home, name="help_home"),  # type: ignore[arg-type]
     path("help/coverage/", coverage_graph, name="coverage"),
+    path(
+        "help/coverage/opinions/", coverage_opinions, name="coverage_opinions"
+    ),
     path(
         "help/coverage/financial-disclosures/",
         coverage_fds,

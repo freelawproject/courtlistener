@@ -7,6 +7,7 @@ from typing import Any
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
+from django.core.cache.utils import make_template_fragment_key
 from django.core.mail import EmailMessage
 from django.db.models import Count, QuerySet, Sum
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
@@ -36,10 +37,12 @@ from cl.search.forms import SearchForm
 from cl.search.models import (
     SOURCES,
     Court,
+    Courthouse,
     Docket,
     OpinionCluster,
     RECAPDocument,
 )
+from cl.simple_pages.coverage_utils import fetch_data, fetch_federal_data
 from cl.simple_pages.forms import ContactForm
 
 logger = logging.getLogger(__name__)
@@ -277,6 +280,42 @@ def get_coverage_data_o(request: HttpRequest) -> dict[str, Any]:
 def coverage_graph(request: HttpRequest) -> HttpResponse:
     coverage_data_o = get_coverage_data_o(request)
     return TemplateResponse(request, "help/coverage.html", coverage_data_o)
+
+
+def coverage_opinions(request: HttpRequest) -> HttpResponse:
+    """Generate Coverage Opinion Page
+
+    :param request: A django request
+    :return: The page requested
+    """
+    coverage_data_op = cache.get("coverage_data_op")
+    if coverage_data_op is None:
+        coverage_data_op = {
+            "private": False,
+            "federal": fetch_federal_data(),
+            "sections": {
+                "state": fetch_data(Court.STATE_JURISDICTIONS),
+                "territory": fetch_data(Court.TERRITORY_JURISDICTIONS),
+                "international": fetch_data(
+                    Court.INTERNATIONAL, group_by_state=False
+                ),
+                "tribal": fetch_data(
+                    Court.TRIBAL_JURISDICTIONS, group_by_state=False
+                ),
+                "special": fetch_data(
+                    [Court.FEDERAL_SPECIAL], group_by_state=False
+                ),
+                "military": fetch_data(
+                    Court.MILITARY_JURISDICTIONS, group_by_state=False
+                ),
+            },
+        }
+        one_day = 60 * 60 * 24
+        cache.set("coverage_data_op", coverage_data_op, one_day)
+
+    return TemplateResponse(
+        request, "help/coverage_opinions.html", coverage_data_op
+    )
 
 
 def feeds(request: HttpRequest) -> HttpResponse:
