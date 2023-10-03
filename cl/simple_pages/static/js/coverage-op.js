@@ -21,7 +21,7 @@ document.body.addEventListener('htmx:afterSettle', function (event) {
       const year = inputDate.getFullYear();
       const inputDate2 = new Date(d.timeRange[1]);
       const year2 = inputDate2.getFullYear();
-      return `${year} - ${year2}`;
+      return `${year} - ${year2} <br>${d.val} opinions`;
     })
     .onSegmentClick(function (d) {
       window.open(`/?court=${d.val}`);
