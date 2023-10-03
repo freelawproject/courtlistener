@@ -2784,7 +2784,9 @@ class HarvardMergerTests(TestCase):
                 "Mikell",
             ),
         ]:
-            data_to_update = merge_judges((item[1], item[0]))
+            # Pass a fake cluster id, it is only necessary to log a message when
+            # skip_judge_merger option is set
+            data_to_update = merge_judges((item[1], item[0]), cluster_id=12345)
             self.assertEqual(data_to_update.get("judges", ""), item[2])
 
     def test_merge_overlap_casenames(self):
