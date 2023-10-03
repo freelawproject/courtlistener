@@ -196,7 +196,7 @@ def coverage_data_opinions(request: HttpRequest):
         group_dict = dict(Court.JURISDICTIONS)
         with Session() as session:
             solr = ExtraSolrInterface(
-                settings.SOLR_OPINION_URL, http_connection=session, mode="r"
+                settings.SOLR_OPINION_URL, http_connection=session, mode="r"  # type: ignore
             )
             if query_parameters:
                 # Query solr for the first and last date
