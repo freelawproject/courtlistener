@@ -15,6 +15,8 @@ from django.urls import NoReverseMatch, reverse
 from django.utils.encoding import force_str
 from django.utils.text import slugify
 from eyecite import get_citations
+from localflavor.us.models import USPostalCodeField, USZipCodeField
+from localflavor.us.us_states import OBSOLETE_STATES, USPS_CHOICES
 from model_utils import FieldTracker
 
 from cl.citations.utils import get_citation_depth_between_clusters
@@ -944,8 +946,12 @@ class Docket(AbstractDateTimeModel):
         )
 
         # Parties, attorneys, firms
-        if self.pk != 6245245:
-            # Don't do parties for the J&J talcum powder case. It's too big.
+        if self.pk not in [
+            # Block mega cases that are too big
+            6245245,  # J&J Talcum Powder
+            4538381,  # Ethicon, Inc. Pelvic Repair System
+            4715020,  # Katrina Canal Breaches Litigation
+        ]:
             out.update(
                 {
                     "party_id": set(),
@@ -1562,9 +1568,13 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             }
         )
 
-        if docket.pk == 6245245:
-            # Skip the parties for the J&J talcum powder case, it's just too
-            # big to pull from the DB. Sorry folks.
+        if docket.pk in [
+            6245245,  # J&J Talcum Powder
+            4538381,  # Ethicon, Inc. Pelvic Repair System
+            4715020,  # Katrina Canal Breaches Litigation
+        ]:
+            # Skip the parties for mega cases that are too big to
+            # pull from the DB. Sorry folks.
             return out
 
         for p in docket.prefetched_parties:
@@ -1923,6 +1933,9 @@ class FederalCourtsQuerySet(models.QuerySet):
     def territorial_courts(self) -> models.QuerySet:
         return self.filter(jurisdictions__in=Court.TERRITORY_JURISDICTIONS)
 
+    def military_courts(self) -> models.QuerySet:
+        return self.filter(jurisdictions__in=Court.MILITARY_JURISDICTIONS)
+
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Court(models.Model):
@@ -1949,6 +1962,8 @@ class Court(models.Model):
     TERRITORY_APPELLATE = "TA"
     TERRITORY_TRIAL = "TT"
     TERRITORY_SPECIAL = "TSP"
+    MILITARY_APPELLATE = "MA"
+    MILITARY_TRIAL = "MT"
     COMMITTEE = "C"
     INTERNATIONAL = "I"
     TESTING_COURT = "T"
@@ -1971,6 +1986,8 @@ class Court(models.Model):
         (TERRITORY_TRIAL, "Territory Trial"),
         (TERRITORY_SPECIAL, "Territory Special"),
         (STATE_ATTORNEY_GENERAL, "State Attorney General"),
+        (MILITARY_APPELLATE, "Military Appellate"),
+        (MILITARY_TRIAL, "Military Trial"),
         (COMMITTEE, "Committee"),
         (INTERNATIONAL, "International"),
         (TESTING_COURT, "Testing"),
@@ -2005,13 +2022,31 @@ class Court(models.Model):
         TERRITORY_TRIAL,
         TERRITORY_SPECIAL,
     ]
+    MILITARY_JURISDICTIONS = [
+        MILITARY_APPELLATE,
+        MILITARY_TRIAL,
+    ]
 
     id = models.CharField(
         help_text="a unique ID for each court as used in URLs",
         max_length=15,  # Changes here will require updates in urls.py
         primary_key=True,
     )
-
+    parent_court = models.ForeignKey(
+        "self",
+        help_text="Parent court for subdivisions",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="child_courts",
+    )
+    appeals_to = models.ManyToManyField(
+        "self",
+        help_text="Appellate courts for this court",
+        blank=True,
+        symmetrical=False,
+        related_name="appeals_from",
+    )
     # Pacer fields
     pacer_court_id = models.PositiveSmallIntegerField(
         help_text=(
@@ -2134,6 +2169,75 @@ class Court(models.Model):
 
     class Meta:
         ordering = ["position"]
+
+
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
+class CourtAppealsTo(Court.appeals_to.through):
+    """A model class to track court appeals_to m2m relation"""
+
+    class Meta:
+        proxy = True
+
+
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
+class Courthouse(models.Model):
+    """A class to represent the physical location of a court."""
+
+    COUNTRY_CHOICES = (("GB", "United Kingdom"), ("US", "United States"))
+
+    court = models.ForeignKey(
+        Court,
+        help_text="The court object associated with this courthouse.",
+        related_name="courthouses",
+        on_delete=models.CASCADE,
+    )
+    court_seat = models.BooleanField(
+        help_text="Is this the seat of the Court?",
+        default=False,
+        null=True,
+    )
+    building_name = models.TextField(
+        help_text="Ex. John Adams Courthouse.",
+        blank=True,
+    )
+    address1 = models.TextField(
+        help_text="The normalized address1 of the courthouse.",
+        blank=True,
+    )
+    address2 = models.TextField(
+        help_text="The normalized address2 of the courthouse.",
+        blank=True,
+    )
+    city = models.TextField(
+        help_text="The normalized city of the courthouse.",
+        blank=True,
+    )
+    county = models.TextField(
+        help_text="The county, if any, where the courthouse resides.",
+        blank=True,
+    )
+    state = USPostalCodeField(
+        help_text="The two-letter USPS postal abbreviation for the "
+        "organization w/ obsolete state options.",
+        choices=USPS_CHOICES + OBSOLETE_STATES,
+        blank=True,
+    )
+    zip_code = USZipCodeField(
+        help_text="The zip code for the organization, XXXXX or XXXXX-XXXX "
+        "work.",
+        blank=True,
+    )
+    country_code = models.TextField(
+        help_text="The two letter country code.",
+        choices=COUNTRY_CHOICES,
+        default="US",
+    )
+
+    def __str__(self):
+        return f"{self.court.short_name} Courthouse"
+
+    class Meta:
+        verbose_name_plural = "Courthouses"
 
 
 class ClusterCitationQuerySet(models.query.QuerySet):
