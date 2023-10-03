@@ -1374,12 +1374,28 @@ def build_join_fulltext_queries(
     q_should = []
     # Build  child documents fulltext queries.
     for child_type, fields in child_query_fields.items():
+        highlight_options: dict[str, dict[str, Any]] = {"fields": {}}
+        match child_type:
+            case "opinion":
+                highlight_options["fields"]["text"] = {
+                    "type": "plain",
+                    "fragment_size": 100,
+                    "number_of_fragments": 100,
+                    "pre_tags": ["<mark>"],
+                    "post_tags": ["</mark>"],
+                }
+
+        inner_hits = {"name": f"text_query_inner_{child_type}", "size": 10}
+
+        if highlight_options:
+            inner_hits["highlight"] = highlight_options
+
         query = Q(
             "has_child",
             type=child_type,
             score_mode="max",
             query=build_fulltext_query(fields, value),
-            inner_hits={"name": f"text_query_inner_{child_type}", "size": 10},
+            inner_hits=inner_hits,
         )
         q_should.append(query)
 
