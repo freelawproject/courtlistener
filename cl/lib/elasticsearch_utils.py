@@ -705,16 +705,19 @@ def get_search_query(
                 )
             case SEARCH_TYPES.OPINION:
                 # Only return Opinion clusters.
-                q_should = Q(
-                    "has_child",
-                    type="opinion",
-                    score_mode="max",
-                    query=Q("match_all"),
-                    inner_hits={
-                        "name": f"text_query_inner_opinion",
-                        "size": 10,
-                    },
-                )
+                q_should = [
+                    Q(
+                        "has_child",
+                        type="opinion",
+                        score_mode="max",
+                        query=Q("match_all"),
+                        inner_hits={
+                            "name": f"text_query_inner_opinion",
+                            "size": 10,
+                        },
+                    ),
+                    Q("match_all"),
+                ]
                 search_query = search_query.query(
                     Q("bool", should=q_should, minimum_should_match=1)
                 )
