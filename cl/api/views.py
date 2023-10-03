@@ -206,7 +206,7 @@ def coverage_data_opinions(request: HttpRequest):
                         "rows": "1",
                         "start": "0",
                         "fq": f"court_exact:{court_id}",
-                        "fl": "dateFiled",
+                        "fl": "dateFiled,court",
                         "sort": "dateFiled desc",
                     }
                     items_desc = (
@@ -228,7 +228,7 @@ def coverage_data_opinions(request: HttpRequest):
                     ]
                     court_data = {
                         "id": court_id,
-                        "label": court_name,
+                        "label": items_asc[0]["court"],
                         "data": [
                             {
                                 "val": total,

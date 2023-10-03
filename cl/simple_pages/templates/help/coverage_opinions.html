@@ -92,22 +92,22 @@
         <ul>
           <li>{{ circuit.full_name }}</li>
           {% if circuit.id == "scotus" %}
-            <input type="hidden" value="{{ circuit.id }}" name="{{ circuit.full_name}}"/>
+            <input type="hidden" value="{{ circuit.id }}" name="{{ circuit.id}}"/>
           {% elif circuit.id == "cafc" %}
             <li>Article I & III Tribunals</li>
             <ul>
               {% for court_id, court in circuit.appeals_from.items %}
                 <li> {{ court.full_name }} </li>
-                <input value="{{ court.id }}" name="{{ court.full_name }}" type="hidden"/>
+                <input value="{{ court.id }}" name="{{ court.id }}" type="hidden"/>
               {% endfor %}
             </ul>
           {% else %}
-            <input type="hidden" value="{{ circuit.id }}" name="{{ circuit.full_name }}"/>
+            <input type="hidden" value="{{ circuit.id }}" name="{{ circuit.id }}"/>
             <li>U.S. Circuit Courts — Pre 1911</li>
             <ul>
               {% for court in circuit.circuit %}
                 <li>{{ court.full_name }} </li>
-                <input type="hidden" value="{{ court.id }}" name="{{ court.full_name }}"/>
+                <input type="hidden" value="{{ court.id }}" name="{{ court.id }}"/>
               {% endfor %}
             </ul>
             <li>Federal District Court</li>
@@ -117,7 +117,7 @@
                 {% if court.end_date %}
                 <i>(Terminated {{ court.end_date }})</i>
                 {% endif %}</li>
-                <input type="hidden" value="{{ court.id }}" name="{{ court.full_name }}"/>
+                <input type="hidden" value="{{ court.id }}" name="{{ court.id }}"/>
               {% endfor %}
             </ul>
             <li>Federal Bankruptcy Court</li>
@@ -128,7 +128,7 @@
                 ({{ court.start_date }} - {{ court.end_date }})
                 {% endif %}
                 </li>
-                <input type="hidden" value="{{ court.id }}" name="{{ court.full_name }}"/>
+                <input type="hidden" value="{{ court.id }}" name="{{ court.id }}"/>
               {% endfor %}
             </ul>
           {% endif %}
@@ -158,11 +158,11 @@
               <ul>
                 {% for sub_court in court.descendants %}
                   <li>{{ sub_court.court.short_name }}</li>
-                  <input type="hidden" value="{{ sub_court.court.id }}" name="{{ sub_court.court.full_name }}"/>
+                  <input type="hidden" value="{{ sub_court.court.id }}" name="{{ sub_court.court.id }}"/>
                   <ul>
                     {% for local_court in sub_court.descendants %}
                       <li>{{ local_court.court.short_name }}</li>
-                      <input type="hidden" value="{{ local_court.court.id }}" name="{{ local_court.court.full_name }}"/>
+                      <input type="hidden" value="{{ local_court.court.id }}" name="{{ local_court.court.id }}"/>
                     {% endfor %}
                   </ul>
                 {% endfor %}
