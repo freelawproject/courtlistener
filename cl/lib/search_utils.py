@@ -83,7 +83,7 @@ BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
 def solr_is_up():
     if settings.SOLR_DISABLED:
         return False
-    #TODO: Cache Solr status
+    # TODO: Cache Solr status
     return ExtraSolrInterface.health_check()
 
 
