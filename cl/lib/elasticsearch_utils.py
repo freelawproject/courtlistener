@@ -19,14 +19,14 @@ from elasticsearch_dsl.connections import connections
 from elasticsearch_dsl.query import QueryString, Range
 from elasticsearch_dsl.response import Response
 from elasticsearch_dsl.utils import AttrDict
-from localflavor.us.us_states import STATE_CHOICES
 
 from cl.lib.date_time import midnight_pt
-from cl.lib.search_utils import BOOSTS, cleanup_main_query
+from cl.lib.search_utils import cleanup_main_query
 from cl.lib.types import ApiPositionMapping, BasePositionMapping, CleanData
 from cl.people_db.models import Position
 from cl.search.constants import (
     ALERTS_HL_TAG,
+    BOOSTS,
     SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS,
     SEARCH_HL_TAG,
     SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS,
@@ -497,39 +497,48 @@ def build_es_base_query(search_query: Search, cd: CleanData) -> Search:
                 cd.get("q", ""),
             )
         case SEARCH_TYPES.PEOPLE:
-            child_query_fields = {
-                "position": add_fields_boosting(
+            child_fields = [
+                "position_type",
+                "nomination_process",
+                "judicial_committee_action",
+                "selection_method",
+                "termination_reason",
+                "court_full_name",
+                "court_citation_string",
+                "court_exact",
+                "organization_name",
+                "job_title",
+            ]
+            child_fields.extend(
+                add_fields_boosting(
                     cd,
                     [
                         "appointer",
                         "supervisor",
                         "predecessor",
-                        "position_type",
-                        "nomination_process",
-                        "judicial_committee_action",
-                        "selection_method",
-                        "termination_reason",
-                        "court_full_name",
-                        "court_citation_string",
-                        "court_exact",
-                        "organization_name",
-                        "job_title",
                     ],
-                ),
+                )
+            )
+            child_query_fields = {
+                "position": child_fields,
             }
-            parent_query_fields = add_fields_boosting(
-                cd,
-                [
-                    "name",
-                    "gender",
-                    "alias",
-                    "dob_city",
-                    "political_affiliation",
-                    "religion",
-                    "fjc_id",
-                    "aba_rating",
-                    "school",
-                ],
+            parent_query_fields = [
+                "gender",
+                "alias",
+                "dob_city",
+                "political_affiliation",
+                "religion",
+                "fjc_id",
+                "aba_rating",
+                "school",
+            ]
+            parent_query_fields.extend(
+                add_fields_boosting(
+                    cd,
+                    [
+                        "name",
+                    ],
+                )
             )
             string_query = build_join_fulltext_queries(
                 child_query_fields,

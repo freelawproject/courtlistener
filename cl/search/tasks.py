@@ -184,6 +184,48 @@ def delete_items(items, app_label, force_commit=False):
             delete_items.retry(exc=exc, countdown=30)
 
 
+def person_first_time_indexing(parent_id: int, position: Position) -> None:
+    """Index a person and their no judiciary positions into Elasticsearch.
+
+    It creates a parent document for the person and indexes each non-judiciary
+    position as a child document.
+
+    :param parent_id: The ID of the Person.
+    :param position: A Position instance.
+    :return: None
+    """
+
+    # Create the parent document if it does not exist yet in ES
+    person_doc = PersonDocument()
+    doc = person_doc.prepare(position.person)
+    PersonDocument(meta={"id": parent_id}, **doc).save(
+        skip_empty=False, return_doc_meta=True
+    )
+
+    # After indexing the person, look for non-judicial positions that have not
+    # been indexed and index them.
+    person_positions = Position.objects.filter(person_id=parent_id)
+    non_judicial_positions = [
+        pos for pos in person_positions if not pos.is_judicial_position
+    ]
+    for person_position in non_judicial_positions:
+        doc_id = ES_CHILD_ID(person_position.pk).POSITION
+        if PositionDocument.exists(id=doc_id):
+            continue
+
+        position_doc = PositionDocument()
+        pos_doc = position_doc.prepare(person_position)
+        es_args = {
+            "_routing": parent_id,
+            "meta": {"id": doc_id},
+        }
+        PositionDocument(**es_args, **pos_doc).save(
+            skip_empty=False,
+            return_doc_meta=False,
+            refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
+        )
+
+
 @app.task(
     bind=True,
     autoretry_for=(TransportError, ConnectionError, RequestError),
@@ -215,12 +257,7 @@ def save_document_in_es(
         ):
             return
         if not PersonDocument.exists(id=parent_id):
-            # create the parent document if it does not exist in ES
-            person_doc = PersonDocument()
-            doc = person_doc.prepare(instance.person)
-            PersonDocument(meta={"id": parent_id}, **doc).save(
-                skip_empty=False, return_doc_meta=True
-            )
+            person_first_time_indexing(parent_id, instance)
 
         doc_id = ES_CHILD_ID(instance.pk).POSITION
         es_args["_routing"] = parent_id
