@@ -80,6 +80,8 @@ BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
 }
 
 def solr_is_up():
+    if settings.DEVELOPMENT:
+        return False
     return ExtraSolrInterface.health_check()
 
 def get_solr_interface(
