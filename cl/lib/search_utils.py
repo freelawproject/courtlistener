@@ -30,6 +30,7 @@ from cl.search.models import (
     SEARCH_TYPES,
     Court,
     OpinionCluster,
+    OpinionsCited,
     RECAPDocument,
 )
 
@@ -78,6 +79,8 @@ BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
     },
 }
 
+def solr_is_up():
+    return ExtraSolrInterface.health_check()
 
 def get_solr_interface(
     cd: CleanData, http_connection: Session | None = None
@@ -1096,6 +1099,17 @@ def get_citing_clusters_with_cache(
     if cached_results is not None:
         return cached_results
 
+    if not solr_is_up():
+        # query DB directly if Solr == dead
+        sub_opinion_pks = cluster.sub_opinions.values_list('pk', flat=True)
+
+        query = OpinionsCited.objects.filter(cited_opinion__in=sub_opinion_pks).select_related('citing_opinion__cluster')
+        citing_clusters = [opinions_cited.citing_opinion.cluster for opinions_cited in query] 
+        a_week = 60 * 60 * 24 * 7
+        res = (citing_clusters, len(citing_clusters))
+        cache.set(cache_key, res, a_week)
+        return res 
+
     # Cache miss. Get the citing results from Solr
     sub_opinion_pks = cluster.sub_opinions.values_list("pk", flat=True)
     ids_str = " OR ".join([str(pk) for pk in sub_opinion_pks])
@@ -1141,8 +1155,6 @@ def get_related_clusters_with_cache(
         # If it is a bot or lacks sub-opinion IDs, return empty results
         return [], [], url_search_params
 
-    si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
-
     # Use cache if enabled
     mlt_cache_key = f"mlt-cluster:{cluster.pk}"
     related_clusters = (
@@ -1150,6 +1162,13 @@ def get_related_clusters_with_cache(
         if settings.RELATED_USE_CACHE
         else None
     )
+
+    if not solr_is_up():
+        # return empty because the MoreLikeThis functionality would be onerous 
+        # and we are abandoning Solr (hopefully) soon anyways
+        return ([], [], {})
+
+    si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
 
     if related_clusters is None:
         # Cache is empty
