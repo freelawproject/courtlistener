@@ -119,7 +119,7 @@ class ProcessingQueue(AbstractDateTimeModel):
         on_delete=models.RESTRICT,
     )
     pacer_case_id = models.CharField(
-        help_text="The cased ID provided by PACER.",
+        help_text="The case ID provided by PACER.",
         max_length=100,
         db_index=True,
         blank=True,
