@@ -1,10 +1,5 @@
 BEGIN;
 --
--- Add field acms_document_guid to claimhistory
---
-ALTER TABLE "search_claimhistory" ADD COLUMN "acms_document_guid" varchar(64) DEFAULT '' NOT NULL;
-ALTER TABLE "search_claimhistory" ALTER COLUMN "acms_document_guid" DROP DEFAULT;
---
 -- Add field acms_document_guid to recapdocument
 --
 ALTER TABLE "search_recapdocument" ADD COLUMN "acms_document_guid" varchar(64) DEFAULT '' NOT NULL;
@@ -29,4 +24,9 @@ CREATE INDEX "search_claimhistory_pacer_doc_id_ddcc4bdf_like" ON "search_claimhi
 ALTER TABLE "search_recapdocument" ALTER COLUMN "pacer_doc_id" TYPE varchar(64);
 CREATE INDEX "search_recapdocument_pacer_doc_id_e52314d9" ON "search_recapdocument" ("pacer_doc_id");
 CREATE INDEX "search_recapdocument_pacer_doc_id_e52314d9_like" ON "search_recapdocument" ("pacer_doc_id" varchar_pattern_ops);
+--
+-- Create index search_reca_acms_do_17c11f_idx on field(s) acms_document_guid of model recapdocument
+--
+CREATE INDEX "search_reca_acms_do_17c11f_idx" ON "search_recapdocument" ("acms_document_guid");
+
 COMMIT;

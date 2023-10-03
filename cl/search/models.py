@@ -1349,11 +1349,6 @@ class AbstractPacerDocument(models.Model):
         blank=True,
         db_index=True,
     )
-    acms_document_guid = models.CharField(
-        help_text="The ID of the document in PACER.",
-        max_length=64,
-        blank=True,
-    )
     is_available = models.BooleanField(
         help_text="True if the item is available in RECAP",
         blank=True,
@@ -1372,9 +1367,6 @@ class AbstractPacerDocument(models.Model):
 
     class Meta:
         abstract = True
-        indexes = [
-            models.Index(fields=["acms_document_guid"]),
-        ]
 
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot())
@@ -1414,6 +1406,11 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         ),
         blank=True,
     )
+    acms_document_guid = models.CharField(
+        help_text="The ID of the document in PACER.",
+        max_length=64,
+        blank=True,
+    )
 
     es_rd_field_tracker = FieldTracker(
         fields=[
@@ -1449,6 +1446,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
                 fields=["filepath_local"],
                 name="search_recapdocument_filepath_local_7dc6b0e53ccf753_uniq",
             ),
+            models.Index(fields=["acms_document_guid"]),
         ]
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
 
