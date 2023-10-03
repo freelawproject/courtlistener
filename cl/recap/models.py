@@ -126,9 +126,14 @@ class ProcessingQueue(AbstractDateTimeModel):
     )
     pacer_doc_id = models.CharField(
         help_text="The ID of the document in PACER.",
-        max_length=32,  # Same as in RECAP
+        max_length=64,  # Increased to support storing docketEntryId from ACMS.
         blank=True,
         db_index=True,
+    )
+    acms_document_guid = models.CharField(
+        help_text="The ID of the document in PACER.",
+        max_length=64,
+        blank=True,
     )
     document_number = models.BigIntegerField(
         help_text="The docket entry number for the document.",
@@ -223,6 +228,9 @@ class ProcessingQueue(AbstractDateTimeModel):
         permissions = (
             ("has_recap_upload_access", "Can upload documents to RECAP."),
         )
+        indexes = [
+            models.Index(fields=["acms_document_guid"]),
+        ]
 
     @property
     def file_contents(self) -> str:
