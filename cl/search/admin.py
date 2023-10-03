@@ -15,6 +15,7 @@ from cl.search.models import (
     ClaimHistory,
     ClusterStub,
     Court,
+    Courthouse,
     Docket,
     DocketEntry,
     Opinion,
@@ -118,6 +119,21 @@ class CourtAdmin(admin.ModelAdmin):
         "id",
     )
     readonly_fields = ("date_modified",)
+
+
+@admin.register(Courthouse)
+class CourthouseAdmin(admin.ModelAdmin):
+    list_display = (
+        "court",
+        "building_name",
+        "state",
+        "country_code",
+    )
+    search_fields = ("court", "state", "country_code")
+    list_filter = (
+        "state",
+        "country_code",
+    )
 
 
 class ClaimHistoryInline(admin.StackedInline):
