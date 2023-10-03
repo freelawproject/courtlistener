@@ -11,7 +11,7 @@
 {% block og_description %}Opinion Coverage for Free Law Project, a 501(c)(3) nonprofit.{% endblock %}
 
 {% block sidebar %}
-  <div id="toc-container" class="hidden-xs hidden-sm col-md-3">
+  <div id="toc-container" class="col-xs-12 hidden-sm col-md-3">
     <div id="toc">
       <h3>Table of Contents</h3>
       <ul>
@@ -133,7 +133,7 @@
             </ul>
           {% endif %}
         </ul>
-        <div class="btn-group" role="group">
+        <div class="btn-group hidden-xs hidden-sm" role="group">
           <button class="btn btn-default" type="submit" hx-boost="false">
             {{ circuit.name }} Timeline
           </button>
@@ -169,7 +169,7 @@
               </ul>
             {% endfor %}
           </ul>
-          <div class="btn-group" role="group">
+          <div class="btn-group hidden-xs hidden-sm" role="group">
             <button class="btn btn-default" type="submit" hx-boost="false">
             {% if header != "NONE" %} {{ header }} {% else %} {{ section | title }} Courts {% endif %} Timeline
             </button>
