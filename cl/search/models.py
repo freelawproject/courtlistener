@@ -651,7 +651,7 @@ class Docket(AbstractDateTimeModel):
     )
     # Nullable for unique constraint requirements.
     pacer_case_id = fields.CharNullField(
-        help_text="The cased ID provided by PACER.",
+        help_text="The case ID provided by PACER.",
         max_length=100,
         blank=True,
         null=True,
@@ -1344,11 +1344,14 @@ class AbstractPacerDocument(models.Model):
         null=True,
     )
     pacer_doc_id = models.CharField(
-        help_text=(
-            "The ID of the document in PACER. This information is "
-            "provided by RECAP."
-        ),
-        max_length=32,  # Same as in RECAP
+        help_text="The ID of the document in PACER.",
+        max_length=64,  # Increased to support storing docketEntryId from ACMS.
+        blank=True,
+        db_index=True,
+    )
+    acms_document_guid = models.CharField(
+        help_text="The ID of the document in PACER.",
+        max_length=64,
         blank=True,
     )
     is_available = models.BooleanField(
@@ -1369,6 +1372,9 @@ class AbstractPacerDocument(models.Model):
 
     class Meta:
         abstract = True
+        indexes = [
+            models.Index(fields=["acms_document_guid"]),
+        ]
 
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot())
@@ -2006,7 +2012,7 @@ class ClaimHistory(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
     )
     pacer_case_id = models.CharField(
         help_text=(
-            "The cased ID provided by PACER. Noted in this case on a "
+            "The case ID provided by PACER. Noted in this case on a "
             "per-document-level, since we've learned that some "
             "documents from other cases can appear in curious places."
         ),
