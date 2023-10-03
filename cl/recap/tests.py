@@ -605,7 +605,7 @@ class RecapUploadsTest(TestCase):
         j = json.loads(r.content)
         self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
         self.assertIn(
-            "PACER case ID can not contain a single (-); looks like a docket number.",
+            "PACER case ID can not contain a single (-); that looks like a docket number.",
             j["non_field_errors"][0],
         )
 
@@ -623,7 +623,7 @@ class RecapUploadsTest(TestCase):
         j = json.loads(r.content)
         self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
         self.assertIn(
-            "PACER case ID can not contain a single (-); looks like a docket number.",
+            "PACER case ID can not contain a single (-); that looks like a docket number.",
             j["non_field_errors"][0],
         )
 
