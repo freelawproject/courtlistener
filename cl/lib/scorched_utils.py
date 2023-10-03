@@ -1,9 +1,8 @@
+import requests
+from django.conf import settings
 from scorched import SolrInterface
 from scorched.exc import SolrError
 from scorched.search import Options, SolrSearch
-import requests
-
-from django.conf import settings
 
 
 class ExtraSolrInterface(SolrInterface):
@@ -50,7 +49,7 @@ class ExtraSolrInterface(SolrInterface):
     def health_check(self) -> bool:
         try:
             response = requests.get(settings.SOLR_HOST)
-            return response.status_code == 200 
+            return response.status_code == 200
         except Exception as e:
             # print(f"Solr health check failed with error: {e}")
             # TODO: add logging
