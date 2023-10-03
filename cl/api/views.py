@@ -1,5 +1,6 @@
 import logging
 from datetime import date, timedelta
+from typing import Any, Optional
 
 import waffle
 from asgiref.sync import sync_to_async
@@ -21,7 +22,7 @@ from cl.lib.search_utils import (
 )
 from cl.search.documents import AudioDocument
 from cl.search.forms import SearchForm
-from cl.search.models import SEARCH_TYPES, Court
+from cl.search.models import SEARCH_TYPES, Court, OpinionCluster
 from cl.simple_pages.views import get_coverage_data_fds
 
 logger = logging.getLogger(__name__)
@@ -161,6 +162,64 @@ def coverage_data(request, version, court):
     return JsonResponse(
         {"annual_counts": annual_counts, "total": total_docs}, safe=True
     )
+
+
+def fetch_first_last_date_filed(
+    court_id: str,
+) -> tuple[Optional[date], Optional[date]]:
+    """Fetch first and last date for court
+
+    :param court_id: Court object id
+    :return: First/last date filed, if any
+    """
+    query = OpinionCluster.objects.filter(docket__court=court_id).order_by(
+        "date_filed"
+    )
+    first, last = query.first(), query.last()
+    if first:
+        return first.date_filed, last.date_filed
+    return None, None
+
+
+def coverage_data_opinions(request: HttpRequest):
+    """Generate Coverage Chart Data
+
+    Accept GET to query court data for timelines-chart on coverage page
+
+    :param request: The HTTP request
+    :return: Timeline data for court(s)
+    """
+    data = []
+    if request.method == "GET":
+        query_parameters = request.GET.items()
+        grouped_data: dict[str, Any] = {}
+        group_dict = dict(Court.JURISDICTIONS)
+        if query_parameters:
+            for court_name, court_id in query_parameters:
+                first_date, last_date = fetch_first_last_date_filed(
+                    str(court_id)
+                )
+                if not first_date:
+                    continue
+                group = group_dict[Court.objects.get(id=court_id).jurisdiction]
+                court_data = {
+                    "id": court_id,
+                    "label": court_name,
+                    "data": [
+                        {
+                            "val": court_id,
+                            "timeRange": [first_date, last_date],
+                        }
+                    ],
+                }
+                grouped_data.setdefault(group, []).append(court_data)  # type: ignore
+            # Convert data to format for timeline chart and
+            # change jurisdiction from code to string
+            data = [
+                {"group": key, "data": value}
+                for key, value in grouped_data.items()
+            ]
+    return JsonResponse(data, safe=False)
 
 
 async def get_result_count(request, version, day_count):
