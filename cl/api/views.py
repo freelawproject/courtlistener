@@ -200,52 +200,45 @@ def coverage_data_opinions(request: HttpRequest):
             solr = ExtraSolrInterface(
                 settings.SOLR_OPINION_URL, http_connection=session, mode="r"  # type: ignore
             )
-            if query_parameters:
-                # Query solr for the first and last date
-                for court_name, court_id in query_parameters:
-                    common_params = {
-                        "q": "*",
-                        "rows": "1",
-                        "start": "0",
-                        "fq": f"court_exact:{court_id}",
-                        "fl": "dateFiled,court",
-                        "sort": "dateFiled desc",
-                    }
-                    items_desc = (
-                        solr.query().add_extra(**common_params).execute()
-                    )
-                    total = items_desc.result.numFound
-                    if not total:
-                        continue
-                    common_params.update({"sort": "dateFiled asc"})
-                    items_asc = (
-                        solr.query().add_extra(**common_params).execute()
-                    )
-                    first_date, last_date = (
-                        items_asc[0]["dateFiled"],
-                        items_desc[0]["dateFiled"],
-                    )
-                    group = group_dict[
-                        Court.objects.get(id=court_id).jurisdiction
-                    ]
-                    court_data = {
-                        "id": court_id,
-                        "label": items_asc[0]["court"],
-                        "data": [
-                            {
-                                "val": total,
-                                "id": court_id,
-                                "timeRange": [first_date, last_date],
-                            }
-                        ],
-                    }
-                    grouped_data.setdefault(group, []).append(court_data)  # type: ignore
-                # Convert data to format for timeline chart and
-                # change jurisdiction from code to string
-                data = [
-                    {"group": key, "data": value}
-                    for key, value in grouped_data.items()
-                ]
+            # Query solr for the first and last date
+            for court_name, court_id in query_parameters:
+                common_params = {
+                    "q": "*",
+                    "rows": "1",
+                    "start": "0",
+                    "fq": f"court_exact:{court_id}",
+                    "fl": "dateFiled,court",
+                    "sort": "dateFiled desc",
+                }
+                items_desc = solr.query().add_extra(**common_params).execute()
+                total = items_desc.result.numFound
+                if not total:
+                    continue
+                common_params.update({"sort": "dateFiled asc"})
+                items_asc = solr.query().add_extra(**common_params).execute()
+                first_date, last_date = (
+                    items_asc[0]["dateFiled"],
+                    items_desc[0]["dateFiled"],
+                )
+                group = group_dict[Court.objects.get(id=court_id).jurisdiction]
+                court_data = {
+                    "id": court_id,
+                    "label": items_asc[0]["court"],
+                    "data": [
+                        {
+                            "val": total,
+                            "id": court_id,
+                            "timeRange": [first_date, last_date],
+                        }
+                    ],
+                }
+                grouped_data.setdefault(group, []).append(court_data)  # type: ignore
+            # Convert data to format for timeline chart and
+            # change jurisdiction from code to string
+            data = [
+                {"group": key, "data": value}
+                for key, value in grouped_data.items()
+            ]
     return JsonResponse(data, safe=False)
 
 
