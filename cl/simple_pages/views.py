@@ -7,7 +7,6 @@ from typing import Any
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
-from django.core.cache.utils import make_template_fragment_key
 from django.core.mail import EmailMessage
 from django.db.models import Count, QuerySet, Sum
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
@@ -37,7 +36,6 @@ from cl.search.forms import SearchForm
 from cl.search.models import (
     SOURCES,
     Court,
-    Courthouse,
     Docket,
     OpinionCluster,
     RECAPDocument,
