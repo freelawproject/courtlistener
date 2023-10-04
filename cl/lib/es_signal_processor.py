@@ -384,13 +384,13 @@ def delete_reverse_related_documents(
     :return: None
     """
     match instance:
-        case Person() if es_document is PositionDocument:
+        case Person() if es_document is PositionDocument:  # type: ignore
             # bulk update position documents when a new reverse related record
             # is deleted
             update_child_documents_by_query.delay(
                 es_document, instance, affected_fields
             )
-        case Person() if es_document is PersonDocument:
+        case Person() if es_document is PersonDocument:  # type: ignore
             main_doc = get_or_create_doc(
                 es_document, instance, avoid_creation=True
             )
