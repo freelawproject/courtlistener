@@ -5,6 +5,7 @@ from typing import Any, Optional
 import waffle
 from asgiref.sync import sync_to_async
 from django.conf import settings
+from django.db.models import Max, Min
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.template import TemplateDoesNotExist
@@ -23,7 +24,7 @@ from cl.lib.search_utils import (
 )
 from cl.search.documents import AudioDocument
 from cl.search.forms import SearchForm
-from cl.search.models import SEARCH_TYPES, Court, OpinionCluster
+from cl.search.models import SEARCH_TYPES, SOURCES, Court, OpinionCluster
 from cl.simple_pages.views import get_coverage_data_fds
 
 logger = logging.getLogger(__name__)
@@ -220,7 +221,8 @@ def coverage_data_opinions(request: HttpRequest):
                     items_asc[0]["dateFiled"],
                     items_desc[0]["dateFiled"],
                 )
-                group = group_dict[Court.objects.get(id=court_id).jurisdiction]
+                court = Court.objects.get(id=court_id)
+                group = group_dict[court.jurisdiction]
                 court_data = {
                     "id": court_id,
                     "label": items_asc[0]["court"],
@@ -233,6 +235,20 @@ def coverage_data_opinions(request: HttpRequest):
                     ],
                 }
                 grouped_data.setdefault(group, []).append(court_data)  # type: ignore
+                if court.has_opinion_scraper:
+                    scraper_dates = OpinionCluster.objects.filter(
+                        docket__court="mass",
+                        source__contains=SOURCES.COURT_WEBSITE,
+                    ).aggregate(
+                        earliest=Min("date_filed"),
+                        latest=Max("date_filed"),
+                    )
+                    court_data["data"][0]["timeRange"] = [
+                        scraper_dates["earliest"],
+                        scraper_dates["latest"],
+                    ]
+                    grouped_data.setdefault("Scrapers", []).append(court_data)  # type: ignore
+
             # Convert data to format for timeline chart and
             # change jurisdiction from code to string
             data = [
