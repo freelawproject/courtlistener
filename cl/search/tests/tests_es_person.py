@@ -1,5 +1,6 @@
 import datetime
 import operator
+from collections import Counter
 from functools import reduce
 
 from django.urls import reverse
@@ -332,6 +333,19 @@ class PeopleSearchTestElasticSearch(
         list of parent documents where their child's documents or the parent
         document itself match the filter.
         """
+        position_5 = PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            court=self.court_2,
+            date_start=datetime.date(2020, 12, 14),
+            predecessor=self.person_3,
+            appointer=self.position_1,
+            judicial_committee_action="no_rep",
+            termination_reason="retire_mand",
+            position_type="c-jud",
+            person=self.person_3,
+            how_selected="e_part",
+            nomination_process="fed_senate",
+        )
 
         # Query by parent field dob_state.
         cd = {
@@ -345,7 +359,7 @@ class PeopleSearchTestElasticSearch(
 
         # Query by parent field dob_state and child field selection_method.
         cd = {
-            "dob_state": "NY",
+            "dob_city": "Brookyln",
             "selection_method": "e_part",
             "type": SEARCH_TYPES.PEOPLE,
         }
@@ -353,6 +367,8 @@ class PeopleSearchTestElasticSearch(
         has_child_filters = build_join_es_filters(cd)
         s = s.filter(reduce(operator.iand, has_child_filters))
         self.assertEqual(s.count(), 1)
+
+        position_5.delete()
 
     def test_sorting(self) -> None:
         """Can we do sorting on various fields?"""
@@ -1089,124 +1105,148 @@ class PeopleSearchTestElasticSearch(
         # API
         r = self._test_api_results_count(params, 1, "API")
 
+        # Compare whether every field in the results contains the same content,
+        # regardless of the order.
         self.assertEqual(
-            r.data["results"][0]["court"],
-            [self.position_2.court.short_name, position_6.court.short_name],
+            Counter(r.data["results"][0]["court"]),
+            Counter(
+                [position_6.court.short_name, self.position_2.court.short_name]
+            ),
         )
         self.assertEqual(
-            r.data["results"][0]["court_exact"],
-            [self.position_2.court.pk, position_6.court.pk],
+            Counter(r.data["results"][0]["court_exact"]),
+            Counter([self.position_2.court.pk, position_6.court.pk]),
         )
         self.assertEqual(
-            r.data["results"][0]["position_type"],
-            [
-                self.position_2.get_position_type_display(),
-                position_6.get_position_type_display(),
-            ],
+            Counter(r.data["results"][0]["position_type"]),
+            Counter(
+                [
+                    self.position_2.get_position_type_display(),
+                    position_6.get_position_type_display(),
+                ]
+            ),
         )
         self.assertEqual(
-            r.data["results"][0]["appointer"],
-            [
-                self.position_2.appointer.person.name_full_reverse,
-                position_6.appointer.person.name_full_reverse,
-            ],
+            Counter(r.data["results"][0]["appointer"]),
+            Counter(
+                [
+                    self.position_2.appointer.person.name_full_reverse,
+                    position_6.appointer.person.name_full_reverse,
+                ]
+            ),
         )
         self.assertEqual(
-            r.data["results"][0]["supervisor"],
-            [position_6.supervisor.name_full_reverse],
+            Counter(r.data["results"][0]["supervisor"]),
+            Counter([position_6.supervisor.name_full_reverse]),
         )
         self.assertEqual(
-            r.data["results"][0]["predecessor"],
-            [
-                self.position_2.predecessor.name_full_reverse,
-                position_6.predecessor.name_full_reverse,
-            ],
+            Counter(r.data["results"][0]["predecessor"]),
+            Counter(
+                [
+                    self.position_2.predecessor.name_full_reverse,
+                    position_6.predecessor.name_full_reverse,
+                ]
+            ),
         )
 
         positions = self.person_2.positions.all()
         self.assertEqual(
-            r.data["results"][0]["date_nominated"],
-            solr_list(positions, "date_nominated"),
+            Counter(r.data["results"][0]["date_nominated"]),
+            Counter(solr_list(positions, "date_nominated")),
         )
         self.assertEqual(
-            r.data["results"][0]["date_elected"],
-            solr_list(positions, "date_elected"),
+            Counter(r.data["results"][0]["date_elected"]),
+            Counter(solr_list(positions, "date_elected")),
         )
         self.assertEqual(
-            r.data["results"][0]["date_recess_appointment"],
-            solr_list(positions, "date_recess_appointment"),
+            Counter(r.data["results"][0]["date_recess_appointment"]),
+            Counter(solr_list(positions, "date_recess_appointment")),
         )
         self.assertEqual(
-            r.data["results"][0]["date_referred_to_judicial_committee"],
-            solr_list(positions, "date_referred_to_judicial_committee"),
+            Counter(
+                r.data["results"][0]["date_referred_to_judicial_committee"]
+            ),
+            Counter(
+                solr_list(positions, "date_referred_to_judicial_committee")
+            ),
         )
         self.assertEqual(
-            r.data["results"][0]["date_judicial_committee_action"],
-            solr_list(positions, "date_judicial_committee_action"),
+            Counter(r.data["results"][0]["date_judicial_committee_action"]),
+            Counter(solr_list(positions, "date_judicial_committee_action")),
         )
         self.assertEqual(
-            r.data["results"][0]["date_hearing"],
-            solr_list(positions, "date_hearing"),
+            Counter(r.data["results"][0]["date_hearing"]),
+            Counter(solr_list(positions, "date_hearing")),
         )
         self.assertEqual(
-            r.data["results"][0]["date_confirmation"],
-            solr_list(positions, "date_confirmation"),
+            Counter(r.data["results"][0]["date_confirmation"]),
+            Counter(solr_list(positions, "date_confirmation")),
         )
         self.assertEqual(
-            r.data["results"][0]["date_start"],
-            solr_list(positions, "date_start"),
+            Counter(r.data["results"][0]["date_start"]),
+            Counter(solr_list(positions, "date_start")),
         )
         self.assertEqual(
-            r.data["results"][0]["date_granularity_start"],
-            [
-                self.position_2.date_granularity_start,
-                self.position_3.date_granularity_start,
-                position_6.date_granularity_start,
-            ],
+            Counter(r.data["results"][0]["date_granularity_start"]),
+            Counter(
+                [
+                    self.position_2.date_granularity_start,
+                    self.position_3.date_granularity_start,
+                    position_6.date_granularity_start,
+                ]
+            ),
         )
         self.assertEqual(
-            r.data["results"][0]["date_retirement"],
-            solr_list(positions, "date_retirement"),
+            Counter(r.data["results"][0]["date_retirement"]),
+            Counter(solr_list(positions, "date_retirement")),
         )
         self.assertEqual(
-            r.data["results"][0]["date_termination"],
-            solr_list(positions, "date_termination"),
+            Counter(r.data["results"][0]["date_termination"]),
+            Counter(solr_list(positions, "date_termination")),
         )
         self.assertEqual(
-            r.data["results"][0]["date_granularity_termination"],
-            [position_6.date_granularity_termination],
+            Counter(r.data["results"][0]["date_granularity_termination"]),
+            Counter([position_6.date_granularity_termination]),
         )
         self.assertEqual(
-            r.data["results"][0]["judicial_committee_action"],
-            [
-                self.position_2.get_judicial_committee_action_display(),
-                position_6.get_judicial_committee_action_display(),
-            ],
+            Counter(r.data["results"][0]["judicial_committee_action"]),
+            Counter(
+                [
+                    self.position_2.get_judicial_committee_action_display(),
+                    position_6.get_judicial_committee_action_display(),
+                ]
+            ),
         )
         self.assertEqual(
-            r.data["results"][0]["nomination_process"],
-            [
-                self.position_2.get_nomination_process_display(),
-                position_6.get_nomination_process_display(),
-            ],
+            Counter(r.data["results"][0]["nomination_process"]),
+            Counter(
+                [
+                    self.position_2.get_nomination_process_display(),
+                    position_6.get_nomination_process_display(),
+                ]
+            ),
         )
         self.assertEqual(
-            r.data["results"][0]["selection_method"],
-            [
-                self.position_2.get_how_selected_display(),
-                position_6.get_how_selected_display(),
-            ],
+            Counter(r.data["results"][0]["selection_method"]),
+            Counter(
+                [
+                    self.position_2.get_how_selected_display(),
+                    position_6.get_how_selected_display(),
+                ]
+            ),
         )
         self.assertEqual(
-            r.data["results"][0]["selection_method_id"],
-            [self.position_2.how_selected, position_6.how_selected],
+            Counter(r.data["results"][0]["selection_method_id"]),
+            Counter([self.position_2.how_selected, position_6.how_selected]),
         )
         self.assertEqual(
-            r.data["results"][0]["termination_reason"],
-            [
-                self.position_2.get_termination_reason_display(),
-                position_6.get_termination_reason_display(),
-            ],
+            Counter(r.data["results"][0]["termination_reason"]),
+            Counter(
+                [
+                    self.position_2.get_termination_reason_display(),
+                    position_6.get_termination_reason_display(),
+                ]
+            ),
         )
 
         position_5.delete()
