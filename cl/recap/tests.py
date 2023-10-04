@@ -775,7 +775,7 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
         serialized_fq.is_valid()
         self.assertIn(
             serialized_fq.errors["non_field_errors"][0],
-            "PACER case ID can not contain a single (-); looks like a docket number.",
+            "PACER case ID can not contain a single (-); that looks like a docket number.",
         )
 
     def test_key_serialization_with_client_code(self, mock) -> None:
