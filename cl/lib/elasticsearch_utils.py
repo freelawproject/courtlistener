@@ -16,7 +16,7 @@ from django_elasticsearch_dsl.search import Search
 from elasticsearch.exceptions import RequestError, TransportError
 from elasticsearch_dsl import A, Q
 from elasticsearch_dsl.connections import connections
-from elasticsearch_dsl.query import QueryString, Range
+from elasticsearch_dsl.query import Query, QueryString, Range
 from elasticsearch_dsl.response import Response
 from elasticsearch_dsl.utils import AttrDict
 
@@ -35,7 +35,7 @@ from cl.lib.types import (
 from cl.people_db.models import Position
 from cl.search.constants import (
     ALERTS_HL_TAG,
-    BOOSTS,
+    RELATED_PATTERN,
     SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS,
     SEARCH_HL_TAG,
     SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS,
@@ -845,6 +845,13 @@ def build_es_base_query(
                 cd, child_query_fields, parent_query_fields
             )
         case SEARCH_TYPES.OPINION:
+            str_query = cd.get("q", "")
+            related_match = RELATED_PATTERN.search(str_query)
+            mlt_query = None
+            if related_match:
+                str_query = RELATED_PATTERN.sub(str_query, "").strip()
+                cluster_pks = related_match.group("pks").split(",")
+                mlt_query = build_more_like_this_query(cluster_pks)
             child_query_fields = {
                 "opinion": add_fields_boosting(
                     cd,
@@ -877,9 +884,7 @@ def build_es_base_query(
                 ],
             )
             string_query = build_join_fulltext_queries(
-                child_query_fields,
-                parent_query_fields,
-                cd.get("q", ""),
+                child_query_fields, parent_query_fields, str_query, mlt_query
             )
 
     search_query = get_search_query(cd, search_query, filters, string_query)
@@ -1387,6 +1392,7 @@ def build_join_fulltext_queries(
     child_query_fields: dict[str, list[str]],
     parent_fields: list[str],
     value: str,
+    mlt_query: Query | None = None,
 ) -> QueryString | List:
     """Creates a full text query string for join parent-child documents.
 
@@ -1396,7 +1402,7 @@ def build_join_fulltext_queries(
     :return: A Elasticsearch QueryString or [] if the "value" param is empty.
     """
 
-    if not value:
+    if not value and not mlt_query:
         return []
     q_should = []
     # Build  child documents fulltext queries.
@@ -1424,17 +1430,24 @@ def build_join_fulltext_queries(
         if highlight_options:
             inner_hits["highlight"] = highlight_options
 
+        child_query = []
+        if value:
+            child_query.append(build_fulltext_query(fields, value))
+
+        if mlt_query:
+            child_query.append(mlt_query)
+
         query = Q(
             "has_child",
             type=child_type,
             score_mode="max",
-            query=build_fulltext_query(fields, value),
+            query=Q("bool", should=child_query),
             inner_hits=inner_hits,
         )
         q_should.append(query)
 
     # Build parent document fulltext queries.
-    if parent_fields:
+    if parent_fields and value:
         q_should.append(build_fulltext_query(parent_fields, value))
 
     if q_should:
