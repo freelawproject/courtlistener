@@ -46,7 +46,11 @@ class OpinionsSearchTest(
     def setUpTestData(cls):
         cls.rebuild_index("search.OpinionCluster")
         super().setUpTestData()
-        court = CourtFactory(id="canb", jurisdiction="FB")
+        court = CourtFactory(
+            id="canb",
+            jurisdiction="FB",
+            full_name="court of the Medical Worries",
+        )
         OpinionClusterFactoryWithChildrenAndParents(
             case_name="Strickland v. Washington.",
             case_name_full="Strickland v. Washington.",
@@ -264,6 +268,8 @@ class OpinionsSearchTest(
         for judge in opinion.joined_by.all():
             self.assertIn(judge.pk, es_doc.joined_by_ids)
 
+        opinion.delete()
+
     def test_parent_document_update_fields_properly(self) -> None:
         """Confirm that parent fields are properly update when changing DB records"""
         docket = DocketFactory(
@@ -388,6 +394,9 @@ class OpinionsSearchTest(
 
         es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         self.assertEqual(es_doc.citeCount, 8)
+
+        docket.delete()
+        opinion_cluster.delete()
 
     def test_update_shared_fields_related_documents(self) -> None:
         """Confirm that related document are properly update using bulk approach"""
@@ -567,6 +576,9 @@ class OpinionsSearchTest(
         opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
         self.assertEqual(cluster_doc.syllabus, "random text for test")
         self.assertEqual(opinion_doc.syllabus, "random text for test")
+
+        docket.delete()
+        opinion_cluster.delete()
 
     async def test_can_perform_a_regular_text_query(self) -> None:
         # Frontend
