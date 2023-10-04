@@ -1186,17 +1186,9 @@ class OpinionsSearchTest(
         self.assertEqual(r.content.decode().count("<mark>Honda</mark>"), 1)
 
 
-@override_settings(
-    # MLT results should not be cached
-    RELATED_USE_CACHE=False,
-    # Default MLT settings limit the search space to minimize run time.
-    # These limitations are not needed on the small document collections during
-    # testing.
-    RELATED_MLT_MINTF=0,
-    RELATED_MLT_MAXQT=9999,
-    RELATED_MLT_MINWL=0,
-)
-class RelatedSearchTest(IndexedSolrTestCase):
+class RelatedSearchTest(
+    ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
+):
     def setUp(self) -> None:
         # Do this in two steps to avoid triggering profile creation signal
         admin = UserProfileWithParentsFactory.create(
@@ -1213,7 +1205,6 @@ class RelatedSearchTest(IndexedSolrTestCase):
         """Get the article count in a query response"""
         return len(html.fromstring(r.content.decode()).xpath("//article"))
 
-    @override_flag("o-es-active", False)
     def test_more_like_this_opinion(self) -> None:
         """Does the MoreLikeThis query return the correct number and order of
         articles."""
@@ -1265,24 +1256,12 @@ class RelatedSearchTest(IndexedSolrTestCase):
 
         recommendations_expected = [
             (
-                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
-                "Debbas v. Franklin",
-            ),
-            (
-                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
-                "Debbas v. Franklin",
-            ),
-            (
-                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
-                "Debbas v. Franklin",
-            ),
-            (
-                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
-                "Debbas v. Franklin",
-            ),
-            (
                 f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
                 "Howard v. Honda",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
+                "Debbas v. Franklin",
             ),
         ]
 
@@ -1318,18 +1297,6 @@ class RelatedSearchTest(IndexedSolrTestCase):
         ]
 
         recommendations_expected = [
-            (
-                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
-                "Howard v. Honda",
-            ),
-            (
-                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
-                "Howard v. Honda",
-            ),
-            (
-                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
-                "Howard v. Honda",
-            ),
             (
                 f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
                 "Howard v. Honda",
