@@ -6,11 +6,13 @@ import traceback
 from dataclasses import fields
 from datetime import date, datetime
 from functools import reduce, wraps
-from typing import Any, Callable, Dict, List, Literal
+from typing import Any, Callable, Dict, List, Literal, Tuple
 
 from django.conf import settings
-from django.core.paginator import Page
+from django.core.cache import cache, caches
+from django.core.paginator import EmptyPage, Page, PageNotAnInteger
 from django.db.models import QuerySet
+from django.http import HttpRequest
 from django.http.request import QueryDict
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.exceptions import RequestError, TransportError
@@ -20,7 +22,9 @@ from elasticsearch_dsl.query import Query, QueryString, Range
 from elasticsearch_dsl.response import Response
 from elasticsearch_dsl.utils import AttrDict
 
+from cl.lib.bot_detector import is_bot
 from cl.lib.date_time import midnight_pt
+from cl.lib.paginators import ESPaginator
 from cl.lib.search_utils import (
     BOOSTS,
     cleanup_main_query,
@@ -50,7 +54,12 @@ from cl.search.constants import (
     SOLR_PEOPLE_ES_HL_FIELDS,
 )
 from cl.search.exception import UnbalancedQuery
-from cl.search.models import SEARCH_TYPES, Court
+from cl.search.models import (
+    PRECEDENTIAL_STATUS,
+    SEARCH_TYPES,
+    Court,
+    OpinionCluster,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1902,3 +1911,55 @@ def merge_opinion_and_cluster(results: Page | dict) -> None:
         result["joined_by_ids"] = opinion["joined_by_ids"]
         result["court_exact"] = opinion["joined_by_ids"]
         result["status_exact"] = result["status"]
+
+
+def get_related_clusters_with_cache_and_es(
+    search: Search,
+    cluster: OpinionCluster,
+    request: HttpRequest,
+) -> Tuple[list[OpinionCluster], list[int], dict[str, str]]:
+    # By default all statuses are included
+    available_statuses = dict(PRECEDENTIAL_STATUS.NAMES).values()
+    url_search_params = {f"stat_{v}": "on" for v in available_statuses}
+
+    # Opinions that belong to the targeted cluster
+    sub_opinion_ids = cluster.sub_opinions.values_list("pk", flat=True)
+
+    if is_bot(request) or not sub_opinion_ids:
+        # If it is a bot or lacks sub-opinion IDs, return empty results
+        return [], [], url_search_params
+
+    # Use cache if enabled
+    mlt_cache_key = f"mlt-cluster-es:{cluster.pk}"
+    related_clusters = (
+        caches["db_cache"].get(mlt_cache_key)
+        if settings.RELATED_USE_CACHE
+        else None
+    )
+
+    if related_clusters is None:
+        sub_opinion_queries = ",".join(str(i) for i in sub_opinion_ids)
+        url_search_params["q"] = f"related:{sub_opinion_queries}"
+        url_search_params["type"] = SEARCH_TYPES.OPINION
+
+        query_dict = QueryDict("", mutable=True)
+        query_dict.update(url_search_params)
+        search_query, _, _ = build_es_main_query(search, url_search_params)
+        hits, _, error = fetch_es_results(
+            query_dict, search_query, 1, settings.RELATED_COUNT
+        )
+
+        if error:
+            return [], [], url_search_params
+
+        paginator = ESPaginator(hits, settings.RELATED_COUNT)
+        try:
+            related_clusters = paginator.page(1)
+        except EmptyPage:
+            related_clusters = paginator.page(paginator.num_pages)
+
+        cache.set(
+            mlt_cache_key, related_clusters, settings.RELATED_CACHE_TIMEOUT
+        )
+
+    return related_clusters, sub_opinion_ids, url_search_params
