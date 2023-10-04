@@ -383,28 +383,29 @@ def delete_reverse_related_documents(
     the instance.
     :return: None
     """
-    if isinstance(instance, Person):
-        if es_document is PositionDocument:
+    match instance:
+        case Person() if es_document is PositionDocument:
             # bulk update position documents when a new reverse related record
             # is deleted
             update_child_documents_by_query.delay(
                 es_document, instance, affected_fields
             )
-        elif es_document is PersonDocument:
+        case Person() if es_document is PersonDocument:
             main_doc = get_or_create_doc(
                 es_document, instance, avoid_creation=True
             )
             if main_doc:
                 prepare_and_update_fields(affected_fields, main_doc, instance)
-
-        return
-
-    main_objects = main_model.objects.filter(**{query_string: instance})
-    for main_object in main_objects:
-        main_doc = get_or_create_doc(es_document, main_object)
-        if not main_doc:
-            return
-        prepare_and_update_fields(affected_fields, main_doc, main_object)
+        case _:
+            main_objects = main_model.objects.filter(
+                **{query_string: instance}
+            )
+            for main_object in main_objects:
+                main_doc = get_or_create_doc(es_document, main_object)
+                if main_doc:
+                    prepare_and_update_fields(
+                        affected_fields, main_doc, main_object
+                    )
 
 
 def avoid_es_audio_indexing(
