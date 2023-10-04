@@ -8,6 +8,7 @@ from django.conf import settings
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.template import TemplateDoesNotExist
+from django.views.decorators.cache import cache_page
 from requests import Session
 from rest_framework import status
 from rest_framework.status import HTTP_400_BAD_REQUEST
@@ -181,6 +182,7 @@ def fetch_first_last_date_filed(
     return None, None
 
 
+@cache_page(60 * 60 * 24, key_prefix="coverage")
 def coverage_data_opinions(request: HttpRequest):
     """Generate Coverage Chart Data
 
