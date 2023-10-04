@@ -1572,3 +1572,7 @@ textarea {
         height: min-content;
     }
 }
+
+.brusher {
+  display: none;
+}
