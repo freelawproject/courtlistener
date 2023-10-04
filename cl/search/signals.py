@@ -12,6 +12,7 @@ from cl.people_db.models import (
     Person,
     PoliticalAffiliation,
     Position,
+    Race,
     School,
 )
 from cl.search.documents import (
@@ -141,7 +142,7 @@ p_field_mapping = {
         Person: {},
     },
     "delete": {Person: {}},
-    "m2m": {},
+    "m2m": {Person.race.through: {"person": {"races": "races"}}},
     "reverse": {
         Education: {"educations": {"all": ["school"]}},
         ABARating: {"aba_ratings": {"all": ["aba_rating"]}},
@@ -171,26 +172,33 @@ position_field_mapping = {
                 "religion": ["religion"],
                 "gender": ["gender"],
                 "dob_city": ["dob_city"],
-                "dob_state": ["dob_state"],
+                "dob_state": ["dob_state", "dob_state_id"],
                 "fjc_id": ["fjc_id"],
+                "date_dob": ["dob"],
+                "date_dod": ["dod"],
             },
         },
         School: {"educations__school": {"name": ["school"]}},
         PoliticalAffiliation: {
             "political_affiliations": {
-                "political_party": ["political_affiliation"]
+                "political_party": [
+                    "political_affiliation",
+                    "political_affiliation_id",
+                ],
             }
         },
         ABARating: {"aba_ratings": {"rating": ["aba_rating"]}},
         Position: {},
     },
     "delete": {Position: {}},
-    "m2m": {},
+    "m2m": {Person.race.through: {"person": {"races": "races"}}},
     "reverse": {
         Education: {"educations": {"all": ["school"]}},
         ABARating: {"aba_ratings": {"all": ["aba_rating"]}},
         PoliticalAffiliation: {
-            "political_affiliations": {"all": ["political_affiliation"]}
+            "political_affiliations": {
+                "all": ["political_affiliation", "political_affiliation_id"]
+            }
         },
     },
 }

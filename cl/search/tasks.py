@@ -368,17 +368,13 @@ def update_child_documents_by_query(
         )
         for field_name in field_list:
             script_lines.append(
-                f"ctx._source.{field_name} = params.{field_to_update};"
+                f"ctx._source.{field_name} = params.{field_name};"
             )
-
             prepare_method = getattr(main_doc, f"prepare_{field_name}", None)
             if prepare_method:
-                params[field_to_update] = prepare_method(parent_instance)
+                params[field_name] = prepare_method(parent_instance)
             else:
-                params[field_to_update] = getattr(
-                    parent_instance, field_to_update
-                )
-
+                params[field_name] = getattr(parent_instance, field_to_update)
     script_source = "\n".join(script_lines)
     # Build the UpdateByQuery script and execute it
     ubq = ubq.script(source=script_source, params=params)

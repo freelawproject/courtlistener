@@ -325,7 +325,6 @@ class PeopleSearchTestElasticSearch(
             how_selected="e_part",
             nomination_process="fed_senate",
         )
-
         person.delete()
 
     def test_has_child_filters(self) -> None:
@@ -645,6 +644,48 @@ class PeopleSearchTestElasticSearch(
         # API
         r = self._test_api_results_count(params, 1, "q")
         self.assertIn("Olivia", r.content.decode())
+
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "appointer:Clinton AND races:(Black or African American)",
+        }
+        r = self._test_article_count(
+            params,
+            1,
+            "q",
+        )
+        self.assertIn("Judith", r.content.decode())
+        # API
+        r = self._test_api_results_count(params, 1, "q")
+        self.assertIn("Judith", r.content.decode())
+
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "appointer:Clinton AND political_affiliation_id:i",
+        }
+        r = self._test_article_count(
+            params,
+            1,
+            "q",
+        )
+        self.assertIn("Judith", r.content.decode())
+        # API
+        r = self._test_api_results_count(params, 1, "q")
+        self.assertIn("Judith", r.content.decode())
+
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "selection_method_id:e_part AND dob_state_id:NY",
+        }
+        r = self._test_article_count(
+            params,
+            1,
+            "q",
+        )
+        self.assertIn("Judith", r.content.decode())
+        # API
+        r = self._test_api_results_count(params, 1, "q")
+        self.assertIn("Judith", r.content.decode())
 
     def test_parent_document_fields_on_search_results(self):
         params = {
@@ -1254,7 +1295,22 @@ class PeopleSearchTestElasticSearch(
         person.delete()
 
     def test_update_related_documents(self):
-        person = PersonFactory.create(name_first="John American")
+        person = PersonFactory.create(
+            name_first="John American",
+            date_granularity_dob="%Y-%m-%d",
+            date_granularity_dod="%Y-%m-%d",
+            date_dob=datetime.date(1940, 10, 21),
+            date_dod=datetime.date(2021, 11, 25),
+        )
+        person.race.add(self.w_race)
+        po_af = PoliticalAffiliationFactory.create(
+            political_party="i",
+            source="b",
+            date_start=datetime.date(2015, 12, 14),
+            person=person,
+            date_granularity_start="%Y-%m-%d",
+        )
+
         person_2 = PersonFactory.create(name_first="Barack Obama")
         position_5 = PositionFactory.create(
             date_granularity_start="%Y-%m-%d",
@@ -1307,6 +1363,66 @@ class PeopleSearchTestElasticSearch(
         self.assertEqual(
             self.position_1.person.name_full_reverse, pos_doc.appointer
         )
+
+        # Check for races, dod and dob, initial values.
+        person_doc = PersonDocument.get(id=person.pk)
+        self.assertEqual(
+            Counter([self.w_race.get_race_display()]),
+            Counter(person_doc.races),
+        )
+        self.assertEqual(person.date_dob, person_doc.dob.date())
+        self.assertEqual(person.date_dod, person_doc.dod.date())
+        self.assertEqual(["i"], person_doc.political_affiliation_id)
+
+        pos_5_doc = PositionDocument.get(
+            id=ES_CHILD_ID(position_5.pk).POSITION
+        )
+        self.assertEqual(
+            Counter([self.w_race.get_race_display()]), Counter(pos_5_doc.races)
+        )
+        self.assertEqual(person.date_dob, pos_5_doc.dob.date())
+        self.assertEqual(person.date_dod, pos_5_doc.dod.date())
+        self.assertEqual(["i"], pos_5_doc.political_affiliation_id)
+
+        # Add a new race and compare person and position fields.
+        person.race.add(self.b_race)
+        person_doc = PersonDocument.get(id=person.pk)
+        self.assertEqual(
+            Counter(
+                [
+                    self.w_race.get_race_display(),
+                    self.b_race.get_race_display(),
+                ]
+            ),
+            Counter(person_doc.races),
+        )
+
+        pos_5_doc = PositionDocument.get(
+            id=ES_CHILD_ID(position_5.pk).POSITION
+        )
+        self.assertEqual(
+            Counter(
+                [
+                    self.w_race.get_race_display(),
+                    self.b_race.get_race_display(),
+                ]
+            ),
+            Counter(pos_5_doc.races),
+        )
+
+        # Update dob and dod:
+        person.date_dob = datetime.date(1940, 10, 25)
+        person.date_dod = datetime.date(2021, 11, 25)
+        person.save()
+
+        person_doc = PersonDocument.get(id=person.pk)
+        pos_5_doc = PositionDocument.get(
+            id=ES_CHILD_ID(position_5.pk).POSITION
+        )
+        self.assertEqual(person.date_dob, person_doc.dob.date())
+        self.assertEqual(person.date_dod, person_doc.dod.date())
+        self.assertEqual(person.date_dob, pos_5_doc.dob.date())
+        self.assertEqual(person.date_dod, pos_5_doc.dod.date())
 
         # Update supervisor
         position_6.supervisor = person_2
@@ -1364,6 +1480,7 @@ class PeopleSearchTestElasticSearch(
 
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         self.assertEqual("Alabama", pos_doc.dob_state)
+        self.assertEqual("AL", pos_doc.dob_state_id)
 
         # Update the gender field in the parent record.
         self.person_3.gender = "m"
