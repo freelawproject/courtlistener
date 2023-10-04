@@ -114,6 +114,15 @@ pa_field_mapping = {
             },
         }
     },
+    "reverse-delete": {
+        Citation: {
+            "opinion__cluster": {
+                "all": ["citation"],
+                Citation.NEUTRAL: ["citation", "neutralCite"],
+                Citation.LEXIS: ["citation", "lexisCite"],
+            },
+        }
+    },
 }
 
 oa_field_mapping = {
@@ -135,6 +144,7 @@ oa_field_mapping = {
     "delete": {Audio: {}},
     "m2m": {Audio.panel.through: {"audio": {"panel_ids": "panel_ids"}}},
     "reverse": {},
+    "reverse-delete": {},
 }
 
 p_field_mapping = {
@@ -148,6 +158,15 @@ p_field_mapping = {
         ABARating: {"aba_ratings": {"all": ["aba_rating"]}},
         PoliticalAffiliation: {
             "political_affiliations": {
+                "all": ["political_affiliation", "political_affiliation_id"]
+            }
+        },
+    },
+    "reverse-delete": {
+        Education: {"person__pk": {"all": ["school"]}},
+        ABARating: {"person__pk": {"all": ["aba_rating"]}},
+        PoliticalAffiliation: {
+            "person__pk": {
                 "all": ["political_affiliation", "political_affiliation_id"]
             }
         },
@@ -197,6 +216,15 @@ position_field_mapping = {
         ABARating: {"aba_ratings": {"all": ["aba_rating"]}},
         PoliticalAffiliation: {
             "political_affiliations": {
+                "all": ["political_affiliation", "political_affiliation_id"]
+            }
+        },
+    },
+    "reverse-delete": {
+        Education: {"person__pk": {"all": ["school"]}},
+        ABARating: {"person__pk": {"all": ["aba_rating"]}},
+        PoliticalAffiliation: {
+            "person__pk": {
                 "all": ["political_affiliation", "political_affiliation_id"]
             }
         },

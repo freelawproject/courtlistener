@@ -1364,7 +1364,7 @@ class PeopleSearchTestElasticSearch(
             self.position_1.person.name_full_reverse, pos_doc.appointer
         )
 
-        # Check for races, dod and dob, initial values.
+        # Check for races, political_affiliation_idk, dod and dob, initial values.
         person_doc = PersonDocument.get(id=person.pk)
         self.assertEqual(
             Counter([self.w_race.get_race_display()]),
@@ -1384,6 +1384,9 @@ class PeopleSearchTestElasticSearch(
         self.assertEqual(person.date_dod, pos_5_doc.dod.date())
         self.assertEqual(["i"], pos_5_doc.political_affiliation_id)
 
+        # Remove political affiliation:
+        po_af.delete()
+
         # Add a new race and compare person and position fields.
         person.race.add(self.b_race)
         person_doc = PersonDocument.get(id=person.pk)
@@ -1396,7 +1399,8 @@ class PeopleSearchTestElasticSearch(
             ),
             Counter(person_doc.races),
         )
-
+        # political_affiliation_id is removed from person doc.
+        self.assertEqual(None, person_doc.political_affiliation_id)
         pos_5_doc = PositionDocument.get(
             id=ES_CHILD_ID(position_5.pk).POSITION
         )
@@ -1409,6 +1413,8 @@ class PeopleSearchTestElasticSearch(
             ),
             Counter(pos_5_doc.races),
         )
+        # political_affiliation_id is removed form position doc.
+        self.assertEqual(None, pos_5_doc.political_affiliation_id)
 
         # Update dob and dod:
         person.date_dob = datetime.date(1940, 10, 25)
@@ -1504,11 +1510,12 @@ class PeopleSearchTestElasticSearch(
         self.assertEqual("39", pos_doc.fjc_id)
 
         # Add education to the parent object
-        EducationFactory(
+        ed_obj = EducationFactory(
             degree_level="ba",
             person=self.person_3,
             school=self.school_2,
         )
+        ed_obj_school_name = ed_obj.school.name
 
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         for education in self.person_3.educations.all():
@@ -1520,6 +1527,14 @@ class PeopleSearchTestElasticSearch(
 
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         self.assertIn("New school updated", pos_doc.school)
+
+        # Remove Education.
+        ed_obj.delete()
+        # Confirm School is removed from the parent and child document.
+        person_3_doc = PersonDocument.get(self.person_3.pk)
+        self.assertNotIn(ed_obj_school_name, person_3_doc.school)
+        pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
+        self.assertNotIn(ed_obj_school_name, pos_doc.school)
 
         # Add political affiliation to the parent object
         PoliticalAffiliationFactory(
@@ -1559,3 +1574,10 @@ class PeopleSearchTestElasticSearch(
         rating.save()
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         self.assertIn("Exceptionally Well Qualified", pos_doc.aba_rating)
+
+        # Remove aba_rating and confirm it's removed from parent and child docs
+        rating.delete()
+        person_3_doc = PersonDocument.get(self.person_3.pk)
+        pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
+        self.assertEqual(None, person_3_doc.aba_rating)
+        self.assertEqual(None, pos_doc.aba_rating)
