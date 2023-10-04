@@ -343,6 +343,7 @@ def build_fulltext_query(
                 quote_field_suffix=".exact",
                 default_operator="AND",
                 tie_breaker=0.3,
+                fuzziness=2,
             ),
             Q(
                 "query_string",
@@ -351,6 +352,7 @@ def build_fulltext_query(
                 quote_field_suffix=".exact",
                 default_operator="AND",
                 type="phrase",
+                fuzziness=2,
             ),
         ]
         if only_queries:
@@ -1852,7 +1854,7 @@ def merge_opinion_and_cluster(results: Page | dict) -> None:
     :return: None, the function modifies the search results object in place.
     """
     for result in results:
-        opinion = result["child_hits"][0]
+        opinion = result["child_hits"][0]["_source"]
         result["cluster_id"] = result["id"]
         result["id"] = opinion["id"]
         result["author_id"] = opinion["author_id"]
