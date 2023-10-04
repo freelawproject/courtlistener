@@ -11,7 +11,7 @@
 {% block og_description %}Opinion Coverage for Free Law Project, a 501(c)(3) nonprofit.{% endblock %}
 
 {% block sidebar %}
-  <div id="toc-container" class="col-xs-12 hidden-sm col-md-3">
+  <div id="toc-container" class="hidden-xs col-sm-3 col-md-3 col-lg-3">
     <div id="toc">
       <h3>Table of Contents</h3>
       <ul>
@@ -57,7 +57,7 @@
 {% endblock %}
 
 {% block content %}
-  <div class="col-xs-12 col-sm-12 col-md-9" role="main">
+  <div class="col-xs-12 col-sm-9 col-md-9 col-lg-9" role="main">
     <h1>Data Coverage — What Opinions Do We Have?</h1>
     <p class="lead">Courtlistener has one of the most comprehensive collections of American Legal Jurisprudence on the internet.</p>
     <p>Having access to complete and reliable data is crucial for making informed decisions in the legal field. As of 2023, we believe CourtListener has one of the most complete collections of legal opinions on the internet. Our database encompasses more than 99% of all precedential legal opinions published in the United States. We have made that possible by collecting our data from a wide variety of sources over many years. Although the collection of legal opinions never stops, here is what we have and how we do it.</p>
@@ -133,7 +133,7 @@
             </ul>
           {% endif %}
         </ul>
-        <div class="btn-group hidden-xs hidden-sm" role="group">
+        <div class="btn-group hidden-xs" role="group">
           <button class="btn btn-default" type="submit" hx-boost="false">
             {{ circuit.name }} Timeline
           </button>
@@ -169,7 +169,7 @@
               </ul>
             {% endfor %}
           </ul>
-          <div class="btn-group hidden-xs hidden-sm" role="group">
+          <div class="btn-group hidden-xs" role="group">
             <button class="btn btn-default" type="submit" hx-boost="false">
             {% if header != "NONE" %} {{ header }} {% else %} {{ section | title }} Courts {% endif %} Timeline
             </button>
