@@ -319,6 +319,16 @@ class JoinField(DEDField, Join):
 
 
 class PersonBaseDocument(Document):
+    id = fields.IntegerField(attr="pk")
+    alias_ids = fields.ListField(
+        fields.IntegerField(multi=True),
+    )
+    races = fields.ListField(
+        fields.KeywordField(multi=True),
+    )
+    political_affiliation_id = fields.ListField(
+        fields.KeywordField(multi=True),
+    )
     fjc_id = fields.TextField()
     name = fields.TextField(
         analyzer="text_en_splitting_cl",
@@ -339,6 +349,8 @@ class PersonBaseDocument(Document):
             multi=True,
         )
     )
+    dob = fields.DateField(attr="date_dob")
+    dod = fields.DateField(attr="date_dod")
     dob_city = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
@@ -355,6 +367,7 @@ class PersonBaseDocument(Document):
         },
         search_analyzer="search_analyzer",
     )
+    dob_state_id = fields.KeywordField(attr="dob_state")
     political_affiliation = fields.ListField(
         fields.TextField(
             analyzer="text_en_splitting_cl",
@@ -430,6 +443,19 @@ class PersonBaseDocument(Document):
 
     def prepare_school(self, instance):
         return [e.school.name for e in instance.educations.all()] or None
+
+    def prepare_races(self, instance):
+        return [r.get_race_display() for r in instance.race.all()] or None
+
+    def prepare_alias_ids(self, instance):
+        return [alias.pk for alias in instance.aliases.all()] or None
+
+    def prepare_political_affiliation_id(self, instance):
+        return [
+            pa.political_party
+            for pa in instance.political_affiliations.all()
+            if pa
+        ] or None
 
 
 @people_db_index.document
@@ -590,6 +616,18 @@ class PositionDocument(PersonBaseDocument):
     def prepare_dob_state(self, instance):
         return instance.person.get_dob_state_display()
 
+    def prepare_id(self, instance):
+        return instance.person.pk
+
+    def prepare_dob_state_id(self, instance):
+        return instance.person.dob_state
+
+    def prepare_dob(self, instance):
+        return instance.person.date_dob
+
+    def prepare_dod(self, instance):
+        return instance.person.date_dod
+
     def prepare_political_affiliation(self, instance):
         return [
             pa.get_political_party_display()
@@ -612,29 +650,30 @@ class PositionDocument(PersonBaseDocument):
             e.school.name for e in instance.person.educations.all()
         ] or None
 
+    def prepare_races(self, instance):
+        return [
+            r.get_race_display() for r in instance.person.race.all()
+        ] or None
+
+    def prepare_alias_ids(self, instance):
+        return [alias.pk for alias in instance.person.aliases.all()] or None
+
+    def prepare_political_affiliation_id(self, instance):
+        return [
+            pa.political_party
+            for pa in instance.person.political_affiliations.all()
+            if pa
+        ] or None
+
 
 @people_db_index.document
 class PersonDocument(PersonBaseDocument):
-    id = fields.IntegerField(attr="pk")
-    alias_ids = fields.ListField(
-        fields.IntegerField(multi=True),
-    )
-    races = fields.ListField(
-        fields.KeywordField(multi=True),
-    )
     name_reverse = fields.KeywordField(
         attr="name_full_reverse",
     )
-
     date_granularity_dob = fields.KeywordField(attr="date_granularity_dob")
     date_granularity_dod = fields.KeywordField(attr="date_granularity_dod")
-    dob_state_id = fields.KeywordField(attr="dob_state")
     absolute_url = fields.KeywordField(attr="get_absolute_url")
-    dob = fields.DateField(attr="date_dob")
-    dod = fields.DateField(attr="date_dod")
-    political_affiliation_id = fields.ListField(
-        fields.KeywordField(multi=True),
-    )
 
     def prepare_fjc_id(self, instance):
         return str(instance.fjc_id)
@@ -642,21 +681,5 @@ class PersonDocument(PersonBaseDocument):
     def prepare_alias(self, instance):
         return [r.name_full for r in instance.aliases.all()] or None
 
-    def prepare_races(self, instance):
-        return [r.get_race_display() for r in instance.race.all()] or None
-
-    def prepare_alias_ids(self, instance):
-        return [alias.pk for alias in instance.aliases.all()] or None
-
-    def prepare_political_affiliation_id(self, instance):
-        return [
-            pa.political_party
-            for pa in instance.political_affiliations.all()
-            if pa
-        ] or None
-
     def prepare_person_child(self, instance):
         return "person"
-
-    def prepare_school(self, instance):
-        return [e.school.name for e in instance.educations.all()] or None
