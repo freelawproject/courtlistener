@@ -232,6 +232,7 @@ def coverage_data_opinions(request: HttpRequest):
                         "data": [
                             {
                                 "val": total,
+                                "id": court_id,
                                 "timeRange": [first_date, last_date],
                             }
                         ],

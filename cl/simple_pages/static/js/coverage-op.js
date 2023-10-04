@@ -24,7 +24,7 @@ document.body.addEventListener('htmx:afterSettle', function (event) {
       return `${year} - ${year2} <br>${d.val} opinions`;
     })
     .onSegmentClick(function (d) {
-      window.open(`/?court=${d.val}`);
+      window.open(`/?court=${d.data.id}`);
     })
     .refresh();
 
