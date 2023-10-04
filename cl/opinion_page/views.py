@@ -6,6 +6,7 @@ from urllib.parse import urlencode
 
 import eyecite
 import natsort
+import waffle
 from asgiref.sync import sync_to_async
 from django.contrib import messages
 from django.contrib.auth.models import AnonymousUser, User
@@ -38,6 +39,7 @@ from cl.favorites.forms import NoteForm
 from cl.favorites.models import Note
 from cl.lib.auth import group_required
 from cl.lib.bot_detector import is_og_bot
+from cl.lib.elasticsearch_utils import get_related_clusters_with_cache_and_es
 from cl.lib.http import is_ajax
 from cl.lib.model_helpers import choices_to_csv
 from cl.lib.models import THUMBNAIL_STATUSES
@@ -57,6 +59,7 @@ from cl.opinion_page.forms import (
 )
 from cl.people_db.models import AttorneyOrganization, CriminalCount, Role
 from cl.recap.constants import COURT_TIMEZONES
+from cl.search.documents import OpinionClusterDocument
 from cl.search.models import (
     Citation,
     Court,
@@ -586,11 +589,19 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
         cluster
     )
 
-    (
-        related_clusters,
-        sub_opinion_ids,
-        related_search_params,
-    ) = get_related_clusters_with_cache(cluster, request)
+    if waffle.flag_is_active(request, "o-es-active"):
+        search = OpinionClusterDocument.search()
+        (
+            related_clusters,
+            sub_opinion_ids,
+            related_search_params,
+        ) = get_related_clusters_with_cache_and_es(search, cluster, request)
+    else:
+        (
+            related_clusters,
+            sub_opinion_ids,
+            related_search_params,
+        ) = get_related_clusters_with_cache(cluster, request)
 
     parenthetical_groups = get_or_create_parenthetical_groups(
         cluster,
