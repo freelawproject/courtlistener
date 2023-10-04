@@ -332,6 +332,7 @@ o_field_mapping = {
         },
     },
     "reverse": {},
+    "reverse-delete": {},
 }
 
 o_cluster_field_mapping = {
@@ -367,6 +368,7 @@ o_cluster_field_mapping = {
             "citations": {"all": ["citation", "neutralCite", "lexisCite"]}
         },
     },
+    "reverse-delete": {},
 }
 
 
