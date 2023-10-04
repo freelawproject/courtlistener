@@ -1565,6 +1565,10 @@ textarea {
   height: 100vh;
 }
 
-.brusher {
-  display: none;
+@media (max-width: 780px) {
+    #toc-container {
+        overflow-y: initial;
+        position: relative;
+        height: min-content;
+    }
 }
