@@ -675,11 +675,5 @@ class PersonDocument(PersonBaseDocument):
     date_granularity_dod = fields.KeywordField(attr="date_granularity_dod")
     absolute_url = fields.KeywordField(attr="get_absolute_url")
 
-    def prepare_fjc_id(self, instance):
-        return str(instance.fjc_id)
-
-    def prepare_alias(self, instance):
-        return [r.name_full for r in instance.aliases.all()] or None
-
     def prepare_person_child(self, instance):
         return "person"
