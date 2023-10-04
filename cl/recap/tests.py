@@ -610,7 +610,7 @@ class RecapUploadsTest(TestCase):
         )
 
     def test_recap_upload_validate_acms_pacer_case_id(self, mock):
-        """Can we properly validate the pacer_case_id doesn't contain a dash -?"""
+        """Can we properly validate a pacer_case_id that is a GUIDs.?"""
         self.data.update(
             {
                 "upload_type": UPLOAD_TYPE.ACMS_DOCKET_JSON,
@@ -621,11 +621,8 @@ class RecapUploadsTest(TestCase):
         del self.data["pacer_doc_id"]
         r = self.client.post(self.path, self.data)
         j = json.loads(r.content)
-        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
-        self.assertIn(
-            "PACER case ID can not contain a single (-); that looks like a docket number.",
-            j["non_field_errors"][0],
-        )
+
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
 
 
 @mock.patch("cl.recap.tasks.DocketReport", new=fakes.FakeDocketReport)
