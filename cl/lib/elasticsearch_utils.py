@@ -149,6 +149,28 @@ def build_daterange_query(
     return []
 
 
+def build_more_like_this_query(related_id: list[str]):
+    document_list = [{"_id": f"o_{id}"} for id in related_id]
+    return Q(
+        "more_like_this",
+        fields=[
+            "type",
+            "text",
+            "court",
+            "citation",
+            "judge",
+            "caseName",
+            "docketNumber",
+            "caseNameFull",
+            "caseNameShort",
+            "status",
+        ],
+        like=document_list,
+        min_term_freq=1,
+        max_query_terms=12,
+    )
+
+
 def make_es_boost_list(fields: Dict[str, float]) -> list[str]:
     """Constructs a list of Elasticsearch fields with their corresponding
     boost values.
