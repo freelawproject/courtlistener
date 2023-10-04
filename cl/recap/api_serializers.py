@@ -290,8 +290,13 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
                 "without 'court' parameter."
             )
 
-        if attrs.get("pacer_case_id") and "-" in attrs.get("pacer_case_id"):
-            raise ValidationError("PACER case ID can not contains dashes -")
+        if attrs.get("pacer_case_id"):
+            dashes = attrs.get("pacer_case_id").count("-")
+            if dashes == 1:
+                raise ValidationError(
+                    "PACER case ID can not contain a single (-); "
+                    "that looks like a docket number."
+                )
 
         if attrs.get("docket_number") and not attrs.get("court"):
             # If a docket_number is included, is a court also?
