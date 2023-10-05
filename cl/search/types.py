@@ -46,6 +46,8 @@ ESDocumentClassType = Union[
     Type[AudioDocument],
     Type[ParentheticalGroupDocument],
     Type[AudioPercolator],
+    Type[PersonDocument],
+    Type[PositionDocument],
 ]
 
 
