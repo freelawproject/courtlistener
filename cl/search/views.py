@@ -35,6 +35,7 @@ from cl.lib.elasticsearch_utils import (
     es_index_exists,
     fetch_es_results,
     merge_courts_from_db,
+    merge_unavailable_fields_on_parent_document,
     sanitize_unbalanced_parenthesis,
     set_results_highlights,
 )
@@ -52,7 +53,11 @@ from cl.lib.search_utils import (
     regroup_snippets,
 )
 from cl.search.constants import RELATED_PATTERN
-from cl.search.documents import AudioDocument, ParentheticalGroupDocument
+from cl.search.documents import (
+    AudioDocument,
+    ParentheticalGroupDocument,
+    PersonDocument,
+)
 from cl.search.exception import UnbalancedQuery
 from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import SEARCH_TYPES, Court, Opinion, OpinionCluster
@@ -476,18 +481,23 @@ def show_results(request: HttpRequest) -> HttpResponse:
                     initial={"query": get_string, "rate": "dly"},
                     user=request.user,
                 )
-
-            if request.GET.get("type") == SEARCH_TYPES.PARENTHETICAL:
-                render_dict.update(do_es_search(request.GET.copy()))
-            else:
-                # Check if waffle flag is active.
-                if request.GET.get(
-                    "type"
-                ) == SEARCH_TYPES.ORAL_ARGUMENT and waffle.flag_is_active(
-                    request, "oa-es-active"
-                ):
+            search_type = request.GET.get("type")
+            match search_type:
+                case SEARCH_TYPES.PARENTHETICAL:
                     render_dict.update(do_es_search(request.GET.copy()))
-                else:
+                case SEARCH_TYPES.ORAL_ARGUMENT:
+                    # Check if waffle flag is active.
+                    if waffle.flag_is_active(request, "oa-es-active"):
+                        render_dict.update(do_es_search(request.GET.copy()))
+                    else:
+                        render_dict.update(do_search(request.GET.copy()))
+                case SEARCH_TYPES.PEOPLE:
+                    # Check if waffle flag is active.
+                    if waffle.flag_is_active(request, "p-es-active"):
+                        render_dict.update(do_es_search(request.GET.copy()))
+                    else:
+                        render_dict.update(do_search(request.GET.copy()))
+                case _:
                     render_dict.update(do_search(request.GET.copy()))
 
             # Set the value to the query as a convenience
@@ -495,6 +505,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
                 "search_summary_str"
             ]
             render_dict.update({"alert_form": alert_form})
+
             return TemplateResponse(request, "search.html", render_dict)
 
 
@@ -606,10 +617,13 @@ def do_es_search(
     suggested_query = ""
 
     search_form = SearchForm(get_params)
-    if get_params.get("type") == SEARCH_TYPES.PARENTHETICAL:
-        document_type = ParentheticalGroupDocument
-    elif get_params.get("type") == SEARCH_TYPES.ORAL_ARGUMENT:
-        document_type = AudioDocument
+    match get_params.get("type"):
+        case SEARCH_TYPES.PARENTHETICAL:
+            document_type = ParentheticalGroupDocument
+        case SEARCH_TYPES.ORAL_ARGUMENT:
+            document_type = AudioDocument
+        case SEARCH_TYPES.PEOPLE:
+            document_type = PersonDocument
 
     if search_form.is_valid() and es_index_exists(
         index_name=document_type._index._name
@@ -643,6 +657,7 @@ def do_es_search(
     search_summary_str = search_form.as_text(court_count_human)
     search_summary_dict = search_form.as_display_dict(court_count_human)
     results_details = [query_time, total_query_results, top_hits_limit]
+
     return {
         "results": paged_results,
         "results_details": results_details,
@@ -692,6 +707,7 @@ def fetch_and_paginate_results(
     hits, query_time, error = fetch_es_results(
         get_params, search_query, page, rows_per_page
     )
+
     if error:
         return [], query_time, error
     paginator = ESPaginator(hits, rows_per_page)
@@ -704,9 +720,11 @@ def fetch_and_paginate_results(
 
     search_type = get_params.get("type")
     # Set highlights in results.
+
     set_results_highlights(results, search_type)
-    convert_str_date_fields_to_date_objects(results, "dateFiled", search_type)
+    convert_str_date_fields_to_date_objects(results, search_type)
     merge_courts_from_db(results, search_type)
+    merge_unavailable_fields_on_parent_document(results, search_type)
 
     if cache_key is not None:
         cache.set(cache_key, results, settings.QUERY_RESULTS_CACHE)

@@ -3,12 +3,14 @@ import operator
 import re
 import time
 import traceback
-from datetime import date
+from dataclasses import fields
+from datetime import date, datetime
 from functools import reduce, wraps
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, List, Literal
 
 from django.conf import settings
 from django.core.paginator import Page
+from django.db.models import QuerySet
 from django.http.request import QueryDict
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.exceptions import RequestError, TransportError
@@ -18,13 +20,17 @@ from elasticsearch_dsl.query import QueryString, Range
 from elasticsearch_dsl.response import Response
 from elasticsearch_dsl.utils import AttrDict
 
-from cl.lib.search_utils import BOOSTS, cleanup_main_query
-from cl.lib.types import CleanData
+from cl.lib.date_time import midnight_pt
+from cl.lib.search_utils import cleanup_main_query
+from cl.lib.types import ApiPositionMapping, BasePositionMapping, CleanData
+from cl.people_db.models import Position
 from cl.search.constants import (
     ALERTS_HL_TAG,
+    BOOSTS,
     SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS,
     SEARCH_HL_TAG,
     SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS,
+    SOLR_PEOPLE_ES_HL_FIELDS,
 )
 from cl.search.exception import UnbalancedQuery
 from cl.search.models import SEARCH_TYPES, Court
@@ -56,7 +62,10 @@ def es_index_exists(index_name: str) -> bool:
 
 
 def build_daterange_query(
-    field: str, before: date, after: date, relation: str | None = None
+    field: str,
+    before: date,
+    after: date,
+    relation: Literal["INTERSECTS", "CONTAINS", "WITHIN", None] = None,
 ) -> list[Range]:
     """Given field name and date range limits returns ElasticSearch range query or None
     https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html#ranges-on-dates
@@ -101,10 +110,14 @@ def make_es_boost_list(fields: Dict[str, float]) -> list[str]:
     return boosted_fields
 
 
-def add_fields_boosting(cd: CleanData) -> list[str]:
+def add_fields_boosting(
+    cd: CleanData, fields: list[str] | None = None
+) -> list[str]:
     """Applies boosting to specific fields according the search type.
 
     :param cd: The user input CleanedData
+    :param fields: If provided, a custom fields list to apply boosting,
+    otherwise apply to all fields.
     :return: A list of Elasticsearch fields with their respective boost values.
     """
     # Apply standard qf parameters
@@ -127,6 +140,8 @@ def add_fields_boosting(cd: CleanData) -> list[str]:
         if any([vs_query, in_re_query, matter_of_query, ex_parte_query]):
             qf.update({"caseName": 50})
 
+    if fields:
+        qf = {key: value for key, value in qf.items() if key in fields}
     return make_es_boost_list(qf)
 
 
@@ -333,21 +348,31 @@ def build_sort_results(cd: CleanData) -> Dict:
     :return: The short dict.
     """
 
-    if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
-        order_by_map = {
-            "score desc": {"_score": {"order": "desc"}},
-            "dateArgued desc": {"dateArgued": {"order": "desc"}},
-            "dateArgued asc": {"dateArgued": {"order": "asc"}},
-            "random_ desc": {"random_": {"order": "desc"}},
-            "random_ asc": {"random_": {"order": "asc"}},
-        }
+    order_by_map = {
+        "score desc": {"_score": {"order": "desc"}},
+        "dateArgued desc": {"dateArgued": {"order": "desc"}},
+        "dateArgued asc": {"dateArgued": {"order": "asc"}},
+        "random_ desc": {"random_": {"order": "desc"}},
+        "random_ asc": {"random_": {"order": "asc"}},
+        "name_reverse asc": {"name_reverse": {"order": "asc"}},
+        "dob desc,name_reverse asc": {
+            "dob": {"order": "desc"},
+            "name_reverse": {"order": "asc"},
+        },
+        "dob asc,name_reverse asc": {
+            "dob": {"order": "asc"},
+            "name_reverse": {"order": "asc"},
+        },
+        "dod desc,name_reverse asc": {
+            "dod": {"order": "desc"},
+            "name_reverse": {"order": "asc"},
+        },
+        "dateFiled desc": {"dateFiled": {"order": "desc"}},
+        "dateFiled asc": {"dateFiled": {"order": "asc"}},
+    }
 
-    else:
-        order_by_map = {
-            "score desc": {"score": {"order": "desc"}},
-            "dateFiled desc": {"dateFiled": {"order": "desc"}},
-            "dateFiled asc": {"dateFiled": {"order": "asc"}},
-        }
+    if cd["type"] == SEARCH_TYPES.PARENTHETICAL:
+        order_by_map["score desc"] = {"score": {"order": "desc"}}
 
     order_by = cd.get("order_by")
     if order_by and "random_" in order_by:
@@ -444,7 +469,12 @@ def build_es_base_query(search_query: Search, cd: CleanData) -> Search:
     """
 
     string_query = None
-    filters = build_es_filters(cd)
+    join_field_documents = [SEARCH_TYPES.PEOPLE]
+    if cd["type"] in join_field_documents:
+        filters = build_join_es_filters(cd)
+    else:
+        filters = build_es_filters(cd)
+
     match cd["type"]:
         case SEARCH_TYPES.PARENTHETICAL:
             string_query = build_fulltext_query(
@@ -466,6 +496,56 @@ def build_es_base_query(search_query: Search, cd: CleanData) -> Search:
                 fields,
                 cd.get("q", ""),
             )
+        case SEARCH_TYPES.PEOPLE:
+            child_fields = [
+                "position_type",
+                "nomination_process",
+                "judicial_committee_action",
+                "selection_method",
+                "termination_reason",
+                "court_full_name",
+                "court_citation_string",
+                "court_exact",
+                "organization_name",
+                "job_title",
+            ]
+            child_fields.extend(
+                add_fields_boosting(
+                    cd,
+                    [
+                        "appointer",
+                        "supervisor",
+                        "predecessor",
+                    ],
+                )
+            )
+            child_query_fields = {
+                "position": child_fields,
+            }
+            parent_query_fields = [
+                "gender",
+                "alias",
+                "dob_city",
+                "political_affiliation",
+                "religion",
+                "fjc_id",
+                "aba_rating",
+                "school",
+            ]
+            parent_query_fields.extend(
+                add_fields_boosting(
+                    cd,
+                    [
+                        "name",
+                    ],
+                )
+            )
+            string_query = build_join_fulltext_queries(
+                child_query_fields,
+                parent_query_fields,
+                cd.get("q", ""),
+            )
+
     if filters or string_query:
         # Apply filters first if there is at least one set.
         if filters:
@@ -475,7 +555,13 @@ def build_es_base_query(search_query: Search, cd: CleanData) -> Search:
         if string_query:
             search_query = search_query.query(string_query)
     else:
-        search_query = search_query.query("match_all")
+        if cd["type"] == SEARCH_TYPES.PEOPLE:
+            # Only return Person documents.
+            search_query = search_query.query(
+                Q("match", person_child="person")
+            )
+        else:
+            search_query = search_query.query("match_all")
     return search_query
 
 
@@ -494,15 +580,19 @@ def build_es_main_query(
     """
     search_query = build_es_base_query(search_query, cd)
     total_query_results = search_query.count()
-    # Create groups aggregation if needed.
-    top_hits_limit = group_search_results(
-        search_query,
-        cd,
-        build_sort_results(cd),
-    )
-    search_query = add_es_highlighting(search_query, cd)
-    if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
-        search_query = search_query.sort(build_sort_results(cd))
+    top_hits_limit = 5
+    match cd["type"]:
+        case SEARCH_TYPES.PARENTHETICAL:
+            # Create groups aggregation, add highlight and
+            # sort the results of a parenthetical query.
+            search_query, top_hits_limit = group_search_results(
+                search_query,
+                cd,
+                build_sort_results(cd),
+            )
+        case _:
+            search_query = add_es_highlighting(search_query, cd)
+            search_query = search_query.sort(build_sort_results(cd))
     return search_query, total_query_results, top_hits_limit
 
 
@@ -516,20 +606,29 @@ def add_es_highlighting(
     :param alerts: If highlighting is being applied to search Alerts hits.
     :return: The modified Elasticsearch search query object with highlights set
     """
+    fields_to_exclude = []
+    highlighting_fields = []
+    hl_tag = ALERTS_HL_TAG if alerts else SEARCH_HL_TAG
 
-    if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
-        highlighting_fields = SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS
-        hl_tag = SEARCH_HL_TAG
-        if alerts:
-            highlighting_fields = SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS
-            hl_tag = ALERTS_HL_TAG
-        for field in highlighting_fields:
-            search_query = search_query.highlight(
-                field,
-                number_of_fragments=0,
-                pre_tags=[f"<{hl_tag}>"],
-                post_tags=[f"</{hl_tag}>"],
+    match cd["type"]:
+        case SEARCH_TYPES.ORAL_ARGUMENT:
+            highlighting_fields = (
+                SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS
+                if alerts
+                else SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS
             )
+            fields_to_exclude = ["sha1"]
+        case SEARCH_TYPES.PEOPLE:
+            highlighting_fields = SOLR_PEOPLE_ES_HL_FIELDS
+
+    search_query = search_query.source(excludes=fields_to_exclude)
+    for field in highlighting_fields:
+        search_query = search_query.highlight(
+            field,
+            number_of_fragments=0,
+            pre_tags=[f"<{hl_tag}>"],
+            post_tags=[f"</{hl_tag}>"],
+        )
 
     return search_query
 
@@ -558,6 +657,7 @@ def merge_highlights_into_result(
         # both versions are available. Highlighted terms in each
         # version can differ, so the best thing to do is combine
         # highlighted terms from each version and set it.
+
         if "exact" in field:
             field = field.split(".exact")[0]
             marked_strings_2 = []
@@ -593,8 +693,6 @@ def merge_highlights_into_result(
                 rf"<{tag}>\1</{tag}>",
                 combined_highlights,
             )
-
-            # Set combined highlighted terms.
             result[field] = combined_highlights
             exact_hl_fields.append(field)
 
@@ -627,10 +725,11 @@ def set_results_highlights(results: Page, search_type: str) -> None:
                     hit["_source"][highlighted_field] = highlight
         else:
             if not hasattr(result.meta, "highlight"):
-                return
+                continue
 
+            highlights = result.meta.highlight.to_dict()
             merge_highlights_into_result(
-                result.meta.highlight.to_dict(),
+                highlights,
                 result,
                 SEARCH_HL_TAG,
             )
@@ -640,89 +739,85 @@ def group_search_results(
     search: Search,
     cd: CleanData,
     order_by: dict[str, dict[str, str]],
-) -> int | None:
+) -> tuple[Search, int]:
     """Group search results by a specified field and return top hits for each
     group.
 
     :param search: The elasticsearch Search object representing the query.
     :param cd: The cleaned data object containing the query and filters.
     :param order_by: The field name to use for sorting the top hits.
-    :return: The top_hits_limit or None.
+    :return: The modified Elasticsearch search query with highlights and aggregations
     """
 
-    top_hits_limit = 5
-    if cd["type"] == SEARCH_TYPES.PARENTHETICAL:
-        # If cluster_id query set the top_hits_limit to 100
-        # Top hits limit in elasticsearch is 100
-        cluster_query = re.search(r"cluster_id:\d+", cd["q"])
-        size = top_hits_limit if not cluster_query else 100
-        group_by = "cluster_id"
-        aggregation = A("terms", field=group_by, size=1_000_000)
-        sub_aggregation = A(
-            "top_hits",
-            size=size,
-            sort={"_score": {"order": "desc"}},
-            highlight={
-                "fields": {
-                    "representative_text": {},
-                    "docketNumber": {},
-                },
-                "pre_tags": ["<mark>"],
-                "post_tags": ["</mark>"],
+    # If cluster_id query set the top_hits_limit to 100
+    # Top hits limit in elasticsearch is 100
+    cluster_query = re.search(r"cluster_id:\d+", cd["q"])
+    size = 5 if not cluster_query else 100
+    group_by = "cluster_id"
+    aggregation = A("terms", field=group_by, size=1_000_000)
+    sub_aggregation = A(
+        "top_hits",
+        size=size,
+        sort={"_score": {"order": "desc"}},
+        highlight={
+            "fields": {
+                "representative_text": {},
+                "docketNumber": {},
             },
+            "pre_tags": ["<mark>"],
+            "post_tags": ["</mark>"],
+        },
+    )
+    aggregation.bucket("grouped_by_opinion_cluster_id", sub_aggregation)
+
+    order_by_field = list(order_by.keys())[0]
+    if order_by_field != "score":
+        # If order field is other than score (elasticsearch relevance)
+        # Add a max aggregation to calculate the max value of the provided
+        # field to order, for each bucket.
+        max_value_field = A("max", field=order_by_field)
+        aggregation.bucket("max_value_field", max_value_field)
+
+        # Add a bucket_sort aggregation to sort the result buckets based on
+        # the max_value_field aggregation
+        bucket_sort = A(
+            "bucket_sort",
+            sort=[{"max_value_field": order_by[order_by_field]}],
         )
-        aggregation.bucket("grouped_by_opinion_cluster_id", sub_aggregation)
+        aggregation.bucket("sorted_buckets", bucket_sort)
+    else:
+        # If order field score (elasticsearch relevance)
+        # Add a max aggregation to calculate the max value of _score
+        max_score = A("max", script="_score")
+        aggregation.bucket("max_score", max_score)
+        bucket_sort_score = A(
+            "bucket_sort", sort=[{"max_score": {"order": "desc"}}]
+        )
+        aggregation.bucket("sorted_buckets", bucket_sort_score)
 
-        order_by_field = list(order_by.keys())[0]
-        if order_by_field != "score":
-            # If order field is other than score (elasticsearch relevance)
-            # Add a max aggregation to calculate the max value of the provided
-            # field to order, for each bucket.
-            max_value_field = A("max", field=order_by_field)
-            aggregation.bucket("max_value_field", max_value_field)
+    search.aggs.bucket("groups", aggregation)
 
-            # Add a bucket_sort aggregation to sort the result buckets based on
-            # the max_value_field aggregation
-            bucket_sort = A(
-                "bucket_sort",
-                sort=[{"max_value_field": order_by[order_by_field]}],
-            )
-            aggregation.bucket("sorted_buckets", bucket_sort)
-        else:
-            # If order field score (elasticsearch relevance)
-            # Add a max aggregation to calculate the max value of _score
-            max_score = A("max", script="_score")
-            aggregation.bucket("max_score", max_score)
-            bucket_sort_score = A(
-                "bucket_sort", sort=[{"max_score": {"order": "desc"}}]
-            )
-            aggregation.bucket("sorted_buckets", bucket_sort_score)
-
-        search.aggs.bucket("groups", aggregation)
-
-    return top_hits_limit
+    return search, size
 
 
 def convert_str_date_fields_to_date_objects(
-    results: Page, date_field_name: str, search_type: str
+    results: Page, search_type: str
 ) -> None:
     """Converts string date fields in Elasticsearch search results to date
     objects.
 
     :param results: A Page object containing the search results to be modified.
-    :param date_field_name: The date field name containing the date strings
-    to be converted.
     :param search_type: The search type to perform.
     :return: None, the function modifies the search results object in place.
     """
     if search_type == SEARCH_TYPES.PARENTHETICAL:
+        date_field_name = "dateFiled"
         for result in results.object_list:
-            if search_type == SEARCH_TYPES.PARENTHETICAL:
-                top_hits = result.grouped_by_opinion_cluster_id.hits.hits
-                for hit in top_hits:
-                    date_str = hit["_source"][date_field_name]
-                    date_obj = date.fromisoformat(date_str)
-                    hit["_source"][date_field_name] = date_obj
+            top_hits = result.grouped_by_opinion_cluster_id.hits.hits
+            for hit in top_hits:
+                date_str = hit["_source"][date_field_name]
+                date_obj = date.fromisoformat(date_str)
+                hit["_source"][date_field_name] = date_obj
 
 
 def merge_courts_from_db(results: Page, search_type: str) -> None:
@@ -752,6 +847,94 @@ def merge_courts_from_db(results: Page, search_type: str) -> None:
             for hit in top_hits:
                 court_id = hit["_source"]["court_id"]
                 hit["_source"]["citation_string"] = courts_dict.get(court_id)
+
+
+def fill_position_mapping(
+    positions: QuerySet[Position],
+    request_type: Literal["frontend", "api"] = "frontend",
+) -> BasePositionMapping | ApiPositionMapping:
+    """Extract all the data from the position queryset and
+    fill the attributes of the mapping.
+
+    :param positions: List of position records.
+    :param request_type: The request type, fronted or api.
+    :return: PositionMapping, the function fill the attributes of the mapping.
+    """
+    position_db_mapping = (
+        BasePositionMapping()
+        if request_type == "frontend"
+        else ApiPositionMapping()
+    )
+    db_to_dataclass_map = position_db_mapping.get_db_to_dataclass_map()
+
+    for position in positions:
+        # Add data to the mapping using the judge ID as a key.
+        # API and Frontend
+        person_id = position.person.pk
+        for validation, value in db_to_dataclass_map.items():
+            if not getattr(position, validation, None):
+                continue
+
+            for db_field, position_field in value.items():
+                mapping_dict = getattr(position_db_mapping, position_field)
+                for key, attr in enumerate(db_field.split("__")):
+                    field_value = (
+                        getattr(position, attr)
+                        if not key
+                        else getattr(field_value, attr)  # type: ignore
+                    )
+
+                if callable(field_value):
+                    field_value = field_value()
+                elif isinstance(field_value, (datetime, date)):
+                    field_value = midnight_pt(field_value)
+
+                mapping_dict[person_id].append(field_value)
+
+    return position_db_mapping
+
+
+def merge_unavailable_fields_on_parent_document(
+    results: Page | dict,
+    search_type: str,
+    request_type: Literal["frontend", "api"] = "frontend",
+) -> None:
+    """Merges unavailable fields on parent document from the database into
+    search results, not all fields are required in frontend, so that fields are
+    completed according to the received request_type (frontend or api).
+
+    :param results: A Page object containing the search results to be modified.
+    :param search_type: The search type to perform.
+    :param request_type: The request type, frontend or api.
+    :return: None, the function modifies the search results object in place.
+    """
+
+    if search_type != SEARCH_TYPES.PEOPLE:
+        return
+
+    # Merge positions courts.
+    person_ids = [d["id"] for d in results]
+    positions_in_page = Position.objects.filter(
+        person_id__in=person_ids
+    ).select_related(
+        "person",
+        "court",
+        "appointer",
+        "appointer__person",
+        "supervisor",
+        "predecessor",
+    )
+    position_db_mapping = fill_position_mapping(
+        positions_in_page, request_type
+    )
+
+    for result in results:
+        person_id = result["id"]
+        for field in fields(position_db_mapping):
+            position_dict = getattr(position_db_mapping, field.name)
+            value = position_dict.get(person_id)
+            cleaned_name = re.sub("_dict", "", field.name)
+            result[cleaned_name] = value
 
 
 def fetch_es_results(
@@ -789,6 +972,118 @@ def fetch_es_results(
         if settings.DEBUG is True:
             traceback.print_exc()
     return [], 0, error
+
+
+def build_join_fulltext_queries(
+    child_query_fields: dict[str, list[str]],
+    parent_fields: list[str],
+    value: str,
+) -> QueryString | List:
+    """Creates a full text query string for join parent-child documents.
+
+    :param child_query_fields: A list of child name fields to search in.
+    :param parent_fields: The parent fields to search in.
+    :param value: The string value to search for.
+    :return: A Elasticsearch QueryString or [] if the "value" param is empty.
+    """
+
+    if not value:
+        return []
+    q_should = []
+    # Build  child documents fulltext queries.
+    for child_type, fields in child_query_fields.items():
+        query = Q(
+            "has_child",
+            type=child_type,
+            score_mode="max",
+            query=build_fulltext_query(fields, value),
+            inner_hits={"name": f"text_query_inner_{child_type}", "size": 10},
+        )
+        q_should.append(query)
+
+    # Build parent document fulltext queries.
+    if parent_fields:
+        q_should.append(build_fulltext_query(parent_fields, value))
+
+    if q_should:
+        return Q("bool", should=q_should, minimum_should_match=1)
+    return []
+
+
+def build_has_child_filters(
+    child_type: str, cd: CleanData
+) -> list[QueryString]:
+    """Builds Elasticsearch 'has_child' filters based on the given child type
+    and CleanData.
+
+    :param child_type: The type of child filter to build (e.g., "position").
+    :param cd: The user input CleanedData.
+    :return: A list of QueryString objects containing the 'has_child' filters.
+    """
+
+    queries_list = []
+    if cd["type"] == SEARCH_TYPES.PEOPLE:
+        if child_type == "position":
+            selection_method = cd.get("selection_method", "")
+            court = cd.get("court", "").split()
+            appointer = cd.get("appointer", "")
+            if selection_method:
+                queries_list.extend(
+                    build_term_query(
+                        "selection_method_id",
+                        selection_method,
+                    )
+                )
+            if court:
+                queries_list.extend(build_term_query("court_exact.raw", court))
+            if appointer:
+                queries_list.extend(build_text_filter("appointer", appointer))
+
+    if not queries_list:
+        return []
+
+    return [
+        Q(
+            "has_child",
+            type=child_type,
+            score_mode="max",
+            query=reduce(operator.iand, queries_list),
+            inner_hits={"name": f"filter_inner_{child_type}", "size": 10},
+        )
+    ]
+
+
+def build_join_es_filters(cd: CleanData) -> List:
+    """Builds join elasticsearch filters based on the CleanData object.
+
+    :param cd: An object containing cleaned user data.
+    :return: The list of Elasticsearch queries built.
+    """
+
+    queries_list = []
+    if cd["type"] == SEARCH_TYPES.PEOPLE:
+        # Build parent document filters.
+        queries_list.extend(
+            [
+                Q("match", person_child="person"),
+                *build_term_query("dob_state_id", cd.get("dob_state", "")),
+                *build_term_query(
+                    "political_affiliation_id",
+                    cd.get("political_affiliation", "").split(),
+                ),
+                *build_daterange_query(
+                    "dob", cd.get("born_before", ""), cd.get("born_after", "")
+                ),
+                *build_text_filter("dob_city", cd.get("dob_city", "")),
+                *build_text_filter("name", cd.get("name", "")),
+                *build_text_filter("school", cd.get("school", "")),
+            ]
+        )
+
+        # Build position has child filter:
+        queries_list.extend(build_has_child_filters("position", cd))
+
+    return queries_list
 
 
 def do_es_feed_query(

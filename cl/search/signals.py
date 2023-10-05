@@ -6,10 +6,17 @@ from cl.citations.tasks import (
     find_citations_and_parantheticals_for_recap_documents,
 )
 from cl.lib.es_signal_processor import ESSignalProcessor
-from cl.people_db.models import Education, Person, Position
+from cl.people_db.models import (
+    ABARating,
+    Education,
+    Person,
+    PoliticalAffiliation,
+    Position,
+    Race,
+    School,
+)
 from cl.search.documents import (
     AudioDocument,
-    EducationDocument,
     ParentheticalGroupDocument,
     PersonDocument,
     PositionDocument,
@@ -107,6 +114,15 @@ pa_field_mapping = {
             },
         }
     },
+    "reverse-delete": {
+        Citation: {
+            "opinion__cluster": {
+                "all": ["citation"],
+                Citation.NEUTRAL: ["citation", "neutralCite"],
+                Citation.LEXIS: ["citation", "lexisCite"],
+            },
+        }
+    },
 }
 
 oa_field_mapping = {
@@ -128,35 +144,93 @@ oa_field_mapping = {
     "delete": {Audio: {}},
     "m2m": {Audio.panel.through: {"audio": {"panel_ids": "panel_ids"}}},
     "reverse": {},
+    "reverse-delete": {},
 }
 
 p_field_mapping = {
     "save": {
         Person: {},
     },
-    "delete": {},
-    "m2m": {},
-    "reverse": {},
+    "delete": {Person: {}},
+    "m2m": {Person.race.through: {"person": {"races": "races"}}},
+    "reverse": {
+        Education: {"educations": {"all": ["school"]}},
+        ABARating: {"aba_ratings": {"all": ["aba_rating"]}},
+        PoliticalAffiliation: {
+            "political_affiliations": {
+                "all": ["political_affiliation", "political_affiliation_id"]
+            }
+        },
+    },
+    "reverse-delete": {
+        Education: {"person__pk": {"all": ["school"]}},
+        ABARating: {"person__pk": {"all": ["aba_rating"]}},
+        PoliticalAffiliation: {
+            "person__pk": {
+                "all": ["political_affiliation", "political_affiliation_id"]
+            }
+        },
+    },
 }
 
 
 position_field_mapping = {
     "save": {
+        Person: {
+            "appointer__person": {
+                "name_full_reverse": ["appointer"],
+            },
+            "predecessor": {
+                "name_full_reverse": ["predecessor"],
+            },
+            "supervisor": {
+                "name_full_reverse": ["supervisor"],
+            },
+            "person": {
+                "name_full": ["name"],
+                "religion": ["religion"],
+                "gender": ["gender"],
+                "dob_city": ["dob_city"],
+                "dob_state": ["dob_state", "dob_state_id"],
+                "fjc_id": ["fjc_id"],
+                "date_dob": ["dob"],
+                "date_dod": ["dod"],
+            },
+        },
+        School: {"educations__school": {"name": ["school"]}},
+        PoliticalAffiliation: {
+            "political_affiliations": {
+                "political_party": [
+                    "political_affiliation",
+                    "political_affiliation_id",
+                ],
+            }
+        },
+        ABARating: {"aba_ratings": {"rating": ["aba_rating"]}},
         Position: {},
     },
-    "delete": {},
-    "m2m": {},
-    "reverse": {},
+    "delete": {Position: {}},
+    "m2m": {Person.race.through: {"person": {"races": "races"}}},
+    "reverse": {
+        Education: {"educations": {"all": ["school"]}},
+        ABARating: {"aba_ratings": {"all": ["aba_rating"]}},
+        PoliticalAffiliation: {
+            "political_affiliations": {
+                "all": ["political_affiliation", "political_affiliation_id"]
+            }
+        },
+    },
+    "reverse-delete": {
+        Education: {"person__pk": {"all": ["school"]}},
+        ABARating: {"person__pk": {"all": ["aba_rating"]}},
+        PoliticalAffiliation: {
+            "person__pk": {
+                "all": ["political_affiliation", "political_affiliation_id"]
+            }
+        },
+    },
 }
 
-education_field_mapping = {
-    "save": {
-        Education: {},
-    },
-    "delete": {},
-    "m2m": {},
-    "reverse": {},
-}
 
 # Instantiate a new ESSignalProcessor() for each Model/Document that needs to
 # be tracked. The arguments are: main model, ES document mapping, and field mapping dict.
@@ -176,11 +250,7 @@ _p_signal_processor = ESSignalProcessor(
     Person, PersonDocument, p_field_mapping
 )
 
-_eduacation_signal_processor = ESSignalProcessor(
-    Education, EducationDocument, education_field_mapping
-)
-
-_position_signañ_processor = ESSignalProcessor(
+_position_signal_processor = ESSignalProcessor(
     Position, PositionDocument, position_field_mapping
 )
 

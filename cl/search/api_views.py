@@ -7,16 +7,17 @@ from cl.search.api_serializers import (
     CourtSerializer,
     DocketEntrySerializer,
     DocketSerializer,
+    ExtendedPersonESSerializer,
+    OAESResultSerializer,
     OpinionClusterSerializer,
     OpinionsCitedSerializer,
     OpinionSerializer,
     OriginalCourtInformationSerializer,
     RECAPDocumentSerializer,
-    SearchESResultSerializer,
     SearchResultSerializer,
     TagSerializer,
 )
-from cl.search.documents import AudioDocument
+from cl.search.documents import AudioDocument, PersonDocument
 from cl.search.filters import (
     CourtFilter,
     DocketEntryFilter,
@@ -173,8 +174,6 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
         search_form = SearchForm(request.GET)
         if search_form.is_valid():
             cd = search_form.cleaned_data
-            if cd["q"] == "":
-                cd["q"] = "*"  # Get everything
 
             search_type = cd["type"]
             paginator = pagination.PageNumberPagination()
@@ -184,16 +183,15 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
                 search_type == SEARCH_TYPES.ORAL_ARGUMENT
                 and waffle.flag_is_active(request, "oa-es-active")
             ):
-                serializer = SearchESResultSerializer(
-                    result_page,
-                    many=True,
-                    context={
-                        "schema": AudioDocument._index.get_mapping()[
-                            AudioDocument._index._name
-                        ]["mappings"]
-                    },
-                )
+                serializer = OAESResultSerializer(result_page, many=True)
+            elif search_type == SEARCH_TYPES.PEOPLE and waffle.flag_is_active(
+                request, "p-es-activate"
+            ):
+                serializer = ExtendedPersonESSerializer(result_page, many=True)
+
             else:
+                if cd["q"] == "":
+                    cd["q"] = "*"  # Get everything
                 serializer = SearchResultSerializer(
                     result_page, many=True, context={"schema": sl.conn.schema}
                 )

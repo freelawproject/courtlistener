@@ -2242,7 +2242,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 user=user_profile.user,
                 rate=Alert.DAILY,
                 name=f"Test Alert OA {i}",
-                query=f"q=DLY+Alert+OA&+19-5735type=oa",
+                query=f"q=OA&+19-5735&type=oa",
             )
             alerts_created.append(alert)
             # Create a new document that triggers each existing alert created
