@@ -194,7 +194,7 @@ def coverage_data_opinions(request: HttpRequest):
     """
     chart_data = []
     if request.method == "GET":
-        court_ids = request.GET.get("court_ids").split(",")
+        court_ids = request.GET.get("court_ids").split(",")  # type: ignore
         chart_data = build_chart_data(court_ids)
     return JsonResponse(chart_data, safe=False)
 
