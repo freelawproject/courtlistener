@@ -1,11 +1,10 @@
 import logging
 from datetime import date, timedelta
-from typing import Any, Optional
+from typing import Optional
 
 import waffle
 from asgiref.sync import sync_to_async
 from django.conf import settings
-from django.db.models import Max, Min
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.template import TemplateDoesNotExist
@@ -24,7 +23,7 @@ from cl.lib.search_utils import (
 )
 from cl.search.documents import AudioDocument
 from cl.search.forms import SearchForm
-from cl.search.models import SEARCH_TYPES, SOURCES, Court, OpinionCluster
+from cl.search.models import SEARCH_TYPES, Court, OpinionCluster
 from cl.simple_pages.coverage_utils import build_chart_data
 from cl.simple_pages.views import get_coverage_data_fds
 
