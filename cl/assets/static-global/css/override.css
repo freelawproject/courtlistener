@@ -1565,7 +1565,7 @@ textarea {
   height: 100vh;
 }
 
-@media (max-width: 780px) {
+@media (max-width: 767px) {
     #toc-container {
         overflow-y: initial;
         position: relative;

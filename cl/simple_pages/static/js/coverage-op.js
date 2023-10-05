@@ -4,7 +4,7 @@ document.body.addEventListener('htmx:afterRequest', function (event) {
 
 document.body.addEventListener('htmx:configRequest', function (event) {
   var formData = new URLSearchParams(new FormData(event.srcElement));
-  var values = Array.from(formData.values())
+  var values = Array.from(formData.values());
   event.detail.parameters = {};
   event.detail.parameters['court_ids'] = values.map(encodeURIComponent).join(',');
   if (values.length === 0) {
@@ -52,4 +52,12 @@ $(document).ready(function () {
     var circuitName = $(this).text();
     $('#modalLabel').text(circuitName);
   });
+});
+
+$(document).ready(function () {
+  // Check if the screen size is xs and automatically toggle the collapse accordingly
+  if ($(window).width() < 767) {
+    $('#federal_courts').collapse('hide');
+    $('#state_courts').collapse('hide');
+  }
 });
