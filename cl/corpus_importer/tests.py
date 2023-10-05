@@ -2598,7 +2598,7 @@ class HarvardMergerTests(TestCase):
             .values_list("id", flat=True)
         )
 
-        self.assertEqual([1, 4], list(cluster_ids))
+        self.assertEqual([1, 4], list(sorted(cluster_ids)))
 
         case_data = {
             "docket_number": "345",
