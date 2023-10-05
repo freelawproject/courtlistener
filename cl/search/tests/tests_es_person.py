@@ -3,6 +3,7 @@ import operator
 from collections import Counter
 from functools import reduce
 
+from django.core.management import call_command
 from django.urls import reverse
 from elasticsearch_dsl import Q
 from lxml import html
@@ -1581,3 +1582,58 @@ class PeopleSearchTestElasticSearch(
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         self.assertEqual(None, person_3_doc.aba_rating)
         self.assertEqual(None, pos_doc.aba_rating)
+
+
+class IndexJudgesPositionsCommandTest(
+    CourtTestCase, PeopleTestCase, ESIndexTestCase, TestCase
+):
+    """test_cl_index_judges_positions_command tests for Elasticsearch"""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.rebuild_index("people_db.Person")
+        super().setUpTestData()
+        cls.delete_index("people_db.Person")
+        cls.create_index("people_db.Person")
+
+    def test_cl_index_judges_positions_command(self):
+        """Confirm the command can properly index Judges and their positions
+        into the ES."""
+
+        s = PersonDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0)
+
+        # Call cl_index_judges_and_positions command.
+        call_command(
+            "cl_index_judges_and_positions",
+            pk_offset=0,
+        )
+
+        s = PersonDocument.search()
+        s = s.query(Q("match", person_child="person"))
+        self.assertEqual(s.count(), 2, msg="Wrong number of judges returned.")
+
+        s = PersonDocument.search()
+        s = s.query(Q("match", person_child="position"))
+        self.assertEqual(
+            s.count(), 3, msg="Wrong number of positions returned."
+        )
+
+        # Positions are indexed.
+        position_pks = [
+            self.position_2.pk,
+            self.position_4.pk,
+            self.position_3.pk,
+        ]
+        for position_pk in position_pks:
+            self.assertTrue(
+                PositionDocument.exists(id=ES_CHILD_ID(position_pk).POSITION)
+            )
+
+        s = PersonDocument.search()
+        s = s.query("parent_id", type="position", id=self.person_2.pk)
+        self.assertEqual(s.count(), 2)
+
+        s = PersonDocument.search()
+        s = s.query("parent_id", type="position", id=self.person_3.pk)
+        self.assertEqual(s.count(), 1)

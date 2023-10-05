@@ -1,3 +1,4 @@
+import logging
 import socket
 from datetime import timedelta
 from typing import Any
@@ -13,6 +14,7 @@ from elasticsearch.exceptions import (
     RequestError,
     TransportError,
 )
+from elasticsearch.helpers import bulk
 from elasticsearch_dsl import Document, UpdateByQuery, connections
 from requests import Session
 from scorched.exc import SolrError
@@ -37,6 +39,8 @@ from cl.search.types import (
 )
 
 models_alert_support = [Audio]
+
+logger = logging.getLogger(__name__)
 
 
 @app.task
@@ -330,7 +334,7 @@ def update_document_in_es(
 )
 def update_child_documents_by_query(
     self: Task,
-    es_document: ESDocumentInstanceType,
+    es_document: ESDocumentClassType,
     parent_instance: ESModelType,
     fields_to_update: list[str],
     fields_map: dict[str, str] | None = None,
@@ -383,3 +387,64 @@ def update_child_documents_by_query(
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
         es_document._index.refresh()
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(TransportError, ConnectionError, RequestError),
+    max_retries=3,
+    interval_start=5,
+)
+def index_parent_and_child_docs(
+    self: Task,
+    instance_id: int,
+    parent_es_document: ESDocumentClassType,
+    child_es_document: ESDocumentClassType,
+) -> None:
+    """Index parent and child documents in Elasticsearch.
+
+    :param self: The Celery task instance
+    :param instance_id: The parent instance ID.
+    :return: None
+    """
+
+    instance = Person.objects.prefetch_related("positions").get(pk=instance_id)
+    doc = parent_es_document().prepare(instance)
+    es_args = {
+        "meta": {"id": instance_id},
+    }
+    response = parent_es_document(**es_args, **doc).save(
+        skip_empty=False,
+        return_doc_meta=False,
+        refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
+    )
+    if response != "created":
+        model_label = parent_es_document.Django.model.__name__.capitalize()
+        logger.error(
+            f"The {model_label} with ID:{instance_id} can't be index in ES. "
+            "Aborting the indexing of their child objects."
+        )
+        return
+
+    client = connections.get_connection()
+    child_docs = instance.positions.all()
+    base_doc = {
+        "_op_type": "index",
+        "_index": parent_es_document._index._name,
+    }
+    child_docs_to_index = []
+    for child in child_docs:
+        position_doc = child_es_document().prepare(child)
+        child_params = {
+            "_id": ES_CHILD_ID(child.pk).POSITION,
+            "_routing": f"{instance_id}",
+        }
+        position_doc.update(base_doc)
+        position_doc.update(child_params)
+        child_docs_to_index.append(position_doc)
+
+    # Perform bulk indexing for child documents
+    bulk(client, child_docs_to_index)
+    if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
+        # Set auto-refresh, used for testing.
+        PersonDocument._index.refresh()
