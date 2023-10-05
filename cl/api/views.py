@@ -184,7 +184,7 @@ def fetch_first_last_date_filed(
     return None, None
 
 
-# @cache_page(60 * 60 * 24, key_prefix="coverage")
+@cache_page(60 * 60 * 24, key_prefix="coverage")
 def coverage_data_opinions(request: HttpRequest):
     """Generate Coverage Chart Data
 
