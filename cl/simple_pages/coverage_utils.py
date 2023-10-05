@@ -1,4 +1,11 @@
-from cl.search.models import Court, Docket
+from typing import Any
+
+from django.conf import settings
+from django.db.models import Max, Min
+from requests import Session
+
+from cl.lib.scorched_utils import ExtraSolrInterface
+from cl.search.models import SOURCES, Court, Docket, OpinionCluster
 
 
 def fetch_data(jurisdictions, group_by_state=True):
@@ -105,3 +112,80 @@ def fetch_federal_data():
                     **filters,
                 ).distinct()
     return court_data
+
+
+def build_chart_data(court_ids: list[str]):
+    """Find and Organize Chart Data
+
+    :param court_ids: List of court ids to chart
+    :return: Chart data
+    """
+    grouped_data: dict[str, Any] = {}
+    group_dict = dict(Court.JURISDICTIONS)
+    with Session() as session:
+        solr = ExtraSolrInterface(
+            settings.SOLR_OPINION_URL,
+            http_connection=session,
+            mode="r"
+            # type: ignore
+        )
+        # Query solr for the first and last date
+        for court_id in court_ids:
+            common_params = {
+                "q": "*",
+                "rows": "1",
+                "start": "0",
+                "fq": f"court_exact:{court_id}",
+                "fl": "dateFiled,court",
+                "sort": "dateFiled desc",
+            }
+            items_desc = solr.query().add_extra(**common_params).execute()
+            total = items_desc.result.numFound
+            if not total:
+                continue
+            common_params.update({"sort": "dateFiled asc"})
+            items_asc = solr.query().add_extra(**common_params).execute()
+            court = Court.objects.get(id=court_id)
+            group = group_dict[court.jurisdiction]
+            court_data_temp = {
+                "id": court_id,
+                "label": items_asc[0]["court"],
+            }
+            court_data = court_data_temp.copy()
+            court_data["data"] = [
+                {
+                    "val": total,
+                    "id": court_id,
+                    "timeRange": [
+                        items_asc[0]["dateFiled"],
+                        items_desc[0]["dateFiled"],
+                    ],
+                }
+            ]
+            grouped_data.setdefault(group, []).append(
+                court_data
+            )  # type: ignore
+
+            if court.has_opinion_scraper:
+                # Query db for scraper data
+                scraper_dates = OpinionCluster.objects.filter(
+                    docket__court=court_id,
+                    source__contains=SOURCES.COURT_WEBSITE,
+                ).aggregate(
+                    earliest=Min("date_filed"),
+                    latest=Max("date_filed"),
+                )
+                if scraper_dates["earliest"]:
+                    scraper_data = court_data_temp.copy()
+                    scraper_data["data"] = [
+                        {
+                            "timeRange": list(scraper_dates.values()),
+                            "id": court_id,
+                        }
+                    ]
+                    grouped_data.setdefault("Scrapers", []).append(
+                        scraper_data
+                    )  # type: ignore
+    return [
+        {"group": key, "data": value} for key, value in grouped_data.items()
+    ]
