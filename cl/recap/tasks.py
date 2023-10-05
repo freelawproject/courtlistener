@@ -1212,12 +1212,12 @@ async def process_recap_acms_docket(pk):
 
     if process.current_process().daemon:
         # yyy
-        data = parse_appellate_text(map_cl_to_pacer_id(pq.court_id), text)
+        data = parse_acms_json(map_cl_to_pacer_id(pq.court_id), text)
     else:
         with concurrent.futures.ProcessPoolExecutor() as pool:
             data = await asyncio.get_running_loop().run_in_executor(
                 pool,
-                parse_appellate_text,
+                parse_acms_json,
                 map_cl_to_pacer_id(pq.court_id),
                 text,
             )

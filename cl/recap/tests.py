@@ -102,6 +102,7 @@ from cl.recap.tasks import (
     do_pacer_fetch,
     fetch_pacer_doc_by_rd,
     get_and_copy_recap_attachment_docs,
+    process_recap_acms_docket,
     process_recap_appellate_attachment,
     process_recap_appellate_docket,
     process_recap_attachment,
@@ -127,7 +128,7 @@ from cl.search.models import (
 )
 from cl.tests import fakes
 from cl.tests.cases import SimpleTestCase, TestCase
-from cl.tests.utils import MockResponse
+from cl.tests.utils import MockACMSDocketReport, MockResponse
 from cl.users.factories import (
     UserProfileWithParentsFactory,
     UserWithChildProfileFactory,
@@ -623,6 +624,42 @@ class RecapUploadsTest(TestCase):
         j = json.loads(r.content)
 
         self.assertEqual(r.status_code, HTTP_201_CREATED)
+
+    def test_processing_an_acms_docket(self, mock_upload):
+        """Can we process an ACMS docket report?
+
+        Note that this works fine even though we're not actually uploading a
+        docket due to the mock.
+        """
+
+        pq = ProcessingQueue.objects.create(
+            court=self.court_appellate,
+            uploader=self.user,
+            pacer_case_id="34cacf7f-52d5-4d1f-b4f0-0542b429f674",
+            upload_type=UPLOAD_TYPE.ACMS_DOCKET_JSON,
+            filepath_local=self.f,
+        )
+        with mock.patch(
+            "cl.recap.tasks.ACMSDocketReport", MockACMSDocketReport
+        ):
+            # Process the ACMS docket report.
+            async_to_sync(process_recap_acms_docket)(pq.pk)
+
+        docket = Docket.objects.get(
+            pacer_case_id="34cacf7f-52d5-4d1f-b4f0-0542b429f674"
+        )
+        docket_entries = DocketEntry.objects.filter(docket=docket).order_by(
+            "date_created"
+        )
+
+        # Confirm Docket entry and RECAPDocument is properly created.
+        self.assertEqual(docket_entries.count(), 1)
+        recap_documents = RECAPDocument.objects.all().order_by("date_created")
+        self.assertEqual(recap_documents.count(), 1)
+        self.assertEqual(
+            recap_documents[0].pacer_doc_id,
+            "bde556a7-bdde-ed11-a7c6-001dd806a1fd",
+        )
 
 
 @mock.patch("cl.recap.tasks.DocketReport", new=fakes.FakeDocketReport)
