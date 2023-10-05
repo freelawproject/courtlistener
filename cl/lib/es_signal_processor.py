@@ -599,9 +599,7 @@ class ESSignalProcessor(object):
             if isinstance(
                 instance, (ABARating, PoliticalAffiliation, Education)
             ):
-                query_string_split = query_string.split("__")
-                query_string = query_string_split[-1]
-                instance_field = query_string_split[0]
+                instance_field, *_, query_string = query_string.split("__")
 
             try:
                 instance = getattr(instance, instance_field, instance)
