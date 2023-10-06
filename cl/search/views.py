@@ -652,6 +652,7 @@ def do_es_search(
     total_child_results = 0
     related_cluster = None
     cited_cluster = None
+    query_citation = None
 
     search_form = SearchForm(get_params)
     match get_params.get("type", SEARCH_TYPES.OPINION):
@@ -693,6 +694,14 @@ def do_es_search(
                 search_data=cd,
                 search_results=paged_results,
             )
+
+            if cd["type"] in [
+                SEARCH_TYPES.OPINION,
+                SEARCH_TYPES.RECAP,
+                SEARCH_TYPES.DOCKETS,
+            ]:
+                query_citation = get_query_citation(cd)
+
             related_prefix = RELATED_PATTERN.search(cd["q"])
             if related_prefix:
                 related_pks = related_prefix.group("pks").split(",")
@@ -732,6 +741,7 @@ def do_es_search(
         "suggested_query": suggested_query,
         "related_cluster": related_cluster,
         "cited_cluster": cited_cluster,
+        "query_citation": query_citation,
     }
 
 
