@@ -680,6 +680,7 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
             user__username="pandora",
             user__password=make_password("password"),
         )
+        self.rebuild_index("search.OpinionCluster")
         super().setUp()
 
     def _perform_wildcard_search(self):
