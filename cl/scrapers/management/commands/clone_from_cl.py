@@ -406,6 +406,16 @@ def clone_docket(
                 else None
             )
 
+            docket_data["referred_to"] = (
+                clone_person(
+                    session,
+                    [get_id_from_url(docket_data["referred_to"])],
+                    person_positions,
+                )[0]
+                if docket_data["referred_to"]
+                else None
+            )
+
             docket = model.objects.create(**docket_data)
 
             dockets.append(docket)
@@ -544,10 +554,19 @@ def clone_recap_documents(
             session, [get_id_from_url(tag_url) for tag_url in tags_data]
         )
 
-        if cloned_tags:
-            recap_document.tags.add(*cloned_tags)
+        if recap_document:
+            if cloned_tags:
+                recap_document.tags.add(*cloned_tags)
 
-        created_recap_documents.append(recap_document)
+            created_recap_documents.append(recap_document)
+
+            print(
+                "View cloned recap document here:",
+                reverse(
+                    "recapdocument-detail",
+                    args=["v3", recap_document_data["id"]],
+                ),
+            )
 
     return created_recap_documents
 
@@ -592,12 +611,13 @@ def clone_tag(
         except (IntegrityError, ValidationError):
             tag = model.objects.filter(pk=tag_data["id"])[0]
 
-        created_tags.append(tag)
+        if tag:
+            created_tags.append(tag)
 
-        print(
-            "View cloned tag here:",
-            reverse("tag-detail", args=["v3", tag_id]),
-        )
+            print(
+                "View cloned tag here:",
+                reverse("tag-detail", args=["v3", tag_id]),
+            )
 
     return created_tags
 
@@ -716,12 +736,12 @@ def clone_position(
             pos = model.objects.filter(pk=position_data["id"]).first()
 
         if pos:
-            positions.append(positions)
+            positions.append(pos)
 
-        print(
-            "View cloned position here:",
-            reverse("position-detail", args=["v3", position_id]),
-        )
+            print(
+                "View cloned position here:",
+                reverse("position-detail", args=["v3", position_id]),
+            )
 
 
 def clone_person(
@@ -893,16 +913,19 @@ def clone_court(session: Session, court_ids: list, object_type="search.Court"):
         except (IntegrityError, ValidationError):
             ct = model.objects.filter(pk=court_data["id"])[0]
 
-        if added_appeals_to:
-            # Add m2m objects
-            ct.appeals_to.add(*Court.objects.filter(id__in=added_appeals_to))
+        if ct:
+            if added_appeals_to:
+                # Add m2m objects
+                ct.appeals_to.add(
+                    *Court.objects.filter(id__in=added_appeals_to)
+                )
 
-        courts.append(ct)
+            courts.append(ct)
+            print(
+                "View cloned court here:",
+                reverse("court-detail", args=["v3", court_id]),
+            )
 
-        print(
-            "View cloned court here:",
-            reverse("court-detail", args=["v3", court_id]),
-        )
     return courts
 
 
