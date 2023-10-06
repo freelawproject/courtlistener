@@ -403,6 +403,7 @@ def build_sort_results(cd: CleanData) -> Dict:
         "dateFiled asc": {"dateFiled": {"order": "asc"}},
         "entry_date_filed asc": {"_score": {"order": "asc"}},
         "entry_date_filed desc": {"_score": {"order": "desc"}},
+        "entry_date_filed_feed desc": {"entry_date_filed": {"order": "desc"}},
     }
 
     if cd["type"] == SEARCH_TYPES.PARENTHETICAL:
@@ -741,28 +742,48 @@ def build_es_base_query(
     return search_query, join_query
 
 
-def build_child_docs_count_query(
-    join_query: QueryString | None,
+def build_child_docs_query(
+    join_query: QueryString | None, exclude_docs_for_empty_field: str = ""
 ) -> QueryString:
     """Build a query for counting child documents in Elasticsearch, using the
     has_child query filters and queries. And append a match filter to only
     retrieve RECAPDocuments.
 
     :param join_query: Existing Elasticsearch QueryString object or None
+    :param exclude_docs_for_empty_field: Field that should not be empty for a
+    document to be included
     :return: An Elasticsearch QueryString object
     """
 
     if not join_query:
-        return Q("match", docket_child="recap_document")
-    query_dict = join_query.to_dict()
+        # Match all case.
+        if not exclude_docs_for_empty_field:
+            return Q("match", docket_child="recap_document")
+        else:
+            filters = [
+                Q("match", docket_child="recap_document"),
+                Q("exists", field=exclude_docs_for_empty_field),
+            ]
 
+            return Q("bool", filter=filters)
+
+    query_dict = join_query.to_dict()
     if "filter" in query_dict["bool"]:
         existing_filter = query_dict["bool"]["filter"]
         existing_filter.append(Q("match", docket_child="recap_document"))
+        if exclude_docs_for_empty_field:
+            existing_filter.append(
+                Q("exists", field=exclude_docs_for_empty_field)
+            )
+
     else:
         query_dict["bool"]["filter"] = [
             Q("match", docket_child="recap_document")
         ]
+        if exclude_docs_for_empty_field:
+            query_dict["bool"]["filter"].append(
+                Q("exists", field=exclude_docs_for_empty_field)
+            )
 
     return Q(query_dict)
 
@@ -801,7 +822,7 @@ def build_es_main_query(
                 total_child_results,
             )
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
-            child_docs_count_query = build_child_docs_count_query(join_query)
+            child_docs_count_query = build_child_docs_query(join_query)
             if child_docs_count_query:
                 # Get the total RECAP Documents count.
                 search_query_base = search_query_base.query(
@@ -1390,8 +1411,16 @@ def do_es_feed_query(
     :param rows: Number of rows (items) to be retrieved in the response
     :return: The Elasticsearch DSL response.
     """
-
-    s, _ = build_es_base_query(search_query, cd)
+    match cd["type"]:
+        case SEARCH_TYPES.RECAP:
+            _, join_query = build_es_base_query(search_query, cd)
+            # Eliminate items that lack the ordering field.
+            s = build_child_docs_query(
+                join_query, exclude_docs_for_empty_field="entry_date_filed"
+            )
+            s = search_query.query(s)
+        case _:
+            s, _ = build_es_base_query(search_query, cd)
     s = s.sort(build_sort_results(cd))
     response = s.extra(from_=0, size=rows).execute()
     return response

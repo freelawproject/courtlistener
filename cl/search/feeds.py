@@ -1,5 +1,4 @@
-import os
-
+import waffle
 from django.conf import settings
 from django.contrib.syndication.views import Feed
 from django.shortcuts import get_object_or_404
@@ -8,8 +7,11 @@ from requests import Session
 
 from cl.lib import search_utils
 from cl.lib.date_time import midnight_pt
+from cl.lib.elasticsearch_utils import do_es_feed_query
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.scorched_utils import ExtraSolrInterface
+from cl.lib.timezone_helpers import localize_naive_datetime_to_court_timezone
+from cl.search.documents import ESRECAPDocument
 from cl.search.forms import SearchForm
 from cl.search.models import SEARCH_TYPES, Court
 
@@ -59,20 +61,36 @@ class SearchFeed(Feed):
                     )
                 else:
                     return []
-                main_params = search_utils.build_main_query(
-                    cd, highlight=False, facet=False
-                )
-                main_params.update(
-                    {
-                        "sort": f"{order_by} desc",
-                        "rows": "20",
-                        "start": "0",
-                        "caller": "SearchFeed",
+
+                if (
+                    waffle.flag_is_active(obj, "r-es-active")
+                    and cd["type"] == SEARCH_TYPES.RECAP
+                ):
+                    override_params = {
+                        "order_by": "entry_date_filed_feed desc",
                     }
-                )
-                # Eliminate items that lack the ordering field.
-                main_params["fq"].append(f"{order_by}:[* TO *]")
-                items = solr.query().add_extra(**main_params).execute()
+                    cd.update(override_params)
+                    search_query = ESRECAPDocument.search()
+                    items = do_es_feed_query(
+                        search_query,
+                        cd,
+                        rows=20,
+                    )
+                else:
+                    main_params = search_utils.build_main_query(
+                        cd, highlight=False, facet=False
+                    )
+                    main_params.update(
+                        {
+                            "sort": f"{order_by} desc",
+                            "rows": "20",
+                            "start": "0",
+                            "caller": "SearchFeed",
+                        }
+                    )
+                    # Eliminate items that lack the ordering field.
+                    main_params["fq"].append(f"{order_by}:[* TO *]")
+                    items = solr.query().add_extra(**main_params).execute()
                 return items
         else:
             return []
@@ -84,7 +102,15 @@ class SearchFeed(Feed):
         return get_item(item)["court"]
 
     def item_pubdate(self, item):
-        return midnight_pt(get_item(item)["dateFiled"])
+        try:
+            # Get pub_date for RECAP
+            entry_date = get_item(item)["entry_date_filed"]
+            return localize_naive_datetime_to_court_timezone(
+                get_item(item)["court_id"], entry_date
+            )
+        except KeyError:
+            # Get pub_date for Opinions
+            return midnight_pt(get_item(item)["dateFiled"])
 
     def item_title(self, item):
         return get_item(item)["caseName"]

@@ -5,7 +5,7 @@ from asgiref.sync import sync_to_async
 from django.test import override_settings
 from django.urls import reverse
 from elasticsearch_dsl import Q
-from lxml import html
+from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
 
 from cl.lib.elasticsearch_utils import build_es_main_query
@@ -1757,3 +1757,168 @@ class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):
             < r.content.decode().index("12-1235"),
             msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by asc.",
         )
+
+
+class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
+    """Tests for RECAP Search Feed"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.rebuild_index("search.Docket")
+        super().setUpTestData()
+
+    def test_do_recap_search_feed_have_content(self) -> None:
+        """Can we make a RECAP Search Feed?"""
+
+        # Docket entry without date_filed it should be excluded from feed.
+        de_1 = DocketEntryWithParentsFactory(
+            docket=DocketFactory(
+                court=self.court,
+                case_name="Lorem Ipsum",
+                case_name_full="Jackson & Sons Holdings vs. Bank",
+                date_filed=None,
+                date_argued=datetime.date(2013, 5, 20),
+                docket_number="1:21-bk-1234",
+                assigned_to=self.judge,
+                referred_to=self.judge_2,
+                nature_of_suit="440",
+            ),
+            date_filed=None,
+            description="MOTION for Leave to File Amicus Curiae Lorem",
+        )
+        RECAPDocumentFactory(
+            docket_entry=de_1,
+            description="Leave to File",
+            document_number="1",
+            is_available=True,
+            page_count=5,
+        )
+
+        # Text query case.
+        params = {
+            "q": f"Leave to File",
+            "type": SEARCH_TYPES.RECAP,
+        }
+        response = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(
+            200, response.status_code, msg="Did not get a 200 OK status code."
+        )
+        xml_tree = etree.fromstring(response.content)
+        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
+        node_tests = (
+            ("//atom:feed/atom:title", 1),
+            ("//atom:feed/atom:link", 2),
+            ("//atom:entry", 3),
+            ("//atom:entry/atom:title", 3),
+            ("//atom:entry/atom:link", 3),
+            ("//atom:entry/atom:published", 3),
+            ("//atom:entry/atom:author/atom:name", 3),
+            ("//atom:entry/atom:id", 3),
+            ("//atom:entry/atom:summary", 3),
+        )
+        for test, count in node_tests:
+            node_count = len(xml_tree.xpath(test, namespaces=namespaces))  # type: ignore
+            self.assertEqual(
+                node_count,
+                count,
+                msg="Did not find %s node(s) with XPath query: %s. "
+                "Instead found: %s" % (count, test, node_count),
+            )
+
+        # Confirm items are ordered by entry_date_filed desc
+        published_format = "%Y-%m-%dT%H:%M:%S%z"
+        first_item_published_str = str(
+            xml_tree.xpath(
+                "//atom:entry[2]/atom:published", namespaces=namespaces
+            )[0].text
+            # type: ignore
+        )
+        second_item_published_str = str(
+            xml_tree.xpath(
+                "//atom:entry[3]/atom:published", namespaces=namespaces
+            )[0].text
+            # type: ignore
+        )
+        first_item_published_dt = datetime.datetime.strptime(
+            first_item_published_str, published_format
+        )
+        second_item_published_dt = datetime.datetime.strptime(
+            second_item_published_str, published_format
+        )
+        self.assertGreater(
+            first_item_published_dt,
+            second_item_published_dt,
+            msg="The first item should be newer than the second item.",
+        )
+
+        # Filter case.
+        params = {
+            "court": self.court.pk,
+            "type": SEARCH_TYPES.RECAP,
+        }
+        response = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(
+            200, response.status_code, msg="Did not get a 200 OK status code."
+        )
+        xml_tree = etree.fromstring(response.content)
+        node_tests = (
+            ("//atom:feed/atom:title", 1),
+            ("//atom:feed/atom:link", 2),
+            ("//atom:entry", 2),
+            ("//atom:entry/atom:title", 2),
+            ("//atom:entry/atom:link", 2),
+            ("//atom:entry/atom:published", 2),
+            ("//atom:entry/atom:author/atom:name", 2),
+            ("//atom:entry/atom:id", 2),
+            ("//atom:entry/atom:summary", 2),
+        )
+
+        for test, count in node_tests:
+            node_count = len(xml_tree.xpath(test, namespaces=namespaces))  # type: ignore
+            self.assertEqual(
+                node_count,
+                count,
+                msg="Did not find %s node(s) with XPath query: %s. "
+                "Instead found: %s" % (count, test, node_count),
+            )
+
+        # Match all case.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+        }
+        response = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(
+            200, response.status_code, msg="Did not get a 200 OK status code."
+        )
+        xml_tree = etree.fromstring(response.content)
+        node_tests = (
+            ("//atom:feed/atom:title", 1),
+            ("//atom:feed/atom:link", 2),
+            ("//atom:entry", 3),
+            ("//atom:entry/atom:title", 3),
+            ("//atom:entry/atom:link", 3),
+            ("//atom:entry/atom:published", 3),
+            ("//atom:entry/atom:author/atom:name", 3),
+            ("//atom:entry/atom:id", 3),
+            ("//atom:entry/atom:summary", 3),
+        )
+
+        for test, count in node_tests:
+            node_count = len(
+                xml_tree.xpath(test, namespaces=namespaces)
+            )  # type: ignore
+            self.assertEqual(
+                node_count,
+                count,
+                msg="Did not find %s node(s) with XPath query: %s. "
+                "Instead found: %s" % (count, test, node_count),
+            )
