@@ -39,7 +39,345 @@ from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.users.factories import UserProfileWithParentsFactory
 
 
-class OpinionsSearchTest(
+class OpinionAPISolrSearchTest(IndexedSolrTestCase):
+    @classmethod
+    def setUpTestData(cls):
+        court = CourtFactory(
+            id="canb",
+            jurisdiction="FB",
+            full_name="court of the Medical Worries",
+        )
+        OpinionClusterFactoryWithChildrenAndParents(
+            case_name="Strickland v. Washington.",
+            case_name_full="Strickland v. Washington.",
+            docket=DocketFactory(court=court, docket_number="1:21-cv-1234"),
+            sub_opinions=RelatedFactory(
+                OpinionWithChildrenFactory,
+                factory_related_name="cluster",
+                html_columbia="<p>Code, &#167; 1-815</p>",
+            ),
+            date_filed=datetime.date(2020, 8, 15),
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            syllabus="some rando syllabus",
+            procedural_history="some rando history",
+            source="C",
+            judges="",
+            attorneys="a bunch of crooks!",
+            slug="case-name-cluster",
+            citation_count=1,
+            scdb_votes_minority=3,
+            scdb_votes_majority=6,
+        )
+        OpinionClusterFactoryWithChildrenAndParents(
+            case_name="Strickland v. Lorem.",
+            case_name_full="Strickland v. Lorem.",
+            date_filed=datetime.date(2020, 8, 15),
+            docket=DocketFactory(court=court, docket_number="123456"),
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            syllabus="some rando syllabus",
+            procedural_history="some rando history",
+            source="C",
+            judges="",
+            attorneys="a bunch of crooks!",
+            slug="case-name-cluster",
+            citation_count=1,
+            scdb_votes_minority=3,
+            scdb_votes_majority=6,
+        )
+        super().setUpTestData()
+
+    async def _test_api_results_count(
+        self, params, expected_count, field_name
+    ):
+        """Get the result count in a API query response"""
+        r = await self.async_client.get(
+            reverse("search-list", kwargs={"version": "v3"}), params
+        )
+        got = len(r.data["results"])
+        self.assertEqual(
+            got,
+            expected_count,
+            msg="Did not get the right number of search results in API with %s "
+            "filter applied.\n"
+            "Expected: %s\n"
+            "     Got: %s\n\n"
+            "Params were: %s" % (field_name, expected_count, got, params),
+        )
+        return r
+
+    async def test_can_perform_a_regular_text_query(self) -> None:
+        search_params = {"q": "supreme"}
+
+        r = await self._test_api_results_count(search_params, 1, "text_query")
+        self.assertIn("Honda", r.content.decode())
+
+    async def test_can_search_with_white_spaces_only(self) -> None:
+        """Does everything work when whitespace is in various fields?"""
+        search_params = {"q": " ", "judge": " ", "case_name": " "}
+
+        # API, 2 results expected since the query shows published clusters by default
+        r = await self._test_api_results_count(
+            search_params, 4, "white_spaces"
+        )
+        self.assertIn("Honda", r.content.decode())
+
+    async def test_can_filter_using_the_case_name(self) -> None:
+        search_params = {"q": "*", "case_name": "honda"}
+
+        r = await self._test_api_results_count(search_params, 1, "case_name")
+        self.assertIn("Honda", r.content.decode())
+
+    async def test_can_query_with_an_old_date(self) -> None:
+        """Do we have any recurrent issues with old dates and strftime (issue
+        220)?"""
+        search_params = {"q": "*", "filed_after": "1890"}
+
+        r = await self._test_api_results_count(search_params, 4, "filed_after")
+        self.assertIn("Honda", r.content.decode())
+
+    async def test_can_filter_using_filed_range(self) -> None:
+        """Does querying by date work?"""
+        search_params = {
+            "q": "*",
+            "filed_after": "1895-06",
+            "filed_before": "1896-01",
+        }
+
+        r = await self._test_api_results_count(search_params, 1, "filed_range")
+        self.assertIn("Honda", r.content.decode())
+
+    async def test_can_filter_using_a_docket_number(self) -> None:
+        """Can we query by docket number?"""
+        search_params = {"q": "*", "docket_number": "2"}
+
+        r = await self._test_api_results_count(
+            search_params, 1, "docket_number"
+        )
+        self.assertIn("Honda", r.content.decode())
+
+    async def test_can_filter_by_citation_number(self) -> None:
+        """Can we query by citation number?"""
+        get_dicts = [{"q": "*", "citation": "33"}, {"q": "citation:33"}]
+        for get_dict in get_dicts:
+            r = await self._test_api_results_count(
+                get_dict, 1, "citation_count"
+            )
+            self.assertIn("Honda", r.content.decode())
+
+    async def test_can_filter_using_neutral_citation(self) -> None:
+        """Can we query by neutral citation numbers?"""
+        search_params = {"q": "*", "neutral_cite": "22"}
+
+        r = await self._test_api_results_count(
+            search_params, 1, "citation_number"
+        )
+        self.assertIn("Honda", r.content.decode())
+
+    async def test_can_filter_using_judge_name(self) -> None:
+        """Can we query by judge name?"""
+        search_array = [{"q": "*", "judge": "david"}, {"q": "judge:david"}]
+        for search_params in search_array:
+            r = await self._test_api_results_count(
+                search_params, 1, "judge_name"
+            )
+            self.assertIn("Honda", r.content.decode())
+
+    async def test_can_filter_by_nature_of_suit(self) -> None:
+        """Can we query by nature of suit?"""
+        search_params = {"q": 'suitNature:"copyright"'}
+
+        r = await self._test_api_results_count(search_params, 1, "suit_nature")
+        self.assertIn("Honda", r.content.decode())
+
+    async def test_can_filtering_by_citation_count(self) -> None:
+        """Can we find Documents by citation filtering?"""
+        search_params = {"q": "*", "cited_lt": 7, "cited_gt": 5}
+
+        r = await self._test_api_results_count(
+            search_params, 1, "citation_count"
+        )
+        self.assertIn("Honda", r.content.decode())
+
+        search_params = {"q": "*", "cited_lt": 100, "cited_gt": 80}
+
+        r = self._test_api_results_count(search_params, 0, "citation_count")
+
+    async def test_citation_ordering_by_citation_count(self) -> None:
+        """Can the results be re-ordered by citation count?"""
+        search_params = {"q": "*", "order_by": "citeCount desc"}
+        most_cited_name = "case name cluster 3"
+        less_cited_name = "Howard v. Honda"
+
+        r = await self._test_api_results_count(
+            search_params, 4, "citeCount desc"
+        )
+        self.assertTrue(
+            r.content.decode().index(most_cited_name)
+            < r.content.decode().index(less_cited_name),
+            msg="'%s' should come BEFORE '%s' when ordered by descending "
+            "citeCount." % (most_cited_name, less_cited_name),
+        )
+
+        search_params = {"q": "*", "order_by": "citeCount asc"}
+
+        r = await self._test_api_results_count(
+            search_params, 4, "citeCount asc"
+        )
+        self.assertTrue(
+            r.content.decode().index(most_cited_name)
+            > r.content.decode().index(less_cited_name),
+            msg="'%s' should come AFTER '%s' when ordered by ascending "
+            "citeCount." % (most_cited_name, less_cited_name),
+        )
+
+    async def test_random_ordering(self) -> None:
+        """Can the results be ordered randomly?
+
+        This test is difficult since we can't check that things actually get
+        ordered randomly, but we can at least make sure the query succeeds.
+        """
+        search_params = {"q": "*", "order_by": "random_123 desc"}
+
+        await self._test_api_results_count(search_params, 4, "order random")
+
+    async def test_issue_635_leading_zeros(self) -> None:
+        """Do queries with leading zeros work equal to ones without?"""
+        search_params = {"docket_number": "005", "stat_Errata": "on"}
+        expected = 1
+
+        await self._test_api_results_count(
+            search_params, expected, "docket_number"
+        )
+
+        search_params["docket_number"] = "5"
+        await self._test_api_results_count(
+            search_params, expected, "docket_number"
+        )
+
+    async def test_issue_1193_docket_numbers_as_phrase(self) -> None:
+        """Are docket numbers searched as a phrase?"""
+        # Search for the full docket number. Does it work?
+        search_params = {
+            "docket_number": "docket number 1 005",
+            "stat_Errata": "on",
+        }
+        await self._test_api_results_count(search_params, 1, "docket_number")
+
+        # Twist up the docket numbers. Do we get no results?
+        search_params["docket_number"] = "docket 005 number"
+        await self._test_api_results_count(search_params, 0, "docket_number")
+
+    async def test_can_use_docket_number_proximity(self) -> None:
+        """Test docket_number proximity query, so that docket numbers like
+        1:21-cv-1234 can be matched by queries like: 21-1234
+        """
+        # Query 21-1234, return results for 1:21-bk-1234
+        search_params = {"type": SEARCH_TYPES.OPINION, "q": "21-1234"}
+
+        r = await self._test_api_results_count(
+            search_params, 1, "docket number proximity"
+        )
+        self.assertIn("Washington", r.content.decode())
+
+        # Query 1:21-cv-1234
+        search_params["q"] = "1:21-cv-1234"
+
+        r = await self._test_api_results_count(
+            search_params, 1, "docket number proximity"
+        )
+        self.assertIn("Washington", r.content.decode())
+
+        # docket_number box filter: 21-1234, return results for 1:21-bk-1234
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "docket_number": "21-1234",
+        }
+
+        r = await self._test_api_results_count(
+            search_params, 1, "docket number proximity"
+        )
+        self.assertIn("Washington", r.content.decode())
+
+    async def test_can_filter_with_docket_number_suffixes(self) -> None:
+        """Test docket_number with suffixes can be found."""
+        # Indexed: 1:21-cv-1234 -> Search: 1:21-cv-1234-ABC
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": f"1:21-cv-1234-ABC",
+        }
+
+        r = await self._test_api_results_count(
+            search_params, 1, "docket number box"
+        )
+        self.assertIn("Washington", r.content.decode())
+
+        # Other kind of formats can still be searched -> 123456
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": "123456",
+        }
+
+        r = await self._test_api_results_count(
+            search_params, 1, "docket number box"
+        )
+        self.assertIn("Lorem", r.content.decode())
+
+    async def test_results_api_fields(self) -> None:
+        """Confirm fields in RECAP Search API results."""
+        search_params = {"q": "Honda"}
+        # API
+        r = await self._test_api_results_count(search_params, 1, "API fields")
+        keys_to_check = [
+            "absolute_url",
+            "attorney",
+            "author_id",
+            "caseName",
+            "caseNameShort",
+            "citation",
+            "citeCount",
+            "cites",
+            "cluster_id",
+            "court",
+            "court_citation_string",
+            "court_exact",
+            "court_id",
+            "dateArgued",
+            "dateFiled",
+            "dateReargued",
+            "dateReargumentDenied",
+            "docketNumber",
+            "docket_id",
+            "download_url",
+            "id",
+            "joined_by_ids",
+            "judge",
+            "lexisCite",
+            "local_path",
+            "neutralCite",
+            "non_participating_judge_ids",
+            "pagerank",
+            "panel_ids",
+            "per_curiam",
+            "scdb_id",
+            "sibling_ids",
+            "snippet",
+            "source",
+            "status",
+            "status_exact",
+            "suitNature",
+            "timestamp",
+            "type",
+        ]
+        keys_count = len(r.data["results"][0])
+        self.assertEqual(keys_count, len(keys_to_check))
+        for key in keys_to_check:
+            self.assertTrue(
+                key in r.data["results"][0],
+                msg=f"Key {key} not found in the result object.",
+            )
+
+
+class OpinionsESSearchTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
 ):
     @classmethod
@@ -587,10 +925,6 @@ class OpinionsSearchTest(
         self.assertIn("Honda", r.content.decode())
         self.assertIn("1 Opinion", r.content.decode())
 
-        # API
-        r = await self._test_api_results_count(search_params, 1, "text_query")
-        self.assertIn("Honda", r.content.decode())
-
     async def test_homepage(self) -> None:
         """Is the homepage loaded when no GET parameters are provided?"""
         response = await self.async_client.get(reverse("show_results"))
@@ -622,20 +956,10 @@ class OpinionsSearchTest(
         self.assertIn("Honda", r.content.decode())
         self.assertNotIn("an error", r.content.decode())
 
-        # API, 2 results expected since the query shows published clusters by default
-        r = await self._test_api_results_count(
-            search_params, 4, "white_spaces"
-        )
-        self.assertIn("Honda", r.content.decode())
-
     async def test_can_filter_using_the_case_name(self) -> None:
         # Frontend
         search_params = {"q": "*", "case_name": "honda"}
         r = await self._test_article_count(search_params, 1, "case_name")
-        self.assertIn("Honda", r.content.decode())
-
-        # API
-        r = await self._test_api_results_count(search_params, 1, "case_name")
         self.assertIn("Honda", r.content.decode())
 
     async def test_can_query_with_an_old_date(self) -> None:
@@ -646,10 +970,6 @@ class OpinionsSearchTest(
         # Frontend
         r = await self._test_article_count(search_params, 4, "filed_after")
         self.assertEqual(200, r.status_code)
-
-        # API
-        r = await self._test_api_results_count(search_params, 4, "filed_after")
-        self.assertIn("Honda", r.content.decode())
 
     async def test_can_filter_using_filed_range(self) -> None:
         """Does querying by date work?"""
@@ -662,10 +982,6 @@ class OpinionsSearchTest(
         r = await self._test_article_count(search_params, 1, "filed_range")
         self.assertIn("Honda", r.content.decode())
 
-        # API
-        r = await self._test_api_results_count(search_params, 1, "filed_range")
-        self.assertIn("Honda", r.content.decode())
-
     async def test_can_filter_using_a_docket_number(self) -> None:
         """Can we query by docket number?"""
         search_params = {"q": "*", "docket_number": "2"}
@@ -676,12 +992,6 @@ class OpinionsSearchTest(
             "Honda", r.content.decode(), "Result not found by docket number!"
         )
 
-        # API
-        r = await self._test_api_results_count(
-            search_params, 1, "docket_number"
-        )
-        self.assertIn("Honda", r.content.decode())
-
     async def test_can_filter_by_citation_number(self) -> None:
         """Can we query by citation number?"""
         get_dicts = [{"q": "*", "citation": "33"}, {"q": "citation:33"}]
@@ -690,23 +1000,11 @@ class OpinionsSearchTest(
             r = await self._test_article_count(get_dict, 1, "citation_count")
             self.assertIn("Honda", r.content.decode())
 
-            # API
-            r = await self._test_api_results_count(
-                get_dict, 1, "citation_count"
-            )
-            self.assertIn("Honda", r.content.decode())
-
     async def test_can_filter_using_neutral_citation(self) -> None:
         """Can we query by neutral citation numbers?"""
         search_params = {"q": "*", "neutral_cite": "22"}
         # Frontend
         r = await self._test_article_count(search_params, 1, "citation_number")
-        self.assertIn("Honda", r.content.decode())
-
-        # API
-        r = await self._test_api_results_count(
-            search_params, 1, "citation_number"
-        )
         self.assertIn("Honda", r.content.decode())
 
     async def test_can_filter_using_judge_name(self) -> None:
@@ -717,21 +1015,11 @@ class OpinionsSearchTest(
             r = await self._test_article_count(search_params, 1, "judge_name")
             self.assertIn("Honda", r.content.decode())
 
-            # API
-            r = await self._test_api_results_count(
-                search_params, 1, "judge_name"
-            )
-            self.assertIn("Honda", r.content.decode())
-
     async def test_can_filter_by_nature_of_suit(self) -> None:
         """Can we query by nature of suit?"""
         search_params = {"q": 'suitNature:"copyright"'}
         # Frontend
         r = await self._test_article_count(search_params, 1, "suit_nature")
-        self.assertIn("Honda", r.content.decode())
-
-        # API
-        r = await self._test_api_results_count(search_params, 1, "suit_nature")
         self.assertIn("Honda", r.content.decode())
 
     async def test_can_filtering_by_citation_count(self) -> None:
@@ -745,12 +1033,6 @@ class OpinionsSearchTest(
             msg="Did not get case back when filtering by citation count.",
         )
 
-        # API
-        r = await self._test_api_results_count(
-            search_params, 1, "citation_count"
-        )
-        self.assertIn("Honda", r.content.decode())
-
         search_params = {"q": "*", "cited_lt": 100, "cited_gt": 80}
         # Frontend
         r = await self._test_article_count(search_params, 0, "citation_count")
@@ -759,9 +1041,6 @@ class OpinionsSearchTest(
             r.content.decode(),
             msg="Got case back when filtering by crazy citation count.",
         )
-
-        # API
-        r = self._test_api_results_count(search_params, 0, "citation_count")
 
     async def test_faceted_queries(self) -> None:
         """Does querying in a given court return the document? Does querying
@@ -792,31 +1071,10 @@ class OpinionsSearchTest(
             msg="'%s' should come BEFORE '%s' when ordered by descending "
             "citeCount." % (most_cited_name, less_cited_name),
         )
-        # API
-        r = await self._test_api_results_count(
-            search_params, 4, "citeCount desc"
-        )
-        self.assertTrue(
-            r.content.decode().index(most_cited_name)
-            < r.content.decode().index(less_cited_name),
-            msg="'%s' should come BEFORE '%s' when ordered by descending "
-            "citeCount." % (most_cited_name, less_cited_name),
-        )
 
         search_params = {"q": "*", "order_by": "citeCount asc"}
         # Frontend
         r = await self._test_article_count(search_params, 4, "citeCount asc")
-        self.assertTrue(
-            r.content.decode().index(most_cited_name)
-            > r.content.decode().index(less_cited_name),
-            msg="'%s' should come AFTER '%s' when ordered by ascending "
-            "citeCount." % (most_cited_name, less_cited_name),
-        )
-
-        # API
-        r = await self._test_api_results_count(
-            search_params, 4, "citeCount asc"
-        )
         self.assertTrue(
             r.content.decode().index(most_cited_name)
             > r.content.decode().index(less_cited_name),
@@ -837,9 +1095,6 @@ class OpinionsSearchTest(
         )
         self.assertNotIn("an error", r.content.decode())
 
-        # API
-        await self._test_api_results_count(search_params, 4, "order random")
-
     async def test_issue_635_leading_zeros(self) -> None:
         """Do queries with leading zeros work equal to ones without?"""
         search_params = {"docket_number": "005", "stat_Errata": "on"}
@@ -849,18 +1104,8 @@ class OpinionsSearchTest(
             search_params, expected, "docket_number"
         )
 
-        # API
-        await self._test_article_count(
-            search_params, expected, "docket_number"
-        )
-
         search_params["docket_number"] = "5"
         # Frontend
-        await self._test_api_results_count(
-            search_params, expected, "docket_number"
-        )
-
-        # API
         await self._test_article_count(
             search_params, expected, "docket_number"
         )
@@ -874,14 +1119,10 @@ class OpinionsSearchTest(
         }
         # Frontend
         await self._test_article_count(search_params, 1, "docket_number")
-        # API
-        await self._test_article_count(search_params, 1, "docket_number")
 
         # Twist up the docket numbers. Do we get no results?
         search_params["docket_number"] = "docket 005 number"
         # Frontend
-        await self._test_article_count(search_params, 0, "docket_number")
-        # API
         await self._test_article_count(search_params, 0, "docket_number")
 
     async def test_issue_1296_abnormal_citation_type_queries(self) -> None:
@@ -920,22 +1161,10 @@ class OpinionsSearchTest(
         )
         self.assertIn("Washington", r.content.decode())
 
-        # API
-        r = await self._test_api_results_count(
-            search_params, 1, "docket number proximity"
-        )
-        self.assertIn("Washington", r.content.decode())
-
         # Query 1:21-cv-1234
         search_params["q"] = "1:21-cv-1234"
         # Frontend
         r = await self._test_article_count(
-            search_params, 1, "docket number proximity"
-        )
-        self.assertIn("Washington", r.content.decode())
-
-        # API
-        r = await self._test_api_results_count(
             search_params, 1, "docket number proximity"
         )
         self.assertIn("Washington", r.content.decode())
@@ -948,12 +1177,6 @@ class OpinionsSearchTest(
         # Frontend
         r = await self._test_article_count(
             search_params, 1, "docket number box"
-        )
-        self.assertIn("Washington", r.content.decode())
-
-        # API
-        r = await self._test_api_results_count(
-            search_params, 1, "docket number proximity"
         )
         self.assertIn("Washington", r.content.decode())
 
@@ -972,12 +1195,6 @@ class OpinionsSearchTest(
         )
         self.assertIn("Washington", r.content.decode())
 
-        # API
-        r = await self._test_api_results_count(
-            search_params, 1, "docket number box"
-        )
-        self.assertIn("Washington", r.content.decode())
-
         # Other kind of formats can still be searched -> 123456
         search_params = {
             "type": SEARCH_TYPES.OPINION,
@@ -985,12 +1202,6 @@ class OpinionsSearchTest(
         }
         # Frontend
         r = await self._test_article_count(
-            search_params, 1, "docket number box"
-        )
-        self.assertIn("Lorem", r.content.decode())
-
-        # API
-        r = await self._test_api_results_count(
             search_params, 1, "docket number box"
         )
         self.assertIn("Lorem", r.content.decode())
@@ -1118,59 +1329,6 @@ class OpinionsSearchTest(
         self.assertIn("docket number 2", r.content.decode())
         self.assertIn("docket number 3", r.content.decode())
         self.assertIn("2 Opinions", r.content.decode())
-
-    async def test_results_api_fields(self) -> None:
-        """Confirm fields in RECAP Search API results."""
-        search_params = {"q": "Honda"}
-        # API
-        r = await self._test_api_results_count(search_params, 1, "API fields")
-        keys_to_check = [
-            "absolute_url",
-            "attorney",
-            "author_id",
-            "caseName",
-            "caseNameShort",
-            "citation",
-            "citeCount",
-            "cites",
-            "cluster_id",
-            "court",
-            "court_citation_string",
-            "court_exact",
-            "court_id",
-            "dateArgued",
-            "dateFiled",
-            "dateReargued",
-            "dateReargumentDenied",
-            "docketNumber",
-            "docket_id",
-            "download_url",
-            "id",
-            "joined_by_ids",
-            "judge",
-            "lexisCite",
-            "local_path",
-            "neutralCite",
-            "non_participating_judge_ids",
-            "panel_ids",
-            "per_curiam",
-            "scdb_id",
-            "sibling_ids",
-            "snippet",
-            "source",
-            "status",
-            "status_exact",
-            "suitNature",
-            "timestamp",
-            "type",
-        ]
-        keys_count = len(r.data["results"][0])
-        self.assertEqual(keys_count, len(keys_to_check))
-        for key in keys_to_check:
-            self.assertTrue(
-                key in r.data["results"][0],
-                msg=f"Key {key} not found in the result object.",
-            )
 
     async def test_results_highlights(self) -> None:
         """Confirm highlights are shown properly"""
