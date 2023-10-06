@@ -9,7 +9,7 @@ import os
 import re
 from datetime import date, datetime, timedelta
 from glob import glob
-from typing import Any, Dict, Iterator, List, Optional, Set, Tuple, TypedDict
+from typing import Any, Dict, List, Optional, Set, Tuple, TypedDict
 
 import requests
 from bs4 import BeautifulSoup
@@ -24,6 +24,7 @@ from juriscraper.lib.diff_tools import normalize_phrase
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize, titlecase
 
 from cl.citations.utils import map_reporter_db_cite_type
+from cl.corpus_importer.utils import compare_documents
 from cl.lib.argparse_types import _argparse_volumes
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_diff import get_cosine_similarity
@@ -253,7 +254,7 @@ def merge_fixes(data: Dict[str, Any], identifier: str) -> Dict[str, Any]:
     """Merge fixes into the data
 
     :param data: The Harvard data
-    :param filepath: The filepath of the data to fix.
+    :param identifier: The filepath of the data to fix.
     :return:
     """
     fix = requests.get(
@@ -1072,97 +1073,6 @@ def winnow_case_name(case_name: str) -> Set:
     # Lastly remove our ever-growing set of false positive words
     # This is different from bad words, but may have some overlap.
     return cleaned_set - (cleaned_set & false_positive_set)
-
-
-def compare_documents(harvard_characters: str, cl_characters: str) -> int:
-    """Compare Harvard text to CL opinion text
-
-    This code iterates over two opinions logging similar stretches and then
-    returns a percentage of the total overlapping characters
-
-    :param harvard_characters: The stripped down opinion text from Harvard
-    :param cl_characters: The stripped down opinion text on Courtlistener
-    :return: Percentage (as integer) overlapping content
-    """
-
-    start, stop, count = 0, 0, 0
-    matched_substring = ""
-    found_overlaps = []
-    while stop < len(harvard_characters):
-        stop += 1
-        harvard_substring = harvard_characters[start:stop]
-        if harvard_substring in cl_characters:
-            matched_substring = harvard_substring
-        else:
-            if len(matched_substring) > 5:
-                subset = make_subset_range(cl_characters, matched_substring)
-                found_overlaps.append(subset)
-            matched_substring = ""
-            start = stop - 1
-    if len(matched_substring) > 5:
-        subset = make_subset_range(cl_characters, matched_substring)
-        found_overlaps.append(subset)
-
-    # If we checked our subsets as we parsed- we wouldn't need to do this
-    # filtering here. This is a good candidate for refactoring.
-    filtered_subset = list(filter_subsets(found_overlaps))
-    for overlap in filtered_subset:
-        count += len(overlap)
-    percent_match = int(
-        100 * (count / min([len(harvard_characters), len(cl_characters)]))
-    )
-    return percent_match
-
-
-def make_subset_range(cl_characters: str, max_string: str) -> List[int]:
-    """Find indices for matching max_string in CL opinion
-
-    :param cl_characters: The stripped down CL characters
-    :param max_string: The current largest identified substring
-    :return: Range of indicies of match to CL as list
-    """
-    string_index_start = cl_characters.find(max_string)
-    string_index_end = string_index_start + len(max_string)
-    return list(range(string_index_start, string_index_end))
-
-
-def is_subset(match: List[int], other_match: List[int]) -> bool:
-    """Check if match is a subset of other matches
-
-    Check if needle is ordered subset of haystack in O(n)
-    :param match: Matching range of text as the indices
-    :param other_match: Other matching range of text as indices
-    :return: Is match a subset of other match
-    """
-
-    if len(other_match) < len(match):
-        return False
-    index = 0
-    for element in match:
-        try:
-            index = other_match.index(element, index) + 1
-        except ValueError:
-            return False
-    else:
-        return True
-
-
-def filter_subsets(lists: List[List[int]]) -> Iterator[List[int]]:
-    """Filter subsets from matches
-
-    Given list of lists, return new list of lists without subsets
-
-    :param lists: List of matched lists ranges
-    :return: Reduced list of matches
-    """
-
-    for match in lists:
-        if not any(
-            is_subset(match, other_matches)
-            for other_matches in lists
-            if match is not other_matches
-        ):
-            yield match
 
 
 class MissingDocumentError(Exception):
