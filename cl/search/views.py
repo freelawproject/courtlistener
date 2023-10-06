@@ -650,6 +650,7 @@ def do_es_search(
     error_message = ""
     suggested_query = ""
     total_child_results = 0
+    related_cluster = None
 
     search_form = SearchForm(get_params)
     match get_params.get("type", SEARCH_TYPES.OPINION):
@@ -686,6 +687,12 @@ def do_es_search(
                 search_form.cleaned_data,
                 courts,
             )
+            related_prefix = RELATED_PATTERN.search(cd["q"])
+            if related_prefix:
+                related_pks = related_prefix.group("pks").split(",")
+                related_cluster = OpinionCluster.objects.get(
+                    sub_opinions__pk__in=related_pks
+                )
         except UnbalancedQuery:
             error = True
             error_message = "has incorrect syntax. Did you forget to close one or more parentheses?"
@@ -717,6 +724,7 @@ def do_es_search(
         "court_count": court_count,
         "error_message": error_message,
         "suggested_query": suggested_query,
+        "related_cluster": related_cluster,
     }
 
 
