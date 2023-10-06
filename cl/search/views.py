@@ -651,6 +651,7 @@ def do_es_search(
     suggested_query = ""
     total_child_results = 0
     related_cluster = None
+    cited_cluster = None
 
     search_form = SearchForm(get_params)
     match get_params.get("type", SEARCH_TYPES.OPINION):
@@ -686,6 +687,11 @@ def do_es_search(
                 get_params,
                 search_form.cleaned_data,
                 courts,
+            )
+            cited_cluster = add_depth_counts(
+                # Also returns cited cluster if found
+                search_data=cd,
+                search_results=paged_results,
             )
             related_prefix = RELATED_PATTERN.search(cd["q"])
             if related_prefix:
@@ -725,6 +731,7 @@ def do_es_search(
         "error_message": error_message,
         "suggested_query": suggested_query,
         "related_cluster": related_cluster,
+        "cited_cluster": cited_cluster,
     }
 
 
