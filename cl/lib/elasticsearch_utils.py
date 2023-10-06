@@ -54,6 +54,7 @@ from cl.search.constants import (
     SOLR_PEOPLE_ES_HL_FIELDS,
 )
 from cl.search.exception import UnbalancedQuery
+from cl.search.forms import SearchForm
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
@@ -1971,7 +1972,7 @@ def get_related_clusters_with_cache_and_es(
 
 
 def make_es_stats_variable(
-    search_form: CleanData,
+    search_form: SearchForm,
     paged_results: Page,
 ) -> list[str]:
     """Create a useful facet variable for use in a template
@@ -1986,7 +1987,7 @@ def make_es_stats_variable(
     facet_fields = []
 
     try:
-        aggregations = paged_results.paginator.aggregations.to_dict()
+        aggregations = paged_results.paginator.aggregations.to_dict()  # type: ignore
         buckets = aggregations["status"]["buckets"]
         facet_values = {group["key"]: group["doc_count"] for group in buckets}
     except (KeyError, AttributeError):
