@@ -22,6 +22,7 @@ class VisualizationCrudTests(BaseSeleniumTest):
             user__username="user",
             user__password=make_password("password"),
         )
+        self.rebuild_index("search.OpinionCluster")
         super().setUp()
 
     def tearDown(self) -> None:

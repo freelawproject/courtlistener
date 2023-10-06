@@ -46,18 +46,10 @@ def get_object_list(request, cd, paginator):
         "type"
     ] == SEARCH_TYPES.PEOPLE and waffle.flag_is_active(request, "p-es-active")
 
-    is_opinion_active = cd[
-        "type"
-    ] == SEARCH_TYPES.OPINION and waffle.flag_is_active(
-        request, "o-es-activate"
-    )
-
     if is_oral_argument_active:
         search_query = AudioDocument.search()
     elif is_people_active:
         search_query = PersonDocument.search()
-    elif is_opinion_active:
-        search_query = OpinionClusterDocument.search()
     else:
         search_query = None
 
@@ -77,7 +69,7 @@ def get_object_list(request, cd, paginator):
     if cd["type"] == SEARCH_TYPES.RECAP:
         main_query["sort"] = map_to_docket_entry_sorting(main_query["sort"])
 
-    if is_oral_argument_active or is_people_active or is_opinion_active:
+    if is_oral_argument_active or is_people_active:
         sl = ESList(
             main_query=main_query,
             count=total_query_results,
