@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Any, Optional
+from typing import Any, Iterator, Optional
 
 import bs4
 from django.utils.timezone import now
@@ -8,7 +8,7 @@ from cl.lib.string_diff import get_cosine_similarity
 from cl.search.models import Docket
 
 
-def mark_ia_upload_needed(d: Docket, save_docket: bool) -> None:
+async def mark_ia_upload_needed(d: Docket, save_docket: bool) -> None:
     """Mark the docket as needing upload if it's not already marked.
 
     The point here is that we need to know the first time an item was updated,
@@ -24,7 +24,7 @@ def mark_ia_upload_needed(d: Docket, save_docket: bool) -> None:
         d.ia_needs_upload = True
         d.ia_date_first_change = now()
     if save_docket:
-        d.save()
+        await d.asave()
 
 
 def get_start_of_quarter(d: Optional[date] = None) -> date:
@@ -44,6 +44,117 @@ def get_start_of_quarter(d: Optional[date] = None) -> date:
         date(d_year, 10, 1),
     ]
     return max([q for q in quarter_dates if q <= d])
+
+
+def make_subset_range(cl_characters: str, max_string: str) -> list[int]:
+    """Find indices for matching max_string in CL opinion
+
+    :param cl_characters: The stripped down CL characters
+    :param max_string: The current largest identified substring
+    :return: Range of indices of match to CL as list
+    """
+    string_index_start = cl_characters.find(max_string)
+    string_index_end = string_index_start + len(max_string)
+    return list(range(string_index_start, string_index_end))
+
+
+def filter_subsets(lists: list[list[int]]) -> Iterator[list[int]]:
+    """Filter subsets from matches
+
+    Given list of lists, return new list of lists without subsets
+
+    :param lists: List of matched lists ranges
+    :return: Reduced list of matches
+    """
+
+    for match in lists:
+        if not any(
+            is_subset(match, other_matches)
+            for other_matches in lists
+            if match is not other_matches
+        ):
+            yield match
+
+
+def is_subset(match: list[int], other_match: list[int]) -> bool:
+    """Check if match is a subset of other matches
+
+    Check if needle is ordered subset of haystack in O(n)
+    :param match: Matching range of text as the indices
+    :param other_match: Other matching range of text as indices
+    :return: Is match a subset of other match
+    """
+
+    if len(other_match) < len(match):
+        return False
+    index = 0
+    for element in match:
+        try:
+            index = other_match.index(element, index) + 1
+        except ValueError:
+            return False
+    else:
+        return True
+
+
+def compare_documents(harvard_characters: str, cl_characters: str) -> int:
+    """Compare Harvard text to CL opinion text
+
+    This code iterates over two opinions logging similar stretches and then
+    returns a percentage of the total overlapping characters
+
+    :param harvard_characters: The stripped down opinion text from Harvard
+    :param cl_characters: The stripped down opinion text on Courtlistener
+    :return: Percentage (as integer) overlapping content
+    """
+
+    start, stop, count = 0, 0, 0
+    matched_substring = ""
+    found_overlaps = []
+    while stop < len(harvard_characters):
+        stop += 1
+        harvard_substring = harvard_characters[start:stop]
+        if harvard_substring in cl_characters:
+            matched_substring = harvard_substring
+        else:
+            if len(matched_substring) > 5:
+                subset = make_subset_range(cl_characters, matched_substring)
+                found_overlaps.append(subset)
+            matched_substring = ""
+            start = stop - 1
+    if len(matched_substring) > 5:
+        subset = make_subset_range(cl_characters, matched_substring)
+        found_overlaps.append(subset)
+
+    # If we checked our subsets as we parsed-we wouldn't need to do this
+    # filtering here. This is a good candidate for refactoring.
+    filtered_subset = list(filter_subsets(found_overlaps))
+    for overlap in filtered_subset:
+        count += len(overlap)
+
+    percent_match = int(
+        100 * (count / min([len(harvard_characters), len(cl_characters)]))
+    )
+    return percent_match
+
+
+def wrap_text(length, text):
+    """Wrap text to specified length without cutting words
+    :param length: max length to wrap
+    :param text: text to wrap
+    :return: text wrapped
+    """
+    words = text.split(" ")
+    if words:
+        lines = [words[0]]
+        for word in words[1:]:
+            if len(lines[-1]) + len(word) < length:
+                lines[-1] += f" {word}"
+            else:
+                lines.append(word)
+                break
+        return " ".join(lines)
+    return ""
 
 
 def similarity_scores(
@@ -86,10 +197,6 @@ def match_lists(
     :param cl_opinions_list: CL opinions
     :return: Matches if found or False
     """
-    # We import this here to avoid a circular import
-    from cl.corpus_importer.management.commands.harvard_opinions import (
-        compare_documents,
-    )
 
     # Convert harvard HTML to Text to compare
     harvard_opinions_list = [h.getText() for h in harvard_opinions_list]
@@ -99,37 +206,23 @@ def match_lists(
     for i, row in enumerate(scores):
         j = row.argmax()  # type: ignore
         # Lower threshold for small opinions.
-        if (
-            get_cosine_similarity(
-                harvard_opinions_list[i], cl_opinions_list[j]
-            )
-            < 0.60
-        ):
-            continue
+        cosine_sim = get_cosine_similarity(
+            harvard_opinions_list[i], cl_opinions_list[j]
+        )
         percent_match = compare_documents(
             harvard_opinions_list[i], cl_opinions_list[j]
         )
-        if percent_match < 60:
+
+        # Sometimes cosine similarity fails when there are small variations in text,
+        # such as parties, attorneys, case name, or court that are included in the
+        # content of the opinion, compare_documents() checks the percentage of the
+        # harvard opinion text that it is in courtlistener opinion, having a large
+        # percentage means that almost all the harvard opinion is in courtlistener
+        # opinion, but there is a possibility that the courtlistener opinion contains
+        # some additional data in que opinion content (such as case name, parties, etc.)
+        if cosine_sim < 0.60 and percent_match < 60:
             continue
+
         matches[i] = j
 
     return matches
-
-
-def wrap_text(length, text):
-    """Wrap text to specified length without cutting words
-    :param length: max length to wrap
-    :param text: text to wrap
-    :return: text wrapped
-    """
-    words = text.split(" ")
-    if words:
-        lines = [words[0]]
-        for word in words[1:]:
-            if len(lines[-1]) + len(word) < length:
-                lines[-1] += f" {word}"
-            else:
-                lines.append(word)
-                break
-        return " ".join(lines)
-    return ""

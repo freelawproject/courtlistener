@@ -5,7 +5,7 @@ import shutil
 from unittest import mock
 from unittest.mock import MagicMock
 
-from asgiref.sync import sync_to_async
+from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -104,7 +104,9 @@ class DocumentPageRedirection(TestCase):
                 )
             ],
         )
-        add_docket_entries(cls.docket, cls.de_data["docket_entries"])
+        async_to_sync(add_docket_entries)(
+            cls.docket, cls.de_data["docket_entries"]
+        )
 
         cls.att_data = AppellateAttachmentPageFactory(
             attachments=[
@@ -116,7 +118,7 @@ class DocumentPageRedirection(TestCase):
             pacer_doc_id="288651",
             pacer_case_id="104490",
         )
-        merge_attachment_page_data(
+        async_to_sync(merge_attachment_page_data)(
             cls.court,
             cls.att_data["pacer_case_id"],
             cls.att_data["pacer_doc_id"],
@@ -555,11 +557,9 @@ class NewDocketAlertTest(SimpleUserDataMixin, TestCase):
         "test_court.json",
     ]
 
-    async def setUp(self) -> None:
+    def setUp(self) -> None:
         self.assertTrue(
-            await sync_to_async(self.async_client.login)(
-                username="pandora", password="password"
-            )
+            self.async_client.login(username="pandora", password="password")
         )
 
     async def test_bad_parameters(self) -> None:

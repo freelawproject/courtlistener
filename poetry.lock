@@ -2186,13 +2186,13 @@ requests = ">=2.0,<3.0"
 
 [[package]]
 name = "juriscraper"
-version = "2.5.51"
+version = "2.5.53"
 description = "An API to scrape American court websites for metadata."
 optional = false
 python-versions = "*"
 files = [
-    {file = "juriscraper-2.5.51-py27-none-any.whl", hash = "sha256:43b3d44c4e24fa11da681ea9e66beb26b1ebeb05b6b2fb5330c4a11d461acae0"},
-    {file = "juriscraper-2.5.51.tar.gz", hash = "sha256:5a1e995cb41c498f7b436e51d73219ffa925c81c7c19f8e97cce3dc03de7c5eb"},
+    {file = "juriscraper-2.5.53-py27-none-any.whl", hash = "sha256:7c4d02ad1f8d85d0179fde65fd1540afad84abd8b1b6abf3f344534cbdfac332"},
+    {file = "juriscraper-2.5.53.tar.gz", hash = "sha256:6b77f7ee4ec90f13b688a38bc1e3d0bee915eea519bcfa24e083a40c7d174937"},
 ]
 
 [package.dependencies]
@@ -2721,7 +2721,7 @@ name = "ndg-httpsclient"
 version = "0.5.1"
 description = "Provides enhanced HTTPS support for httplib and urllib2 using PyOpenSSL"
 optional = false
-python-versions = ">=2.7,<3.0.dev0 || >=3.4.dev0"
+python-versions = ">=2.7,<3.0.0 || >=3.4.0"
 files = [
     {file = "ndg_httpsclient-0.5.1-py2-none-any.whl", hash = "sha256:d2c7225f6a1c6cf698af4ebc962da70178a99bcde24ee6d1961c4f3338130d57"},
     {file = "ndg_httpsclient-0.5.1-py3-none-any.whl", hash = "sha256:dd174c11d971b6244a891f7be2b32ca9853d3797a72edb34fa5d7b07d8fff7d4"},
@@ -5096,4 +5096,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11, <3.12"
-content-hash = "96bb211d8a53b99b00d7d118fd7f90f35dcf27b9a940532d8ea814eecc5cbd6b"
+content-hash = "4b906615444a53e1a26780aa6a3742c0e7844c307c6a991b059ee4de0cb177a8"

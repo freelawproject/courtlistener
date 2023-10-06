@@ -411,9 +411,9 @@ class APITests(APITestCase):
         self.client = make_client(self.pandora.user.pk)
         self.client2 = make_client(self.unconfirmed.user.pk)
 
-    async def tearDown(cls):
-        await UserTag.objects.all().adelete()
-        await DocketTag.objects.all().adelete()
+    def tearDown(cls):
+        UserTag.objects.all().delete()
+        DocketTag.objects.all().delete()
 
     async def make_a_good_tag(self, client, tag_name="taggy-tag"):
         data = {

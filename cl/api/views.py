@@ -1,5 +1,6 @@
 import logging
 from datetime import date, timedelta
+from typing import Optional
 
 import waffle
 from asgiref.sync import sync_to_async
@@ -7,6 +8,7 @@ from django.conf import settings
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.template import TemplateDoesNotExist
+from django.views.decorators.cache import cache_page
 from requests import Session
 from rest_framework import status
 from rest_framework.status import HTTP_400_BAD_REQUEST
@@ -21,7 +23,8 @@ from cl.lib.search_utils import (
 )
 from cl.search.documents import AudioDocument
 from cl.search.forms import SearchForm
-from cl.search.models import SEARCH_TYPES, Court
+from cl.search.models import SEARCH_TYPES, Court, OpinionCluster
+from cl.simple_pages.coverage_utils import build_chart_data
 from cl.simple_pages.views import get_coverage_data_fds
 
 logger = logging.getLogger(__name__)
@@ -161,6 +164,39 @@ def coverage_data(request, version, court):
     return JsonResponse(
         {"annual_counts": annual_counts, "total": total_docs}, safe=True
     )
+
+
+def fetch_first_last_date_filed(
+    court_id: str,
+) -> tuple[Optional[date], Optional[date]]:
+    """Fetch first and last date for court
+
+    :param court_id: Court object id
+    :return: First/last date filed, if any
+    """
+    query = OpinionCluster.objects.filter(docket__court=court_id).order_by(
+        "date_filed"
+    )
+    first, last = query.first(), query.last()
+    if first:
+        return first.date_filed, last.date_filed
+    return None, None
+
+
+@cache_page(60 * 60 * 24, key_prefix="coverage")
+def coverage_data_opinions(request: HttpRequest):
+    """Generate Coverage Chart Data
+
+    Accept GET to query court data for timelines-chart on coverage page
+
+    :param request: The HTTP request
+    :return: Timeline data for court(s)
+    """
+    chart_data = []
+    if request.method == "GET":
+        court_ids = request.GET.get("court_ids").split(",")  # type: ignore
+        chart_data = build_chart_data(court_ids)
+    return JsonResponse(chart_data, safe=False)
 
 
 async def get_result_count(request, version, day_count):
