@@ -79,6 +79,14 @@ class OpinionTypeException(Exception):
         self.message = message
 
 
+class EmptyOpinionException(Exception):
+    """An exception for opinions that raise a ZeroDivisionError Exception due empty
+    opinion tag"""
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+
 def find_data_fields(soup: BeautifulSoup, field_name: str) -> list:
     """Find field by tag name or data-type attribute
     :param soup: parsed document
@@ -281,10 +289,14 @@ def merge_long_fields(
 
 def merge_judges(
     overlapping_data: Optional[Tuple[str, str]],
+    cluster_id: int,
+    skip_judge_merger: bool = False,
 ) -> dict[str, Any]:
     """Merge overlapping judge values
 
     :param overlapping_data: data to compare from harvard and courtlistener
+    :param cluster_id: opinion cluster id
+    :param skip_judge_merger: skip judge merger instead of raise exception
     :return: None
     """
 
@@ -335,7 +347,15 @@ def merge_judges(
             )
             return {"judges": titlecase(", ".join(new_judges_list))}
         else:
-            raise JudgeException("Judges are completely different.")
+            if skip_judge_merger:
+                # Fail silently but continue to merge
+                logger.info(
+                    f"Can't merge judges, something failed, cluster id: {cluster_id}"
+                )
+                return {}
+            else:
+                # Stop merge raising an exception
+                raise JudgeException("Judges are completely different.")
 
     return {}
 
@@ -500,11 +520,14 @@ def merge_date_filed(
 
 
 def merge_overlapping_data(
-    cluster: OpinionCluster, changed_values_dictionary: dict
+    cluster: OpinionCluster,
+    changed_values_dictionary: dict,
+    skip_judge_merger: bool = False,
 ) -> dict[str, Any]:
     """Merge overlapping data
     :param cluster: the cluster object
     :param changed_values_dictionary: the dictionary of data to merge
+    :param skip_judge_merger: skip judge merger
     :return: None
     """
 
@@ -546,6 +569,8 @@ def merge_overlapping_data(
             data_to_update.update(
                 merge_judges(
                     changed_values_dictionary.get(field_name),
+                    cluster.id,
+                    skip_judge_merger,
                 )
             )
         elif field_name == "attorneys":
@@ -575,6 +600,10 @@ def update_docket_source(cluster: OpinionCluster) -> None:
         Docket.RECAP_AND_SCRAPER_AND_HARVARD,
         Docket.HARVARD_AND_COLUMBIA,
         Docket.DIRECT_INPUT_AND_HARVARD,
+        Docket.IDB_AND_HARVARD,
+        Docket.RECAP_AND_IDB_AND_HARVARD,
+        Docket.SCRAPER_AND_IDB_AND_HARVARD,
+        Docket.RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
         Docket.ANON_2020_AND_HARVARD,
         Docket.ANON_2020_AND_SCRAPER_AND_HARVARD,
     ]:
@@ -636,12 +665,15 @@ def save_headmatter(harvard_data: Dict[str, Any]) -> dict[str, Any]:
 
 
 def merge_opinion_clusters(
-    cluster_id: int, only_fastcase: bool = False
+    cluster_id: int,
+    only_fastcase: bool = False,
+    skip_judge_merger: bool = False,
 ) -> None:
     """Merge opinion cluster, docket and opinion data from Harvard
 
     :param cluster_id: The cluster ID to merger
     :param only_fastcase: Only process fastcase data
+    :param skip_judge_merger: skip judge merger
     :return: None
     """
     opinion_cluster = OpinionCluster.objects.get(id=cluster_id)
@@ -679,7 +711,7 @@ def merge_opinion_clusters(
                 opinion_cluster, harvard_data
             )
             overlapping_data_to_update = merge_overlapping_data(
-                opinion_cluster, changed_values_dictionary
+                opinion_cluster, changed_values_dictionary, skip_judge_merger
             )
             headmatter_data = save_headmatter(harvard_data)
 
@@ -723,6 +755,10 @@ def merge_opinion_clusters(
     except OpinionTypeException:
         logger.warning(
             msg=f"Opinion type not found in xml file for cluster id: {cluster_id}"
+        )
+    except EmptyOpinionException:
+        logger.warning(
+            msg=f"Opinion tag probably empty in json file from cluster id: {cluster_id}"
         )
 
 
@@ -846,7 +882,7 @@ def update_matching_opinions(
                     find_just_name(op.author_str).lower()
                     != find_just_name(author_str).lower()
                 ):
-                    raise AuthorException(f"Authors don't match - log error")
+                    raise AuthorException(f"Authors don't match")
                 elif any(s.isupper() for s in op.author_str.split(",")):
                     # Some names are uppercase, update with processed names
                     op.author_str = author_str
@@ -879,10 +915,15 @@ def map_and_merge_opinions(
     harvard_opinions = find_data_fields(soup, "opinion")
 
     if len(harvard_opinions) == len(cl_opinions):
-        matches = match_lists(
-            [op for op in harvard_opinions],
-            fetch_cl_opinion_content(sub_opinions=cl_opinions),
-        )
+        try:
+            matches = match_lists(
+                [op for op in harvard_opinions],
+                fetch_cl_opinion_content(sub_opinions=cl_opinions),
+            )
+        except ZeroDivisionError:
+            raise EmptyOpinionException(
+                "Opinion tag probably empty in harvard data"
+            )
         if len(matches) == len(harvard_opinions):
             update_matching_opinions(matches, cl_opinions, harvard_opinions)
         else:
@@ -940,6 +981,11 @@ class Command(VerboseCommand):
             "--fastcase",
             action="store_true",
             help="A flag to choose to merge only fastcase opinions",
+        )
+        parser.add_argument(
+            "--skip-judge-merger",
+            action="store_true",
+            help="Set flag to skip judge merger if the judges do not match",
         )
         parser.add_argument(
             "--offset",
@@ -1002,5 +1048,7 @@ class Command(VerboseCommand):
         for cluster_id, filepath in cluster_ids:
             logger.info(msg=f"Merging {cluster_id} at {filepath}")
             merge_opinion_clusters(
-                cluster_id=cluster_id, only_fastcase=options["fastcase"]
+                cluster_id=cluster_id,
+                only_fastcase=options["fastcase"],
+                skip_judge_merger=options["skip_judge_merger"],
             )
