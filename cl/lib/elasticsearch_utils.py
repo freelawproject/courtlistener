@@ -1390,10 +1390,8 @@ def fetch_es_results(
         ).execute()
         query_time = response.took
         error = False
-        if (
-            response.aggregations
-            and get_params["type"] == SEARCH_TYPES.PARENTHETICAL
-        ):
+        search_type = get_params.get("type", SEARCH_TYPES.OPINION)
+        if response.aggregations and search_type == SEARCH_TYPES.PARENTHETICAL:
             response = response.aggregations.groups.buckets
         return response, query_time, error
     except (TransportError, ConnectionError, RequestError) as e:

@@ -35,6 +35,7 @@ from cl.lib.elasticsearch_utils import (
     es_index_exists,
     fetch_es_results,
     limit_inner_hits,
+    make_es_stats_variable,
     merge_courts_from_db,
     merge_unavailable_fields_on_parent_document,
     sanitize_unbalanced_parenthesis,
@@ -742,6 +743,7 @@ def do_es_search(
         "related_cluster": related_cluster,
         "cited_cluster": cited_cluster,
         "query_citation": query_citation,
+        "facet_fields": make_es_stats_variable(search_form, paged_results),
     }
 
 
