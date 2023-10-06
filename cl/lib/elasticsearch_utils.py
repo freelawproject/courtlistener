@@ -861,6 +861,7 @@ def build_es_base_query(
                 str_query = RELATED_PATTERN.sub(str_query, "").strip()
                 cluster_pks = related_match.group("pks").split(",")
                 mlt_query = build_more_like_this_query(cluster_pks)
+
             child_query_fields = {
                 "opinion": add_fields_boosting(
                     cd,
@@ -992,6 +993,9 @@ def build_es_main_query(
 
     search_query = add_es_highlighting(search_query, cd)
     search_query = search_query.sort(build_sort_results(cd))
+
+    if SEARCH_TYPES.OPINION:
+        search_query.aggs.bucket("status", A("terms", field="status.raw"))
 
     return (
         search_query,
@@ -1386,7 +1390,10 @@ def fetch_es_results(
         ).execute()
         query_time = response.took
         error = False
-        if response.aggregations:
+        if (
+            response.aggregations
+            and get_params["type"] == SEARCH_TYPES.PARENTHETICAL
+        ):
             response = response.aggregations.groups.buckets
         return response, query_time, error
     except (TransportError, ConnectionError, RequestError) as e:
@@ -1963,3 +1970,41 @@ def get_related_clusters_with_cache_and_es(
         )
 
     return related_clusters, sub_opinion_ids, url_search_params
+
+
+def make_es_stats_variable(
+    search_form: CleanData,
+    paged_results: Page,
+) -> list[str]:
+    """Create a useful facet variable for use in a template
+
+    This function merges the fields in the form with the bucket counts from
+    ES, creating useful variables for the front end.
+
+    The count value is associated with the form fields as an attribute
+    named "count". If the search didn't work, the value will be None.
+    If it did, the value will be an int.
+    """
+    facet_fields = []
+
+    try:
+        aggregations = paged_results.paginator.aggregations.to_dict()
+        buckets = aggregations["status"]["buckets"]
+        facet_values = {group["key"]: group["doc_count"] for group in buckets}
+    except (KeyError, AttributeError):
+        facet_values = {}
+
+    for field in search_form:
+        if not field.html_name.startswith("stat_"):
+            continue
+
+        try:
+            count = facet_values[field.html_name.replace("stat_", "")]
+        except KeyError:
+            # Happens when a field is iterated on that doesn't exist in the
+            # facets variable
+            count = None
+
+        field.count = count
+        facet_fields.append(field)
+    return facet_fields
