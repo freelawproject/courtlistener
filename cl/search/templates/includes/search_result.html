@@ -166,7 +166,7 @@
       {% with doc=doc|get_attrdict:"_source" %}
         <div class="col-md-offset-half">
           <h4>
-            <a href="{{ doc.absolute_url }}" class="visitable">{% if doc.short_description %}{{ doc.short_description|safe }}<span class="gray">&nbsp;&mdash;&nbsp;</span>{% endif %}Document #{{ doc.document_number }}{% if doc.attachment_number %}, Attachment #{{ doc.attachment_number }}{% endif %}
+            <a href="{% if doc.absolute_url %}{{ doc.absolute_url }}{% else %}{{ result.docket_absolute_url }}#minute-entry-{{ doc.docket_entry_id }}{% endif %}" class="visitable">{% if doc.short_description %}{{ doc.short_description|safe }}<span class="gray">&nbsp;&mdash;&nbsp;</span>{% endif %}Document #{{ doc.document_number }}{% if doc.attachment_number %}, Attachment #{{ doc.attachment_number }}{% endif %}
             </a>
             {% if not doc.is_available %}
               <i class="fa fa-ban gray"
