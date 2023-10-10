@@ -704,8 +704,15 @@ class OpinionsESSearchTest(
             cluster=opinion_cluster,
         )
 
+        lexis_citation_str = str(lexis_citation)
         es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        self.assertEqual(str(lexis_citation), es_doc.lexisCite)
+        self.assertEqual(lexis_citation_str, es_doc.lexisCite)
+
+        # Remove lexis citation from the db
+        lexis_citation.delete()
+
+        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        self.assertNotEqual(lexis_citation_str, es_doc.lexisCite)
 
         # Add neutral citation to the cluster
         neutral_citation = CitationWithParentsFactory.create(
@@ -716,8 +723,15 @@ class OpinionsESSearchTest(
             cluster=opinion_cluster,
         )
 
+        neutral_citation_str = str(neutral_citation)
         es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        self.assertEqual(str(neutral_citation), es_doc.neutralCite)
+        self.assertEqual(neutral_citation_str, es_doc.neutralCite)
+
+        # Remove neutral citation from the db
+        neutral_citation.delete()
+
+        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        self.assertNotEqual(neutral_citation_str, es_doc.neutralCite)
 
         # Update the source field in the cluster record.
         opinion_cluster.source = "ZLCR"

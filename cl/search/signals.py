@@ -332,7 +332,12 @@ o_field_mapping = {
         },
     },
     "reverse": {},
-    "reverse-delete": {},
+    "reverse-delete": {
+        Opinion: {"cluster": {"all": ["sibling_ids"]}},
+        Citation: {
+            "cluster": {"all": ["citation", "neutralCite", "lexisCite"]}
+        },
+    },
 }
 
 o_cluster_field_mapping = {
@@ -368,7 +373,12 @@ o_cluster_field_mapping = {
             "citations": {"all": ["citation", "neutralCite", "lexisCite"]}
         },
     },
-    "reverse-delete": {},
+    "reverse-delete": {
+        Opinion: {"cluster": {"all": ["sibling_ids"]}},
+        Citation: {
+            "cluster": {"all": ["citation", "neutralCite", "lexisCite"]}
+        },
+    },
 }
 
 

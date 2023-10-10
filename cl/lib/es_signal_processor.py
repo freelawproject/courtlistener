@@ -532,6 +532,31 @@ def delete_reverse_related_documents(
                         affected_fields,
                     )
                 )
+        case OpinionCluster() if es_document is OpinionClusterDocument: # type: ignore
+            main_doc = exists_or_create_doc(
+                es_document, instance, avoid_creation=True
+            )
+            if main_doc:
+                # Update parent document in ES.
+                transaction.on_commit(
+                    partial(
+                        update_es_document.delay,
+                        es_document.__name__,
+                        affected_fields,
+                        (compose_app_label(instance), instance.pk),
+                        None,
+                        None,
+                    )
+                )
+                # Then update all their child documents (Positions)
+                transaction.on_commit(
+                    partial(
+                        update_children_docs_by_query.delay,
+                        OpinionDocument.__name__,
+                        instance.pk,
+                        affected_fields,
+                    )
+                )
         case _:
             main_objects = main_model.objects.filter(
                 **{query_string: instance}
