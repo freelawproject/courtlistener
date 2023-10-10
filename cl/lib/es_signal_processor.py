@@ -22,6 +22,7 @@ from cl.people_db.models import (
 from cl.search.documents import (
     ES_CHILD_ID,
     AudioDocument,
+    DocketDocument,
     ESRECAPDocument,
     ParentheticalGroupDocument,
     PersonDocument,
@@ -54,7 +55,7 @@ def updated_fields(
         tracked_set = getattr(instance, "es_oa_field_tracker", None)
     elif es_document is ParentheticalGroupDocument:
         tracked_set = getattr(instance, "es_pa_field_tracker", None)
-    elif es_document is ESRECAPDocument:
+    elif es_document is ESRECAPDocument or es_document is DocketDocument:
         tracked_set = getattr(instance, "es_rd_field_tracker", None)
     elif es_document is PositionDocument:
         tracked_set = getattr(instance, "es_p_field_tracker", None)
@@ -415,6 +416,18 @@ def delete_reverse_related_documents(
             )
             if main_doc:
                 prepare_and_update_fields(affected_fields, main_doc, instance)
+        case Docket() if es_document is DocketDocument:  # type: ignore
+            main_doc = get_or_create_doc(
+                es_document, instance, avoid_creation=True
+            )
+            if main_doc:
+                prepare_and_update_fields(affected_fields, main_doc, instance)
+        case Docket() if es_document is ESRECAPDocument:  # type: ignore
+            # bulk update RECAP documents when a new reverse related record
+            # is deleted
+            update_child_documents_by_query.delay(
+                es_document, instance, affected_fields
+            )
         case _:
             main_objects = main_model.objects.filter(
                 **{query_string: instance}
@@ -615,11 +628,6 @@ class ESSignalProcessor(object):
                 affected_fields = fields_map["all"]
 
             instance_field = query_string.split("__")[-1]
-            if isinstance(
-                instance, (ABARating, PoliticalAffiliation, Education)
-            ):
-                instance_field, *_, query_string = query_string.split("__")
-
             try:
                 instance = getattr(instance, instance_field, instance)
             except ObjectDoesNotExist:

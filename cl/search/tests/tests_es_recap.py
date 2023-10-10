@@ -193,8 +193,8 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 date_filed=datetime.date(2015, 8, 16),
                 date_argued=datetime.date(2013, 5, 20),
                 docket_number="1:21-bk-1234",
-                assigned_to=self.judge,
-                referred_to=self.judge_2,
+                assigned_to=None,
+                referred_to=None,
                 nature_of_suit="440",
             ),
             date_filed=datetime.date(2015, 8, 19),
@@ -242,16 +242,44 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIn(attorney.name, docket_doc.attorney)
         self.assertIn(firm.pk, docket_doc.firm_id)
         self.assertIn(firm.name, docket_doc.firm)
+        self.assertEqual(None, docket_doc.assignedTo)
+        self.assertEqual(None, docket_doc.referredTo)
+        self.assertEqual(None, docket_doc.assigned_to_id)
+        self.assertEqual(None, docket_doc.referred_to_id)
+
+        # Confirm assigned_to and referred_to are properly updated in Docket.
+        judge = PersonFactory.create(name_first="Thalassa", name_last="Miller")
+        judge_2 = PersonFactory.create(
+            name_first="Persephone", name_last="Sinclair"
+        )
 
         # Update docket field:
         de_1.docket.case_name = "USA vs Bank"
+        de_1.docket.assigned_to = judge
+        de_1.docket.referred_to = judge_2
         de_1.docket.save()
 
         docket_doc = DocketDocument.get(id=docket_pk)
         self.assertIn("USA vs Bank", docket_doc.caseName)
+        self.assertIn(judge.name_full, docket_doc.assignedTo)
+        self.assertIn(judge_2.name_full, docket_doc.referredTo)
+        self.assertEqual(judge.pk, docket_doc.assigned_to_id)
+        self.assertEqual(judge_2.pk, docket_doc.referred_to_id)
+
+        # Update judges name.
+        judge.name_first = "William"
+        judge.name_last = "Anderson"
+        judge.save()
+
+        judge_2.name_first = "Emily"
+        judge_2.name_last = "Clark"
+        judge_2.save()
+
+        docket_doc = DocketDocument.get(id=docket_pk)
+        self.assertIn(judge.name_full, docket_doc.assignedTo)
+        self.assertIn(judge_2.name_full, docket_doc.referredTo)
 
         # Update docket entry field:
-
         de_1.description = "Notification to File Ipsum"
         de_1.entry_number = 99
         de_1.save()
@@ -268,13 +296,19 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(str(bank.trustee_str), docket_doc.trustee_str)
 
         # Update Bankruptcy document.
-        bank.chapter = "97"
+        bank.chapter = "98"
         bank.trustee_str = "Victoria, Sherline"
         bank.save()
 
         docket_doc = DocketDocument.get(id=docket_pk)
-        self.assertEqual("97", docket_doc.chapter)
+        self.assertEqual("98", docket_doc.chapter)
         self.assertEqual("Victoria, Sherline", docket_doc.trustee_str)
+
+        # Remove Bankruptcy document and confirm it gets removed from Docket.
+        bank.delete()
+        docket_doc = DocketDocument.get(id=docket_pk)
+        self.assertEqual(None, docket_doc.chapter)
+        self.assertEqual(None, docket_doc.trustee_str)
 
         # Add another RD:
         rd_2 = RECAPDocumentFactory(
@@ -339,11 +373,17 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "q": "USA vs Bank Lorem",
         }
 
-        # Query the parent docket and confirm is indexed.
+        # Query the parent docket and confirm is indexed with the right content
         response = self._test_main_es_query(params, 1, "q")
         for i in range(2):
             self._compare_response_child_value(
                 response, 0, i, judge.name_full, "assignedTo"
+            )
+            self._compare_response_child_value(
+                response, 0, i, bank_data.chapter, "chapter"
+            )
+            self._compare_response_child_value(
+                response, 0, i, bank_data.trustee_str, "trustee_str"
             )
 
         # Update some docket fields.
@@ -461,6 +501,16 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             self._compare_response_child_value(response, 0, i, "15", "chapter")
             self._compare_response_child_value(
                 response, 0, i, "Jessica Taylor", "trustee_str"
+            )
+
+        # Remove BankruptcyInformation and confirm it's removed from RDs.
+        bank_data.delete()
+        response = self._test_main_es_query(params, 1, "q")
+        # Confirm all docket fields in the RDs were updated.
+        for i in range(2):
+            self._compare_response_child_value(response, 0, i, None, "chapter")
+            self._compare_response_child_value(
+                response, 0, i, None, "trustee_str"
             )
 
         # Also confirm the assigned_to_str and referred_to_str are being

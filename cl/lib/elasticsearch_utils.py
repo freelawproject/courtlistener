@@ -702,48 +702,56 @@ def build_es_base_query(
                 cd.get("q", ""),
             )
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
-            child_query_fields = {
-                "recap_document": add_fields_boosting(
+            child_fields = [
+                "case_name_full",
+                "suitNature",
+                "juryDemand",
+                "cause",
+                "assignedTo",
+                "referredTo",
+                "court",
+                "court_id",
+                "court_citation_string",
+                "chapter",
+                "trustee_str",
+                "short_description",
+                "plain_text",
+                "document_type",
+            ]
+
+            child_fields.extend(
+                add_fields_boosting(
                     cd,
                     [
                         "description",
-                        "short_description",
-                        "plain_text",
-                        "document_type",
                         # Docket Fields
                         "docketNumber",
                         "caseName",
-                        "case_name_full",
-                        "suitNature",
-                        "cause",
-                        "juryDemand",
-                        "assignedTo",
-                        "referredTo",
-                        "court",
-                        "court_id",
-                        "court_citation_string",
-                        "chapter",
-                        "trustee_str",
                     ],
-                ),
-            }
-            parent_query_fields = add_fields_boosting(
-                cd,
-                [
-                    "docketNumber",
-                    "caseName",
-                    "case_name_full",
-                    "suitNature",
-                    "cause",
-                    "juryDemand",
-                    "assignedTo",
-                    "referredTo",
-                    "court",
-                    "court_id",
-                    "court_citation_string",
-                    "chapter",
-                    "trustee_str",
-                ],
+                )
+            )
+            child_query_fields = {"recap_document": child_fields}
+            parent_query_fields = [
+                "case_name_full",
+                "suitNature",
+                "cause",
+                "juryDemand",
+                "assignedTo",
+                "referredTo",
+                "court",
+                "court_id",
+                "court_citation_string",
+                "chapter",
+                "trustee_str",
+            ]
+            parent_query_fields.extend(
+                add_fields_boosting(
+                    cd,
+                    [
+                        "docketNumber",
+                        "caseName",
+                    ],
+                )
             )
             string_query, join_query = build_full_join_es_queries(
                 cd, child_query_fields, parent_query_fields

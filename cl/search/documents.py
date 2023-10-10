@@ -22,6 +22,7 @@ from cl.search.es_indices import (
 )
 from cl.search.forms import SearchForm
 from cl.search.models import (
+    BankruptcyInformation,
     Citation,
     Docket,
     ParentheticalGroup,
@@ -1016,11 +1017,11 @@ class DocketDocument(DocketBaseDocument):
             return instance.referred_to_str
 
     def prepare_chapter(self, instance):
-        if hasattr(instance, "bankruptcy_information"):
+        if BankruptcyInformation.objects.filter(docket=instance).exists():
             return instance.bankruptcy_information.chapter
 
     def prepare_trustee_str(self, instance):
-        if hasattr(instance, "bankruptcy_information"):
+        if BankruptcyInformation.objects.filter(docket=instance).exists():
             return instance.bankruptcy_information.trustee_str
 
     def prepare_docket_child(self, instance):

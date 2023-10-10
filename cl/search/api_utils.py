@@ -48,7 +48,7 @@ def get_object_list(request, cd, paginator):
         search_query = None
 
     if search_query:
-       (
+        (
             main_query,
             total_query_results,
             top_hits_limit,

@@ -113,6 +113,13 @@ recap_boosts_qf = {
     "docketNumber": 3.0,
     "description": 2.0,
 }
+recap_boosts_es = {
+    # Docket fields
+    "caseName": 4.0,
+    "docketNumber": 3.0,
+    # RECAPDocument fields:
+    "description": 2.0,
+}
 recap_boosts_pf = {"text": 3.0, "caseName": 3.0, "description": 3.0}
 BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
     "qf": {
@@ -138,6 +145,10 @@ BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
             "supervisor": 0.3,
             "predecessor": 0.3,
         },
+    },
+    "es": {
+        SEARCH_TYPES.RECAP: recap_boosts_es,
+        SEARCH_TYPES.DOCKETS: recap_boosts_es,
     },
     # Phrase-based boosts.
     "pf": {
