@@ -739,29 +739,6 @@ def remove_doc_from_es_index(
     try:
         doc = es_document.get(id=doc_id)
         doc.delete(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)
-        if es_document is PersonDocument:
-            instance = Person.objects.get(pk=instance_id)
-            position_objects = instance.positions.all()
-            for position in position_objects:
-                doc_id = ES_CHILD_ID(position.pk).POSITION
-                if PositionDocument.exists(id=doc_id):
-                    doc = PositionDocument.get(id=doc_id)
-                    doc.delete(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)
-        elif es_document is DocketDocument:
-            instance = Docket.objects.get(pk=instance_id)
-            # Prefetch the related RECAPDocument objects for each DocketEntry
-            docket_entries = instance.docket_entries.prefetch_related(
-                Prefetch("recap_documents")
-            ).all()
-            recap_documents = []
-            for docket_entry in docket_entries:
-                recap_documents.extend(
-                    list(docket_entry.recap_documents.all())
-                )
-            for rd in recap_documents:
-                doc = ESRECAPDocument.get(id=ES_CHILD_ID(rd.pk).RECAP)
-                doc.delete(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)
-
     except NotFoundError:
         model_label = es_document.Django.model.__name__.capitalize()
         logger.error(
