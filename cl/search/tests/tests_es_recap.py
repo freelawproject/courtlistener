@@ -145,7 +145,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         )
 
     def test_minute_entry_indexing(self) -> None:
-        """Confirm child documents can be updated and removed properly."""
+        """Confirm a minute entry can be properly indexed."""
 
         de_1 = DocketEntryWithParentsFactory(
             docket=DocketFactory(

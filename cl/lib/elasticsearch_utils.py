@@ -446,11 +446,11 @@ def build_sort_results(cd: CleanData) -> Dict:
 
 
 def get_child_sorting_key(cd: CleanData) -> str:
-    """Given cleaned data, find order_by value and return dict to use with
-    in a has_child query.
+    """Given cleaned data, find order_by value and return a key to use within
+    a has_child query.
 
     :param cd: The user input CleanedData
-    :return: The short dict.
+    :return: The short key.
     """
     order_by_map_child = {
         "entry_date_filed asc": "entry_date_filed",
