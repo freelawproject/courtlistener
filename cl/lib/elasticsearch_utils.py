@@ -590,26 +590,22 @@ def get_search_query(
     :param string_query: An Elasticsearch QueryString object.
     :return: The modified Search object based on the given conditions.
     """
+    if not any([filters, string_query]):
+        match cd["type"]:
+            case SEARCH_TYPES.PEOPLE:
+                return search_query.query(Q("match", person_child="person"))
+            case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
+                return search_query.query(Q("match", docket_child="docket"))
+            case _:
+                return search_query.query("match_all")
 
-    if filters or string_query:
-        if cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
-            return search_query.query(string_query)
+    if string_query:
+        search_query = search_query.query(string_query)
 
-        if filters:
-            search_query = search_query.filter(reduce(operator.iand, filters))
+    if filters:
+        search_query = search_query.filter(reduce(operator.iand, filters))
 
-        if string_query:
-            return search_query.query(string_query)
-
-        return search_query
-
-    if cd["type"] == SEARCH_TYPES.PEOPLE:
-        return search_query.query(Q("match", person_child="person"))
-
-    if cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
-        return search_query.query(Q("match", docket_child="docket"))
-
-    return search_query.query("match_all")
+    return search_query
 
 
 def build_es_base_query(
