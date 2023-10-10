@@ -274,7 +274,7 @@
                             </a>
                         {% endif %}
                     </h2>
-                    {% if type == SEARCH_TYPES.PARENTHETICAL or type == SEARCH_TYPES.ORAL_ARGUMENT %}
+                    {% if type == SEARCH_TYPES.PARENTHETICAL or type == SEARCH_TYPES.ORAL_ARGUMENT or type == SEARCH_TYPES.PEOPLE %}
                       <span class="small gray top">{{ results_details.0|intcomma }}ms</span>
                     {% else %}
                       <span class="small gray top">{{ results.object_list.QTime|intcomma }}ms</span>
@@ -285,6 +285,12 @@
               {% include "includes/pa_search_result.html" %}
             {% elif type == SEARCH_TYPES.ORAL_ARGUMENT %}
               {% flag "oa-es-active" %}
+                {% include "includes/search_result.html" %}
+              {% else %}
+                {% include "includes/search_result_solr.html" %}
+              {% endflag %}
+            {% elif type == SEARCH_TYPES.PEOPLE %}
+              {% flag "p-es-active" %}
                 {% include "includes/search_result.html" %}
               {% else %}
                 {% include "includes/search_result_solr.html" %}
