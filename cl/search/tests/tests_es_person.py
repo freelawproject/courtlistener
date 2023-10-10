@@ -1634,6 +1634,7 @@ class IndexJudgesPositionsCommandTest(
         call_command(
             "cl_index_parent_and_child_docs",
             search_type=SEARCH_TYPES.PEOPLE,
+            queue="celery",
             pk_offset=0,
         )
 

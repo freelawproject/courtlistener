@@ -1997,6 +1997,7 @@ class IndexDocketRECAPDocumentsCommandTest(
         call_command(
             "cl_index_parent_and_child_docs",
             search_type=SEARCH_TYPES.RECAP,
+            queue="celery",
             pk_offset=0,
         )
 
