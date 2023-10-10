@@ -734,15 +734,6 @@ def remove_doc_from_es_index(
     try:
         doc = es_document.get(id=doc_id)
         doc.delete(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)
-
-        if es_document is PersonDocument:
-            instance = Person.objects.get(pk=instance_id)
-            position_objects = instance.positions.all()
-            for position in position_objects:
-                doc_id = ES_CHILD_ID(position.pk).POSITION
-                if PositionDocument.exists(id=doc_id):
-                    doc = PositionDocument.get(id=doc_id)
-                    doc.delete(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)
     except NotFoundError:
         model_label = es_document.Django.model.__name__.capitalize()
         logger.error(
