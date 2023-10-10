@@ -1614,7 +1614,7 @@ class PeopleSearchTestElasticSearch(
 class IndexJudgesPositionsCommandTest(
     CourtTestCase, PeopleTestCase, ESIndexTestCase, TestCase
 ):
-    """test_cl_index_judges_positions_command tests for Elasticsearch"""
+    """test_cl_index_parent_and_child_docs_command tests for Elasticsearch"""
 
     @classmethod
     def setUpTestData(cls):
@@ -1623,16 +1623,17 @@ class IndexJudgesPositionsCommandTest(
         cls.delete_index("people_db.Person")
         cls.create_index("people_db.Person")
 
-    def test_cl_index_judges_positions_command(self):
+    def test_cl_index_parent_and_child_docs_command(self):
         """Confirm the command can properly index Judges and their positions
         into the ES."""
 
         s = PersonDocument.search().query("match_all")
         self.assertEqual(s.count(), 0)
 
-        # Call cl_index_judges_and_positions command.
+        # Call cl_index_parent_and_child_docs command.
         call_command(
-            "cl_index_judges_and_positions",
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.PEOPLE,
             pk_offset=0,
         )
 

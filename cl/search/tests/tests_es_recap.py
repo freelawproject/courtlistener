@@ -2,6 +2,7 @@ import datetime
 import unittest
 
 from asgiref.sync import sync_to_async
+from django.core.management import call_command
 from django.test import override_settings
 from django.urls import reverse
 from elasticsearch_dsl import Q
@@ -17,7 +18,7 @@ from cl.people_db.factories import (
     PartyTypeFactory,
     PersonFactory,
 )
-from cl.search.documents import ES_CHILD_ID, DocketDocument
+from cl.search.documents import ES_CHILD_ID, DocketDocument, ESRECAPDocument
 from cl.search.factories import (
     BankruptcyInformationFactory,
     DocketEntryWithParentsFactory,
@@ -1972,3 +1973,62 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 msg="Did not find %s node(s) with XPath query: %s. "
                 "Instead found: %s" % (count, test, node_count),
             )
+
+
+class IndexDocketRECAPDocumentsCommandTest(
+    RECAPSearchTestCase, ESIndexTestCase, TestCase
+):
+    """cl_index_parent_and_child_docs command tests for Elasticsearch"""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.rebuild_index("search.Docket")
+        super().setUpTestData()
+        cls.delete_index("search.Docket")
+        cls.create_index("search.Docket")
+
+    def test_cl_index_parent_and_child_docs_command(self):
+        """Confirm the command can properly index Dockets and their
+        RECAPDocuments into the ES."""
+
+        s = DocketDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0)
+        # Call cl_index_parent_and_child_docs command.
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            pk_offset=0,
+        )
+
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="docket"))
+        self.assertEqual(s.count(), 2, msg="Wrong number of Dockets returned.")
+
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="recap_document"))
+        self.assertEqual(
+            s.count(), 3, msg="Wrong number of RECAPDocuments returned."
+        )
+
+        # RECAPDocuments are indexed.
+        rds_pks = [
+            self.rd.pk,
+            self.rd_att.pk,
+            self.rd_2.pk,
+        ]
+        for rd_pk in rds_pks:
+            self.assertTrue(
+                ESRECAPDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP)
+            )
+
+        s = DocketDocument.search()
+        s = s.query("parent_id", type="recap_document", id=self.de.pk)
+        self.assertEqual(
+            s.count(), 2, msg="Wrong number of RECAPDocuments returned."
+        )
+
+        s = DocketDocument.search()
+        s = s.query("parent_id", type="recap_document", id=self.de_1.pk)
+        self.assertEqual(
+            s.count(), 1, msg="Wrong number of RECAPDocuments returned."
+        )
