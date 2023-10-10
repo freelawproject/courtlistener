@@ -850,8 +850,9 @@ async def add_docket_entries(
 
         attachments = docket_entry.get("attachments")
         if attachments is not None:
+            court = await Court.objects.aget(pk=d.court_id)
             await merge_attachment_page_data(
-                d.court,
+                court,
                 d.pacer_case_id,
                 rd.pacer_doc_id,
                 docket_entry["document_number"],
@@ -1440,9 +1441,11 @@ async def clean_duplicate_attachment_entries(
     if not await dupe_doc_ids.aexists():
         return
     dupes = rds.filter(
-        pacer_doc_id__in=[i["pacer_doc_id"] for i in dupe_doc_ids]
+        pacer_doc_id__in=[
+            i["pacer_doc_id"] async for i in dupe_doc_ids.aiterator()
+        ]
     )
-    for dupe in dupes.aiterator():
+    async for dupe in dupes.aiterator():
         for attachment in attachment_dicts:
             attachment_number = attachment["attachment_number"]
             pacer_doc_id = attachment["pacer_doc_id"]

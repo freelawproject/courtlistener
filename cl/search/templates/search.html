@@ -277,7 +277,7 @@
                             </a>
                         {% endif %}
                     </h2>
-                    {% if type == SEARCH_TYPES.PARENTHETICAL or type == SEARCH_TYPES.ORAL_ARGUMENT or type == SEARCH_TYPES.RECAP %}
+                    {% if type == SEARCH_TYPES.PARENTHETICAL or type == SEARCH_TYPES.ORAL_ARGUMENT or type == SEARCH_TYPES.PEOPLE or type == SEARCH_TYPES.RECAP %}
                       <span class="small gray top">{{ results_details.0|intcomma }}ms</span>
                     {% else %}
                       <span class="small gray top">{{ results.object_list.QTime|intcomma }}ms</span>

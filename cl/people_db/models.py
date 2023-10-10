@@ -217,6 +217,8 @@ class Person(AbstractDateTimeModel):
             "dob_city",
             "dob_state",
             "fjc_id",
+            "date_dob",
+            "date_dod",
         ]
     )
     es_rd_field_tracker = FieldTracker(fields=["name_full"])

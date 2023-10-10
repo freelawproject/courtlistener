@@ -19,6 +19,7 @@ from cl.lib.model_helpers import clean_docket_number, is_docket_number
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.types import CleanData, SearchParam
 from cl.search.constants import (
+    BOOSTS,
     SEARCH_ORAL_ARGUMENT_HL_FIELDS,
     SEARCH_RECAP_HL_FIELDS,
     SOLR_OPINION_HL_FIELDS,
@@ -32,95 +33,6 @@ from cl.search.models import (
     OpinionCluster,
     RECAPDocument,
 )
-
-recap_boosts_qf = {
-    # Docket fields
-    "text": 1.0,
-    "caseName": 4.0,
-    "docketNumber": 3.0,
-    "description": 2.0,
-}
-recap_boosts_es = {
-    # Docket fields
-    "caseName": 4.0,
-    "docketNumber": 3.0,
-    "case_name_full": 1,
-    "suitNature": 1,
-    "cause": 1,
-    "juryDemand": 1,
-    "assignedTo": 1,
-    "referredTo": 1,
-    "court": 1,
-    "court_id_text": 1,
-    "court_citation_string": 1,
-    "chapter": 1,
-    "trustee_str": 1,
-    # RECAPDocument fields:
-    "description": 2.0,
-    "short_description": 1,
-    "plain_text": 1,
-    "document_type": 1,
-}
-recap_boosts_pf = {"text": 3.0, "caseName": 3.0, "description": 3.0}
-BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
-    "qf": {
-        SEARCH_TYPES.OPINION: {
-            "text": 1.0,
-            "caseName": 4.0,
-            "docketNumber": 2.0,
-        },
-        SEARCH_TYPES.RECAP: recap_boosts_qf,
-        SEARCH_TYPES.DOCKETS: recap_boosts_qf,
-        SEARCH_TYPES.ORAL_ARGUMENT: {
-            "text": 1.0,
-            "caseName": 4.0,
-            "docketNumber": 2.0,
-        },
-        SEARCH_TYPES.PEOPLE: {
-            # Was previously 4, but that had bad results for the name "William"
-            # due to Williams and Mary College.
-            "name": 8,
-            "gender": 1,
-            "alias": 1,
-            "dob_city": 1,
-            "political_affiliation": 1,
-            "religion": 1,
-            "fjc_id": 1,
-            "aba_rating": 1,
-            "school": 1,
-            "political_affiliation": 1,
-            # Suppress these fields b/c a match on them returns the wrong
-            # person.
-            "appointer": 0.3,
-            "supervisor": 0.3,
-            "predecessor": 0.3,
-            "position_type": 1,
-            "nomination_process": 1,
-            "judicial_committee_action": 1,
-            "selection_method": 1,
-            "termination_reason": 1,
-            "court_full_name": 1,
-            "court_citation_string": 1,
-            "court_exact": 1,
-            "organization_name": 1,
-            "job_title": 1,
-        },
-    },
-    "es": {
-        SEARCH_TYPES.RECAP: recap_boosts_es,
-        SEARCH_TYPES.DOCKETS: recap_boosts_es,
-    },
-    # Phrase-based boosts.
-    "pf": {
-        SEARCH_TYPES.OPINION: {"text": 3.0, "caseName": 3.0},
-        SEARCH_TYPES.RECAP: recap_boosts_pf,
-        SEARCH_TYPES.DOCKETS: recap_boosts_pf,
-        SEARCH_TYPES.ORAL_ARGUMENT: {"caseName": 3.0},
-        SEARCH_TYPES.PEOPLE: {
-            # None here. Phrases don't make much sense for people.
-        },
-    },
-}
 
 
 def get_solr_interface(

@@ -1,7 +1,7 @@
 from typing import Any
 
 from celery.canvas import chain
-from django.core.exceptions import FieldDoesNotExist
+from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist
 from django.db.models.signals import m2m_changed, post_delete, post_save
 from elasticsearch.exceptions import NotFoundError
 
@@ -24,6 +24,7 @@ from cl.search.documents import (
     AudioDocument,
     ESRECAPDocument,
     ParentheticalGroupDocument,
+    PersonDocument,
     PositionDocument,
 )
 from cl.search.models import BankruptcyInformation, Docket
@@ -145,11 +146,15 @@ def document_fields_to_update(
 
 
 def get_or_create_doc(
-    es_document: ESDocumentClassType, instance: ESModelType
+    es_document: ESDocumentClassType,
+    instance: ESModelType,
+    avoid_creation: bool = False,
 ) -> ESDocumentInstanceType | None:
     """Get or create a document in Elasticsearch.
     :param es_document: The Elasticsearch document type.
     :param instance: The instance of the document to get or create.
+    :param avoid_creation: Whether the document shouldn't be created if it doesn't
+    exist.
     :return: An Elasticsearch document if found, otherwise None.
     """
 
@@ -164,7 +169,8 @@ def get_or_create_doc(
     try:
         main_doc = es_document.get(id=doc_id)
     except NotFoundError:
-        save_document_in_es.delay(instance, es_document)
+        if not avoid_creation:
+            save_document_in_es.delay(instance, es_document)
         return None
     return main_doc
 
@@ -350,6 +356,77 @@ def update_reverse_related_documents(
         )
 
 
+def prepare_and_update_fields(
+    affected_fields: list[str],
+    main_doc: ESDocumentInstanceType,
+    main_object: ESModelType,
+):
+    """Prepare and update affected fields in an Elasticsearch document.
+
+    :param affected_fields: List of field names that need to be updated.
+    :param main_doc: A Elasticsearch DSL document.
+    :param main_object: The instance for which the reverse related documents
+    are to be updated.
+    :return: None.
+    """
+
+    fields_to_update = {}
+    for field in affected_fields:
+        prepare_method = getattr(main_doc, f"prepare_{field}", None)
+        if not prepare_method:
+            continue
+        field_value = prepare_method(main_object)
+        fields_to_update[field] = field_value
+
+    update_document_in_es.delay(
+        main_doc,
+        fields_to_update,
+    )
+
+
+def delete_reverse_related_documents(
+    main_model: ESModelType,
+    es_document: ESDocumentClassType,
+    instance: ESModelType,
+    query_string: str,
+    affected_fields: list[str],
+) -> None:
+    """Update reverse related document fields in Elasticsearch when the reverse
+    instance is removed.
+    :param main_model: The main model to fetch objects from.
+    :param es_document: The Elasticsearch document type.
+    :param instance: The instance for which the reverse related documents are
+    to be updated.
+    :param query_string: The query string to filter the main model objects.
+    :param affected_fields: The list of field names that are reverse related to
+    the instance.
+    :return: None
+    """
+    match instance:
+        case Person() if es_document is PositionDocument:  # type: ignore
+            # bulk update position documents when a new reverse related record
+            # is deleted
+            update_child_documents_by_query.delay(
+                es_document, instance, affected_fields
+            )
+        case Person() if es_document is PersonDocument:  # type: ignore
+            main_doc = get_or_create_doc(
+                es_document, instance, avoid_creation=True
+            )
+            if main_doc:
+                prepare_and_update_fields(affected_fields, main_doc, instance)
+        case _:
+            main_objects = main_model.objects.filter(
+                **{query_string: instance}
+            )
+            for main_object in main_objects:
+                main_doc = get_or_create_doc(es_document, main_object)
+                if main_doc:
+                    prepare_and_update_fields(
+                        affected_fields, main_doc, main_object
+                    )
+
+
 def avoid_es_audio_indexing(
     instance: ESModelType,
     es_document: ESDocumentClassType,
@@ -399,6 +476,9 @@ class ESSignalProcessor(object):
         models_reverse_foreign_key = list(
             self.documents_model_mapping["reverse"].keys()
         )
+        models_reverse_foreign_key_delete = list(
+            self.documents_model_mapping["reverse-delete"].keys()
+        )
         main_model = self.main_model.__name__.lower()
 
         # Connect signals for save
@@ -419,12 +499,19 @@ class ESSignalProcessor(object):
             self.handle_m2m,
             {m2m_changed: f"update_{main_model}_m2m_in_es_index"},
         )
-        # Connect signals for save and delete on models with reverse foreign keys
+        # Connect signals for save on models with reverse foreign keys
         self.connect_signals(
             models_reverse_foreign_key,
             self.handle_reverse_actions,
             {
                 post_save: f"update_reverse_related_{main_model}_on_save",
+            },
+        )
+        # Connect signals for delete on models with reverse-delete foreign keys
+        self.connect_signals(
+            models_reverse_foreign_key_delete,
+            self.handle_reverse_actions_delete,
+            {
                 post_delete: f"update_reverse_related_{main_model}_on_delete",
             },
         )
@@ -511,6 +598,38 @@ class ESSignalProcessor(object):
                 self.main_model,
                 self.es_document,
                 getattr(instance, instance_field, instance),
+                query_string,
+                affected_fields,
+            )
+
+    @elasticsearch_enabled
+    def handle_reverse_actions_delete(self, sender, instance=None, **kwargs):
+        """Receiver function that gets called after a reverse relation is
+        removed.
+        """
+        mapping_fields = self.documents_model_mapping["reverse-delete"][sender]
+        for query_string, fields_map in mapping_fields.items():
+            try:
+                affected_fields = fields_map[instance.type]
+            except (KeyError, AttributeError):
+                affected_fields = fields_map["all"]
+
+            instance_field = query_string.split("__")[-1]
+            if isinstance(
+                instance, (ABARating, PoliticalAffiliation, Education)
+            ):
+                instance_field, *_, query_string = query_string.split("__")
+
+            try:
+                instance = getattr(instance, instance_field, instance)
+            except ObjectDoesNotExist:
+                # The related objects has already been removed, abort.
+                return
+
+            delete_reverse_related_documents(
+                self.main_model,
+                self.es_document,
+                instance,
                 query_string,
                 affected_fields,
             )

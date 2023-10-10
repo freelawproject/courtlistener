@@ -12,6 +12,7 @@ from cl.people_db.models import (
     Person,
     PoliticalAffiliation,
     Position,
+    Race,
     School,
 )
 from cl.search.documents import (
@@ -117,6 +118,15 @@ pa_field_mapping = {
             },
         }
     },
+    "reverse-delete": {
+        Citation: {
+            "opinion__cluster": {
+                "all": ["citation"],
+                Citation.NEUTRAL: ["citation", "neutralCite"],
+                Citation.LEXIS: ["citation", "lexisCite"],
+            },
+        }
+    },
 }
 
 oa_field_mapping = {
@@ -138,6 +148,7 @@ oa_field_mapping = {
     "delete": {Audio: {}},
     "m2m": {Audio.panel.through: {"audio": {"panel_ids": "panel_ids"}}},
     "reverse": {},
+    "reverse-delete": {},
 }
 
 p_field_mapping = {
@@ -145,12 +156,21 @@ p_field_mapping = {
         Person: {},
     },
     "delete": {Person: {}},
-    "m2m": {},
+    "m2m": {Person.race.through: {"person": {"races": "races"}}},
     "reverse": {
         Education: {"educations": {"all": ["school"]}},
         ABARating: {"aba_ratings": {"all": ["aba_rating"]}},
         PoliticalAffiliation: {
             "political_affiliations": {
+                "all": ["political_affiliation", "political_affiliation_id"]
+            }
+        },
+    },
+    "reverse-delete": {
+        Education: {"person__pk": {"all": ["school"]}},
+        ABARating: {"person__pk": {"all": ["aba_rating"]}},
+        PoliticalAffiliation: {
+            "person__pk": {
                 "all": ["political_affiliation", "political_affiliation_id"]
             }
         },
@@ -175,26 +195,42 @@ position_field_mapping = {
                 "religion": ["religion"],
                 "gender": ["gender"],
                 "dob_city": ["dob_city"],
-                "dob_state": ["dob_state"],
+                "dob_state": ["dob_state", "dob_state_id"],
                 "fjc_id": ["fjc_id"],
+                "date_dob": ["dob"],
+                "date_dod": ["dod"],
             },
         },
         School: {"educations__school": {"name": ["school"]}},
         PoliticalAffiliation: {
             "political_affiliations": {
-                "political_party": ["political_affiliation"]
+                "political_party": [
+                    "political_affiliation",
+                    "political_affiliation_id",
+                ],
             }
         },
         ABARating: {"aba_ratings": {"rating": ["aba_rating"]}},
         Position: {},
     },
     "delete": {Position: {}},
-    "m2m": {},
+    "m2m": {Person.race.through: {"person": {"races": "races"}}},
     "reverse": {
         Education: {"educations": {"all": ["school"]}},
         ABARating: {"aba_ratings": {"all": ["aba_rating"]}},
         PoliticalAffiliation: {
-            "political_affiliations": {"all": ["political_affiliation"]}
+            "political_affiliations": {
+                "all": ["political_affiliation", "political_affiliation_id"]
+            }
+        },
+    },
+    "reverse-delete": {
+        Education: {"person__pk": {"all": ["school"]}},
+        ABARating: {"person__pk": {"all": ["aba_rating"]}},
+        PoliticalAffiliation: {
+            "person__pk": {
+                "all": ["political_affiliation", "political_affiliation_id"]
+            }
         },
     },
 }

@@ -68,14 +68,14 @@ class PeopleTestCase(SimpleTestCase):
 
     @classmethod
     def setUpTestData(cls):
-        w_race = Race.objects.get(race="w")
-        b_race = Race.objects.get(race="b")
+        cls.w_race = Race.objects.get(race="w")
+        cls.b_race = Race.objects.get(race="b")
         cls.person_1 = PersonFactory.create(
             gender="m",
             name_first="Bill",
             name_last="Clinton",
         )
-        cls.person_1.race.add(w_race)
+        cls.person_1.race.add(cls.w_race)
 
         cls.person_2 = PersonFactory.create(
             gender="f",
@@ -89,8 +89,8 @@ class PeopleTestCase(SimpleTestCase):
             dob_city="Brookyln",
             dob_state="NY",
         )
-        cls.person_2.race.add(w_race)
-        cls.person_2.race.add(b_race)
+        cls.person_2.race.add(cls.w_race)
+        cls.person_2.race.add(cls.b_race)
 
         cls.person_3 = PersonFactory.create(
             gender="f",
@@ -102,7 +102,7 @@ class PeopleTestCase(SimpleTestCase):
             dob_city="Queens",
             dob_state="NY",
         )
-        cls.person_3.race.add(w_race)
+        cls.person_3.race.add(cls.w_race)
 
         cls.position_1 = PositionFactory.create(
             date_granularity_start="%Y-%m-%d",

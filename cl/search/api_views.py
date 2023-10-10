@@ -184,7 +184,7 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
             ):
                 serializer = OAESResultSerializer(result_page, many=True)
             elif search_type == SEARCH_TYPES.PEOPLE and waffle.flag_is_active(
-                request, "p-es-activate"
+                request, "p-es-active"
             ):
                 serializer = ExtendedPersonESSerializer(result_page, many=True)
             else:

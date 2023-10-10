@@ -29,8 +29,8 @@ oral_arguments_percolator_index.settings(
 # Define people elasticsearch index
 people_db_index = Index("people_db_index")
 people_db_index.settings(
-    number_of_shards=settings.ELASTICSEARCH_NUMBER_OF_SHARDS,
-    number_of_replicas=settings.ELASTICSEARCH_NUMBER_OF_REPLICAS,
+    number_of_shards=settings.ELASTICSEARCH_PEOPLE_NUMBER_OF_SHARDS,
+    number_of_replicas=settings.ELASTICSEARCH_PEOPLE_NUMBER_OF_REPLICAS,
     analysis=settings.ELASTICSEARCH_DSL["analysis"],
 )
 

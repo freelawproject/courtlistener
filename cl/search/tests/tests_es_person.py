@@ -1,7 +1,9 @@
 import datetime
 import operator
+from collections import Counter
 from functools import reduce
 
+from django.core.management import call_command
 from django.urls import reverse
 from elasticsearch_dsl import Q
 from lxml import html
@@ -103,6 +105,99 @@ class PeopleSearchTestElasticSearch(
             self.assertTrue(
                 PersonDocument.exists(id=ES_CHILD_ID(position_pk).POSITION)
             )
+
+    def test_index_all_person_positions(self) -> None:
+        """Confirm we can index all the person positions in ES after a
+        judiciary position is created for the person.
+        """
+
+        person = PersonFactory.create(
+            gender="f",
+            name_first="Ava",
+            name_last="Wilson",
+            date_dob=datetime.date(1942, 10, 21),
+            date_dod=datetime.date(2020, 11, 25),
+            date_granularity_dob="%Y-%m-%d",
+            date_granularity_dod="%Y-%m-%d",
+        )
+        no_jud_position = PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            date_start=datetime.date(2015, 12, 14),
+            organization_name="Pants, Inc.",
+            job_title="Corporate Lawyer",
+            position_type=None,
+            person=person,
+        )
+
+        # At this point there is no judiciary position for person, so the
+        # person and no_jud_position are not indexed yet.
+        self.assertFalse(PersonDocument.exists(id=person.pk))
+        self.assertFalse(
+            PersonDocument.exists(id=ES_CHILD_ID(no_jud_position.pk).POSITION)
+        )
+
+        # Add a judiciary position:
+        jud_position = PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            court=self.court_1,
+            date_start=datetime.date(2015, 12, 14),
+            predecessor=self.person_2,
+            appointer=self.position_1,
+            judicial_committee_action="no_rep",
+            termination_reason="retire_mand",
+            position_type="c-jud",
+            person=person,
+            how_selected="e_part",
+            nomination_process="fed_senate",
+            date_elected=datetime.date(2015, 11, 12),
+        )
+
+        # Confirm now the Person is indexed in ES.
+        self.assertTrue(PersonDocument.exists(id=person.pk))
+        # Also the judiciary position is indexed.
+        self.assertTrue(
+            PositionDocument.exists(id=ES_CHILD_ID(jud_position.pk).POSITION)
+        )
+        # Previous no judiciary positions should also been indexed now.
+        self.assertTrue(
+            PositionDocument.exists(
+                id=ES_CHILD_ID(no_jud_position.pk).POSITION
+            )
+        )
+
+        # Upcoming non-judiciary and judiciary positions should be indexed.
+        no_jud_position_2 = PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            date_start=datetime.date(2015, 12, 14),
+            organization_name="Pants, Inc.",
+            job_title="Corporate Lawyer",
+            position_type=None,
+            person=person,
+        )
+        self.assertTrue(
+            PositionDocument.exists(
+                id=ES_CHILD_ID(no_jud_position_2.pk).POSITION
+            )
+        )
+
+        jud_position_2 = PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            court=self.court_1,
+            date_start=datetime.date(2015, 12, 14),
+            predecessor=self.person_2,
+            appointer=self.position_1,
+            judicial_committee_action="no_rep",
+            termination_reason="retire_mand",
+            position_type="c-jud",
+            person=person,
+            how_selected="e_part",
+            nomination_process="fed_senate",
+            date_elected=datetime.date(2015, 11, 12),
+        )
+        self.assertTrue(
+            PositionDocument.exists(id=ES_CHILD_ID(jud_position_2.pk).POSITION)
+        )
+        person.delete()
 
     def test_remove_parent_child_objects_from_index(self) -> None:
         """Confirm join child objects are removed from the index when the
@@ -231,7 +326,6 @@ class PeopleSearchTestElasticSearch(
             how_selected="e_part",
             nomination_process="fed_senate",
         )
-
         person.delete()
 
     def test_has_child_filters(self) -> None:
@@ -239,6 +333,19 @@ class PeopleSearchTestElasticSearch(
         list of parent documents where their child's documents or the parent
         document itself match the filter.
         """
+        position_5 = PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            court=self.court_2,
+            date_start=datetime.date(2020, 12, 14),
+            predecessor=self.person_3,
+            appointer=self.position_1,
+            judicial_committee_action="no_rep",
+            termination_reason="retire_mand",
+            position_type="c-jud",
+            person=self.person_3,
+            how_selected="e_part",
+            nomination_process="fed_senate",
+        )
 
         # Query by parent field dob_state.
         cd = {
@@ -252,7 +359,7 @@ class PeopleSearchTestElasticSearch(
 
         # Query by parent field dob_state and child field selection_method.
         cd = {
-            "dob_state": "NY",
+            "dob_city": "Brookyln",
             "selection_method": "e_part",
             "type": SEARCH_TYPES.PEOPLE,
         }
@@ -260,6 +367,8 @@ class PeopleSearchTestElasticSearch(
         has_child_filters = build_join_es_filters(cd)
         s = s.filter(reduce(operator.iand, has_child_filters))
         self.assertEqual(s.count(), 1)
+
+        position_5.delete()
 
     def test_sorting(self) -> None:
         """Can we do sorting on various fields?"""
@@ -536,6 +645,48 @@ class PeopleSearchTestElasticSearch(
         # API
         r = self._test_api_results_count(params, 1, "q")
         self.assertIn("Olivia", r.content.decode())
+
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "appointer:Clinton AND races:(Black or African American)",
+        }
+        r = self._test_article_count(
+            params,
+            1,
+            "q",
+        )
+        self.assertIn("Judith", r.content.decode())
+        # API
+        r = self._test_api_results_count(params, 1, "q")
+        self.assertIn("Judith", r.content.decode())
+
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "appointer:Clinton AND political_affiliation_id:i",
+        }
+        r = self._test_article_count(
+            params,
+            1,
+            "q",
+        )
+        self.assertIn("Judith", r.content.decode())
+        # API
+        r = self._test_api_results_count(params, 1, "q")
+        self.assertIn("Judith", r.content.decode())
+
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "selection_method_id:e_part AND dob_state_id:NY",
+        }
+        r = self._test_article_count(
+            params,
+            1,
+            "q",
+        )
+        self.assertIn("Judith", r.content.decode())
+        # API
+        r = self._test_api_results_count(params, 1, "q")
+        self.assertIn("Judith", r.content.decode())
 
     def test_parent_document_fields_on_search_results(self):
         params = {
@@ -1023,124 +1174,148 @@ class PeopleSearchTestElasticSearch(
         # API
         r = self._test_api_results_count(params, 1, "API")
 
+        # Compare whether every field in the results contains the same content,
+        # regardless of the order.
         self.assertEqual(
-            r.data["results"][0]["court"],
-            [self.position_2.court.short_name, position_6.court.short_name],
+            Counter(r.data["results"][0]["court"]),
+            Counter(
+                [position_6.court.short_name, self.position_2.court.short_name]
+            ),
         )
         self.assertEqual(
-            r.data["results"][0]["court_exact"],
-            [self.position_2.court.pk, position_6.court.pk],
+            Counter(r.data["results"][0]["court_exact"]),
+            Counter([self.position_2.court.pk, position_6.court.pk]),
         )
         self.assertEqual(
-            r.data["results"][0]["position_type"],
-            [
-                self.position_2.get_position_type_display(),
-                position_6.get_position_type_display(),
-            ],
+            Counter(r.data["results"][0]["position_type"]),
+            Counter(
+                [
+                    self.position_2.get_position_type_display(),
+                    position_6.get_position_type_display(),
+                ]
+            ),
         )
         self.assertEqual(
-            r.data["results"][0]["appointer"],
-            [
-                self.position_2.appointer.person.name_full_reverse,
-                position_6.appointer.person.name_full_reverse,
-            ],
+            Counter(r.data["results"][0]["appointer"]),
+            Counter(
+                [
+                    self.position_2.appointer.person.name_full_reverse,
+                    position_6.appointer.person.name_full_reverse,
+                ]
+            ),
         )
         self.assertEqual(
-            r.data["results"][0]["supervisor"],
-            [position_6.supervisor.name_full_reverse],
+            Counter(r.data["results"][0]["supervisor"]),
+            Counter([position_6.supervisor.name_full_reverse]),
         )
         self.assertEqual(
-            r.data["results"][0]["predecessor"],
-            [
-                self.position_2.predecessor.name_full_reverse,
-                position_6.predecessor.name_full_reverse,
-            ],
+            Counter(r.data["results"][0]["predecessor"]),
+            Counter(
+                [
+                    self.position_2.predecessor.name_full_reverse,
+                    position_6.predecessor.name_full_reverse,
+                ]
+            ),
         )
 
         positions = self.person_2.positions.all()
         self.assertEqual(
-            r.data["results"][0]["date_nominated"],
-            solr_list(positions, "date_nominated"),
+            Counter(r.data["results"][0]["date_nominated"]),
+            Counter(solr_list(positions, "date_nominated")),
         )
         self.assertEqual(
-            r.data["results"][0]["date_elected"],
-            solr_list(positions, "date_elected"),
+            Counter(r.data["results"][0]["date_elected"]),
+            Counter(solr_list(positions, "date_elected")),
         )
         self.assertEqual(
-            r.data["results"][0]["date_recess_appointment"],
-            solr_list(positions, "date_recess_appointment"),
+            Counter(r.data["results"][0]["date_recess_appointment"]),
+            Counter(solr_list(positions, "date_recess_appointment")),
         )
         self.assertEqual(
-            r.data["results"][0]["date_referred_to_judicial_committee"],
-            solr_list(positions, "date_referred_to_judicial_committee"),
+            Counter(
+                r.data["results"][0]["date_referred_to_judicial_committee"]
+            ),
+            Counter(
+                solr_list(positions, "date_referred_to_judicial_committee")
+            ),
         )
         self.assertEqual(
-            r.data["results"][0]["date_judicial_committee_action"],
-            solr_list(positions, "date_judicial_committee_action"),
+            Counter(r.data["results"][0]["date_judicial_committee_action"]),
+            Counter(solr_list(positions, "date_judicial_committee_action")),
         )
         self.assertEqual(
-            r.data["results"][0]["date_hearing"],
-            solr_list(positions, "date_hearing"),
+            Counter(r.data["results"][0]["date_hearing"]),
+            Counter(solr_list(positions, "date_hearing")),
         )
         self.assertEqual(
-            r.data["results"][0]["date_confirmation"],
-            solr_list(positions, "date_confirmation"),
+            Counter(r.data["results"][0]["date_confirmation"]),
+            Counter(solr_list(positions, "date_confirmation")),
         )
         self.assertEqual(
-            r.data["results"][0]["date_start"],
-            solr_list(positions, "date_start"),
+            Counter(r.data["results"][0]["date_start"]),
+            Counter(solr_list(positions, "date_start")),
         )
         self.assertEqual(
-            r.data["results"][0]["date_granularity_start"],
-            [
-                self.position_2.date_granularity_start,
-                self.position_3.date_granularity_start,
-                position_6.date_granularity_start,
-            ],
+            Counter(r.data["results"][0]["date_granularity_start"]),
+            Counter(
+                [
+                    self.position_2.date_granularity_start,
+                    self.position_3.date_granularity_start,
+                    position_6.date_granularity_start,
+                ]
+            ),
         )
         self.assertEqual(
-            r.data["results"][0]["date_retirement"],
-            solr_list(positions, "date_retirement"),
+            Counter(r.data["results"][0]["date_retirement"]),
+            Counter(solr_list(positions, "date_retirement")),
         )
         self.assertEqual(
-            r.data["results"][0]["date_termination"],
-            solr_list(positions, "date_termination"),
+            Counter(r.data["results"][0]["date_termination"]),
+            Counter(solr_list(positions, "date_termination")),
         )
         self.assertEqual(
-            r.data["results"][0]["date_granularity_termination"],
-            [position_6.date_granularity_termination],
+            Counter(r.data["results"][0]["date_granularity_termination"]),
+            Counter([position_6.date_granularity_termination]),
         )
         self.assertEqual(
-            r.data["results"][0]["judicial_committee_action"],
-            [
-                self.position_2.get_judicial_committee_action_display(),
-                position_6.get_judicial_committee_action_display(),
-            ],
+            Counter(r.data["results"][0]["judicial_committee_action"]),
+            Counter(
+                [
+                    self.position_2.get_judicial_committee_action_display(),
+                    position_6.get_judicial_committee_action_display(),
+                ]
+            ),
         )
         self.assertEqual(
-            r.data["results"][0]["nomination_process"],
-            [
-                self.position_2.get_nomination_process_display(),
-                position_6.get_nomination_process_display(),
-            ],
+            Counter(r.data["results"][0]["nomination_process"]),
+            Counter(
+                [
+                    self.position_2.get_nomination_process_display(),
+                    position_6.get_nomination_process_display(),
+                ]
+            ),
         )
         self.assertEqual(
-            r.data["results"][0]["selection_method"],
-            [
-                self.position_2.get_how_selected_display(),
-                position_6.get_how_selected_display(),
-            ],
+            Counter(r.data["results"][0]["selection_method"]),
+            Counter(
+                [
+                    self.position_2.get_how_selected_display(),
+                    position_6.get_how_selected_display(),
+                ]
+            ),
         )
         self.assertEqual(
-            r.data["results"][0]["selection_method_id"],
-            [self.position_2.how_selected, position_6.how_selected],
+            Counter(r.data["results"][0]["selection_method_id"]),
+            Counter([self.position_2.how_selected, position_6.how_selected]),
         )
         self.assertEqual(
-            r.data["results"][0]["termination_reason"],
-            [
-                self.position_2.get_termination_reason_display(),
-                position_6.get_termination_reason_display(),
-            ],
+            Counter(r.data["results"][0]["termination_reason"]),
+            Counter(
+                [
+                    self.position_2.get_termination_reason_display(),
+                    position_6.get_termination_reason_display(),
+                ]
+            ),
         )
 
         position_5.delete()
@@ -1148,7 +1323,22 @@ class PeopleSearchTestElasticSearch(
         person.delete()
 
     def test_update_related_documents(self):
-        person = PersonFactory.create(name_first="John American")
+        person = PersonFactory.create(
+            name_first="John American",
+            date_granularity_dob="%Y-%m-%d",
+            date_granularity_dod="%Y-%m-%d",
+            date_dob=datetime.date(1940, 10, 21),
+            date_dod=datetime.date(2021, 11, 25),
+        )
+        person.race.add(self.w_race)
+        po_af = PoliticalAffiliationFactory.create(
+            political_party="i",
+            source="b",
+            date_start=datetime.date(2015, 12, 14),
+            person=person,
+            date_granularity_start="%Y-%m-%d",
+        )
+
         person_2 = PersonFactory.create(name_first="Barack Obama")
         position_5 = PositionFactory.create(
             date_granularity_start="%Y-%m-%d",
@@ -1201,6 +1391,72 @@ class PeopleSearchTestElasticSearch(
         self.assertEqual(
             self.position_1.person.name_full_reverse, pos_doc.appointer
         )
+
+        # Check for races, political_affiliation_idk, dod and dob, initial values.
+        person_doc = PersonDocument.get(id=person.pk)
+        self.assertEqual(
+            Counter([self.w_race.get_race_display()]),
+            Counter(person_doc.races),
+        )
+        self.assertEqual(person.date_dob, person_doc.dob.date())
+        self.assertEqual(person.date_dod, person_doc.dod.date())
+        self.assertEqual(["i"], person_doc.political_affiliation_id)
+
+        pos_5_doc = PositionDocument.get(
+            id=ES_CHILD_ID(position_5.pk).POSITION
+        )
+        self.assertEqual(
+            Counter([self.w_race.get_race_display()]), Counter(pos_5_doc.races)
+        )
+        self.assertEqual(person.date_dob, pos_5_doc.dob.date())
+        self.assertEqual(person.date_dod, pos_5_doc.dod.date())
+        self.assertEqual(["i"], pos_5_doc.political_affiliation_id)
+
+        # Remove political affiliation:
+        po_af.delete()
+
+        # Add a new race and compare person and position fields.
+        person.race.add(self.b_race)
+        person_doc = PersonDocument.get(id=person.pk)
+        self.assertEqual(
+            Counter(
+                [
+                    self.w_race.get_race_display(),
+                    self.b_race.get_race_display(),
+                ]
+            ),
+            Counter(person_doc.races),
+        )
+        # political_affiliation_id is removed from person doc.
+        self.assertEqual(None, person_doc.political_affiliation_id)
+        pos_5_doc = PositionDocument.get(
+            id=ES_CHILD_ID(position_5.pk).POSITION
+        )
+        self.assertEqual(
+            Counter(
+                [
+                    self.w_race.get_race_display(),
+                    self.b_race.get_race_display(),
+                ]
+            ),
+            Counter(pos_5_doc.races),
+        )
+        # political_affiliation_id is removed form position doc.
+        self.assertEqual(None, pos_5_doc.political_affiliation_id)
+
+        # Update dob and dod:
+        person.date_dob = datetime.date(1940, 10, 25)
+        person.date_dod = datetime.date(2021, 11, 25)
+        person.save()
+
+        person_doc = PersonDocument.get(id=person.pk)
+        pos_5_doc = PositionDocument.get(
+            id=ES_CHILD_ID(position_5.pk).POSITION
+        )
+        self.assertEqual(person.date_dob, person_doc.dob.date())
+        self.assertEqual(person.date_dod, person_doc.dod.date())
+        self.assertEqual(person.date_dob, pos_5_doc.dob.date())
+        self.assertEqual(person.date_dod, pos_5_doc.dod.date())
 
         # Update supervisor
         position_6.supervisor = person_2
@@ -1258,6 +1514,7 @@ class PeopleSearchTestElasticSearch(
 
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         self.assertEqual("Alabama", pos_doc.dob_state)
+        self.assertEqual("AL", pos_doc.dob_state_id)
 
         # Update the gender field in the parent record.
         self.person_3.gender = "m"
@@ -1281,11 +1538,12 @@ class PeopleSearchTestElasticSearch(
         self.assertEqual("39", pos_doc.fjc_id)
 
         # Add education to the parent object
-        EducationFactory(
+        ed_obj = EducationFactory(
             degree_level="ba",
             person=self.person_3,
             school=self.school_2,
         )
+        ed_obj_school_name = ed_obj.school.name
 
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         for education in self.person_3.educations.all():
@@ -1297,6 +1555,14 @@ class PeopleSearchTestElasticSearch(
 
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         self.assertIn("New school updated", pos_doc.school)
+
+        # Remove Education.
+        ed_obj.delete()
+        # Confirm School is removed from the parent and child document.
+        person_3_doc = PersonDocument.get(self.person_3.pk)
+        self.assertNotIn(ed_obj_school_name, person_3_doc.school)
+        pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
+        self.assertNotIn(ed_obj_school_name, pos_doc.school)
 
         # Add political affiliation to the parent object
         PoliticalAffiliationFactory(
@@ -1336,3 +1602,65 @@ class PeopleSearchTestElasticSearch(
         rating.save()
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         self.assertIn("Exceptionally Well Qualified", pos_doc.aba_rating)
+
+        # Remove aba_rating and confirm it's removed from parent and child docs
+        rating.delete()
+        person_3_doc = PersonDocument.get(self.person_3.pk)
+        pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
+        self.assertEqual(None, person_3_doc.aba_rating)
+        self.assertEqual(None, pos_doc.aba_rating)
+
+
+class IndexJudgesPositionsCommandTest(
+    CourtTestCase, PeopleTestCase, ESIndexTestCase, TestCase
+):
+    """test_cl_index_judges_positions_command tests for Elasticsearch"""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.rebuild_index("people_db.Person")
+        super().setUpTestData()
+        cls.delete_index("people_db.Person")
+        cls.create_index("people_db.Person")
+
+    def test_cl_index_judges_positions_command(self):
+        """Confirm the command can properly index Judges and their positions
+        into the ES."""
+
+        s = PersonDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0)
+
+        # Call cl_index_judges_and_positions command.
+        call_command(
+            "cl_index_judges_and_positions",
+            pk_offset=0,
+        )
+
+        s = PersonDocument.search()
+        s = s.query(Q("match", person_child="person"))
+        self.assertEqual(s.count(), 2, msg="Wrong number of judges returned.")
+
+        s = PersonDocument.search()
+        s = s.query(Q("match", person_child="position"))
+        self.assertEqual(
+            s.count(), 3, msg="Wrong number of positions returned."
+        )
+
+        # Positions are indexed.
+        position_pks = [
+            self.position_2.pk,
+            self.position_4.pk,
+            self.position_3.pk,
+        ]
+        for position_pk in position_pks:
+            self.assertTrue(
+                PositionDocument.exists(id=ES_CHILD_ID(position_pk).POSITION)
+            )
+
+        s = PersonDocument.search()
+        s = s.query("parent_id", type="position", id=self.person_2.pk)
+        self.assertEqual(s.count(), 2)
+
+        s = PersonDocument.search()
+        s = s.query("parent_id", type="position", id=self.person_3.pk)
+        self.assertEqual(s.count(), 1)

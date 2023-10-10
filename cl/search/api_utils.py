@@ -38,17 +38,17 @@ def get_object_list(request, cd, paginator):
     )
     is_people_active = cd[
         "type"
-    ] == SEARCH_TYPES.PEOPLE and waffle.flag_is_active(
-        request, "p-es-activate"
-    )
+    ] == SEARCH_TYPES.PEOPLE and waffle.flag_is_active(request, "p-es-active")
 
-    if is_oral_argument_active or is_people_active:
-        search_query = (
-            AudioDocument.search()
-            if is_oral_argument_active
-            else PersonDocument.search()
-        )
-        (
+    if is_oral_argument_active:
+        search_query = AudioDocument.search()
+    elif is_people_active:
+        search_query = PersonDocument.search()
+    else:
+        search_query = None
+
+    if search_query:
+       (
             main_query,
             total_query_results,
             top_hits_limit,
