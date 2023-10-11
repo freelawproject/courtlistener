@@ -32,7 +32,12 @@ from cl.search.documents import (
     PersonDocument,
     PositionDocument,
 )
-from cl.search.models import Docket, OpinionCluster, RECAPDocument
+from cl.search.models import (
+    SEARCH_TYPES,
+    Docket,
+    OpinionCluster,
+    RECAPDocument,
+)
 from cl.search.types import (
     ESDocumentClassType,
     ESDocumentInstanceType,
@@ -458,54 +463,79 @@ def index_docket_parties_in_es(
 )
 def index_parent_and_child_docs(
     self: Task,
-    instance_id: int,
-    parent_es_document: ESDocumentClassType,
-    child_es_document: ESDocumentClassType,
+    instance_ids: list[int],
+    search_type: str,
 ) -> None:
     """Index parent and child documents in Elasticsearch.
 
     :param self: The Celery task instance
-    :param instance_id: The parent instance ID.
+    :param instance_ids: The parent instance IDs to index.
+    :param search_type: The Search Type to index parent and child docs.
     :return: None
     """
 
-    instance = Person.objects.prefetch_related("positions").get(pk=instance_id)
-    doc = parent_es_document().prepare(instance)
-    es_args = {
-        "meta": {"id": instance_id},
-    }
-    response = parent_es_document(**es_args, **doc).save(
-        skip_empty=False,
-        return_doc_meta=False,
-        refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
-    )
-    if response != "created":
-        model_label = parent_es_document.Django.model.__name__.capitalize()
-        logger.error(
-            f"The {model_label} with ID:{instance_id} can't be index in ES. "
-            "Aborting the indexing of their child objects."
-        )
-        return
+    match search_type:
+        case SEARCH_TYPES.PEOPLE:
+            parent_es_document = PersonDocument
+            child_es_document = PositionDocument
+            child_id_property = "POSITION"
+        case SEARCH_TYPES.RECAP:
+            parent_es_document = DocketDocument
+            child_es_document = ESRECAPDocument
+            child_id_property = "RECAP"
+        case _:
+            return
 
-    client = connections.get_connection()
-    child_docs = instance.positions.all()
-    base_doc = {
-        "_op_type": "index",
-        "_index": parent_es_document._index._name,
-    }
-    child_docs_to_index = []
-    for child in child_docs:
-        position_doc = child_es_document().prepare(child)
-        child_params = {
-            "_id": ES_CHILD_ID(child.pk).POSITION,
-            "_routing": f"{instance_id}",
+    for instance_id in instance_ids:
+        if search_type == SEARCH_TYPES.PEOPLE:
+            instance = Person.objects.prefetch_related("positions").get(
+                pk=instance_id
+            )
+            child_docs = instance.positions.all()
+        elif search_type == SEARCH_TYPES.RECAP:
+            instance = Docket.objects.get(pk=instance_id)
+            child_docs = RECAPDocument.objects.filter(
+                docket_entry__docket=instance
+            )
+        else:
+            return
+
+        doc = parent_es_document().prepare(instance)
+        es_args = {
+            "meta": {"id": instance_id},
         }
-        position_doc.update(base_doc)
-        position_doc.update(child_params)
-        child_docs_to_index.append(position_doc)
+        response = parent_es_document(**es_args, **doc).save(
+            skip_empty=False,
+            return_doc_meta=False,
+            refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
+        )
+        if response != "created":
+            model_label = parent_es_document.Django.model.__name__.capitalize()
+            logger.error(
+                f"The {model_label} with ID:{instance_id} can't be index in ES. "
+                "Aborting the indexing of their child objects."
+            )
+            return
 
-    # Perform bulk indexing for child documents
-    bulk(client, child_docs_to_index)
+        client = connections.get_connection()
+        base_doc = {
+            "_op_type": "index",
+            "_index": parent_es_document._index._name,
+        }
+        child_docs_to_index = []
+        for child in child_docs.iterator():
+            child_doc = child_es_document().prepare(child)
+            child_params = {
+                "_id": getattr(ES_CHILD_ID(child.pk), child_id_property),
+                "_routing": f"{instance_id}",
+            }
+            child_doc.update(base_doc)
+            child_doc.update(child_params)
+            child_docs_to_index.append(child_doc)
+
+        # Perform bulk indexing for child documents
+        bulk(client, child_docs_to_index)
+
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
-        PersonDocument._index.refresh()
+        parent_es_document._index.refresh()
