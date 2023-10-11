@@ -10,10 +10,8 @@
 
     {% if DEBUG %}
         <script src="{% static "js/d3.js" %}"></script>
-        <script src="{% static "js/plottable.js" %}"></script>
     {% else %}
         <script src="{% static "js/d3.min.js" %}"></script>
-        <script src="{% static "js/plottable.min.js" %}"></script>
     {% endif %}
 
     <script type="text/javascript" nonce="{{ request.csp_nonce }}">
@@ -26,11 +24,6 @@
     </script>
     {% include "includes/anchors.html" %}
 
-{% endblock %}
-
-{% block head %}
-    <link rel="stylesheet" href="{% static "css/plottable.css" %}"
-          type="text/css" media="screen, projection">
 {% endblock %}
 
 {% block content %}
