@@ -46,33 +46,36 @@ class SearchFeed(Feed):
         if search_form.is_valid():
             cd = search_form.cleaned_data
             order_by = "dateFiled"
+            es_search_query = None
             with Session() as session:
-                if cd["type"] == SEARCH_TYPES.OPINION:
-                    solr = ExtraSolrInterface(
-                        settings.SOLR_OPINION_URL,
-                        http_connection=session,
-                        mode="r",
-                    )
-                elif cd["type"] == SEARCH_TYPES.RECAP:
-                    solr = ExtraSolrInterface(
-                        settings.SOLR_RECAP_URL,
-                        http_connection=session,
-                        mode="r",
-                    )
-                else:
-                    return []
+                match cd["type"]:
+                    case SEARCH_TYPES.OPINION:
+                        solr = ExtraSolrInterface(
+                            settings.SOLR_OPINION_URL,
+                            http_connection=session,
+                            mode="r",
+                        )
+                    case SEARCH_TYPES.RECAP if waffle.flag_is_active(
+                        obj, "r-es-active"
+                    ):
+                        es_search_query = ESRECAPDocument.search()
+                    case SEARCH_TYPES.RECAP:
+                        solr = ExtraSolrInterface(
+                            settings.SOLR_RECAP_URL,
+                            http_connection=session,
+                            mode="r",
+                        )
+                    case _:
+                        return []
 
-                if (
-                    waffle.flag_is_active(obj, "r-es-active")
-                    and cd["type"] == SEARCH_TYPES.RECAP
-                ):
+                if es_search_query:
                     override_params = {
                         "order_by": "entry_date_filed_feed desc",
                     }
                     cd.update(override_params)
-                    search_query = ESRECAPDocument.search()
+
                     items = do_es_feed_query(
-                        search_query,
+                        es_search_query,
                         cd,
                         rows=20,
                     )
