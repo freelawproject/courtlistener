@@ -1613,24 +1613,17 @@ def get_child_top_hits_limit(
     # whether there are more than CHILD_HITS_PER_RESULT results, which would
     # trigger the "View Additional Results" button on the frontend.
     query_hits_limit = settings.CHILD_HITS_PER_RESULT + 1
-    match search_type:
-        case SEARCH_TYPES.RECAP:
-            docket_id_query = re.search(
-                r"docket_id:\d+", search_params.get("q", "")
-            )
-            if docket_id_query:
-                frontend_hits_limit = settings.VIEW_MORE_CHILD_HITS
-                query_hits_limit = settings.VIEW_MORE_CHILD_HITS
-        case SEARCH_TYPES.DOCKETS:
-            frontend_hits_limit = 1
-            docket_id_query = re.search(
-                r"docket_id:\d+", search_params.get("q", "")
-            )
-            if docket_id_query:
-                frontend_hits_limit = settings.VIEW_MORE_CHILD_HITS
-                query_hits_limit = settings.VIEW_MORE_CHILD_HITS
-        case _:
-            pass
+
+    if search_type not in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
+        return frontend_hits_limit, query_hits_limit
+
+    if search_type == SEARCH_TYPES.DOCKETS:
+        frontend_hits_limit = 1
+
+    docket_id_query = re.search(r"docket_id:\d+", search_params.get("q", ""))
+    if docket_id_query:
+        frontend_hits_limit = settings.VIEW_MORE_CHILD_HITS
+        query_hits_limit = settings.VIEW_MORE_CHILD_HITS
 
     return frontend_hits_limit, query_hits_limit
 
