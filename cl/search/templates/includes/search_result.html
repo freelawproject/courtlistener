@@ -17,7 +17,7 @@
       </a>
 
     {% elif type == SEARCH_TYPES.RECAP or type == SEARCH_TYPES.DOCKETS or type_override == SEARCH_TYPES.RECAP or type_override == SEARCH_TYPES.DOCKETS %}
-      <a href="{{ result.docket_absolute_url }}"
+      <a href="{% url 'view_docket' result.docket_id result.docket_slug %}"
          class="visitable">
       {{ result.caseName|safe }}
       ({% if result.court_id != 'scotus' %}{{ result.court_citation_string|nbsp|safe }}&nbsp;{% endif %}{{ result.dateFiled|date:"Y" }})
@@ -88,7 +88,7 @@
       <div class="inline-block">
         <span class="meta-data-header">Nature of Suit:</span>
         <span class="meta-data-value">
-          <a href="?type=r&nature_of_suit=&quot;{{ result.suitNature.0|striptags|urlencode }}&quot;">
+          <a href="?type=r&nature_of_suit=&quot;{{ result.suitNature|striptags|urlencode }}&quot;">
               {{ result.suitNature|safe }}
           </a>
         </span>
