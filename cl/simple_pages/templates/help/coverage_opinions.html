@@ -60,31 +60,41 @@
   <div class="col-xs-12 col-sm-12 col-md-8 col-lg-6" role="main">
     <h1>Data Coverage — What Opinions Do We Have?</h1>
     <p class="lead">Courtlistener has one of the most comprehensive collections of American Legal Jurisprudence on the internet.</p>
-    <p>Having access to complete and reliable data is crucial for making informed decisions in the legal field. As of 2023, we believe CourtListener has one of the most complete collections of legal opinions on the internet. Our database encompasses more than 99% of all precedential legal opinions published in the United States. We have made that possible by collecting our data from a wide variety of sources over many years. Although the collection of legal opinions never stops, here is what we have and how we do it.</p>
+    <p>Having access to complete and reliable data is crucial for making informed decisions in the legal field. As of 2023, we believe CourtListener has one of the most complete collections of legal opinions on the internet. Our database encompasses more than 99% of all precedential legal opinions published in the United States. We have made that possible by collecting our data from a wide variety of sources over many years. Scroll down or use the Table of Contents to inspect particular jurisdictions or read on to learn more about how we do it.</p>
 
-    <p><strong>Diverse Sources:</strong>
-    Our data is sourced from a wide range of reputable institutions and organizations, including prestigious institutions like Resource.org, the Supreme Court Database, Columbia, Harvard, and the Law Library of Congress, among others. These institutions have contributed to the richness and diversity of our data collection. For example, thanks to the Caselaw Access Project and our partnership with vLex, we have every legal opinion from Harvard University’s law library, going back over 365 years.</p>
+    <p><strong>Diverse Sources —</strong>
+    Our data is sourced from a wide range of reputable institutions and organizations, including prestigious institutions like Resource.org, the <a href="https://scdb.wustl.edu/">Supreme Court Database</a>, Columbia, Harvard, and the Law Library of Congress, among others. These institutions have contributed to the richness and diversity of our data collection. For example, thanks to the <a href="https://case.law/">Caselaw Access Project</a> and <a href="https://free.law/2022/09/12/vlex-partnership/">our partnership with vLex</a>, we have every legal opinion from Harvard University’s law library, going back over 365 years.</p>
 
-    <p><strong>Continuous Updates:</strong>
+    <p><strong>Continuous Updates —</strong>
     The legal landscape is constantly evolving. To ensure that our users have access to the most recent legal opinions, we collect opinions as they are released by the courts. This technology allows us to continuously update and expand our database, providing users with the most current legal opinions available the moment they happen. As of 2023, our scrapers have added more than 1.75 million court opinions.</p>
 
-    <p><strong>Publishing:</strong>
-    In 2020, Free Law Project, the non-profit behind CourtListener, began partnering with courts throughout the United States to enable direct publishing of opinions. Whether Supreme or Limited Jurisdiction, we work with courts to publish with us and make sure that neutral citations are generated at the time of issuance.</p>
+    <p><strong>Publishing —</strong>
+    In 2020, <a href="https://free.law">Free Law Project</a>, the non-profit behind CourtListener, began <a href="https://free.law/2022/08/02/maine-supreme-and-tennessee-workers-comp/">partnering with courts</a> throughout the United States to enable direct publishing of opinions. Whether Supreme or Limited Jurisdiction, we work with courts to publish with us and make sure that <a href="https://www.courtlistener.com/faq/#explain-neutral-citations">neutral citations</a> are generated at the time of issuance.</p>
 
-    <p><strong>Over Nine Million Opinions and 2000+ Courts:</strong>
-    Our commitment to completeness is reflected in our database's size, which currently contains nine million legal opinions. This extensive collection ensures that you can find the information you need. While our extension collection of scraped opinions does not have every page number and every citation, we are working with law libraries to make that a reality.</p>
+    <p><strong>Over Nine Million Opinions and 2000+ Courts —</strong>
+    Our commitment to completeness is reflected in our database's size, which currently contains nine million legal opinions. This extensive collection ensures that you can find the information you need. While our extensive collection of scraped opinions does not have every page number and every citation, we are working with law libraries to make that a reality.</p>
 
-    <p><strong>Quality:</strong>
-    While we emphasize quantity, we also prioritize quality. Our team constantly is working to improve each and every opinion, and has used Machine Learning and human resources to make over a million corrections to other datasets. Incomplete or inaccurate data can have serious consequences in the legal field, and we are dedicated to maintaining the highest standards. Beyond providing the most accurate information, we also are unique in providing primary source documents found on court websites.</p>
+    <p><strong>Quality —</strong>
+    While we emphasize quantity, we also prioritize quality. Our team constantly is working to improve each and every opinion, and has used machine learning and human resources to make over a million corrections to other datasets. Incomplete or inaccurate data can have serious consequences in the legal field, and we are dedicated to maintaining the highest standards. Beyond providing the most accurate information, we also are unique in providing primary source documents found on court websites.</p>
+    <style>
+         .htmx-indicator{
+        opacity:0;
+        transition: opacity 200ms ease-in;
+    }
+    .htmx-request .htmx-indicator{
+        opacity:1
+    }
+    .htmx-request.htmx-indicator{
+        opacity:1
+    }
+    </style>
+    <p><strong>Data for All —</strong>
+    We make our data available in <a href="https://www.courtlistener.com/help/api/">numerous formats</a>. Our hope is that when our work is done, it will never need to be done again — All American jurisprudence will be available to all, forever.</p>
 
-    <p><strong>Data for All:</strong>
-    We make our data available in numerous formats. Our hope is that when our work is done, it will never need to be done again — All American jurisprudence will be available to all, forever.</p>
-
-    <p><strong>Support:</strong>
+    <p><strong>Support —</strong>
     Questions about our coverage can be sent to our <a href="https://github.com/freelawproject/courtlistener/discussions" target="_blank">to our Github Discussions forum</a> or via our <a href="{% url "contact" %}">contact form</a>. In general, we prefer that questions be posted publicly in the forum so they can be searched by others in the future. If you are a private organization posting to that forum, we will work with you to avoid sharing details about your organization.</p>
 
-    <p><strong>Finally:</strong> Don’t take our word for it, check it out below.</p>
-
+    <p><strong>Finally —</strong> Don’t take our word for it, check it out below.</p>
     <h1 id="federal">Federal Courts</h1>
     {% for id, circuit in federal.items %}
       <h3 id="{{ id }}">{{ circuit.name }}</h3>
@@ -133,11 +143,12 @@
             </ul>
           {% endif %}
         </ul>
-        <div class="btn-group hidden-xs hidden-sm" role="group">
-          <button class="btn btn-default" type="submit" hx-boost="false">
+        <div class="btn-group" role="group">
+          <button class="btn btn-default" type="submit" hx-boost="false" hx-indicator=".spinner">
             {{ circuit.name }} Timeline
           </button>
         </div>
+        <i class="spinner htmx-indicator fa fa-spinner fa-spin fa-2x fa-fw"></i>
       </form>
     {% endfor %}
 
@@ -154,7 +165,7 @@
           <ul>
             {% for court in section_data|get:header %}
               <li>{{ court.court.short_name }}</li>
-              <input type="hidden" value="{{ court.court.id }}" name="{{ court.court.full_name }}"/>
+              <input type="hidden" value="{{ court.court.id }}" name="{{ court.court.short_name }}"/>
               <ul>
                 {% for sub_court in court.descendants %}
                   <li>{{ sub_court.court.short_name }}</li>
@@ -169,11 +180,12 @@
               </ul>
             {% endfor %}
           </ul>
-          <div class="btn-group hidden-xs hidden-sm" role="group">
-            <button class="btn btn-default" type="submit" hx-boost="false">
+          <div class="btn-group " role="group">
+            <button class="btn btn-default" type="submit" hx-boost="false" hx-indicator=".spinner">
             {% if header != "NONE" %} {{ header }} {% else %} {{ section | title }} Courts {% endif %} Timeline
             </button>
           </div>
+            <i class="spinner htmx-indicator fa fa-spinner fa-spin fa-2x fa-fw"></i>
           </form>
         {% endfor %}
       {% endwith %}
@@ -190,6 +202,7 @@
         <div class="modal-header">
           <h4 class="modal-title" id="modalLabel">Court Timeline</h4>
         </div>
+        <div id="json-data"></div>
         <div id="timeline-body" class="modal-body">
           <!-- SVG Chart goes here -->
         </div>
