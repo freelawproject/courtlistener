@@ -8,6 +8,7 @@ from localflavor.us.models import (
     USStateField,
     USZipCodeField,
 )
+from model_utils import FieldTracker
 
 from cl.custom_filters.templatetags.extras import granular_date
 from cl.lib.date_time import midnight_pt
@@ -206,6 +207,19 @@ class Person(AbstractDateTimeModel):
         help_text="Whether there is a photo corresponding to this person in "
         "the judge pics project.",
         default=False,
+    )
+    es_p_field_tracker = FieldTracker(
+        fields=[
+            "name_full",
+            "name_full_reverse",
+            "religion",
+            "gender",
+            "dob_city",
+            "dob_state",
+            "fjc_id",
+            "date_dob",
+            "date_dod",
+        ]
     )
 
     def __str__(self) -> str:
@@ -414,6 +428,7 @@ class School(AbstractDateTimeModel):
         blank=True,
         db_index=True,
     )
+    es_p_field_tracker = FieldTracker(fields=["name"])
 
     def __str__(self) -> str:
         if self.is_alias_of:
@@ -1294,6 +1309,7 @@ class PoliticalAffiliation(AbstractDateTimeModel):
         max_length=15,
         blank=True,
     )
+    es_p_field_tracker = FieldTracker(fields=["political_party"])
 
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -1356,6 +1372,7 @@ class ABARating(AbstractDateTimeModel):
         choices=ABA_RATINGS,
         max_length=5,
     )
+    es_p_field_tracker = FieldTracker(fields=["rating"])
 
     class Meta:
         verbose_name = "American Bar Association Rating"
