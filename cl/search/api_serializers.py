@@ -6,10 +6,10 @@ from rest_framework.serializers import ModelSerializer
 
 from cl.api.utils import HyperlinkedModelSerializerWithId
 from cl.audio.models import Audio
-from cl.lib.document_serializer import DateOrDateTimeField, DocumentSerializer
+from cl.lib.document_serializer import DocumentSerializer
 from cl.people_db.models import PartyType, Person
 from cl.recap.api_serializers import FjcIntegratedDatabaseSerializer
-from cl.search.documents import AudioDocument, DocketDocument, PersonDocument
+from cl.search.documents import AudioDocument, PersonDocument
 from cl.search.models import (
     Citation,
     Court,
