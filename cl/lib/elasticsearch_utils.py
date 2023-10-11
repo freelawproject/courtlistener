@@ -30,8 +30,13 @@ from cl.search.constants import (
     SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS,
     SEARCH_HL_TAG,
     SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS,
+    SEARCH_ORAL_ARGUMENT_QUERY_FIELDS,
+    SEARCH_PEOPLE_CHILD_QUERY_FIELDS,
+    SEARCH_PEOPLE_PARENT_QUERY_FIELDS,
     SEARCH_RECAP_CHILD_HL_FIELDS,
+    SEARCH_RECAP_CHILD_QUERY_FIELDS,
     SEARCH_RECAP_HL_FIELDS,
+    SEARCH_RECAP_PARENT_QUERY_FIELDS,
     SOLR_PEOPLE_ES_HL_FIELDS,
 )
 from cl.search.exception import UnbalancedQuery
@@ -633,34 +638,14 @@ def build_es_base_query(
                 ["representative_text"], cd.get("q", "")
             )
         case SEARCH_TYPES.ORAL_ARGUMENT:
-            fields = [
-                "court",
-                "court_citation_string",
-                "judge",
-                "dateArgued_text",
-                "dateReargued_text",
-                "dateReargumentDenied_text",
-                "court_id_text",
-                "sha1",
-            ]
+            fields = SEARCH_ORAL_ARGUMENT_QUERY_FIELDS
             fields.extend(add_fields_boosting(cd))
             string_query = build_fulltext_query(
                 fields,
                 cd.get("q", ""),
             )
         case SEARCH_TYPES.PEOPLE:
-            child_fields = [
-                "position_type",
-                "nomination_process",
-                "judicial_committee_action",
-                "selection_method",
-                "termination_reason",
-                "court_full_name",
-                "court_citation_string",
-                "court_exact",
-                "organization_name",
-                "job_title",
-            ]
+            child_fields = SEARCH_PEOPLE_CHILD_QUERY_FIELDS
             child_fields.extend(
                 add_fields_boosting(
                     cd,
@@ -674,16 +659,7 @@ def build_es_base_query(
             child_query_fields = {
                 "position": child_fields,
             }
-            parent_query_fields = [
-                "gender",
-                "alias",
-                "dob_city",
-                "political_affiliation",
-                "religion",
-                "fjc_id",
-                "aba_rating",
-                "school",
-            ]
+            parent_query_fields = SEARCH_PEOPLE_PARENT_QUERY_FIELDS
             parent_query_fields.extend(
                 add_fields_boosting(
                     cd,
@@ -698,23 +674,7 @@ def build_es_base_query(
                 cd.get("q", ""),
             )
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
-            child_fields = [
-                "case_name_full",
-                "suitNature",
-                "juryDemand",
-                "cause",
-                "assignedTo",
-                "referredTo",
-                "court",
-                "court_id",
-                "court_citation_string",
-                "chapter",
-                "trustee_str",
-                "short_description",
-                "plain_text",
-                "document_type",
-            ]
-
+            child_fields = SEARCH_RECAP_CHILD_QUERY_FIELDS
             child_fields.extend(
                 add_fields_boosting(
                     cd,
@@ -727,19 +687,7 @@ def build_es_base_query(
                 )
             )
             child_query_fields = {"recap_document": child_fields}
-            parent_query_fields = [
-                "case_name_full",
-                "suitNature",
-                "cause",
-                "juryDemand",
-                "assignedTo",
-                "referredTo",
-                "court",
-                "court_id",
-                "court_citation_string",
-                "chapter",
-                "trustee_str",
-            ]
+            parent_query_fields = SEARCH_RECAP_PARENT_QUERY_FIELDS
             parent_query_fields.extend(
                 add_fields_boosting(
                     cd,
