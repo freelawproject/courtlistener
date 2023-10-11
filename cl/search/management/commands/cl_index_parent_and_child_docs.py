@@ -88,10 +88,11 @@ class Command(VerboseCommand):
                 ).apply_async()
                 chunk = []
                 self.stdout.write(
-                    "\rProcessed {}/{}, ({:.0%})".format(
+                    "\rProcessed {}/{}, ({:.0%}), last PK indexed: {},".format(
                         processed_count,
                         count,
                         processed_count * 1.0 / count,
+                        item_id,
                     )
                 )
 
