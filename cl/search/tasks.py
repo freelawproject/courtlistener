@@ -381,11 +381,9 @@ def update_child_documents_by_query(
         main_doc = DocketDocument.get(id=parent_instance.pk)
 
     if not main_doc:
-        return
-
-    if not main_doc:
         # Abort bulk update for a not supported document.
         return
+
     client = connections.get_connection()
     ubq = UpdateByQuery(using=client, index=es_document._index._name).query(
         s.to_dict()["query"]
