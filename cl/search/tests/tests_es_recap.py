@@ -2023,13 +2023,13 @@ class IndexDocketRECAPDocumentsCommandTest(
             )
 
         s = DocketDocument.search()
-        s = s.query("parent_id", type="recap_document", id=self.de.pk)
+        s = s.query("parent_id", type="recap_document", id=self.de.docket.pk)
         self.assertEqual(
             s.count(), 2, msg="Wrong number of RECAPDocuments returned."
         )
 
         s = DocketDocument.search()
-        s = s.query("parent_id", type="recap_document", id=self.de_1.pk)
+        s = s.query("parent_id", type="recap_document", id=self.de_1.docket.pk)
         self.assertEqual(
             s.count(), 1, msg="Wrong number of RECAPDocuments returned."
         )

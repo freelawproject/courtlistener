@@ -1,18 +1,18 @@
+from typing import Iterable
+
 from cl.lib.celery_utils import CeleryThrottle
-from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.command_utils import VerboseCommand
 from cl.people_db.models import Person
-from cl.search.documents import (
-    DocketDocument,
-    ESRECAPDocument,
-    PersonDocument,
-    PositionDocument,
-)
 from cl.search.models import SEARCH_TYPES, Docket
 from cl.search.tasks import index_parent_and_child_docs
 
 
 class Command(VerboseCommand):
     help = "Index existing Parent and Children docs into Elasticsearch."
+
+    def __init__(self, *args, **kwargs):
+        super(Command, self).__init__(*args, **kwargs)
+        self.options = []
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -36,47 +36,65 @@ class Command(VerboseCommand):
             default="celery",
             help="The celery queue where the tasks should be processed.",
         )
+        parser.add_argument(
+            "--chunk-size",
+            type=int,
+            default="100",
+            help="The number of items to index in a single celery task.",
+        )
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
-        pk_offset = options["pk_offset"]
-        queue = options["queue"]
+        self.options = options
         search_type = options["search_type"]
-
-        throttle = CeleryThrottle(queue_name=queue)
-        indexing_counter = 0
         match search_type:
             case SEARCH_TYPES.PEOPLE:
-                # Get Person objects by pk_offset.
-                queryset = Person.objects.filter(pk__gte=pk_offset).order_by(
-                    "pk"
-                )
-                # Indexing judges and positions.
-                for person in queryset.iterator():
-                    if not person.is_judge:
-                        continue
-                    logger.info(f"Indexing Person with ID: {person.pk}")
-                    throttle.maybe_wait()
-                    index_parent_and_child_docs.si(
-                        person.pk, SEARCH_TYPES.PEOPLE
-                    ).set(queue=queue).apply_async()
-                    indexing_counter += 1
-                self.stdout.write(
-                    f"Successfully indexed {indexing_counter} Judges from pk {pk_offset}."
-                )
+                queryset = Person.objects.filter(
+                    pk__gte=options["pk_offset"], is_alias_of=None
+                ).order_by("pk")
+                q = [item.pk for item in queryset if item.is_judge]
+                count = len(q)
+                self.process_queryset(q, count, SEARCH_TYPES.PEOPLE)
             case SEARCH_TYPES.RECAP:
                 # Get Docket objects by pk_offset.
-                queryset = Docket.objects.all().order_by("pk")
-
-                # Indexing Dockets and RECAPDocuments.
-                for docket in queryset.iterator():
-                    logger.info(f"Indexing Docket with ID: {docket.pk}")
-                    throttle.maybe_wait()
-                    index_parent_and_child_docs.si(
-                        docket.pk, SEARCH_TYPES.RECAP
-                    ).set(queue=queue).apply_async()
-                    indexing_counter += 1
-
-                self.stdout.write(
-                    f"Successfully indexed {indexing_counter} Dockets from pk {pk_offset}."
+                queryset = (
+                    Docket.objects.filter(pk__gte=options["pk_offset"])
+                    .order_by("pk")
+                    .values_list("pk", flat=True)
                 )
+                q = queryset.iterator()
+                count = queryset.count()
+                self.process_queryset(q, count, SEARCH_TYPES.RECAP)
+
+    def process_queryset(
+        self, iterable: Iterable, count: int, search_type: str
+    ) -> None:
+        pk_offset = self.options["pk_offset"]
+        queue = self.options["queue"]
+        chunk_size = self.options["chunk_size"]
+
+        chunk = []
+        processed_count = 0
+        throttle = CeleryThrottle(queue_name=queue)
+        # Indexing Parent and their child documents.
+        for item_id in iterable:
+            processed_count += 1
+            last_item = count == processed_count
+            chunk.append(item_id)
+            if processed_count % chunk_size == 0 or last_item:
+                throttle.maybe_wait()
+                index_parent_and_child_docs.si(chunk, search_type).set(
+                    queue=queue
+                ).apply_async()
+                chunk = []
+                self.stdout.write(
+                    "\rProcessed {}/{}, ({:.0%})".format(
+                        processed_count,
+                        count,
+                        processed_count * 1.0 / count,
+                    )
+                )
+
+        self.stdout.write(
+            f"Successfully indexed {processed_count} items from pk {pk_offset}."
+        )
