@@ -355,7 +355,6 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             description="MOTION for Leave to File Amicus Curiae Lorem",
         )
 
-        bank_data = BankruptcyInformationFactory(docket=de.docket)
         # Create two RECAPDocuments within the same case.
         rd_created_pks = []
         for i in range(2):
@@ -379,6 +378,16 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             self._compare_response_child_value(
                 response, 0, i, judge.name_full, "assignedTo"
             )
+            self._compare_response_child_value(response, 0, i, None, "chapter")
+            self._compare_response_child_value(
+                response, 0, i, None, "trustee_str"
+            )
+
+        # Add BankruptcyInformation and confirm is indexed with the right content
+        bank_data = BankruptcyInformationFactory(docket=de.docket)
+
+        response = self._test_main_es_query(params, 1, "q")
+        for i in range(2):
             self._compare_response_child_value(
                 response, 0, i, bank_data.chapter, "chapter"
             )

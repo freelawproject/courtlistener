@@ -325,36 +325,42 @@ def update_reverse_related_documents(
     the instance.
     :return: None
     """
-    # bulk update position documents when a new reverse related record is created/deleted
-    if es_document is PositionDocument and isinstance(
-        instance, (ABARating, PoliticalAffiliation, Education)
-    ):
-        related_record = Person.objects.filter(**{query_string: instance})
-        for person in related_record:
+    match instance:
+        case ABARating() | PoliticalAffiliation() | Education() if es_document is PositionDocument:  # type: ignore
+            # bulk update position documents when a new reverse related record is created/deleted
+            related_record = Person.objects.filter(**{query_string: instance})
+            for person in related_record:
+                update_child_documents_by_query.delay(
+                    es_document, person, affected_fields
+                )
+        case Docket() if es_document is ESRECAPDocument:  # type: ignore
             update_child_documents_by_query.delay(
-                es_document, person, affected_fields
+                es_document, instance, affected_fields
             )
-        return
+        case _:
+            main_objects = main_model.objects.filter(
+                **{query_string: instance}
+            )
+            for main_object in main_objects:
+                main_doc = get_or_create_doc(es_document, main_object)
+                if not main_doc:
+                    return
 
-    main_objects = main_model.objects.filter(**{query_string: instance})
-    for main_object in main_objects:
-        main_doc = get_or_create_doc(es_document, main_object)
-        if not main_doc:
-            return
+                fields_to_update = {}
+                for field in affected_fields:
+                    prepare_method = getattr(
+                        main_doc, f"prepare_{field}", None
+                    )
+                    if prepare_method:
+                        field_value = prepare_method(main_object)
+                    else:
+                        field_value = getattr(instance, field)
+                    fields_to_update[field] = field_value
 
-        fields_to_update = {}
-        for field in affected_fields:
-            prepare_method = getattr(main_doc, f"prepare_{field}", None)
-            if prepare_method:
-                field_value = prepare_method(main_object)
-            else:
-                field_value = getattr(instance, field)
-            fields_to_update[field] = field_value
-
-        update_document_in_es.delay(
-            main_doc,
-            fields_to_update,
-        )
+                update_document_in_es.delay(
+                    main_doc,
+                    fields_to_update,
+                )
 
 
 def prepare_and_update_fields(

@@ -304,7 +304,9 @@ recap_document_field_mapping = {
     },
     "delete": {RECAPDocument: {}},
     "m2m": {},
-    "reverse": {},
+    "reverse": {
+        BankruptcyInformation: {"docket": {"all": ["chapter", "trustee_str"]}}
+    },
     "reverse-delete": {
         BankruptcyInformation: {"docket": {"all": ["chapter", "trustee_str"]}},
     },
