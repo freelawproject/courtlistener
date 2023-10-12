@@ -35,10 +35,16 @@ from cl.lib.command_utils import logger
 from cl.lib.elasticsearch_utils import merge_highlights_into_result
 from cl.lib.redis_utils import create_redis_semaphore, delete_redis_semaphore
 from cl.lib.string_utils import trunc
+from cl.people_db.models import Person
 from cl.recap.constants import COURT_TIMEZONES
 from cl.search.constants import ALERTS_HL_TAG
-from cl.search.documents import AudioPercolator
-from cl.search.models import SEARCH_TYPES, Docket, DocketEntry
+from cl.search.documents import (
+    ES_CHILD_ID,
+    AudioPercolator,
+    PersonDocument,
+    PositionDocument,
+)
+from cl.search.models import Docket, DocketEntry
 from cl.search.types import (
     ESDocumentClassType,
     PercolatorResponseType,
@@ -720,11 +726,16 @@ def remove_doc_from_es_index(
     :return: None
     """
 
+    doc_id = (
+        ES_CHILD_ID(instance_id).POSITION
+        if es_document is PositionDocument
+        else instance_id
+    )
     try:
-        doc = es_document.get(id=instance_id)
+        doc = es_document.get(id=doc_id)
         doc.delete(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)
     except NotFoundError:
-        model_label = es_document.Django.model._meta.app_label.capitalize()
+        model_label = es_document.Django.model.__name__.capitalize()
         logger.error(
             f"The {model_label} with ID:{instance_id} can't be deleted from "
             f"the ES index, it doesn't exists."
