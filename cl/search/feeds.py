@@ -3,6 +3,7 @@ from django.conf import settings
 from django.contrib.syndication.views import Feed
 from django.shortcuts import get_object_or_404
 from django.utils.feedgenerator import Atom1Feed
+from django.utils.timezone import is_naive
 from requests import Session
 
 from cl.lib import search_utils
@@ -108,9 +109,13 @@ class SearchFeed(Feed):
         try:
             # Get pub_date for RECAP
             entry_date = get_item(item)["entry_date_filed"]
-            return localize_naive_datetime_to_court_timezone(
-                get_item(item)["court_id"], entry_date
-            )
+            if not is_naive(entry_date):
+                # Handle non-naive dates
+                return midnight_pt(entry_date)
+            else:
+                return localize_naive_datetime_to_court_timezone(
+                    get_item(item)["court_id"], entry_date
+                )
         except KeyError:
             # Get pub_date for Opinions
             return midnight_pt(get_item(item)["dateFiled"])
