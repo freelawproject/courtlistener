@@ -82,6 +82,13 @@ VALID_UPDATED_DOCKET_SOURCES = [
     Docket.COLUMBIA_AND_SCRAPER_AND_IDB,
     Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB,
     Docket.HARVARD_AND_COLUMBIA,
+    Docket.COLUMBIA_AND_RECAP_AND_HARVARD,
+    Docket.COLUMBIA_AND_SCRAPER_AND_HARVARD,
+    Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_HARVARD,
+    Docket.COLUMBIA_AND_IDB_AND_HARVARD,
+    Docket.COLUMBIA_AND_RECAP_AND_IDB_AND_HARVARD,
+    Docket.COLUMBIA_AND_SCRAPER_AND_IDB_AND_HARVARD,
+    Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
 ]
 
 VALID_MERGED_SOURCES = [
@@ -1047,14 +1054,20 @@ def merge_judges(
     # Get last names keeping case and cleaning the string (We could have
     # the judge names in capital letters)
     cl_clean = set(find_all_judges(cl_data))
+    # Lowercase courtlistener judge names for set operations
+    temp_cl_clean = set([c.lower() for c in cl_clean])
     # Get last names in lowercase and cleaned
     columbia_clean = set(find_all_judges(columbia_data))
+    # Lowercase columbia judge names for set operations
+    temp_columbia_clean = set([h.lower() for h in columbia_clean])
+    # Prepare judges string
     judges = titlecase(", ".join(find_all_judges(columbia_data)))
+
     if (
-        columbia_clean.issuperset(cl_clean) or cl_data_upper
+        temp_columbia_clean.issuperset(temp_cl_clean) or cl_data_upper
     ) and columbia_clean != cl_clean:
         return {"judges": judges}
-    elif not columbia_clean.intersection(set(find_all_judges(cl_data))):
+    elif not temp_columbia_clean.intersection(temp_cl_clean):
         raise JudgeException("Judges are completely different.")
 
     return {}
