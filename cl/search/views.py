@@ -34,6 +34,7 @@ from cl.lib.elasticsearch_utils import (
     convert_str_date_fields_to_date_objects,
     es_index_exists,
     fetch_es_results,
+    limit_inner_hits,
     merge_courts_from_db,
     merge_unavailable_fields_on_parent_document,
     sanitize_unbalanced_parenthesis,
@@ -52,9 +53,11 @@ from cl.lib.search_utils import (
     merge_form_with_courts,
     regroup_snippets,
 )
+from cl.lib.types import CleanData
 from cl.search.constants import RELATED_PATTERN
 from cl.search.documents import (
     AudioDocument,
+    DocketDocument,
     ParentheticalGroupDocument,
     PersonDocument,
 )
@@ -497,6 +500,12 @@ def show_results(request: HttpRequest) -> HttpResponse:
                         render_dict.update(do_es_search(request.GET.copy()))
                     else:
                         render_dict.update(do_search(request.GET.copy()))
+                case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
+                    if waffle.flag_is_active(request, "r-es-active"):
+                        search_results = do_es_search(request.GET.copy())
+                    else:
+                        search_results = do_search(request.GET.copy())
+                    render_dict.update(search_results)
                 case _:
                     render_dict.update(do_search(request.GET.copy()))
 
@@ -615,6 +624,7 @@ def do_es_search(
     document_type = None
     error_message = ""
     suggested_query = ""
+    total_child_results = 0
 
     search_form = SearchForm(get_params)
     match get_params.get("type"):
@@ -624,6 +634,8 @@ def do_es_search(
             document_type = AudioDocument
         case SEARCH_TYPES.PEOPLE:
             document_type = PersonDocument
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
+            document_type = DocketDocument
 
     if search_form.is_valid() and es_index_exists(
         index_name=document_type._index._name
@@ -633,9 +645,12 @@ def do_es_search(
             # Create necessary filters to execute ES query
             search_query = document_type.search()
 
-            s, total_query_results, top_hits_limit = build_es_main_query(
-                search_query, cd
-            )
+            (
+                s,
+                total_query_results,
+                top_hits_limit,
+                total_child_results,
+            ) = build_es_main_query(search_query, cd)
             paged_results, query_time, error = fetch_and_paginate_results(
                 get_params, s, rows_per_page=rows, cache_key=cache_key
             )
@@ -656,7 +671,12 @@ def do_es_search(
     )
     search_summary_str = search_form.as_text(court_count_human)
     search_summary_dict = search_form.as_display_dict(court_count_human)
-    results_details = [query_time, total_query_results, top_hits_limit]
+    results_details = [
+        query_time,
+        total_query_results,
+        top_hits_limit,
+        total_child_results,
+    ]
 
     return {
         "results": paged_results,
@@ -721,9 +741,10 @@ def fetch_and_paginate_results(
     search_type = get_params.get("type")
     # Set highlights in results.
 
-    set_results_highlights(results, search_type)
     convert_str_date_fields_to_date_objects(results, search_type)
     merge_courts_from_db(results, search_type)
+    limit_inner_hits(get_params, results, search_type)
+    set_results_highlights(results, search_type)
     merge_unavailable_fields_on_parent_document(results, search_type)
 
     if cache_key is not None:

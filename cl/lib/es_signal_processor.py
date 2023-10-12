@@ -22,10 +22,13 @@ from cl.people_db.models import (
 from cl.search.documents import (
     ES_CHILD_ID,
     AudioDocument,
+    DocketDocument,
+    ESRECAPDocument,
     ParentheticalGroupDocument,
     PersonDocument,
     PositionDocument,
 )
+from cl.search.models import BankruptcyInformation, Docket
 from cl.search.tasks import (
     save_document_in_es,
     update_child_documents_by_query,
@@ -52,6 +55,8 @@ def updated_fields(
         tracked_set = getattr(instance, "es_oa_field_tracker", None)
     elif es_document is ParentheticalGroupDocument:
         tracked_set = getattr(instance, "es_pa_field_tracker", None)
+    elif es_document is ESRECAPDocument or es_document is DocketDocument:
+        tracked_set = getattr(instance, "es_rd_field_tracker", None)
     elif es_document is PositionDocument:
         tracked_set = getattr(instance, "es_p_field_tracker", None)
 
@@ -157,6 +162,8 @@ def get_or_create_doc(
     # Get doc_id for parent-child documents.
     if es_document is PositionDocument:
         doc_id = ES_CHILD_ID(instance.pk).POSITION
+    elif es_document is ESRECAPDocument:
+        doc_id = ES_CHILD_ID(instance.pk).RECAP
     else:
         doc_id = instance.pk
 
@@ -216,6 +223,19 @@ def update_es_documents(
                     update_child_documents_by_query.delay(
                         es_document,
                         person,
+                        fields_to_update,
+                        fields_map,
+                    )
+            case Docket() if es_document is ESRECAPDocument:  # type: ignore
+                update_child_documents_by_query.delay(
+                    es_document, instance, fields_to_update, fields_map
+                )
+            case Person() | BankruptcyInformation() if es_document is ESRECAPDocument:  # type: ignore
+                related_dockets = Docket.objects.filter(**{query: instance})
+                for rel_docket in related_dockets:
+                    update_child_documents_by_query.delay(
+                        es_document,
+                        rel_docket,
                         fields_to_update,
                         fields_map,
                     )
@@ -305,36 +325,42 @@ def update_reverse_related_documents(
     the instance.
     :return: None
     """
-    # bulk update position documents when a new reverse related record is created/deleted
-    if es_document is PositionDocument and isinstance(
-        instance, (ABARating, PoliticalAffiliation, Education)
-    ):
-        related_record = Person.objects.filter(**{query_string: instance})
-        for person in related_record:
+    match instance:
+        case ABARating() | PoliticalAffiliation() | Education() if es_document is PositionDocument:  # type: ignore
+            # bulk update position documents when a new reverse related record is created/deleted
+            related_record = Person.objects.filter(**{query_string: instance})
+            for person in related_record:
+                update_child_documents_by_query.delay(
+                    es_document, person, affected_fields
+                )
+        case Docket() if es_document is ESRECAPDocument:  # type: ignore
             update_child_documents_by_query.delay(
-                es_document, person, affected_fields
+                es_document, instance, affected_fields
             )
-        return
+        case _:
+            main_objects = main_model.objects.filter(
+                **{query_string: instance}
+            )
+            for main_object in main_objects:
+                main_doc = get_or_create_doc(es_document, main_object)
+                if not main_doc:
+                    return
 
-    main_objects = main_model.objects.filter(**{query_string: instance})
-    for main_object in main_objects:
-        main_doc = get_or_create_doc(es_document, main_object)
-        if not main_doc:
-            return
+                fields_to_update = {}
+                for field in affected_fields:
+                    prepare_method = getattr(
+                        main_doc, f"prepare_{field}", None
+                    )
+                    if prepare_method:
+                        field_value = prepare_method(main_object)
+                    else:
+                        field_value = getattr(instance, field)
+                    fields_to_update[field] = field_value
 
-        fields_to_update = {}
-        for field in affected_fields:
-            prepare_method = getattr(main_doc, f"prepare_{field}", None)
-            if prepare_method:
-                field_value = prepare_method(main_object)
-            else:
-                field_value = getattr(instance, field)
-            fields_to_update[field] = field_value
-
-        update_document_in_es.delay(
-            main_doc,
-            fields_to_update,
-        )
+                update_document_in_es.delay(
+                    main_doc,
+                    fields_to_update,
+                )
 
 
 def prepare_and_update_fields(
@@ -396,6 +422,18 @@ def delete_reverse_related_documents(
             )
             if main_doc:
                 prepare_and_update_fields(affected_fields, main_doc, instance)
+        case Docket() if es_document is DocketDocument:  # type: ignore
+            main_doc = get_or_create_doc(
+                es_document, instance, avoid_creation=True
+            )
+            if main_doc:
+                prepare_and_update_fields(affected_fields, main_doc, instance)
+        case Docket() if es_document is ESRECAPDocument:  # type: ignore
+            # bulk update RECAP documents when a new reverse related record
+            # is deleted
+            update_child_documents_by_query.delay(
+                es_document, instance, affected_fields
+            )
         case _:
             main_objects = main_model.objects.filter(
                 **{query_string: instance}
@@ -596,11 +634,6 @@ class ESSignalProcessor(object):
                 affected_fields = fields_map["all"]
 
             instance_field = query_string.split("__")[-1]
-            if isinstance(
-                instance, (ABARating, PoliticalAffiliation, Education)
-            ):
-                instance_field, *_, query_string = query_string.split("__")
-
             try:
                 instance = getattr(instance, instance_field, instance)
             except ObjectDoesNotExist:
