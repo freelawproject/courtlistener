@@ -12,51 +12,51 @@ document.body.addEventListener('htmx:configRequest', function (event) {
   }
 });
 
-function calculateWordWidth(word) {
-  //calculate the width we need for the right margin here.
-  const span = document.createElement('text');
-  span.style.fontSize = '12px';
-  span.style.fontFamily = '"Helvetica Neue", Helvetica, Arial, sans-serif;';
-  span.style.visibility = 'hidden';
-  span.style.position = 'absolute';
-  span.textContent = word;
-  document.body.appendChild(span);
-  const width = span.offsetWidth;
-  document.body.removeChild(span);
-  return width;
+function update_labels(data) {
+  data.forEach((item) => {
+    Object.keys(item).forEach((key) => {
+      if (key === 'data') {
+        update_labels(item[key]);
+      }
+      if (key === 'label') {
+        item['label'] = item['id'];
+      }
+    });
+  });
 }
 
-function make_data_mobile_friendly(data) {
-  // Convert data to mobile chart data
-  // Change labels to ID or short citations
-  if (Array.isArray(data)) {
-    data.forEach((item) => {
-      make_data_mobile_friendly(item);
-    });
-  } else if (typeof data === 'object') {
-    if (data.hasOwnProperty('label')) {
-      data.label = data.id;
-      // console.log(data.label)
-    }
-    for (const key in data) {
-      make_data_mobile_friendly(data[key]);
-    }
-  }
-}
+all_group_to_abbreivations = {
+  'Federal Appellate': 'Fed. App.',
+  'Federal District': 'Fed. Dist.',
+  'Federal Bankruptcy': 'Fed. Bankr.',
+  'Federal Bankruptcy Panel': 'Fed. Bankr. Pan.',
+  'Federal Special': 'Fed. Spec.',
+  'State Supreme': 'State Sup.',
+  'State Appellate': 'State App.',
+  'State Trial': 'State Tri.',
+  'State Special': 'State Spec.',
+  'Tribal Supreme': 'Trib. Sup.',
+  'Tribal Appellate': 'Trib. App.',
+  'Tribal Trial': 'Trib. Trial',
+  'Tribal Special': 'Trib. Spec.',
+  'Territory Supreme': 'Terr. Sup.',
+  'Territory Appellate': 'Terr. App.',
+  'Territory Trial': 'Terr. Trial',
+  'Territory Special': 'Terr. Spec.',
+  'State Attorney General': 'St. Att. Gen.',
+  'Military Appellate': 'Mil. App.',
+  'Military Trial': 'Mil. Trial',
+  'Committee': 'Comm.',
+  'International': 'Int.',
+  'Scrapers': "Scrapers"
+};
 
 function abbreviate_group_names(data) {
   if (Array.isArray(data)) {
     data.forEach((item) => {
       if (item.group) {
-        item.group = item.group
-          .replace('Federal', 'Fed.')
-          .replace('Appellate', 'App.')
-          .replace('Trial', 'Tr.')
-          .replace('Special', 'Spec.')
-          .replace('Bankruptcy', 'Bank.')
-          .replace('Panel', 'Pnl')
-          .replace('District', 'Dist.')
-          .replace('Supreme', 'Sup.');
+        console.log(item.group)
+        item.group = all_group_to_abbreivations[item.group];
       }
     });
   }
@@ -87,7 +87,7 @@ $(document).ready(function () {
   }
 });
 
-function get_right_margins(results) {
+function get_right_margins(results, smallScreen= false) {
   let right_margin = 0;
   var longest_label;
   results.forEach((group) => {
@@ -99,7 +99,7 @@ function get_right_margins(results) {
       }
     });
   });
-  return calculateWordWidth(longest_label) + 150;
+  return longest_label.length * (12 / Math.sqrt(2));
 }
 
 function initializeTimelinesChart() {
@@ -114,13 +114,14 @@ function initializeTimelinesChart() {
   abbreviate_group_names(results);
 
   if (containerWidth > 750) {
-    right_margin = get_right_margins(results);
+    right_margin = get_right_margins(results, false);
     left_margin = 150;
   } else {
-    make_data_mobile_friendly(results);
-    right_margin = 150;
+    update_labels(results)
+    right_margin = get_right_margins(results, true);
     left_margin = 0; // drop the margin all together
   }
+
   this.chart = new TimelinesChart()(`#timeline-body`)
     .zQualitative(false)
     .enableOverview(true)
