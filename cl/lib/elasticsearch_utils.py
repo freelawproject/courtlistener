@@ -540,7 +540,7 @@ def build_has_child_query(
     :return: The 'has_child' query.
     """
 
-    if order_by and order_by[0]:
+    if order_by and all(order_by):
         sort_field, order = order_by
         # Define the function score for sorting based in the child sort_field.
         query = Q(
