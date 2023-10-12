@@ -407,7 +407,9 @@ def build_sort_results(cd: CleanData) -> Dict:
         },
         "dateFiled desc": {"dateFiled": {"order": "desc"}},
         "dateFiled asc": {"dateFiled": {"order": "asc"}},
-        "entry_date_filed asc": {"_score": {"order": "asc"}},
+        # For child sorting keys use always "order": "desc", the sorting will
+        # be handled internally by a function score in the has_child query.
+        "entry_date_filed asc": {"_score": {"order": "desc"}},
         "entry_date_filed desc": {"_score": {"order": "desc"}},
         "entry_date_filed_feed desc": {"entry_date_filed": {"order": "desc"}},
     }
@@ -450,19 +452,19 @@ def build_sort_results(cd: CleanData) -> Dict:
     return order_by_map[order_by]
 
 
-def get_child_sorting_key(cd: CleanData) -> str:
+def get_child_sorting_key(cd: CleanData) -> tuple[str, str]:
     """Given cleaned data, find order_by value and return a key to use within
     a has_child query.
 
     :param cd: The user input CleanedData
-    :return: The short key.
+    :return: A two tuple containing the short key and the order (asc or desc).
     """
     order_by_map_child = {
-        "entry_date_filed asc": "entry_date_filed",
-        "entry_date_filed desc": "entry_date_filed",
+        "entry_date_filed asc": ("entry_date_filed", "asc"),
+        "entry_date_filed desc": ("entry_date_filed", "desc"),
     }
     order_by = cd.get("order_by", "")
-    return order_by_map_child.get(order_by, "")
+    return order_by_map_child.get(order_by, ("", ""))
 
 
 def build_es_filters(cd: CleanData) -> List:
@@ -525,7 +527,7 @@ def build_has_child_query(
     child_type: str,
     child_hits_limit: int,
     highlighting_fields: dict[str, int] | None = None,
-    order_by: str = "",
+    order_by: tuple[str, str] | None = None,
 ) -> QueryString:
     """Build a 'has_child' query.
 
@@ -538,15 +540,44 @@ def build_has_child_query(
     :return: The 'has_child' query.
     """
 
-    if order_by:
+    if order_by and order_by[0]:
+        sort_field, order = order_by
+        # Define the function score for sorting based in the child sort_field.
         query = Q(
             "function_score",
             query=query,
             script_score={
                 "script": {
-                    "source": f"doc['{order_by}'].value.toInstant().toEpochMilli()"
-                }
+                    "source": f"""
+                    // Check if the document has a value for the 'sort_field'
+                    if (doc['{sort_field}'].size() == 0) {{
+                        return 0;  // If not, return 0 as the score
+                    }} else {{
+                        // Get the current time in milliseconds
+                        long current_time = new Date().getTime();
+
+                        // Convert the 'sort_field' value to epoch milliseconds
+                        long date_filed_time = doc['{sort_field}'].value.toInstant().toEpochMilli();
+
+                        // If the order is 'desc', return the 'date_filed_time' as the score
+                        if (params.order.equals('desc')) {{
+                            return date_filed_time;
+                        }} else {{
+                            // Otherwise, calculate the difference between current time and 'date_filed_time'
+                            // in order to boost older documents if the order is asc.
+                            long diff = current_time - date_filed_time;
+
+                            // Return the difference if it's non-negative, otherwise return 0
+                            return diff >= 0 ? diff : 0;
+                        }}
+                    }}
+                    """,
+                    # Parameters passed to the script
+                    "params": {"order": order},
+                },
             },
+            # Replace the original score with the one computed by the script
+            boost_mode="replace",
         )
 
     if highlighting_fields is None:
@@ -600,7 +631,23 @@ def get_search_query(
             case SEARCH_TYPES.PEOPLE:
                 return search_query.query(Q("match", person_child="person"))
             case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
-                return search_query.query(Q("match", docket_child="docket"))
+                # Match all query for RECAP dn Dockets, it'll return dockets
+                # with child documents and also empty dockets.
+                _, query_hits_limit = get_child_top_hits_limit(cd, cd["type"])
+                match_all_child_query = build_has_child_query(
+                    "match_all",
+                    "recap_document",
+                    query_hits_limit,
+                    None,
+                    get_child_sorting_key(cd),
+                )
+                match_all_parent_query = Q("match", docket_child="docket")
+                return search_query.query(
+                    Q(
+                        "bool",
+                        should=[match_all_child_query, match_all_parent_query],
+                    )
+                )
             case _:
                 return search_query.query("match_all")
 
@@ -1460,6 +1507,7 @@ def build_full_join_es_queries(
         string_query = build_fulltext_query(
             parent_query_fields, cd.get("q", ""), only_queries=True
         )
+        parent_query = None
         match parent_filters, string_query:
             case [], []:
                 pass
@@ -1470,8 +1518,6 @@ def build_full_join_es_queries(
                     should=string_query,
                     minimum_should_match=1,
                 )
-                q_should.append(parent_query)
-
             case _, []:
                 parent_filters.extend([Q("match", docket_child="docket")])
                 p_filters = reduce(operator.iand, parent_filters)
@@ -1479,8 +1525,6 @@ def build_full_join_es_queries(
                     "bool",
                     filter=p_filters,
                 )
-                q_should.append(parent_query)
-
             case _, _:
                 parent_filters.extend([Q("match", docket_child="docket")])
                 p_filters = reduce(operator.iand, parent_filters)
@@ -1490,7 +1534,8 @@ def build_full_join_es_queries(
                     should=string_query,
                     minimum_should_match=1,
                 )
-                q_should.append(parent_query)
+        if parent_query:
+            q_should.append(parent_query)
 
     if not q_should:
         return [], join_query

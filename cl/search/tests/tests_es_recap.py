@@ -710,6 +710,12 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIn("2 Cases", r.content.decode())
         # 3 Docket entries in count.
         self.assertIn("3 Docket", r.content.decode())
+        self._count_child_documents(
+            0, r.content.decode(), 2, "match all query"
+        )
+        self._count_child_documents(
+            1, r.content.decode(), 1, "match all query"
+        )
 
         # Confirm an empty docket is shown in a match_all query.
         empty_docket = await sync_to_async(DocketFactory)(
@@ -724,6 +730,15 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIn("3 Cases", r.content.decode())
         # 3 Docket entries in count.
         self.assertIn("3 Docket", r.content.decode())
+        self._count_child_documents(
+            0, r.content.decode(), 2, "match all query"
+        )
+        self._count_child_documents(
+            1, r.content.decode(), 1, "match all query"
+        )
+        self._count_child_documents(
+            2, r.content.decode(), 0, "match all query"
+        )
         await empty_docket.adelete()
 
     def test_sorting(self) -> None:
@@ -1316,6 +1331,25 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # Frontend
         await self._test_article_count(params, 2, "order score desc")
 
+        de_4 = await sync_to_async(DocketEntryWithParentsFactory)(
+            docket=await sync_to_async(DocketFactory)(
+                docket_number="12-1236",
+                court=self.court_2,
+                case_name="SUBPOENAS SERVED FOUR",
+            ),
+            entry_number=4,
+            date_filed=None,
+        )
+        rd_4 = await sync_to_async(RECAPDocumentFactory)(
+            docket_entry=de_4,
+            document_number="4",
+        )
+        empty_docket = await sync_to_async(DocketFactory)(
+            court=self.court,
+            case_name="SUBPOENAS SERVED FIVE",
+            docket_number="12-1237",
+        )
+
         # Order by entry_date_filed desc
         params = {
             "type": SEARCH_TYPES.RECAP,
@@ -1324,11 +1358,13 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         }
         # Frontend
         r = await self._test_article_count(
-            params, 2, "order entry_date_filed desc"
+            params, 4, "order entry_date_filed desc"
         )
         self.assertTrue(
             r.content.decode().index("1:21-bk-1234")
-            < r.content.decode().index("12-1235"),
+            < r.content.decode().index("12-1235")
+            < r.content.decode().index("12-1236")
+            < r.content.decode().index("12-1237"),
             msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by entry_date_filed  desc.",
         )
 
@@ -1340,13 +1376,18 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         }
         # Frontend
         r = await self._test_article_count(
-            params, 2, "order entry_date_filed asc"
+            params, 4, "order entry_date_filed asc"
         )
         self.assertTrue(
             r.content.decode().index("12-1235")
-            < r.content.decode().index("1:21-bk-1234"),
+            < r.content.decode().index("1:21-bk-1234")
+            < r.content.decode().index("12-1236")
+            < r.content.decode().index("12-1237"),
             msg="'12-1235' should come BEFORE '1:21-bk-1234' when order_by entry_date_filed asc.",
         )
+
+        await rd_4.docket_entry.docket.adelete()
+        await empty_docket.adelete()
 
         # Order by dateFiled desc
         params = {
