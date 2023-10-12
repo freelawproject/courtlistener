@@ -38,10 +38,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
     RECAP Search Tests
     """
 
-    tests_running_over_solr = True
-
     @classmethod
     def setUpTestData(cls):
+        cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
         super().setUpTestData()
         # Index parties in ES.
