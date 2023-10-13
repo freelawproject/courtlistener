@@ -134,6 +134,23 @@ ELASTICSEARCH_OA_ALERTS_NUMBER_OF_REPLICAS = env(
     "ELASTICSEARCH_OA_ALERTS_NUMBER_OF_REPLICAS", default=0
 )
 
+# RECAP Search index shards and replicas
+ELASTICSEARCH_RECAP_NUMBER_OF_SHARDS = env(
+    "ELASTICSEARCH_RECAP_NUMBER_OF_SHARDS", default=1
+)
+ELASTICSEARCH_RECAP_NUMBER_OF_REPLICAS = env(
+    "ELASTICSEARCH_RECAP_NUMBER_OF_REPLICAS", default=0
+)
+
+
+# People Search index shards and replicas
+ELASTICSEARCH_PEOPLE_NUMBER_OF_SHARDS = env(
+    "ELASTICSEARCH_PEOPLE_NUMBER_OF_SHARDS", default=1
+)
+ELASTICSEARCH_PEOPLE_NUMBER_OF_REPLICAS = env(
+    "ELASTICSEARCH_PEOPLE_NUMBER_OF_REPLICAS", default=0
+)
+
 # ES Auto refresh. In production, it's suggested to wait for ES periodically
 # refresh (every ~1 second) since it's a resource-intensive operation.
 # This setting is overridden for testing.

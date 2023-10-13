@@ -123,81 +123,16 @@
     </p>
     <hr>
 
-
-
     <h2 id="opinions">Judicial Opinions</h2>
-    <p>Our database of opinions was created over a span of many years and was acquired from a variety of sources. We do not currently claim to have complete coverage of judicial opinions, but we believe that we will one day soon. Once we have this data collected, it will not be necessary to collect it again.
-    </p>
-    <p>Our judicial opinions database has a variety of sources which we merge together to create the most complete collection possible:
-    </p>
-    <ul>
-      <li>
-        <p><strong>Bulk contributions:</strong> Long before we began our work, Carl Malamud at <a href="https://public.resource.org/">Public.Resource.Org</a> was way ahead of us. When we started, one of our first steps was to add the data that he had collected, including the the complete <a href="https://en.wikipedia.org/wiki/United_States_Reports">United States Reports</a> going back to 1759, <a href="https://free.law/2011/08/25/second-series-of-federal-reporter-from-1950-to-1993-now-on-courtlistener/">the second series of the Federal Reporter</a>, and <a href="https://free.law/2012/05/13/announcing-the-third-series-of-the-federal-reporter/">volumes 1-491 of the third series of the Federal Reporter</a>. These sources added {{ count_pro|intcomma }} opinions to our collection.
-        </p>
-        <p>In 2013 we <a href="https://free.law/2013/10/30/lawbox/">received a generous data donation from Lawbox, LLC</a> that contributed to {{ count_lawbox|intcomma }} opinions.
-        </p>
-      </li>
-      <li><p><strong>Scrapers:</strong> Since 2010, we have gathered opinions directly from court websites via <a href="https://free.law/juriscraper/">our Juriscraper toolkit</a>. When we began, we only collected content from the federal Circuit courts and the Supreme Court, but as of now we run over 200 scrapers throughout every day. So far, they have contributed to {{ count_scraper|intcomma }} opinions. The supported courts <a href="#scraped-jurisdictions">are listed below</a>.
-      </p></li>
-      <li><p><strong>Supreme Court Database (SCDB):</strong> The <a href="http://scdb.wustl.edu/">NSF-funded SCDB</a> is the gold standard for high-quality legal information, and we have <a href="https://free.law/2014/12/21/scdb/">linked it up with the data available in the United States Reports</a>. Doing this added parallel citations and other metadata to tens of thousands of SCOTUS opinions.
-      </p></li>
-      <li><p><strong>Library of Congress:</strong> The Library of Congress released a PDF listing the filing dates for thousands of early historical Supreme Court cases. We have <a href="https://free.law/2011/05/25/updated-scotus-dates/">integrated these dates</a> so our users have the best information possible.
-      </p></li>
-    </ul>
-    <p>We currently have one more source of judicial opinions that we plan to add to the above sources. When that is complete, we will perform an audit to ensure that every opinion from both WestLaw and LexisNexis are readily available to the public in high-quality, machine readable, and easily accessible formats. <a href="{% url "contact" %}">Get in touch</a> if you want to help support this historical project.
-    </p>
-    <p>We welcome additional data donations on our <a href="{% url "donate" %}?referrer=coverage">donate</a> page of any public domain legal data.
-    </p>
-
-    <h3 id="opinion-chart">Seeing Our Opinion Coverage</h3>
-    <p>The chart below attempts to demonstrate the number of opinions we have in each jurisdiction in any given year. A few notes:
-    </p>
-    <ol>
-      <li>Use the drop down to select a court to inspect.</li>
-      <li>Bars can be clicked to view the opinions from that year.</li>
-      <li>Counts below include both <a href="{% url "faq" %}#non-precedential">precendential and non-precedential</a> opinions.
-      </li>
-      <li>The large spike you may see in the Supreme Court in the early 2000's is due to denied
-        certiorari's being included in the reporters during those years. This is not a data error.
-      </li>
-    </ol>
-    <p>For more information about the specific jurisdictions or courts that we support, see <a
-      href="{% url "court_index" %}">our jurisdiction page</a>.
-    </p>
-    <p>If you have further questions about our coverage of judicial opinions, <a href="{% url "contact" %}">please feel free to get in touch</a>.
-    </p>
+    <p id="opinion-chart">Courtlistener has one of the most comprehensive collections of American Legal Jurisprudence on the internet. We have over 9 million opinions for over 2000 courts. See our page on this topic for more details:</p>
+    <p><a href="{% url "coverage_opinions" %}" class="btn btn-default btn-lg">Opinion Coverage</a></p>
+    <hr>
   </div>
-
   <div class="col-xs-12">
-    <div id="nav" class="text-right">
-      <select class="bottom top float-right"></select>
-    </div>
-
-    <div id="chart" style="height: 400px;"></div>
   </div>
 
   <div class="hidden-xs hidden-sm col-md-3"></div>
   <div class="col-xs-12 col-md-8 col-lg-6">
-    <h3 id="scraped-jurisdictions">Courts We Scrape for Opinions</h3>
-    <p>As mentioned above, we gather opinions from hundreds of court websites every day. For each of these jurisdictions, we are able to provide <a href="{% url "alert_help" %}">instant, daily, weekly, or monthly alerts</a>. If you are setting up an alert, it's important to know that we do not yet have coverage for all of the courts on CourtListener. The courts for which we currently can provide alerts are:
-    </p>
-    <div class="row">
-      {% for row in courts_with_opinion_scrapers|rows:2 %}
-        <div class="col-sm-6">
-          <ul class="{% if not forloop.last %}bottom{% endif %}">
-            {% for court in row %}
-              <li>
-                <a href="/?q=&court_{{ court.pk }}=on&order_by=dateFiled+desc"
-                   rel="nofollow"
-                >{{ court }}</a>
-              </li>
-            {% endfor %}
-          </ul>
-        </div>
-      {% endfor %}
-    </div>
-    <hr>
-
 
     <h2 id="financial-disclosures">Financial Disclosures</h2>
     <p>All federal judges and many state judges must file financial disclosure documents to indicate any real or perceived biases they may have. We have collected
