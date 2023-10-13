@@ -12,14 +12,18 @@ document.body.addEventListener('htmx:configRequest', function (event) {
   }
 });
 
-function update_labels(data) {
+function update_labels(data, is_scraper = false) {
   data.forEach((item) => {
     Object.keys(item).forEach((key) => {
       if (key === 'data') {
-        update_labels(item[key]);
+        update_labels(item[key], item.group == "Scrapers");
       }
       if (key === 'label') {
-        item['label'] = item['id'];
+        if (is_scraper) {
+          item['label'] = item['id'] + " (scraper)";
+        }else {
+          item['label'] = item['id'];
+        }
       }
     });
   });
@@ -152,11 +156,7 @@ function initializeTimelinesChart() {
       const year = inputDate.getFullYear();
       const inputDate2 = new Date(d.timeRange[1]);
       const year2 = inputDate2.getFullYear();
-      if (d.val) {
-        return `${year} - ${year2} <br>${d.val} opinions`;
-      } else {
-        return `${year} - ${year2}`;
-      }
+      return `${year} - ${year2}`;
     })
     .onSegmentClick(function (d) {
       window.open(`/?court=${d.data.id}`);
