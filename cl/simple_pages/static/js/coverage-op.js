@@ -12,6 +12,16 @@ document.body.addEventListener('htmx:configRequest', function (event) {
   }
 });
 
+function getTextWidth(text) {
+  // re-use canvas object for better performance
+  const canvas = getTextWidth.canvas || (getTextWidth.canvas = document.createElement('canvas'));
+  const context = canvas.getContext('2d');
+  // use the style of the tooltips to avoid overflow
+  context.font = 'bold 13px sans-serif';
+  const metrics = context.measureText(text);
+  return Math.ceil(metrics.width);
+}
+
 function update_labels(data) {
   data.forEach((item) => {
     Object.keys(item).forEach((key) => {
@@ -48,7 +58,7 @@ const ALL_GROUP_TO_ABBREVIATIONS = {
   'Military Trial': 'Mil. Trial',
   'Committee': 'Comm.',
   'International': 'Int.',
-  'Scrapers': "Scrapers"
+  'Scrapers': 'Scrapers'
 };
 
 function abbreviate_group_names(data) {
