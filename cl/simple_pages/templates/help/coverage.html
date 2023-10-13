@@ -10,10 +10,8 @@
 
     {% if DEBUG %}
         <script src="{% static "js/d3.js" %}"></script>
-        <script src="{% static "js/plottable.js" %}"></script>
     {% else %}
         <script src="{% static "js/d3.min.js" %}"></script>
-        <script src="{% static "js/plottable.min.js" %}"></script>
     {% endif %}
 
     <script type="text/javascript" nonce="{{ request.csp_nonce }}">
@@ -24,15 +22,8 @@
         ];
         var sorted_courts = {{ sorted_courts|safe}};
     </script>
-    <script src="{% static "js/coverage.js" %}"></script>
-
     {% include "includes/anchors.html" %}
 
-{% endblock %}
-
-{% block head %}
-    <link rel="stylesheet" href="{% static "css/plottable.css" %}"
-          type="text/css" media="screen, projection">
 {% endblock %}
 
 {% block content %}
@@ -46,10 +37,6 @@
       </ul>
       <li>
         <a href="#opinions">Judicial Opinion Coverage</a>
-        <ul>
-          <li><a href="#opinion-chart">Coverage Chart</a></li>
-          <li><a href="#scraped-jurisdictions">Scheduled Updates</a></li>
-        </ul>
       </li>
       <li><a href="#financial-disclosures">Financial Disclosure Coverage</a></li>
       <li><a href="#judges">Judge Coverage</a></li>
@@ -124,15 +111,9 @@
     <hr>
 
     <h2 id="opinions">Judicial Opinions</h2>
-    <p id="opinion-chart">Courtlistener has one of the most comprehensive collections of American Legal Jurisprudence on the internet. We have over 9 million opinions for over 2000 courts. See our page on this topic for more details:</p>
+    <p id="opinion-chart">Courtlistener has one of the most comprehensive collections of American Legal Jurisprudence on the internet. We have over 9 million opinions for over 2000 courts. See our page on this topic for more details.</p>
     <p><a href="{% url "coverage_opinions" %}" class="btn btn-default btn-lg">Opinion Coverage</a></p>
     <hr>
-  </div>
-  <div class="col-xs-12">
-  </div>
-
-  <div class="hidden-xs hidden-sm col-md-3"></div>
-  <div class="col-xs-12 col-md-8 col-lg-6">
 
     <h2 id="financial-disclosures">Financial Disclosures</h2>
     <p>All federal judges and many state judges must file financial disclosure documents to indicate any real or perceived biases they may have. We have collected
@@ -149,7 +130,6 @@
     <p><a href="{% url "advanced_p" %}" class="btn btn-default btn-lg">Judge Homepage</a>
     </p>
     <hr>
-
 
     <h2 id="oral-arguments">Oral Argument Recordings</h2>
     <p>Although we have the largest collection of oral argument recordings on the Internet, we currently only have support for the Supreme Court and the Federal Circuit Courts listed below. For the courts listed below, we gather their oral argument recordings within about an hour of when the files are posted.

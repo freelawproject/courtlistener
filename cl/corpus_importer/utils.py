@@ -1,3 +1,4 @@
+import re
 from datetime import date
 from typing import Any, Iterator, Optional
 
@@ -206,12 +207,16 @@ def match_lists(
     for i, row in enumerate(scores):
         j = row.argmax()  # type: ignore
         # Lower threshold for small opinions.
-        cosine_sim = get_cosine_similarity(
-            harvard_opinions_list[i], cl_opinions_list[j]
+        # Remove non-alphanumeric and non-whitespace characters from lowercased text,
+        # this tries to make both texts in equal conditions to prove if both are
+        # similar or equal
+        h_opinion = re.sub(
+            r"[^a-zA-Z0-9 ]", "", harvard_opinions_list[i].lower()
         )
-        percent_match = compare_documents(
-            harvard_opinions_list[i], cl_opinions_list[j]
-        )
+        cl_opinion = re.sub(r"[^a-zA-Z0-9 ]", "", cl_opinions_list[j].lower())
+
+        cosine_sim = get_cosine_similarity(h_opinion, cl_opinion)
+        percent_match = compare_documents(h_opinion, cl_opinion)
 
         # Sometimes cosine similarity fails when there are small variations in text,
         # such as parties, attorneys, case name, or court that are included in the
