@@ -9,11 +9,7 @@ from celery import Task
 from django.apps import apps
 from django.conf import settings
 from django.utils.timezone import now
-from elasticsearch.exceptions import (
-    NotFoundError,
-    RequestError,
-    TransportError,
-)
+from elasticsearch.exceptions import NotFoundError, TransportError
 from elasticsearch.helpers import bulk
 from elasticsearch_dsl import Document, UpdateByQuery, connections
 from requests import Session
@@ -239,7 +235,7 @@ def person_first_time_indexing(parent_id: int, position: Position) -> None:
 
 @app.task(
     bind=True,
-    autoretry_for=(TransportError, ConnectionError, RequestError),
+    autoretry_for=(TransportError, ConnectionError),
     max_retries=3,
     interval_start=5,
 )
@@ -324,7 +320,7 @@ def save_document_in_es(
 
 @app.task(
     bind=True,
-    autoretry_for=(TransportError, ConnectionError, RequestError),
+    autoretry_for=(TransportError, ConnectionError),
     max_retries=3,
     interval_start=5,
 )
@@ -347,12 +343,28 @@ def update_document_in_es(
     )
 
 
+def get_doc_from_es(
+    es_document: ESDocumentClassType,
+    instance_id: int,
+) -> ESDocumentInstanceType | None:
+    """Get a document in Elasticsearch.
+    :param es_document: The Elasticsearch document type.
+    :param instance_id: The instance ID of the document to retrieve.
+    :return: An Elasticsearch document if found, otherwise None.
+    """
+
+    try:
+        main_doc = es_document.get(id=instance_id)
+    except NotFoundError:
+        return None
+    return main_doc
+
+
 @app.task(
     bind=True,
     autoretry_for=(
         TransportError,
         ConnectionError,
-        RequestError,
         NotFoundError,
     ),
     max_retries=3,
@@ -380,13 +392,14 @@ def update_child_documents_by_query(
     main_doc = None
     if es_document is PositionDocument:
         s = s.query("parent_id", type="position", id=parent_instance.pk)
-        main_doc = PersonDocument.get(id=parent_instance.pk)
+        main_doc = get_doc_from_es(PersonDocument, parent_instance.pk)
     elif es_document is ESRECAPDocument:
         s = s.query("parent_id", type="recap_document", id=parent_instance.pk)
-        main_doc = DocketDocument.get(id=parent_instance.pk)
+        main_doc = get_doc_from_es(DocketDocument, parent_instance.pk)
 
     if not main_doc:
-        # Abort bulk update for a not supported document.
+        # Abort bulk update for a not supported document or non-existing parent
+        # document in ES.
         return
 
     client = connections.get_connection()
@@ -424,7 +437,6 @@ def update_child_documents_by_query(
     autoretry_for=(
         TransportError,
         ConnectionError,
-        RequestError,
         NotFoundError,
     ),
     max_retries=3,
@@ -457,7 +469,7 @@ def index_docket_parties_in_es(
 
 @app.task(
     bind=True,
-    autoretry_for=(TransportError, ConnectionError, RequestError),
+    autoretry_for=(TransportError, ConnectionError),
     max_retries=3,
     interval_start=5,
 )
