@@ -25,7 +25,7 @@ function update_labels(data) {
   });
 }
 
-all_group_to_abbreivations = {
+const ALL_GROUP_TO_ABBREVIATIONS = {
   'Federal Appellate': 'Fed. App.',
   'Federal District': 'Fed. Dist.',
   'Federal Bankruptcy': 'Fed. Bankr.',
