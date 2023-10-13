@@ -17,13 +17,17 @@ from cl.people_db.models import (
 )
 from cl.search.documents import (
     AudioDocument,
+    DocketDocument,
+    ESRECAPDocument,
     ParentheticalGroupDocument,
     PersonDocument,
     PositionDocument,
 )
 from cl.search.models import (
+    BankruptcyInformation,
     Citation,
     Docket,
+    DocketEntry,
     Opinion,
     OpinionCluster,
     OpinionsCited,
@@ -163,10 +167,10 @@ p_field_mapping = {
         },
     },
     "reverse-delete": {
-        Education: {"person__pk": {"all": ["school"]}},
-        ABARating: {"person__pk": {"all": ["aba_rating"]}},
+        Education: {"person": {"all": ["school"]}},
+        ABARating: {"person": {"all": ["aba_rating"]}},
         PoliticalAffiliation: {
-            "person__pk": {
+            "person": {
                 "all": ["political_affiliation", "political_affiliation_id"]
             }
         },
@@ -221,13 +225,90 @@ position_field_mapping = {
         },
     },
     "reverse-delete": {
-        Education: {"person__pk": {"all": ["school"]}},
-        ABARating: {"person__pk": {"all": ["aba_rating"]}},
+        Education: {"person": {"all": ["school"]}},
+        ABARating: {"person": {"all": ["aba_rating"]}},
         PoliticalAffiliation: {
-            "person__pk": {
+            "person": {
                 "all": ["political_affiliation", "political_affiliation_id"]
             }
         },
+    },
+}
+
+docket_field_mapping = {
+    "save": {
+        Docket: {},
+        Person: {
+            "assigned_to": {
+                "name_full": ["assignedTo"],
+            },
+            "referred_to": {
+                "name_full": ["referredTo"],
+            },
+        },
+    },
+    "delete": {Docket: {}},
+    "m2m": {},
+    "reverse": {
+        BankruptcyInformation: {
+            "bankruptcy_information": {"all": ["chapter", "trustee_str"]}
+        },
+    },
+    "reverse-delete": {
+        BankruptcyInformation: {"docket": {"all": ["chapter", "trustee_str"]}},
+    },
+}
+
+recap_document_field_mapping = {
+    "save": {
+        RECAPDocument: {},
+        DocketEntry: {
+            "docket_entry": {
+                "description": ["description"],
+                "entry_number": ["entry_number"],
+                "date_filed": ["entry_date_filed"],
+            }
+        },
+        Docket: {
+            "docket_entry__docket": {
+                "case_name": ["caseName"],
+                "case_name_full": ["case_name_full"],
+                "docket_number": ["docketNumber"],
+                "nature_of_suit": ["suitNature"],
+                "cause": ["cause"],
+                "jury_demand": ["juryDemand"],
+                "jurisdiction_type": ["jurisdictionType"],
+                "date_argued": ["dateArgued"],
+                "date_filed": ["dateFiled"],
+                "date_terminated": ["dateTerminated"],
+                "assigned_to_id": ["assigned_to_id", "assignedTo"],
+                "referred_to_id": ["referred_to_id", "referredTo"],
+                "assigned_to_str": ["assignedTo"],
+                "referred_to_str": ["referredTo"],
+            }
+        },
+        Person: {
+            "assigned_to": {
+                "name_full": ["assignedTo"],
+            },
+            "referred_to": {
+                "name_full": ["referredTo"],
+            },
+        },
+        BankruptcyInformation: {
+            "bankruptcy_information": {
+                "chapter": ["chapter"],
+                "trustee_str": ["trustee_str"],
+            }
+        },
+    },
+    "delete": {RECAPDocument: {}},
+    "m2m": {},
+    "reverse": {
+        BankruptcyInformation: {"docket": {"all": ["chapter", "trustee_str"]}}
+    },
+    "reverse-delete": {
+        BankruptcyInformation: {"docket": {"all": ["chapter", "trustee_str"]}},
     },
 }
 
@@ -252,6 +333,14 @@ _p_signal_processor = ESSignalProcessor(
 
 _position_signal_processor = ESSignalProcessor(
     Position, PositionDocument, position_field_mapping
+)
+
+_docket_signal_processor = ESSignalProcessor(
+    Docket, DocketDocument, docket_field_mapping
+)
+
+_recap_document_signal_processor = ESSignalProcessor(
+    RECAPDocument, ESRECAPDocument, recap_document_field_mapping
 )
 
 
