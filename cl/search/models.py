@@ -717,6 +717,24 @@ class Docket(AbstractDateTimeModel):
             "slug",
         ]
     )
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "docket_number",
+            "case_name",
+            "case_name_full",
+            "nature_of_suit",
+            "cause",
+            "jury_demand",
+            "jurisdiction_type",
+            "date_argued",
+            "date_filed",
+            "date_terminated",
+            "assigned_to_id",
+            "assigned_to_str",
+            "referred_to_id",
+            "referred_to_str",
+        ]
+    )
 
     class Meta:
         unique_together = ("docket_number", "pacer_case_id", "court")
@@ -1200,6 +1218,13 @@ class DocketEntry(AbstractDateTimeModel):
             "PACER docket page."
         ),
         blank=True,
+    )
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "description",
+            "entry_number",
+            "date_filed",
+        ]
     )
 
     class Meta:
@@ -1720,6 +1745,12 @@ class BankruptcyInformation(AbstractDateTimeModel):
     )
     trustee_str = models.TextField(
         help_text="The name of the trustee handling the case.", blank=True
+    )
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "chapter",
+            "trustee_str",
+        ]
     )
 
     class Meta:

@@ -8,6 +8,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives, get_connection, send_mail
 from django.db import transaction
+from django.db.models import Prefetch
 from django.template import loader
 from django.utils.timezone import now
 from elasticsearch.exceptions import (
@@ -41,6 +42,8 @@ from cl.search.constants import ALERTS_HL_TAG
 from cl.search.documents import (
     ES_CHILD_ID,
     AudioPercolator,
+    DocketDocument,
+    ESRECAPDocument,
     PersonDocument,
     PositionDocument,
 )
@@ -726,11 +729,13 @@ def remove_doc_from_es_index(
     :return: None
     """
 
-    doc_id = (
-        ES_CHILD_ID(instance_id).POSITION
-        if es_document is PositionDocument
-        else instance_id
-    )
+    if es_document is PositionDocument:
+        doc_id = ES_CHILD_ID(instance_id).POSITION
+    elif es_document is ESRECAPDocument:
+        doc_id = ES_CHILD_ID(instance_id).RECAP
+    else:
+        doc_id = instance_id
+
     try:
         doc = es_document.get(id=doc_id)
         doc.delete(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)

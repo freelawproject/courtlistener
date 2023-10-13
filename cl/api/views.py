@@ -231,7 +231,7 @@ async def get_result_count(request, version, day_count):
         cd["argued_after"] = date.today() - timedelta(days=int(day_count))
         cd["argued_before"] = None
         search_query = document_type.search()
-        s = build_es_base_query(search_query, cd)
+        s, _ = build_es_base_query(search_query, cd)
         total_query_results = s.count()
     else:
         with Session() as session:

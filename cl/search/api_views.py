@@ -17,7 +17,6 @@ from cl.search.api_serializers import (
     SearchResultSerializer,
     TagSerializer,
 )
-from cl.search.documents import AudioDocument, PersonDocument
 from cl.search.filters import (
     CourtFilter,
     DocketEntryFilter,
@@ -188,7 +187,6 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
                 request, "p-es-active"
             ):
                 serializer = ExtendedPersonESSerializer(result_page, many=True)
-
             else:
                 if cd["q"] == "":
                     cd["q"] = "*"  # Get everything

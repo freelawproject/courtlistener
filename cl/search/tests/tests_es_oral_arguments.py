@@ -67,7 +67,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
     @staticmethod
     def save_percolator_query(cd):
         search_query = AudioDocument.search()
-        query = build_es_base_query(search_query, cd)
+        query, _ = build_es_base_query(search_query, cd)
         query_dict = query.to_dict()["query"]
         percolator_query = AudioPercolator(
             percolator_query=query_dict, rate=Alert.REAL_TIME
@@ -1139,9 +1139,12 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
                     "order_by": order,
                 }
                 search_query = AudioDocument.search()
-                s, total_query_results, top_hits_limit = build_es_main_query(
-                    search_query, cd
-                )
+                (
+                    s,
+                    total_query_results,
+                    top_hits_limit,
+                    total_child_results,
+                ) = build_es_main_query(search_query, cd)
                 hits, query_time, error = fetch_es_results(
                     cd, s, page=page + 1, rows_per_page=page_size
                 )
@@ -1735,9 +1738,12 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
                 "order_by": "score desc",
             }
             search_query = AudioDocument.search()
-            s, total_query_results, top_hits_limit = build_es_main_query(
-                search_query, cd
-            )
+            (
+                s,
+                total_query_results,
+                top_hits_limit,
+                total_child_results,
+            ) = build_es_main_query(search_query, cd)
             self.assertEqual(s.count(), 1)
             results = s.execute()
             self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. USA")
@@ -1751,9 +1757,12 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             docket_5.date_reargument_denied = datetime.date(2021, 5, 15)
             docket_5.save()
             # Confirm docket number and dateArgued are updated in the index.
-            s, total_query_results, top_hits_limit = build_es_main_query(
-                search_query, cd
-            )
+            (
+                s,
+                total_query_results,
+                top_hits_limit,
+                total_child_results,
+            ) = build_es_main_query(search_query, cd)
             self.assertEqual(s.count(), 1)
             results = s.execute()
             self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. USA")
@@ -1770,9 +1779,12 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             audio_7.panel.add(self.author)
             # Confirm ManyToMany field is updated in the index.
             cd["q"] = "Lorem Ipsum Dolor vs. IRS"
-            s, total_query_results, top_hits_limit = build_es_main_query(
-                search_query, cd
-            )
+            (
+                s,
+                total_query_results,
+                top_hits_limit,
+                total_child_results,
+            ) = build_es_main_query(search_query, cd)
             self.assertEqual(s.count(), 1)
             results = s.execute()
             self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. IRS")
@@ -1782,9 +1794,12 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             audio_7.duration = 322
             audio_7.save()
             audio_7.refresh_from_db()
-            s, total_query_results, top_hits_limit = build_es_main_query(
-                search_query, cd
-            )
+            (
+                s,
+                total_query_results,
+                top_hits_limit,
+                total_child_results,
+            ) = build_es_main_query(search_query, cd)
             self.assertEqual(s.count(), 1)
             results = s.execute()
             self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. IRS")
@@ -1795,9 +1810,12 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             # Confirm that docket-related audio objects are removed from the
             # index.
             cd["q"] = "Lorem Ipsum Dolor"
-            s, total_query_results, top_hits_limit = build_es_main_query(
-                search_query, cd
-            )
+            (
+                s,
+                total_query_results,
+                top_hits_limit,
+                total_child_results,
+            ) = build_es_main_query(search_query, cd)
             self.assertEqual(s.count(), 0)
 
     def test_exact_and_synonyms_query(self) -> None:
