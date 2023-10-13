@@ -337,8 +337,15 @@ def merge_judges(
             if s.ratio() >= 0.7:
                 # We found a match, we assume that the data in CL is better, we keep
                 # the one from CL and remove the one from harvard
-                harvard_clean_list.remove(pair[1])
+                try:
+                    harvard_clean_list.remove(pair[1])
+                except ValueError:
+                    # The value was removed in an earlier iteration, but we still
+                    # have the value in the remaining pairs to match, we simply
+                    # ignore it
+                    pass
                 success = True
+
         if success:
             # At least one success that matches the names, we can create a new judges
             # list
