@@ -166,6 +166,29 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertTrue(DocketDocument.exists(id=ES_CHILD_ID(rd_1.pk).RECAP))
         de_1.docket.delete()
 
+    def test_unnumbered_entry_indexing(self) -> None:
+        """Confirm an unnumbered entry which uses the pacer_doc_id as number
+        can be properly indexed."""
+
+        de_1 = DocketEntryWithParentsFactory(
+            docket=DocketFactory(
+                court=self.court,
+            ),
+            date_filed=datetime.date(2015, 8, 19),
+            description="MOTION for Leave to File Amicus Curiae Lorem",
+            entry_number=3010113237867,
+        )
+        rd_1 = RECAPDocumentFactory(
+            docket_entry=de_1,
+            description="Leave to File",
+            document_number="3010113237867",
+            is_available=True,
+            page_count=5,
+        )
+
+        self.assertTrue(DocketDocument.exists(id=ES_CHILD_ID(rd_1.pk).RECAP))
+        de_1.docket.delete()
+
     def test_index_recap_parent_and_child_objects(self) -> None:
         """Confirm Dockets and RECAPDocuments are properly indexed in ES"""
 
