@@ -55,8 +55,7 @@ function abbreviate_group_names(data) {
   if (Array.isArray(data)) {
     data.forEach((item) => {
       if (item.group) {
-        console.log(item.group)
-        item.group = all_group_to_abbreivations[item.group];
+        item.group = ALL_GROUP_TO_ABBREVIATIONS[item.group];
       }
     });
   }
