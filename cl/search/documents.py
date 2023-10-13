@@ -754,6 +754,14 @@ class DocketBaseDocument(Document):
     )
     jurisdictionType = fields.TextField(
         attr="jurisdiction_type",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                attr="jurisdiction_type",
+                analyzer="english_exact",
+            ),
+        },
+        search_analyzer="search_analyzer",
     )
     dateArgued = fields.DateField(attr="date_argued")
     dateFiled = fields.DateField(attr="date_filed")
@@ -832,7 +840,7 @@ class ESRECAPDocument(DocketBaseDocument):
         },
         search_analyzer="search_analyzer",
     )
-    entry_number = fields.IntegerField(attr="docket_entry.entry_number")
+    entry_number = fields.LongField(attr="docket_entry.entry_number")
     entry_date_filed = fields.DateField(attr="docket_entry.date_filed")
     short_description = fields.TextField(
         attr="description",
@@ -851,7 +859,7 @@ class ESRECAPDocument(DocketBaseDocument):
         },
         search_analyzer="search_analyzer",
     )
-    document_number = fields.TextField(attr="document_number")
+    document_number = fields.LongField()
     pacer_doc_id = fields.KeywordField(attr="pacer_doc_id")
     plain_text = fields.TextField(
         attr="plain_text",
@@ -872,6 +880,9 @@ class ESRECAPDocument(DocketBaseDocument):
     class Django:
         model = RECAPDocument
         ignore_signals = True
+
+    def prepare_document_number(self, instance):
+        return instance.document_number or None
 
     def prepare_document_type(self, instance):
         return instance.get_document_type_display()
