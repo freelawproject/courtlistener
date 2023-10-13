@@ -221,6 +221,7 @@ class Person(AbstractDateTimeModel):
             "date_dod",
         ]
     )
+    es_rd_field_tracker = FieldTracker(fields=["name_full"])
 
     def __str__(self) -> str:
         return f"{self.pk}: {self.name_full}"

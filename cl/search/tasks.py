@@ -27,10 +27,17 @@ from cl.people_db.models import Person, Position
 from cl.search.documents import (
     ES_CHILD_ID,
     AudioDocument,
+    DocketDocument,
+    ESRECAPDocument,
     PersonDocument,
     PositionDocument,
 )
-from cl.search.models import Docket, OpinionCluster, RECAPDocument
+from cl.search.models import (
+    SEARCH_TYPES,
+    Docket,
+    OpinionCluster,
+    RECAPDocument,
+)
 from cl.search.types import (
     ESDocumentClassType,
     ESDocumentInstanceType,
@@ -270,6 +277,25 @@ def save_document_in_es(
         if not instance.is_judge:
             return
         doc_id = instance.pk
+    elif isinstance(instance, RECAPDocument):
+        parent_id = getattr(instance.docket_entry.docket, "pk", None)
+        if not all(
+            [
+                es_index_exists(es_document._index._name),
+                parent_id,
+            ]
+        ):
+            return
+
+        if not DocketDocument.exists(id=parent_id):
+            # create the parent document if it does not exist in ES
+            docket_doc = DocketDocument()
+            doc = docket_doc.prepare(instance.docket_entry.docket)
+            DocketDocument(meta={"id": parent_id}, **doc).save(
+                skip_empty=False, return_doc_meta=True
+            )
+        doc_id = ES_CHILD_ID(instance.pk).RECAP
+        es_args["_routing"] = parent_id
     else:
         doc_id = instance.pk
 
@@ -355,10 +381,14 @@ def update_child_documents_by_query(
     if es_document is PositionDocument:
         s = s.query("parent_id", type="position", id=parent_instance.pk)
         main_doc = PersonDocument.get(id=parent_instance.pk)
+    elif es_document is ESRECAPDocument:
+        s = s.query("parent_id", type="recap_document", id=parent_instance.pk)
+        main_doc = DocketDocument.get(id=parent_instance.pk)
 
     if not main_doc:
         # Abort bulk update for a not supported document.
         return
+
     client = connections.get_connection()
     ubq = UpdateByQuery(using=client, index=es_document._index._name).query(
         s.to_dict()["query"]
@@ -391,60 +421,121 @@ def update_child_documents_by_query(
 
 @app.task(
     bind=True,
+    autoretry_for=(
+        TransportError,
+        ConnectionError,
+        RequestError,
+        NotFoundError,
+    ),
+    max_retries=3,
+    interval_start=5,
+)
+def index_docket_parties_in_es(
+    self: Task,
+    docket_id: int,
+) -> None:
+    """Update a document in Elasticsearch.
+    :param self: The celery task
+    :param docket_id: The docket ID to update in ES.
+    :param fields_values_to_update: A dictionary with fields and values to update.
+    :return: None
+    """
+
+    docket_document = DocketDocument.get(id=docket_id)
+    docket = Docket.objects.get(id=docket_id)
+    parties_prepared = docket_document.prepare_parties(docket)
+
+    fields_to_update = {
+        key: list(set_values) for key, set_values in parties_prepared.items()
+    }
+    Document.update(
+        docket_document,
+        **fields_to_update,
+        refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
+    )
+
+
+@app.task(
+    bind=True,
     autoretry_for=(TransportError, ConnectionError, RequestError),
     max_retries=3,
     interval_start=5,
 )
 def index_parent_and_child_docs(
     self: Task,
-    instance_id: int,
-    parent_es_document: ESDocumentClassType,
-    child_es_document: ESDocumentClassType,
+    instance_ids: list[int],
+    search_type: str,
 ) -> None:
     """Index parent and child documents in Elasticsearch.
 
     :param self: The Celery task instance
-    :param instance_id: The parent instance ID.
+    :param instance_ids: The parent instance IDs to index.
+    :param search_type: The Search Type to index parent and child docs.
     :return: None
     """
 
-    instance = Person.objects.prefetch_related("positions").get(pk=instance_id)
-    doc = parent_es_document().prepare(instance)
-    es_args = {
-        "meta": {"id": instance_id},
-    }
-    response = parent_es_document(**es_args, **doc).save(
-        skip_empty=False,
-        return_doc_meta=False,
-        refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
-    )
-    if response != "created":
-        model_label = parent_es_document.Django.model.__name__.capitalize()
-        logger.error(
-            f"The {model_label} with ID:{instance_id} can't be index in ES. "
-            "Aborting the indexing of their child objects."
-        )
-        return
+    match search_type:
+        case SEARCH_TYPES.PEOPLE:
+            parent_es_document = PersonDocument
+            child_es_document = PositionDocument
+            child_id_property = "POSITION"
+        case SEARCH_TYPES.RECAP:
+            parent_es_document = DocketDocument
+            child_es_document = ESRECAPDocument
+            child_id_property = "RECAP"
+        case _:
+            return
 
-    client = connections.get_connection()
-    child_docs = instance.positions.all()
-    base_doc = {
-        "_op_type": "index",
-        "_index": parent_es_document._index._name,
-    }
-    child_docs_to_index = []
-    for child in child_docs:
-        position_doc = child_es_document().prepare(child)
-        child_params = {
-            "_id": ES_CHILD_ID(child.pk).POSITION,
-            "_routing": f"{instance_id}",
+    for instance_id in instance_ids:
+        if search_type == SEARCH_TYPES.PEOPLE:
+            instance = Person.objects.prefetch_related("positions").get(
+                pk=instance_id
+            )
+            child_docs = instance.positions.all()
+        elif search_type == SEARCH_TYPES.RECAP:
+            instance = Docket.objects.get(pk=instance_id)
+            child_docs = RECAPDocument.objects.filter(
+                docket_entry__docket=instance
+            )
+        else:
+            return
+
+        doc = parent_es_document().prepare(instance)
+        es_args = {
+            "meta": {"id": instance_id},
         }
-        position_doc.update(base_doc)
-        position_doc.update(child_params)
-        child_docs_to_index.append(position_doc)
+        response = parent_es_document(**es_args, **doc).save(
+            skip_empty=False,
+            return_doc_meta=False,
+            refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
+        )
+        if response != "created":
+            model_label = parent_es_document.Django.model.__name__.capitalize()
+            logger.error(
+                f"The {model_label} with ID:{instance_id} can't be index in ES. "
+                "Aborting the indexing of their child objects."
+            )
+            return
 
-    # Perform bulk indexing for child documents
-    bulk(client, child_docs_to_index)
+        client = connections.get_connection()
+        base_doc = {
+            "_op_type": "index",
+            "_index": parent_es_document._index._name,
+        }
+        child_docs_to_index = []
+        for child in child_docs.iterator():
+            child_doc = child_es_document().prepare(child)
+            child_params = {
+                "_id": getattr(ES_CHILD_ID(child.pk), child_id_property),
+                "_routing": f"{instance_id}",
+            }
+            child_doc.update(base_doc)
+            child_doc.update(child_params)
+            child_docs_to_index.append(child_doc)
+
+        # Perform bulk indexing for child documents
+        bulk(client, child_docs_to_index)
+
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
-        PersonDocument._index.refresh()
+        parent_es_document._index.refresh()

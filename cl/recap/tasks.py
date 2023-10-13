@@ -94,7 +94,11 @@ from cl.recap.models import (
 )
 from cl.scrapers.tasks import extract_recap_pdf, extract_recap_pdf_base
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
-from cl.search.tasks import add_items_to_solr, add_or_update_recap_docket
+from cl.search.tasks import (
+    add_items_to_solr,
+    add_or_update_recap_docket,
+    index_docket_parties_in_es,
+)
 
 logger = logging.getLogger(__name__)
 cnt = CaseNameTweaker()
@@ -563,6 +567,7 @@ async def process_recap_docket(pk):
         d, data["docket_entries"]
     )
     await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
+    await sync_to_async(index_docket_parties_in_es.delay)(d.pk)
     await process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
@@ -1047,6 +1052,7 @@ async def process_recap_appellate_docket(pk):
         d, data["docket_entries"]
     )
     await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
+    await sync_to_async(index_docket_parties_in_es.delay)(d.pk)
     await process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)

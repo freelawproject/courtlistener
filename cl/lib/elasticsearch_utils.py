@@ -30,6 +30,13 @@ from cl.search.constants import (
     SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS,
     SEARCH_HL_TAG,
     SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS,
+    SEARCH_ORAL_ARGUMENT_QUERY_FIELDS,
+    SEARCH_PEOPLE_CHILD_QUERY_FIELDS,
+    SEARCH_PEOPLE_PARENT_QUERY_FIELDS,
+    SEARCH_RECAP_CHILD_HL_FIELDS,
+    SEARCH_RECAP_CHILD_QUERY_FIELDS,
+    SEARCH_RECAP_HL_FIELDS,
+    SEARCH_RECAP_PARENT_QUERY_FIELDS,
     SOLR_PEOPLE_ES_HL_FIELDS,
 )
 from cl.search.exception import UnbalancedQuery
@@ -57,8 +64,16 @@ def es_index_exists(index_name: str) -> bool:
     :param index_name: The index name to check.
     :return: True if the index exists, otherwise False.
     """
-    es = connections.get_connection()
-    return es.indices.exists(index=index_name)
+    try:
+        es = connections.get_connection()
+        index_exists = es.indices.exists(index=index_name)
+    except (TransportError, ConnectionError) as e:
+        logger.warning(
+            f"Error in ES connection when checking index existence: {index_name}"
+        )
+        logger.warning(f"Error was: {e}")
+        index_exists = False
+    return index_exists
 
 
 def build_daterange_query(
@@ -122,7 +137,17 @@ def add_fields_boosting(
     """
     # Apply standard qf parameters
     qf = BOOSTS["qf"][cd["type"]].copy()
-    if cd["type"] in [SEARCH_TYPES.ORAL_ARGUMENT]:
+    if cd["type"] in [
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.DOCKETS,
+    ]:
+        qf = BOOSTS["es"][cd["type"]].copy()
+
+    if cd["type"] in [
+        SEARCH_TYPES.ORAL_ARGUMENT,
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.DOCKETS,
+    ]:
         # Give a boost on the case_name field if it's obviously a case_name
         # query.
         query = cd.get("q", "")
@@ -236,12 +261,16 @@ def append_query_conjunctions(query: str) -> str:
     return " ".join(clean_q)
 
 
-def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
+def build_fulltext_query(
+    fields: list[str], value: str, only_queries=False
+) -> QueryString | List:
     """Given the cleaned data from a form, return a Elastic Search string query or []
     https://www.elastic.co/guide/en/elasticsearch/reference/current/full-text-queries.html
 
     :param fields: A list of name fields to search in.
     :param value: The string value to search for.
+    :param only_queries: If True return only the queries avoiding wrapping them
+    into a bool clause.
     :return: A Elasticsearch QueryString or [] if the "value" param is empty.
     """
     if value:
@@ -286,6 +315,8 @@ def build_fulltext_query(fields: list[str], value: str) -> QueryString | List:
                 type="phrase",
             ),
         ]
+        if only_queries:
+            return q_should
         return Q("bool", should=q_should)
 
     return []
@@ -336,7 +367,14 @@ def build_text_filter(field: str, value: str) -> List:
     :return: Empty list or list with DSL Phrase query
     """
     if value:
-        return [Q("match_phrase", **{field: value})]
+        return [
+            Q(
+                "query_string",
+                query=value,
+                fields=[field],
+                default_operator="AND",
+            )
+        ]
     return []
 
 
@@ -369,10 +407,20 @@ def build_sort_results(cd: CleanData) -> Dict:
         },
         "dateFiled desc": {"dateFiled": {"order": "desc"}},
         "dateFiled asc": {"dateFiled": {"order": "asc"}},
+        # For child sorting keys use always "order": "desc", the sorting will
+        # be handled internally by a function score in the has_child query.
+        "entry_date_filed asc": {"_score": {"order": "desc"}},
+        "entry_date_filed desc": {"_score": {"order": "desc"}},
+        "entry_date_filed_feed desc": {"entry_date_filed": {"order": "desc"}},
     }
 
     if cd["type"] == SEARCH_TYPES.PARENTHETICAL:
         order_by_map["score desc"] = {"score": {"order": "desc"}}
+
+    if cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
+        random_order_field_id = "docket_id"
+    else:
+        random_order_field_id = "id"
 
     order_by = cd.get("order_by")
     if order_by and "random_" in order_by:
@@ -389,7 +437,7 @@ def build_sort_results(cd: CleanData) -> Dict:
             "_script": {
                 "type": "number",
                 "script": {
-                    "source": "Long.hashCode(doc['id'].value ^ params.seed)",
+                    "source": f"Long.hashCode(doc['{random_order_field_id}'].value ^ params.seed)",
                     "params": {"seed": seed},
                 },
                 "order": order,
@@ -402,6 +450,21 @@ def build_sort_results(cd: CleanData) -> Dict:
         return order_by_map["score desc"]
 
     return order_by_map[order_by]
+
+
+def get_child_sorting_key(cd: CleanData) -> tuple[str, str]:
+    """Given cleaned data, find order_by value and return a key to use within
+    a has_child query.
+
+    :param cd: The user input CleanedData
+    :return: A two tuple containing the short key and the order (asc or desc).
+    """
+    order_by_map_child = {
+        "entry_date_filed asc": ("entry_date_filed", "asc"),
+        "entry_date_filed desc": ("entry_date_filed", "desc"),
+    }
+    order_by = cd.get("order_by", "")
+    return order_by_map_child.get(order_by, ("", ""))
 
 
 def build_es_filters(cd: CleanData) -> List:
@@ -459,7 +522,147 @@ def build_es_filters(cd: CleanData) -> List:
     return queries_list
 
 
-def build_es_base_query(search_query: Search, cd: CleanData) -> Search:
+def build_has_child_query(
+    query: QueryString | str,
+    child_type: str,
+    child_hits_limit: int,
+    highlighting_fields: dict[str, int] | None = None,
+    order_by: tuple[str, str] | None = None,
+) -> QueryString:
+    """Build a 'has_child' query.
+
+    :param query: The Elasticsearch query string or QueryString object.
+    :param child_type: The type of the child document.
+    :param child_hits_limit: The maximum number of child hits to be returned.
+    :param highlighting_fields: List of fields to highlight in child docs.
+    :param order_by: If provided the field to use to compute score for sorting
+    results based on a child document field.
+    :return: The 'has_child' query.
+    """
+
+    if order_by and all(order_by):
+        sort_field, order = order_by
+        # Define the function score for sorting based in the child sort_field.
+        query = Q(
+            "function_score",
+            query=query,
+            script_score={
+                "script": {
+                    "source": f"""
+                    // Check if the document has a value for the 'sort_field'
+                    if (doc['{sort_field}'].size() == 0) {{
+                        return 0;  // If not, return 0 as the score
+                    }} else {{
+                        // Get the current time in milliseconds
+                        long current_time = new Date().getTime();
+
+                        // Convert the 'sort_field' value to epoch milliseconds
+                        long date_filed_time = doc['{sort_field}'].value.toInstant().toEpochMilli();
+
+                        // If the order is 'desc', return the 'date_filed_time' as the score
+                        if (params.order.equals('desc')) {{
+                            return date_filed_time;
+                        }} else {{
+                            // Otherwise, calculate the difference between current time and 'date_filed_time'
+                            // in order to boost older documents if the order is asc.
+                            long diff = current_time - date_filed_time;
+
+                            // Return the difference if it's non-negative, otherwise return 0
+                            return diff >= 0 ? diff : 0;
+                        }}
+                    }}
+                    """,
+                    # Parameters passed to the script
+                    "params": {"order": order},
+                },
+            },
+            # Replace the original score with the one computed by the script
+            boost_mode="replace",
+        )
+
+    if highlighting_fields is None:
+        highlighting_fields = {}
+    highlight_options: dict[str, dict[str, Any]] = {"fields": {}}
+
+    for field, fragment_size in highlighting_fields.items():
+        number_of_fragments = 0
+        if fragment_size:
+            number_of_fragments = 1
+        highlight_options["fields"][field] = {
+            "type": "plain",
+            "fragment_size": fragment_size,
+            "number_of_fragments": number_of_fragments,
+            "pre_tags": ["<mark>"],
+            "post_tags": ["</mark>"],
+        }
+
+    inner_hits = {
+        "name": f"filter_query_inner_{child_type}",
+        "size": child_hits_limit,
+    }
+    if highlight_options:
+        inner_hits["highlight"] = highlight_options
+
+    return Q(
+        "has_child",
+        type=child_type,
+        score_mode="max",
+        query=query,
+        inner_hits=inner_hits,
+    )
+
+
+def get_search_query(
+    cd: CleanData,
+    search_query: Search,
+    filters: list,
+    string_query: QueryString,
+) -> Search:
+    """Get the appropriate search query based on the given parameters.
+
+    :param cd: The query CleanedData
+    :param search_query: Elasticsearch DSL Search object
+    :param filters: A list of filter objects to be applied.
+    :param string_query: An Elasticsearch QueryString object.
+    :return: The modified Search object based on the given conditions.
+    """
+    if not any([filters, string_query]):
+        match cd["type"]:
+            case SEARCH_TYPES.PEOPLE:
+                return search_query.query(Q("match", person_child="person"))
+            case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
+                # Match all query for RECAP dn Dockets, it'll return dockets
+                # with child documents and also empty dockets.
+                _, query_hits_limit = get_child_top_hits_limit(cd, cd["type"])
+                match_all_child_query = build_has_child_query(
+                    "match_all",
+                    "recap_document",
+                    query_hits_limit,
+                    None,
+                    get_child_sorting_key(cd),
+                )
+                match_all_parent_query = Q("match", docket_child="docket")
+                return search_query.query(
+                    Q(
+                        "bool",
+                        should=[match_all_child_query, match_all_parent_query],
+                    )
+                )
+            case _:
+                return search_query.query("match_all")
+
+    if string_query:
+        search_query = search_query.query(string_query)
+
+    if filters:
+        search_query = search_query.filter(reduce(operator.iand, filters))
+
+    return search_query
+
+
+def build_es_base_query(
+    search_query: Search, cd: CleanData
+) -> tuple[Search, QueryString | None]:
     """Builds filters and fulltext_query based on the given cleaned
      data and returns an elasticsearch query.
 
@@ -469,6 +672,7 @@ def build_es_base_query(search_query: Search, cd: CleanData) -> Search:
     """
 
     string_query = None
+    join_query = None
     join_field_documents = [SEARCH_TYPES.PEOPLE]
     if cd["type"] in join_field_documents:
         filters = build_join_es_filters(cd)
@@ -481,34 +685,14 @@ def build_es_base_query(search_query: Search, cd: CleanData) -> Search:
                 ["representative_text"], cd.get("q", "")
             )
         case SEARCH_TYPES.ORAL_ARGUMENT:
-            fields = [
-                "court",
-                "court_citation_string",
-                "judge",
-                "dateArgued_text",
-                "dateReargued_text",
-                "dateReargumentDenied_text",
-                "court_id_text",
-                "sha1",
-            ]
+            fields = SEARCH_ORAL_ARGUMENT_QUERY_FIELDS
             fields.extend(add_fields_boosting(cd))
             string_query = build_fulltext_query(
                 fields,
                 cd.get("q", ""),
             )
         case SEARCH_TYPES.PEOPLE:
-            child_fields = [
-                "position_type",
-                "nomination_process",
-                "judicial_committee_action",
-                "selection_method",
-                "termination_reason",
-                "court_full_name",
-                "court_citation_string",
-                "court_exact",
-                "organization_name",
-                "job_title",
-            ]
+            child_fields = SEARCH_PEOPLE_CHILD_QUERY_FIELDS
             child_fields.extend(
                 add_fields_boosting(
                     cd,
@@ -522,16 +706,7 @@ def build_es_base_query(search_query: Search, cd: CleanData) -> Search:
             child_query_fields = {
                 "position": child_fields,
             }
-            parent_query_fields = [
-                "gender",
-                "alias",
-                "dob_city",
-                "political_affiliation",
-                "religion",
-                "fjc_id",
-                "aba_rating",
-                "school",
-            ]
+            parent_query_fields = SEARCH_PEOPLE_PARENT_QUERY_FIELDS
             parent_query_fields.extend(
                 add_fields_boosting(
                     cd,
@@ -545,29 +720,86 @@ def build_es_base_query(search_query: Search, cd: CleanData) -> Search:
                 parent_query_fields,
                 cd.get("q", ""),
             )
-
-    if filters or string_query:
-        # Apply filters first if there is at least one set.
-        if filters:
-            search_query = search_query.filter(reduce(operator.iand, filters))
-        # Apply string query after if is set, required to properly
-        # compute elasticsearch scores.
-        if string_query:
-            search_query = search_query.query(string_query)
-    else:
-        if cd["type"] == SEARCH_TYPES.PEOPLE:
-            # Only return Person documents.
-            search_query = search_query.query(
-                Q("match", person_child="person")
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
+            child_fields = SEARCH_RECAP_CHILD_QUERY_FIELDS
+            child_fields.extend(
+                add_fields_boosting(
+                    cd,
+                    [
+                        "description",
+                        # Docket Fields
+                        "docketNumber",
+                        "caseName",
+                    ],
+                )
             )
+            child_query_fields = {"recap_document": child_fields}
+            parent_query_fields = SEARCH_RECAP_PARENT_QUERY_FIELDS
+            parent_query_fields.extend(
+                add_fields_boosting(
+                    cd,
+                    [
+                        "docketNumber",
+                        "caseName",
+                    ],
+                )
+            )
+            string_query, join_query = build_full_join_es_queries(
+                cd, child_query_fields, parent_query_fields
+            )
+    search_query = get_search_query(cd, search_query, filters, string_query)
+    return search_query, join_query
+
+
+def build_child_docs_query(
+    join_query: QueryString | None, exclude_docs_for_empty_field: str = ""
+) -> QueryString:
+    """Build a query for counting child documents in Elasticsearch, using the
+    has_child query filters and queries. And append a match filter to only
+    retrieve RECAPDocuments.
+
+    :param join_query: Existing Elasticsearch QueryString object or None
+    :param exclude_docs_for_empty_field: Field that should not be empty for a
+    document to be included
+    :return: An Elasticsearch QueryString object
+    """
+
+    if not join_query:
+        # Match all case.
+        if not exclude_docs_for_empty_field:
+            return Q("match", docket_child="recap_document")
         else:
-            search_query = search_query.query("match_all")
-    return search_query
+            filters = [
+                Q("match", docket_child="recap_document"),
+                Q("exists", field=exclude_docs_for_empty_field),
+            ]
+
+            return Q("bool", filter=filters)
+
+    query_dict = join_query.to_dict()
+    if "filter" in query_dict["bool"]:
+        existing_filter = query_dict["bool"]["filter"]
+        existing_filter.append(Q("match", docket_child="recap_document"))
+        if exclude_docs_for_empty_field:
+            existing_filter.append(
+                Q("exists", field=exclude_docs_for_empty_field)
+            )
+
+    else:
+        query_dict["bool"]["filter"] = [
+            Q("match", docket_child="recap_document")
+        ]
+        if exclude_docs_for_empty_field:
+            query_dict["bool"]["filter"].append(
+                Q("exists", field=exclude_docs_for_empty_field)
+            )
+
+    return Q(query_dict)
 
 
 def build_es_main_query(
     search_query: Search, cd: CleanData
-) -> tuple[Search, int, int | None]:
+) -> tuple[Search, int | None, int, int | None]:
     """Builds and returns an elasticsearch query based on the given cleaned
      data, also performs grouping if required, add highlighting and returns
      additional query related metrics.
@@ -578,9 +810,11 @@ def build_es_main_query(
     filters, string query and grouping if needed, the total number of results,
     the total number of top hits returned by a group if applicable.
     """
-    search_query = build_es_base_query(search_query, cd)
-    total_query_results = search_query.count()
+    search_query_base = search_query
+    search_query, join_query = build_es_base_query(search_query, cd)
+    total_query_results = do_count_query(search_query)
     top_hits_limit = 5
+    total_child_results: int | None = None
     match cd["type"]:
         case SEARCH_TYPES.PARENTHETICAL:
             # Create groups aggregation, add highlight and
@@ -590,10 +824,32 @@ def build_es_main_query(
                 cd,
                 build_sort_results(cd),
             )
+            return (
+                search_query,
+                total_query_results,
+                top_hits_limit,
+                total_child_results,
+            )
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
+            child_docs_count_query = build_child_docs_query(join_query)
+            if child_docs_count_query:
+                # Get the total RECAP Documents count.
+                search_query_base = search_query_base.query(
+                    child_docs_count_query
+                )
+                total_child_results = do_count_query(search_query_base)
         case _:
-            search_query = add_es_highlighting(search_query, cd)
-            search_query = search_query.sort(build_sort_results(cd))
-    return search_query, total_query_results, top_hits_limit
+            pass
+
+    search_query = add_es_highlighting(search_query, cd)
+    search_query = search_query.sort(build_sort_results(cd))
+
+    return (
+        search_query,
+        total_query_results,
+        top_hits_limit,
+        total_child_results,
+    )
 
 
 def add_es_highlighting(
@@ -620,6 +876,8 @@ def add_es_highlighting(
             fields_to_exclude = ["sha1"]
         case SEARCH_TYPES.PEOPLE:
             highlighting_fields = SOLR_PEOPLE_ES_HL_FIELDS
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
+            highlighting_fields = SEARCH_RECAP_HL_FIELDS
 
     search_query = search_query.source(excludes=fields_to_exclude)
     for field in highlighting_fields:
@@ -724,15 +982,25 @@ def set_results_highlights(results: Page, search_type: str) -> None:
                     highlight = hit.highlight[highlighted_field][0]
                     hit["_source"][highlighted_field] = highlight
         else:
-            if not hasattr(result.meta, "highlight"):
-                continue
+            if hasattr(result.meta, "highlight"):
+                highlights = result.meta.highlight.to_dict()
+                merge_highlights_into_result(
+                    highlights,
+                    result,
+                    SEARCH_HL_TAG,
+                )
 
-            highlights = result.meta.highlight.to_dict()
-            merge_highlights_into_result(
-                highlights,
-                result,
-                SEARCH_HL_TAG,
-            )
+            # Merge child document highlights
+            if not hasattr(result, "child_docs"):
+                continue
+            for child_doc in result.child_docs:
+                if hasattr(child_doc, "highlight"):
+                    highlights = child_doc.highlight.to_dict()
+                    merge_highlights_into_result(
+                        highlights,
+                        child_doc["_source"],
+                        SEARCH_HL_TAG,
+                    )
 
 
 def group_search_results(
@@ -1039,6 +1307,34 @@ def build_has_child_filters(
             if appointer:
                 queries_list.extend(build_text_filter("appointer", appointer))
 
+    if cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
+        if child_type == "recap_document":
+            available_only = cd.get("available_only", "")
+            description = cd.get("description", "")
+            document_number = cd.get("document_number", "")
+            attachment_number = cd.get("attachment_number", "")
+
+            if available_only:
+                queries_list.extend(
+                    build_term_query(
+                        "is_available",
+                        available_only,
+                    )
+                )
+            if description:
+                queries_list.extend(
+                    build_text_filter("description", description)
+                )
+            if document_number:
+                queries_list.extend(
+                    build_term_query("document_number", document_number)
+                )
+            if attachment_number:
+                queries_list.extend(
+                    build_term_query("attachment_number", attachment_number)
+                )
+            return queries_list
+
     if not queries_list:
         return []
 
@@ -1079,10 +1375,36 @@ def build_join_es_filters(cd: CleanData) -> List:
                 *build_text_filter("school", cd.get("school", "")),
             ]
         )
-
         # Build position has child filter:
         queries_list.extend(build_has_child_filters("position", cd))
 
+    if cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
+        queries_list.extend(
+            [
+                *build_term_query(
+                    "court_id.raw",
+                    cd.get("court", "").split(),
+                ),
+                *build_text_filter("caseName", cd.get("case_name", "")),
+                *build_term_query(
+                    "docketNumber",
+                    cd.get("docket_number", ""),
+                    make_phrase=True,
+                    slop=1,
+                ),
+                *build_text_filter("suitNature", cd.get("nature_of_suit", "")),
+                *build_text_filter("cause", cd.get("cause", "")),
+                *build_text_filter("assignedTo", cd.get("assigned_to", "")),
+                *build_text_filter("referredTo", cd.get("referred_to", "")),
+                *build_text_filter("party", cd.get("party_name", "")),
+                *build_text_filter("attorney", cd.get("atty_name", "")),
+                *build_daterange_query(
+                    "dateFiled",
+                    cd.get("filed_before", ""),
+                    cd.get("filed_after", ""),
+                ),
+            ]
+        )
     return queries_list
 
 
@@ -1098,8 +1420,220 @@ def do_es_feed_query(
     :param rows: Number of rows (items) to be retrieved in the response
     :return: The Elasticsearch DSL response.
     """
-
-    s = build_es_base_query(search_query, cd)
+    match cd["type"]:
+        case SEARCH_TYPES.RECAP:
+            _, join_query = build_es_base_query(search_query, cd)
+            # Eliminate items that lack the ordering field.
+            s = build_child_docs_query(
+                join_query, exclude_docs_for_empty_field="entry_date_filed"
+            )
+            s = search_query.query(s)
+        case _:
+            s, _ = build_es_base_query(search_query, cd)
     s = s.sort(build_sort_results(cd))
     response = s.extra(from_=0, size=rows).execute()
     return response
+
+
+def build_full_join_es_queries(
+    cd: CleanData,
+    child_query_fields: dict[str, list[str]],
+    parent_query_fields: list[str],
+) -> tuple[QueryString | list, QueryString | None]:
+    """Build a complete Elasticsearch query with both parent and child document
+      conditions.
+
+    :param cd: The query CleanedData
+    :param child_query_fields: A dictionary mapping child fields document type.
+    :param parent_query_fields: A list of fields for the parent document.
+    :return: An Elasticsearch QueryString object.
+    """
+
+    q_should = []
+    child_type = "recap_document"
+    join_query = None
+    if cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
+        # Build child filters.
+        child_filters = build_has_child_filters(child_type, cd)
+
+        # Build child text query.
+        child_fields = child_query_fields["recap_document"]
+        child_text_query = build_fulltext_query(
+            child_fields, cd.get("q", ""), only_queries=True
+        )
+
+        # Build parent filters.
+        parent_filters = build_join_es_filters(cd)
+        # If parent filters, extend into child_filters.
+        if parent_filters:
+            child_filters.extend(parent_filters)
+        if child_filters:
+            child_filters = reduce(operator.iand, child_filters)
+        # Build the child query based on child_filters and child child_text_query
+        match child_filters, child_text_query:
+            case [], []:
+                pass
+            case [], _:
+                join_query = Q(
+                    "bool",
+                    should=child_text_query,
+                    minimum_should_match=1,
+                )
+            case _, []:
+                join_query = Q(
+                    "bool",
+                    filter=child_filters,
+                )
+            case _, _:
+                join_query = Q(
+                    "bool",
+                    filter=child_filters,
+                    should=child_text_query,
+                    minimum_should_match=1,
+                )
+
+        if child_text_query or child_filters:
+            _, query_hits_limit = get_child_top_hits_limit(cd, cd["type"])
+            query = build_has_child_query(
+                join_query,
+                "recap_document",
+                query_hits_limit,
+                SEARCH_RECAP_CHILD_HL_FIELDS,
+                get_child_sorting_key(cd),
+            )
+            q_should.append(query)
+
+        # Build the parent filter and text queries.
+        string_query = build_fulltext_query(
+            parent_query_fields, cd.get("q", ""), only_queries=True
+        )
+        parent_query = None
+        match parent_filters, string_query:
+            case [], []:
+                pass
+            case [], _:
+                parent_query = Q(
+                    "bool",
+                    filter=Q("match", docket_child="docket"),
+                    should=string_query,
+                    minimum_should_match=1,
+                )
+            case _, []:
+                parent_filters.extend([Q("match", docket_child="docket")])
+                p_filters = reduce(operator.iand, parent_filters)
+                parent_query = Q(
+                    "bool",
+                    filter=p_filters,
+                )
+            case _, _:
+                parent_filters.extend([Q("match", docket_child="docket")])
+                p_filters = reduce(operator.iand, parent_filters)
+                parent_query = Q(
+                    "bool",
+                    filter=p_filters,
+                    should=string_query,
+                    minimum_should_match=1,
+                )
+        if parent_query:
+            q_should.append(parent_query)
+
+    if not q_should:
+        return [], join_query
+
+    return (
+        Q(
+            "bool",
+            should=q_should,
+        ),
+        join_query,
+    )
+
+
+def limit_inner_hits(
+    get_params: QueryDict, results: Page, search_type: str
+) -> None:
+    """Limit inner hits of has_child query results.
+
+    :param get_params: The user search params.
+    :param results: The Page object containing search results.
+    :param search_type: The search type to perform.
+    :return: None, the function updates the results in place.
+    """
+
+    hits_limit, _ = get_child_top_hits_limit(get_params, search_type)
+    match search_type:
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
+            child_type = "recap_document"
+        case _:
+            return
+
+    for result in results:
+        try:
+            inner_hits = [
+                hit
+                for hit in result.meta["inner_hits"][
+                    f"filter_query_inner_{child_type}"
+                ]["hits"]["hits"]
+            ]
+        except KeyError:
+            result["child_docs"] = []
+            result["child_remaining"] = False
+            continue
+
+        count_hits = len(inner_hits)
+        if count_hits > hits_limit:
+            result["child_docs"] = inner_hits[:hits_limit]
+            result["child_remaining"] = True
+        else:
+            result["child_docs"] = inner_hits
+            result["child_remaining"] = False
+
+
+def get_child_top_hits_limit(
+    search_params: QueryDict | CleanData, search_type: str
+) -> tuple[int, int]:
+    """Get the frontend and query hit limits for child documents.
+
+    :param search_params: Either a QueryDict or CleanData object containing the
+    search parameters.
+    :param search_type: Elasticsearch DSL Search object
+    :return: A two tuple containing the limit for frontend hits, the limit for
+     query hits.
+    """
+
+    frontend_hits_limit = settings.CHILD_HITS_PER_RESULT
+    # Increase the CHILD_HITS_PER_RESULT value by 1. This is done to determine
+    # whether there are more than CHILD_HITS_PER_RESULT results, which would
+    # trigger the "View Additional Results" button on the frontend.
+    query_hits_limit = settings.CHILD_HITS_PER_RESULT + 1
+
+    if search_type not in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
+        return frontend_hits_limit, query_hits_limit
+
+    if search_type == SEARCH_TYPES.DOCKETS:
+        frontend_hits_limit = 1
+
+    docket_id_query = re.search(r"docket_id:\d+", search_params.get("q", ""))
+    if docket_id_query:
+        frontend_hits_limit = settings.VIEW_MORE_CHILD_HITS
+        query_hits_limit = settings.VIEW_MORE_CHILD_HITS
+
+    return frontend_hits_limit, query_hits_limit
+
+
+def do_count_query(
+    search_query: Search,
+) -> int | None:
+    """Execute an Elasticsearch count query and catch errors.
+    :param search_query: Elasticsearch DSL Search object.
+    :return: The results count.
+    """
+    try:
+        total_results = search_query.count()
+    except (TransportError, ConnectionError, RequestError) as e:
+        logger.warning(
+            f"Error on count query request: {search_query.to_dict()}"
+        )
+        logger.warning(f"Error was: {e}")
+        total_results = None
+    return total_results
