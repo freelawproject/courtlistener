@@ -108,11 +108,9 @@ function get_right_margins(results, smallScreen = false) {
       }
     });
   });
-  if (smallScreen) {
-    return longest_label.length * (12 / Math.sqrt(2)) * 0.9;
-  } else {
-    return getTextWidth(longest_label) + 20;
-  }
+  let width = getTextWidth(longest_label)
+  let padding = smallScreen ? 0 : 20;
+  return width + padding;
 }
 
 function initializeTimelinesChart() {
