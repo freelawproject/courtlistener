@@ -130,7 +130,7 @@ function initializeTimelinesChart() {
     right_margin = get_right_margins(results, false);
     left_margin = 150;
   } else {
-    update_labels(results)
+    update_labels(results);
     right_margin = get_right_margins(results, true);
     left_margin = 0; // drop the margin all together
   }
@@ -145,6 +145,7 @@ function initializeTimelinesChart() {
     })
     .maxLineHeight(25)
     .data([results[0]])
+    .disableReduceLabels(true)
     .enableAnimations(false)
     .timeFormat('%Y-%m-%d')
     .sortChrono(false)
