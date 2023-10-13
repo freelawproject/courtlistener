@@ -177,9 +177,12 @@ UNKNOWN_TAGS = [
 ]
 
 
-def convert_columbia_html(text):
-    """Convert xml tags to html tags
+def convert_columbia_html(text: str, opinion_index: int) -> str:
+    """Convert xml tags to html tags and process additional data from opinions
+    like footnotes,
     :param text: Text to convert to html
+    :param opinion_index: opinion index from a list of all opinions
+    :return: converted text
     """
     conversions = [
         ("italic", "em"),
@@ -197,6 +200,64 @@ def convert_columbia_html(text):
         text = re.sub(f"<{pattern}>", f"<{replacement}>", text)
         text = re.sub(f"</{pattern}>", f"</{replacement}>", text)
 
+        # grayed-out page numbers
+        text = re.sub(
+            "<page_number>", ' <span class="star-pagination">*', text
+        )
+        text = re.sub("</page_number>", "</span> ", text)
+
+        # footnotes
+        foot_references = re.findall(
+            "<footnote_reference>.*?</footnote_reference>", text
+        )
+
+        # We use opinion index to ensure that all footnotes are linked to the
+        # corresponding opinion
+        for ref in foot_references:
+            if (match := re.search(r"[\*\d]+", ref)) is not None:
+                f_num = match.group()
+            elif (match := re.search(r"\[fn(.+)\]", ref)) is not None:
+                f_num = match.group(1)
+            else:
+                f_num = None
+            if f_num:
+                rep = f'<sup id="op{opinion_index}-ref-fn{f_num}"><a href="#op{opinion_index}-fn{f_num}">{f_num}</a></sup>'
+                text = text.replace(ref, rep)
+
+        # Add footnotes to opinion
+        footnotes = re.findall(
+            "<footnote_body>.[\s\S]*?</footnote_body>", text
+        )
+        for fn in footnotes:
+            content = re.search(
+                "<footnote_body>(.[\s\S]*?)</footnote_body>", fn
+            )
+            if content:
+                rep = r'<div class="footnote">%s</div>' % content.group(1)
+                text = text.replace(fn, rep)
+
+        # Replace footnote numbers
+        foot_numbers = re.findall(
+            "<footnote_number>.*?</footnote_number>", text
+        )
+        for ref in foot_numbers:
+            if (match := re.search(r"[\*\d]+", ref)) is not None:
+                f_num = match.group()
+            elif (match := re.search(r"\[fn(.+)\]", ref)) is not None:
+                f_num = match.group(1)
+            else:
+                f_num = None
+            if f_num:
+                rep = (
+                    rf'<sup id="op{opinion_index}-fn%s"><a href="#op{opinion_index}-ref-fn%s">%s</a></sup>'
+                    % (
+                        f_num,
+                        f_num,
+                        f_num,
+                    )
+                )
+                text = text.replace(ref, rep)
+
     # Make nice paragraphs. This replaces double newlines with paragraphs, then
     # nests paragraphs inside blockquotes, rather than vice versa. The former
     # looks good. The latter is bad.
@@ -206,67 +267,6 @@ def convert_columbia_html(text):
     text = re.sub("\n  ", "</p>\n<p>", text)
     text = re.sub(r"<p>\s*<blockquote>", "<blockquote><p>", text, re.M)
     text = re.sub("</blockquote></p>", "</p></blockquote>", text, re.M)
-
-    return text
-
-
-def convert_columbia_opinion(text: str, opinion_index: int) -> str:
-    """Convert xml tags to html tags and process additional data from opinions
-    like footnotes,
-    :param text: Text to convert to html
-    :param opinion_index: opinion index from a list of all opinions
-    :return: converted text
-    """
-
-    text = convert_columbia_html(text)
-
-    # grayed-out page numbers
-    text = re.sub("<page_number>", ' <span class="star-pagination">*', text)
-    text = re.sub("</page_number>", "</span> ", text)
-
-    # footnotes
-    foot_references = re.findall(
-        "<footnote_reference>.*?</footnote_reference>", text
-    )
-
-    for ref in foot_references:
-        if (match := re.search(r"[\*\d]+", ref)) is not None:
-            f_num = match.group()
-        elif (match := re.search(r"\[fn(.+)\]", ref)) is not None:
-            f_num = match.group(1)
-        else:
-            f_num = None
-        if f_num:
-            rep = f'<sup id="op{opinion_index}-ref-fn{f_num}"><a href="#op{opinion_index}-fn{f_num}">{f_num}</a></sup>'
-            text = text.replace(ref, rep)
-
-    # Add footnotes to opinion
-    footnotes = re.findall("<footnote_body>.[\s\S]*?</footnote_body>", text)
-    for fn in footnotes:
-        content = re.search("<footnote_body>(.[\s\S]*?)</footnote_body>", fn)
-        if content:
-            rep = r'<div class="footnote">%s</div>' % content.group(1)
-            text = text.replace(fn, rep)
-
-    # Replace footnote numbers
-    foot_numbers = re.findall("<footnote_number>.*?</footnote_number>", text)
-    for ref in foot_numbers:
-        if (match := re.search(r"[\*\d]+", ref)) is not None:
-            f_num = match.group()
-        elif (match := re.search(r"\[fn(.+)\]", ref)) is not None:
-            f_num = match.group(1)
-        else:
-            f_num = None
-        if f_num:
-            rep = (
-                rf'<sup id="op{opinion_index}-fn%s"><a href="#op{opinion_index}-ref-fn%s">%s</a></sup>'
-                % (
-                    f_num,
-                    f_num,
-                    f_num,
-                )
-            )
-            text = text.replace(ref, rep)
 
     return text
 
