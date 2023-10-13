@@ -9,7 +9,7 @@ from celery import Task
 from django.apps import apps
 from django.conf import settings
 from django.utils.timezone import now
-from elasticsearch.exceptions import NotFoundError, TransportError
+from elasticsearch.exceptions import NotFoundError
 from elasticsearch.helpers import bulk
 from elasticsearch_dsl import Document, UpdateByQuery, connections
 from requests import Session
@@ -235,7 +235,7 @@ def person_first_time_indexing(parent_id: int, position: Position) -> None:
 
 @app.task(
     bind=True,
-    autoretry_for=(TransportError, ConnectionError),
+    autoretry_for=(ConnectionError,),
     max_retries=3,
     interval_start=5,
 )
@@ -271,7 +271,8 @@ def save_document_in_es(
     elif isinstance(instance, Person):
         # index person records only if they were ever a judge.
         if not instance.is_judge:
-            return
+            self.request.chain = None
+            return None
         doc_id = instance.pk
     elif isinstance(instance, RECAPDocument):
         parent_id = getattr(instance.docket_entry.docket, "pk", None)
@@ -281,7 +282,8 @@ def save_document_in_es(
                 parent_id,
             ]
         ):
-            return
+            self.request.chain = None
+            return None
 
         if not DocketDocument.exists(id=parent_id):
             # create the parent document if it does not exist in ES
@@ -320,7 +322,7 @@ def save_document_in_es(
 
 @app.task(
     bind=True,
-    autoretry_for=(TransportError, ConnectionError),
+    autoretry_for=(ConnectionError,),
     max_retries=3,
     interval_start=5,
 )
@@ -362,11 +364,7 @@ def get_doc_from_es(
 
 @app.task(
     bind=True,
-    autoretry_for=(
-        TransportError,
-        ConnectionError,
-        NotFoundError,
-    ),
+    autoretry_for=(ConnectionError, NotFoundError),
     max_retries=3,
     interval_start=5,
 )
@@ -434,11 +432,7 @@ def update_child_documents_by_query(
 
 @app.task(
     bind=True,
-    autoretry_for=(
-        TransportError,
-        ConnectionError,
-        NotFoundError,
-    ),
+    autoretry_for=(ConnectionError, NotFoundError),
     max_retries=3,
     interval_start=5,
 )
@@ -469,7 +463,7 @@ def index_docket_parties_in_es(
 
 @app.task(
     bind=True,
-    autoretry_for=(TransportError, ConnectionError),
+    autoretry_for=(ConnectionError,),
     max_retries=3,
     interval_start=5,
 )
