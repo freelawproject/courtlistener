@@ -12,16 +12,6 @@ document.body.addEventListener('htmx:configRequest', function (event) {
   }
 });
 
-function getTextWidth(text) {
-  // re-use canvas object for better performance
-  const canvas = getTextWidth.canvas || (getTextWidth.canvas = document.createElement('canvas'));
-  const context = canvas.getContext('2d');
-  // use the style of the tooltips to avoid overflow
-  context.font = 'bold 13px sans-serif';
-  const metrics = context.measureText(text);
-  return Math.ceil(metrics.width);
-}
-
 function update_labels(data) {
   data.forEach((item) => {
     Object.keys(item).forEach((key) => {
@@ -96,7 +86,17 @@ $(document).ready(function () {
   }
 });
 
-function get_right_margins(results, smallScreen= false) {
+function getTextWidth(text) {
+  // re-use canvas object for better performance
+  const canvas = getTextWidth.canvas || (getTextWidth.canvas = document.createElement('canvas'));
+  const context = canvas.getContext('2d');
+  // use the style of the tooltips to avoid overflow
+  context.font = 'bold 13px sans-serif';
+  const metrics = context.measureText(text);
+  return Math.ceil(metrics.width);
+}
+
+function get_right_margins(results, smallScreen = false) {
   let right_margin = 0;
   var longest_label;
   results.forEach((group) => {
@@ -108,7 +108,11 @@ function get_right_margins(results, smallScreen= false) {
       }
     });
   });
-  return longest_label.length * (12 / Math.sqrt(2));
+  if (smallScreen) {
+    return longest_label.length * (12 / Math.sqrt(2)) * 0.9;
+  } else {
+    return getTextWidth(longest_label) + 20;
+  }
 }
 
 function initializeTimelinesChart() {
