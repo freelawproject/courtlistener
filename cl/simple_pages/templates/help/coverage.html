@@ -7,23 +7,7 @@
 {% block sidebar %}{% endblock %}
 
 {% block footer-scripts %}
-
-    {% if DEBUG %}
-        <script src="{% static "js/d3.js" %}"></script>
-    {% else %}
-        <script src="{% static "js/d3.min.js" %}"></script>
-    {% endif %}
-
-    <script type="text/javascript" nonce="{{ request.csp_nonce }}">
-        var precedentTypes = [
-            {% for status in precedential_statuses %}
-                '{{ status }}'{% if not forloop.last %},{% endif %}
-            {% endfor %}
-        ];
-        var sorted_courts = {{ sorted_courts|safe}};
-    </script>
     {% include "includes/anchors.html" %}
-
 {% endblock %}
 
 {% block content %}

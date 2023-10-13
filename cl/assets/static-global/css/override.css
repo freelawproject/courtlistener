@@ -1576,3 +1576,8 @@ textarea {
 .brusher {
   display: none;
 }
+
+rect.series-segment {
+  fill: rgb(49, 54, 149) !important;
+  fill-opacity: 1.0 !important;
+}
