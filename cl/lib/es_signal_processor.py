@@ -207,6 +207,12 @@ def update_es_documents(
                 This case handles the update of one or more fields that belongs to
                 the parent model(The person model).
                 """
+                main_doc = get_or_create_doc(
+                    PersonDocument, instance, avoid_creation=True
+                )
+                if not main_doc:
+                    # Abort bulk update for a non-existing parent document in ES.
+                    return
                 update_child_documents_by_query.delay(
                     es_document, instance, fields_to_update, fields_map
                 )
@@ -220,6 +226,12 @@ def update_es_documents(
                 """
                 related_record = Person.objects.filter(**{query: instance})
                 for person in related_record:
+                    main_doc = get_or_create_doc(
+                        PersonDocument, person, avoid_creation=True
+                    )
+                    if not main_doc:
+                        # Abort bulk update for a non-existing parent document in ES.
+                        return
                     update_child_documents_by_query.delay(
                         es_document,
                         person,
@@ -227,12 +239,24 @@ def update_es_documents(
                         fields_map,
                     )
             case Docket() if es_document is ESRECAPDocument:  # type: ignore
+                main_doc = get_or_create_doc(
+                    DocketDocument, instance, avoid_creation=True
+                )
+                if not main_doc:
+                    # Abort bulk update for a non-existing parent document in ES.
+                    return
                 update_child_documents_by_query.delay(
                     es_document, instance, fields_to_update, fields_map
                 )
-            case Person() | BankruptcyInformation() if es_document is ESRECAPDocument:  # type: ignore
+            case Person() if es_document is ESRECAPDocument:  # type: ignore
                 related_dockets = Docket.objects.filter(**{query: instance})
                 for rel_docket in related_dockets:
+                    main_doc = get_or_create_doc(
+                        DocketDocument, rel_docket, avoid_creation=True
+                    )
+                    if not main_doc:
+                        # Abort bulk update for a non-existing parent document in ES.
+                        return
                     update_child_documents_by_query.delay(
                         es_document,
                         rel_docket,
@@ -325,42 +349,57 @@ def update_reverse_related_documents(
     the instance.
     :return: None
     """
+
+    # Update parent instance
+    main_objects = main_model.objects.filter(**{query_string: instance})
+    for main_object in main_objects:
+        main_doc = get_or_create_doc(
+            es_document, main_object, avoid_creation=True
+        )
+        if not main_doc:
+            # Abort update if the parent document doesn't exist in the index.
+            continue
+
+        fields_to_update = {}
+        for field in affected_fields:
+            prepare_method = getattr(main_doc, f"prepare_{field}", None)
+            if prepare_method:
+                field_value = prepare_method(main_object)
+            else:
+                field_value = getattr(instance, field)
+            fields_to_update[field] = field_value
+
+        update_document_in_es.delay(
+            main_doc,
+            fields_to_update,
+        )
+
     match instance:
-        case ABARating() | PoliticalAffiliation() | Education() if es_document is PositionDocument:  # type: ignore
-            # bulk update position documents when a new reverse related record is created/deleted
+        case ABARating() | PoliticalAffiliation() | Education() if es_document is PersonDocument:  # type: ignore
+            # bulk update position documents when a reverse related record is created/updated.
             related_record = Person.objects.filter(**{query_string: instance})
             for person in related_record:
-                update_child_documents_by_query.delay(
-                    es_document, person, affected_fields
+                main_doc = get_or_create_doc(
+                    es_document, person, avoid_creation=True
                 )
-        case Docket() if es_document is ESRECAPDocument:  # type: ignore
-            update_child_documents_by_query.delay(
-                es_document, instance, affected_fields
-            )
-        case _:
-            main_objects = main_model.objects.filter(
-                **{query_string: instance}
-            )
-            for main_object in main_objects:
-                main_doc = get_or_create_doc(es_document, main_object)
                 if not main_doc:
+                    # Abort bulk update for a non-existing parent document in ES.
                     return
-
-                fields_to_update = {}
-                for field in affected_fields:
-                    prepare_method = getattr(
-                        main_doc, f"prepare_{field}", None
-                    )
-                    if prepare_method:
-                        field_value = prepare_method(main_object)
-                    else:
-                        field_value = getattr(instance, field)
-                    fields_to_update[field] = field_value
-
-                update_document_in_es.delay(
-                    main_doc,
-                    fields_to_update,
+                update_child_documents_by_query.delay(
+                    PositionDocument, person, affected_fields
                 )
+
+        case BankruptcyInformation() if es_document is DocketDocument:  # type: ignore
+            # bulk update RECAP documents when a reverse related record is created/updated.
+            main_doc = get_or_create_doc(
+                es_document, instance.docket, avoid_creation=True
+            )
+            if not main_doc:
+                # Abort bulk update for a non-existing parent document in ES.
+                return
+            update_child_documents_by_query.delay(
+                ESRECAPDocument, instance.docket, affected_fields
+            )
 
 
 def prepare_and_update_fields(
@@ -409,37 +448,38 @@ def delete_reverse_related_documents(
     the instance.
     :return: None
     """
+
     match instance:
-        case Person() if es_document is PositionDocument:  # type: ignore
-            # bulk update position documents when a new reverse related record
-            # is deleted
-            update_child_documents_by_query.delay(
-                es_document, instance, affected_fields
-            )
         case Person() if es_document is PersonDocument:  # type: ignore
+            # Update the Person document after the reverse instanced is deleted
             main_doc = get_or_create_doc(
                 es_document, instance, avoid_creation=True
             )
             if main_doc:
                 prepare_and_update_fields(affected_fields, main_doc, instance)
+                # Then update all their child documents (Positions)
+                update_child_documents_by_query.delay(
+                    PositionDocument, instance, affected_fields
+                )
         case Docket() if es_document is DocketDocument:  # type: ignore
+            # Update the Docket document after the reverse instanced is deleted
             main_doc = get_or_create_doc(
                 es_document, instance, avoid_creation=True
             )
             if main_doc:
                 prepare_and_update_fields(affected_fields, main_doc, instance)
-        case Docket() if es_document is ESRECAPDocument:  # type: ignore
-            # bulk update RECAP documents when a new reverse related record
-            # is deleted
-            update_child_documents_by_query.delay(
-                es_document, instance, affected_fields
-            )
+                # Then update all their child documents (RECAPDocuments)
+                update_child_documents_by_query.delay(
+                    ESRECAPDocument, instance, affected_fields
+                )
         case _:
             main_objects = main_model.objects.filter(
                 **{query_string: instance}
             )
             for main_object in main_objects:
-                main_doc = get_or_create_doc(es_document, main_object)
+                main_doc = get_or_create_doc(
+                    es_document, main_object, avoid_creation=True
+                )
                 if main_doc:
                     prepare_and_update_fields(
                         affected_fields, main_doc, main_object

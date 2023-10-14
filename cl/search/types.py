@@ -8,6 +8,7 @@ from cl.people_db.models import Education, Person, Position
 from cl.search.documents import (
     AudioDocument,
     AudioPercolator,
+    DocketDocument,
     ESRECAPDocument,
     ParentheticalGroupDocument,
     PersonDocument,
@@ -50,6 +51,7 @@ ESDocumentClassType = Union[
     Type[AudioPercolator],
     Type[PersonDocument],
     Type[PositionDocument],
+    Type[DocketDocument],
 ]
 
 
