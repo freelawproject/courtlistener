@@ -9,7 +9,7 @@ from celery import Task
 from django.apps import apps
 from django.conf import settings
 from django.utils.timezone import now
-from elasticsearch.exceptions import NotFoundError
+from elasticsearch.exceptions import ConnectionError, NotFoundError
 from elasticsearch.helpers import bulk
 from elasticsearch_dsl import Document, UpdateByQuery, connections
 from requests import Session
