@@ -6,7 +6,7 @@ ifndef VERSION
 $(error VERSION variable is not set. Use -e VERSION=XYZ to proceed.)
 endif
 
-.PHONY: build-image push-image 
+.PHONY: build-image push-image
 
 REPO ?= freelawproject/courtlistener
 DOCKER_TAG_PROD = $(VERSION)-prod
