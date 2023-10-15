@@ -30,100 +30,80 @@ jobs:
       - name: Set shortcode
         id: vars
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v3
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
+
       - name: Create Kubeconfig with AWS CLI
         run: aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
-      - name: Collect static assets and check unapplied migration exit code
-        id: checkMigration
-        # Do big complicated thing to get secrets into the image.
-        # See: https://stackoverflow.com/a/52488906/64911
-        run: |
-          kubectl run ${{ steps.vars.outputs.sha_short }} -it --rm -n ${{ env.EKS_NAMESPACE }} --image freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod --restart Never --pod-running-timeout=120s --overrides='
-          {
-            "spec": {
-              "containers": [
-                {
-                  "name": "${{ steps.vars.outputs.sha_short }}",
-                  "image": "freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod",
-                  "command": [
-                      "/bin/sh",
-                      "-c",
-                      "./manage.py collectstatic --noinput && ./manage.py migrate --check"
-                  ],
-                  "envFrom": [
-                    {
-                      "secretRef": {
-                        "name": "cl-env"
-                      }
-                    }
-                  ]
-                }
-              ]
-            }
-          }
-          '
 
-      # If the previous step had an error, start a pod to do maintenance, and
-      # quit with an error message.
-      - name: Check migration exit code from previous step
+      - name: Launch Temporary Pod
+        id: tempPod
+        run: |
+          kubectl run temp-pod-${{ steps.vars.outputs.sha_short }} --rm -i -n ${{ env.EKS_NAMESPACE }} --image=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod --restart Never --pod-running-timeout=120s --overrides='
+          {
+              "spec": {
+              "containers": [{
+                  "name": "temp-pod",
+                  "image": "freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod",
+                  "command": ["/bin/sh", "-c", "trap : TERM INT; sleep 3600 & wait"],
+                  "envFrom": [{
+                  "secretRef": {
+                      "name": "cl-env"
+                  }
+                  }]
+              }]
+              }
+          }'
+
+      - name: Collect Static Assets
+        id: collectStatic
+        run: |
+          kubectl exec -n ${{ env.EKS_NAMESPACE }} temp-pod-${{ steps.vars.outputs.sha_short }} -- python manage.py collectstatic --noinput
+      - name: Handle Collectstatic Error
+        if: failure()
+        run: | # Error-handling logic for collectstatic
+          echo "collectstatic failed--aborting build"
+          exit 1
+
+      - name: Check Migrations
+        id: checkMigration
+        run: |
+          kubectl exec -n ${{ env.EKS_NAMESPACE }} temp-pod-${{ steps.vars.outputs.sha_short }} -- python manage.py migrate --check
+      - name: Handle Check Migrations Error
         if: failure()
         run: |
-          echo "Found unapplied migrations. A pod named deploy-${{ steps.vars.outputs.sha_short }} has been created for you."
-          echo "Shell into that pod, do a manual migration, delete the pod, and re-run this Github Action job."
-          kubectl run deploy-${{ steps.vars.outputs.sha_short }} -n ${{ env.EKS_NAMESPACE }} --image freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod --restart Never --overrides='
-            {
-              "spec": {
-                "containers": [
-                  {
-                    "name": "deploy-${{ steps.vars.outputs.sha_short }}",
-                    "image": "freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod",
-                    "command": [
-                        "/bin/sh",
-                        "-c",
-                        "trap : TERM INT; sleep infinity & wait"
-                    ],
-                    "envFrom": [
-                      {
-                        "secretRef": {
-                          "name": "cl-env"
-                        }
-                      }
-                    ]
-                  }
-                ]
-              }
-            }
-            '
+          echo "Found unapplied migrations. Open shell into pod temp-pod-${{ steps.vars.outputs.sha_short }}"
+          echo "Manually run migrations. That pod will delete itself after an hour."
           exit 1
 
       # Rollout new versions one by one (watch "deployments" in k9s)
       - name: Rollout cl-python
-        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-python web=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-web-prod
+        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-python web=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
       - name: Watch cl-python rollout status
         run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-python
 
       - name: Rollout cl-celery-prefork
-        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork cl-celery-prefork=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-celery
+        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork cl-celery-prefork=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
       - name: Watch cl-celery-prefork rollout status
         run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork
 
       - name: Rollout cl-celery-prefork-bulk
-        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork-bulk cl-celery-prefork-bulk=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-celery
+        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork-bulk cl-celery-prefork-bulk=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
       - name: Watch cl-celery-prefork-bulk rollout status
         run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork-bulk
 
       - name: Rollout cl-scrape-rss
-        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-scrape-rss scrape-rss=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-scrape-rss
+        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-scrape-rss scrape-rss=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
       - name: Watch cl-scrape-rss rollout status
         run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-scrape-rss
 
       - name: Rollout cl-retry-webhooks
-        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-retry-webhooks retry-webhooks=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-webhooks-retry
+        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-retry-webhooks retry-webhooks=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
       - name: Watch cl-retry-webhooks rollout status
         run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-retry-webhooks
 
@@ -132,5 +112,5 @@ jobs:
         run: |
           CRONJOB_NAMES=$(kubectl get cronjobs -n court-listener -o jsonpath='{.items.*.metadata.name}' -l image_type=web-prod);
           for name in $CRONJOB_NAMES; do
-             kubectl set image -n ${{ env.EKS_NAMESPACE }} CronJob/$name job=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-web-prod;
+             kubectl set image -n ${{ env.EKS_NAMESPACE }} CronJob/$name job=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod;
           done;
