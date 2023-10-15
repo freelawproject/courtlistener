@@ -215,24 +215,8 @@ position_field_mapping = {
     },
     "delete": {Position: {}},
     "m2m": {Person.race.through: {"person": {"races": "races"}}},
-    "reverse": {
-        Education: {"educations": {"all": ["school"]}},
-        ABARating: {"aba_ratings": {"all": ["aba_rating"]}},
-        PoliticalAffiliation: {
-            "political_affiliations": {
-                "all": ["political_affiliation", "political_affiliation_id"]
-            }
-        },
-    },
-    "reverse-delete": {
-        Education: {"person": {"all": ["school"]}},
-        ABARating: {"person": {"all": ["aba_rating"]}},
-        PoliticalAffiliation: {
-            "person": {
-                "all": ["political_affiliation", "political_affiliation_id"]
-            }
-        },
-    },
+    "reverse": {},
+    "reverse-delete": {},
 }
 
 docket_field_mapping = {
@@ -295,21 +279,11 @@ recap_document_field_mapping = {
                 "name_full": ["referredTo"],
             },
         },
-        BankruptcyInformation: {
-            "bankruptcy_information": {
-                "chapter": ["chapter"],
-                "trustee_str": ["trustee_str"],
-            }
-        },
     },
     "delete": {RECAPDocument: {}},
     "m2m": {},
-    "reverse": {
-        BankruptcyInformation: {"docket": {"all": ["chapter", "trustee_str"]}}
-    },
-    "reverse-delete": {
-        BankruptcyInformation: {"docket": {"all": ["chapter", "trustee_str"]}},
-    },
+    "reverse": {},
+    "reverse-delete": {},
 }
 
 

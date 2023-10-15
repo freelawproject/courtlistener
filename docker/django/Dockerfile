@@ -13,6 +13,8 @@ RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
     nodejs npm \
     # For installing poetry and git-based deps
     curl git \
+    # For maintenance tasks \
+    screen \
     # Other dependencies
     libffi-dev libxml2-dev libxslt-dev procps vim cmake
 
