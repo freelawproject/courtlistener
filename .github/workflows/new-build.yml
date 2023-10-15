@@ -80,3 +80,29 @@ jobs:
           echo "Found unapplied migrations. Open shell into pod temp-pod-${{ steps.vars.outputs.sha_short }}"
           echo "Manually run migrations. That pod will delete itself after an hour."
           exit 1
+
+      # Rollout new versions one by one (watch "deployments" in k9s)
+      - name: Rollout cl-python
+        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-python web=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
+      - name: Watch cl-python rollout status
+        run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-python
+
+      - name: Rollout cl-celery-prefork
+        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork cl-celery-prefork=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
+      - name: Watch cl-celery-prefork rollout status
+        run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork
+
+      - name: Rollout cl-celery-prefork-bulk
+        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork-bulk cl-celery-prefork-bulk=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
+      - name: Watch cl-celery-prefork-bulk rollout status
+        run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork-bulk
+
+      - name: Rollout cl-scrape-rss
+        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-scrape-rss scrape-rss=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
+      - name: Watch cl-scrape-rss rollout status
+        run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-scrape-rss
+
+      - name: Rollout cl-retry-webhooks
+        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-retry-webhooks retry-webhooks=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
+      - name: Watch cl-retry-webhooks rollout status
+        run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-retry-webhooks

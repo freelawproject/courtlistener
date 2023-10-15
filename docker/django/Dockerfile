@@ -75,5 +75,6 @@ ENV PYTHONPATH="${PYTHONPATH}:/opt/courtlistener"
 USER root
 RUN chmod +x /opt/courtlistener/docker/django/docker-entrypoint.sh
 RUN chown www-data:www-data /opt/courtlistener/docker/django/docker-entrypoint.sh
+
 USER www-data
 ENTRYPOINT ["/bin/sh", "/opt/courtlistener/docker/django/docker-entrypoint.sh"]
