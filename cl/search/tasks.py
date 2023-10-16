@@ -9,7 +9,12 @@ from celery import Task
 from django.apps import apps
 from django.conf import settings
 from django.utils.timezone import now
-from elasticsearch.exceptions import ConnectionError, NotFoundError
+from elasticsearch.exceptions import (
+    ConflictError,
+    ConnectionError,
+    NotFoundError,
+    RequestError,
+)
 from elasticsearch.helpers import bulk
 from elasticsearch_dsl import Document, UpdateByQuery, connections
 from requests import Session
@@ -529,23 +534,29 @@ def index_parent_and_child_docs(
         else:
             return
 
-        doc = parent_es_document().prepare(instance)
-        es_args = {
-            "meta": {"id": instance_id},
-        }
-        response = parent_es_document(**es_args, **doc).save(
-            skip_empty=False,
-            return_doc_meta=False,
-            refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
-        )
-        if response != "created":
-            model_label = parent_es_document.Django.model.__name__.capitalize()
-            logger.error(
-                f"The {model_label} with ID:{instance_id} can't be index in ES. "
-                "Aborting the indexing of their child objects."
-            )
-            return
+        if not parent_es_document.exists(instance_id):
+            # Parent document is not yet indexed, index it.
+            doc = parent_es_document().prepare(instance)
+            es_args = {
+                "meta": {"id": instance_id},
+            }
+            try:
+                parent_es_document(**es_args, **doc).save(
+                    skip_empty=False,
+                    return_doc_meta=False,
+                    refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
+                )
+            except (ConflictError, RequestError) as exc:
+                model_label = (
+                    parent_es_document.Django.model.__name__.capitalize()
+                )
+                logger.error(
+                    f"Error indexing the {model_label} with ID: {instance_id}. "
+                    f"Exception was: {type(exc).__name__}"
+                )
+                continue
 
+        # Index child documents in bulk.
         client = connections.get_connection()
         base_doc = {
             "_op_type": "index",
