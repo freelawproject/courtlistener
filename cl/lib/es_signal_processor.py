@@ -41,6 +41,27 @@ from cl.search.types import (
 )
 
 
+def get_task_throttling_id(
+    es_document: ESDocumentClassType, parent_instance_id: int
+):
+    """Determine the throttling ID based on the Elasticsearch document and
+    parent instance ID.
+
+    :param es_document: The type Elasticsearch document.
+    :param parent_instance_id: The ID of the parent instance.
+    :return: A string representing the throttling ID.
+    """
+
+    if es_document is PersonDocument:
+        throttling_id = f"person_{parent_instance_id}"
+    elif es_document is DocketDocument:
+        throttling_id = f"docket_{parent_instance_id}"
+    else:
+        throttling_id = f"{parent_instance_id}"
+
+    return throttling_id
+
+
 def updated_fields(
     instance: ESModelType, es_document: ESDocumentClassType
 ) -> list[str]:
@@ -213,8 +234,15 @@ def update_es_documents(
                 if not main_doc:
                     # Abort bulk update for a non-existing parent document in ES.
                     return
+                throttling_id = get_task_throttling_id(
+                    PersonDocument, instance.pk
+                )
                 update_child_documents_by_query.delay(
-                    es_document, instance, fields_to_update, fields_map
+                    es_document,
+                    instance.pk,
+                    throttling_id,
+                    fields_to_update,
+                    fields_map,
                 )
             case ABARating() | PoliticalAffiliation() | School() if es_document is PositionDocument:  # type: ignore
                 """
@@ -232,9 +260,13 @@ def update_es_documents(
                     if not main_doc:
                         # Abort bulk update for a non-existing parent document in ES.
                         return
+                    throttling_id = get_task_throttling_id(
+                        PersonDocument, person.pk
+                    )
                     update_child_documents_by_query.delay(
                         es_document,
-                        person,
+                        person.pk,
+                        throttling_id,
                         fields_to_update,
                         fields_map,
                     )
@@ -245,8 +277,15 @@ def update_es_documents(
                 if not main_doc:
                     # Abort bulk update for a non-existing parent document in ES.
                     return
+                throttling_id = get_task_throttling_id(
+                    DocketDocument, instance.pk
+                )
                 update_child_documents_by_query.delay(
-                    es_document, instance, fields_to_update, fields_map
+                    es_document,
+                    instance.pk,
+                    throttling_id,
+                    fields_to_update,
+                    fields_map,
                 )
             case Person() if es_document is ESRECAPDocument:  # type: ignore
                 related_dockets = Docket.objects.filter(**{query: instance})
@@ -257,9 +296,13 @@ def update_es_documents(
                     if not main_doc:
                         # Abort bulk update for a non-existing parent document in ES.
                         return
+                    throttling_id = get_task_throttling_id(
+                        DocketDocument, rel_docket.pk
+                    )
                     update_child_documents_by_query.delay(
                         es_document,
-                        rel_docket,
+                        rel_docket.pk,
+                        throttling_id,
                         fields_to_update,
                         fields_map,
                     )
@@ -271,7 +314,8 @@ def update_es_documents(
                         continue
                     if fields_to_update:
                         update_document_in_es.delay(
-                            main_doc,
+                            es_document,
+                            main_object.pk,
                             document_fields_to_update(
                                 main_doc,
                                 main_object,
@@ -329,7 +373,9 @@ def update_m2m_field_in_es_document(
     if not document:
         return
     get_m2m_value = getattr(document, f"prepare_{affected_field}")(instance)
-    update_document_in_es.delay(document, {affected_field: get_m2m_value})
+    update_document_in_es.delay(
+        es_document, instance.pk, {affected_field: get_m2m_value}
+    )
 
 
 def update_reverse_related_documents(
@@ -370,7 +416,8 @@ def update_reverse_related_documents(
             fields_to_update[field] = field_value
 
         update_document_in_es.delay(
-            main_doc,
+            es_document,
+            main_object.pk,
             fields_to_update,
         )
 
@@ -385,8 +432,11 @@ def update_reverse_related_documents(
                 if not main_doc:
                     # Abort bulk update for a non-existing parent document in ES.
                     return
+                throttling_id = get_task_throttling_id(
+                    PersonDocument, person.pk
+                )
                 update_child_documents_by_query.delay(
-                    PositionDocument, person, affected_fields
+                    PositionDocument, person.pk, throttling_id, affected_fields
                 )
 
         case BankruptcyInformation() if es_document is DocketDocument:  # type: ignore
@@ -397,20 +447,26 @@ def update_reverse_related_documents(
             if not main_doc:
                 # Abort bulk update for a non-existing parent document in ES.
                 return
+            throttling_id = get_task_throttling_id(
+                DocketDocument, instance.docket.pk
+            )
             update_child_documents_by_query.delay(
-                ESRECAPDocument, instance.docket, affected_fields
+                ESRECAPDocument,
+                instance.docket.pk,
+                throttling_id,
+                affected_fields,
             )
 
 
 def prepare_and_update_fields(
     affected_fields: list[str],
-    main_doc: ESDocumentInstanceType,
+    es_document: ESDocumentClassType,
     main_object: ESModelType,
 ):
     """Prepare and update affected fields in an Elasticsearch document.
 
     :param affected_fields: List of field names that need to be updated.
-    :param main_doc: A Elasticsearch DSL document.
+    :param es_document: The Elasticsearch document type.
     :param main_object: The instance for which the reverse related documents
     are to be updated.
     :return: None.
@@ -418,14 +474,15 @@ def prepare_and_update_fields(
 
     fields_to_update = {}
     for field in affected_fields:
-        prepare_method = getattr(main_doc, f"prepare_{field}", None)
+        prepare_method = getattr(es_document(), f"prepare_{field}", None)
         if not prepare_method:
             continue
         field_value = prepare_method(main_object)
         fields_to_update[field] = field_value
 
     update_document_in_es.delay(
-        main_doc,
+        es_document,
+        main_object.pk,
         fields_to_update,
     )
 
@@ -456,10 +513,18 @@ def delete_reverse_related_documents(
                 es_document, instance, avoid_creation=True
             )
             if main_doc:
-                prepare_and_update_fields(affected_fields, main_doc, instance)
+                prepare_and_update_fields(
+                    affected_fields, es_document, instance
+                )
                 # Then update all their child documents (Positions)
+                throttling_id = get_task_throttling_id(
+                    PersonDocument, instance.pk
+                )
                 update_child_documents_by_query.delay(
-                    PositionDocument, instance, affected_fields
+                    PositionDocument,
+                    instance.pk,
+                    throttling_id,
+                    affected_fields,
                 )
         case Docket() if es_document is DocketDocument:  # type: ignore
             # Update the Docket document after the reverse instanced is deleted
@@ -467,10 +532,18 @@ def delete_reverse_related_documents(
                 es_document, instance, avoid_creation=True
             )
             if main_doc:
-                prepare_and_update_fields(affected_fields, main_doc, instance)
+                prepare_and_update_fields(
+                    affected_fields, es_document, instance
+                )
                 # Then update all their child documents (RECAPDocuments)
+                throttling_id = get_task_throttling_id(
+                    DocketDocument, instance.pk
+                )
                 update_child_documents_by_query.delay(
-                    ESRECAPDocument, instance, affected_fields
+                    ESRECAPDocument,
+                    instance.pk,
+                    throttling_id,
+                    affected_fields,
                 )
         case _:
             main_objects = main_model.objects.filter(
@@ -482,7 +555,7 @@ def delete_reverse_related_documents(
                 )
                 if main_doc:
                     prepare_and_update_fields(
-                        affected_fields, main_doc, main_object
+                        affected_fields, es_document, main_object
                     )
 
 

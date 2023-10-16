@@ -168,3 +168,9 @@ PERCOLATOR_PAGE_SIZE = 100
 # The maximum number of scheduled hits per alert. #
 ###################################################
 SCHEDULED_ALERT_HITS_LIMIT = 30
+
+
+####################################
+# ES Indexing Throttling tasks rate #
+####################################
+ES_THROTTLING_TASKS_RATE = env("ES_THROTTLING_TASKS_RATE", default="30/m")

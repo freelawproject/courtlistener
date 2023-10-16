@@ -324,5 +324,5 @@ class BankruptcyInformationFactory(DjangoModelFactory):
     class Meta:
         model = BankruptcyInformation
 
-    chapter = Faker("random_int", min=1, max=100)
+    chapter = Faker("random_id_string")
     trustee_str = Faker("name_female")

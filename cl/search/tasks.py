@@ -17,6 +17,7 @@ from scorched.exc import SolrError
 
 from cl.audio.models import Audio
 from cl.celery_init import app
+from cl.lib.celery_utils import throttle_task
 from cl.lib.elasticsearch_utils import es_index_exists
 from cl.lib.search_index_utils import InvalidDocumentError
 from cl.people_db.models import Person, Position
@@ -328,18 +329,29 @@ def save_document_in_es(
 )
 def update_document_in_es(
     self: Task,
-    es_document: ESDocumentInstanceType,
+    es_document: ESDocumentClassType,
+    document_id: int,
     fields_values_to_update: dict[str, Any],
 ) -> None:
     """Update a document in Elasticsearch.
     :param self: The celery task
-    :param es_document: The instance of the document to save.
+    :param es_document: The Elasticsearch document type.
+    :param document_id: The document ID to index.
     :param fields_values_to_update: A dictionary with fields and values to update.
     :return: None
     """
 
+    es_doc = get_doc_from_es(es_document, document_id)
+    if not es_doc:
+        model_label = es_document.Django.model.__name__.capitalize()
+        logger.warning(
+            f"The {model_label} with ID:{document_id} can't updated. "
+            "It has been removed from the index."
+        )
+        return
+
     Document.update(
-        es_document,
+        es_doc,
         **fields_values_to_update,
         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
     )
@@ -355,6 +367,12 @@ def get_doc_from_es(
     :return: An Elasticsearch document if found, otherwise None.
     """
 
+    # Get doc_id for parent-child documents.
+    if es_document is PositionDocument:
+        instance_id = ES_CHILD_ID(instance_id).POSITION
+    elif es_document is ESRECAPDocument:
+        instance_id = ES_CHILD_ID(instance_id).RECAP
+
     try:
         main_doc = es_document.get(id=instance_id)
     except NotFoundError:
@@ -368,10 +386,12 @@ def get_doc_from_es(
     max_retries=3,
     interval_start=5,
 )
+@throttle_task(settings.ES_THROTTLING_TASKS_RATE, key="throttling_id")
 def update_child_documents_by_query(
     self: Task,
     es_document: ESDocumentClassType,
-    parent_instance: ESModelType,
+    parent_instance_id: int,
+    throttling_id: str,
     fields_to_update: list[str],
     fields_map: dict[str, str] | None = None,
 ) -> None:
@@ -380,7 +400,8 @@ def update_child_documents_by_query(
 
     :param self: The celery task
     :param es_document: The Elasticsearch Document type to update.
-    :param parent_instance: The parent instance containing the fields to update.
+    :param parent_instance_id: The parent instance ID containing the fields to update.
+    :param throttling_id: The throttling ID.
     :param fields_to_update: List of field names to be updated.
     :param fields_map: A mapping from model fields to Elasticsearch document fields.
     :return: None
@@ -388,12 +409,15 @@ def update_child_documents_by_query(
 
     s = es_document.search()
     main_doc = None
+    parent_instance = None
     if es_document is PositionDocument:
-        s = s.query("parent_id", type="position", id=parent_instance.pk)
-        main_doc = get_doc_from_es(PersonDocument, parent_instance.pk)
+        s = s.query("parent_id", type="position", id=parent_instance_id)
+        main_doc = get_doc_from_es(PersonDocument, parent_instance_id)
+        parent_instance = Person.objects.get(pk=parent_instance_id)
     elif es_document is ESRECAPDocument:
-        s = s.query("parent_id", type="recap_document", id=parent_instance.pk)
-        main_doc = get_doc_from_es(DocketDocument, parent_instance.pk)
+        s = s.query("parent_id", type="recap_document", id=parent_instance_id)
+        main_doc = get_doc_from_es(DocketDocument, parent_instance_id)
+        parent_instance = Docket.objects.get(pk=parent_instance_id)
 
     if not main_doc:
         # Abort bulk update for a not supported document or non-existing parent
@@ -436,6 +460,7 @@ def update_child_documents_by_query(
     max_retries=3,
     interval_start=5,
 )
+@throttle_task(settings.ES_THROTTLING_TASKS_RATE, key="docket_id")
 def index_docket_parties_in_es(
     self: Task,
     docket_id: int,
@@ -443,17 +468,15 @@ def index_docket_parties_in_es(
     """Update a document in Elasticsearch.
     :param self: The celery task
     :param docket_id: The docket ID to update in ES.
-    :param fields_values_to_update: A dictionary with fields and values to update.
     :return: None
     """
 
-    docket_document = DocketDocument.get(id=docket_id)
     docket = Docket.objects.get(id=docket_id)
-    parties_prepared = docket_document.prepare_parties(docket)
-
+    parties_prepared = DocketDocument().prepare_parties(docket)
     fields_to_update = {
         key: list(set_values) for key, set_values in parties_prepared.items()
     }
+    docket_document = DocketDocument.get(id=docket_id)
     Document.update(
         docket_document,
         **fields_to_update,
