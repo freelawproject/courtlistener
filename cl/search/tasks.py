@@ -242,7 +242,7 @@ def person_first_time_indexing(parent_id: int, position: Position) -> None:
         )
 
 
-# Old task to be removed.
+# TODO Old task to be removed.
 @app.task(
     bind=True,
     autoretry_for=(ConnectionError,),
@@ -427,7 +427,7 @@ def es_save_document(
         return None
 
 
-# Old task to be removed.
+# TODO Old task to be removed.
 @app.task(
     bind=True,
     autoretry_for=(ConnectionError,),
@@ -514,7 +514,7 @@ def get_doc_from_es(
     return main_doc
 
 
-# Old task to be removed.
+# TODO Old task to be removed.
 @app.task(
     bind=True,
     autoretry_for=(ConnectionError, NotFoundError),
