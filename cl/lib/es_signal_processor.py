@@ -3,11 +3,9 @@ from typing import Any
 from celery.canvas import chain
 from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist
 from django.db.models.signals import m2m_changed, post_delete, post_save
-from elasticsearch.exceptions import NotFoundError
 
 from cl.alerts.tasks import (
     process_percolator_response,
-    remove_doc_from_es_index,
     send_or_schedule_alerts,
 )
 from cl.audio.models import Audio
@@ -30,15 +28,12 @@ from cl.search.documents import (
 )
 from cl.search.models import BankruptcyInformation, Docket
 from cl.search.tasks import (
-    save_document_in_es,
-    update_child_documents_by_query,
-    update_document_in_es,
+    es_document_update,
+    es_save_document,
+    remove_document_from_es_index,
+    update_children_documents_by_query,
 )
-from cl.search.types import (
-    ESDocumentClassType,
-    ESDocumentInstanceType,
-    ESModelType,
-)
+from cl.search.types import ESDocumentClassType, ESModelType
 
 
 def get_task_throttling_id(
@@ -60,6 +55,15 @@ def get_task_throttling_id(
         throttling_id = f"{parent_instance_id}"
 
     return throttling_id
+
+
+def compose_app_label(instance: ESModelType) -> str:
+    """Compose the app label and model class name for an ES model instance.
+
+    :param instance: The ES Model instance.
+    :return: A string combining the app label and the Model class name.
+    """
+    return f"{instance._meta.app_label}.{instance.__class__.__name__}"
 
 
 def updated_fields(
@@ -192,7 +196,9 @@ def exists_or_create_doc(
         return True
 
     if not avoid_creation:
-        save_document_in_es.delay(instance, es_document)
+        es_save_document.delay(
+            instance.pk, compose_app_label(instance), es_document.__name__
+        )
         return False
     return False
 
@@ -237,8 +243,8 @@ def update_es_documents(
                 throttling_id = get_task_throttling_id(
                     PersonDocument, instance.pk
                 )
-                update_child_documents_by_query.delay(
-                    es_document,
+                update_children_documents_by_query.delay(
+                    es_document.__name__,
                     instance.pk,
                     throttling_id,
                     fields_to_update,
@@ -250,7 +256,7 @@ def update_es_documents(
                 the parent document using ForeignKeys.
 
                 First, we get the list of all the Person objects related to the instance object
-                and then we use the update_child_documents_by_query method to update their positions.
+                and then we use the update_children_documents_by_query method to update their positions.
                 """
                 related_record = Person.objects.filter(**{query: instance})
                 for person in related_record:
@@ -263,8 +269,8 @@ def update_es_documents(
                     throttling_id = get_task_throttling_id(
                         PersonDocument, person.pk
                     )
-                    update_child_documents_by_query.delay(
-                        es_document,
+                    update_children_documents_by_query.delay(
+                        es_document.__name__,
                         person.pk,
                         throttling_id,
                         fields_to_update,
@@ -280,8 +286,8 @@ def update_es_documents(
                 throttling_id = get_task_throttling_id(
                     DocketDocument, instance.pk
                 )
-                update_child_documents_by_query.delay(
-                    es_document,
+                update_children_documents_by_query.delay(
+                    es_document.__name__,
                     instance.pk,
                     throttling_id,
                     fields_to_update,
@@ -299,8 +305,8 @@ def update_es_documents(
                     throttling_id = get_task_throttling_id(
                         DocketDocument, rel_docket.pk
                     )
-                    update_child_documents_by_query.delay(
-                        es_document,
+                    update_children_documents_by_query.delay(
+                        es_document.__name__,
                         rel_docket.pk,
                         throttling_id,
                         fields_to_update,
@@ -313,8 +319,8 @@ def update_es_documents(
                     if not main_doc:
                         continue
                     if fields_to_update:
-                        update_document_in_es.delay(
-                            es_document,
+                        es_document_update.delay(
+                            es_document.__name__,
                             main_object.pk,
                             document_fields_to_update(
                                 es_document,
@@ -375,8 +381,8 @@ def update_m2m_field_in_es_document(
     get_m2m_value = getattr(es_document(), f"prepare_{affected_field}")(
         instance
     )
-    update_document_in_es.delay(
-        es_document, instance.pk, {affected_field: get_m2m_value}
+    es_document_update.delay(
+        es_document.__name__, instance.pk, {affected_field: get_m2m_value}
     )
 
 
@@ -417,8 +423,8 @@ def update_reverse_related_documents(
                 field_value = getattr(instance, field)
             fields_to_update[field] = field_value
 
-        update_document_in_es.delay(
-            es_document,
+        es_document_update.delay(
+            es_document.__name__,
             main_object.pk,
             fields_to_update,
         )
@@ -437,8 +443,11 @@ def update_reverse_related_documents(
                 throttling_id = get_task_throttling_id(
                     PersonDocument, person.pk
                 )
-                update_child_documents_by_query.delay(
-                    PositionDocument, person.pk, throttling_id, affected_fields
+                update_children_documents_by_query.delay(
+                    PositionDocument.__name__,
+                    person.pk,
+                    throttling_id,
+                    affected_fields,
                 )
 
         case BankruptcyInformation() if es_document is DocketDocument:  # type: ignore
@@ -452,8 +461,8 @@ def update_reverse_related_documents(
             throttling_id = get_task_throttling_id(
                 DocketDocument, instance.docket.pk
             )
-            update_child_documents_by_query.delay(
-                ESRECAPDocument,
+            update_children_documents_by_query.delay(
+                ESRECAPDocument.__name__,
                 instance.docket.pk,
                 throttling_id,
                 affected_fields,
@@ -482,8 +491,8 @@ def prepare_and_update_fields(
         field_value = prepare_method(main_object)
         fields_to_update[field] = field_value
 
-    update_document_in_es.delay(
-        es_document,
+    es_document_update.delay(
+        es_document.__name__,
         main_object.pk,
         fields_to_update,
     )
@@ -522,8 +531,8 @@ def delete_reverse_related_documents(
                 throttling_id = get_task_throttling_id(
                     PersonDocument, instance.pk
                 )
-                update_child_documents_by_query.delay(
-                    PositionDocument,
+                update_children_documents_by_query.delay(
+                    PositionDocument.__name__,
                     instance.pk,
                     throttling_id,
                     affected_fields,
@@ -541,8 +550,8 @@ def delete_reverse_related_documents(
                 throttling_id = get_task_throttling_id(
                     DocketDocument, instance.pk
                 )
-                update_child_documents_by_query.delay(
-                    ESRECAPDocument,
+                update_children_documents_by_query.delay(
+                    ESRECAPDocument.__name__,
                     instance.pk,
                     throttling_id,
                     affected_fields,
@@ -691,7 +700,11 @@ class ESSignalProcessor(object):
                 # yet been processed by process_audio_file.
                 return None
             chain(
-                save_document_in_es.si(instance, self.es_document),
+                es_save_document.si(
+                    instance.pk,
+                    compose_app_label(instance),
+                    self.es_document.__name__,
+                ),
                 send_or_schedule_alerts.s(self.es_document._index._name),
                 process_percolator_response.s(),
             ).apply_async()
@@ -699,7 +712,9 @@ class ESSignalProcessor(object):
     @elasticsearch_enabled
     def handle_delete(self, sender, instance, **kwargs):
         """Receiver function that gets called after an object instance is deleted"""
-        remove_doc_from_es_index.delay(self.es_document, instance.pk)
+        remove_document_from_es_index.delay(
+            self.es_document.__name__, instance.pk
+        )
 
     @elasticsearch_enabled
     def handle_m2m(self, sender, instance=None, action=None, **kwargs):
