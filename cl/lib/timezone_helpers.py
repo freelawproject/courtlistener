@@ -27,6 +27,12 @@ def localize_date_and_time(
     """Localize the date and time into local court timezone, split it into
     date and time.
 
+    If given a "naive datetime" (no timezone information), assume the
+    time is in the court's local time. and return timezone-aware date
+    and time objects. If given a timezone-aware datetime, convert it
+    to the court's local timezone and return timezone-aware date and
+    time objects.
+
     :param court_id: The court_id to get the timezone from.
     :param date_filed: The date or datetime instance provided by the source.
     :return: A tuple of date_filed and time_filed or None if no time available.
