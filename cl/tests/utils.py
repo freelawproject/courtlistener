@@ -69,15 +69,15 @@ class MockACMSDocketReport:
     def _parse_text(self, json):
         acms_data = DocketDataFactory(
             court_id="ca2",
-            appeal_from="S.D.N.Y . (NEW YORK CITY)",
-            case_name="United States of America v. Raji",
-            case_type_information="Criminal, Direct Criminal",
+            appeal_from="Department of Justice",
+            case_name="Ascent Pharmaceuticals, Inc. v. United States Drug Enforcement Administration",
+            case_type_information="Agency, Non-Immigration Petition for Review",
             date_filed=date(2023, 10, 2),
             docket_number="23-6364",
             fee_status="IFP Granted",
             originating_court_information={
-                "identifier": "S.D.N.Y. (NEW YORK CITY)",
-                "name": "S.D.N.Y . (NEW YORK CITY)",
+                "identifier": "DOJ",
+                "name": "Department of Justice",
             },
             pacer_case_id="9f5ae37f-c44e-4194-b075-3f8f028559c4",
             parties=[
