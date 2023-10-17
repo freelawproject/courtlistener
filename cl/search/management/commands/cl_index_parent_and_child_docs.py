@@ -33,7 +33,7 @@ class Command(VerboseCommand):
             "--queue",
             type=str,
             required=True,
-            default="celery",
+            default="etl_tasks",
             help="The celery queue where the tasks should be processed.",
         )
         parser.add_argument(

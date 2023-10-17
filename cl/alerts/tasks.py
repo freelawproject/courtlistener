@@ -714,6 +714,7 @@ def index_alert_document(
     max_retries=3,
     interval_start=5,
     ignore_result=True,
+    queue="etl_tasks",
 )
 def es_save_alert_document(
     self: Task,
