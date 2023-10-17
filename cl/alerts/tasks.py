@@ -710,6 +710,7 @@ def index_alert_document(
         logger.warning(f"Error indexing Alert ID: {alert.pk}")
 
 
+# Old task to be removed.
 @app.task(
     bind=True,
     autoretry_for=(TransportError, ConnectionError, RequestError),
