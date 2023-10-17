@@ -415,13 +415,16 @@ def update_child_documents_by_query(
     s = es_document.search()
     main_doc = None
     parent_instance = None
+    parent_doc_class = None
     if es_document is PositionDocument:
         s = s.query("parent_id", type="position", id=parent_instance_id)
-        main_doc = get_doc_from_es(PersonDocument, parent_instance_id)
+        parent_doc_class = PersonDocument
+        main_doc = parent_doc_class.exists(parent_instance_id)
         parent_instance = Person.objects.get(pk=parent_instance_id)
     elif es_document is ESRECAPDocument:
         s = s.query("parent_id", type="recap_document", id=parent_instance_id)
-        main_doc = get_doc_from_es(DocketDocument, parent_instance_id)
+        parent_doc_class = DocketDocument
+        main_doc = parent_doc_class.exists(parent_instance_id)
         parent_instance = Docket.objects.get(pk=parent_instance_id)
 
     if not main_doc:
@@ -444,7 +447,9 @@ def update_child_documents_by_query(
             script_lines.append(
                 f"ctx._source.{field_name} = params.{field_name};"
             )
-            prepare_method = getattr(main_doc, f"prepare_{field_name}", None)
+            prepare_method = getattr(
+                parent_doc_class(), f"prepare_{field_name}", None
+            )
             if prepare_method:
                 params[field_name] = prepare_method(parent_instance)
             else:
