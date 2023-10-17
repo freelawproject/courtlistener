@@ -1,3 +1,4 @@
+from datetime import date, datetime
 from typing import Tuple
 
 from django.contrib.auth.models import User
@@ -67,28 +68,62 @@ class MockACMSDocketReport:
 
     def _parse_text(self, json):
         acms_data = DocketDataFactory(
-            court_id="ca9",
+            court_id="ca2",
+            appeal_from="S.D.N.Y . (NEW YORK CITY)",
+            case_name="United States of America v. Raji",
+            case_type_information="Criminal, Direct Criminal",
+            date_filed=date(2023, 10, 2),
             docket_number="23-6364",
+            fee_status="IFP Granted",
+            originating_court_information={
+                "identifier": "S.D.N.Y. (NEW YORK CITY)",
+                "name": "S.D.N.Y . (NEW YORK CITY)",
+            },
+            pacer_case_id="9f5ae37f-c44e-4194-b075-3f8f028559c4",
             parties=[
                 {
                     "attorneys": [
                         {
-                            "contact": "Dawson Parrish, PC\n309 W. 7th St.\nSte 915\nFt. Worth, TX 76102\n817-870-1212\nEmail: hparrish@dawsonparrish.com\n",
-                            "name": "John Hunter Parrish",
-                            "roles": ["ATTORNEY TO BE NOTICED"],
+                            "contact": "Email: won.shin@usdoj.gov\nUnited States Attorney's Office for the Southern District of New York\nOne Saint Andrew's Plaza\nNew York, NY 10007",
+                            "name": "Won S. Shin, Assistant U.S. Attorney",
+                            "roles": ["US Attorney"],
                         }
                     ],
-                    "date_terminated": None,
-                    "extra_info": "",
-                    "name": "RFC Drilling, LLC",
-                    "type": "Plaintiff",
+                    "name": "UNITED STATES OF AMERICA",
+                    "type": "AppelleeUSA",
+                },
+                {
+                    "attorneys": [
+                        {
+                            "contact": "Direct: 212-571-5500\nEmail: jschneider@rssslaaw.com\nRothman, Schneider, Soloway & Stern, LLP\n100 Lafayette Street\nSuite 501\nNew York, NY 10013",
+                            "name": "Jeremy Schneider, -",
+                            "roles": ["CJA Appointment"],
+                        }
+                    ],
+                    "name": "MUSTAPHA RAJI",
+                    "type": "Appellant",
+                    "unparsed": [
+                        "\u00a0\u00a0\u00a0\u00a0AKA Sealed Defendant 1, "
+                    ],
                 },
             ],
             docket_entries=[
                 DocketEntryDataFactory(
-                    pacer_doc_id="bde556a7-bdde-ed11-a7c6-001dd806a1fd",
+                    date_filed=datetime(2023, 10, 2, 11, 17, 0),
+                    date_entered=datetime(2023, 10, 2, 11, 17, 0),
+                    description="<p>NOTICE OF CRIMINAL APPEAL, with district court docket, on behalf of Appellant Mustapha Raji, FILED. [Entered: 10/02/2023 11:17 AM]</p>",
+                    pacer_doc_id="46de54cd-3561-ee11-be6e-001dd804e087",
                     document_number=1,
-                )
+                    page_count=18,
+                ),
+                DocketEntryDataFactory(
+                    date_filed=datetime(2023, 10, 2, 11, 20, 0),
+                    date_entered=datetime(2023, 10, 2, 11, 20, 0),
+                    description="<p>DISTRICT COURT JUDGMENT, dated 09/19/2023, RECEIVED. [Entered: 10/02/2023 11:20 AM]</p>",
+                    pacer_doc_id="0d24550b-3761-ee11-be6e-001dd804e087",
+                    document_number=2,
+                    page_count=8,
+                ),
             ],
         )
         self.data = acms_data

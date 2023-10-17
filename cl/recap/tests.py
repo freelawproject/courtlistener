@@ -1,7 +1,7 @@
 import json
 import os
 from copy import deepcopy
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 from unittest.mock import ANY
@@ -146,7 +146,7 @@ class RecapUploadsTest(TestCase):
         cls.court_appellate = CourtFactory(
             id="ca9", jurisdiction="F", in_use=True
         )
-
+        cls.ca2 = CourtFactory(id="ca2", jurisdiction="F", in_use=True)
         cls.att_data = AppellateAttachmentPageFactory(
             attachments=[
                 AppellateAttachmentFactory(
@@ -633,9 +633,9 @@ class RecapUploadsTest(TestCase):
         """
 
         pq = ProcessingQueue.objects.create(
-            court=self.court_appellate,
+            court=self.ca2,
             uploader=self.user,
-            pacer_case_id="34cacf7f-52d5-4d1f-b4f0-0542b429f674",
+            pacer_case_id="9f5ae37f-c44e-4194-b075-3f8f028559c4",
             upload_type=UPLOAD_TYPE.ACMS_DOCKET_JSON,
             filepath_local=self.f,
         )
@@ -646,20 +646,33 @@ class RecapUploadsTest(TestCase):
             async_to_sync(process_recap_acms_docket)(pq.pk)
 
         docket = Docket.objects.get(
-            pacer_case_id="34cacf7f-52d5-4d1f-b4f0-0542b429f674"
+            pacer_case_id="9f5ae37f-c44e-4194-b075-3f8f028559c4"
         )
         docket_entries = DocketEntry.objects.filter(docket=docket).order_by(
             "date_created"
         )
 
         # Confirm Docket entry and RECAPDocument is properly created.
-        self.assertEqual(docket_entries.count(), 1)
+        self.assertEqual(docket_entries.count(), 2)
         recap_documents = RECAPDocument.objects.all().order_by("date_created")
-        self.assertEqual(recap_documents.count(), 1)
+        self.assertEqual(recap_documents.count(), 2)
         self.assertEqual(
             recap_documents[0].pacer_doc_id,
-            "bde556a7-bdde-ed11-a7c6-001dd806a1fd",
+            "46de54cd-3561-ee11-be6e-001dd804e087",
         )
+        self.assertEqual(
+            recap_documents[1].pacer_doc_id,
+            "0d24550b-3761-ee11-be6e-001dd804e087",
+        )
+
+        # Confirm the naive date_filed is not converted.
+        de_1 = DocketEntry.objects.get(docket__court=self.ca2, entry_number=1)
+        self.assertEqual(de_1.date_filed, date(2023, 10, 2))
+        self.assertEqual(de_1.time_filed, time(11, 17, 0))
+
+        de_2 = DocketEntry.objects.get(docket__court=self.ca2, entry_number=2)
+        self.assertEqual(de_2.date_filed, date(2023, 10, 2))
+        self.assertEqual(de_2.time_filed, time(11, 20, 0))
 
 
 @mock.patch("cl.recap.tasks.DocketReport", new=fakes.FakeDocketReport)
