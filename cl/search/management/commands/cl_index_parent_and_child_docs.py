@@ -34,7 +34,7 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--queue",
             type=str,
-            default=settings.CELERY_ETL_TASKS_QUEUE,
+            default=settings.CELERY_ETL_TASK_QUEUE,
             help="The celery queue where the tasks should be processed.",
         )
         parser.add_argument(
