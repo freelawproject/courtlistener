@@ -593,7 +593,9 @@ def update_child_documents_by_query(
     interval_start=5,
     queue=settings.CELERY_ETL_TASKS_QUEUE,
 )
-@throttle_task(settings.ELASTICSEARCH_THROTTLING_TASK_RATE, key="throttling_id")
+@throttle_task(
+    settings.ELASTICSEARCH_THROTTLING_TASK_RATE, key="throttling_id"
+)
 def update_children_documents_by_query(
     self: Task,
     es_document_name: str,
