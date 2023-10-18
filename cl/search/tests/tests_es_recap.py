@@ -1,9 +1,10 @@
 import datetime
 import unittest
+from unittest import mock
 
 from asgiref.sync import sync_to_async
 from django.core.management import call_command
-from django.test import override_settings
+from django.test import RequestFactory, override_settings
 from django.urls import reverse
 from elasticsearch_dsl import Q
 from lxml import etree, html
@@ -11,6 +12,7 @@ from rest_framework.status import HTTP_200_OK
 
 from cl.lib.elasticsearch_utils import build_es_main_query
 from cl.lib.test_helpers import IndexedSolrTestCase, RECAPSearchTestCase
+from cl.lib.view_utils import increment_view_count
 from cl.people_db.factories import (
     AttorneyFactory,
     AttorneyOrganizationFactory,
@@ -1439,6 +1441,37 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             < r.content.decode().index("12-1235"),
             msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by dateFiled asc.",
         )
+
+    @mock.patch("cl.lib.es_signal_processor.chain")
+    def test_avoid_updating_docket_in_es_on_view_count_increment(
+        self, mock_es_save_chain
+    ) -> None:
+        """Confirm a docket is not updated in ES on a view_count increment."""
+
+        docket = DocketFactory(
+            court=self.court,
+            case_name="Lorem Ipsum",
+            case_name_full="Jackson & Sons Holdings vs. Bank",
+            date_filed=datetime.date(2015, 8, 16),
+            date_argued=datetime.date(2013, 5, 20),
+            docket_number="1:21-bk-1234",
+            assigned_to=None,
+            referred_to=None,
+            nature_of_suit="440",
+        )
+        # Restart save chain mock count.
+        mock_es_save_chain.reset_mock()
+        self.assertEqual(mock_es_save_chain.call_count, 0)
+
+        request_factory = RequestFactory()
+        request = request_factory.get("/docket/")
+        with mock.patch("cl.lib.view_utils.is_bot", return_value=False):
+            # Increase the view_count.
+            increment_view_count(docket, request)
+
+        # The save chain shouldn't be called.
+        self.assertEqual(mock_es_save_chain.call_count, 0)
+        docket.delete()
 
 
 class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):
