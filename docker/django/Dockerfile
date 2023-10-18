@@ -14,9 +14,9 @@ RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
     # For installing poetry and git-based deps
     curl git \
     # For maintenance tasks \
-    screen \
+    screen redis-tools vim \
     # Other dependencies
-    libffi-dev libxml2-dev libxslt-dev procps vim cmake
+    libffi-dev libxml2-dev libxslt-dev procps cmake
 
 # Set PGSSLCERT at a dummy location ro avoid a SSL error connection.
 # https://github.com/freelawproject/courtlistener/issues/2827
