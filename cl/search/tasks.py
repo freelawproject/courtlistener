@@ -672,8 +672,8 @@ def update_children_documents_by_query(
 @app.task(
     bind=True,
     autoretry_for=(ConnectionError, NotFoundError),
-    max_retries=3,
-    interval_start=5,
+    max_retries=5,
+    interval_start=5 * 60,
     queue=settings.CELERY_ETL_TASK_QUEUE,
 )
 @throttle_task(settings.ELASTICSEARCH_THROTTLING_TASK_RATE, key="docket_id")
@@ -687,28 +687,16 @@ def index_docket_parties_in_es(
     :return: None
     """
     docket = Docket.objects.get(id=docket_id)
-    if DocketDocument.exists(id=docket_id):
-        # Docket already exists in the index, only update the party fields.
-        docket_document = DocketDocument.get(id=docket_id)
-        parties_prepared = DocketDocument().prepare_parties(docket)
-        fields_to_update = {
-            key: list(set_values)
-            for key, set_values in parties_prepared.items()
-        }
-        Document.update(
-            docket_document,
-            **fields_to_update,
-            refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
-        )
-    else:
-        # The docket is not yet in the index, add it along with the parties.
-        doc = DocketDocument().prepare(docket)
-        es_args = {"meta": {"id": docket_id}}
-        DocketDocument(**es_args, **doc).save(
-            skip_empty=False,
-            return_doc_meta=False,
-            refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
-        )
+    parties_prepared = DocketDocument().prepare_parties(docket)
+    fields_to_update = {
+        key: list(set_values) for key, set_values in parties_prepared.items()
+    }
+    docket_document = DocketDocument.get(id=docket_id)
+    Document.update(
+        docket_document,
+        **fields_to_update,
+        refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
+    )
 
 
 @app.task(

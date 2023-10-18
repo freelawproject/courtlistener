@@ -29,7 +29,6 @@ from cl.search.models import SEARCH_TYPES
 from cl.search.tasks import (
     add_docket_to_solr_by_rds,
     index_docket_parties_in_es,
-    remove_document_from_es_index,
 )
 from cl.tests.cases import ESIndexTestCase, TestCase
 
@@ -1440,56 +1439,6 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             < r.content.decode().index("12-1235"),
             msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by dateFiled asc.",
         )
-
-    def test_index_docket_when_indexing_parties(self) -> None:
-        """Confirm a docket is indexed when indexing parties if it wasn't in
-        the index yet.
-        """
-
-        docket = DocketFactory(
-            court=self.court,
-            case_name="Lorem Ipsum",
-            case_name_full="Jackson & Sons Holdings vs. Bank",
-            date_filed=datetime.date(2015, 8, 16),
-            date_argued=datetime.date(2013, 5, 20),
-            docket_number="1:21-bk-1234",
-            assigned_to=None,
-            referred_to=None,
-            nature_of_suit="440",
-        )
-        firm = AttorneyOrganizationFactory(
-            lookup_key="280kingofprussiaroadradnorkesslertopazmeltzercheck19087",
-            name="Law Firm LLP",
-        )
-        attorney = AttorneyFactory(
-            name="Emily Green",
-            organizations=[firm],
-            docket=docket,
-        )
-        party_type = PartyTypeFactory.create(
-            party=PartyFactory(
-                name="Mary Williams Corp.",
-                docket=docket,
-                attorneys=[attorney],
-            ),
-            docket=docket,
-        )
-        remove_document_from_es_index.delay("DocketDocument", docket.pk)
-        self.assertFalse(DocketDocument.exists(id=docket.pk))
-
-        # Index docket parties using index_docket_parties_in_es task, it should
-        # index the docket including the party fields.
-        index_docket_parties_in_es.delay(docket.pk)
-
-        docket_doc = DocketDocument.get(id=docket.pk)
-        self.assertIn(party_type.party.pk, docket_doc.party_id)
-        self.assertIn(party_type.party.name, docket_doc.party)
-        self.assertIn(attorney.pk, docket_doc.attorney_id)
-        self.assertIn(attorney.name, docket_doc.attorney)
-        self.assertIn(firm.pk, docket_doc.firm_id)
-        self.assertIn(firm.name, docket_doc.firm)
-
-        docket.delete()
 
 
 class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):
