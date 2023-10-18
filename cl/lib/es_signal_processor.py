@@ -3,11 +3,9 @@ from typing import Any
 from celery.canvas import chain
 from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist
 from django.db.models.signals import m2m_changed, post_delete, post_save
-from elasticsearch.exceptions import NotFoundError
 
 from cl.alerts.tasks import (
     process_percolator_response,
-    remove_doc_from_es_index,
     send_or_schedule_alerts,
 )
 from cl.audio.models import Audio
@@ -30,15 +28,42 @@ from cl.search.documents import (
 )
 from cl.search.models import BankruptcyInformation, Docket
 from cl.search.tasks import (
-    save_document_in_es,
-    update_child_documents_by_query,
-    update_document_in_es,
+    es_document_update,
+    es_save_document,
+    remove_document_from_es_index,
+    update_children_documents_by_query,
 )
-from cl.search.types import (
-    ESDocumentClassType,
-    ESDocumentInstanceType,
-    ESModelType,
-)
+from cl.search.types import ESDocumentClassType, ESModelType
+
+
+def get_task_throttling_id(
+    es_document: ESDocumentClassType, parent_instance_id: int
+):
+    """Determine the throttling ID based on the Elasticsearch document and
+    parent instance ID.
+
+    :param es_document: The type Elasticsearch document.
+    :param parent_instance_id: The ID of the parent instance.
+    :return: A string representing the throttling ID.
+    """
+
+    if es_document is PersonDocument:
+        throttling_id = f"person_{parent_instance_id}"
+    elif es_document is DocketDocument:
+        throttling_id = f"docket_{parent_instance_id}"
+    else:
+        throttling_id = f"{parent_instance_id}"
+
+    return throttling_id
+
+
+def compose_app_label(instance: ESModelType) -> str:
+    """Compose the app label and model class name for an ES model instance.
+
+    :param instance: The ES Model instance.
+    :return: A string combining the app label and the Model class name.
+    """
+    return f"{instance._meta.app_label}.{instance.__class__.__name__}"
 
 
 def updated_fields(
@@ -111,7 +136,7 @@ def get_fields_to_update(
 
 
 def document_fields_to_update(
-    main_doc: ESDocumentInstanceType,
+    es_document: ESDocumentClassType,
     main_object: ESModelType,
     field_list: list[str],
     instance: ESModelType,
@@ -120,7 +145,7 @@ def document_fields_to_update(
     """Generate a dictionary of fields and values to update based on a
      provided map and an instance.
 
-    :param main_doc: A Elasticsearch DSL document.
+    :param es_document: The Elasticsearch DSL document class.
     :param main_object: The main object instance that changed.
     :param field_list: A list of field names that need to be updated.
     :param instance: The instance from which field values are to be extracted.
@@ -136,7 +161,7 @@ def document_fields_to_update(
                 fields_to_update[doc_field] = getattr(instance, field)()
             else:
                 prepare_method = getattr(
-                    main_doc, f"prepare_{doc_field}", None
+                    es_document(), f"prepare_{doc_field}", None
                 )
                 if prepare_method:
                     field_value = prepare_method(main_object)
@@ -146,17 +171,17 @@ def document_fields_to_update(
     return fields_to_update
 
 
-def get_or_create_doc(
+def exists_or_create_doc(
     es_document: ESDocumentClassType,
     instance: ESModelType,
     avoid_creation: bool = False,
-) -> ESDocumentInstanceType | None:
+) -> bool:
     """Get or create a document in Elasticsearch.
     :param es_document: The Elasticsearch document type.
     :param instance: The instance of the document to get or create.
     :param avoid_creation: Whether the document shouldn't be created if it doesn't
     exist.
-    :return: An Elasticsearch document if found, otherwise None.
+    :return: True if the ES document exists, False otherwise.
     """
 
     # Get doc_id for parent-child documents.
@@ -167,13 +192,15 @@ def get_or_create_doc(
     else:
         doc_id = instance.pk
 
-    try:
-        main_doc = es_document.get(id=doc_id)
-    except NotFoundError:
-        if not avoid_creation:
-            save_document_in_es.delay(instance, es_document)
-        return None
-    return main_doc
+    if es_document.exists(id=doc_id):
+        return True
+
+    if not avoid_creation:
+        es_save_document.delay(
+            instance.pk, compose_app_label(instance), es_document.__name__
+        )
+        return False
+    return False
 
 
 def update_es_documents(
@@ -207,14 +234,21 @@ def update_es_documents(
                 This case handles the update of one or more fields that belongs to
                 the parent model(The person model).
                 """
-                main_doc = get_or_create_doc(
+                main_doc = exists_or_create_doc(
                     PersonDocument, instance, avoid_creation=True
                 )
                 if not main_doc:
                     # Abort bulk update for a non-existing parent document in ES.
                     return
-                update_child_documents_by_query.delay(
-                    es_document, instance, fields_to_update, fields_map
+                throttling_id = get_task_throttling_id(
+                    PersonDocument, instance.pk
+                )
+                update_children_documents_by_query.delay(
+                    es_document.__name__,
+                    instance.pk,
+                    throttling_id,
+                    fields_to_update,
+                    fields_map,
                 )
             case ABARating() | PoliticalAffiliation() | School() if es_document is PositionDocument:  # type: ignore
                 """
@@ -222,58 +256,74 @@ def update_es_documents(
                 the parent document using ForeignKeys.
 
                 First, we get the list of all the Person objects related to the instance object
-                and then we use the update_child_documents_by_query method to update their positions.
+                and then we use the update_children_documents_by_query method to update their positions.
                 """
                 related_record = Person.objects.filter(**{query: instance})
                 for person in related_record:
-                    main_doc = get_or_create_doc(
+                    main_doc = exists_or_create_doc(
                         PersonDocument, person, avoid_creation=True
                     )
                     if not main_doc:
                         # Abort bulk update for a non-existing parent document in ES.
                         return
-                    update_child_documents_by_query.delay(
-                        es_document,
-                        person,
+                    throttling_id = get_task_throttling_id(
+                        PersonDocument, person.pk
+                    )
+                    update_children_documents_by_query.delay(
+                        es_document.__name__,
+                        person.pk,
+                        throttling_id,
                         fields_to_update,
                         fields_map,
                     )
             case Docket() if es_document is ESRECAPDocument:  # type: ignore
-                main_doc = get_or_create_doc(
+                main_doc = exists_or_create_doc(
                     DocketDocument, instance, avoid_creation=True
                 )
                 if not main_doc:
                     # Abort bulk update for a non-existing parent document in ES.
                     return
-                update_child_documents_by_query.delay(
-                    es_document, instance, fields_to_update, fields_map
+                throttling_id = get_task_throttling_id(
+                    DocketDocument, instance.pk
+                )
+                update_children_documents_by_query.delay(
+                    es_document.__name__,
+                    instance.pk,
+                    throttling_id,
+                    fields_to_update,
+                    fields_map,
                 )
             case Person() if es_document is ESRECAPDocument:  # type: ignore
                 related_dockets = Docket.objects.filter(**{query: instance})
                 for rel_docket in related_dockets:
-                    main_doc = get_or_create_doc(
+                    main_doc = exists_or_create_doc(
                         DocketDocument, rel_docket, avoid_creation=True
                     )
                     if not main_doc:
                         # Abort bulk update for a non-existing parent document in ES.
                         return
-                    update_child_documents_by_query.delay(
-                        es_document,
-                        rel_docket,
+                    throttling_id = get_task_throttling_id(
+                        DocketDocument, rel_docket.pk
+                    )
+                    update_children_documents_by_query.delay(
+                        es_document.__name__,
+                        rel_docket.pk,
+                        throttling_id,
                         fields_to_update,
                         fields_map,
                     )
             case _:
                 main_objects = main_model.objects.filter(**{query: instance})
                 for main_object in main_objects:
-                    main_doc = get_or_create_doc(es_document, main_object)
+                    main_doc = exists_or_create_doc(es_document, main_object)
                     if not main_doc:
                         continue
                     if fields_to_update:
-                        update_document_in_es.delay(
-                            main_doc,
+                        es_document_update.delay(
+                            es_document.__name__,
+                            main_object.pk,
                             document_fields_to_update(
-                                main_doc,
+                                es_document,
                                 main_object,
                                 fields_to_update,
                                 instance,
@@ -325,11 +375,15 @@ def update_m2m_field_in_es_document(
     relationships with the instance.
     :return: None
     """
-    document = get_or_create_doc(es_document, instance)
+    document = exists_or_create_doc(es_document, instance)
     if not document:
         return
-    get_m2m_value = getattr(document, f"prepare_{affected_field}")(instance)
-    update_document_in_es.delay(document, {affected_field: get_m2m_value})
+    get_m2m_value = getattr(es_document(), f"prepare_{affected_field}")(
+        instance
+    )
+    es_document_update.delay(
+        es_document.__name__, instance.pk, {affected_field: get_m2m_value}
+    )
 
 
 def update_reverse_related_documents(
@@ -353,7 +407,7 @@ def update_reverse_related_documents(
     # Update parent instance
     main_objects = main_model.objects.filter(**{query_string: instance})
     for main_object in main_objects:
-        main_doc = get_or_create_doc(
+        main_doc = exists_or_create_doc(
             es_document, main_object, avoid_creation=True
         )
         if not main_doc:
@@ -362,15 +416,16 @@ def update_reverse_related_documents(
 
         fields_to_update = {}
         for field in affected_fields:
-            prepare_method = getattr(main_doc, f"prepare_{field}", None)
+            prepare_method = getattr(es_document(), f"prepare_{field}", None)
             if prepare_method:
                 field_value = prepare_method(main_object)
             else:
                 field_value = getattr(instance, field)
             fields_to_update[field] = field_value
 
-        update_document_in_es.delay(
-            main_doc,
+        es_document_update.delay(
+            es_document.__name__,
+            main_object.pk,
             fields_to_update,
         )
 
@@ -379,38 +434,50 @@ def update_reverse_related_documents(
             # bulk update position documents when a reverse related record is created/updated.
             related_record = Person.objects.filter(**{query_string: instance})
             for person in related_record:
-                main_doc = get_or_create_doc(
+                main_doc = exists_or_create_doc(
                     es_document, person, avoid_creation=True
                 )
                 if not main_doc:
                     # Abort bulk update for a non-existing parent document in ES.
                     return
-                update_child_documents_by_query.delay(
-                    PositionDocument, person, affected_fields
+                throttling_id = get_task_throttling_id(
+                    PersonDocument, person.pk
+                )
+                update_children_documents_by_query.delay(
+                    PositionDocument.__name__,
+                    person.pk,
+                    throttling_id,
+                    affected_fields,
                 )
 
         case BankruptcyInformation() if es_document is DocketDocument:  # type: ignore
             # bulk update RECAP documents when a reverse related record is created/updated.
-            main_doc = get_or_create_doc(
+            main_doc = exists_or_create_doc(
                 es_document, instance.docket, avoid_creation=True
             )
             if not main_doc:
                 # Abort bulk update for a non-existing parent document in ES.
                 return
-            update_child_documents_by_query.delay(
-                ESRECAPDocument, instance.docket, affected_fields
+            throttling_id = get_task_throttling_id(
+                DocketDocument, instance.docket.pk
+            )
+            update_children_documents_by_query.delay(
+                ESRECAPDocument.__name__,
+                instance.docket.pk,
+                throttling_id,
+                affected_fields,
             )
 
 
 def prepare_and_update_fields(
     affected_fields: list[str],
-    main_doc: ESDocumentInstanceType,
+    es_document: ESDocumentClassType,
     main_object: ESModelType,
 ):
     """Prepare and update affected fields in an Elasticsearch document.
 
     :param affected_fields: List of field names that need to be updated.
-    :param main_doc: A Elasticsearch DSL document.
+    :param es_document: The Elasticsearch document type.
     :param main_object: The instance for which the reverse related documents
     are to be updated.
     :return: None.
@@ -418,14 +485,15 @@ def prepare_and_update_fields(
 
     fields_to_update = {}
     for field in affected_fields:
-        prepare_method = getattr(main_doc, f"prepare_{field}", None)
+        prepare_method = getattr(es_document(), f"prepare_{field}", None)
         if not prepare_method:
             continue
         field_value = prepare_method(main_object)
         fields_to_update[field] = field_value
 
-    update_document_in_es.delay(
-        main_doc,
+    es_document_update.delay(
+        es_document.__name__,
+        main_object.pk,
         fields_to_update,
     )
 
@@ -452,37 +520,53 @@ def delete_reverse_related_documents(
     match instance:
         case Person() if es_document is PersonDocument:  # type: ignore
             # Update the Person document after the reverse instanced is deleted
-            main_doc = get_or_create_doc(
+            main_doc = exists_or_create_doc(
                 es_document, instance, avoid_creation=True
             )
             if main_doc:
-                prepare_and_update_fields(affected_fields, main_doc, instance)
+                prepare_and_update_fields(
+                    affected_fields, es_document, instance
+                )
                 # Then update all their child documents (Positions)
-                update_child_documents_by_query.delay(
-                    PositionDocument, instance, affected_fields
+                throttling_id = get_task_throttling_id(
+                    PersonDocument, instance.pk
+                )
+                update_children_documents_by_query.delay(
+                    PositionDocument.__name__,
+                    instance.pk,
+                    throttling_id,
+                    affected_fields,
                 )
         case Docket() if es_document is DocketDocument:  # type: ignore
             # Update the Docket document after the reverse instanced is deleted
-            main_doc = get_or_create_doc(
+            main_doc = exists_or_create_doc(
                 es_document, instance, avoid_creation=True
             )
             if main_doc:
-                prepare_and_update_fields(affected_fields, main_doc, instance)
+                prepare_and_update_fields(
+                    affected_fields, es_document, instance
+                )
                 # Then update all their child documents (RECAPDocuments)
-                update_child_documents_by_query.delay(
-                    ESRECAPDocument, instance, affected_fields
+                throttling_id = get_task_throttling_id(
+                    DocketDocument, instance.pk
+                )
+                update_children_documents_by_query.delay(
+                    ESRECAPDocument.__name__,
+                    instance.pk,
+                    throttling_id,
+                    affected_fields,
                 )
         case _:
             main_objects = main_model.objects.filter(
                 **{query_string: instance}
             )
             for main_object in main_objects:
-                main_doc = get_or_create_doc(
+                main_doc = exists_or_create_doc(
                     es_document, main_object, avoid_creation=True
                 )
                 if main_doc:
                     prepare_and_update_fields(
-                        affected_fields, main_doc, main_object
+                        affected_fields, es_document, main_object
                     )
 
 
@@ -616,7 +700,11 @@ class ESSignalProcessor(object):
                 # yet been processed by process_audio_file.
                 return None
             chain(
-                save_document_in_es.si(instance, self.es_document),
+                es_save_document.si(
+                    instance.pk,
+                    compose_app_label(instance),
+                    self.es_document.__name__,
+                ),
                 send_or_schedule_alerts.s(self.es_document._index._name),
                 process_percolator_response.s(),
             ).apply_async()
@@ -624,7 +712,9 @@ class ESSignalProcessor(object):
     @elasticsearch_enabled
     def handle_delete(self, sender, instance, **kwargs):
         """Receiver function that gets called after an object instance is deleted"""
-        remove_doc_from_es_index.delay(self.es_document, instance.pk)
+        remove_document_from_es_index.delay(
+            self.es_document.__name__, instance.pk
+        )
 
     @elasticsearch_enabled
     def handle_m2m(self, sender, instance=None, action=None, **kwargs):
