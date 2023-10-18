@@ -336,6 +336,7 @@ def save_document_in_es(
     autoretry_for=(ConnectionError,),
     max_retries=3,
     interval_start=5,
+    queue=settings.CELERY_ETL_TASKS_QUEUE,
 )
 def es_save_document(
     self: Task,
@@ -459,6 +460,7 @@ def update_document_in_es(
     autoretry_for=(ConnectionError,),
     max_retries=3,
     interval_start=5,
+    queue=settings.CELERY_ETL_TASKS_QUEUE,
 )
 def es_document_update(
     self: Task,
@@ -589,6 +591,7 @@ def update_child_documents_by_query(
     autoretry_for=(ConnectionError, NotFoundError),
     max_retries=3,
     interval_start=5,
+    queue=settings.CELERY_ETL_TASKS_QUEUE,
 )
 @throttle_task(settings.ES_THROTTLING_TASKS_RATE, key="throttling_id")
 def update_children_documents_by_query(
@@ -669,6 +672,7 @@ def update_children_documents_by_query(
     autoretry_for=(ConnectionError, NotFoundError),
     max_retries=3,
     interval_start=5,
+    queue=settings.CELERY_ETL_TASKS_QUEUE,
 )
 @throttle_task(settings.ES_THROTTLING_TASKS_RATE, key="docket_id")
 def index_docket_parties_in_es(
@@ -792,6 +796,7 @@ def index_parent_and_child_docs(
     max_retries=3,
     interval_start=5,
     ignore_result=True,
+    queue=settings.CELERY_ETL_TASKS_QUEUE,
 )
 def remove_document_from_es_index(
     self: Task, es_document_name: str, instance_id: int

@@ -1,5 +1,7 @@
 from typing import Iterable
 
+from django.conf import settings
+
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand
 from cl.people_db.models import Person
@@ -32,8 +34,7 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--queue",
             type=str,
-            required=True,
-            default="celery",
+            default=settings.CELERY_ETL_TASKS_QUEUE,
             help="The celery queue where the tasks should be processed.",
         )
         parser.add_argument(

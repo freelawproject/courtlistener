@@ -4,6 +4,7 @@ from .redis import REDIS_DATABASES, REDIS_HOST, REDIS_PORT
 
 env = environ.FileAwareEnv()
 DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
+CELERY_ETL_TASKS_QUEUE = env("CELERY_ETL_TASKS_QUEUE", default="celery")
 
 # This can be useful in a dev environment:
 # .virtualenvs/courtlistener/bin/celery worker -n w1 --app=cl  --loglevel=INFO
