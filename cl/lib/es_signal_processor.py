@@ -189,9 +189,12 @@ def exists_or_create_doc(
         return True
 
     if not avoid_creation:
-        es_save_document.delay(
-            instance.pk, compose_app_label(instance), es_document.__name__
+        transaction.on_commit(
+            lambda: es_save_document.delay(
+                instance.pk, compose_app_label(instance), es_document.__name__
+            )
         )
+
         return False
     return False
 
