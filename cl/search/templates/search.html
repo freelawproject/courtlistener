@@ -8,9 +8,9 @@
 
 {% block title %}
     {% if search_summary_str %}
-        Search Results for {{ search_summary_str }} &mdash; {% if not error %}{{ results.paginator.count|intcomma }} Result{{ results.paginator.count|pluralize }} &mdash; {% endif %}CourtListener.com
+      Search Results for {{ search_summary_str }} &mdash; {% if not error %}{% if results_details %}{{ results_details.1|intcomma }}{% else %}{{ results.paginator.count|intcomma }}{% endif %} Result{{results.paginator.count|pluralize }} &mdash; {% endif %}CourtListener.com
     {% else %}
-        Free Legal Search Engine and Alert System &mdash; CourtListener.com
+      Free Legal Search Engine and Alert System &mdash; CourtListener.com
     {% endif %}
 {% endblock %}
 {% block og_title %}

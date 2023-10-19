@@ -682,6 +682,13 @@ class ESSignalProcessor(object):
         **kwargs,
     ):
         """Receiver function that gets called after an object instance is saved"""
+
+        if update_fields and "view_count" in update_fields:
+            # If the save includes 'view_count' in the update fields, abort
+            # the operation.This indicates that a user view is incrementing
+            # the 'view_count' for dockets and opinions.
+            return None
+
         mapping_fields = self.documents_model_mapping["save"][sender]
         if not created:
             update_es_documents(
