@@ -21,11 +21,14 @@ from cl.people_db.factories import (
     PersonFactory,
     PoliticalAffiliationFactory,
     PositionFactory,
+    RaceFactory,
     SchoolFactory,
 )
+from cl.people_db.models import Race
 from cl.search.documents import ES_CHILD_ID, PersonDocument, PositionDocument
+from cl.search.factories import CourtFactory
 from cl.search.models import SEARCH_TYPES
-from cl.tests.cases import ESIndexTestCase, TestCase
+from cl.tests.cases import ESIndexTestCase, TestCase, TransactionTestCase
 
 
 class PeopleSearchTestElasticSearch(
@@ -37,6 +40,12 @@ class PeopleSearchTestElasticSearch(
     def setUpTestData(cls):
         cls.rebuild_index("people_db.Person")
         super().setUpTestData()
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.PEOPLE,
+            queue="celery",
+            pk_offset=0,
+        )
 
     def _test_article_count(self, params, expected_count, field_name):
         r = self.client.get("/", params)
@@ -105,191 +114,6 @@ class PeopleSearchTestElasticSearch(
             self.assertTrue(
                 PersonDocument.exists(id=ES_CHILD_ID(position_pk).POSITION)
             )
-
-    def test_index_all_person_positions(self) -> None:
-        """Confirm we can index all the person positions in ES after a
-        judiciary position is created for the person.
-        """
-
-        person = PersonFactory.create(
-            gender="f",
-            name_first="Ava",
-            name_last="Wilson",
-            date_dob=datetime.date(1942, 10, 21),
-            date_dod=datetime.date(2020, 11, 25),
-            date_granularity_dob="%Y-%m-%d",
-            date_granularity_dod="%Y-%m-%d",
-        )
-        no_jud_position = PositionFactory.create(
-            date_granularity_start="%Y-%m-%d",
-            date_start=datetime.date(2015, 12, 14),
-            organization_name="Pants, Inc.",
-            job_title="Corporate Lawyer",
-            position_type=None,
-            person=person,
-        )
-
-        # At this point there is no judiciary position for person, so the
-        # person and no_jud_position are not indexed yet.
-        self.assertFalse(PersonDocument.exists(id=person.pk))
-        self.assertFalse(
-            PersonDocument.exists(id=ES_CHILD_ID(no_jud_position.pk).POSITION)
-        )
-
-        # Add a judiciary position:
-        jud_position = PositionFactory.create(
-            date_granularity_start="%Y-%m-%d",
-            court=self.court_1,
-            date_start=datetime.date(2015, 12, 14),
-            predecessor=self.person_2,
-            appointer=self.position_1,
-            judicial_committee_action="no_rep",
-            termination_reason="retire_mand",
-            position_type="c-jud",
-            person=person,
-            how_selected="e_part",
-            nomination_process="fed_senate",
-            date_elected=datetime.date(2015, 11, 12),
-        )
-
-        # Confirm now the Person is indexed in ES.
-        self.assertTrue(PersonDocument.exists(id=person.pk))
-        # Also the judiciary position is indexed.
-        self.assertTrue(
-            PositionDocument.exists(id=ES_CHILD_ID(jud_position.pk).POSITION)
-        )
-        # Previous no judiciary positions should also been indexed now.
-        self.assertTrue(
-            PositionDocument.exists(
-                id=ES_CHILD_ID(no_jud_position.pk).POSITION
-            )
-        )
-
-        # Upcoming non-judiciary and judiciary positions should be indexed.
-        no_jud_position_2 = PositionFactory.create(
-            date_granularity_start="%Y-%m-%d",
-            date_start=datetime.date(2015, 12, 14),
-            organization_name="Pants, Inc.",
-            job_title="Corporate Lawyer",
-            position_type=None,
-            person=person,
-        )
-        self.assertTrue(
-            PositionDocument.exists(
-                id=ES_CHILD_ID(no_jud_position_2.pk).POSITION
-            )
-        )
-
-        jud_position_2 = PositionFactory.create(
-            date_granularity_start="%Y-%m-%d",
-            court=self.court_1,
-            date_start=datetime.date(2015, 12, 14),
-            predecessor=self.person_2,
-            appointer=self.position_1,
-            judicial_committee_action="no_rep",
-            termination_reason="retire_mand",
-            position_type="c-jud",
-            person=person,
-            how_selected="e_part",
-            nomination_process="fed_senate",
-            date_elected=datetime.date(2015, 11, 12),
-        )
-        self.assertTrue(
-            PositionDocument.exists(id=ES_CHILD_ID(jud_position_2.pk).POSITION)
-        )
-        person.delete()
-
-    def test_remove_parent_child_objects_from_index(self) -> None:
-        """Confirm join child objects are removed from the index when the
-        parent objects is deleted.
-        """
-        person = PersonFactory.create(name_first="John Deer")
-        pos_1 = PositionFactory.create(
-            court=self.court_1,
-            person=person,
-            date_granularity_start="%Y-%m-%d",
-            date_start=datetime.date(1993, 1, 20),
-            date_retirement=datetime.date(2001, 1, 20),
-            termination_reason="retire_mand",
-            position_type="c-jud",
-            how_selected="e_part",
-            nomination_process="fed_senate",
-        )
-        PoliticalAffiliationFactory.create(person=person)
-        school = SchoolFactory.create(name="Harvard University")
-
-        person_pk = person.pk
-        pos_1_pk = pos_1.pk
-        # Person instance is indexed.
-        self.assertTrue(PersonDocument.exists(id=person_pk))
-        # Position instance is indexed.
-        self.assertTrue(
-            PersonDocument.exists(id=ES_CHILD_ID(pos_1_pk).POSITION)
-        )
-
-        # Confirm documents can be updated in the ES index.
-        person.name_first = "John Debbas"
-        person.save()
-
-        pos_1.court = self.court_2
-        pos_1.save()
-
-        person_doc = PersonDocument.get(id=person.pk)
-        self.assertIn("Debbas", person_doc.name)
-
-        position_doc = PersonDocument.get(id=ES_CHILD_ID(pos_1_pk).POSITION)
-        self.assertEqual(self.court_2.pk, position_doc.court_exact)
-
-        # Delete person instance; it should be removed from the index along
-        # with its child documents.
-        person.delete()
-
-        # Person document should be removed.
-        self.assertFalse(PersonDocument.exists(id=person_pk))
-        # Position document is removed.
-        self.assertFalse(
-            PersonDocument.exists(id=ES_CHILD_ID(pos_1_pk).POSITION)
-        )
-
-    def test_remove_nested_objects_from_index(self) -> None:
-        """Confirm that child objects are removed from the index when they are
-        deleted independently of their parent object
-        """
-
-        person = PersonFactory.create(name_first="John Deer")
-        pos_1 = PositionFactory.create(
-            court=self.court_1,
-            person=person,
-            date_granularity_start="%Y-%m-%d",
-            date_start=datetime.date(1993, 1, 20),
-            date_retirement=datetime.date(2001, 1, 20),
-            termination_reason="retire_mand",
-            position_type="c-jud",
-            how_selected="e_part",
-            nomination_process="fed_senate",
-        )
-        PoliticalAffiliationFactory.create(person=person)
-
-        person_pk = person.pk
-        pos_1_pk = pos_1.pk
-        # Person instance is indexed.
-        self.assertTrue(PersonDocument.exists(id=person_pk))
-        # Position instance is indexed.
-        self.assertTrue(
-            PersonDocument.exists(id=ES_CHILD_ID(pos_1_pk).POSITION)
-        )
-
-        # Delete pos_1 and education, keep the parent person instance.
-        pos_1.delete()
-
-        # Person instance still exists.
-        self.assertTrue(PersonDocument.exists(id=person_pk))
-
-        # Position object is removed
-        self.assertFalse(
-            PersonDocument.exists(id=ES_CHILD_ID(pos_1_pk).POSITION)
-        )
-        person.delete()
 
     def test_has_child_queries(self) -> None:
         """Test the build_join_fulltext_queries has child query, it returns a
@@ -822,32 +646,32 @@ class PeopleSearchTestElasticSearch(
                 "hits"
             ]["hits"][0]["_source"]["appointer"],
         )
-
-        appointer = PersonFactory.create(
-            name_first="Obama", name_last="Clinton"
-        )
-        position_obama = PositionFactory.create(
-            date_granularity_start="%Y-%m-%d",
-            date_start=datetime.date(1993, 1, 20),
-            date_retirement=datetime.date(2001, 1, 20),
-            termination_reason="retire_mand",
-            position_type="pres",
-            person=appointer,
-            how_selected="e_part",
-        )
-        person_2_position = PositionFactory.create(
-            date_granularity_start="%Y-%m-%d",
-            court=self.court_1,
-            date_start=datetime.date(2015, 12, 14),
-            predecessor=self.person_3,
-            appointer=position_obama,
-            judicial_committee_action="no_rep",
-            termination_reason="retire_mand",
-            position_type="c-jud",
-            person=self.person_2,
-            how_selected="e_part",
-            nomination_process="fed_senate",
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            appointer = PersonFactory.create(
+                name_first="Obama", name_last="Clinton"
+            )
+            position_obama = PositionFactory.create(
+                date_granularity_start="%Y-%m-%d",
+                date_start=datetime.date(1993, 1, 20),
+                date_retirement=datetime.date(2001, 1, 20),
+                termination_reason="retire_mand",
+                position_type="pres",
+                person=appointer,
+                how_selected="e_part",
+            )
+            person_2_position = PositionFactory.create(
+                date_granularity_start="%Y-%m-%d",
+                court=self.court_1,
+                date_start=datetime.date(2015, 12, 14),
+                predecessor=self.person_3,
+                appointer=position_obama,
+                judicial_committee_action="no_rep",
+                termination_reason="retire_mand",
+                position_type="c-jud",
+                person=self.person_2,
+                how_selected="e_part",
+                nomination_process="fed_senate",
+            )
 
         search_query = PersonDocument.search()
         (
@@ -1129,45 +953,47 @@ class PeopleSearchTestElasticSearch(
 
     def test_merge_unavailable_fields_api(self) -> None:
         """Confirm unavailable ES fields are properly merged from DB in the API"""
+        with self.captureOnCommitCallbacks(execute=True):
+            person = PersonFactory.create(name_first="John American")
+            position_5 = PositionFactory.create(
+                date_granularity_start="%Y-%m-%d",
+                court=self.court_1,
+                date_start=datetime.date(2015, 12, 14),
+                predecessor=self.person_3,
+                appointer=self.position_1,
+                judicial_committee_action="no_rep",
+                termination_reason="retire_mand",
+                position_type="c-jud",
+                person=person,
+                how_selected="e_part",
+                nomination_process="fed_senate",
+            )
 
-        person = PersonFactory.create(name_first="John American")
-        position_5 = PositionFactory.create(
-            date_granularity_start="%Y-%m-%d",
-            court=self.court_1,
-            date_start=datetime.date(2015, 12, 14),
-            predecessor=self.person_3,
-            appointer=self.position_1,
-            judicial_committee_action="no_rep",
-            termination_reason="retire_mand",
-            position_type="c-jud",
-            person=person,
-            how_selected="e_part",
-            nomination_process="fed_senate",
-        )
-
-        position_6 = PositionFactory.create(
-            date_granularity_start="%Y-%m-%d",
-            court=self.court_2,
-            date_start=datetime.date(2015, 12, 14),
-            predecessor=self.person_2,
-            appointer=self.position_1,
-            judicial_committee_action="no_rep",
-            termination_reason="retire_mand",
-            position_type="clerk",
-            person=self.person_2,
-            supervisor=person,
-            date_nominated=datetime.date(2015, 11, 14),
-            date_recess_appointment=datetime.date(2016, 11, 14),
-            date_referred_to_judicial_committee=datetime.date(2017, 11, 14),
-            date_judicial_committee_action=datetime.date(2017, 10, 14),
-            date_confirmation=datetime.date(2017, 10, 11),
-            date_hearing=datetime.date(2017, 10, 16),
-            date_retirement=datetime.date(2020, 10, 10),
-            date_termination=datetime.date(2019, 10, 24),
-            date_granularity_termination="%Y-%m-%d",
-            how_selected="a_legis",
-            nomination_process="fed_senate",
-        )
+            position_6 = PositionFactory.create(
+                date_granularity_start="%Y-%m-%d",
+                court=self.court_2,
+                date_start=datetime.date(2015, 12, 14),
+                predecessor=self.person_2,
+                appointer=self.position_1,
+                judicial_committee_action="no_rep",
+                termination_reason="retire_mand",
+                position_type="clerk",
+                person=self.person_2,
+                supervisor=person,
+                date_nominated=datetime.date(2015, 11, 14),
+                date_recess_appointment=datetime.date(2016, 11, 14),
+                date_referred_to_judicial_committee=datetime.date(
+                    2017, 11, 14
+                ),
+                date_judicial_committee_action=datetime.date(2017, 10, 14),
+                date_confirmation=datetime.date(2017, 10, 11),
+                date_hearing=datetime.date(2017, 10, 16),
+                date_retirement=datetime.date(2020, 10, 10),
+                date_termination=datetime.date(2019, 10, 24),
+                date_granularity_termination="%Y-%m-%d",
+                how_selected="a_legis",
+                nomination_process="fed_senate",
+            )
 
         params = {"type": SEARCH_TYPES.PEOPLE, "q": "Susan"}
 
@@ -1320,6 +1146,338 @@ class PeopleSearchTestElasticSearch(
 
         position_5.delete()
         position_6.delete()
+        person.delete()
+
+
+class IndexJudgesPositionsCommandTest(
+    CourtTestCase, PeopleTestCase, ESIndexTestCase, TestCase
+):
+    """test_cl_index_parent_and_child_docs_command tests for Elasticsearch"""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.rebuild_index("people_db.Person")
+        super().setUpTestData()
+        cls.delete_index("people_db.Person")
+        cls.create_index("people_db.Person")
+
+    def test_cl_index_parent_and_child_docs_command(self):
+        """Confirm the command can properly index Judges and their positions
+        into the ES."""
+
+        s = PersonDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0)
+
+        # Call cl_index_parent_and_child_docs command.
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.PEOPLE,
+            queue="celery",
+            pk_offset=0,
+        )
+
+        s = PersonDocument.search()
+        s = s.query(Q("match", person_child="person"))
+        self.assertEqual(s.count(), 2, msg="Wrong number of judges returned.")
+
+        s = PersonDocument.search()
+        s = s.query(Q("match", person_child="position"))
+        self.assertEqual(
+            s.count(), 3, msg="Wrong number of positions returned."
+        )
+
+        # Positions are indexed.
+        position_pks = [
+            self.position_2.pk,
+            self.position_4.pk,
+            self.position_3.pk,
+        ]
+        for position_pk in position_pks:
+            self.assertTrue(
+                PositionDocument.exists(id=ES_CHILD_ID(position_pk).POSITION)
+            )
+
+        s = PersonDocument.search()
+        s = s.query("parent_id", type="position", id=self.person_2.pk)
+        self.assertEqual(s.count(), 2)
+
+        s = PersonDocument.search()
+        s = s.query("parent_id", type="position", id=self.person_3.pk)
+        self.assertEqual(s.count(), 1)
+
+
+class PeopleIndexingTest(ESIndexTestCase, TransactionTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.rebuild_index("people_db.Person")
+
+    def setUp(self):
+        self.court_1 = CourtFactory(
+            id="ca1",
+            full_name="First Circuit",
+            citation_string="1st Cir.",
+        )
+        self.court_2 = CourtFactory(
+            id="test",
+            full_name="Testing Supreme Court",
+            citation_string="Test",
+        )
+
+        w_query = Race.objects.filter(race="w")
+        b_query = Race.objects.filter(race="b")
+        self.w_race = (
+            w_query.first() if w_query.exists() else RaceFactory(race="w")
+        )
+        self.b_race = (
+            b_query.first() if b_query.exists() else RaceFactory(race="b")
+        )
+
+        self.person_1 = PersonFactory.create(
+            gender="m",
+            name_first="Bill",
+            name_last="Clinton",
+        )
+        self.person_1.race.add(self.w_race)
+        self.position_1 = PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            date_start=datetime.date(1993, 1, 20),
+            date_retirement=datetime.date(2001, 1, 20),
+            termination_reason="retire_mand",
+            position_type="pres",
+            person=self.person_1,
+            how_selected="e_part",
+        )
+
+        self.person_2 = PersonFactory.create(
+            gender="f",
+            name_first="Judith",
+            name_last="Sheindlin",
+            date_dob=datetime.date(1942, 10, 21),
+            date_dod=datetime.date(2020, 11, 25),
+            date_granularity_dob="%Y-%m-%d",
+            date_granularity_dod="%Y-%m-%d",
+            name_middle="Susan",
+            dob_city="Brookyln",
+            dob_state="NY",
+        )
+        self.person_2.race.add(self.w_race)
+        self.person_2.race.add(self.b_race)
+
+        self.person_3 = PersonFactory.create(
+            gender="f",
+            name_first="Sheindlin",
+            name_last="Judith",
+            date_dob=datetime.date(1945, 11, 20),
+            date_granularity_dob="%Y-%m-%d",
+            name_middle="Olivia",
+            dob_city="Queens",
+            dob_state="NY",
+        )
+        self.person_3.race.add(self.w_race)
+        PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            court=self.court_2,
+            date_start=datetime.date(2020, 12, 14),
+            predecessor=self.person_3,
+            appointer=self.position_1,
+            judicial_committee_action="no_rep",
+            termination_reason="retire_mand",
+            position_type="c-jud",
+            person=self.person_3,
+            how_selected="a_legis",
+            nomination_process="fed_senate",
+        )
+        self.school_1 = SchoolFactory(name="New York Law School")
+        self.education_3 = EducationFactory(
+            degree_level="ba",
+            person=self.person_3,
+            school=self.school_1,
+        )
+        self.political_affiliation_3 = PoliticalAffiliationFactory.create(
+            political_party="i",
+            source="b",
+            date_start=datetime.date(2015, 12, 14),
+            person=self.person_3,
+            date_granularity_start="%Y-%m-%d",
+        )
+
+    def test_index_all_person_positions(self) -> None:
+        """Confirm we can index all the person positions in ES after a
+        judiciary position is created for the person.
+        """
+
+        person = PersonFactory.create(
+            gender="f",
+            name_first="Ava",
+            name_last="Wilson",
+            date_dob=datetime.date(1942, 10, 21),
+            date_dod=datetime.date(2020, 11, 25),
+            date_granularity_dob="%Y-%m-%d",
+            date_granularity_dod="%Y-%m-%d",
+        )
+        no_jud_position = PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            date_start=datetime.date(2015, 12, 14),
+            organization_name="Pants, Inc.",
+            job_title="Corporate Lawyer",
+            position_type=None,
+            person=person,
+        )
+
+        # At this point there is no judiciary position for person, so the
+        # person and no_jud_position are not indexed yet.
+        self.assertFalse(PersonDocument.exists(id=person.pk))
+        self.assertFalse(
+            PersonDocument.exists(id=ES_CHILD_ID(no_jud_position.pk).POSITION)
+        )
+
+        # Add a judiciary position:
+        jud_position = PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            date_start=datetime.date(2015, 12, 14),
+            judicial_committee_action="no_rep",
+            termination_reason="retire_mand",
+            position_type="c-jud",
+            person=person,
+            how_selected="e_part",
+            nomination_process="fed_senate",
+            date_elected=datetime.date(2015, 11, 12),
+        )
+
+        # Confirm now the Person is indexed in ES.
+        self.assertTrue(PersonDocument.exists(id=person.pk))
+        # Also the judiciary position is indexed.
+        self.assertTrue(
+            PositionDocument.exists(id=ES_CHILD_ID(jud_position.pk).POSITION)
+        )
+        # Previous no judiciary positions should also been indexed now.
+        self.assertTrue(
+            PositionDocument.exists(
+                id=ES_CHILD_ID(no_jud_position.pk).POSITION
+            )
+        )
+
+        # Upcoming non-judiciary and judiciary positions should be indexed.
+        no_jud_position_2 = PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            date_start=datetime.date(2015, 12, 14),
+            organization_name="Pants, Inc.",
+            job_title="Corporate Lawyer",
+            position_type=None,
+            person=person,
+        )
+        self.assertTrue(
+            PositionDocument.exists(
+                id=ES_CHILD_ID(no_jud_position_2.pk).POSITION
+            )
+        )
+
+        jud_position_2 = PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            date_start=datetime.date(2015, 12, 14),
+            judicial_committee_action="no_rep",
+            termination_reason="retire_mand",
+            position_type="c-jud",
+            person=person,
+            how_selected="e_part",
+            nomination_process="fed_senate",
+            date_elected=datetime.date(2015, 11, 12),
+        )
+        self.assertTrue(
+            PositionDocument.exists(id=ES_CHILD_ID(jud_position_2.pk).POSITION)
+        )
+        person.delete()
+
+    def test_remove_parent_child_objects_from_index(self) -> None:
+        """Confirm join child objects are removed from the index when the
+        parent objects is deleted.
+        """
+        person = PersonFactory.create(name_first="John Deer")
+        pos_1 = PositionFactory.create(
+            person=person,
+            date_granularity_start="%Y-%m-%d",
+            date_start=datetime.date(1993, 1, 20),
+            date_retirement=datetime.date(2001, 1, 20),
+            termination_reason="retire_mand",
+            position_type="c-jud",
+            how_selected="e_part",
+            nomination_process="fed_senate",
+        )
+        PoliticalAffiliationFactory.create(person=person)
+        school = SchoolFactory.create(name="Harvard University")
+
+        person_pk = person.pk
+        pos_1_pk = pos_1.pk
+        # Person instance is indexed.
+        self.assertTrue(PersonDocument.exists(id=person_pk))
+        # Position instance is indexed.
+        self.assertTrue(
+            PersonDocument.exists(id=ES_CHILD_ID(pos_1_pk).POSITION)
+        )
+
+        # Confirm documents can be updated in the ES index.
+        person.name_first = "John Debbas"
+        person.save()
+
+        court = CourtFactory()
+        pos_1.court = court
+        pos_1.save()
+
+        person_doc = PersonDocument.get(id=person.pk)
+        self.assertIn("Debbas", person_doc.name)
+
+        position_doc = PersonDocument.get(id=ES_CHILD_ID(pos_1_pk).POSITION)
+        self.assertEqual(court.pk, position_doc.court_exact)
+
+        # Delete person instance; it should be removed from the index along
+        # with its child documents.
+        person.delete()
+
+        # Person document should be removed.
+        self.assertFalse(PersonDocument.exists(id=person_pk))
+        # Position document is removed.
+        self.assertFalse(
+            PersonDocument.exists(id=ES_CHILD_ID(pos_1_pk).POSITION)
+        )
+
+    def test_remove_nested_objects_from_index(self) -> None:
+        """Confirm that child objects are removed from the index when they are
+        deleted independently of their parent object
+        """
+
+        person = PersonFactory.create(name_first="John Deer")
+        pos_1 = PositionFactory.create(
+            person=person,
+            date_granularity_start="%Y-%m-%d",
+            date_start=datetime.date(1993, 1, 20),
+            date_retirement=datetime.date(2001, 1, 20),
+            termination_reason="retire_mand",
+            position_type="c-jud",
+            how_selected="e_part",
+            nomination_process="fed_senate",
+        )
+        PoliticalAffiliationFactory.create(person=person)
+
+        person_pk = person.pk
+        pos_1_pk = pos_1.pk
+        # Person instance is indexed.
+        self.assertTrue(PersonDocument.exists(id=person_pk))
+        # Position instance is indexed.
+        self.assertTrue(
+            PersonDocument.exists(id=ES_CHILD_ID(pos_1_pk).POSITION)
+        )
+
+        # Delete pos_1 and education, keep the parent person instance.
+        pos_1.delete()
+
+        # Person instance still exists.
+        self.assertTrue(PersonDocument.exists(id=person_pk))
+
+        # Position object is removed
+        self.assertFalse(
+            PersonDocument.exists(id=ES_CHILD_ID(pos_1_pk).POSITION)
+        )
         person.delete()
 
     def test_update_related_documents(self):
@@ -1537,11 +1695,13 @@ class PeopleSearchTestElasticSearch(
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         self.assertEqual("39", pos_doc.fjc_id)
 
+        school_2 = SchoolFactory(name="American University")
+
         # Add education to the parent object
         ed_obj = EducationFactory(
             degree_level="ba",
             person=self.person_3,
-            school=self.school_2,
+            school=school_2,
         )
         ed_obj_school_name = ed_obj.school.name
 
@@ -1609,60 +1769,3 @@ class PeopleSearchTestElasticSearch(
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         self.assertEqual(None, person_3_doc.aba_rating)
         self.assertEqual(None, pos_doc.aba_rating)
-
-
-class IndexJudgesPositionsCommandTest(
-    CourtTestCase, PeopleTestCase, ESIndexTestCase, TestCase
-):
-    """test_cl_index_parent_and_child_docs_command tests for Elasticsearch"""
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.rebuild_index("people_db.Person")
-        super().setUpTestData()
-        cls.delete_index("people_db.Person")
-        cls.create_index("people_db.Person")
-
-    def test_cl_index_parent_and_child_docs_command(self):
-        """Confirm the command can properly index Judges and their positions
-        into the ES."""
-
-        s = PersonDocument.search().query("match_all")
-        self.assertEqual(s.count(), 0)
-
-        # Call cl_index_parent_and_child_docs command.
-        call_command(
-            "cl_index_parent_and_child_docs",
-            search_type=SEARCH_TYPES.PEOPLE,
-            queue="celery",
-            pk_offset=0,
-        )
-
-        s = PersonDocument.search()
-        s = s.query(Q("match", person_child="person"))
-        self.assertEqual(s.count(), 2, msg="Wrong number of judges returned.")
-
-        s = PersonDocument.search()
-        s = s.query(Q("match", person_child="position"))
-        self.assertEqual(
-            s.count(), 3, msg="Wrong number of positions returned."
-        )
-
-        # Positions are indexed.
-        position_pks = [
-            self.position_2.pk,
-            self.position_4.pk,
-            self.position_3.pk,
-        ]
-        for position_pk in position_pks:
-            self.assertTrue(
-                PositionDocument.exists(id=ES_CHILD_ID(position_pk).POSITION)
-            )
-
-        s = PersonDocument.search()
-        s = s.query("parent_id", type="position", id=self.person_2.pk)
-        self.assertEqual(s.count(), 2)
-
-        s = PersonDocument.search()
-        s = s.query("parent_id", type="position", id=self.person_3.pk)
-        self.assertEqual(s.count(), 1)
