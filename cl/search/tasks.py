@@ -672,7 +672,7 @@ def update_children_documents_by_query(
 @app.task(
     bind=True,
     autoretry_for=(ConnectionError, NotFoundError),
-    max_retries=5,
+    max_retries=8,
     interval_start=5 * 60,
     queue=settings.CELERY_ETL_TASK_QUEUE,
 )
