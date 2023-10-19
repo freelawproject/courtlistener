@@ -11,6 +11,7 @@ from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
 
 from cl.lib.elasticsearch_utils import build_es_main_query
+from cl.lib.redis_utils import make_redis_interface
 from cl.lib.test_helpers import IndexedSolrTestCase, RECAPSearchTestCase
 from cl.lib.view_utils import increment_view_count
 from cl.people_db.factories import (
@@ -26,6 +27,10 @@ from cl.search.factories import (
     DocketEntryWithParentsFactory,
     DocketFactory,
     RECAPDocumentFactory,
+)
+from cl.search.management.commands.cl_index_parent_and_child_docs import (
+    get_last_parent_document_id_processed,
+    log_last_parent_document_processed,
 )
 from cl.search.models import SEARCH_TYPES
 from cl.search.tasks import (
@@ -2092,6 +2097,10 @@ class IndexDocketRECAPDocumentsCommandTest(
         cls.delete_index("search.Docket")
         cls.create_index("search.Docket")
 
+    def setUp(self) -> None:
+        self.r = make_redis_interface("STATS")
+        self.r.flushdb()
+
     def test_cl_index_parent_and_child_docs_command(self):
         """Confirm the command can properly index Dockets and their
         RECAPDocuments into the ES."""
@@ -2138,3 +2147,23 @@ class IndexDocketRECAPDocumentsCommandTest(
         self.assertEqual(
             s.count(), 1, msg="Wrong number of RECAPDocuments returned."
         )
+
+    def test_log_and_get_last_docket_id(self):
+        """Can we log and get the last docket indexed to/from redis?"""
+
+        last_values = log_last_parent_document_processed(
+            SEARCH_TYPES.RECAP, 1001
+        )
+        self.assertEqual(last_values["last_docket_id"], 1001)
+
+        last_values = log_last_parent_document_processed(
+            SEARCH_TYPES.RECAP, 2001
+        )
+        self.assertEqual(last_values["last_docket_id"], 2001)
+
+        last_docket_id = get_last_parent_document_id_processed(
+            SEARCH_TYPES.RECAP
+        )
+        self.assertEqual(last_docket_id, 2001)
+
+        self.r.flushdb()

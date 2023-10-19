@@ -1,12 +1,56 @@
-from typing import Iterable
+from datetime import datetime
+from typing import Iterable, Mapping
 
 from django.conf import settings
 
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand
+from cl.lib.redis_utils import make_redis_interface
 from cl.people_db.models import Person
 from cl.search.models import SEARCH_TYPES, Docket
 from cl.search.tasks import index_parent_and_child_docs
+
+
+def log_last_parent_document_processed(
+    search_type: str, docket_pk: int
+) -> Mapping[str | bytes, int | str]:
+    """Log the last docket_id indexed.
+
+    :param search_type: The search type key to log.
+    :param docket_pk: The last docket_id processed.
+    :return: The data logged to redis.
+    """
+
+    r = make_redis_interface("STATS")
+    pipe = r.pipeline()
+    log_key = f"{search_type}_indexing:log"
+    pipe.hgetall(log_key)
+    log_info: Mapping[str | bytes, int | str] = {
+        "last_docket_id": docket_pk,
+        "date_time": datetime.now().isoformat(),
+    }
+    pipe.hset(log_key, mapping=log_info)
+    pipe.expire(log_key, 60 * 60 * 24 * 28)  # 4 weeks
+    pipe.execute()
+
+    return log_info
+
+
+def get_last_parent_document_id_processed(search_type: str) -> int:
+    """Get the last document ID indexed.
+
+    :param search_type: The search type key to get the last document ID.
+    :return: The last document ID indexed.
+    """
+
+    r = make_redis_interface("STATS")
+    pipe = r.pipeline()
+    log_key = f"{search_type}_indexing:log"
+    pipe.hgetall(log_key)
+    stored_values = pipe.execute()
+    last_docket_id = int(stored_values[0].get("last_docket_id", 0))
+
+    return last_docket_id
 
 
 class Command(VerboseCommand):
@@ -43,15 +87,30 @@ class Command(VerboseCommand):
             default="100",
             help="The number of items to index in a single celery task.",
         )
+        parser.add_argument(
+            "--auto-resume",
+            action="store_true",
+            help="Auto resume the command using the last docket_id logged in Redis. "
+            "If --pk-offset is provided, it'll be ignored.",
+        )
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
         self.options = options
         search_type = options["search_type"]
+        auto_resume = options.get("auto_resume", False)
+
+        pk_offset = options["pk_offset"]
+        if auto_resume:
+            pk_offset = get_last_parent_document_id_processed(search_type)
+            self.stdout.write(
+                f"Auto-resume enabled starting indexing from ID: {pk_offset}."
+            )
+
         match search_type:
             case SEARCH_TYPES.PEOPLE:
                 queryset = Person.objects.filter(
-                    pk__gte=options["pk_offset"], is_alias_of=None
+                    pk__gte=pk_offset, is_alias_of=None
                 ).order_by("pk")
                 q = [item.pk for item in queryset if item.is_judge]
                 count = len(q)
@@ -59,18 +118,21 @@ class Command(VerboseCommand):
             case SEARCH_TYPES.RECAP:
                 # Get Docket objects by pk_offset.
                 queryset = (
-                    Docket.objects.filter(pk__gte=options["pk_offset"])
+                    Docket.objects.filter(pk__gte=pk_offset)
                     .order_by("pk")
                     .values_list("pk", flat=True)
                 )
                 q = queryset.iterator()
                 count = queryset.count()
-                self.process_queryset(q, count, SEARCH_TYPES.RECAP)
+                self.process_queryset(q, count, SEARCH_TYPES.RECAP, pk_offset)
 
     def process_queryset(
-        self, iterable: Iterable, count: int, search_type: str
+        self,
+        iterable: Iterable,
+        count: int,
+        search_type: str,
+        pk_offset: int,
     ) -> None:
-        pk_offset = self.options["pk_offset"]
         queue = self.options["queue"]
         chunk_size = self.options["chunk_size"]
 
@@ -96,7 +158,9 @@ class Command(VerboseCommand):
                         item_id,
                     )
                 )
-
+            if not processed_count % 1000:
+                # Log every 1000 parent documents processed.
+                log_last_parent_document_processed(search_type, item_id)
         self.stdout.write(
             f"Successfully indexed {processed_count} items from pk {pk_offset}."
         )
