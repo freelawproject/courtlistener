@@ -235,7 +235,10 @@ docket_field_mapping = {
     "m2m": {},
     "reverse": {
         BankruptcyInformation: {
-            "bankruptcy_information": {"all": ["chapter", "trustee_str"]}
+            "bankruptcy_information": {
+                "chapter": ["chapter"],
+                "trustee_str": ["trustee_str"],
+            }
         },
     },
     "reverse-delete": {

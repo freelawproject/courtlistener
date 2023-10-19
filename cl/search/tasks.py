@@ -462,17 +462,22 @@ def update_document_in_es(
     interval_start=5,
     queue=settings.CELERY_ETL_TASK_QUEUE,
 )
+@throttle_task(
+    settings.ELASTICSEARCH_THROTTLING_TASK_RATE, key="throttling_id"
+)
 def es_document_update(
     self: Task,
     es_document_name: str,
     document_id: int,
     fields_values_to_update: dict[str, Any],
+    throttling_id: str,
 ) -> None:
     """Update a document in Elasticsearch.
     :param self: The celery task
     :param es_document_name: The Elasticsearch document type name.
     :param document_id: The document ID to index.
     :param fields_values_to_update: A dictionary with fields and values to update.
+    :param throttling_id: The throttling ID.
     :return: None
     """
 
