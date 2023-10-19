@@ -12,12 +12,12 @@ from cl.search.tasks import index_parent_and_child_docs
 
 
 def log_last_parent_document_processed(
-    search_type: str, docket_pk: int
+    search_type: str, document_pk: int
 ) -> Mapping[str | bytes, int | str]:
-    """Log the last docket_id indexed.
+    """Log the last document_id indexed.
 
     :param search_type: The search type key to log.
-    :param docket_pk: The last docket_id processed.
+    :param document_pk: The last document_id processed.
     :return: The data logged to redis.
     """
 
@@ -26,7 +26,7 @@ def log_last_parent_document_processed(
     log_key = f"{search_type}_indexing:log"
     pipe.hgetall(log_key)
     log_info: Mapping[str | bytes, int | str] = {
-        "last_docket_id": docket_pk,
+        "last_document_id": document_pk,
         "date_time": datetime.now().isoformat(),
     }
     pipe.hset(log_key, mapping=log_info)
@@ -48,9 +48,9 @@ def get_last_parent_document_id_processed(search_type: str) -> int:
     log_key = f"{search_type}_indexing:log"
     pipe.hgetall(log_key)
     stored_values = pipe.execute()
-    last_docket_id = int(stored_values[0].get("last_docket_id", 0))
+    last_document_id = int(stored_values[0].get("last_document_id", 0))
 
-    return last_docket_id
+    return last_document_id
 
 
 class Command(VerboseCommand):
@@ -90,7 +90,7 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--auto-resume",
             action="store_true",
-            help="Auto resume the command using the last docket_id logged in Redis. "
+            help="Auto resume the command using the last document_id logged in Redis. "
             "If --pk-offset is provided, it'll be ignored.",
         )
 
@@ -114,7 +114,7 @@ class Command(VerboseCommand):
                 ).order_by("pk")
                 q = [item.pk for item in queryset if item.is_judge]
                 count = len(q)
-                self.process_queryset(q, count, SEARCH_TYPES.PEOPLE)
+                self.process_queryset(q, count, SEARCH_TYPES.PEOPLE, pk_offset)
             case SEARCH_TYPES.RECAP:
                 # Get Docket objects by pk_offset.
                 queryset = (

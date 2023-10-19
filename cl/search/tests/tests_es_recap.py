@@ -2148,22 +2148,22 @@ class IndexDocketRECAPDocumentsCommandTest(
             s.count(), 1, msg="Wrong number of RECAPDocuments returned."
         )
 
-    def test_log_and_get_last_docket_id(self):
+    def test_log_and_get_last_document_id(self):
         """Can we log and get the last docket indexed to/from redis?"""
 
         last_values = log_last_parent_document_processed(
             SEARCH_TYPES.RECAP, 1001
         )
-        self.assertEqual(last_values["last_docket_id"], 1001)
+        self.assertEqual(last_values["last_document_id"], 1001)
 
         last_values = log_last_parent_document_processed(
             SEARCH_TYPES.RECAP, 2001
         )
-        self.assertEqual(last_values["last_docket_id"], 2001)
+        self.assertEqual(last_values["last_document_id"], 2001)
 
-        last_docket_id = get_last_parent_document_id_processed(
+        last_document_id = get_last_parent_document_id_processed(
             SEARCH_TYPES.RECAP
         )
-        self.assertEqual(last_docket_id, 2001)
+        self.assertEqual(last_document_id, 2001)
 
         self.r.flushdb()
