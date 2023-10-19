@@ -2,6 +2,7 @@ from typing import Any
 
 from celery.canvas import chain
 from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist
+from django.db import transaction
 from django.db.models.signals import m2m_changed, post_delete, post_save
 
 from cl.alerts.tasks import (
@@ -692,12 +693,14 @@ class ESSignalProcessor(object):
 
         mapping_fields = self.documents_model_mapping["save"][sender]
         if not created:
-            update_es_documents(
-                self.main_model,
-                self.es_document,
-                instance,
-                created,
-                mapping_fields,
+            transaction.on_commit(
+                lambda: update_es_documents(
+                    self.main_model,
+                    self.es_document,
+                    instance,
+                    created,
+                    mapping_fields,
+                )
             )
         if not mapping_fields:
             if avoid_es_audio_indexing(
@@ -707,15 +710,18 @@ class ESSignalProcessor(object):
                 # search alerts for Audio instances whose MP3 files have not
                 # yet been processed by process_audio_file.
                 return None
-            chain(
-                es_save_document.si(
-                    instance.pk,
-                    compose_app_label(instance),
-                    self.es_document.__name__,
-                ),
-                send_or_schedule_alerts.s(self.es_document._index._name),
-                process_percolator_response.s(),
-            ).apply_async()
+
+            transaction.on_commit(
+                lambda: chain(
+                    es_save_document.si(
+                        instance.pk,
+                        compose_app_label(instance),
+                        self.es_document.__name__,
+                    ),
+                    send_or_schedule_alerts.s(self.es_document._index._name),
+                    process_percolator_response.s(),
+                ).apply_async()
+            )
 
     @elasticsearch_enabled
     def handle_delete(self, sender, instance, **kwargs):
