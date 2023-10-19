@@ -588,7 +588,9 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
             query="type=o&stat_Precedential=on",
         )
         cls.mock_date = now().replace(day=15, hour=0)
-        with time_machine.travel(cls.mock_date, tick=False):
+        with time_machine.travel(
+            cls.mock_date, tick=False
+        ), cls.captureOnCommitCallbacks(execute=True):
             cls.dly_opinion = OpinionWithParentsFactory.create(
                 cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
                 cluster__date_filed=now() - timedelta(hours=5),
@@ -708,7 +710,9 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
 
     def test_send_search_alert_webhooks_rates(self):
         """Can we send search alert webhooks for different alert rates?"""
-        with time_machine.travel(self.mock_date, tick=False):
+        with time_machine.travel(
+            self.mock_date, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
             # Get ready the RT opinion for the test.
             rt_opinion = OpinionWithParentsFactory.create(
                 cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
@@ -1623,7 +1627,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         self.assertEqual(r.json()["count"], 0)
 
         mock_date = now().replace(day=1, hour=5)
-        with time_machine.travel(mock_date, tick=False):
+        with time_machine.travel(
+            mock_date, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
             # When the Audio object is created it should trigger an alert.
             rt_oral_argument = AudioWithParentsFactory.create(
                 case_name="Frequency Test OA",
@@ -1651,7 +1657,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             ),
         ):
             mock_date = now().replace(day=1, hour=5)
-            with time_machine.travel(mock_date, tick=False):
+            with time_machine.travel(
+                mock_date, tick=False
+            ), self.captureOnCommitCallbacks(execute=True):
                 # When the Audio object is created it should trigger an alert.
                 transcript_response = {
                     "response": {
@@ -1757,7 +1765,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ):
+        ), self.captureOnCommitCallbacks(execute=True):
             # When the Audio object is created it should trigger an alert.
             rt_oral_argument = AudioWithParentsFactory.create(
                 case_name="RT Test OA",
@@ -1785,7 +1793,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ):
+        ), self.captureOnCommitCallbacks(execute=True):
             # Audio object is updated.
             rt_oral_argument.sha1 = "12345"
             rt_oral_argument.save()
@@ -1919,13 +1927,13 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         """Confirm dly, wly and mly alerts are properly stored and sent
         according to their periodicity.
         """
-
-        dly_oral_argument = AudioWithParentsFactory.create(
-            case_name="DLY Test OA",
-            docket__court=self.court_1,
-            docket__date_argued=now().date(),
-            docket__docket_number="19-5739",
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            dly_oral_argument = AudioWithParentsFactory.create(
+                case_name="DLY Test OA",
+                docket__court=self.court_1,
+                docket__date_argued=now().date(),
+                docket__docket_number="19-5739",
+            )
         # When a new document is created, and it triggers a dly, wly or mly
         # It's stored to send it later.
         scheduled_alerts = ScheduledAlertHit.objects.filter(
@@ -1969,12 +1977,13 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         )
         # Create an additional document that should be included in wly and mly
         # Alerts.
-        wly_oral_argument = AudioWithParentsFactory.create(
-            case_name="WLY Test OA",
-            docket__court=self.court_1,
-            docket__date_argued=now().date(),
-            docket__docket_number="19-5741",
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            wly_oral_argument = AudioWithParentsFactory.create(
+                case_name="WLY Test OA",
+                docket__court=self.court_1,
+                docket__date_argued=now().date(),
+                docket__docket_number="19-5741",
+            )
         # Send wly alerts and check assertions.
         current_date = timezone.localtime(timezone.now()).replace(
             day=7, hour=0
@@ -1988,12 +1997,13 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             alert_count=2,
         )
         # Create an additional document that should be included mly Alert.
-        mly_oral_argument = AudioWithParentsFactory.create(
-            case_name="MLY Test OA",
-            docket__court=self.court_1,
-            docket__date_argued=now().date(),
-            docket__docket_number="19-5742",
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            mly_oral_argument = AudioWithParentsFactory.create(
+                case_name="MLY Test OA",
+                docket__court=self.court_1,
+                docket__date_argued=now().date(),
+                docket__docket_number="19-5742",
+            )
         # Send mly alerts on a day after 28th, it must fail.
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -2034,7 +2044,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ):
+        ), self.captureOnCommitCallbacks(execute=True):
             # When the Audio object is created it should trigger an alert.
             rt_oral_argument_1 = AudioWithParentsFactory.create(
                 case_name="DLY Test OA",
@@ -2187,7 +2197,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ):
+        ), self.captureOnCommitCallbacks(execute=True):
             rt_oral_argument = AudioWithParentsFactory.create(
                 case_name=f"RT Test OA",
                 docket__court=self.court_1,
@@ -2252,7 +2262,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 side_effect=lambda *args, **kwargs: MockResponse(
                     200, mock_raw=True
                 ),
-            ):
+            ), self.captureOnCommitCallbacks(execute=True):
                 audio = AudioWithParentsFactory.create(
                     case_name=f"Test OA",
                     docket__court=self.court_1,
@@ -2328,7 +2338,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ):
+        ), self.captureOnCommitCallbacks(execute=True):
             rt_oral_argument = AudioWithParentsFactory.create(
                 case_name=f"Lorem Ipsum",
                 docket__court=self.court_1,
@@ -2423,7 +2433,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ):
+        ), self.captureOnCommitCallbacks(execute=True):
             # When the Audio object is created it should trigger an alert.
             oral_argument = AudioWithParentsFactory.create(
                 case_name="Scheduled+Alert",
@@ -2463,7 +2473,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
 
         # Create a new Audio Document which will schedule a new DLY Alert hit.
         mock_date = now() + timedelta(days=DAYS_TO_DELETE - 5)
-        with time_machine.travel(mock_date, tick=False):
+        with time_machine.travel(
+            mock_date, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
             oral_argument_2 = AudioWithParentsFactory.create(
                 case_name="Scheduled+Alert",
                 docket__court=self.court_1,
@@ -2516,7 +2528,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ):
+        ), self.captureOnCommitCallbacks(execute=True):
             # Schedule the MONTHLY Alert hit.
             oral_argument_3 = AudioWithParentsFactory.create(
                 case_name="Monthly+Hit",
@@ -2576,23 +2588,24 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
 
         oa_created = []
         for i in range(4):
-            oral_argument = AudioWithParentsFactory.create(
-                case_name="USA vs Bank",
-                docket__court=self.court_1,
-                docket__date_argued=now().date(),
-                docket__docket_number="19-5735",
-            )
-            oa_created.append(oral_argument)
-
-            if i in (1, 2):
-                # Only schedule two hits for this one.
-                oral_argument_2 = AudioWithParentsFactory.create(
-                    case_name="Texas vs Corp",
+            with self.captureOnCommitCallbacks(execute=True):
+                oral_argument = AudioWithParentsFactory.create(
+                    case_name="USA vs Bank",
                     docket__court=self.court_1,
                     docket__date_argued=now().date(),
-                    docket__docket_number="20-5030",
+                    docket__docket_number="19-5735",
                 )
-                oa_created.append(oral_argument_2)
+                oa_created.append(oral_argument)
+
+                if i in (1, 2):
+                    # Only schedule two hits for this one.
+                    oral_argument_2 = AudioWithParentsFactory.create(
+                        case_name="Texas vs Corp",
+                        docket__court=self.court_1,
+                        docket__date_argued=now().date(),
+                        docket__docket_number="20-5030",
+                    )
+                    oa_created.append(oral_argument_2)
 
         # Call dly command
         call_command("cl_send_scheduled_alerts", rate=Alert.DAILY)
