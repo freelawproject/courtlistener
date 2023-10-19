@@ -393,11 +393,13 @@ def update_m2m_field_in_es_document(
         instance
     )
     throttling_id = get_task_throttling_id(es_document, instance.pk)
-    es_document_update.delay(
-        es_document.__name__,
-        instance.pk,
-        {affected_field: get_m2m_value},
-        throttling_id,
+    transaction.on_commit(
+        lambda: es_document_update.delay(
+            es_document.__name__,
+            instance.pk,
+            {affected_field: get_m2m_value},
+            throttling_id,
+        )
     )
 
 
