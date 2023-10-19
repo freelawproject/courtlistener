@@ -27,6 +27,8 @@ from juriscraper.lib.string_utils import harmonize, titlecase
 
 from cl.corpus_importer.import_columbia.columbia_utils import (
     ARGUED_TAGS,
+    CERT_DENIED_TAGS,
+    CERT_GRANTED_TAGS,
     DECIDED_TAGS,
     FILED_TAGS,
     REARGUE_DENIED_TAGS,
@@ -632,6 +634,14 @@ def read_xml_file(xml_filepath: str) -> dict:
                 date_reargued = date_info[1]
             elif date_info[0] in REARGUE_DENIED_TAGS:
                 date_reargument_denied = date_info[1]
+            elif date_info[0] in CERT_GRANTED_TAGS:
+                # This date is stored in Docket, and we are not updating docket data,
+                # ignore date
+                pass
+            elif date_info[0] in CERT_DENIED_TAGS:
+                # This date is stored in Docket, and we are not updating docket data,
+                # ignore date
+                pass
             else:
                 unknown_date = date_info[1]
                 if date_info[0] not in UNKNOWN_TAGS:
@@ -1195,6 +1205,7 @@ def process_cluster(
         new_xml_filepath = fix_filepath(xml_path, xml_dir)  # type: ignore
 
     try:
+        logger.info(msg=f"Merging {cluster_id} at {new_xml_filepath}")
         columbia_data = read_xml_file(new_xml_filepath)
     except FileNotFoundError:
         logger.warning(
@@ -1206,10 +1217,14 @@ def process_cluster(
             f"Cannot decode file: {new_xml_filepath} to merge with cluster: {cluster_id}"
         )
         return
+    except DateException:
+        logger.warning(
+            msg=f"Date exception found in {new_xml_filepath} related to cluster id: {cluster_id}"
+        )
+        return
 
     try:
         with transaction.atomic():
-            logger.info(f"Processing cluster id: {cluster_id}")
             map_and_merge_opinions(
                 cluster_id, cl_cleaned_opinions, columbia_data["opinions"]
             )
@@ -1272,10 +1287,6 @@ def process_cluster(
     except ClusterSourceException:
         logger.warning(
             msg=f"Cluster source exception for cluster id: {cluster_id}"
-        )
-    except DateException:
-        logger.warning(
-            msg=f"Date exception found in {new_xml_filepath} related to cluster id: {cluster_id}"
         )
 
 

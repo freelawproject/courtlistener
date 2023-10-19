@@ -21,6 +21,10 @@ FILED_TAGS = [
     "opinions filed",
     "filed on",
     "decision filed",
+    "date delivered",
+    "affirmed and opinion filed",
+    "dismissed and opinion filed",
+    "decided and entered",
 ]
 DECIDED_TAGS = ["decided", "date decided", "decided on", "decided date"]
 ARGUED_TAGS = [
@@ -35,6 +39,7 @@ ARGUED_TAGS = [
     "opinions delivered",
     "opinion delivered",
     "assigned on briefs",
+    "assigned on brief",
     "opinion issued",
     "delivered",
     "rendered",
@@ -44,6 +49,8 @@ ARGUED_TAGS = [
     "rendered on",
     "oral argument",
     "submitted on record and briefs",
+    "argued on",
+    "on reargument",
 ]
 REARGUE_DENIED_TAGS = [
     "reargument denied",
@@ -77,6 +84,7 @@ REARGUE_DENIED_TAGS = [
     "opinion modified and rehearing denied",
     "as amended on denial of rehearing",
     "reh denied",
+    "opinion dissenting from denial of rehearing",
 ]
 REARGUE_TAGS = ["reargued", "reheard", "upon rehearing", "on rehearing"]
 CERT_GRANTED_TAGS = [
@@ -94,7 +102,7 @@ UNKNOWN_TAGS = [
     "affirmed",
     "reversed and remanded",
     "rehearing overruled",
-    "review granted",
+    "motion for rehearing overruled" "review granted",
     "decision released",
     "transfer denied",
     "released for publication",
@@ -110,12 +118,14 @@ UNKNOWN_TAGS = [
     "opinion released",
     "permission to appeal denied by supreme court",
     "rehearing pending",
+    "on motion for rehearing",
     "application for transfer denied",
     "effective date",
     "modified",
     "opinion modified",
     "transfer granted",
     "discretionary review denied",
+    "discretionary review refused",
     "application for leave to file second petition for rehearing denied",
     "final",
     "date of judgment entry on appeal",
@@ -174,6 +184,10 @@ UNKNOWN_TAGS = [
     "decision and journal entry dated",
     "memorandum filed",
     "as modified",
+    "application for permission to appeal denied by supreme court",
+    "rehearing and clarification denied",
+    "reversed and remanded for reconsideration",
+    "opinion granting rehearing in part",
 ]
 
 
