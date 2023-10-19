@@ -8,9 +8,9 @@
 
 {% block title %}
     {% if search_summary_str %}
-        Search Results for {{ search_summary_str }} &mdash; {% if not error %}{{ results.paginator.count|intcomma }} Result{{ results.paginator.count|pluralize }} &mdash; {% endif %}CourtListener.com
+      Search Results for {{ search_summary_str }} &mdash; {% if not error %}{% if results_details %}{{ results_details.1|intcomma }}{% else %}{{ results.paginator.count|intcomma }}{% endif %} Result{{results.paginator.count|pluralize }} &mdash; {% endif %}CourtListener.com
     {% else %}
-        Free Legal Search Engine and Alert System &mdash; CourtListener.com
+      Free Legal Search Engine and Alert System &mdash; CourtListener.com
     {% endif %}
 {% endblock %}
 {% block og_title %}
@@ -249,7 +249,7 @@
                             {{ results_details.1|intcomma }} Parenthetical{{ results_details.1|pluralize }} Summarizing {{ results.paginator.count|intcomma }} Opinion{{ results.paginator.count|pluralize }}
                         {% elif type == SEARCH_TYPES.RECAP or type == SEARCH_TYPES.DOCKETS %}
                           {% flag "r-es-active" %}
-                            {% with matches=results_details.3 count=results.paginator.count %}
+                            {% with matches=results_details.3 count=results_details.1 %}
                               {{ count|intcomma }} Case{{ count|pluralize }}
                               {% if matches %}
                                 <span class="gray">&mdash;</span>
@@ -271,7 +271,12 @@
                             {% endflag %}
                               Oral Argument{{ results.paginator.count|pluralize }}
                         {% elif type == SEARCH_TYPES.PEOPLE %}
-                            {{ results.paginator.count|intcomma }} Judge{{ results.paginator.count|pluralize }}
+                            {% flag "p-es-active" %}
+                              {{ results_details.1|intcomma }}
+                            {% else %}
+                              {{ results.paginator.count|intcomma }}
+                            {% endflag %}
+                              Judge{{ results.paginator.count|pluralize }}
                         {% endif %}
                         {% if type == SEARCH_TYPES.OPINION or type == SEARCH_TYPES.RECAP or type == SEARCH_TYPES.DOCKETS %}
                             <a href="/feed/search/?{{ get_string }}">
