@@ -11,6 +11,15 @@ from cl.search.models import SEARCH_TYPES, Docket
 from cl.search.tasks import index_parent_and_child_docs
 
 
+def compose_redis_key(search_type: str) -> str:
+    """Compose a Redis key based on the search type for indexing log.
+
+    :param search_type: The type of search.
+    :return: A Redis key as a string.
+    """
+    return f"es-{search_type}_indexing:log"
+
+
 def log_last_parent_document_processed(
     search_type: str, document_pk: int
 ) -> Mapping[str | bytes, int | str]:
@@ -23,7 +32,7 @@ def log_last_parent_document_processed(
 
     r = make_redis_interface("STATS")
     pipe = r.pipeline()
-    log_key = f"{search_type}_indexing:log"
+    log_key = compose_redis_key(search_type)
     pipe.hgetall(log_key)
     log_info: Mapping[str | bytes, int | str] = {
         "last_document_id": document_pk,
@@ -45,7 +54,7 @@ def get_last_parent_document_id_processed(search_type: str) -> int:
 
     r = make_redis_interface("STATS")
     pipe = r.pipeline()
-    log_key = f"{search_type}_indexing:log"
+    log_key = compose_redis_key(search_type)
     pipe.hgetall(log_key)
     stored_values = pipe.execute()
     last_document_id = int(stored_values[0].get("last_document_id", 0))

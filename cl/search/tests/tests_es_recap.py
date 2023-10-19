@@ -29,6 +29,7 @@ from cl.search.factories import (
     RECAPDocumentFactory,
 )
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
+    compose_redis_key,
     get_last_parent_document_id_processed,
     log_last_parent_document_processed,
 )
@@ -2099,7 +2100,9 @@ class IndexDocketRECAPDocumentsCommandTest(
 
     def setUp(self) -> None:
         self.r = make_redis_interface("STATS")
-        self.r.flushdb()
+        keys = self.r.keys(compose_redis_key(SEARCH_TYPES.RECAP))
+        if keys:
+            self.r.delete(*keys)
 
     def test_cl_index_parent_and_child_docs_command(self):
         """Confirm the command can properly index Dockets and their
@@ -2166,4 +2169,6 @@ class IndexDocketRECAPDocumentsCommandTest(
         )
         self.assertEqual(last_document_id, 2001)
 
-        self.r.flushdb()
+        keys = self.r.keys(compose_redis_key(SEARCH_TYPES.RECAP))
+        if keys:
+            self.r.delete(*keys)
