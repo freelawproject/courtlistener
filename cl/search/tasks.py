@@ -593,7 +593,7 @@ def update_child_documents_by_query(
 # New task.
 @app.task(
     bind=True,
-    autoretry_for=(ConnectionError, NotFoundError),
+    autoretry_for=(ConnectionError,),
     max_retries=3,
     interval_start=5,
     queue=settings.CELERY_ETL_TASK_QUEUE,
@@ -677,8 +677,8 @@ def update_children_documents_by_query(
 @app.task(
     bind=True,
     autoretry_for=(ConnectionError, NotFoundError),
-    max_retries=3,
-    interval_start=5,
+    max_retries=8,
+    interval_start=5 * 60,
     queue=settings.CELERY_ETL_TASK_QUEUE,
 )
 @throttle_task(settings.ELASTICSEARCH_THROTTLING_TASK_RATE, key="docket_id")
@@ -691,7 +691,6 @@ def index_docket_parties_in_es(
     :param docket_id: The docket ID to update in ES.
     :return: None
     """
-
     docket = Docket.objects.get(id=docket_id)
     parties_prepared = DocketDocument().prepare_parties(docket)
     fields_to_update = {

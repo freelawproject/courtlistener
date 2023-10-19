@@ -567,7 +567,9 @@ async def process_recap_docket(pk):
         d, data["docket_entries"]
     )
     await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
-    await sync_to_async(index_docket_parties_in_es.delay)(d.pk)
+    if data["parties"]:
+        # Index or re-index parties only if the docket has parties.
+        await sync_to_async(index_docket_parties_in_es.delay)(d.pk)
     await process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
@@ -1052,7 +1054,9 @@ async def process_recap_appellate_docket(pk):
         d, data["docket_entries"]
     )
     await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
-    await sync_to_async(index_docket_parties_in_es.delay)(d.pk)
+    if data["parties"]:
+        # Index or re-index parties only if the docket has parties.
+        await sync_to_async(index_docket_parties_in_es.delay)(d.pk)
     await process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
