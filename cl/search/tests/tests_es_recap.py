@@ -2099,7 +2099,7 @@ class IndexDocketRECAPDocumentsCommandTest(
         cls.create_index("search.Docket")
 
     def setUp(self) -> None:
-        self.r = make_redis_interface("STATS")
+        self.r = make_redis_interface("CACHE")
         keys = self.r.keys(compose_redis_key(SEARCH_TYPES.RECAP))
         if keys:
             self.r.delete(*keys)

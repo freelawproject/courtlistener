@@ -17,7 +17,7 @@ def compose_redis_key(search_type: str) -> str:
     :param search_type: The type of search.
     :return: A Redis key as a string.
     """
-    return f"es-{search_type}_indexing:log"
+    return f"es_{search_type}_indexing:log"
 
 
 def log_last_parent_document_processed(
@@ -30,7 +30,7 @@ def log_last_parent_document_processed(
     :return: The data logged to redis.
     """
 
-    r = make_redis_interface("STATS")
+    r = make_redis_interface("CACHE")
     pipe = r.pipeline()
     log_key = compose_redis_key(search_type)
     pipe.hgetall(log_key)
@@ -52,12 +52,10 @@ def get_last_parent_document_id_processed(search_type: str) -> int:
     :return: The last document ID indexed.
     """
 
-    r = make_redis_interface("STATS")
-    pipe = r.pipeline()
+    r = make_redis_interface("CACHE")
     log_key = compose_redis_key(search_type)
-    pipe.hgetall(log_key)
-    stored_values = pipe.execute()
-    last_document_id = int(stored_values[0].get("last_document_id", 0))
+    stored_values = r.hgetall(log_key)
+    last_document_id = int(stored_values.get("last_document_id", 0))
 
     return last_document_id
 
