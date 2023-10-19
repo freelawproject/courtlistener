@@ -236,12 +236,14 @@ def update_es_documents(
                 throttling_id = get_task_throttling_id(
                     PersonDocument, instance.pk
                 )
-                update_children_documents_by_query.delay(
-                    es_document.__name__,
-                    instance.pk,
-                    throttling_id,
-                    fields_to_update,
-                    fields_map,
+                transaction.on_commit(
+                    lambda: update_children_documents_by_query.delay(
+                        es_document.__name__,
+                        instance.pk,
+                        throttling_id,
+                        fields_to_update,
+                        fields_map,
+                    )
                 )
             case ABARating() | PoliticalAffiliation() | School() if es_document is PositionDocument:  # type: ignore
                 """
@@ -262,12 +264,14 @@ def update_es_documents(
                     throttling_id = get_task_throttling_id(
                         PersonDocument, person.pk
                     )
-                    update_children_documents_by_query.delay(
-                        es_document.__name__,
-                        person.pk,
-                        throttling_id,
-                        fields_to_update,
-                        fields_map,
+                    transaction.on_commit(
+                        lambda: update_children_documents_by_query.delay(
+                            es_document.__name__,
+                            person.pk,
+                            throttling_id,
+                            fields_to_update,
+                            fields_map,
+                        )
                     )
             case Docket() if es_document is ESRECAPDocument:  # type: ignore
                 main_doc = exists_or_create_doc(
@@ -279,12 +283,14 @@ def update_es_documents(
                 throttling_id = get_task_throttling_id(
                     DocketDocument, instance.pk
                 )
-                update_children_documents_by_query.delay(
-                    es_document.__name__,
-                    instance.pk,
-                    throttling_id,
-                    fields_to_update,
-                    fields_map,
+                transaction.on_commit(
+                    lambda: update_children_documents_by_query.delay(
+                        es_document.__name__,
+                        instance.pk,
+                        throttling_id,
+                        fields_to_update,
+                        fields_map,
+                    )
                 )
             case Person() if es_document is ESRECAPDocument:  # type: ignore
                 related_dockets = Docket.objects.filter(**{query: instance})
@@ -298,12 +304,14 @@ def update_es_documents(
                     throttling_id = get_task_throttling_id(
                         DocketDocument, rel_docket.pk
                     )
-                    update_children_documents_by_query.delay(
-                        es_document.__name__,
-                        rel_docket.pk,
-                        throttling_id,
-                        fields_to_update,
-                        fields_map,
+                    transaction.on_commit(
+                        lambda: update_children_documents_by_query.delay(
+                            es_document.__name__,
+                            rel_docket.pk,
+                            throttling_id,
+                            fields_to_update,
+                            fields_map,
+                        )
                     )
             case _:
                 main_objects = main_model.objects.filter(**{query: instance})
@@ -315,17 +323,20 @@ def update_es_documents(
                         throttling_id = get_task_throttling_id(
                             es_document, main_object.pk
                         )
-                        es_document_update.delay(
-                            es_document.__name__,
-                            main_object.pk,
-                            document_fields_to_update(
-                                es_document,
-                                main_object,
-                                fields_to_update,
-                                instance,
-                                fields_map,
-                            ),
-                            throttling_id,
+
+                        transaction.on_commit(
+                            lambda: es_document_update.delay(
+                                es_document.__name__,
+                                main_object.pk,
+                                document_fields_to_update(
+                                    es_document,
+                                    main_object,
+                                    fields_to_update,
+                                    instance,
+                                    fields_map,
+                                ),
+                                throttling_id,
+                            )
                         )
 
 
@@ -693,14 +704,12 @@ class ESSignalProcessor(object):
 
         mapping_fields = self.documents_model_mapping["save"][sender]
         if not created:
-            transaction.on_commit(
-                lambda: update_es_documents(
-                    self.main_model,
-                    self.es_document,
-                    instance,
-                    created,
-                    mapping_fields,
-                )
+            update_es_documents(
+                self.main_model,
+                self.es_document,
+                instance,
+                created,
+                mapping_fields,
             )
         if not mapping_fields:
             if avoid_es_audio_indexing(
