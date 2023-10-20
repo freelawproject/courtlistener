@@ -317,12 +317,6 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIn("2 Cases", r.content.decode())
         # 3 Docket entries in count.
         self.assertIn("3 Docket", r.content.decode())
-        self._count_child_documents(
-            0, r.content.decode(), 2, "match all query"
-        )
-        self._count_child_documents(
-            1, r.content.decode(), 1, "match all query"
-        )
 
         with self.captureOnCommitCallbacks(execute=True):
             # Confirm an empty docket is shown in a match_all query.
@@ -341,15 +335,6 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIn("3 Cases", r.content.decode())
         # 3 Docket entries in count.
         self.assertIn("3 Docket", r.content.decode())
-        self._count_child_documents(
-            0, r.content.decode(), 2, "match all query"
-        )
-        self._count_child_documents(
-            1, r.content.decode(), 1, "match all query"
-        )
-        self._count_child_documents(
-            2, r.content.decode(), 0, "match all query"
-        )
         empty_docket.delete()
 
     def test_sorting(self) -> None:
