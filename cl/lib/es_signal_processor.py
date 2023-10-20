@@ -46,15 +46,7 @@ def get_task_throttling_id(
     :param parent_instance_id: The ID of the parent instance.
     :return: A string representing the throttling ID.
     """
-
-    if es_document is PersonDocument:
-        throttling_id = f"person_{parent_instance_id}"
-    elif es_document is DocketDocument:
-        throttling_id = f"docket_{parent_instance_id}"
-    else:
-        throttling_id = f"{parent_instance_id}"
-
-    return throttling_id
+    return f"{es_document.__name__.lower()}_{parent_instance_id}"
 
 
 def compose_app_label(instance: ESModelType) -> str:
@@ -319,6 +311,9 @@ def update_es_documents(
                     if not main_doc:
                         continue
                     if fields_to_update:
+                        throttling_id = get_task_throttling_id(
+                            es_document, main_object.pk
+                        )
                         es_document_update.delay(
                             es_document.__name__,
                             main_object.pk,
@@ -329,6 +324,7 @@ def update_es_documents(
                                 instance,
                                 fields_map,
                             ),
+                            throttling_id,
                         )
 
 
@@ -381,8 +377,12 @@ def update_m2m_field_in_es_document(
     get_m2m_value = getattr(es_document(), f"prepare_{affected_field}")(
         instance
     )
+    throttling_id = get_task_throttling_id(es_document, instance.pk)
     es_document_update.delay(
-        es_document.__name__, instance.pk, {affected_field: get_m2m_value}
+        es_document.__name__,
+        instance.pk,
+        {affected_field: get_m2m_value},
+        throttling_id,
     )
 
 
@@ -423,10 +423,12 @@ def update_reverse_related_documents(
                 field_value = getattr(instance, field)
             fields_to_update[field] = field_value
 
+        throttling_id = get_task_throttling_id(es_document, main_object.pk)
         es_document_update.delay(
             es_document.__name__,
             main_object.pk,
             fields_to_update,
+            throttling_id,
         )
 
     match instance:
@@ -491,10 +493,9 @@ def prepare_and_update_fields(
         field_value = prepare_method(main_object)
         fields_to_update[field] = field_value
 
+    throttling_id = get_task_throttling_id(es_document, main_object.pk)
     es_document_update.delay(
-        es_document.__name__,
-        main_object.pk,
-        fields_to_update,
+        es_document.__name__, main_object.pk, fields_to_update, throttling_id
     )
 
 
@@ -745,10 +746,24 @@ class ESSignalProcessor(object):
         """
         mapping_fields = self.documents_model_mapping["reverse"][sender]
         for query_string, fields_map in mapping_fields.items():
-            try:
-                affected_fields = fields_map[instance.type]
-            except (KeyError, AttributeError):
-                affected_fields = fields_map["all"]
+            match instance:
+                case BankruptcyInformation() if self.es_document is DocketDocument:  # type: ignore
+                    # BankruptcyInformation is a one-to-one relation that can
+                    # be re-saved many times without changes. It's better to
+                    # check if the indexed fields have changed before
+                    # triggering an update.
+                    changed_fields = updated_fields(instance, self.es_document)
+                    affected_fields = get_fields_to_update(
+                        changed_fields, fields_map
+                    )
+                    if not affected_fields:
+                        return None
+                case _:
+                    try:
+                        affected_fields = fields_map[instance.type]
+                    except (KeyError, AttributeError):
+                        affected_fields = fields_map["all"]
+
             instance_field = query_string.split("__")[-1]
             update_reverse_related_documents(
                 self.main_model,

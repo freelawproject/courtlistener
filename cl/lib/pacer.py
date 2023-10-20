@@ -278,7 +278,9 @@ def process_docket_data(
         UPLOAD_TYPE.IA_XML_FILE,
     ):
         add_parties_and_attorneys(d, data["parties"])
-        index_docket_parties_in_es.delay(d.pk)
+        if data["parties"]:
+            # Index or re-index parties only if the docket has parties.
+            index_docket_parties_in_es.delay(d.pk)
     return d.pk
 
 

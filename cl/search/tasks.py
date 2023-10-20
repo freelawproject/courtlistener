@@ -462,17 +462,22 @@ def update_document_in_es(
     interval_start=5,
     queue=settings.CELERY_ETL_TASK_QUEUE,
 )
+@throttle_task(
+    settings.ELASTICSEARCH_THROTTLING_TASK_RATE, key="throttling_id"
+)
 def es_document_update(
     self: Task,
     es_document_name: str,
     document_id: int,
     fields_values_to_update: dict[str, Any],
+    throttling_id: str,
 ) -> None:
     """Update a document in Elasticsearch.
     :param self: The celery task
     :param es_document_name: The Elasticsearch document type name.
     :param document_id: The document ID to index.
     :param fields_values_to_update: A dictionary with fields and values to update.
+    :param throttling_id: The throttling ID.
     :return: None
     """
 
@@ -588,7 +593,7 @@ def update_child_documents_by_query(
 # New task.
 @app.task(
     bind=True,
-    autoretry_for=(ConnectionError, NotFoundError),
+    autoretry_for=(ConnectionError,),
     max_retries=3,
     interval_start=5,
     queue=settings.CELERY_ETL_TASK_QUEUE,
@@ -672,8 +677,8 @@ def update_children_documents_by_query(
 @app.task(
     bind=True,
     autoretry_for=(ConnectionError, NotFoundError),
-    max_retries=3,
-    interval_start=5,
+    max_retries=8,
+    interval_start=5 * 60,
     queue=settings.CELERY_ETL_TASK_QUEUE,
 )
 @throttle_task(settings.ELASTICSEARCH_THROTTLING_TASK_RATE, key="docket_id")
@@ -686,7 +691,6 @@ def index_docket_parties_in_es(
     :param docket_id: The docket ID to update in ES.
     :return: None
     """
-
     docket = Docket.objects.get(id=docket_id)
     parties_prepared = DocketDocument().prepare_parties(docket)
     fields_to_update = {
