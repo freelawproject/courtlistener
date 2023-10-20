@@ -441,11 +441,13 @@ def update_reverse_related_documents(
             fields_to_update[field] = field_value
 
         throttling_id = get_task_throttling_id(es_document, main_object.pk)
-        es_document_update.delay(
-            es_document.__name__,
-            main_object.pk,
-            fields_to_update,
-            throttling_id,
+        transaction.on_commit(
+            lambda: es_document_update.delay(
+                es_document.__name__,
+                main_object.pk,
+                fields_to_update,
+                throttling_id,
+            )
         )
 
     match instance:
@@ -462,13 +464,14 @@ def update_reverse_related_documents(
                 throttling_id = get_task_throttling_id(
                     PersonDocument, person.pk
                 )
-                update_children_documents_by_query.delay(
-                    PositionDocument.__name__,
-                    person.pk,
-                    throttling_id,
-                    affected_fields,
+                transaction.on_commit(
+                    lambda: update_children_documents_by_query.delay(
+                        PositionDocument.__name__,
+                        person.pk,
+                        throttling_id,
+                        affected_fields,
+                    )
                 )
-
         case BankruptcyInformation() if es_document is DocketDocument:  # type: ignore
             # bulk update RECAP documents when a reverse related record is created/updated.
             main_doc = exists_or_create_doc(
@@ -480,11 +483,13 @@ def update_reverse_related_documents(
             throttling_id = get_task_throttling_id(
                 DocketDocument, instance.docket.pk
             )
-            update_children_documents_by_query.delay(
-                ESRECAPDocument.__name__,
-                instance.docket.pk,
-                throttling_id,
-                affected_fields,
+            transaction.on_commit(
+                lambda: update_children_documents_by_query.delay(
+                    ESRECAPDocument.__name__,
+                    instance.docket.pk,
+                    throttling_id,
+                    affected_fields,
+                )
             )
 
 
