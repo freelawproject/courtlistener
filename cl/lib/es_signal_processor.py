@@ -1,7 +1,9 @@
+from functools import partial
 from typing import Any
 
 from celery.canvas import chain
 from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist
+from django.db import transaction
 from django.db.models.signals import m2m_changed, post_delete, post_save
 
 from cl.alerts.tasks import (
@@ -188,8 +190,13 @@ def exists_or_create_doc(
         return True
 
     if not avoid_creation:
-        es_save_document.delay(
-            instance.pk, compose_app_label(instance), es_document.__name__
+        transaction.on_commit(
+            partial(
+                es_save_document.delay,
+                instance.pk,
+                compose_app_label(instance),
+                es_document.__name__,
+            )
         )
         return False
     return False
@@ -235,12 +242,15 @@ def update_es_documents(
                 throttling_id = get_task_throttling_id(
                     PersonDocument, instance.pk
                 )
-                update_children_documents_by_query.delay(
-                    es_document.__name__,
-                    instance.pk,
-                    throttling_id,
-                    fields_to_update,
-                    fields_map,
+                transaction.on_commit(
+                    partial(
+                        update_children_documents_by_query.delay,
+                        es_document.__name__,
+                        instance.pk,
+                        throttling_id,
+                        fields_to_update,
+                        fields_map,
+                    )
                 )
             case ABARating() | PoliticalAffiliation() | School() if es_document is PositionDocument:  # type: ignore
                 """
@@ -261,12 +271,15 @@ def update_es_documents(
                     throttling_id = get_task_throttling_id(
                         PersonDocument, person.pk
                     )
-                    update_children_documents_by_query.delay(
-                        es_document.__name__,
-                        person.pk,
-                        throttling_id,
-                        fields_to_update,
-                        fields_map,
+                    transaction.on_commit(
+                        partial(
+                            update_children_documents_by_query.delay,
+                            es_document.__name__,
+                            person.pk,
+                            throttling_id,
+                            fields_to_update,
+                            fields_map,
+                        )
                     )
             case Docket() if es_document is ESRECAPDocument:  # type: ignore
                 main_doc = exists_or_create_doc(
@@ -278,12 +291,15 @@ def update_es_documents(
                 throttling_id = get_task_throttling_id(
                     DocketDocument, instance.pk
                 )
-                update_children_documents_by_query.delay(
-                    es_document.__name__,
-                    instance.pk,
-                    throttling_id,
-                    fields_to_update,
-                    fields_map,
+                transaction.on_commit(
+                    partial(
+                        update_children_documents_by_query.delay,
+                        es_document.__name__,
+                        instance.pk,
+                        throttling_id,
+                        fields_to_update,
+                        fields_map,
+                    )
                 )
             case Person() if es_document is ESRECAPDocument:  # type: ignore
                 related_dockets = Docket.objects.filter(**{query: instance})
@@ -297,12 +313,15 @@ def update_es_documents(
                     throttling_id = get_task_throttling_id(
                         DocketDocument, rel_docket.pk
                     )
-                    update_children_documents_by_query.delay(
-                        es_document.__name__,
-                        rel_docket.pk,
-                        throttling_id,
-                        fields_to_update,
-                        fields_map,
+                    transaction.on_commit(
+                        partial(
+                            update_children_documents_by_query.delay,
+                            es_document.__name__,
+                            rel_docket.pk,
+                            throttling_id,
+                            fields_to_update,
+                            fields_map,
+                        )
                     )
             case _:
                 main_objects = main_model.objects.filter(**{query: instance})
@@ -314,17 +333,21 @@ def update_es_documents(
                         throttling_id = get_task_throttling_id(
                             es_document, main_object.pk
                         )
-                        es_document_update.delay(
-                            es_document.__name__,
-                            main_object.pk,
-                            document_fields_to_update(
-                                es_document,
-                                main_object,
-                                fields_to_update,
-                                instance,
-                                fields_map,
-                            ),
-                            throttling_id,
+
+                        transaction.on_commit(
+                            partial(
+                                es_document_update.delay,
+                                es_document.__name__,
+                                main_object.pk,
+                                document_fields_to_update(
+                                    es_document,
+                                    main_object,
+                                    fields_to_update,
+                                    instance,
+                                    fields_map,
+                                ),
+                                throttling_id,
+                            )
                         )
 
 
@@ -378,11 +401,14 @@ def update_m2m_field_in_es_document(
         instance
     )
     throttling_id = get_task_throttling_id(es_document, instance.pk)
-    es_document_update.delay(
-        es_document.__name__,
-        instance.pk,
-        {affected_field: get_m2m_value},
-        throttling_id,
+    transaction.on_commit(
+        partial(
+            es_document_update.delay,
+            es_document.__name__,
+            instance.pk,
+            {affected_field: get_m2m_value},
+            throttling_id,
+        )
     )
 
 
@@ -424,11 +450,14 @@ def update_reverse_related_documents(
             fields_to_update[field] = field_value
 
         throttling_id = get_task_throttling_id(es_document, main_object.pk)
-        es_document_update.delay(
-            es_document.__name__,
-            main_object.pk,
-            fields_to_update,
-            throttling_id,
+        transaction.on_commit(
+            partial(
+                es_document_update.delay,
+                es_document.__name__,
+                main_object.pk,
+                fields_to_update,
+                throttling_id,
+            )
         )
 
     match instance:
@@ -445,13 +474,15 @@ def update_reverse_related_documents(
                 throttling_id = get_task_throttling_id(
                     PersonDocument, person.pk
                 )
-                update_children_documents_by_query.delay(
-                    PositionDocument.__name__,
-                    person.pk,
-                    throttling_id,
-                    affected_fields,
+                transaction.on_commit(
+                    partial(
+                        update_children_documents_by_query.delay,
+                        PositionDocument.__name__,
+                        person.pk,
+                        throttling_id,
+                        affected_fields,
+                    )
                 )
-
         case BankruptcyInformation() if es_document is DocketDocument:  # type: ignore
             # bulk update RECAP documents when a reverse related record is created/updated.
             main_doc = exists_or_create_doc(
@@ -463,11 +494,14 @@ def update_reverse_related_documents(
             throttling_id = get_task_throttling_id(
                 DocketDocument, instance.docket.pk
             )
-            update_children_documents_by_query.delay(
-                ESRECAPDocument.__name__,
-                instance.docket.pk,
-                throttling_id,
-                affected_fields,
+            transaction.on_commit(
+                partial(
+                    update_children_documents_by_query.delay,
+                    ESRECAPDocument.__name__,
+                    instance.docket.pk,
+                    throttling_id,
+                    affected_fields,
+                )
             )
 
 
@@ -494,8 +528,14 @@ def prepare_and_update_fields(
         fields_to_update[field] = field_value
 
     throttling_id = get_task_throttling_id(es_document, main_object.pk)
-    es_document_update.delay(
-        es_document.__name__, main_object.pk, fields_to_update, throttling_id
+    transaction.on_commit(
+        partial(
+            es_document_update.delay,
+            es_document.__name__,
+            main_object.pk,
+            fields_to_update,
+            throttling_id,
+        )
     )
 
 
@@ -532,11 +572,14 @@ def delete_reverse_related_documents(
                 throttling_id = get_task_throttling_id(
                     PersonDocument, instance.pk
                 )
-                update_children_documents_by_query.delay(
-                    PositionDocument.__name__,
-                    instance.pk,
-                    throttling_id,
-                    affected_fields,
+                transaction.on_commit(
+                    partial(
+                        update_children_documents_by_query.delay,
+                        PositionDocument.__name__,
+                        instance.pk,
+                        throttling_id,
+                        affected_fields,
+                    )
                 )
         case Docket() if es_document is DocketDocument:  # type: ignore
             # Update the Docket document after the reverse instanced is deleted
@@ -551,11 +594,14 @@ def delete_reverse_related_documents(
                 throttling_id = get_task_throttling_id(
                     DocketDocument, instance.pk
                 )
-                update_children_documents_by_query.delay(
-                    ESRECAPDocument.__name__,
-                    instance.pk,
-                    throttling_id,
-                    affected_fields,
+                transaction.on_commit(
+                    partial(
+                        update_children_documents_by_query.delay,
+                        ESRECAPDocument.__name__,
+                        instance.pk,
+                        throttling_id,
+                        affected_fields,
+                    )
                 )
         case _:
             main_objects = main_model.objects.filter(
@@ -707,15 +753,18 @@ class ESSignalProcessor(object):
                 # search alerts for Audio instances whose MP3 files have not
                 # yet been processed by process_audio_file.
                 return None
-            chain(
-                es_save_document.si(
-                    instance.pk,
-                    compose_app_label(instance),
-                    self.es_document.__name__,
-                ),
-                send_or_schedule_alerts.s(self.es_document._index._name),
-                process_percolator_response.s(),
-            ).apply_async()
+
+            transaction.on_commit(
+                lambda: chain(
+                    es_save_document.si(
+                        instance.pk,
+                        compose_app_label(instance),
+                        self.es_document.__name__,
+                    ),
+                    send_or_schedule_alerts.s(self.es_document._index._name),
+                    process_percolator_response.s(),
+                ).apply_async()
+            )
 
     @elasticsearch_enabled
     def handle_delete(self, sender, instance, **kwargs):

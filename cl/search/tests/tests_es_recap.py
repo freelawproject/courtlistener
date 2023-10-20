@@ -2,7 +2,7 @@ import datetime
 import unittest
 from unittest import mock
 
-from asgiref.sync import sync_to_async
+from asgiref.sync import async_to_sync, sync_to_async
 from django.core.management import call_command
 from django.test import RequestFactory, override_settings
 from django.urls import reverse
@@ -24,6 +24,7 @@ from cl.people_db.factories import (
 from cl.search.documents import ES_CHILD_ID, DocketDocument, ESRECAPDocument
 from cl.search.factories import (
     BankruptcyInformationFactory,
+    CourtFactory,
     DocketEntryWithParentsFactory,
     DocketFactory,
     RECAPDocumentFactory,
@@ -33,12 +34,12 @@ from cl.search.management.commands.cl_index_parent_and_child_docs import (
     get_last_parent_document_id_processed,
     log_last_parent_document_processed,
 )
-from cl.search.models import SEARCH_TYPES
+from cl.search.models import SEARCH_TYPES, RECAPDocument
 from cl.search.tasks import (
     add_docket_to_solr_by_rds,
     index_docket_parties_in_es,
 )
-from cl.tests.cases import ESIndexTestCase, TestCase
+from cl.tests.cases import ESIndexTestCase, TestCase, TransactionTestCase
 
 
 class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
@@ -51,6 +52,12 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
         super().setUpTestData()
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            queue="celery",
+            pk_offset=0,
+        )
         # Index parties in ES.
         index_docket_parties_in_es.delay(cls.de.docket.pk)
 
@@ -151,438 +158,6 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "Expected: %s\n"
             "     Got: %s\n\n" % (field_name, expected_count, got),
         )
-
-    def test_minute_entry_indexing(self) -> None:
-        """Confirm a minute entry can be properly indexed."""
-
-        de_1 = DocketEntryWithParentsFactory(
-            docket=DocketFactory(
-                court=self.court,
-            ),
-            date_filed=datetime.date(2015, 8, 19),
-            description="MOTION for Leave to File Amicus Curiae Lorem",
-            entry_number=None,
-        )
-        rd_1 = RECAPDocumentFactory(
-            docket_entry=de_1,
-            description="Leave to File",
-            document_number="",
-            is_available=True,
-            page_count=5,
-        )
-
-        self.assertTrue(DocketDocument.exists(id=ES_CHILD_ID(rd_1.pk).RECAP))
-        de_1.docket.delete()
-
-    def test_unnumbered_entry_indexing(self) -> None:
-        """Confirm an unnumbered entry which uses the pacer_doc_id as number
-        can be properly indexed."""
-
-        de_1 = DocketEntryWithParentsFactory(
-            docket=DocketFactory(
-                court=self.court,
-            ),
-            date_filed=datetime.date(2015, 8, 19),
-            description="MOTION for Leave to File Amicus Curiae Lorem",
-            entry_number=3010113237867,
-        )
-        rd_1 = RECAPDocumentFactory(
-            docket_entry=de_1,
-            description="Leave to File",
-            document_number="3010113237867",
-            is_available=True,
-            page_count=5,
-        )
-
-        self.assertTrue(DocketDocument.exists(id=ES_CHILD_ID(rd_1.pk).RECAP))
-        de_1.docket.delete()
-
-    def test_index_recap_parent_and_child_objects(self) -> None:
-        """Confirm Dockets and RECAPDocuments are properly indexed in ES"""
-
-        s = DocketDocument.search()
-        s = s.query(Q("match", docket_child="docket"))
-        self.assertEqual(s.count(), 2)
-
-        # RECAPDocuments are indexed.
-        rd_pks = [
-            self.rd.pk,
-            self.rd_att.pk,
-            self.rd_2.pk,
-        ]
-        for rd_pk in rd_pks:
-            self.assertTrue(DocketDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP))
-
-    def test_update_and_remove_parent_child_objects_in_es(self) -> None:
-        """Confirm child documents can be updated and removed properly."""
-
-        de_1 = DocketEntryWithParentsFactory(
-            docket=DocketFactory(
-                court=self.court,
-                case_name="Lorem Ipsum",
-                case_name_full="Jackson & Sons Holdings vs. Bank",
-                date_filed=datetime.date(2015, 8, 16),
-                date_argued=datetime.date(2013, 5, 20),
-                docket_number="1:21-bk-1234",
-                assigned_to=None,
-                referred_to=None,
-                nature_of_suit="440",
-            ),
-            date_filed=datetime.date(2015, 8, 19),
-            description="MOTION for Leave to File Amicus Curiae Lorem",
-        )
-        rd_1 = RECAPDocumentFactory(
-            docket_entry=de_1,
-            description="Leave to File",
-            document_number="1",
-            is_available=True,
-            page_count=5,
-        )
-        firm = AttorneyOrganizationFactory(
-            lookup_key="280kingofprussiaroadradnorkesslertopazmeltzercheck19087",
-            name="Law Firm LLP",
-        )
-        attorney = AttorneyFactory(
-            name="Emily Green",
-            organizations=[firm],
-            docket=de_1.docket,
-        )
-        party_type = PartyTypeFactory.create(
-            party=PartyFactory(
-                name="Mary Williams Corp.",
-                docket=de_1.docket,
-                attorneys=[attorney],
-            ),
-            docket=de_1.docket,
-        )
-
-        docket_pk = de_1.docket.pk
-        rd_pk = rd_1.pk
-        self.assertTrue(DocketDocument.exists(id=docket_pk))
-
-        self.assertTrue(DocketDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP))
-
-        # Confirm parties fields are indexed into DocketDocument.
-        # Index docket parties using index_docket_parties_in_es task.
-        index_docket_parties_in_es.delay(de_1.docket.pk)
-
-        docket_doc = DocketDocument.get(id=docket_pk)
-        self.assertIn(party_type.party.pk, docket_doc.party_id)
-        self.assertIn(party_type.party.name, docket_doc.party)
-        self.assertIn(attorney.pk, docket_doc.attorney_id)
-        self.assertIn(attorney.name, docket_doc.attorney)
-        self.assertIn(firm.pk, docket_doc.firm_id)
-        self.assertIn(firm.name, docket_doc.firm)
-        self.assertEqual(None, docket_doc.assignedTo)
-        self.assertEqual(None, docket_doc.referredTo)
-        self.assertEqual(None, docket_doc.assigned_to_id)
-        self.assertEqual(None, docket_doc.referred_to_id)
-
-        # Confirm assigned_to and referred_to are properly updated in Docket.
-        judge = PersonFactory.create(name_first="Thalassa", name_last="Miller")
-        judge_2 = PersonFactory.create(
-            name_first="Persephone", name_last="Sinclair"
-        )
-
-        # Update docket field:
-        de_1.docket.case_name = "USA vs Bank"
-        de_1.docket.assigned_to = judge
-        de_1.docket.referred_to = judge_2
-        de_1.docket.save()
-
-        docket_doc = DocketDocument.get(id=docket_pk)
-        self.assertIn("USA vs Bank", docket_doc.caseName)
-        self.assertIn(judge.name_full, docket_doc.assignedTo)
-        self.assertIn(judge_2.name_full, docket_doc.referredTo)
-        self.assertEqual(judge.pk, docket_doc.assigned_to_id)
-        self.assertEqual(judge_2.pk, docket_doc.referred_to_id)
-
-        # Update judges name.
-        judge.name_first = "William"
-        judge.name_last = "Anderson"
-        judge.save()
-
-        judge_2.name_first = "Emily"
-        judge_2.name_last = "Clark"
-        judge_2.save()
-
-        docket_doc = DocketDocument.get(id=docket_pk)
-        self.assertIn(judge.name_full, docket_doc.assignedTo)
-        self.assertIn(judge_2.name_full, docket_doc.referredTo)
-
-        # Update docket entry field:
-        de_1.description = "Notification to File Ipsum"
-        de_1.entry_number = 99
-        de_1.save()
-
-        rd_doc = DocketDocument.get(id=ES_CHILD_ID(rd_pk).RECAP)
-        self.assertEqual("Notification to File Ipsum", rd_doc.description)
-        self.assertEqual(99, rd_doc.entry_number)
-
-        # Add a Bankruptcy document.
-
-        bank = BankruptcyInformationFactory(docket=de_1.docket)
-        docket_doc = DocketDocument.get(id=docket_pk)
-        self.assertEqual(str(bank.chapter), docket_doc.chapter)
-        self.assertEqual(str(bank.trustee_str), docket_doc.trustee_str)
-
-        # Update Bankruptcy document.
-        bank.chapter = "98"
-        bank.trustee_str = "Victoria, Sherline"
-        bank.save()
-
-        docket_doc = DocketDocument.get(id=docket_pk)
-        self.assertEqual("98", docket_doc.chapter)
-        self.assertEqual("Victoria, Sherline", docket_doc.trustee_str)
-
-        # Remove Bankruptcy document and confirm it gets removed from Docket.
-        bank.delete()
-        docket_doc = DocketDocument.get(id=docket_pk)
-        self.assertEqual(None, docket_doc.chapter)
-        self.assertEqual(None, docket_doc.trustee_str)
-
-        # Add another RD:
-        rd_2 = RECAPDocumentFactory(
-            docket_entry=de_1,
-            description="Notification to File",
-            document_number="2",
-            is_available=True,
-            page_count=2,
-        )
-
-        rd_2_pk = rd_2.pk
-        self.assertTrue(DocketDocument.exists(id=ES_CHILD_ID(rd_2_pk).RECAP))
-        rd_2.delete()
-        self.assertFalse(DocketDocument.exists(id=ES_CHILD_ID(rd_2_pk).RECAP))
-
-        self.assertTrue(DocketDocument.exists(id=docket_pk))
-        self.assertTrue(DocketDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP))
-
-        de_1.docket.delete()
-        self.assertFalse(DocketDocument.exists(id=docket_pk))
-        self.assertFalse(DocketDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP))
-
-    def test_update_docket_fields_in_recap_documents(self) -> None:
-        """Confirm all the docket fields in RECAPDocuments that belong to a
-        case are updated in bulk when the docket changes.
-        """
-
-        judge = PersonFactory.create(name_first="Thalassa", name_last="Miller")
-        judge_2 = PersonFactory.create(
-            name_first="Persephone", name_last="Sinclair"
-        )
-        de = DocketEntryWithParentsFactory(
-            docket=DocketFactory(
-                court=self.court,
-                case_name="USA vs Bank Lorem",
-                case_name_full="Jackson & Sons Holdings vs. Bank",
-                date_filed=datetime.date(2015, 8, 16),
-                date_argued=datetime.date(2013, 5, 20),
-                docket_number="1:21-bk-1234",
-                assigned_to=judge,
-                nature_of_suit="440",
-            ),
-            date_filed=datetime.date(2015, 8, 19),
-            description="MOTION for Leave to File Amicus Curiae Lorem",
-        )
-
-        # Create two RECAPDocuments within the same case.
-        rd_created_pks = []
-        for i in range(2):
-            rd = RECAPDocumentFactory(
-                docket_entry=de,
-                description=f"Leave to File {i}",
-                document_number=f"{i}",
-                is_available=True,
-                page_count=5,
-            )
-            rd_created_pks.append(rd.pk)
-
-        params = {
-            "type": SEARCH_TYPES.RECAP,
-            "q": "USA vs Bank Lorem",
-        }
-
-        # Query the parent docket and confirm is indexed with the right content
-        response = self._test_main_es_query(params, 1, "q")
-        for i in range(2):
-            self._compare_response_child_value(
-                response, 0, i, judge.name_full, "assignedTo"
-            )
-            self._compare_response_child_value(response, 0, i, None, "chapter")
-            self._compare_response_child_value(
-                response, 0, i, None, "trustee_str"
-            )
-
-        # Add BankruptcyInformation and confirm is indexed with the right content
-        bank_data = BankruptcyInformationFactory(docket=de.docket)
-
-        response = self._test_main_es_query(params, 1, "q")
-        for i in range(2):
-            self._compare_response_child_value(
-                response, 0, i, bank_data.chapter, "chapter"
-            )
-            self._compare_response_child_value(
-                response, 0, i, bank_data.trustee_str, "trustee_str"
-            )
-
-        # Update some docket fields.
-        de.docket.case_name = "America vs Doe Enterprise"
-        de.docket.docket_number = "21-45632"
-        de.docket.case_name_full = "Teachers Union v. Board of Education"
-        de.docket.nature_of_suit = "500"
-        de.docket.cause = "Civil Rights Act"
-        de.docket.jury_demand = "1300"
-        de.docket.jurisdiction_type = "U.S. Government Lorem"
-        de.docket.date_filed = datetime.date(2020, 4, 19)
-        de.docket.date_argued = datetime.date(2020, 4, 18)
-        de.docket.date_terminated = datetime.date(2022, 6, 10)
-        de.docket.assigned_to = judge_2
-        de.docket.referred_to = judge
-        de.docket.save()
-
-        # Query the parent docket by its updated name.
-        params = {
-            "type": SEARCH_TYPES.RECAP,
-            "q": "America vs Doe Enterprise",
-        }
-        response = self._test_main_es_query(params, 1, "q")
-
-        # Confirm all docket fields in the RDs were updated.
-        for i in range(2):
-            self._compare_response_child_value(
-                response, 0, i, "America vs Doe Enterprise", "caseName"
-            )
-            self._compare_response_child_value(
-                response, 0, i, "21-45632", "docketNumber"
-            )
-
-            self._compare_response_child_value(
-                response,
-                0,
-                i,
-                "Teachers Union v. Board of Education",
-                "case_name_full",
-            )
-
-            self._compare_response_child_value(
-                response, 0, i, "500", "suitNature"
-            )
-
-            self._compare_response_child_value(
-                response, 0, i, "Civil Rights Act", "cause"
-            )
-            self._compare_response_child_value(
-                response, 0, i, "1300", "juryDemand"
-            )
-            self._compare_response_child_value(
-                response, 0, i, "U.S. Government Lorem", "jurisdictionType"
-            )
-            self._compare_response_child_value(
-                response,
-                0,
-                i,
-                de.docket.date_argued.strftime("%Y-%m-%d"),
-                "dateArgued",
-            )
-            self._compare_response_child_value(
-                response,
-                0,
-                i,
-                de.docket.date_filed.strftime("%Y-%m-%d"),
-                "dateFiled",
-            )
-            self._compare_response_child_value(
-                response,
-                0,
-                i,
-                de.docket.date_terminated.strftime("%Y-%m-%d"),
-                "dateTerminated",
-            )
-
-            self._compare_response_child_value(
-                response, 0, i, de.docket.referred_to.name_full, "referredTo"
-            )
-            self._compare_response_child_value(
-                response, 0, i, de.docket.assigned_to.name_full, "assignedTo"
-            )
-            self._compare_response_child_value(
-                response, 0, i, de.docket.referred_to.pk, "referred_to_id"
-            )
-            self._compare_response_child_value(
-                response, 0, i, de.docket.assigned_to.pk, "assigned_to_id"
-            )
-        # Update judge name.
-        judge.name_first = "William"
-        judge.name_last = "Anderson"
-        judge.save()
-
-        judge_2.name_first = "Emily"
-        judge_2.name_last = "Clark"
-        judge_2.save()
-
-        response = self._test_main_es_query(params, 1, "q")
-        # Confirm all docket fields in the RDs were updated.
-        for i in range(2):
-            self._compare_response_child_value(
-                response, 0, i, judge.name_full, "referredTo"
-            )
-            self._compare_response_child_value(
-                response, 0, i, judge_2.name_full, "assignedTo"
-            )
-
-        bank_data.chapter = "15"
-        bank_data.trustee_str = "Jessica Taylor"
-        bank_data.save()
-
-        response = self._test_main_es_query(params, 1, "q")
-        # Confirm all docket fields in the RDs were updated.
-        for i in range(2):
-            self._compare_response_child_value(response, 0, i, "15", "chapter")
-            self._compare_response_child_value(
-                response, 0, i, "Jessica Taylor", "trustee_str"
-            )
-
-        # Remove BankruptcyInformation and confirm it's removed from RDs.
-        bank_data.delete()
-        response = self._test_main_es_query(params, 1, "q")
-        # Confirm all docket fields in the RDs were updated.
-        for i in range(2):
-            self._compare_response_child_value(response, 0, i, None, "chapter")
-            self._compare_response_child_value(
-                response, 0, i, None, "trustee_str"
-            )
-
-        # Also confirm the assigned_to_str and referred_to_str are being
-        # tracked for changes in case assigned_to and referred_to are None.
-        de.docket.assigned_to = None
-        de.docket.referred_to = None
-        de.docket.assigned_to_str = "Sarah Williams"
-        de.docket.referred_to_str = "Laura Davis"
-        de.docket.save()
-
-        response = self._test_main_es_query(params, 1, "q")
-        for i in range(2):
-            self._compare_response_child_value(
-                response, 0, i, "Laura Davis", "referredTo"
-            )
-            self._compare_response_child_value(
-                response, 0, i, "Sarah Williams", "assignedTo"
-            )
-            self._compare_response_child_value(
-                response, 0, i, None, "referred_to_id"
-            )
-            self._compare_response_child_value(
-                response, 0, i, None, "assigned_to_id"
-            )
-
-        de.docket.delete()
-        # After the docket is removed all the RECAPDocuments are also removed
-        # from ES.
-        for rd_pk in rd_created_pks:
-            self.assertFalse(
-                DocketDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP)
-            )
 
     def test_has_child_text_queries(self) -> None:
         """Test has_child text queries."""
@@ -727,7 +302,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # The View Additional Results button is shown.
         self.assertIn("View Additional Results for", r.content.decode())
 
-    async def test_match_all_query_and_docket_entries_count(self) -> None:
+    def test_match_all_query_and_docket_entries_count(self) -> None:
         """Confirm a RECAP search with no params return a match all query.
         The case and docket entries count is available.
         """
@@ -735,41 +310,32 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # Perform a RECAP match all search.
         params = {"type": SEARCH_TYPES.RECAP}
         # Frontend
-        r = await self._test_article_count(params, 2, "match all query")
+        r = async_to_sync(self._test_article_count)(
+            params, 2, "match all query"
+        )
         # Two cases are returned.
         self.assertIn("2 Cases", r.content.decode())
         # 3 Docket entries in count.
         self.assertIn("3 Docket", r.content.decode())
-        self._count_child_documents(
-            0, r.content.decode(), 2, "match all query"
-        )
-        self._count_child_documents(
-            1, r.content.decode(), 1, "match all query"
-        )
 
-        # Confirm an empty docket is shown in a match_all query.
-        empty_docket = await sync_to_async(DocketFactory)(
-            court=self.court,
-            case_name="America vs Ipsum",
-            date_filed=datetime.date(2015, 8, 16),
-            date_argued=datetime.date(2013, 5, 20),
-            docket_number="1:21-bk-1235",
+        with self.captureOnCommitCallbacks(execute=True):
+            # Confirm an empty docket is shown in a match_all query.
+            empty_docket = DocketFactory(
+                court=self.court,
+                case_name="America vs Ipsum",
+                date_filed=datetime.date(2015, 8, 16),
+                date_argued=datetime.date(2013, 5, 20),
+                docket_number="1:21-bk-1235",
+            )
+
+        r = async_to_sync(self._test_article_count)(
+            params, 3, "match all query"
         )
-        r = await self._test_article_count(params, 3, "match all query")
         # 3 cases are returned.
         self.assertIn("3 Cases", r.content.decode())
         # 3 Docket entries in count.
         self.assertIn("3 Docket", r.content.decode())
-        self._count_child_documents(
-            0, r.content.decode(), 2, "match all query"
-        )
-        self._count_child_documents(
-            1, r.content.decode(), 1, "match all query"
-        )
-        self._count_child_documents(
-            2, r.content.decode(), 0, "match all query"
-        )
-        await empty_docket.adelete()
+        empty_docket.delete()
 
     def test_sorting(self) -> None:
         """Can we do sorting on various fields?"""
@@ -995,38 +561,39 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         )
 
     @override_settings(VIEW_MORE_CHILD_HITS=6)
-    async def test_docket_child_documents(self) -> None:
+    def test_docket_child_documents(self) -> None:
         """Confirm results contain the right number of child documents"""
         # Get results for a broad filter
-        rd_1 = await sync_to_async(RECAPDocumentFactory)(
-            docket_entry=self.de,
-            document_number="2",
-            is_available=True,
-        )
-        rd_2 = await sync_to_async(RECAPDocumentFactory)(
-            docket_entry=self.de,
-            document_number="3",
-            is_available=True,
-        )
-        rd_3 = await sync_to_async(RECAPDocumentFactory)(
-            docket_entry=self.de,
-            document_number="4",
-            is_available=True,
-        )
-        rd_4 = await sync_to_async(RECAPDocumentFactory)(
-            docket_entry=self.de,
-            document_number="5",
-            is_available=False,
-        )
-        rd_5 = await sync_to_async(RECAPDocumentFactory)(
-            docket_entry=self.de,
-            document_number="6",
-            is_available=False,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            rd_1 = RECAPDocumentFactory(
+                docket_entry=self.de,
+                document_number="2",
+                is_available=True,
+            )
+            rd_2 = RECAPDocumentFactory(
+                docket_entry=self.de,
+                document_number="3",
+                is_available=True,
+            )
+            rd_3 = RECAPDocumentFactory(
+                docket_entry=self.de,
+                document_number="4",
+                is_available=True,
+            )
+            rd_4 = RECAPDocumentFactory(
+                docket_entry=self.de,
+                document_number="5",
+                is_available=False,
+            )
+            rd_5 = RECAPDocumentFactory(
+                docket_entry=self.de,
+                document_number="6",
+                is_available=False,
+            )
 
         params = {"type": SEARCH_TYPES.RECAP, "docket_number": "1:21-bk-1234"}
         # Frontend
-        r = await self._test_article_count(params, 1, "docket_number")
+        r = async_to_sync(self._test_article_count)(params, 1, "docket_number")
         # Count child documents under docket.
         self._count_child_documents(0, r.content.decode(), 5, "docket_number")
 
@@ -1039,7 +606,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "q": f"docket_id:{self.de.docket.id}",
         }
         # Frontend
-        r = await self._test_article_count(params, 1, "docket_number")
+        r = async_to_sync(self._test_article_count)(params, 1, "docket_number")
         # Count child documents under docket.
         self._count_child_documents(0, r.content.decode(), 6, "docket_number")
         self.assertNotIn("View Additional Results for", r.content.decode())
@@ -1051,7 +618,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "available_only": True,
         }
         # Frontend
-        r = await self._test_article_count(
+        r = async_to_sync(self._test_article_count)(
             params, 1, "docket_number + available_only"
         )
         # Count child documents under docket.
@@ -1063,11 +630,11 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "View Additional Results for this Case", r.content.decode()
         )
 
-        await rd_1.adelete()
-        await rd_2.adelete()
-        await rd_3.adelete()
-        await rd_4.adelete()
-        await rd_5.adelete()
+        rd_1.delete()
+        rd_2.delete()
+        rd_3.delete()
+        rd_4.delete()
+        rd_5.delete()
 
     async def test_advanced_queries(self) -> None:
         """Confirm advance queries works properly"""
@@ -1341,7 +908,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             r.content.decode().count("<mark>attachment</mark>"), 1
         )
 
-    async def test_results_ordering(self) -> None:
+    def test_results_ordering(self) -> None:
         """Confirm results ordering works properly"""
         # Order by random order.
         params = {
@@ -1350,7 +917,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "order_by": "random_123 desc",
         }
         # Frontend
-        await self._test_article_count(params, 2, "order random desc")
+        async_to_sync(self._test_article_count)(params, 2, "order random desc")
 
         # Order by score desc (relevance).
         params = {
@@ -1359,26 +926,27 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "order_by": "score desc",
         }
         # Frontend
-        await self._test_article_count(params, 2, "order score desc")
+        async_to_sync(self._test_article_count)(params, 2, "order score desc")
 
-        de_4 = await sync_to_async(DocketEntryWithParentsFactory)(
-            docket=await sync_to_async(DocketFactory)(
-                docket_number="12-1236",
-                court=self.court_2,
-                case_name="SUBPOENAS SERVED FOUR",
-            ),
-            entry_number=4,
-            date_filed=None,
-        )
-        rd_4 = await sync_to_async(RECAPDocumentFactory)(
-            docket_entry=de_4,
-            document_number="4",
-        )
-        empty_docket = await sync_to_async(DocketFactory)(
-            court=self.court,
-            case_name="SUBPOENAS SERVED FIVE",
-            docket_number="12-1237",
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            de_4 = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    docket_number="12-1236",
+                    court=self.court_2,
+                    case_name="SUBPOENAS SERVED FOUR",
+                ),
+                entry_number=4,
+                date_filed=None,
+            )
+            rd_4 = RECAPDocumentFactory(
+                docket_entry=de_4,
+                document_number="4",
+            )
+            empty_docket = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED FIVE",
+                docket_number="12-1237",
+            )
 
         # Order by entry_date_filed desc
         params = {
@@ -1387,7 +955,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "order_by": "entry_date_filed desc",
         }
         # Frontend
-        r = await self._test_article_count(
+        r = async_to_sync(self._test_article_count)(
             params, 4, "order entry_date_filed desc"
         )
         self.assertTrue(
@@ -1405,7 +973,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "order_by": "entry_date_filed asc",
         }
         # Frontend
-        r = await self._test_article_count(
+        r = async_to_sync(self._test_article_count)(
             params, 4, "order entry_date_filed asc"
         )
         self.assertTrue(
@@ -1416,8 +984,8 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             msg="'12-1235' should come BEFORE '1:21-bk-1234' when order_by entry_date_filed asc.",
         )
 
-        await rd_4.docket_entry.docket.adelete()
-        await empty_docket.adelete()
+        rd_4.docket_entry.docket.delete()
+        empty_docket.delete()
 
         # Order by dateFiled desc
         params = {
@@ -1427,7 +995,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         }
 
         # Frontend
-        r = await self._test_article_count(params, 2, "order dateFiled desc")
+        r = async_to_sync(self._test_article_count)(
+            params, 2, "order dateFiled desc"
+        )
         self.assertTrue(
             r.content.decode().index("12-1235")
             < r.content.decode().index("1:21-bk-1234"),
@@ -1441,12 +1011,15 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "order_by": "dateFiled asc",
         }
         # Frontend
-        r = await self._test_article_count(params, 2, "order dateFiled asc")
+        r = async_to_sync(self._test_article_count)(
+            params, 2, "order dateFiled asc"
+        )
         self.assertTrue(
             r.content.decode().index("1:21-bk-1234")
             < r.content.decode().index("12-1235"),
             msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by dateFiled asc.",
         )
+        de_4.delete()
 
     @mock.patch("cl.lib.es_signal_processor.chain")
     def test_avoid_updating_docket_in_es_on_view_count_increment(
@@ -1928,33 +1501,39 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
     def setUpTestData(cls) -> None:
         cls.rebuild_index("search.Docket")
         super().setUpTestData()
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            queue="celery",
+            pk_offset=0,
+        )
 
     def test_do_recap_search_feed_have_content(self) -> None:
         """Can we make a RECAP Search Feed?"""
-
-        # Docket entry without date_filed it should be excluded from feed.
-        de_1 = DocketEntryWithParentsFactory(
-            docket=DocketFactory(
-                court=self.court,
-                case_name="Lorem Ipsum",
-                case_name_full="Jackson & Sons Holdings vs. Bank",
+        with self.captureOnCommitCallbacks(execute=True):
+            # Docket entry without date_filed it should be excluded from feed.
+            de_1 = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=self.court,
+                    case_name="Lorem Ipsum",
+                    case_name_full="Jackson & Sons Holdings vs. Bank",
+                    date_filed=None,
+                    date_argued=datetime.date(2013, 5, 20),
+                    docket_number="1:21-bk-1234",
+                    assigned_to=self.judge,
+                    referred_to=self.judge_2,
+                    nature_of_suit="440",
+                ),
                 date_filed=None,
-                date_argued=datetime.date(2013, 5, 20),
-                docket_number="1:21-bk-1234",
-                assigned_to=self.judge,
-                referred_to=self.judge_2,
-                nature_of_suit="440",
-            ),
-            date_filed=None,
-            description="MOTION for Leave to File Amicus Curiae Lorem",
-        )
-        RECAPDocumentFactory(
-            docket_entry=de_1,
-            description="Leave to File",
-            document_number="1",
-            is_available=True,
-            page_count=5,
-        )
+                description="MOTION for Leave to File Amicus Curiae Lorem",
+            )
+            RECAPDocumentFactory(
+                docket_entry=de_1,
+                description="Leave to File",
+                document_number="1",
+                is_available=True,
+                page_count=5,
+            )
 
         # Text query case.
         params = {
@@ -2172,3 +1751,537 @@ class IndexDocketRECAPDocumentsCommandTest(
         keys = self.r.keys(compose_redis_key(SEARCH_TYPES.RECAP))
         if keys:
             self.r.delete(*keys)
+
+
+class RECAPIndexingTest(ESIndexTestCase, TransactionTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.rebuild_index("people_db.Person")
+        cls.rebuild_index("search.Docket")
+
+    def setUp(self):
+        self.court = CourtFactory(id="canb", jurisdiction="FB")
+
+    def _compare_response_child_value(
+        self,
+        response,
+        parent_index,
+        child_index,
+        expected_value,
+        field_name,
+    ):
+        self.assertEqual(
+            expected_value,
+            response["hits"]["hits"][parent_index]["inner_hits"][
+                "filter_query_inner_recap_document"
+            ]["hits"]["hits"][child_index]["_source"][field_name],
+            msg=f"Did not get the right {field_name} value.",
+        )
+
+    def _test_main_es_query(self, cd, parent_expected, field_name):
+        search_query = DocketDocument.search()
+        (
+            s,
+            total_query_results,
+            top_hits_limit,
+            total_child_results,
+        ) = build_es_main_query(search_query, cd)
+        self.assertEqual(
+            total_query_results,
+            parent_expected,
+            msg="Did not get the right number of parent documents %s\n"
+            "Expected: %s\n"
+            "     Got: %s\n\n"
+            % (field_name, parent_expected, total_query_results),
+        )
+
+        return s.execute().to_dict()
+
+    def test_minute_entry_indexing(self) -> None:
+        """Confirm a minute entry can be properly indexed."""
+
+        de_1 = DocketEntryWithParentsFactory(
+            docket=DocketFactory(
+                court=self.court,
+            ),
+            date_filed=datetime.date(2015, 8, 19),
+            description="MOTION for Leave to File Amicus Curiae Lorem",
+            entry_number=None,
+        )
+        rd_1 = RECAPDocumentFactory(
+            docket_entry=de_1,
+            description="Leave to File",
+            document_number="",
+            is_available=True,
+            page_count=5,
+        )
+
+        self.assertTrue(DocketDocument.exists(id=ES_CHILD_ID(rd_1.pk).RECAP))
+        de_1.docket.delete()
+
+    def test_unnumbered_entry_indexing(self) -> None:
+        """Confirm an unnumbered entry which uses the pacer_doc_id as number
+        can be properly indexed."""
+
+        de_1 = DocketEntryWithParentsFactory(
+            docket=DocketFactory(
+                court=self.court,
+            ),
+            date_filed=datetime.date(2015, 8, 19),
+            description="MOTION for Leave to File Amicus Curiae Lorem",
+            entry_number=3010113237867,
+        )
+        rd_1 = RECAPDocumentFactory(
+            docket_entry=de_1,
+            description="Leave to File",
+            document_number="3010113237867",
+            is_available=True,
+            page_count=5,
+        )
+
+        self.assertTrue(DocketDocument.exists(id=ES_CHILD_ID(rd_1.pk).RECAP))
+        de_1.docket.delete()
+
+    def test_index_recap_parent_and_child_objects(self) -> None:
+        """Confirm Dockets and RECAPDocuments are properly indexed in ES"""
+        docket_entry_1 = DocketEntryWithParentsFactory(
+            docket=DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED ON",
+                case_name_full="Jackson & Sons Holdings vs. Bank",
+                date_filed=datetime.date(2015, 8, 16),
+                date_argued=datetime.date(2013, 5, 20),
+                docket_number="1:21-bk-1234",
+                nature_of_suit="440",
+            ),
+            entry_number=1,
+            date_filed=datetime.date(2015, 8, 19),
+            description="MOTION for Leave to File Amicus Curiae Lorem",
+        )
+
+        rd = RECAPDocumentFactory(
+            docket_entry=docket_entry_1,
+            description="Leave to File",
+            document_number="1",
+            is_available=True,
+            page_count=5,
+            pacer_doc_id="018036652435",
+        )
+
+        rd_att = RECAPDocumentFactory(
+            docket_entry=docket_entry_1,
+            description="Document attachment",
+            document_type=RECAPDocument.ATTACHMENT,
+            document_number="1",
+            attachment_number=2,
+            is_available=False,
+            page_count=7,
+            pacer_doc_id="018036652436",
+        )
+
+        docket_entry_2 = DocketEntryWithParentsFactory(
+            docket=DocketFactory(
+                docket_number="12-1235",
+                court=self.court,
+                case_name="SUBPOENAS SERVED OFF",
+                case_name_full="The State of Franklin v. Solutions LLC",
+                date_filed=datetime.date(2016, 8, 16),
+                date_argued=datetime.date(2012, 6, 23),
+            ),
+            entry_number=3,
+            date_filed=datetime.date(2014, 7, 19),
+            description="MOTION for Leave to File Amicus Discharging Debtor",
+        )
+        rd_2 = RECAPDocumentFactory(
+            docket_entry=docket_entry_2,
+            description="Leave to File",
+            document_number="3",
+            page_count=10,
+            plain_text="Mauris iaculis, leo sit amet hendrerit vehicula, Maecenas nunc justo. Integer varius sapien arcu, quis laoreet lacus consequat vel.",
+            pacer_doc_id="016156723121",
+        )
+
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="docket"))
+        self.assertEqual(s.count(), 2)
+
+        # RECAPDocuments are indexed.
+        rd_pks = [
+            rd.pk,
+            rd_att.pk,
+            rd_2.pk,
+        ]
+        for rd_pk in rd_pks:
+            self.assertTrue(DocketDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP))
+
+    def test_update_and_remove_parent_child_objects_in_es(self) -> None:
+        """Confirm child documents can be updated and removed properly."""
+
+        de_1 = DocketEntryWithParentsFactory(
+            docket=DocketFactory(
+                court=self.court,
+                case_name="Lorem Ipsum",
+                case_name_full="Jackson & Sons Holdings vs. Bank",
+                date_filed=datetime.date(2015, 8, 16),
+                date_argued=datetime.date(2013, 5, 20),
+                docket_number="1:21-bk-1234",
+                assigned_to=None,
+                referred_to=None,
+                nature_of_suit="440",
+            ),
+            date_filed=datetime.date(2015, 8, 19),
+            description="MOTION for Leave to File Amicus Curiae Lorem",
+        )
+        rd_1 = RECAPDocumentFactory(
+            docket_entry=de_1,
+            description="Leave to File",
+            document_number="1",
+            is_available=True,
+            page_count=5,
+        )
+        firm = AttorneyOrganizationFactory(
+            lookup_key="280kingofprussiaroadradnorkesslertopazmeltzercheck19087",
+            name="Law Firm LLP",
+        )
+        attorney = AttorneyFactory(
+            name="Emily Green",
+            organizations=[firm],
+            docket=de_1.docket,
+        )
+        party_type = PartyTypeFactory.create(
+            party=PartyFactory(
+                name="Mary Williams Corp.",
+                docket=de_1.docket,
+                attorneys=[attorney],
+            ),
+            docket=de_1.docket,
+        )
+
+        docket_pk = de_1.docket.pk
+        rd_pk = rd_1.pk
+        self.assertTrue(DocketDocument.exists(id=docket_pk))
+
+        self.assertTrue(DocketDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP))
+
+        # Confirm parties fields are indexed into DocketDocument.
+        # Index docket parties using index_docket_parties_in_es task.
+        index_docket_parties_in_es.delay(de_1.docket.pk)
+
+        docket_doc = DocketDocument.get(id=docket_pk)
+        self.assertIn(party_type.party.pk, docket_doc.party_id)
+        self.assertIn(party_type.party.name, docket_doc.party)
+        self.assertIn(attorney.pk, docket_doc.attorney_id)
+        self.assertIn(attorney.name, docket_doc.attorney)
+        self.assertIn(firm.pk, docket_doc.firm_id)
+        self.assertIn(firm.name, docket_doc.firm)
+        self.assertEqual(None, docket_doc.assignedTo)
+        self.assertEqual(None, docket_doc.referredTo)
+        self.assertEqual(None, docket_doc.assigned_to_id)
+        self.assertEqual(None, docket_doc.referred_to_id)
+
+        # Confirm assigned_to and referred_to are properly updated in Docket.
+        judge = PersonFactory.create(name_first="Thalassa", name_last="Miller")
+        judge_2 = PersonFactory.create(
+            name_first="Persephone", name_last="Sinclair"
+        )
+
+        # Update docket field:
+        de_1.docket.case_name = "USA vs Bank"
+        de_1.docket.assigned_to = judge
+        de_1.docket.referred_to = judge_2
+        de_1.docket.save()
+
+        docket_doc = DocketDocument.get(id=docket_pk)
+        self.assertIn("USA vs Bank", docket_doc.caseName)
+        self.assertIn(judge.name_full, docket_doc.assignedTo)
+        self.assertIn(judge_2.name_full, docket_doc.referredTo)
+        self.assertEqual(judge.pk, docket_doc.assigned_to_id)
+        self.assertEqual(judge_2.pk, docket_doc.referred_to_id)
+
+        # Update judges name.
+        judge.name_first = "William"
+        judge.name_last = "Anderson"
+        judge.save()
+
+        judge_2.name_first = "Emily"
+        judge_2.name_last = "Clark"
+        judge_2.save()
+
+        docket_doc = DocketDocument.get(id=docket_pk)
+        self.assertIn(judge.name_full, docket_doc.assignedTo)
+        self.assertIn(judge_2.name_full, docket_doc.referredTo)
+
+        # Update docket entry field:
+        de_1.description = "Notification to File Ipsum"
+        de_1.entry_number = 99
+        de_1.save()
+
+        rd_doc = DocketDocument.get(id=ES_CHILD_ID(rd_pk).RECAP)
+        self.assertEqual("Notification to File Ipsum", rd_doc.description)
+        self.assertEqual(99, rd_doc.entry_number)
+
+        # Add a Bankruptcy document.
+
+        bank = BankruptcyInformationFactory(docket=de_1.docket)
+        docket_doc = DocketDocument.get(id=docket_pk)
+        self.assertEqual(str(bank.chapter), docket_doc.chapter)
+        self.assertEqual(str(bank.trustee_str), docket_doc.trustee_str)
+
+        # Update Bankruptcy document.
+        bank.chapter = "98"
+        bank.trustee_str = "Victoria, Sherline"
+        bank.save()
+
+        docket_doc = DocketDocument.get(id=docket_pk)
+        self.assertEqual("98", docket_doc.chapter)
+        self.assertEqual("Victoria, Sherline", docket_doc.trustee_str)
+
+        # Remove Bankruptcy document and confirm it gets removed from Docket.
+        bank.delete()
+        docket_doc = DocketDocument.get(id=docket_pk)
+        self.assertEqual(None, docket_doc.chapter)
+        self.assertEqual(None, docket_doc.trustee_str)
+
+        # Add another RD:
+        rd_2 = RECAPDocumentFactory(
+            docket_entry=de_1,
+            description="Notification to File",
+            document_number="2",
+            is_available=True,
+            page_count=2,
+        )
+
+        rd_2_pk = rd_2.pk
+        self.assertTrue(DocketDocument.exists(id=ES_CHILD_ID(rd_2_pk).RECAP))
+        rd_2.delete()
+        self.assertFalse(DocketDocument.exists(id=ES_CHILD_ID(rd_2_pk).RECAP))
+
+        self.assertTrue(DocketDocument.exists(id=docket_pk))
+        self.assertTrue(DocketDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP))
+
+        de_1.docket.delete()
+        self.assertFalse(DocketDocument.exists(id=docket_pk))
+        self.assertFalse(DocketDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP))
+
+    def test_update_docket_fields_in_recap_documents(self) -> None:
+        """Confirm all the docket fields in RECAPDocuments that belong to a
+        case are updated in bulk when the docket changes.
+        """
+
+        judge = PersonFactory.create(name_first="Thalassa", name_last="Miller")
+        judge_2 = PersonFactory.create(
+            name_first="Persephone", name_last="Sinclair"
+        )
+        de = DocketEntryWithParentsFactory(
+            docket=DocketFactory(
+                court=self.court,
+                case_name="USA vs Bank Lorem",
+                case_name_full="Jackson & Sons Holdings vs. Bank",
+                date_filed=datetime.date(2015, 8, 16),
+                date_argued=datetime.date(2013, 5, 20),
+                docket_number="1:21-bk-1234",
+                assigned_to=judge,
+                nature_of_suit="440",
+            ),
+            date_filed=datetime.date(2015, 8, 19),
+            description="MOTION for Leave to File Amicus Curiae Lorem",
+        )
+
+        # Create two RECAPDocuments within the same case.
+        rd_created_pks = []
+        for i in range(2):
+            rd = RECAPDocumentFactory(
+                docket_entry=de,
+                description=f"Leave to File {i}",
+                document_number=f"{i}",
+                is_available=True,
+                page_count=5,
+            )
+            rd_created_pks.append(rd.pk)
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "USA vs Bank Lorem",
+        }
+
+        # Query the parent docket and confirm is indexed with the right content
+        response = self._test_main_es_query(params, 1, "q")
+        for i in range(2):
+            self._compare_response_child_value(
+                response, 0, i, judge.name_full, "assignedTo"
+            )
+            self._compare_response_child_value(response, 0, i, None, "chapter")
+            self._compare_response_child_value(
+                response, 0, i, None, "trustee_str"
+            )
+
+        # Add BankruptcyInformation and confirm is indexed with the right content
+        bank_data = BankruptcyInformationFactory(docket=de.docket)
+
+        response = self._test_main_es_query(params, 1, "q")
+        for i in range(2):
+            self._compare_response_child_value(
+                response, 0, i, bank_data.chapter, "chapter"
+            )
+            self._compare_response_child_value(
+                response, 0, i, bank_data.trustee_str, "trustee_str"
+            )
+
+        # Update some docket fields.
+        de.docket.case_name = "America vs Doe Enterprise"
+        de.docket.docket_number = "21-45632"
+        de.docket.case_name_full = "Teachers Union v. Board of Education"
+        de.docket.nature_of_suit = "500"
+        de.docket.cause = "Civil Rights Act"
+        de.docket.jury_demand = "1300"
+        de.docket.jurisdiction_type = "U.S. Government Lorem"
+        de.docket.date_filed = datetime.date(2020, 4, 19)
+        de.docket.date_argued = datetime.date(2020, 4, 18)
+        de.docket.date_terminated = datetime.date(2022, 6, 10)
+        de.docket.assigned_to = judge_2
+        de.docket.referred_to = judge
+        de.docket.save()
+
+        # Query the parent docket by its updated name.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "America vs Doe Enterprise",
+        }
+        response = self._test_main_es_query(params, 1, "q")
+
+        # Confirm all docket fields in the RDs were updated.
+        for i in range(2):
+            self._compare_response_child_value(
+                response, 0, i, "America vs Doe Enterprise", "caseName"
+            )
+            self._compare_response_child_value(
+                response, 0, i, "21-45632", "docketNumber"
+            )
+
+            self._compare_response_child_value(
+                response,
+                0,
+                i,
+                "Teachers Union v. Board of Education",
+                "case_name_full",
+            )
+
+            self._compare_response_child_value(
+                response, 0, i, "500", "suitNature"
+            )
+
+            self._compare_response_child_value(
+                response, 0, i, "Civil Rights Act", "cause"
+            )
+            self._compare_response_child_value(
+                response, 0, i, "1300", "juryDemand"
+            )
+            self._compare_response_child_value(
+                response, 0, i, "U.S. Government Lorem", "jurisdictionType"
+            )
+            self._compare_response_child_value(
+                response,
+                0,
+                i,
+                de.docket.date_argued.strftime("%Y-%m-%d"),
+                "dateArgued",
+            )
+            self._compare_response_child_value(
+                response,
+                0,
+                i,
+                de.docket.date_filed.strftime("%Y-%m-%d"),
+                "dateFiled",
+            )
+            self._compare_response_child_value(
+                response,
+                0,
+                i,
+                de.docket.date_terminated.strftime("%Y-%m-%d"),
+                "dateTerminated",
+            )
+
+            self._compare_response_child_value(
+                response, 0, i, de.docket.referred_to.name_full, "referredTo"
+            )
+            self._compare_response_child_value(
+                response, 0, i, de.docket.assigned_to.name_full, "assignedTo"
+            )
+            self._compare_response_child_value(
+                response, 0, i, de.docket.referred_to.pk, "referred_to_id"
+            )
+            self._compare_response_child_value(
+                response, 0, i, de.docket.assigned_to.pk, "assigned_to_id"
+            )
+        # Update judge name.
+        judge.name_first = "William"
+        judge.name_last = "Anderson"
+        judge.save()
+
+        judge_2.name_first = "Emily"
+        judge_2.name_last = "Clark"
+        judge_2.save()
+
+        response = self._test_main_es_query(params, 1, "q")
+        # Confirm all docket fields in the RDs were updated.
+        for i in range(2):
+            self._compare_response_child_value(
+                response, 0, i, judge.name_full, "referredTo"
+            )
+            self._compare_response_child_value(
+                response, 0, i, judge_2.name_full, "assignedTo"
+            )
+
+        bank_data.chapter = "15"
+        bank_data.trustee_str = "Jessica Taylor"
+        bank_data.save()
+
+        response = self._test_main_es_query(params, 1, "q")
+        # Confirm all docket fields in the RDs were updated.
+        for i in range(2):
+            self._compare_response_child_value(response, 0, i, "15", "chapter")
+            self._compare_response_child_value(
+                response, 0, i, "Jessica Taylor", "trustee_str"
+            )
+
+        # Remove BankruptcyInformation and confirm it's removed from RDs.
+        bank_data.delete()
+        response = self._test_main_es_query(params, 1, "q")
+        # Confirm all docket fields in the RDs were updated.
+        for i in range(2):
+            self._compare_response_child_value(response, 0, i, None, "chapter")
+            self._compare_response_child_value(
+                response, 0, i, None, "trustee_str"
+            )
+
+        # Also confirm the assigned_to_str and referred_to_str are being
+        # tracked for changes in case assigned_to and referred_to are None.
+        de.docket.assigned_to = None
+        de.docket.referred_to = None
+        de.docket.assigned_to_str = "Sarah Williams"
+        de.docket.referred_to_str = "Laura Davis"
+        de.docket.save()
+
+        response = self._test_main_es_query(params, 1, "q")
+        for i in range(2):
+            self._compare_response_child_value(
+                response, 0, i, "Laura Davis", "referredTo"
+            )
+            self._compare_response_child_value(
+                response, 0, i, "Sarah Williams", "assignedTo"
+            )
+            self._compare_response_child_value(
+                response, 0, i, None, "referred_to_id"
+            )
+            self._compare_response_child_value(
+                response, 0, i, None, "assigned_to_id"
+            )
+
+        de.docket.delete()
+        # After the docket is removed all the RECAPDocuments are also removed
+        # from ES.
+        for rd_pk in rd_created_pks:
+            self.assertFalse(
+                DocketDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP)
+            )
