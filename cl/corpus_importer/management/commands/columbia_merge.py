@@ -18,6 +18,7 @@ import os.path
 import re
 import sys
 from datetime import date
+from difflib import SequenceMatcher
 from typing import Any, Dict, List, Optional, Tuple
 
 from asgiref.sync import async_to_sync
@@ -719,9 +720,11 @@ def update_matching_opinions(
 
         op = Opinion.objects.get(id=opinion_id_to_update)
         author_str = ""
+
         if file_byline:
             # Prettify the name a bit
             author_str = titlecase(find_just_name(file_byline.strip(":")))
+
         if op.author_str == "":
             # We have an empty author name
             if author_str:
@@ -733,7 +736,17 @@ def update_matching_opinions(
                     find_just_name(op.author_str).lower()
                     != find_just_name(author_str).lower()
                 ):
-                    raise AuthorException(f"Authors don't match")
+                    # last resort, use distance between words to solve typos
+                    s = SequenceMatcher(
+                        None,
+                        find_just_name(op.author_str).lower(),
+                        find_just_name(author_str).lower(),
+                    )
+                    if s.ratio() >= 0.6:
+                        # columbia names are better
+                        op.author_str = author_str
+                    else:
+                        raise AuthorException(f"Authors don't match")
                 elif any(s.isupper() for s in op.author_str.split(",")):
                     # Some names are uppercase, update with processed names
                     op.author_str = author_str
