@@ -1,3 +1,4 @@
+from functools import partial
 from typing import Any
 
 from celery.canvas import chain
@@ -190,11 +191,13 @@ def exists_or_create_doc(
 
     if not avoid_creation:
         transaction.on_commit(
-            lambda: es_save_document.delay(
-                instance.pk, compose_app_label(instance), es_document.__name__
+            partial(
+                es_save_document.delay,
+                instance.pk,
+                compose_app_label(instance),
+                es_document.__name__,
             )
         )
-
         return False
     return False
 
@@ -240,7 +243,8 @@ def update_es_documents(
                     PersonDocument, instance.pk
                 )
                 transaction.on_commit(
-                    lambda: update_children_documents_by_query.delay(
+                    partial(
+                        update_children_documents_by_query.delay,
                         es_document.__name__,
                         instance.pk,
                         throttling_id,
@@ -268,7 +272,8 @@ def update_es_documents(
                         PersonDocument, person.pk
                     )
                     transaction.on_commit(
-                        lambda: update_children_documents_by_query.delay(
+                        partial(
+                            update_children_documents_by_query.delay,
                             es_document.__name__,
                             person.pk,
                             throttling_id,
@@ -287,7 +292,8 @@ def update_es_documents(
                     DocketDocument, instance.pk
                 )
                 transaction.on_commit(
-                    lambda: update_children_documents_by_query.delay(
+                    partial(
+                        update_children_documents_by_query.delay,
                         es_document.__name__,
                         instance.pk,
                         throttling_id,
@@ -308,7 +314,8 @@ def update_es_documents(
                         DocketDocument, rel_docket.pk
                     )
                     transaction.on_commit(
-                        lambda: update_children_documents_by_query.delay(
+                        partial(
+                            update_children_documents_by_query.delay,
                             es_document.__name__,
                             rel_docket.pk,
                             throttling_id,
@@ -328,7 +335,8 @@ def update_es_documents(
                         )
 
                         transaction.on_commit(
-                            lambda: es_document_update.delay(
+                            partial(
+                                es_document_update.delay,
                                 es_document.__name__,
                                 main_object.pk,
                                 document_fields_to_update(
@@ -394,7 +402,8 @@ def update_m2m_field_in_es_document(
     )
     throttling_id = get_task_throttling_id(es_document, instance.pk)
     transaction.on_commit(
-        lambda: es_document_update.delay(
+        partial(
+            es_document_update.delay,
             es_document.__name__,
             instance.pk,
             {affected_field: get_m2m_value},
@@ -442,7 +451,8 @@ def update_reverse_related_documents(
 
         throttling_id = get_task_throttling_id(es_document, main_object.pk)
         transaction.on_commit(
-            lambda: es_document_update.delay(
+            partial(
+                es_document_update.delay,
                 es_document.__name__,
                 main_object.pk,
                 fields_to_update,
@@ -465,7 +475,8 @@ def update_reverse_related_documents(
                     PersonDocument, person.pk
                 )
                 transaction.on_commit(
-                    lambda: update_children_documents_by_query.delay(
+                    partial(
+                        update_children_documents_by_query.delay,
                         PositionDocument.__name__,
                         person.pk,
                         throttling_id,
@@ -484,7 +495,8 @@ def update_reverse_related_documents(
                 DocketDocument, instance.docket.pk
             )
             transaction.on_commit(
-                lambda: update_children_documents_by_query.delay(
+                partial(
+                    update_children_documents_by_query.delay,
                     ESRECAPDocument.__name__,
                     instance.docket.pk,
                     throttling_id,
@@ -517,7 +529,8 @@ def prepare_and_update_fields(
 
     throttling_id = get_task_throttling_id(es_document, main_object.pk)
     transaction.on_commit(
-        lambda: es_document_update.delay(
+        partial(
+            es_document_update.delay,
             es_document.__name__,
             main_object.pk,
             fields_to_update,
@@ -560,7 +573,8 @@ def delete_reverse_related_documents(
                     PersonDocument, instance.pk
                 )
                 transaction.on_commit(
-                    lambda: update_children_documents_by_query.delay(
+                    partial(
+                        update_children_documents_by_query.delay,
                         PositionDocument.__name__,
                         instance.pk,
                         throttling_id,
@@ -581,7 +595,8 @@ def delete_reverse_related_documents(
                     DocketDocument, instance.pk
                 )
                 transaction.on_commit(
-                    lambda: update_children_documents_by_query.delay(
+                    partial(
+                        update_children_documents_by_query.delay,
                         ESRECAPDocument.__name__,
                         instance.pk,
                         throttling_id,
