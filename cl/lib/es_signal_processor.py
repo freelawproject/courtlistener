@@ -516,8 +516,13 @@ def prepare_and_update_fields(
         fields_to_update[field] = field_value
 
     throttling_id = get_task_throttling_id(es_document, main_object.pk)
-    es_document_update.delay(
-        es_document.__name__, main_object.pk, fields_to_update, throttling_id
+    transaction.on_commit(
+        lambda: es_document_update.delay(
+            es_document.__name__,
+            main_object.pk,
+            fields_to_update,
+            throttling_id,
+        )
     )
 
 
@@ -554,11 +559,13 @@ def delete_reverse_related_documents(
                 throttling_id = get_task_throttling_id(
                     PersonDocument, instance.pk
                 )
-                update_children_documents_by_query.delay(
-                    PositionDocument.__name__,
-                    instance.pk,
-                    throttling_id,
-                    affected_fields,
+                transaction.on_commit(
+                    lambda: update_children_documents_by_query.delay(
+                        PositionDocument.__name__,
+                        instance.pk,
+                        throttling_id,
+                        affected_fields,
+                    )
                 )
         case Docket() if es_document is DocketDocument:  # type: ignore
             # Update the Docket document after the reverse instanced is deleted
@@ -573,11 +580,13 @@ def delete_reverse_related_documents(
                 throttling_id = get_task_throttling_id(
                     DocketDocument, instance.pk
                 )
-                update_children_documents_by_query.delay(
-                    ESRECAPDocument.__name__,
-                    instance.pk,
-                    throttling_id,
-                    affected_fields,
+                transaction.on_commit(
+                    lambda: update_children_documents_by_query.delay(
+                        ESRECAPDocument.__name__,
+                        instance.pk,
+                        throttling_id,
+                        affected_fields,
+                    )
                 )
         case _:
             main_objects = main_model.objects.filter(
