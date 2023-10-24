@@ -190,7 +190,7 @@
           <p>
             {% if doc.plain_text %}
               {% with words=doc.plain_text|wordcount %}
-                &hellip; {{ doc.plain_text|truncatewords:"50" }}{% if words < 50 %} &hellip;{% endif %}
+                &hellip; {{ doc.plain_text|safe|underscore_to_space|truncatewords:"50" }}{% if words < 50 %} &hellip;{% endif %}
               {% endwith %}
             {% endif %}
           </p>
