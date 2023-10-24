@@ -183,7 +183,7 @@
             <div class="inline-block">
               <span class="meta-data-header">Description:</span>
               <span class="meta-data-value">
-                {{ doc.description|safe }}
+                {{ doc.description|safe|read_more:"100" }}
               </span>
             </div>
           {% endif %}
