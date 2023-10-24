@@ -607,6 +607,7 @@ def build_has_child_query(
             "number_of_fragments": number_of_fragments,
             "pre_tags": ["<mark>"],
             "post_tags": ["</mark>"],
+            "max_analyzed_offset": 999_999,
         }
 
     inner_hits = {
