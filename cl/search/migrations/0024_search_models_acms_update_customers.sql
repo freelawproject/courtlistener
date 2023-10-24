@@ -49,5 +49,4 @@ ALTER TABLE "search_recapdocumentevent" ALTER COLUMN "pacer_doc_id" TYPE varchar
 -- Create index search_reca_acms_do_17c11f_idx on field(s) acms_document_guid of model recapdocument
 --
 CREATE INDEX "search_reca_acms_do_17c11f_idx" ON "search_recapdocument" ("acms_document_guid");
-
 COMMIT;

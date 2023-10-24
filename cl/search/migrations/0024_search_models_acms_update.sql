@@ -19,6 +19,7 @@ CREATE INDEX "search_claimhistory_pacer_doc_id_ddcc4bdf_like" ON "search_claimhi
 --
 -- (no-op)
 --
+--
 -- Alter field pacer_doc_id on recapdocument
 --
 ALTER TABLE "search_recapdocument" ALTER COLUMN "pacer_doc_id" TYPE varchar(64);
@@ -28,5 +29,4 @@ CREATE INDEX "search_recapdocument_pacer_doc_id_e52314d9_like" ON "search_recapd
 -- Create index search_reca_acms_do_17c11f_idx on field(s) acms_document_guid of model recapdocument
 --
 CREATE INDEX "search_reca_acms_do_17c11f_idx" ON "search_recapdocument" ("acms_document_guid");
-
 COMMIT;
