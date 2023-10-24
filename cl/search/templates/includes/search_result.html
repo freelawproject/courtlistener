@@ -183,14 +183,14 @@
             <div class="inline-block">
               <span class="meta-data-header">Description:</span>
               <span class="meta-data-value">
-                {{ doc.description|safe|truncatewords:"50" }}
+                {{ doc.description|safe }}
               </span>
             </div>
           {% endif %}
           <p>
             {% if doc.plain_text %}
               {% with words=doc.plain_text|wordcount %}
-                &hellip; {{ doc.plain_text|safe|underscore_to_space|truncatewords:"50" }}{% if words < 50 %} &hellip;{% endif %}
+                &hellip; {{ doc.plain_text|safe|underscore_to_space }}{% if words < 50 %} &hellip;{% endif %}
               {% endwith %}
             {% endif %}
           </p>

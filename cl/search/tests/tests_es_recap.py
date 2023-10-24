@@ -1,4 +1,5 @@
 import datetime
+import re
 import unittest
 from unittest import mock
 
@@ -747,6 +748,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             0, r.content.decode(), 2, "text query judge"
         )
 
+    @override_settings(NO_MATCH_HL_SIZE=50)
     async def test_results_highlights(self) -> None:
         """Confirm highlights are shown properly"""
 
@@ -763,6 +765,18 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIn("<mark>SERVED</mark>", r.content.decode())
         self.assertIn("<mark>OFF</mark>", r.content.decode())
         self.assertEqual(r.content.decode().count("<mark>OFF</mark>"), 1)
+
+        # Confirm we can limit the length of the plain_text snippet using the
+        # NO_MATCH_HL_SIZE setting.
+        tree = html.fromstring(r.content.decode())
+        plain_text = tree.xpath(
+            '(//article)[1]/div[@class="bottom"]/div[@class="col-md-offset-half"]/p/text()'
+        )
+        # Clean the plain_text string.
+        plain_text_string = plain_text[0].strip()
+        cleaned_plain_text = re.sub(r"\s+", " ", plain_text_string)
+        cleaned_plain_text = cleaned_plain_text.replace("…", "")
+        self.assertLess(len(cleaned_plain_text), 50)
 
         # Highlight assigned_to.
         params = {"type": SEARCH_TYPES.RECAP, "q": "Thalassa Miller"}

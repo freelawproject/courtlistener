@@ -584,13 +584,26 @@ def build_has_child_query(
         highlighting_fields = {}
     highlight_options: dict[str, dict[str, Any]] = {"fields": {}}
 
+    fields_to_exclude = []
     for field, fragment_size in highlighting_fields.items():
         number_of_fragments = 0
+        no_match_size = 0
         if fragment_size:
             number_of_fragments = 1
+            # In fields that have a defined fragment size in their HL mapping
+            # e.g., SEARCH_RECAP_CHILD_HL_FIELDS, a 'no_match_size' parameter
+            # is also set. If there are no matching fragments to highlight,
+            # this setting will return a specified amount of text from the
+            # beginning of the field.
+            no_match_size = settings.NO_MATCH_HL_SIZE
+            if not field.endswith("exact"):
+                # The original field is excluded from the response to avoid
+                # returning the entire field from the index.
+                fields_to_exclude.append(field)
         highlight_options["fields"][field] = {
             "type": "plain",
             "fragment_size": fragment_size,
+            "no_match_size": no_match_size,
             "number_of_fragments": number_of_fragments,
             "pre_tags": ["<mark>"],
             "post_tags": ["</mark>"],
@@ -599,6 +612,9 @@ def build_has_child_query(
     inner_hits = {
         "name": f"filter_query_inner_{child_type}",
         "size": child_hits_limit,
+        "_source": {
+            "excludes": fields_to_exclude,
+        },
     }
     if highlight_options:
         inner_hits["highlight"] = highlight_options
@@ -638,7 +654,7 @@ def get_search_query(
                     "match_all",
                     "recap_document",
                     query_hits_limit,
-                    None,
+                    SEARCH_RECAP_CHILD_HL_FIELDS,
                     get_child_sorting_key(cd),
                 )
                 match_all_parent_query = Q("match", docket_child="docket")
@@ -923,35 +939,40 @@ def merge_highlights_into_result(
             marked_strings_1 = re.findall(
                 rf"<{tag}>.*?</{tag}>", highlight_list[0]
             )
-            # Extract all unique marked strings from "field" if
-            # available
-            if field in highlights:
-                marked_strings_2 = re.findall(
-                    rf"<{tag}>.*?</{tag}>",
-                    highlights[field][0],
-                )
+            # Merge highlights only if the exact.field contains highlight tags.
+            # This avoids merging highlights when there are no matching terms,
+            # yet highlights are returned due to the NO_MATCH_HL_SIZE setting.
 
-            unique_marked_strings = list(
-                set(marked_strings_1 + marked_strings_2)
-            )
-            combined_highlights = highlight_list[0]
-            for marked_string in unique_marked_strings:
-                # Replace unique highlighted terms in a single
-                # field.
-                unmarked_string = marked_string.replace(
-                    f"<{tag}>", ""
-                ).replace(f"</{tag}>", "")
-                combined_highlights = combined_highlights.replace(
-                    unmarked_string, marked_string
-                )
+            if marked_strings_1:
+                # Extract all unique marked strings from "field" if
+                # available
+                if field in highlights:
+                    marked_strings_2 = re.findall(
+                        rf"<{tag}>.*?</{tag}>",
+                        highlights[field][0],
+                    )
 
-            # Remove nested <mark> tags after replace.
-            combined_highlights = re.sub(
-                rf"<{tag}><{tag}>(.*?)</{tag}></{tag}>",
-                rf"<{tag}>\1</{tag}>",
-                combined_highlights,
-            )
-            result[field] = combined_highlights
+                unique_marked_strings = list(
+                    set(marked_strings_1 + marked_strings_2)
+                )
+                combined_highlights = highlight_list[0]
+                for marked_string in unique_marked_strings:
+                    # Replace unique highlighted terms in a single
+                    # field.
+                    unmarked_string = marked_string.replace(
+                        f"<{tag}>", ""
+                    ).replace(f"</{tag}>", "")
+                    combined_highlights = combined_highlights.replace(
+                        unmarked_string, marked_string
+                    )
+
+                # Remove nested <mark> tags after replace.
+                combined_highlights = re.sub(
+                    rf"<{tag}><{tag}>(.*?)</{tag}></{tag}>",
+                    rf"<{tag}>\1</{tag}>",
+                    combined_highlights,
+                )
+                result[field] = combined_highlights
             exact_hl_fields.append(field)
 
         if field not in exact_hl_fields:
