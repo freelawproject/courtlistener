@@ -187,11 +187,10 @@
               </span>
             </div>
           {% endif %}
-          <p>
+          <p class="v-offset-above-1">
             {% if doc.plain_text %}
-              {% with words=doc.plain_text|wordcount %}
-                &hellip; {{ doc.plain_text|safe|underscore_to_space }}{% if words < 50 %} &hellip;{% endif %}
-              {% endwith %}
+              {% contains_highlights doc.plain_text as highlighted %}
+              {% if highlighted %}&hellip;{% endif %}{{ doc.plain_text|safe|underscore_to_space }}&hellip;
             {% endif %}
           </p>
         </div>
