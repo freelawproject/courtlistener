@@ -30,7 +30,7 @@ class PodcastTest(ESIndexTestCase, TestCase):
         with mock.patch(
             "cl.lib.es_signal_processor.avoid_es_audio_indexing",
             side_effect=lambda x, y, z: False,
-        ):
+        ), cls.captureOnCommitCallbacks(execute=True):
             cls.audio = AudioWithParentsFactory.create(
                 docket=DocketFactory(
                     court=cls.court_1, date_argued=datetime.date(2014, 8, 16)
@@ -192,10 +192,11 @@ class PodcastTest(ESIndexTestCase, TestCase):
         )
 
         # pubDate key must be omitted in Audios without date_argued.
-        self.audio.docket.date_argued = None
-        self.audio.docket.save()
-        self.audio_2.docket.date_argued = None
-        self.audio_2.docket.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.audio.docket.date_argued = None
+            self.audio.docket.save()
+            self.audio_2.docket.date_argued = None
+            self.audio_2.docket.save()
         response = self.client.get(
             reverse("search_podcast", args=["search"]),
             params,
