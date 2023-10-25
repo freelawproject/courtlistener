@@ -1525,6 +1525,17 @@ def build_full_join_es_queries(
         string_query = build_fulltext_query(
             parent_query_fields, cd.get("q", ""), only_queries=True
         )
+
+        # Adds filter to the parent query to exclude results with no children
+        if cd.get("available_only", ""):
+            parent_filters.append(
+                Q(
+                    "has_child",
+                    type="recap_document",
+                    score_mode="max",
+                    query=Q("term", is_available=True),
+                )
+            )
         parent_query = None
         match parent_filters, string_query:
             case [], []:
