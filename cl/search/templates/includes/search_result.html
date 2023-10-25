@@ -190,7 +190,7 @@
           <p class="v-offset-above-1">
             {% if doc.plain_text %}
               {% contains_highlights doc.plain_text as highlighted %}
-              {% if highlighted %}&hellip;{% endif %}{{ doc.plain_text|safe|underscore_to_space }}&hellip;
+              {% if highlighted %}&hellip;{% endif %}{{ doc.plain_text|safe|underscore_to_space }} &hellip;
             {% endif %}
           </p>
         </div>
