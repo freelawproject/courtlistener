@@ -23,7 +23,6 @@ from scorched.exc import SolrError
 
 from cl.audio.models import Audio
 from cl.celery_init import app
-from cl.lib.celery_utils import throttle_task
 from cl.lib.elasticsearch_utils import es_index_exists
 from cl.lib.search_index_utils import InvalidDocumentError
 from cl.people_db.models import Person, Position
@@ -333,9 +332,11 @@ def save_document_in_es(
 # New task.
 @app.task(
     bind=True,
-    autoretry_for=(ConnectionError,),
-    max_retries=3,
-    interval_start=5,
+    autoretry_for=(ConnectionError, ConflictError),
+    max_retries=5,
+    retry_backoff=3 * 60,
+    retry_backoff_max=10 * 60,
+    retry_jitter=True,
     queue=settings.CELERY_ETL_TASK_QUEUE,
 )
 def es_save_document(
@@ -457,20 +458,18 @@ def update_document_in_es(
 # New task.
 @app.task(
     bind=True,
-    autoretry_for=(ConnectionError,),
-    max_retries=3,
-    interval_start=5,
+    autoretry_for=(ConnectionError, ConflictError),
+    max_retries=5,
+    retry_backoff=3 * 60,
+    retry_backoff_max=10 * 60,
+    retry_jitter=True,
     queue=settings.CELERY_ETL_TASK_QUEUE,
-)
-@throttle_task(
-    settings.ELASTICSEARCH_THROTTLING_TASK_RATE, key="throttling_id"
 )
 def es_document_update(
     self: Task,
     es_document_name: str,
     document_id: int,
     fields_values_to_update: dict[str, Any],
-    throttling_id: str,
 ) -> None:
     """Update a document in Elasticsearch.
     :param self: The celery task
@@ -593,19 +592,17 @@ def update_child_documents_by_query(
 # New task.
 @app.task(
     bind=True,
-    autoretry_for=(ConnectionError,),
-    max_retries=3,
-    interval_start=5,
+    autoretry_for=(ConnectionError, ConflictError),
+    max_retries=5,
+    retry_backoff=3 * 60,
+    retry_backoff_max=10 * 60,
+    retry_jitter=True,
     queue=settings.CELERY_ETL_TASK_QUEUE,
-)
-@throttle_task(
-    settings.ELASTICSEARCH_THROTTLING_TASK_RATE, key="throttling_id"
 )
 def update_children_documents_by_query(
     self: Task,
     es_document_name: str,
     parent_instance_id: int,
-    throttling_id: str,
     fields_to_update: list[str],
     fields_map: dict[str, str] | None = None,
 ) -> None:
@@ -676,12 +673,13 @@ def update_children_documents_by_query(
 
 @app.task(
     bind=True,
-    autoretry_for=(ConnectionError, NotFoundError),
-    max_retries=8,
-    interval_start=5 * 60,
+    autoretry_for=(ConnectionError, NotFoundError, ConflictError),
+    max_retries=5,
+    retry_backoff=3 * 60,
+    retry_backoff_max=10 * 60,
+    retry_jitter=True,
     queue=settings.CELERY_ETL_TASK_QUEUE,
 )
-@throttle_task(settings.ELASTICSEARCH_THROTTLING_TASK_RATE, key="docket_id")
 def index_docket_parties_in_es(
     self: Task,
     docket_id: int,
@@ -798,9 +796,11 @@ def index_parent_and_child_docs(
 
 @app.task(
     bind=True,
-    autoretry_for=(ConnectionError,),
-    max_retries=3,
-    interval_start=5,
+    autoretry_for=(ConnectionError, ConflictError),
+    max_retries=5,
+    retry_backoff=3 * 60,
+    retry_backoff_max=10 * 60,
+    retry_jitter=True,
     ignore_result=True,
     queue=settings.CELERY_ETL_TASK_QUEUE,
 )

@@ -38,19 +38,6 @@ from cl.search.tasks import (
 from cl.search.types import ESDocumentClassType, ESModelType
 
 
-def get_task_throttling_id(
-    es_document: ESDocumentClassType, parent_instance_id: int
-):
-    """Determine the throttling ID based on the Elasticsearch document and
-    parent instance ID.
-
-    :param es_document: The type Elasticsearch document.
-    :param parent_instance_id: The ID of the parent instance.
-    :return: A string representing the throttling ID.
-    """
-    return f"{es_document.__name__.lower()}_{parent_instance_id}"
-
-
 def compose_app_label(instance: ESModelType) -> str:
     """Compose the app label and model class name for an ES model instance.
 
@@ -239,15 +226,11 @@ def update_es_documents(
                 if not main_doc:
                     # Abort bulk update for a non-existing parent document in ES.
                     return
-                throttling_id = get_task_throttling_id(
-                    PersonDocument, instance.pk
-                )
                 transaction.on_commit(
                     partial(
                         update_children_documents_by_query.delay,
                         es_document.__name__,
                         instance.pk,
-                        throttling_id,
                         fields_to_update,
                         fields_map,
                     )
@@ -268,15 +251,11 @@ def update_es_documents(
                     if not main_doc:
                         # Abort bulk update for a non-existing parent document in ES.
                         return
-                    throttling_id = get_task_throttling_id(
-                        PersonDocument, person.pk
-                    )
                     transaction.on_commit(
                         partial(
                             update_children_documents_by_query.delay,
                             es_document.__name__,
                             person.pk,
-                            throttling_id,
                             fields_to_update,
                             fields_map,
                         )
@@ -288,15 +267,11 @@ def update_es_documents(
                 if not main_doc:
                     # Abort bulk update for a non-existing parent document in ES.
                     return
-                throttling_id = get_task_throttling_id(
-                    DocketDocument, instance.pk
-                )
                 transaction.on_commit(
                     partial(
                         update_children_documents_by_query.delay,
                         es_document.__name__,
                         instance.pk,
-                        throttling_id,
                         fields_to_update,
                         fields_map,
                     )
@@ -310,15 +285,11 @@ def update_es_documents(
                     if not main_doc:
                         # Abort bulk update for a non-existing parent document in ES.
                         return
-                    throttling_id = get_task_throttling_id(
-                        DocketDocument, rel_docket.pk
-                    )
                     transaction.on_commit(
                         partial(
                             update_children_documents_by_query.delay,
                             es_document.__name__,
                             rel_docket.pk,
-                            throttling_id,
                             fields_to_update,
                             fields_map,
                         )
@@ -330,10 +301,6 @@ def update_es_documents(
                     if not main_doc:
                         continue
                     if fields_to_update:
-                        throttling_id = get_task_throttling_id(
-                            es_document, main_object.pk
-                        )
-
                         transaction.on_commit(
                             partial(
                                 es_document_update.delay,
@@ -346,7 +313,6 @@ def update_es_documents(
                                     instance,
                                     fields_map,
                                 ),
-                                throttling_id,
                             )
                         )
 
@@ -400,14 +366,12 @@ def update_m2m_field_in_es_document(
     get_m2m_value = getattr(es_document(), f"prepare_{affected_field}")(
         instance
     )
-    throttling_id = get_task_throttling_id(es_document, instance.pk)
     transaction.on_commit(
         partial(
             es_document_update.delay,
             es_document.__name__,
             instance.pk,
             {affected_field: get_m2m_value},
-            throttling_id,
         )
     )
 
@@ -449,14 +413,12 @@ def update_reverse_related_documents(
                 field_value = getattr(instance, field)
             fields_to_update[field] = field_value
 
-        throttling_id = get_task_throttling_id(es_document, main_object.pk)
         transaction.on_commit(
             partial(
                 es_document_update.delay,
                 es_document.__name__,
                 main_object.pk,
                 fields_to_update,
-                throttling_id,
             )
         )
 
@@ -471,15 +433,11 @@ def update_reverse_related_documents(
                 if not main_doc:
                     # Abort bulk update for a non-existing parent document in ES.
                     return
-                throttling_id = get_task_throttling_id(
-                    PersonDocument, person.pk
-                )
                 transaction.on_commit(
                     partial(
                         update_children_documents_by_query.delay,
                         PositionDocument.__name__,
                         person.pk,
-                        throttling_id,
                         affected_fields,
                     )
                 )
@@ -491,15 +449,11 @@ def update_reverse_related_documents(
             if not main_doc:
                 # Abort bulk update for a non-existing parent document in ES.
                 return
-            throttling_id = get_task_throttling_id(
-                DocketDocument, instance.docket.pk
-            )
             transaction.on_commit(
                 partial(
                     update_children_documents_by_query.delay,
                     ESRECAPDocument.__name__,
                     instance.docket.pk,
-                    throttling_id,
                     affected_fields,
                 )
             )
@@ -527,14 +481,12 @@ def prepare_and_update_fields(
         field_value = prepare_method(main_object)
         fields_to_update[field] = field_value
 
-    throttling_id = get_task_throttling_id(es_document, main_object.pk)
     transaction.on_commit(
         partial(
             es_document_update.delay,
             es_document.__name__,
             main_object.pk,
             fields_to_update,
-            throttling_id,
         )
     )
 
@@ -569,15 +521,11 @@ def delete_reverse_related_documents(
                     affected_fields, es_document, instance
                 )
                 # Then update all their child documents (Positions)
-                throttling_id = get_task_throttling_id(
-                    PersonDocument, instance.pk
-                )
                 transaction.on_commit(
                     partial(
                         update_children_documents_by_query.delay,
                         PositionDocument.__name__,
                         instance.pk,
-                        throttling_id,
                         affected_fields,
                     )
                 )
@@ -591,15 +539,11 @@ def delete_reverse_related_documents(
                     affected_fields, es_document, instance
                 )
                 # Then update all their child documents (RECAPDocuments)
-                throttling_id = get_task_throttling_id(
-                    DocketDocument, instance.pk
-                )
                 transaction.on_commit(
                     partial(
                         update_children_documents_by_query.delay,
                         ESRECAPDocument.__name__,
                         instance.pk,
-                        throttling_id,
                         affected_fields,
                     )
                 )
