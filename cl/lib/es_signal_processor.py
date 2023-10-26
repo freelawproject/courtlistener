@@ -30,10 +30,10 @@ from cl.search.documents import (
 )
 from cl.search.models import BankruptcyInformation, Docket
 from cl.search.tasks import (
-    es_document_update,
     es_save_document,
     remove_document_from_es_index,
-    update_children_documents_by_query,
+    update_children_docs_by_query,
+    update_es_document,
 )
 from cl.search.types import ESDocumentClassType, ESModelType
 
@@ -116,42 +116,6 @@ def get_fields_to_update(
     return fields_to_update
 
 
-def document_fields_to_update(
-    es_document: ESDocumentClassType,
-    main_object: ESModelType,
-    field_list: list[str],
-    instance: ESModelType,
-    fields_map: dict,
-) -> dict[str, Any]:
-    """Generate a dictionary of fields and values to update based on a
-     provided map and an instance.
-
-    :param es_document: The Elasticsearch DSL document class.
-    :param main_object: The main object instance that changed.
-    :param field_list: A list of field names that need to be updated.
-    :param instance: The instance from which field values are to be extracted.
-    :param fields_map: A map from which ES field names are to be extracted.
-    :return: A dictionary with fields and values to update.
-    """
-
-    fields_to_update = {}
-    for field in field_list:
-        document_fields = fields_map[field]
-        for doc_field in document_fields:
-            if field.startswith("get_") and field.endswith("_display"):
-                fields_to_update[doc_field] = getattr(instance, field)()
-            else:
-                prepare_method = getattr(
-                    es_document(), f"prepare_{doc_field}", None
-                )
-                if prepare_method:
-                    field_value = prepare_method(main_object)
-                else:
-                    field_value = getattr(instance, field)
-                fields_to_update[doc_field] = field_value
-    return fields_to_update
-
-
 def exists_or_create_doc(
     es_document: ESDocumentClassType,
     instance: ESModelType,
@@ -228,7 +192,7 @@ def update_es_documents(
                     return
                 transaction.on_commit(
                     partial(
-                        update_children_documents_by_query.delay,
+                        update_children_docs_by_query.delay,
                         es_document.__name__,
                         instance.pk,
                         fields_to_update,
@@ -241,7 +205,7 @@ def update_es_documents(
                 the parent document using ForeignKeys.
 
                 First, we get the list of all the Person objects related to the instance object
-                and then we use the update_children_documents_by_query method to update their positions.
+                and then we use the update_children_docs_by_query method to update their positions.
                 """
                 related_record = Person.objects.filter(**{query: instance})
                 for person in related_record:
@@ -253,7 +217,7 @@ def update_es_documents(
                         return
                     transaction.on_commit(
                         partial(
-                            update_children_documents_by_query.delay,
+                            update_children_docs_by_query.delay,
                             es_document.__name__,
                             person.pk,
                             fields_to_update,
@@ -269,7 +233,7 @@ def update_es_documents(
                     return
                 transaction.on_commit(
                     partial(
-                        update_children_documents_by_query.delay,
+                        update_children_docs_by_query.delay,
                         es_document.__name__,
                         instance.pk,
                         fields_to_update,
@@ -287,7 +251,7 @@ def update_es_documents(
                         return
                     transaction.on_commit(
                         partial(
-                            update_children_documents_by_query.delay,
+                            update_children_docs_by_query.delay,
                             es_document.__name__,
                             rel_docket.pk,
                             fields_to_update,
@@ -301,18 +265,19 @@ def update_es_documents(
                     if not main_doc:
                         continue
                     if fields_to_update:
+                        # Update main document in ES, including fields to be
+                        # extracted from a related instance.
                         transaction.on_commit(
                             partial(
-                                es_document_update.delay,
+                                update_es_document.delay,
                                 es_document.__name__,
-                                main_object.pk,
-                                document_fields_to_update(
-                                    es_document,
-                                    main_object,
-                                    fields_to_update,
-                                    instance,
-                                    fields_map,
+                                fields_to_update,
+                                (
+                                    compose_app_label(main_object),
+                                    main_object.pk,
                                 ),
+                                (compose_app_label(instance), instance.pk),
+                                fields_map,
                             )
                         )
 
@@ -363,15 +328,16 @@ def update_m2m_field_in_es_document(
     document = exists_or_create_doc(es_document, instance)
     if not document:
         return
-    get_m2m_value = getattr(es_document(), f"prepare_{affected_field}")(
-        instance
-    )
     transaction.on_commit(
         partial(
-            es_document_update.delay,
+            update_es_document.delay,
             es_document.__name__,
-            instance.pk,
-            {affected_field: get_m2m_value},
+            [
+                affected_field,
+            ],
+            (compose_app_label(instance), instance.pk),
+            None,
+            None,
         )
     )
 
@@ -403,22 +369,14 @@ def update_reverse_related_documents(
         if not main_doc:
             # Abort update if the parent document doesn't exist in the index.
             continue
-
-        fields_to_update = {}
-        for field in affected_fields:
-            prepare_method = getattr(es_document(), f"prepare_{field}", None)
-            if prepare_method:
-                field_value = prepare_method(main_object)
-            else:
-                field_value = getattr(instance, field)
-            fields_to_update[field] = field_value
-
         transaction.on_commit(
             partial(
-                es_document_update.delay,
+                update_es_document.delay,
                 es_document.__name__,
-                main_object.pk,
-                fields_to_update,
+                affected_fields,
+                (compose_app_label(main_object), main_object.pk),
+                None,
+                None,
             )
         )
 
@@ -435,7 +393,7 @@ def update_reverse_related_documents(
                     return
                 transaction.on_commit(
                     partial(
-                        update_children_documents_by_query.delay,
+                        update_children_docs_by_query.delay,
                         PositionDocument.__name__,
                         person.pk,
                         affected_fields,
@@ -451,44 +409,12 @@ def update_reverse_related_documents(
                 return
             transaction.on_commit(
                 partial(
-                    update_children_documents_by_query.delay,
+                    update_children_docs_by_query.delay,
                     ESRECAPDocument.__name__,
                     instance.docket.pk,
                     affected_fields,
                 )
             )
-
-
-def prepare_and_update_fields(
-    affected_fields: list[str],
-    es_document: ESDocumentClassType,
-    main_object: ESModelType,
-):
-    """Prepare and update affected fields in an Elasticsearch document.
-
-    :param affected_fields: List of field names that need to be updated.
-    :param es_document: The Elasticsearch document type.
-    :param main_object: The instance for which the reverse related documents
-    are to be updated.
-    :return: None.
-    """
-
-    fields_to_update = {}
-    for field in affected_fields:
-        prepare_method = getattr(es_document(), f"prepare_{field}", None)
-        if not prepare_method:
-            continue
-        field_value = prepare_method(main_object)
-        fields_to_update[field] = field_value
-
-    transaction.on_commit(
-        partial(
-            es_document_update.delay,
-            es_document.__name__,
-            main_object.pk,
-            fields_to_update,
-        )
-    )
 
 
 def delete_reverse_related_documents(
@@ -517,13 +443,21 @@ def delete_reverse_related_documents(
                 es_document, instance, avoid_creation=True
             )
             if main_doc:
-                prepare_and_update_fields(
-                    affected_fields, es_document, instance
+                # Update parent document in ES.
+                transaction.on_commit(
+                    partial(
+                        update_es_document.delay,
+                        es_document.__name__,
+                        affected_fields,
+                        (compose_app_label(instance), instance.pk),
+                        None,
+                        None,
+                    )
                 )
                 # Then update all their child documents (Positions)
                 transaction.on_commit(
                     partial(
-                        update_children_documents_by_query.delay,
+                        update_children_docs_by_query.delay,
                         PositionDocument.__name__,
                         instance.pk,
                         affected_fields,
@@ -535,13 +469,21 @@ def delete_reverse_related_documents(
                 es_document, instance, avoid_creation=True
             )
             if main_doc:
-                prepare_and_update_fields(
-                    affected_fields, es_document, instance
+                # Update parent document in ES.
+                transaction.on_commit(
+                    partial(
+                        update_es_document.delay,
+                        es_document.__name__,
+                        affected_fields,
+                        (compose_app_label(instance), instance.pk),
+                        None,
+                        None,
+                    )
                 )
                 # Then update all their child documents (RECAPDocuments)
                 transaction.on_commit(
                     partial(
-                        update_children_documents_by_query.delay,
+                        update_children_docs_by_query.delay,
                         ESRECAPDocument.__name__,
                         instance.pk,
                         affected_fields,
@@ -556,8 +498,16 @@ def delete_reverse_related_documents(
                     es_document, main_object, avoid_creation=True
                 )
                 if main_doc:
-                    prepare_and_update_fields(
-                        affected_fields, es_document, main_object
+                    # Update main document in ES.
+                    transaction.on_commit(
+                        partial(
+                            update_es_document.delay,
+                            es_document.__name__,
+                            affected_fields,
+                            (compose_app_label(main_object), main_object.pk),
+                            None,
+                            None,
+                        )
                     )
 
 

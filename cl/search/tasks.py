@@ -23,6 +23,7 @@ from scorched.exc import SolrError
 
 from cl.audio.models import Audio
 from cl.celery_init import app
+from cl.lib.celery_utils import throttle_task
 from cl.lib.elasticsearch_utils import es_index_exists
 from cl.lib.search_index_utils import InvalidDocumentError
 from cl.people_db.models import Person, Position
@@ -241,100 +242,11 @@ def person_first_time_indexing(parent_id: int, position: Position) -> None:
         )
 
 
-# TODO Old task to be removed.
-@app.task(
-    bind=True,
-    autoretry_for=(ConnectionError,),
-    max_retries=3,
-    interval_start=5,
-)
-def save_document_in_es(
-    self: Task,
-    instance: ESModelType,
-    es_document: ESDocumentClassType,
-) -> SaveDocumentResponseType | None:
-    """Save a document in Elasticsearch using a provided callable.
-
-    :param self: The celery task
-    :param instance: The instance of the document to save.
-    :param es_document: A Elasticsearch DSL document.
-    :return: SaveDocumentResponseType or None
-    """
-    es_args = {}
-    if isinstance(instance, Position):
-        parent_id = getattr(instance.person, "pk", None)
-        if not all(
-            [
-                es_index_exists(es_document._index._name),
-                parent_id,
-                # avoid indexing position records if the parent is not a judge
-                instance.person.is_judge,
-            ]
-        ):
-            return
-        if not PersonDocument.exists(id=parent_id):
-            person_first_time_indexing(parent_id, instance)
-
-        doc_id = ES_CHILD_ID(instance.pk).POSITION
-        es_args["_routing"] = parent_id
-    elif isinstance(instance, Person):
-        # index person records only if they were ever a judge.
-        if not instance.is_judge:
-            self.request.chain = None
-            return None
-        doc_id = instance.pk
-    elif isinstance(instance, RECAPDocument):
-        parent_id = getattr(instance.docket_entry.docket, "pk", None)
-        if not all(
-            [
-                es_index_exists(es_document._index._name),
-                parent_id,
-            ]
-        ):
-            self.request.chain = None
-            return None
-
-        if not DocketDocument.exists(id=parent_id):
-            # create the parent document if it does not exist in ES
-            docket_doc = DocketDocument()
-            doc = docket_doc.prepare(instance.docket_entry.docket)
-            DocketDocument(meta={"id": parent_id}, **doc).save(
-                skip_empty=False, return_doc_meta=True
-            )
-        doc_id = ES_CHILD_ID(instance.pk).RECAP
-        es_args["_routing"] = parent_id
-    else:
-        doc_id = instance.pk
-
-    es_args["meta"] = {"id": doc_id}
-    es_doc = es_document()
-    doc = es_doc.prepare(instance)
-    response = es_document(**es_args, **doc).save(
-        skip_empty=False,
-        return_doc_meta=True,
-        refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
-    )
-    if type(instance) in models_alert_support and response["_version"] == 1:
-        # Only send search alerts when a new instance of a model that support
-        # Alerts is indexed in ES _version:1
-        if es_document == AudioDocument and not waffle.switch_is_active(
-            "oa-es-alerts-active"
-        ):
-            # Disable ES Alerts if oa-es-alerts-active switch is not enabled
-            self.request.chain = None
-            return None
-        return response["_id"], doc
-    else:
-        self.request.chain = None
-        return None
-
-
-# New task.
 @app.task(
     bind=True,
     autoretry_for=(ConnectionError, ConflictError),
     max_retries=5,
-    retry_backoff=3 * 60,
+    retry_backoff=2 * 60,
     retry_backoff_max=10 * 60,
     retry_jitter=True,
     queue=settings.CELERY_ETL_TASK_QUEUE,
@@ -429,30 +341,54 @@ def es_save_document(
         return None
 
 
-# TODO Old task to be removed.
-@app.task(
-    bind=True,
-    autoretry_for=(ConnectionError,),
-    max_retries=3,
-    interval_start=5,
-)
-def update_document_in_es(
-    self: Task,
-    es_document: ESDocumentInstanceType,
-    fields_values_to_update: dict[str, Any],
-) -> None:
-    """Update a document in Elasticsearch.
-    :param self: The celery task
-    :param es_document: The instance of the document to save.
-    :param fields_values_to_update: A dictionary with fields and values to update.
-    :return: None
+def document_fields_to_update(
+    es_document: ESDocumentClassType,
+    main_instance: ESModelType,
+    affected_fields: list[str],
+    instance: ESModelType | None,
+    fields_map: dict,
+) -> dict[str, Any]:
+    """Generate a dictionary of fields and values to update based on a
+     provided map and an instance.
+
+    :param es_document: The Elasticsearch DSL document class.
+    :param main_instance: The main instance to update.
+    :param affected_fields: A list of field names that need to be updated.
+    :param instance: The related instance from which field values are to be
+    extracted.
+    :param fields_map: A map from which ES field names are to be extracted.
+    :return: A dictionary with fields and values to update.
     """
 
-    Document.update(
-        es_document,
-        **fields_values_to_update,
-        refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
-    )
+    fields_to_update = {}
+    if fields_map and instance:
+        # If a fields_maps and a related instance is provided, extract the
+        # fields values from the related instance or using the main instance
+        # prepare methods.
+        for field in affected_fields:
+            document_fields = fields_map[field]
+            for doc_field in document_fields:
+                if field.startswith("get_") and field.endswith("_display"):
+                    fields_to_update[doc_field] = getattr(instance, field)()
+                else:
+                    prepare_method = getattr(
+                        es_document(), f"prepare_{doc_field}", None
+                    )
+                    if prepare_method:
+                        field_value = prepare_method(main_instance)
+                    else:
+                        field_value = getattr(instance, field)
+                    fields_to_update[doc_field] = field_value
+    else:
+        # No fields_map is provided, extract field values only using the main
+        # instance prepare methods.
+        for field in affected_fields:
+            prepare_method = getattr(es_document(), f"prepare_{field}", None)
+            if not prepare_method:
+                continue
+            field_value = prepare_method(main_instance)
+            fields_to_update[field] = field_value
+    return fields_to_update
 
 
 # New task.
@@ -460,16 +396,87 @@ def update_document_in_es(
     bind=True,
     autoretry_for=(ConnectionError, ConflictError),
     max_retries=5,
-    retry_backoff=3 * 60,
+    retry_backoff=2 * 60,
     retry_backoff_max=10 * 60,
     retry_jitter=True,
     queue=settings.CELERY_ETL_TASK_QUEUE,
+)
+def update_es_document(
+    self: Task,
+    es_document_name: str,
+    fields_to_update: list[str],
+    main_instance_data: tuple[str, int],
+    instance_data: tuple[str, int] | None,
+    fields_map: dict | None,
+) -> None:
+    """Update a document in Elasticsearch.
+    :param self: The celery task
+    :param es_document_name: The Elasticsearch document type name.
+    :param fields_to_update: A list containing the fields to update.
+    :param main_instance_data: A two tuple, the main instance app label and the
+    main instance ID to update.
+    :param instance_data: A two-tuple: the related instance's app label and the
+    instance ID from which to extract field values. Returns None if the update
+    doesn't involve a related instance.
+    :param fields_map: A dict containing fields that can be updated or None if
+    mapping is not required for the update.
+    :return: None
+    """
+
+    es_document = getattr(es_document_module, es_document_name)
+    main_app_label, main_instance_id = main_instance_data
+    es_doc = get_doc_from_es(es_document, main_instance_id)
+    if not es_doc:
+        model_label = es_document.Django.model.__name__.capitalize()
+        logger.warning(
+            f"The {model_label} with ID:{main_instance_id} can't updated. "
+            "It has been removed from the index."
+        )
+        return
+
+    # Get the main instance from DB, to extract the latest values.
+    main_model = apps.get_model(main_app_label)
+    main_model_instance = main_model.objects.get(pk=main_instance_id)
+
+    instance = None
+    # If provided, get the related instance from DB to extract the latest values.
+    if instance_data:
+        instance_app_label, instance_id = instance_data
+        instance_model = apps.get_model(instance_app_label)
+        instance = instance_model.objects.get(pk=instance_id)
+
+    # Get the fields to update and their values from DB.
+    fields_values_to_update = document_fields_to_update(
+        es_document,
+        main_model_instance,
+        fields_to_update,
+        instance,
+        fields_map,
+    )
+    Document.update(
+        es_doc,
+        **fields_values_to_update,
+        refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
+    )
+
+
+# TODO Old task to be removed.
+@app.task(
+    bind=True,
+    autoretry_for=(ConnectionError,),
+    max_retries=3,
+    interval_start=5,
+    queue=settings.CELERY_ETL_TASK_QUEUE,
+)
+@throttle_task(
+    settings.ELASTICSEARCH_THROTTLING_TASK_RATE, key="throttling_id"
 )
 def es_document_update(
     self: Task,
     es_document_name: str,
     document_id: int,
     fields_values_to_update: dict[str, Any],
+    throttling_id: str,
 ) -> None:
     """Update a document in Elasticsearch.
     :param self: The celery task
@@ -520,17 +527,20 @@ def get_doc_from_es(
     return main_doc
 
 
-# TODO Old task to be removed.
+# New task.
 @app.task(
     bind=True,
-    autoretry_for=(ConnectionError, NotFoundError),
-    max_retries=3,
-    interval_start=5,
+    autoretry_for=(ConnectionError, ConflictError),
+    max_retries=5,
+    retry_backoff=2 * 60,
+    retry_backoff_max=10 * 60,
+    retry_jitter=True,
+    queue=settings.CELERY_ETL_TASK_QUEUE,
 )
-def update_child_documents_by_query(
+def update_children_docs_by_query(
     self: Task,
-    es_document: ESDocumentClassType,
-    parent_instance: ESModelType,
+    es_document_name: str,
+    parent_instance_id: int,
     fields_to_update: list[str],
     fields_map: dict[str, str] | None = None,
 ) -> None:
@@ -538,21 +548,28 @@ def update_child_documents_by_query(
     API.
 
     :param self: The celery task
-    :param es_document: The Elasticsearch Document type to update.
-    :param parent_instance: The parent instance containing the fields to update.
+    :param es_document_name: The Elasticsearch Document type name to update.
+    :param parent_instance_id: The parent instance ID containing the fields to update.
     :param fields_to_update: List of field names to be updated.
     :param fields_map: A mapping from model fields to Elasticsearch document fields.
     :return: None
     """
 
+    es_document = getattr(es_document_module, es_document_name)
     s = es_document.search()
     main_doc = None
+    parent_instance = None
+    parent_doc_class = None
     if es_document is PositionDocument:
-        s = s.query("parent_id", type="position", id=parent_instance.pk)
-        main_doc = get_doc_from_es(PersonDocument, parent_instance.pk)
+        s = s.query("parent_id", type="position", id=parent_instance_id)
+        parent_doc_class = PersonDocument
+        main_doc = parent_doc_class.exists(parent_instance_id)
+        parent_instance = Person.objects.get(pk=parent_instance_id)
     elif es_document is ESRECAPDocument:
-        s = s.query("parent_id", type="recap_document", id=parent_instance.pk)
-        main_doc = get_doc_from_es(DocketDocument, parent_instance.pk)
+        s = s.query("parent_id", type="recap_document", id=parent_instance_id)
+        parent_doc_class = DocketDocument
+        main_doc = parent_doc_class.exists(parent_instance_id)
+        parent_instance = Docket.objects.get(pk=parent_instance_id)
 
     if not main_doc:
         # Abort bulk update for a not supported document or non-existing parent
@@ -574,7 +591,9 @@ def update_child_documents_by_query(
             script_lines.append(
                 f"ctx._source.{field_name} = params.{field_name};"
             )
-            prepare_method = getattr(main_doc, f"prepare_{field_name}", None)
+            prepare_method = getattr(
+                parent_doc_class(), f"prepare_{field_name}", None
+            )
             if prepare_method:
                 params[field_name] = prepare_method(parent_instance)
             else:
@@ -589,20 +608,22 @@ def update_child_documents_by_query(
         es_document._index.refresh()
 
 
-# New task.
+# TODO Old task to be removed.
 @app.task(
     bind=True,
-    autoretry_for=(ConnectionError, ConflictError),
-    max_retries=5,
-    retry_backoff=3 * 60,
-    retry_backoff_max=10 * 60,
-    retry_jitter=True,
+    autoretry_for=(ConnectionError,),
+    max_retries=3,
+    interval_start=5,
     queue=settings.CELERY_ETL_TASK_QUEUE,
+)
+@throttle_task(
+    settings.ELASTICSEARCH_THROTTLING_TASK_RATE, key="throttling_id"
 )
 def update_children_documents_by_query(
     self: Task,
     es_document_name: str,
     parent_instance_id: int,
+    throttling_id: str,
     fields_to_update: list[str],
     fields_map: dict[str, str] | None = None,
 ) -> None:
@@ -675,7 +696,7 @@ def update_children_documents_by_query(
     bind=True,
     autoretry_for=(ConnectionError, NotFoundError, ConflictError),
     max_retries=5,
-    retry_backoff=3 * 60,
+    retry_backoff=2 * 60,
     retry_backoff_max=10 * 60,
     retry_jitter=True,
     queue=settings.CELERY_ETL_TASK_QUEUE,
@@ -798,7 +819,7 @@ def index_parent_and_child_docs(
     bind=True,
     autoretry_for=(ConnectionError, ConflictError),
     max_retries=5,
-    retry_backoff=3 * 60,
+    retry_backoff=2 * 60,
     retry_backoff_max=10 * 60,
     retry_jitter=True,
     ignore_result=True,
