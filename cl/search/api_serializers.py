@@ -142,12 +142,14 @@ class OpinionSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
     absolute_url = serializers.CharField(
         source="get_absolute_url", read_only=True
     )
+    cluster_id = serializers.ReadOnlyField()
     cluster = serializers.HyperlinkedRelatedField(
         many=False,
         view_name="opinioncluster-detail",
         queryset=OpinionCluster.objects.all(),
         style={"base_template": "input.html"},
     )
+    author_id = serializers.ReadOnlyField()
     author = serializers.HyperlinkedRelatedField(
         many=False,
         view_name="person-detail",
@@ -217,6 +219,7 @@ class OpinionClusterSerializer(
         queryset=Person.objects.all(),
         style={"base_template": "input.html"},
     )
+    docket_id = serializers.ReadOnlyField()
     docket = serializers.HyperlinkedRelatedField(
         many=False,
         view_name="docket-detail",
