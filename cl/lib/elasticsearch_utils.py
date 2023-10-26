@@ -1528,12 +1528,17 @@ def build_full_join_es_queries(
 
         # Adds filter to the parent query to exclude results with no children
         if cd.get("available_only", ""):
+            query = (
+                Q("bool", filter=child_filters)
+                if child_filters
+                else Q("term", is_available=True)
+            )
             parent_filters.append(
                 Q(
                     "has_child",
                     type="recap_document",
                     score_mode="max",
-                    query=Q("term", is_available=True),
+                    query=query,
                 )
             )
         parent_query = None
