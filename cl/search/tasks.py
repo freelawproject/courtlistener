@@ -259,7 +259,7 @@ def get_instance_from_db(
     except ObjectDoesNotExist:
         logger.warning(
             f"The {model.__name__} with ID {instance_id} doesn't exists and it"
-            f"can be updated in ES."
+            f"cannot be updated in ES."
         )
         return None
 
