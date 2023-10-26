@@ -290,63 +290,60 @@ def es_save_document(
     """
     es_args = {}
     es_document = getattr(es_document_module, es_document_name)
-    if app_label == "people_db.Position":
-        instance = get_instance_from_db(instance_id, Position)
-        if not instance:
-            return
-        parent_id = getattr(instance.person, "pk", None)
-        if not all(
-            [
-                es_index_exists(es_document._index._name),
-                parent_id,
-                # avoid indexing position records if the parent is not a judge
-                instance.person.is_judge,
-            ]
-        ):
-            return
-        if not PersonDocument.exists(id=parent_id):
-            person_first_time_indexing(parent_id, instance)
 
-        doc_id = ES_CHILD_ID(instance.pk).POSITION
-        es_args["_routing"] = parent_id
-    elif app_label == "people_db.Person":
-        instance = get_instance_from_db(instance_id, Person)
-        if not instance:
-            return
-        # index person records only if they were ever a judge.
-        if not instance.is_judge:
-            self.request.chain = None
-            return None
-        doc_id = instance.pk
-    elif app_label == "search.RECAPDocument":
-        instance = get_instance_from_db(instance_id, RECAPDocument)
-        if not instance:
-            return
-        parent_id = getattr(instance.docket_entry.docket, "pk", None)
-        if not all(
-            [
-                es_index_exists(es_document._index._name),
-                parent_id,
-            ]
-        ):
-            self.request.chain = None
-            return None
+    # Get the instance to save in ES from DB.
+    model = apps.get_model(app_label)
+    instance = get_instance_from_db(instance_id, model)
+    if not instance:
+        # Abort task the instance is not found in DB.
+        self.request.chain = None
+        return None
+    match app_label:
+        case "people_db.Position":
+            parent_id = getattr(instance.person, "pk", None)
+            if not all(
+                [
+                    es_index_exists(es_document._index._name),
+                    parent_id,
+                    # avoid indexing position records if the parent is not a judge
+                    instance.person.is_judge,
+                ]
+            ):
+                self.request.chain = None
+                return
+            if not PersonDocument.exists(id=parent_id):
+                person_first_time_indexing(parent_id, instance)
 
-        if not DocketDocument.exists(id=parent_id):
-            # create the parent document if it does not exist in ES
-            docket_doc = DocketDocument()
-            doc = docket_doc.prepare(instance.docket_entry.docket)
-            DocketDocument(meta={"id": parent_id}, **doc).save(
-                skip_empty=False, return_doc_meta=True
-            )
-        doc_id = ES_CHILD_ID(instance.pk).RECAP
-        es_args["_routing"] = parent_id
-    else:
-        doc_id = instance_id
-        model = apps.get_model(app_label)
-        instance = get_instance_from_db(instance_id, model)
-        if not instance:
-            return
+            doc_id = ES_CHILD_ID(instance.pk).POSITION
+            es_args["_routing"] = parent_id
+        case "people_db.Person":
+            # index person records only if they were ever a judge.
+            if not instance.is_judge:
+                self.request.chain = None
+                return None
+            doc_id = instance.pk
+        case "search.RECAPDocument":
+            parent_id = getattr(instance.docket_entry.docket, "pk", None)
+            if not all(
+                [
+                    es_index_exists(es_document._index._name),
+                    parent_id,
+                ]
+            ):
+                self.request.chain = None
+                return None
+
+            if not DocketDocument.exists(id=parent_id):
+                # create the parent document if it does not exist in ES
+                docket_doc = DocketDocument()
+                doc = docket_doc.prepare(instance.docket_entry.docket)
+                DocketDocument(meta={"id": parent_id}, **doc).save(
+                    skip_empty=False, return_doc_meta=True
+                )
+            doc_id = ES_CHILD_ID(instance.pk).RECAP
+            es_args["_routing"] = parent_id
+        case _:
+            doc_id = instance_id
 
     es_args["meta"] = {"id": doc_id}
     es_doc = es_document()
@@ -375,23 +372,25 @@ def document_fields_to_update(
     es_document: ESDocumentClassType,
     main_instance: ESModelType,
     affected_fields: list[str],
-    instance: ESModelType | None,
+    related_instance: ESModelType | None,
     fields_map: dict,
 ) -> dict[str, Any]:
     """Generate a dictionary of fields and values to update based on a
      provided map and an instance.
 
     :param es_document: The Elasticsearch DSL document class.
-    :param main_instance: The main instance to update.
+    :param main_instance: The main instance to update, this is the instance
+    that's directly related to the document mapping.
     :param affected_fields: A list of field names that need to be updated.
-    :param instance: The related instance from which field values are to be
-    extracted.
+    :param related_instance: The related instance which is not directly
+    connected to the document mapping, although some of its fields are used to
+    populate the document.
     :param fields_map: A map from which ES field names are to be extracted.
     :return: A dictionary with fields and values to update.
     """
 
     fields_to_update = {}
-    if fields_map and instance:
+    if fields_map and related_instance:
         # If a fields_maps and a related instance is provided, extract the
         # fields values from the related instance or using the main instance
         # prepare methods.
@@ -399,7 +398,9 @@ def document_fields_to_update(
             document_fields = fields_map[field]
             for doc_field in document_fields:
                 if field.startswith("get_") and field.endswith("_display"):
-                    fields_to_update[doc_field] = getattr(instance, field)()
+                    fields_to_update[doc_field] = getattr(
+                        related_instance, field
+                    )()
                 else:
                     prepare_method = getattr(
                         es_document(), f"prepare_{doc_field}", None
@@ -407,7 +408,7 @@ def document_fields_to_update(
                     if prepare_method:
                         field_value = prepare_method(main_instance)
                     else:
-                        field_value = getattr(instance, field)
+                        field_value = getattr(related_instance, field)
                     fields_to_update[doc_field] = field_value
     else:
         # No fields_map is provided, extract field values only using the main
@@ -436,7 +437,7 @@ def update_es_document(
     es_document_name: str,
     fields_to_update: list[str],
     main_instance_data: tuple[str, int],
-    instance_data: tuple[str, int] | None,
+    related_instance_data: tuple[str, int] | None,
     fields_map: dict | None,
 ) -> None:
     """Update a document in Elasticsearch.
@@ -445,9 +446,9 @@ def update_es_document(
     :param fields_to_update: A list containing the fields to update.
     :param main_instance_data: A two tuple, the main instance app label and the
     main instance ID to update.
-    :param instance_data: A two-tuple: the related instance's app label and the
-    instance ID from which to extract field values. Returns None if the update
-    doesn't involve a related instance.
+    :param related_instance_data: A two-tuple: the related instance's app label
+    and the related instance ID from which to extract field values. None if the
+    update doesn't involve a related instance.
     :param fields_map: A dict containing fields that can be updated or None if
     mapping is not required for the update.
     :return: None
@@ -470,13 +471,15 @@ def update_es_document(
     if not main_model_instance:
         return
 
-    instance = None
+    related_instance = None
     # If provided, get the related instance from DB to extract the latest values.
-    if instance_data:
-        instance_app_label, instance_id = instance_data
-        instance_model = apps.get_model(instance_app_label)
-        instance = get_instance_from_db(instance_id, instance_model)
-        if not instance:
+    if related_instance_data:
+        related_instance_app_label, related_instance_id = related_instance_data
+        related_instance_model = apps.get_model(related_instance_app_label)
+        related_instance = get_instance_from_db(
+            related_instance_id, related_instance_model
+        )
+        if not related_instance:
             return
 
     # Get the fields to update and their values from DB.
@@ -484,7 +487,7 @@ def update_es_document(
         es_document,
         main_model_instance,
         fields_to_update,
-        instance,
+        related_instance,
         fields_map,
     )
     Document.update(
