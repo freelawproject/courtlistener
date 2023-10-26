@@ -138,9 +138,10 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
         site = test_oral_arg_scraper.Site()
         site.method = "LOCAL"
         parsed_site = site.parse()
-        cl_scrape_oral_arguments.Command().scrape_court(
-            parsed_site, full_crawl=True
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            cl_scrape_oral_arguments.Command().scrape_court(
+                parsed_site, full_crawl=True
+            )
 
         # There should now be two items in the database.
         audio_files = Audio.objects.all()
