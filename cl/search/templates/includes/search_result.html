@@ -10,17 +10,17 @@
     {% if type == SEARCH_TYPES.PEOPLE or type_override == SEARCH_TYPES.PEOPLE %}
       <a href="{{ result.absolute_url }}?{{ request.META.QUERY_STRING }}"
          class="visitable">
-      {{ result.solr_highlights.name_reverse.0|safe }}
+      {{ result.name|safe }}
       {% if result.court %}
         ({{ result.court|uniq|safeseq|join:", " }})
       {% endif %}
       </a>
 
     {% elif type == SEARCH_TYPES.RECAP or type == SEARCH_TYPES.DOCKETS or type_override == SEARCH_TYPES.RECAP or type_override == SEARCH_TYPES.DOCKETS %}
-      <a href="{{ doc0.docket_absolute_url }}"
+      <a href="{% url 'view_docket' result.docket_id result.docket_slug %}"
          class="visitable">
-      {{ doc0.solr_highlights.caseName.0|safe }}
-      ({% if doc0.court_id != 'scotus' %}{{ doc0.solr_highlights.court_citation_string.0|nbsp|safe }}&nbsp;{% endif %}{{ doc0.dateFiled|date:"Y" }})
+      {{ result.caseName|safe }}
+      ({% if result.court_id != 'scotus' %}{{ result.court_citation_string|safe|nbsp }}{% endif %}{% if result.court_citation_string and result.dateFiled %}&nbsp;{% endif %}{{ result.dateFiled|date:"Y" }})
       </a>
 
     {% elif type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION %}
@@ -50,152 +50,158 @@
 
   {% if type == SEARCH_TYPES.RECAP or type == SEARCH_TYPES.DOCKETS or type_override == SEARCH_TYPES.RECAP or type_override == SEARCH_TYPES.DOCKETS %}
   <div class="bottom">
-    {% if doc0.solr_highlights.docketNumber.0 %}
+    {% if result.docketNumber %}
       <div class="inline-block">
         <span class="meta-data-header">Docket Number:</span>
-        <span class="meta-data-value select-all">{{ doc0.solr_highlights.docketNumber.0|safe }}</span>
+        <span class="meta-data-value select-all">{{ result.docketNumber|safe }}</span>
       </div>
     {% endif %}
     <div class="inline-block">
       <span class="meta-data-header">Date Filed:</span>
-      <time class="meta-data-value" datetime="{{ doc0.dateFiled|date:"Y-m-d" }}">
-        {% if doc0.dateFiled %}
-          {{ doc0.dateFiled|date:"F jS, Y" }}
+      <time class="meta-data-value" datetime="{{ result.dateFiled|date:"Y-m-d" }}">
+        {% if result.dateFiled %}
+          {{ result.dateFiled|date:"F jS, Y" }}
         {% else %}
           Unknown Date
         {% endif %}
       </time>
     </div>
-    {% if doc0.dateArgued %}
+    {% if result.dateArgued %}
       <div class="inline-block">
         <span class="meta-data-header">Date Argued:</span>
         <time class="meta-data-value"
-              datetime="{{ doc0.dateArgued|date:'Y-m-d' }}">
-            {{ doc0.dateArgued|date:"F jS, Y" }}
+              datetime="{{ result.dateArgued|date:'Y-m-d' }}">
+            {{ result.dateArgued|date:"F jS, Y" }}
         </time>
       </div>
     {% endif %}
-    {% if doc0.dateTerminated %}
+    {% if result.dateTerminated %}
       <div class="inline-block">
         <span class="meta-data-header">Date Terminated:</span>
         <time class="meta-data-value"
-              datetime="{{ doc0.dateTerminated|date:'Y-m-d' }}">
-            {{ doc0.dateTerminated|date:"F jS, Y" }}
+              datetime="{{ result.dateTerminated|date:'Y-m-d' }}">
+            {{ result.dateTerminated|date:"F jS, Y" }}
         </time>
       </div>
     {% endif %}
-    {% if doc0.solr_highlights.suitNature.0 %}
+    {% if result.suitNature %}
       <div class="inline-block">
         <span class="meta-data-header">Nature of Suit:</span>
         <span class="meta-data-value">
-          <a href="?type=r&nature_of_suit=&quot;{{ doc0.solr_highlights.suitNature.0|striptags|urlencode }}&quot;">
-              {{ doc0.solr_highlights.suitNature.0|safe }}
+          <a href="?type=r&nature_of_suit=&quot;{{ result.suitNature|striptags|urlencode }}&quot;">
+              {{ result.suitNature|safe }}
           </a>
         </span>
       </div>
     {% endif %}
-    {% if doc0.solr_highlights.cause.0 %}
+    {% if result.cause %}
       <div class="inline-block">
         <span class="meta-data-header">Cause:</span>
         <span class="meta-data-value">
-          <a href="?type=r&cause=&quot;{{ doc0.solr_highlights.cause.0|striptags|urlencode }}&quot;">{{ doc0.solr_highlights.cause.0|safe }}
+          <a href="?type=r&cause=&quot;{{ result.cause|striptags|urlencode }}&quot;">{{ result.cause|safe }}
           </a>
         </span>
       </div>
     {% endif %}
-    {% if doc0.solr_highlights.juryDemand.0 %}
+    {% if result.juryDemand %}
       <div class="inline-block">
         <span class="meta-data-header">Jury Demand:</span>
         <span class="meta-data-value">
-          <a href="?type=r&q=juryDemand:&quot;{{ doc0.solr_highlights.juryDemand.0|striptags|urlencode }}&quot;">
-              {{ doc0.solr_highlights.juryDemand.0|safe }}
+          <a href="?type=r&q=juryDemand:&quot;{{ result.juryDemand|striptags|urlencode }}&quot;">
+              {{ result.juryDemand|safe }}
           </a>
         </span>
       </div>
     {% endif %}
-    {% if doc0.solr_highlights.assignedTo.0 %}
+    {% if result.assignedTo %}
       <div class="inline-block">
         <span class="meta-data-header">Assigned To:</span>
         <span class="meta-data-value">
-          {% if doc0.assigned_to_id %}
-            <a href="?type=r&q=assigned_to_id%3A{{ doc0.assigned_to_id|urlencode }}">
-                {{ doc0.solr_highlights.assignedTo.0|safe }}
+          {% if result.assigned_to_id %}
+            <a href="?type=r&q=assigned_to_id%3A{{ result.assigned_to_id|urlencode }}">
+                {{ result.assignedTo|safe }}
             </a>
           {% else %}
-            <a href="?type=r&assigned_to=&quot;{{ doc0.solr_highlights.assignedTo.0|striptags|urlencode }}&quot;">
-                {{ doc0.solr_highlights.assignedTo.0|safe }}
+            <a href="?type=r&assigned_to=&quot;{{ result.assignedTo|striptags|urlencode }}&quot;">
+                {{ result.assignedTo|safe }}
             </a>
           {% endif %}
         </span>
       </div>
     {% endif %}
-    {% if doc0.solr_highlights.referredTo.0 %}
+    {% if result.referredTo %}
       <div class="inline-block">
         <span class="meta-data-header">Referred To:</span>
         <span class="meta-data-value">
-          {% if doc0.referred_to_id %}
-            <a href="?type=r&q=referred_to_id%3A{{ doc0.referred_to_id|urlencode }}">
-                {{ doc0.solr_highlights.referredTo.0|safe }}
+          {% if result.referred_to_id %}
+            <a href="?type=r&q=referred_to_id%3A{{ result.referred_to_id|urlencode }}">
+                {{ result.referredTo|safe }}
             </a>
           {% else %}
-            <a href="?type=r&referred_to=&quot;{{ doc0.solr_highlights.referredTo.0|striptags|urlencode }}&quot;">
-                {{ doc0.solr_highlights.referredTo.0|safe }}
+            <a href="?type=r&referred_to=&quot;{{ result.referredTo|striptags|urlencode }}&quot;">
+                {{ result.referredTo|safe }}
             </a>
           {% endif %}
         </span>
       </div>
     {% endif %}
-    {% if doc0.party.0 %}
+    {% if result.party %}
       <div class="inline-block">
         <span class="meta-data-header">Parties:</span>
         <span class="meta-data-value">
-            {{ doc0.party|safeseq|join:", "|read_more:"13" }}
+            {{ result.party|safeseq|join:", "|read_more:"13" }}
         </span>
       </div>
     {% endif %}
-    {% if doc0.attorney.0 %}
+    {% if result.attorney %}
       <div class="inline-block">
         <span class="meta-data-header">Attorneys:</span>
         <span class="meta-data-value">
-            {{ doc0.attorney|safeseq|join:", "|read_more:"13" }}
+            {{ result.attorney|safeseq|join:", "|read_more:"13" }}
         </span>
       </div>
     {% endif %}
 
-    {% for doc in result.doclist.docs %}
-    <div class="col-md-offset-half">
-      <h4>
-        <a href="{{ doc.absolute_url }}" class="visitable">{% if doc.solr_highlights.short_description.0 %}{{ doc.solr_highlights.short_description.0|safe }}<span class="gray">&nbsp;&mdash;&nbsp;</span>{% endif %}Document #{{ doc.document_number }}{% if doc.attachment_number %}, Attachment #{{ doc.attachment_number }}{% endif %}
-        </a>
-        {% if not doc.is_available %}
-          <i class="fa fa-ban gray"
-             data-toggle="tooltip"
-             data-placement="right"
-             title="Item not yet in RECAP archive."></i>
-        {% else %}
-          {% if doc.page_count %}
-          <span class="small gray">({{ doc.page_count }} page{{ doc.page_count|pluralize }})</span>
+    {% for doc in result.child_docs %}
+      {% with doc=doc|get_attrdict:"_source" %}
+        <div class="col-md-offset-half">
+          <h4>
+            <a href="{% if doc.absolute_url %}{{ doc.absolute_url }}{% else %}{{ result.docket_absolute_url }}#minute-entry-{{ doc.docket_entry_id }}{% endif %}" class="visitable">{% if doc.short_description %}{{ doc.short_description|safe }}<span class="gray">&nbsp;&mdash;&nbsp;</span>{% endif %}Document #{% if doc.document_number %}{{ doc.document_number }}{% endif %}{% if doc.attachment_number %}, Attachment #{{ doc.attachment_number }}{% endif %}
+            </a>
+            {% if not doc.is_available %}
+              <i class="fa fa-ban gray"
+                 data-toggle="tooltip"
+                 data-placement="right"
+                 title="Item not yet in RECAP archive."></i>
+            {% else %}
+              {% if doc.page_count %}
+              <span class="small gray">({{ doc.page_count }} page{{ doc.page_count|pluralize }})</span>
+              {% endif %}
+            {% endif %}
+          </h4>
+          {% if doc.description %}
+            <div class="inline-block">
+              <span class="meta-data-header">Description:</span>
+              <span class="meta-data-value">
+                {{ doc.description|safe|read_more:"100" }}
+              </span>
+            </div>
           {% endif %}
-        {% endif %}
-      </h4>
-      <p>
-        {% if request.GET.q %}&hellip;{% endif %}
-        {% for frag in doc.solr_highlights.text %}
-          {{ frag|safe|underscore_to_space }}&hellip;
-        {% endfor %}
-      </p>
-    </div>
+          <p class="v-offset-above-1">
+            {% if doc.plain_text %}
+              {% contains_highlights doc.plain_text as highlighted %}
+              {% if highlighted %}&hellip;{% endif %}{{ doc.plain_text|safe|underscore_to_space }} &hellip;
+            {% endif %}
+          </p>
+        </div>
+      {% endwith %}
     {% endfor %}
     <div class="col-md-offset-half">
-      {% with limit=results.object_list.params|get:"group.limit" %}
-      {% with remaining=result.doclist.numFound|sub:limit %}
-      {% if remaining > 0 %}
-      <a href="{% url "show_results" %}?type={{ type|urlencode }}&q={% if request.GET.q %}({{ request.GET.q|urlencode }})%20AND%20{% endif %}docket_id%3A{{ doc0.docket_id|urlencode }}" class="btn-default btn">
-        View {{ remaining }} Additional Result{{ remaining|pluralize }} for this Case
+      {% if result.child_remaining %}
+      <a href="{% url "show_results" %}?type={{ type|urlencode }}&q={% if request.GET.q %}({{ request.GET.q|urlencode }})%20AND%20{% endif %}docket_id%3A{{ result.docket_id|urlencode }}" class="btn-default btn">
+        View Additional Results for this Case
       </a>
       {% endif %}
-      {% endwith %}
-      {% endwith %}
     </div>
   </div>
 
@@ -230,18 +236,18 @@
         <div class="inline-block">
           <span class="meta-data-header">Born:</span>
           <span class="meta-data-value"
-                datetime="{% granular_date result 'dob' granularity=result.date_granularity_dob iso=True %}">
-            {% granular_date result 'dob' granularity=result.date_granularity_dob %}
+                datetime="{% granular_date result.to_dict 'dob' granularity=result.date_granularity_dob iso=True %}">
+            {% granular_date result.to_dict 'dob' granularity=result.date_granularity_dob %}
             {% spaceless %}
-            {% if result.solr_highlights.dob_city.0 or result.solr_highlights.dob_state.0 %}
+            {% if result.dob_city or result.dob_state %}
               <span class="gray">in </span>
-              {% if result.solr_highlights.dob_city.0 %}
-                <span>{{ result.solr_highlights.dob_city.0|safe }}</span>
+              {% if result.dob_city %}
+                <span>{{ result.dob_city|safe }}</span>
               {% endif %}
-              {% if result.solr_highlights.dob_city.0 and result.solr_highlights.dob_state.0 %}<span class="gray">, </span>
+              {% if result.dob_city and result.dob_state %}<span class="gray">, </span>
               {% endif %}
-              {% if result.solr_highlights.dob_state.0 %}
-                <span>{{ result.solr_highlights.dob_state.0|safe }}</span>
+              {% if result.dob_state_id %}
+                <span>{{ result.dob_state_id|safe }}</span>
               {% endif %}
             {% endif %}
             {% endspaceless %}
@@ -252,8 +258,8 @@
         <div class="inline-block">
           <span class="meta-data-header">Deceased:</span>
           <time class="meta-data-value"
-                datetime="{% granular_date result 'dod' granularity=result.date_granularity_dod iso=True %}">
-            {% granular_date result 'dod' granularity=result.date_granularity_dod %}
+                datetime="{% granular_date result.to_dict 'dod' granularity=result.date_granularity_dod iso=True %}">
+            {% granular_date result.to_dict 'dod' granularity=result.date_granularity_dod %}
           </time>
         </div>
       {% endif %}

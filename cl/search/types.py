@@ -4,10 +4,15 @@ from elasticsearch_dsl.response import Hit
 
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
+from cl.people_db.models import Education, Person, Position
 from cl.search.documents import (
     AudioDocument,
     AudioPercolator,
+    DocketDocument,
+    ESRECAPDocument,
     ParentheticalGroupDocument,
+    PersonDocument,
+    PositionDocument,
 )
 from cl.search.models import (
     Citation,
@@ -26,16 +31,27 @@ ESModelType = Union[
     Parenthetical,
     ParentheticalGroup,
     Audio,
+    Person,
+    Position,
+    Education,
 ]
 
 ESDocumentInstanceType = Union[
-    AudioDocument, ParentheticalGroupDocument, AudioPercolator
+    AudioDocument,
+    ParentheticalGroupDocument,
+    AudioPercolator,
+    PersonDocument,
+    PositionDocument,
+    ESRECAPDocument,
 ]
 
 ESDocumentClassType = Union[
     Type[AudioDocument],
     Type[ParentheticalGroupDocument],
     Type[AudioPercolator],
+    Type[PersonDocument],
+    Type[PositionDocument],
+    Type[DocketDocument],
 ]
 
 

@@ -29,7 +29,7 @@ from cl.search.factories import (
     ParentheticalGroupFactory,
 )
 from cl.search.models import PRECEDENTIAL_STATUS, SEARCH_TYPES, Citation
-from cl.tests.cases import ESIndexTestCase, TestCase
+from cl.tests.cases import ESIndexTestCase, TestCase, TransactionTestCase
 
 
 class ParentheticalESTest(ESIndexTestCase, TestCase):
@@ -37,7 +37,6 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.rebuild_index("search.ParentheticalGroup")
         cls.c1 = CourtFactory(id="canb", jurisdiction="I")
         cls.c2 = CourtFactory(id="ca1", jurisdiction="F")
         cls.c3 = CourtFactory(id="cacd", jurisdiction="FB")
@@ -158,6 +157,7 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
         cls.p3.save()
         cls.p4.group = cls.pg4
         cls.p4.save()
+        cls.rebuild_index("search.ParentheticalGroup")
 
     @classmethod
     def setUpClass(cls):
@@ -304,9 +304,12 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
             "type": "pa",
         }
         search_query = ParentheticalGroupDocument.search()
-        s, total_query_results, top_hits_limit = build_es_main_query(
-            search_query, cd
-        )
+        (
+            s,
+            total_query_results,
+            top_hits_limit,
+            total_child_results,
+        ) = build_es_main_query(search_query, cd)
         self.assertEqual(s.count(), 1)
 
     def test_cd_query_2(self) -> None:
@@ -502,22 +505,21 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
         )
 
 
-class ParentheticalESSignalProcessorTest(ESIndexTestCase, TestCase):
+class ParentheticalESSignalProcessorTest(ESIndexTestCase, TransactionTestCase):
     """Parenthetical ES indexing related tests"""
 
-    @classmethod
-    def setUpTestData(cls):
-        # Create factories for the test.
-        cls.c1 = CourtFactory(id="canb", jurisdiction="I")
-        cls.c2 = CourtFactory(id="ca1", jurisdiction="F")
-        cls.cluster_1 = OpinionClusterFactory(
+    def setUp(self):
+        super().setUp()
+        self.c1 = CourtFactory(id="canb", jurisdiction="I")
+        self.c2 = CourtFactory(id="ca1", jurisdiction="F")
+        self.cluster_1 = OpinionClusterFactory(
             case_name="Lorem Ipsum",
             case_name_short="Ipsum",
             judges="Lorem 2",
             scdb_id="0000",
             nature_of_suit="410",
             docket=DocketFactory(
-                court=cls.c1,
+                court=self.c1,
                 docket_number="1:95-cr-11111",
                 date_reargued=date(1986, 1, 30),
                 date_reargument_denied=date(1986, 5, 30),
@@ -526,9 +528,9 @@ class ParentheticalESSignalProcessorTest(ESIndexTestCase, TestCase):
             source="H",
             precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
         )
-        cls.cluster_2 = OpinionClusterFactory(
+        self.cluster_2 = OpinionClusterFactory(
             docket=DocketFactory(
-                court=cls.c1,
+                court=self.c1,
                 docket_number="1:25-cr-1111",
                 date_reargued=date(1986, 1, 30),
                 date_reargument_denied=date(1986, 5, 30),
@@ -537,29 +539,26 @@ class ParentheticalESSignalProcessorTest(ESIndexTestCase, TestCase):
             source="H",
             precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
         )
-        cls.o = OpinionWithParentsFactory(
-            cluster=cls.cluster_1,
+        self.o = OpinionWithParentsFactory(
+            cluster=self.cluster_1,
             type="Plurality Opinion",
             extracted_by_ocr=True,
         )
-        cls.o_2 = OpinionWithParentsFactory(
-            cluster=cls.cluster_2,
+        self.o_2 = OpinionWithParentsFactory(
+            cluster=self.cluster_2,
         )
-        cls.p5 = ParentheticalFactory(
-            describing_opinion=cls.o_2,
-            described_opinion=cls.o_2,
+        self.p5 = ParentheticalFactory(
+            describing_opinion=self.o_2,
+            described_opinion=self.o_2,
             group=None,
             text="Lorem Ipsum Dolor.",
             score=0.4218,
         )
-        cls.pg_test = ParentheticalGroupFactory(
-            opinion=cls.o, representative=cls.p5, score=0.3236, size=1
+        self.pg_test = ParentheticalGroupFactory(
+            opinion=self.o, representative=self.p5, score=0.3236, size=1
         )
-        cls.p5.group = cls.pg_test
-        cls.p5.save()
-
-    def setUp(self):
-        super().setUp()
+        self.p5.group = self.pg_test
+        self.p5.save()
         self.rebuild_index("search.ParentheticalGroup")
 
     def test_keep_in_sync_related_pa_objects_on_save(self) -> None:

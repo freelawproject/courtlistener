@@ -289,6 +289,17 @@ class Docket(AbstractDateTimeModel):
     SCRAPER_AND_HARVARD = 18
     RECAP_AND_SCRAPER_AND_HARVARD = 19
     HARVARD_AND_COLUMBIA = 20
+    COLUMBIA_AND_RECAP_AND_HARVARD = 21
+    COLUMBIA_AND_SCRAPER_AND_HARVARD = 22
+    COLUMBIA_AND_RECAP_AND_SCRAPER_AND_HARVARD = 23
+    IDB_AND_HARVARD = 24
+    RECAP_AND_IDB_AND_HARVARD = 25
+    SCRAPER_AND_IDB_AND_HARVARD = 26
+    RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD = 27
+    COLUMBIA_AND_IDB_AND_HARVARD = 28
+    COLUMBIA_AND_RECAP_AND_IDB_AND_HARVARD = 29
+    COLUMBIA_AND_SCRAPER_AND_IDB_AND_HARVARD = 30
+    COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD = 31
     DIRECT_INPUT = 32
     DIRECT_INPUT_AND_HARVARD = 48
     ANON_2020 = 64
@@ -320,6 +331,32 @@ class Docket(AbstractDateTimeModel):
         (SCRAPER_AND_HARVARD, "Scraper and Harvard"),
         (RECAP_AND_SCRAPER_AND_HARVARD, "RECAP, Scraper and Harvard"),
         (HARVARD_AND_COLUMBIA, "Harvard and Columbia"),
+        (COLUMBIA_AND_RECAP_AND_HARVARD, "Columbia, RECAP, and Harvard"),
+        (COLUMBIA_AND_SCRAPER_AND_HARVARD, "Columbia, Scraper, and Harvard"),
+        (
+            COLUMBIA_AND_RECAP_AND_SCRAPER_AND_HARVARD,
+            "Columbia, RECAP, Scraper, and Harvard",
+        ),
+        (IDB_AND_HARVARD, "IDB and Harvard"),
+        (RECAP_AND_IDB_AND_HARVARD, "RECAP, IDB and Harvard"),
+        (SCRAPER_AND_IDB_AND_HARVARD, "Scraper, IDB and Harvard"),
+        (
+            RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
+            "RECAP, Scraper, IDB and Harvard",
+        ),
+        (COLUMBIA_AND_IDB_AND_HARVARD, "Columbia, IDB, and Harvard"),
+        (
+            COLUMBIA_AND_RECAP_AND_IDB_AND_HARVARD,
+            "Columbia, Recap, IDB, and Harvard",
+        ),
+        (
+            COLUMBIA_AND_SCRAPER_AND_IDB_AND_HARVARD,
+            "Columbia, Scraper, IDB, and Harvard",
+        ),
+        (
+            COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
+            "Columbia, Recap, Scraper, IDB, and Harvard",
+        ),
         (DIRECT_INPUT, "Direct court input"),
         (DIRECT_INPUT_AND_HARVARD, "Direct court input and Harvard"),
         (ANON_2020, "2020 anonymous database"),
@@ -678,6 +715,24 @@ class Docket(AbstractDateTimeModel):
             "date_reargument_denied",
             "docket_number",
             "slug",
+        ]
+    )
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "docket_number",
+            "case_name",
+            "case_name_full",
+            "nature_of_suit",
+            "cause",
+            "jury_demand",
+            "jurisdiction_type",
+            "date_argued",
+            "date_filed",
+            "date_terminated",
+            "assigned_to_id",
+            "assigned_to_str",
+            "referred_to_id",
+            "referred_to_str",
         ]
     )
 
@@ -1163,6 +1218,13 @@ class DocketEntry(AbstractDateTimeModel):
             "PACER docket page."
         ),
         blank=True,
+    )
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "description",
+            "entry_number",
+            "date_filed",
+        ]
     )
 
     class Meta:
@@ -1683,6 +1745,12 @@ class BankruptcyInformation(AbstractDateTimeModel):
     )
     trustee_str = models.TextField(
         help_text="The name of the trustee handling the case.", blank=True
+    )
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "chapter",
+            "trustee_str",
+        ]
     )
 
     class Meta:

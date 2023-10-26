@@ -1,6 +1,6 @@
 import logging
 from datetime import date, timedelta
-from typing import Any, Optional
+from typing import Optional
 
 import waffle
 from asgiref.sync import sync_to_async
@@ -8,6 +8,7 @@ from django.conf import settings
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.template import TemplateDoesNotExist
+from django.views.decorators.cache import cache_page
 from requests import Session
 from rest_framework import status
 from rest_framework.status import HTTP_400_BAD_REQUEST
@@ -23,6 +24,7 @@ from cl.lib.search_utils import (
 from cl.search.documents import AudioDocument
 from cl.search.forms import SearchForm
 from cl.search.models import SEARCH_TYPES, Court, OpinionCluster
+from cl.simple_pages.coverage_utils import build_chart_data
 from cl.simple_pages.views import get_coverage_data_fds
 
 logger = logging.getLogger(__name__)
@@ -181,6 +183,7 @@ def fetch_first_last_date_filed(
     return None, None
 
 
+@cache_page(7 * 60 * 60 * 24, key_prefix="coverage")
 def coverage_data_opinions(request: HttpRequest):
     """Generate Coverage Chart Data
 
@@ -189,37 +192,11 @@ def coverage_data_opinions(request: HttpRequest):
     :param request: The HTTP request
     :return: Timeline data for court(s)
     """
-    data = []
+    chart_data = []
     if request.method == "GET":
-        query_parameters = request.GET.items()
-        grouped_data: dict[str, Any] = {}
-        group_dict = dict(Court.JURISDICTIONS)
-        if query_parameters:
-            for court_name, court_id in query_parameters:
-                first_date, last_date = fetch_first_last_date_filed(
-                    str(court_id)
-                )
-                if not first_date:
-                    continue
-                group = group_dict[Court.objects.get(id=court_id).jurisdiction]
-                court_data = {
-                    "id": court_id,
-                    "label": court_name,
-                    "data": [
-                        {
-                            "val": court_id,
-                            "timeRange": [first_date, last_date],
-                        }
-                    ],
-                }
-                grouped_data.setdefault(group, []).append(court_data)  # type: ignore
-            # Convert data to format for timeline chart and
-            # change jurisdiction from code to string
-            data = [
-                {"group": key, "data": value}
-                for key, value in grouped_data.items()
-            ]
-    return JsonResponse(data, safe=False)
+        court_ids = request.GET.get("court_ids").split(",")  # type: ignore
+        chart_data = build_chart_data(court_ids)
+    return JsonResponse(chart_data, safe=False)
 
 
 async def get_result_count(request, version, day_count):
@@ -254,7 +231,7 @@ async def get_result_count(request, version, day_count):
         cd["argued_after"] = date.today() - timedelta(days=int(day_count))
         cd["argued_before"] = None
         search_query = document_type.search()
-        s = build_es_base_query(search_query, cd)
+        s, _ = build_es_base_query(search_query, cd)
         total_query_results = s.count()
     else:
         with Session() as session:

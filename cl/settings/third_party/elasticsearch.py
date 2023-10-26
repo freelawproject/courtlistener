@@ -33,6 +33,7 @@ ELASTICSEARCH_CA_CERT = env(
     "ELASTICSEARCH_CA_CERT",
     default="/opt/courtlistener/docker/elastic/ca.crt",
 )
+ELASTICSEARCH_TIMEOUT = env("ELASTICSEARCH_TIMEOUT", default=30)
 ELASTICSEARCH_DSL = {
     "default": {
         "hosts": ELASTICSEARCH_DSL_HOST,
@@ -40,6 +41,7 @@ ELASTICSEARCH_DSL = {
         "use_ssl": True,
         "verify_certs": False,
         "ca_certs": ELASTICSEARCH_CA_CERT,
+        "timeout": ELASTICSEARCH_TIMEOUT,
     },
     "analysis": {
         "analyzer": {
@@ -134,6 +136,23 @@ ELASTICSEARCH_OA_ALERTS_NUMBER_OF_REPLICAS = env(
     "ELASTICSEARCH_OA_ALERTS_NUMBER_OF_REPLICAS", default=0
 )
 
+# RECAP Search index shards and replicas
+ELASTICSEARCH_RECAP_NUMBER_OF_SHARDS = env(
+    "ELASTICSEARCH_RECAP_NUMBER_OF_SHARDS", default=1
+)
+ELASTICSEARCH_RECAP_NUMBER_OF_REPLICAS = env(
+    "ELASTICSEARCH_RECAP_NUMBER_OF_REPLICAS", default=0
+)
+
+
+# People Search index shards and replicas
+ELASTICSEARCH_PEOPLE_NUMBER_OF_SHARDS = env(
+    "ELASTICSEARCH_PEOPLE_NUMBER_OF_SHARDS", default=1
+)
+ELASTICSEARCH_PEOPLE_NUMBER_OF_REPLICAS = env(
+    "ELASTICSEARCH_PEOPLE_NUMBER_OF_REPLICAS", default=0
+)
+
 # ES Auto refresh. In production, it's suggested to wait for ES periodically
 # refresh (every ~1 second) since it's a resource-intensive operation.
 # This setting is overridden for testing.
@@ -151,3 +170,11 @@ PERCOLATOR_PAGE_SIZE = 100
 # The maximum number of scheduled hits per alert. #
 ###################################################
 SCHEDULED_ALERT_HITS_LIMIT = 30
+
+
+####################################
+# ES Indexing Throttling task rate #
+####################################
+ELASTICSEARCH_THROTTLING_TASK_RATE = env(
+    "ELASTICSEARCH_THROTTLING_TASK_RATE", default="30/m"
+)
