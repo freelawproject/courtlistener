@@ -1,5 +1,6 @@
 import waffle
 from rest_framework import pagination, permissions, response, status, viewsets
+from rest_framework.pagination import PageNumberPagination
 
 from cl.api.utils import CacheListMixin, LoggingMixin, RECAPUsersReadOnly
 from cl.search import api_utils
@@ -119,6 +120,10 @@ class CourtViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Court.objects.exclude(
         jurisdiction=Court.TESTING_COURT
     ).order_by("position")
+    # Our default pagination blocks deep pagination by overriding
+    # PageNumberPagination. Allow deep pagination, by overriding our default
+    # with this base class.
+    pagination_class = PageNumberPagination
 
 
 class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
