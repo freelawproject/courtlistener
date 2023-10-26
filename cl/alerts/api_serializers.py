@@ -1,10 +1,8 @@
 from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
-from rest_framework.serializers import HyperlinkedRelatedField
 
 from cl.alerts.models import Alert, DocketAlert
 from cl.api.utils import HyperlinkedModelSerializerWithId
-from cl.search.models import Docket
 
 
 class SearchAlertSerializer(
