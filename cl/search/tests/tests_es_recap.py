@@ -1,4 +1,5 @@
 import datetime
+import re
 import unittest
 from unittest import mock
 
@@ -498,12 +499,81 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # Frontend
         await self._test_article_count(params, 1, "document_number")
 
-    async def test_available_only_field(self) -> None:
+    def test_available_only_field(self) -> None:
         """Confirm available only filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "available_only": True}
 
         # Frontend
-        await self._test_article_count(params, 1, "available_only")
+        async_to_sync(self._test_article_count)(params, 1, "available_only")
+
+        # Add docket with no document
+        with self.captureOnCommitCallbacks(execute=True):
+            docket = DocketFactory(
+                court=self.court,
+                case_name="Reese Exploration v. Williams Natural Gas ",
+                date_filed=datetime.date(2015, 8, 16),
+                date_argued=datetime.date(2013, 5, 20),
+                docket_number="5:90-cv-04007",
+                nature_of_suit="440",
+            )
+
+        # perform the previous query and check we still get one result
+        async_to_sync(self._test_article_count)(params, 1, "available_only")
+
+        # perform a text query using the name of the new docket and the available_only filter
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Reese",
+            "available_only": True,
+        }
+        async_to_sync(self._test_article_count)(params, 0, "available_only")
+
+        # add a document that is not available to the new docket
+        with self.captureOnCommitCallbacks(execute=True):
+            entry = DocketEntryWithParentsFactory(
+                docket=docket,
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem",
+            )
+            recap_document = RECAPDocumentFactory(
+                docket_entry=entry,
+                description="New File",
+                document_number="1",
+                is_available=False,
+                page_count=5,
+            )
+
+        # Query all documents but only show results with PDFs
+        params = {"type": SEARCH_TYPES.RECAP, "available_only": True}
+        async_to_sync(self._test_article_count)(params, 1, "available_only")
+
+        # Repeat the text query using the name of the new docket
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Reese",
+            "available_only": True,
+        }
+        async_to_sync(self._test_article_count)(params, 0, "available_only")
+
+        # Update the status of the document to reflect it's available
+        with self.captureOnCommitCallbacks(execute=True):
+            recap_document.is_available = True
+            recap_document.save()
+
+        # Query all documents but only show results with PDFs
+        params = {"type": SEARCH_TYPES.RECAP, "available_only": True}
+        async_to_sync(self._test_article_count)(params, 2, "available_only")
+
+        # Repeat text search, 1 result expected since the doc is available now
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Reese",
+            "available_only": True,
+        }
+        async_to_sync(self._test_article_count)(params, 1, "available_only")
+
+        docket.delete()
 
     async def test_party_name_filter(self) -> None:
         """Confirm party_name filter works properly"""
@@ -747,6 +817,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             0, r.content.decode(), 2, "text query judge"
         )
 
+    @override_settings(NO_MATCH_HL_SIZE=50)
     async def test_results_highlights(self) -> None:
         """Confirm highlights are shown properly"""
 
@@ -763,6 +834,18 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIn("<mark>SERVED</mark>", r.content.decode())
         self.assertIn("<mark>OFF</mark>", r.content.decode())
         self.assertEqual(r.content.decode().count("<mark>OFF</mark>"), 1)
+
+        # Confirm we can limit the length of the plain_text snippet using the
+        # NO_MATCH_HL_SIZE setting.
+        tree = html.fromstring(r.content.decode())
+        plain_text = tree.xpath(
+            '(//article)[1]/div[@class="bottom"]/div[@class="col-md-offset-half"]/p/text()'
+        )
+        # Clean the plain_text string.
+        plain_text_string = plain_text[0].strip()
+        cleaned_plain_text = re.sub(r"\s+", " ", plain_text_string)
+        cleaned_plain_text = cleaned_plain_text.replace("…", "")
+        self.assertLess(len(cleaned_plain_text), 50)
 
         # Highlight assigned_to.
         params = {"type": SEARCH_TYPES.RECAP, "q": "Thalassa Miller"}
