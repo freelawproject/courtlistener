@@ -19,7 +19,7 @@ import re
 import sys
 from datetime import date
 from difflib import SequenceMatcher
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup, NavigableString, Tag
@@ -143,14 +143,17 @@ class DateException(Exception):
         self.message = message
 
 
-def format_case_name(n):
+def format_case_name(name: str) -> str:
     """Applies standard harmonization methods after normalizing with
-    lowercase."""
-    return titlecase(harmonize(n.lower()))
+    lowercase.
+    :param name: case name
+    :return: title cased name
+    """
+    return titlecase(harmonize(name.lower()))
 
 
 def match_text_lists(
-    file_opinions_list: List[Any], cl_opinions_list: List[Any]
+    file_opinions_list: list[Any], cl_opinions_list: list[Any]
 ) -> dict[int, int]:
     """Generate matching lists above threshold
     :param file_opinions_list: Opinions from file
@@ -168,11 +171,17 @@ def match_text_lists(
     for i, row in enumerate(scores):
         j = row.argmax()  # type: ignore
         # Lower threshold for small opinions.
+        # Remove non-alphanumeric and non-whitespace characters from lowercased text,
+        # this tries to make both texts in equal conditions to prove if both are
+        # similar or equal
+        file_opinion = re.sub(
+            r"[^a-zA-Z0-9 ]", "", file_opinions_list[i].lower()
+        )
+        cl_opinion = re.sub(r"[^a-zA-Z0-9 ]", "", cl_opinions_list[j].lower())
+
         # NOTE: get_cosine_similarity works great when both texts are almost the same
         # with very small variations
-        cosine_sim = get_cosine_similarity(
-            file_opinions_list[i], cl_opinions_list[j]
-        )
+        cosine_sim = get_cosine_similarity(file_opinion, cl_opinion)
         # NOTE: compare_documents works good when the opinion from the file is a
         # subset of the opinion in CL, the percentage represents how much of the
         # opinion of the file is in the opinion from cl (content in cl opinion can
@@ -180,9 +189,7 @@ def match_text_lists(
         # id: 7643871 we have the posture and the opinion text but in the xml file we
         # only have the opinion text, cosine_sim: 0.1639075094124459 and
         # percent_match: 73)
-        percent_match = compare_documents(
-            file_opinions_list[i], cl_opinions_list[j]
-        )
+        percent_match = compare_documents(file_opinion, cl_opinion)
 
         # Sometimes one algorithm performs better than the other, this is due to some
         # additional text, such as editor's notes, or the author, page number or posture
@@ -198,12 +205,20 @@ def match_text_lists(
     return matches
 
 
-def clean_opinion_content(content: str) -> str:
+def clean_opinion_content(content: str, harvard_content: bool) -> str:
     """Strip all non-alphanumeric characters
     :param content: content from opinion
+    :param harvard_content: true if content is from harvard
     :return: cleaned content
     """
     soup = BeautifulSoup(content, features="html.parser")
+
+    if harvard_content:
+        for op in soup.select("opinion"):
+            # Remove any author tag inside opinion
+            for extra in op.find_all(["author"]):
+                extra.extract()
+
     prep_text = re.sub(
         r"[^a-zA-Z0-9 ]", "", soup.getText(separator=" ").lower()
     )
@@ -212,7 +227,7 @@ def clean_opinion_content(content: str) -> str:
 
 
 def get_cl_opinion_content(
-    cluster_id,
+    cluster_id: int,
 ) -> tuple[Optional[str], list[dict[Any, Any]]]:
     """Get the opinions content for a cluster object
     :param cluster_id: Cluster ID for a set of opinions
@@ -226,6 +241,7 @@ def get_cl_opinion_content(
         if op.local_path and not xml_path:
             xml_path = str(op.local_path)
         content = None
+        harvard_content = False
         if len(op.html_with_citations) > 1:
             content = op.html_with_citations
         elif len(op.html_columbia) > 1:
@@ -238,8 +254,11 @@ def get_cl_opinion_content(
             content = op.html
         elif len(op.xml_harvard) > 1:
             content = op.xml_harvard
+            harvard_content = True
         if content:
-            prep_text = clean_opinion_content(content)
+            prep_text = clean_opinion_content(
+                content, harvard_content=harvard_content
+            )
             cl_cleaned_opinions.append(
                 {
                     "id": op.id,
@@ -252,7 +271,7 @@ def get_cl_opinion_content(
     return xml_path, cl_cleaned_opinions
 
 
-def fix_xml_tags(xml_filepath) -> tuple[str, bool]:
+def fix_xml_tags(xml_filepath: str) -> tuple[str, bool]:
     """This function fixes the bad tags in columbia xml files
     :param xml_filepath: path to xml file
     :return: string with content, bool that indicates if opinion is unpublished or not
@@ -762,7 +781,7 @@ def map_and_merge_opinions(
     cluster_id: int,
     cl_cleaned_opinions: list[dict],
     columbia_opinions: list[dict],
-):
+) -> None:
     """Map and merge opinion data
     :param cluster_id: Cluster id
     :param cl_cleaned_opinions: list of cl opinions
@@ -772,7 +791,10 @@ def map_and_merge_opinions(
     if len(columbia_opinions) == len(cl_cleaned_opinions):
         # We need that both list to be cleaned, so we can have a more accurate match
         matches = match_text_lists(
-            [clean_opinion_content(op["opinion"]) for op in columbia_opinions],
+            [
+                clean_opinion_content(op["opinion"], harvard_content=False)
+                for op in columbia_opinions
+            ],
             [op.get("opinion") for op in cl_cleaned_opinions],
         )
         if len(matches) == len(columbia_opinions):
@@ -818,7 +840,7 @@ def map_and_merge_opinions(
         )
 
 
-def fetch_columbia_metadata(columbia_data) -> Dict[str, Any]:
+def fetch_columbia_metadata(columbia_data: dict) -> dict[str, Any]:
     """Extract only the desired fields
     :param columbia_data: dict with columbia data
     :return: reduced dict
@@ -850,7 +872,7 @@ def combine_non_overlapping_data(
     :return: Optional dictionary of data to continue to merge
     """
     all_data = fetch_columbia_metadata(columbia_data)
-    changed_values_dictionary: dict[str, Tuple] = {}
+    changed_values_dictionary: dict[str, tuple] = {}
     new_values: dict[str, Any] = {}
     for key, value in all_data.items():
         cl_value = getattr(cluster, key)
@@ -901,7 +923,7 @@ def merge_docket_numbers(cluster: OpinionCluster, docket_number: str) -> None:
 
 
 def merge_case_names(
-    cluster: OpinionCluster, columbia_data: Dict[str, Any]
+    cluster: OpinionCluster, columbia_data: dict[str, Any]
 ) -> dict[str, Any]:
     """Merge case names
     :param cluster: The cluster of the merging item
@@ -976,7 +998,7 @@ def merge_date_filed(
 
 def merge_long_fields(
     field_name: str,
-    overlapping_data: Optional[Tuple[str, str]],
+    overlapping_data: Optional[tuple[str, str]],
     cluster_id: int,
 ) -> dict[str, Any]:
     """Merge two long text fields
@@ -1005,7 +1027,7 @@ def merge_long_fields(
 
 
 def merge_strings(
-    field_name: str, overlapping_data: Tuple[str, str]
+    field_name: str, overlapping_data: tuple[str, str]
 ) -> dict[str, Any]:
     """Compare two strings and choose the largest
 
@@ -1024,7 +1046,7 @@ def merge_strings(
 
 
 def merge_judges(
-    overlapping_data: Optional[Tuple[str, str]],
+    overlapping_data: Optional[tuple[str, str]],
 ) -> dict[str, Any]:
     """Merge overlapping judge values
     :param overlapping_data: data to compare from columbia and courtlistener
@@ -1145,7 +1167,7 @@ def update_panel(
     cluster: OpinionCluster,
     panel_list: list[str],
     panel_date: Optional[date] = None,
-):
+) -> None:
     """Update cluster's panel
     :param cluster: the cluster object
     :param panel_list: list with people names
@@ -1186,7 +1208,7 @@ def process_cluster(
     xml_dir: str,
     filepath: str = "",
     csv_file: bool = False,
-):
+) -> None:
     """Merge specified cluster id
     :param cluster_id: Cluster object id to merge
     :param xml_dir: path to mounted dir
@@ -1198,6 +1220,13 @@ def process_cluster(
         cluster = OpinionCluster.objects.get(pk=cluster_id)
     except OpinionCluster.DoesNotExist:
         logger.info(f"Cluster ID: {cluster_id} doesn't exist")
+        return
+
+    if (
+        cluster.docket.source in VALID_UPDATED_DOCKET_SOURCES
+        or cluster.source in VALID_MERGED_SOURCES
+    ):
+        # Early abort if docket or cluster already merged
         return
 
     xml_path, cl_cleaned_opinions = get_cl_opinion_content(cluster.id)
@@ -1303,7 +1332,7 @@ def process_cluster(
         )
 
 
-def process_csv_file(csv_path, mounted_xml_dir: str) -> None:
+def process_csv_file(csv_path: str, mounted_xml_dir: str) -> None:
     """Process xml files from a list of cluster ids in csv file
     :param csv_path: Absolute path to csv file
     :param mounted_xml_dir: Path to mounted dir
