@@ -19,7 +19,7 @@ import traceback
 from datetime import date
 from glob import glob
 from random import shuffle
-from typing import Any
+from typing import Any, Optional
 
 import dateutil.parser as dparser
 from bs4 import BeautifulSoup, NavigableString, Tag
@@ -486,12 +486,37 @@ def get_text(xml_filepath: str) -> dict:
     return data
 
 
-def parse_file(file_path: str) -> dict:
+def fix_filepath(xml_path: str, xml_dir: str) -> str:
+    """Build the correct filepath to xml file
+    :param xml_path: current file path
+    :param xml_dir: mounted dir where the xml files are
+    :return: fixed filepath with mounted dir
+    """
+    if (
+        xml_path
+        and "/home/mlissner/columbia/opinions/" in xml_path
+        or "/Users/Palin/Work/columbia/usb/" in xml_path
+    ):
+        filepath = xml_path.replace(
+            "/home/mlissner/columbia/opinions/", ""
+        ).replace("/Users/Palin/Work/columbia/usb/", "")
+        return os.path.join(xml_dir, filepath)
+
+    return os.path.join(xml_dir, xml_path)
+
+
+def parse_file(
+    file_path: str, xml_dir: Optional[str] = None, csv_file: bool = False
+) -> dict:
     """Parses a file, turning it into a correctly formatted dictionary,
     ready to be used by a populate script.
     :param file_path: A path the file to be parsed.
+    :param xml_dir: path to mounted dir
     :return: dict with parsed data
     """
+
+    if csv_file and xml_dir:
+        file_path = fix_filepath(file_path, xml_dir)
 
     raw_info = get_text(file_path)
     info = {
@@ -597,10 +622,11 @@ def parse_file(file_path: str) -> dict:
     return info
 
 
-def process_csv_file(csv_path, debug):
+def process_csv_file(csv_path: str, debug: bool, mounted_xml_dir: str) -> None:
     """
     Import xml files from a list of paths in csv file
     :param csv_path: Absolute path to csv file
+    :param mounted_xml_dir: Path to mounted dir
     :param debug: set true to fake process
     """
     logger.info(f"Loading csv file at {csv_path}")
@@ -613,7 +639,9 @@ def process_csv_file(csv_path, debug):
             if xml_path and os.path.exists(xml_path):
                 try:
                     logger.info(f"Processing opinion at {xml_path}")
-                    parsed = parse_file(xml_path)
+                    parsed = parse_file(
+                        xml_path, xml_dir=mounted_xml_dir, csv_file=True
+                    )
                     add_new_case(parsed, testing=debug)
                 except Exception as e:
                     known = [
@@ -636,7 +664,7 @@ def process_csv_file(csv_path, debug):
                 logger.info(f"The file doesn't exist: {xml_path}")
 
 
-def parse_opinions(options):
+def parse_opinions(options) -> None:
     """Runs through a directory of the form /data/[state]/[sub]/.../[folders]/[.xml documents].
     Parses each .xml document, instantiates the associated model object, and
     saves the object. Prints/logs status updates and tracebacks instead of
@@ -876,22 +904,29 @@ class Command(VerboseCommand):
             help="Don't change the data.",
         )
         parser.add_argument(
-            "--csv",
+            "--csv-file",
             required=False,
             help="The absolute path to the CSV containing the path to the xml files "
             "to import",
         )
+        parser.add_argument(
+            "--xml-dir",
+            default="/tmp/columbia",
+            required=False,
+            help="The absolute path to the directory with columbia xml files",
+        )
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
-        if not options["csv"] and not options["dir"]:
-            logger.warning("At least one option required: --csv or --dir")
+        if not options["csv_file"] and not options["dir"]:
+            logger.warning("At least one option required: --csv-file or --dir")
             return
-        if options["csv"]:
-            if not os.path.exists(options["csv"]):
+        if options["csv_file"]:
+            if not os.path.exists(options["csv_file"]):
                 logger.warning("CSV file doesn't exist.")
                 return
-            process_csv_file(options["csv"], options["debug"])
-
+            process_csv_file(
+                options["csv_file"], options["debug"], options["xml_dir"]
+            )
         else:
             parse_opinions(options)
