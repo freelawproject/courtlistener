@@ -9,6 +9,7 @@ import waffle
 from celery import Task
 from django.apps import apps
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 from django.utils.timezone import now
 from elasticsearch.exceptions import (
     ConflictError,
@@ -44,6 +45,7 @@ from cl.search.models import (
 from cl.search.types import (
     ESDocumentClassType,
     ESDocumentInstanceType,
+    ESModelClassType,
     ESModelType,
     SaveDocumentResponseType,
 )
@@ -242,6 +244,26 @@ def person_first_time_indexing(parent_id: int, position: Position) -> None:
         )
 
 
+def get_instance_from_db(
+    instance_id: int, model: ESModelClassType
+) -> ESModelType | None:
+    """Get a model instance from DB or return None if it doesn't exist.
+
+    :param instance_id: The primary key of the parent instance.
+    :param model: The model class of the instance.
+    :return: The object instance or None if it doesn't exist.
+    """
+
+    try:
+        return model.objects.get(pk=instance_id)
+    except ObjectDoesNotExist:
+        logger.warning(
+            f"The {model.__name__} with ID {instance_id} doesn't exists and it"
+            f"can be updated in ES."
+        )
+        return None
+
+
 @app.task(
     bind=True,
     autoretry_for=(ConnectionError, ConflictError),
@@ -269,7 +291,9 @@ def es_save_document(
     es_args = {}
     es_document = getattr(es_document_module, es_document_name)
     if app_label == "people_db.Position":
-        instance = Position.objects.get(pk=instance_id)
+        instance = get_instance_from_db(instance_id, Position)
+        if not instance:
+            return
         parent_id = getattr(instance.person, "pk", None)
         if not all(
             [
@@ -286,14 +310,18 @@ def es_save_document(
         doc_id = ES_CHILD_ID(instance.pk).POSITION
         es_args["_routing"] = parent_id
     elif app_label == "people_db.Person":
-        instance = Person.objects.get(pk=instance_id)
+        instance = get_instance_from_db(instance_id, Person)
+        if not instance:
+            return
         # index person records only if they were ever a judge.
         if not instance.is_judge:
             self.request.chain = None
             return None
         doc_id = instance.pk
     elif app_label == "search.RECAPDocument":
-        instance = RECAPDocument.objects.get(pk=instance_id)
+        instance = get_instance_from_db(instance_id, RECAPDocument)
+        if not instance:
+            return
         parent_id = getattr(instance.docket_entry.docket, "pk", None)
         if not all(
             [
@@ -316,7 +344,9 @@ def es_save_document(
     else:
         doc_id = instance_id
         model = apps.get_model(app_label)
-        instance = model.objects.get(pk=instance_id)
+        instance = get_instance_from_db(instance_id, model)
+        if not instance:
+            return
 
     es_args["meta"] = {"id": doc_id}
     es_doc = es_document()
@@ -436,14 +466,18 @@ def update_es_document(
 
     # Get the main instance from DB, to extract the latest values.
     main_model = apps.get_model(main_app_label)
-    main_model_instance = main_model.objects.get(pk=main_instance_id)
+    main_model_instance = get_instance_from_db(main_instance_id, main_model)
+    if not main_model_instance:
+        return
 
     instance = None
     # If provided, get the related instance from DB to extract the latest values.
     if instance_data:
         instance_app_label, instance_id = instance_data
         instance_model = apps.get_model(instance_app_label)
-        instance = instance_model.objects.get(pk=instance_id)
+        instance = get_instance_from_db(instance_id, instance_model)
+        if not instance:
+            return
 
     # Get the fields to update and their values from DB.
     fields_values_to_update = document_fields_to_update(
@@ -564,12 +598,16 @@ def update_children_docs_by_query(
         s = s.query("parent_id", type="position", id=parent_instance_id)
         parent_doc_class = PersonDocument
         main_doc = parent_doc_class.exists(parent_instance_id)
-        parent_instance = Person.objects.get(pk=parent_instance_id)
+        parent_instance = get_instance_from_db(parent_instance_id, Person)
+        if not parent_instance:
+            return
     elif es_document is ESRECAPDocument:
         s = s.query("parent_id", type="recap_document", id=parent_instance_id)
         parent_doc_class = DocketDocument
         main_doc = parent_doc_class.exists(parent_instance_id)
-        parent_instance = Docket.objects.get(pk=parent_instance_id)
+        parent_instance = get_instance_from_db(parent_instance_id, Docket)
+        if not parent_instance:
+            return
 
     if not main_doc:
         # Abort bulk update for a not supported document or non-existing parent
@@ -710,7 +748,10 @@ def index_docket_parties_in_es(
     :param docket_id: The docket ID to update in ES.
     :return: None
     """
-    docket = Docket.objects.get(id=docket_id)
+
+    docket = get_instance_from_db(docket_id, Docket)
+    if not docket:
+        return
     parties_prepared = DocketDocument().prepare_parties(docket)
     fields_to_update = {
         key: list(set_values) for key, set_values in parties_prepared.items()
