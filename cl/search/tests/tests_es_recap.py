@@ -600,6 +600,18 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 is_available=True,
                 page_count=5,
             )
+            e_2_d_1 = DocketEntryWithParentsFactory(
+                docket=docket,
+                entry_number=2,
+                date_filed=datetime.date(2015, 8, 19),
+                description="Not available document for the League of Voluntary Hospitals and Homes of New York",
+            )
+            RECAPDocumentFactory(
+                docket_entry=e_2_d_1,
+                document_number="2",
+                is_available=False,
+                page_count=5,
+            )
 
             docket_2 = DocketFactory(
                 court=self.court,
@@ -679,11 +691,34 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIn("Document #27", r.content.decode())
         self.assertNotIn("Document #14", r.content.decode())
 
+        # Query all documents with the word "Voluntary" in the description and case name
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Voluntary",
+            "description": "Voluntary",
+        }
+        r = async_to_sync(self._test_article_count)(
+            params, 1, "case_name + description + available_only"
+        )
+        self.assertIn("Document #1", r.content.decode())
+        self.assertIn("Document #2", r.content.decode())
+
         # Query all documents with the word "Voluntary" in the description and case name and only show results with PDFs
         params = {
             "type": SEARCH_TYPES.RECAP,
             "case_name": "Voluntary",
             "description": "Voluntary",
+            "available_only": True,
+        }
+        r = async_to_sync(self._test_article_count)(
+            params, 1, "case_name + description + available_only"
+        )
+        self.assertIn("Document #1", r.content.decode())
+
+        # test the combination of the text query and the available_only filter
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Voluntary Hospitals",
             "available_only": True,
         }
         r = async_to_sync(self._test_article_count)(
