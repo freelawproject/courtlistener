@@ -742,6 +742,59 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # Frontend, 1 result expected since RECAPDocuments are grouped by case
         await self._test_article_count(params, 1, "party_name")
 
+    def test_party_name_and_children_filter(self) -> None:
+        """Confirm dockets with children are shown when using the party filter"""
+        with self.captureOnCommitCallbacks(execute=True):
+            docket = DocketFactory(
+                court=self.court,
+                case_name="NYU Hospitals Center v. League of Voluntary Hospitals",
+                date_filed=datetime.date(2015, 8, 16),
+                date_argued=datetime.date(2013, 5, 20),
+                docket_number="1:17-cv-04465",
+                nature_of_suit="440",
+            )
+            e_1_d_1 = DocketEntryWithParentsFactory(
+                docket=docket,
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="United Healthcare Workers East, League of Voluntary Hospitals and Homes of New York",
+            )
+            RECAPDocumentFactory(
+                docket_entry=e_1_d_1,
+                document_number="1",
+                is_available=True,
+                page_count=5,
+            )
+            e_2_d_1 = DocketEntryWithParentsFactory(
+                docket=docket,
+                entry_number=2,
+                date_filed=datetime.date(2015, 8, 19),
+                description="Not available document for the League of Voluntary Hospitals and Homes of New York",
+            )
+            RECAPDocumentFactory(
+                docket_entry=e_2_d_1,
+                document_number="2",
+                is_available=False,
+                page_count=5,
+            )
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "hospital",
+            "description": "voluntary",
+            "party_name": "Frank Paul Sabatini",
+        }
+
+        # Frontend, 1 result expected since RECAPDocuments are grouped by case
+        r = async_to_sync(self._test_article_count)(
+            params, 1, "text query + description + party_name"
+        )
+        self.assertIn("Document #1", r.content.decode())
+        self.assertIn("Document #2", r.content.decode())
+
+        with self.captureOnCommitCallbacks(execute=True):
+            docket.delete()
+
     async def test_atty_name_filter(self) -> None:
         """Confirm atty_name filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "atty_name": "Debbie Russell"}
