@@ -621,7 +621,9 @@ def update_children_docs_by_query(
     ubq = (
         UpdateByQuery(using=client, index=es_document._index._name)
         .query(s.to_dict()["query"])
-        .params(slices="auto")
+        .params(
+            slices=es_document._index._settings["number_of_shards"]
+        )  # Set slices equal to the number of shards.
     )
 
     script_lines = []
@@ -842,8 +844,10 @@ def index_parent_and_child_docs(
             "_op_type": "index",
             "_index": parent_es_document._index._name,
         }
+
+        BATCH_SIZE = 200
         child_docs_to_index = []
-        for child in child_docs.iterator():
+        for i, child in enumerate(child_docs.iterator()):
             child_doc = child_es_document().prepare(child)
             child_params = {
                 "_id": getattr(ES_CHILD_ID(child.pk), child_id_property),
@@ -853,8 +857,13 @@ def index_parent_and_child_docs(
             child_doc.update(child_params)
             child_docs_to_index.append(child_doc)
 
-        # Perform bulk indexing for child documents
-        bulk(client, child_docs_to_index)
+            if i % BATCH_SIZE == 0:
+                bulk(client, child_docs_to_index)
+                child_docs_to_index.clear()
+
+        # Index the last batch
+        if child_docs_to_index:
+            bulk(client, child_docs_to_index)
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
