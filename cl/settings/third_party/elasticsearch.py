@@ -178,3 +178,10 @@ SCHEDULED_ALERT_HITS_LIMIT = 30
 ELASTICSEARCH_THROTTLING_TASK_RATE = env(
     "ELASTICSEARCH_THROTTLING_TASK_RATE", default="30/m"
 )
+
+################################
+# ES bulk indexing batch size #
+################################
+ELASTICSEARCH_BULK_BATCH_SIZE = env(
+    "ELASTICSEARCH_BULK_BATCH_SIZE", default=200
+)

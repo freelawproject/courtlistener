@@ -845,7 +845,6 @@ def index_parent_and_child_docs(
             "_index": parent_es_document._index._name,
         }
 
-        BATCH_SIZE = 200
         child_docs_to_index = []
         for i, child in enumerate(child_docs.iterator()):
             child_doc = child_es_document().prepare(child)
@@ -857,7 +856,7 @@ def index_parent_and_child_docs(
             child_doc.update(child_params)
             child_docs_to_index.append(child_doc)
 
-            if i % BATCH_SIZE == 0:
+            if i % settings.ELASTICSEARCH_BULK_BATCH_SIZE == 0:
                 bulk(client, child_docs_to_index)
                 child_docs_to_index.clear()
 
