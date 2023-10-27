@@ -22,7 +22,7 @@ from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
-from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from reporters_db import (
     EDITIONS,
     NAMES_TO_EDITIONS,
@@ -1103,6 +1103,7 @@ def citation_redirector(
     return HttpResponse(status=500)
 
 
+@csrf_exempt
 def citation_homepage(request: HttpRequest) -> HttpResponse:
     """Show the citation homepage"""
     if request.method == "POST":
