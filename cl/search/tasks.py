@@ -618,8 +618,10 @@ def update_children_docs_by_query(
         return
 
     client = connections.get_connection()
-    ubq = UpdateByQuery(using=client, index=es_document._index._name).query(
-        s.to_dict()["query"]
+    ubq = (
+        UpdateByQuery(using=client, index=es_document._index._name)
+        .query(s.to_dict()["query"])
+        .params(slices="auto")
     )
 
     script_lines = []
