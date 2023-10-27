@@ -888,6 +888,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = async_to_sync(self._test_article_count)(params, 1, "docket_number")
         # Count child documents under docket.
         self._count_child_documents(0, r.content.decode(), 6, "docket_number")
+        # The "See full docket for details" button is shown if the case has
+        # more entries than VIEW_MORE_CHILD_HITS.
+        self.assertIn("See full docket for details", r.content.decode())
         self.assertNotIn("View Additional Results for", r.content.decode())
 
         # Constraint filter:
@@ -909,7 +912,23 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "View Additional Results for this Case", r.content.decode()
         )
 
+        # Remove 1 RECAPDocument to ensure the docket does not contain more than
+        # VIEW_MORE_CHILD_HITS entries.
         rd_1.delete()
+        # View additional results query:
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": f"docket_id:{self.de.docket.id}",
+        }
+        # Frontend
+        r = async_to_sync(self._test_article_count)(params, 1, "docket_number")
+        # Count child documents under docket.
+        self._count_child_documents(0, r.content.decode(), 6, "docket_number")
+        # The "See full docket for details" button is not shown because the case
+        # does not contain more than VIEW_MORE_CHILD_HITS entries.
+        self.assertNotIn("See full docket for details", r.content.decode())
+        self.assertNotIn("View Additional Results for", r.content.decode())
+
         rd_2.delete()
         rd_3.delete()
         rd_4.delete()

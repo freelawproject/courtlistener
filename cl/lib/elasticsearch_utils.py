@@ -1606,6 +1606,9 @@ def limit_inner_hits(
             return
 
     for result in results:
+        result["child_docs"] = []
+        result["child_remaining"] = False
+        result["child_remaining_query_id"] = False
         try:
             inner_hits = [
                 hit
@@ -1614,17 +1617,18 @@ def limit_inner_hits(
                 ]["hits"]["hits"]
             ]
         except KeyError:
-            result["child_docs"] = []
-            result["child_remaining"] = False
             continue
 
+        docket_id_query = re.search(r"docket_id:\d+", get_params.get("q", ""))
         count_hits = len(inner_hits)
         if count_hits > hits_limit:
             result["child_docs"] = inner_hits[:hits_limit]
-            result["child_remaining"] = True
+            if docket_id_query:
+                result["child_remaining_query_id"] = True
+            else:
+                result["child_remaining"] = True
         else:
             result["child_docs"] = inner_hits
-            result["child_remaining"] = False
 
 
 def get_child_top_hits_limit(
@@ -1654,7 +1658,7 @@ def get_child_top_hits_limit(
     docket_id_query = re.search(r"docket_id:\d+", search_params.get("q", ""))
     if docket_id_query:
         frontend_hits_limit = settings.VIEW_MORE_CHILD_HITS
-        query_hits_limit = settings.VIEW_MORE_CHILD_HITS
+        query_hits_limit = settings.VIEW_MORE_CHILD_HITS + 1
 
     return frontend_hits_limit, query_hits_limit
 
