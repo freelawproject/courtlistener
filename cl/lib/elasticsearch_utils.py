@@ -1484,6 +1484,8 @@ def build_full_join_es_queries(
         parent_filters = build_join_es_filters(cd)
         # If parent filters, extend into child_filters.
         if parent_filters:
+            # Removes the party and attorney filter if they were provided because
+            # those fields are not part of the RECAPDocument mapping.
             child_filters.extend(
                 [
                     query
