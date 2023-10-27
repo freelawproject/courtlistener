@@ -1484,7 +1484,16 @@ def build_full_join_es_queries(
         parent_filters = build_join_es_filters(cd)
         # If parent filters, extend into child_filters.
         if parent_filters:
-            child_filters.extend(parent_filters)
+            # Removes the party and attorney filter if they were provided because
+            # those fields are not part of the RECAPDocument mapping.
+            child_filters.extend(
+                [
+                    query
+                    for query in parent_filters
+                    if not isinstance(query, QueryString)
+                    or query.fields[0] not in ["party", "attorney"]
+                ]
+            )
         if child_filters:
             child_filters = reduce(operator.iand, child_filters)
         # Build the child query based on child_filters and child child_text_query
@@ -1527,13 +1536,13 @@ def build_full_join_es_queries(
         )
 
         # Adds filter to the parent query to exclude results with no children
-        if cd.get("available_only", ""):
+        if child_filters:
             parent_filters.append(
                 Q(
                     "has_child",
                     type="recap_document",
                     score_mode="max",
-                    query=Q("term", is_available=True),
+                    query=Q("bool", filter=child_filters),
                 )
             )
         parent_query = None
