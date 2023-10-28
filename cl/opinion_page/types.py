@@ -6,6 +6,7 @@ from django.urls import reverse
 from cl.search.models import OpinionCluster, OpinionsCitedByRECAPDocument
 
 
+@dataclass
 class ViewAuthority:
     caption: str
     count: int
