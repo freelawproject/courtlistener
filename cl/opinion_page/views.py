@@ -579,7 +579,7 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
             "private": cluster.blocked,
             "citing_clusters": citing_clusters,
             "citing_cluster_count": citing_cluster_count,
-            "authorities_section_context": authorities_context,
+            "authorities_context": authorities_context,
             "top_parenthetical_groups": parenthetical_groups,
             "summaries_count": cluster.parentheticals.count(),
             "sub_opinion_ids": sub_opinion_ids,
@@ -620,7 +620,7 @@ def view_summaries(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     )
 
 
-def view_authorities(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
+def view_authorities(request: HttpRequest, pk: int, slug: str, doc_type=0) -> HttpResponse:
     cluster = get_object_or_404(OpinionCluster, pk=pk)
 
     return TemplateResponse(
