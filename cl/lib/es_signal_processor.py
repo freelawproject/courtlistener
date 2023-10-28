@@ -532,7 +532,7 @@ def delete_reverse_related_documents(
                         affected_fields,
                     )
                 )
-        case OpinionCluster() if es_document is OpinionClusterDocument: # type: ignore
+        case OpinionCluster() if es_document is OpinionClusterDocument:  # type: ignore
             main_doc = exists_or_create_doc(
                 es_document, instance, avoid_creation=True
             )
