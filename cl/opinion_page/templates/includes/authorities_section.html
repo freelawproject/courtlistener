@@ -5,9 +5,9 @@
 {% load text_filters %}
 
     {# Show cases this case cites #}
-        {% if context.total_authorities_count > 0  %}
+        {% if authorities_authorities_authorities_context.total_authorities_count > 0  %}
             <div id="authorities" class="sidebar-section">
-                <h3><span>Authorities ({{ context.total_authorities_count|intcomma }})</span></h3>
+                <h3><span>Authorities ({{ authorities_context.total_authorities_count|intcomma }})</span></h3>
                 <p class="bottom">This opinion cites:</p>
                 <ul>
                     {% for authority in view_data.top_authorities %}
@@ -22,7 +22,7 @@
                     {% endfor %}
                 </ul>
                 <h4>
-                    <a href="{{ context.view_all_authorities_url }}"
+                    <a href="{{ authorities_context.view_all_authorities_url }}"
                        class="btn btn-default">
                         View All Authorities
                     </a>

@@ -493,7 +493,7 @@ def view_recap_document(
                 rd.docket_entry.docket.court_id, "US/Eastern"
             ),
             "redirect_to_pacer_modal": redirect_to_pacer_modal,
-            "authorities_section_context": authorities_context,
+            "authorities_context": authorities_context,
         },
     )
 
