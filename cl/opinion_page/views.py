@@ -620,7 +620,7 @@ def view_summaries(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     )
 
 
-def view_authorities(request: HttpRequest, pk: int, slug: str, doc_type=0) -> HttpResponse:
+def view_authorities(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     cluster = get_object_or_404(OpinionCluster, pk=pk)
 
     return TemplateResponse(
