@@ -469,12 +469,14 @@ def view_recap_document(
     # Override the og:url if we're serving a request to an OG crawler bot
     og_file_path_override = f"/{rd.filepath_local}" if is_og_bot else None
 
-    total_citation_count, citation_records = get_recap_citations(rd.pk, k=5)
+    total_citation_count, citation_records = get_recap_citations(
+        rd.pk, top_k=5
+    )
     authorities_context: AuthoritiesContext = (
         AuthoritiesContext.from_recap_document_cits(
             total_cit_count=total_citation_count,
             cit_records=citation_records,
-            request_queyy_string=request.META["QUERY_STRING"],
+            request_query_string=request.META["QUERY_STRING"],
         )
     )
 

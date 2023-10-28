@@ -62,10 +62,13 @@ class AuthoritiesContext:
         cls,
         total_cit_count: int,
         cit_records: List[OpinionsCitedByRECAPDocument],
-        request_queyy_string: str,
+        request_query_string: str,
     ):
         top_authorities = [
-            ViewAuthority.from_recap_cit_record(r) for r in cit_records
+            ViewAuthority.from_recap_cit_record(
+                r, query_string=request_query_string
+            )
+            for r in cit_records
         ]
         # TODO
         view_all_url_base = ""
