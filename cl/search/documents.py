@@ -335,10 +335,6 @@ class ES_CHILD_ID:
         return f"o_{self.instance_id}"
 
 
-class JoinField(DEDField, Join):
-    pass
-
-
 class PersonBaseDocument(Document):
     id = fields.IntegerField(attr="pk")
     alias_ids = fields.ListField(
