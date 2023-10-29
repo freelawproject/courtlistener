@@ -1950,7 +1950,7 @@ def get_related_clusters_with_cache_and_es(
 
         query_dict = QueryDict("", mutable=True)
         query_dict.update(url_search_params)
-        search_query, _, _ = build_es_main_query(search, url_search_params)
+        search_query, *_ = build_es_main_query(search, url_search_params)
         hits, _, error = fetch_es_results(
             query_dict, search_query, 1, settings.RELATED_COUNT
         )
