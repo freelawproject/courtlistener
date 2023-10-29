@@ -5,8 +5,6 @@ from rest_framework.exceptions import ParseError
 from cl.lib import search_utils
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
-    expose_inner_hits,
-    merge_opinion_and_cluster,
     merge_unavailable_fields_on_parent_document,
 )
 from cl.lib.scorched_utils import ExtraSolrInterface
@@ -126,9 +124,6 @@ class ESList(object):
                 results, self.type, "api"
             )
 
-        if self.type == SEARCH_TYPES.OPINION:
-            expose_inner_hits(results, self.type)
-            merge_opinion_and_cluster(results)
         # Pull the text snippet up a level
         for result in results:
             if hasattr(result.meta, "highlight") and hasattr(
