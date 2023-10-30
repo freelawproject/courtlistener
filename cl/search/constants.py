@@ -87,6 +87,14 @@ SEARCH_RECAP_PARENT_QUERY_FIELDS = [
     "chapter",
     "trustee_str",
 ]
+SEARCH_OPINION_QUERY_FIELDS = [
+    "court",
+    "citation",
+    "judge",
+    "caseNameFull",
+    "caseNameShort",
+    "status",
+]
 
 # ES fields that are used for highlighting
 SEARCH_HL_TAG = "mark"
@@ -193,14 +201,6 @@ BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
             # Cluster fields
             "caseName": 4.0,
             "docketNumber": 2.0,
-            "court": 1.0,
-            "citation": 1.0,
-            "judge": 1.0,
-            "caseName": 1.0,
-            "docketNumber": 1.0,
-            "caseNameFull": 1.0,
-            "caseNameShort": 1.0,
-            "status": 1.0,
         },
         SEARCH_TYPES.RECAP: recap_boosts_qf,
         SEARCH_TYPES.DOCKETS: recap_boosts_qf,
