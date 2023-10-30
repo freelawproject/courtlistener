@@ -580,6 +580,8 @@ def get_doc_from_es(
         instance_id = ES_CHILD_ID(instance_id).POSITION
     elif es_document is ESRECAPDocument:
         instance_id = ES_CHILD_ID(instance_id).RECAP
+    elif es_document is OpinionDocument:
+        instance_id = ES_CHILD_ID(instance_id).OPINION
 
     try:
         main_doc = es_document.get(id=instance_id)
@@ -635,10 +637,6 @@ def update_children_docs_by_query(
         parent_instance = get_instance_from_db(parent_instance_id, Docket)
         if not parent_instance:
             return
-
-    if es_document is OpinionDocument:
-        s = s.query("parent_id", type="opinion", id=parent_instance.pk)
-        main_doc = OpinionClusterDocument.get(id=parent_instance.pk)
 
     if not main_doc:
         # Abort bulk update for a not supported document or non-existing parent
