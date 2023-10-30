@@ -19,6 +19,7 @@ from cl.lib.test_helpers import (
     PeopleTestCase,
     SearchTestCase,
 )
+from cl.people_db.factories import PersonFactory
 from cl.search.documents import (
     ES_CHILD_ID,
     OpinionClusterDocument,
@@ -35,7 +36,7 @@ from cl.search.factories import (
 )
 from cl.search.models import PRECEDENTIAL_STATUS, SEARCH_TYPES
 from cl.search.views import do_search
-from cl.tests.cases import ESIndexTestCase, TestCase
+from cl.tests.cases import ESIndexTestCase, TestCase, TransactionTestCase
 from cl.users.factories import UserProfileWithParentsFactory
 
 
@@ -460,477 +461,6 @@ class OpinionsESSearchTest(
             "Params were: %s" % (field_name, expected_count, got, params),
         )
         return r
-
-    def test_remove_parent_child_objects_from_index(self) -> None:
-        """Confirm join child objects are removed from the index when the
-        parent objects is deleted.
-        """
-        cluster = OpinionClusterFactory.create(
-            case_name_full="Paul Debbas v. Franklin",
-            case_name_short="Debbas",
-            syllabus="some rando syllabus",
-            date_filed=datetime.date(2015, 8, 14),
-            procedural_history="some rando history",
-            source="C",
-            case_name="Debbas v. Franklin",
-            attorneys="a bunch of crooks!",
-            slug="case-name-cluster",
-            precedential_status="Errata",
-            citation_count=4,
-            docket=self.docket_1,
-        )
-        opinion_1 = OpinionFactory.create(
-            extracted_by_ocr=False,
-            author=self.person_2,
-            plain_text="my plain text",
-            cluster=cluster,
-            local_path="test/search/opinion_doc1.doc",
-            per_curiam=False,
-            type="010combined",
-        )
-
-        cluster_pk = cluster.pk
-        opinion_pk = opinion_1.pk
-        # Cluster instance is indexed.
-        self.assertTrue(OpinionClusterDocument.exists(id=cluster_pk))
-        # Opinion instance is indexed.
-        self.assertTrue(
-            OpinionDocument.exists(id=ES_CHILD_ID(opinion_pk).OPINION)
-        )
-
-        # Delete Cluster instance; it should be removed from the index along
-        # with its child documents.
-        cluster.delete()
-
-        # Cluster document should be removed.
-        self.assertFalse(OpinionClusterDocument.exists(id=cluster_pk))
-        # Opinion document is removed.
-        self.assertFalse(
-            OpinionDocument.exists(id=ES_CHILD_ID(opinion_pk).OPINION)
-        )
-
-    def test_remove_nested_objects_from_index(self) -> None:
-        """Confirm that child objects are removed from the index when they are
-        deleted independently of their parent object
-        """
-        cluster = OpinionClusterFactory.create(
-            case_name_full="Paul Debbas v. Franklin",
-            case_name_short="Debbas",
-            syllabus="some rando syllabus",
-            date_filed=datetime.date(2015, 8, 14),
-            procedural_history="some rando history",
-            source="C",
-            case_name="Debbas v. Franklin",
-            attorneys="a bunch of crooks!",
-            slug="case-name-cluster",
-            precedential_status="Errata",
-            citation_count=4,
-            docket=self.docket_1,
-        )
-        opinion_1 = OpinionFactory.create(
-            extracted_by_ocr=False,
-            author=self.person_2,
-            plain_text="my plain text",
-            cluster=cluster,
-            local_path="test/search/opinion_doc1.doc",
-            per_curiam=False,
-            type="010combined",
-        )
-
-        cluster_pk = cluster.pk
-        opinion_pk = opinion_1.pk
-
-        # Delete pos_1 and education, keep the parent person instance.
-        opinion_1.delete()
-
-        # Opinion cluster instance still exists.
-        self.assertTrue(OpinionClusterDocument.exists(id=cluster_pk))
-
-        # Opinion object is removed
-        self.assertFalse(
-            OpinionDocument.exists(id=ES_CHILD_ID(opinion_pk).OPINION)
-        )
-        cluster.delete()
-
-    def test_child_document_update_properly(self) -> None:
-        """Confirm that child fields are properly update when changing DB records"""
-        opinion = OpinionFactory.create(
-            extracted_by_ocr=False,
-            author=self.person_1,
-            plain_text="my plain text secret word for queries",
-            cluster=self.opinion_cluster_1,
-            local_path="test/search/opinion_doc.doc",
-            per_curiam=False,
-            type="020lead",
-        )
-        # Update the author field in the opinion record.
-        opinion.author = self.person_2
-        opinion.save()
-
-        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        self.assertEqual(es_doc.author_id, self.person_2.pk)
-
-        # Update the type field in the opinion record.
-        opinion.type = "010combined"
-        opinion.save()
-
-        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        self.assertEqual(es_doc.type, "010combined")
-        self.assertEqual(es_doc.type_text, "Combined Opinion")
-
-        # Update the per_curiam field in the opinion record.
-        opinion.per_curiam = True
-        opinion.save()
-
-        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        self.assertEqual(es_doc.per_curiam, True)
-
-        # Update the text field in the opinion record.
-        opinion.plain_text = "This is a test"
-        opinion.save()
-
-        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        self.assertEqual(es_doc.text, "This is a test")
-
-        # Update cites field in the opinion record.
-        opinion.opinions_cited.add(self.opinion_5)
-
-        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        for cite in opinion.opinions_cited.all():
-            self.assertIn(cite.pk, es_doc.cites)
-
-        # Update joined_by field in the opinion record.
-        opinion.joined_by.add(self.person_3)
-
-        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        for judge in opinion.joined_by.all():
-            self.assertIn(judge.pk, es_doc.joined_by_ids)
-
-        opinion.delete()
-
-    def test_parent_document_update_fields_properly(self) -> None:
-        """Confirm that parent fields are properly update when changing DB records"""
-        docket = DocketFactory(
-            court_id=self.court_2.pk,
-        )
-        opinion_cluster = OpinionClusterFactory.create(
-            case_name_full="Paul test v. Franklin",
-            case_name_short="Debbas",
-            syllabus="some rando syllabus",
-            date_filed=datetime.date(2015, 8, 14),
-            procedural_history="some rando history",
-            source="C",
-            case_name="Debbas v. Franklin",
-            attorneys="a bunch of crooks!",
-            slug="case-name-cluster",
-            precedential_status="Errata",
-            citation_count=4,
-            docket=docket,
-        )
-
-        # Update the court field in the docket record.
-        docket.court = self.court_1
-        docket.save()
-
-        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        self.assertEqual(es_doc.court_exact, "ca1")
-
-        # Update the absolute_url field in the cluster record.
-        opinion_cluster.case_name = "Debbas v. test"
-        opinion_cluster.save()
-
-        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        self.assertEqual(
-            es_doc.absolute_url,
-            f"/opinion/{opinion_cluster.pk}/debbas-v-test/",
-        )
-
-        # Update the case_name_short field in the cluster record.
-        opinion_cluster.case_name_short = "Franklin"
-        opinion_cluster.save()
-
-        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        self.assertEqual(es_doc.caseNameShort, "Franklin")
-
-        # Add a new opinion to the cluster record.
-        opinion_1 = OpinionFactory.create(
-            extracted_by_ocr=False,
-            plain_text="my plain text secret word for queries",
-            cluster=opinion_cluster,
-            type="020lead",
-        )
-
-        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        self.assertIn(opinion_1.pk, es_doc.sibling_ids)
-
-        opinion_2 = OpinionFactory.create(
-            extracted_by_ocr=False,
-            plain_text="my plain text secret word for queries",
-            cluster=self.opinion_cluster_1,
-            type="010combined",
-        )
-
-        opinion_2.cluster = opinion_cluster
-        opinion_2.save()
-
-        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        self.assertIn(opinion_2.pk, es_doc.sibling_ids)
-
-        # Add a new judge to the cluster record.
-        opinion_cluster.panel.add(self.person_1)
-
-        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        self.assertIn(self.person_1.pk, es_doc.panel_ids)
-
-        # Add a new non participating judge to the cluster record.
-        opinion_cluster.non_participating_judges.add(self.person_3)
-
-        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        self.assertIn(self.person_3.pk, es_doc.non_participating_judge_ids)
-
-        # Update the scdb_id field in the cluster record.
-        opinion_cluster.scdb_id = "test"
-        opinion_cluster.save()
-
-        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        self.assertEqual(es_doc.scdb_id, "test")
-
-        # Add lexis citation to the cluster
-        lexis_citation = CitationWithParentsFactory.create(
-            volume=10,
-            reporter="Yeates",
-            page="4",
-            type=6,
-            cluster=opinion_cluster,
-        )
-
-        lexis_citation_str = str(lexis_citation)
-        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        self.assertEqual(lexis_citation_str, es_doc.lexisCite)
-
-        # Remove lexis citation from the db
-        lexis_citation.delete()
-
-        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        self.assertNotEqual(lexis_citation_str, es_doc.lexisCite)
-
-        # Add neutral citation to the cluster
-        neutral_citation = CitationWithParentsFactory.create(
-            volume=16,
-            reporter="Yeates",
-            page="58",
-            type=8,
-            cluster=opinion_cluster,
-        )
-
-        neutral_citation_str = str(neutral_citation)
-        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        self.assertEqual(neutral_citation_str, es_doc.neutralCite)
-
-        # Remove neutral citation from the db
-        neutral_citation.delete()
-
-        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        self.assertNotEqual(neutral_citation_str, es_doc.neutralCite)
-
-        # Update the source field in the cluster record.
-        opinion_cluster.source = "ZLCR"
-        opinion_cluster.save()
-
-        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        self.assertEqual(es_doc.source, "ZLCR")
-
-        # Update the cite_count field in the cluster record.
-        opinion_cluster.citation_count = 8
-        opinion_cluster.save()
-
-        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        self.assertEqual(es_doc.citeCount, 8)
-
-        docket.delete()
-        opinion_cluster.delete()
-
-    def test_update_shared_fields_related_documents(self) -> None:
-        """Confirm that related document are properly update using bulk approach"""
-        docket = DocketFactory(
-            court_id=self.court_2.pk,
-        )
-        opinion_cluster = OpinionClusterFactory.create(
-            case_name_full="Paul test v. Franklin",
-            case_name_short="Debbas",
-            syllabus="some rando syllabus",
-            date_filed=datetime.date(2015, 8, 14),
-            procedural_history="some rando history",
-            source="C",
-            case_name="Debbas v. Franklin",
-            attorneys="a bunch of crooks!",
-            slug="case-name-cluster",
-            precedential_status="Errata",
-            citation_count=4,
-            docket=docket,
-        )
-        opinion = OpinionFactory.create(
-            extracted_by_ocr=False,
-            author=self.person_1,
-            plain_text="my plain text secret word for queries",
-            cluster=opinion_cluster,
-            local_path="test/search/opinion_doc.doc",
-            per_curiam=False,
-            type="020lead",
-        )
-
-        # update docket number in parent document
-        docket.docket_number = "005"
-        docket.save()
-
-        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        self.assertEqual(cluster_doc.docketNumber, "005")
-        self.assertEqual(opinion_doc.docketNumber, "005")
-
-        # update the case name in the opinion cluster record
-        opinion_cluster.case_name = "Debbas v. Franklin2"
-        opinion_cluster.save()
-
-        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        self.assertEqual(cluster_doc.caseName, "Debbas v. Franklin2")
-        self.assertEqual(opinion_doc.caseName, "Debbas v. Franklin2")
-
-        opinion_cluster.case_name = ""
-        opinion_cluster.case_name_full = "Franklin v. Debbas"
-        opinion_cluster.case_name_short = "Franklin"
-        opinion_cluster.save()
-
-        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        self.assertEqual(cluster_doc.caseName, "Franklin v. Debbas")
-        self.assertEqual(cluster_doc.caseNameFull, "Franklin v. Debbas")
-        self.assertEqual(opinion_doc.caseName, "Franklin v. Debbas")
-        self.assertEqual(opinion_doc.caseNameFull, "Franklin v. Debbas")
-
-        opinion_cluster.case_name_full = ""
-        opinion_cluster.case_name_short = "Franklin50"
-        opinion_cluster.save()
-
-        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        self.assertEqual(cluster_doc.caseName, "Franklin50")
-        self.assertEqual(opinion_doc.caseName, "Franklin50")
-
-        # update the date_field field in the cluster record
-        opinion_cluster.date_filed = now().date()
-        opinion_cluster.save()
-
-        date_text = opinion_cluster.date_filed.strftime("%-d %B %Y")
-
-        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        self.assertEqual(cluster_doc.dateFiled_text, date_text)
-        self.assertEqual(opinion_doc.dateFiled_text, date_text)
-
-        # update the date_argued field in the docket record
-        docket.date_argued = now().date()
-        docket.save()
-
-        date_text = docket.date_argued.strftime("%-d %B %Y")
-
-        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        self.assertEqual(cluster_doc.dateArgued_text, date_text)
-        self.assertEqual(opinion_doc.dateArgued_text, date_text)
-
-        # update the date_reargued field in the docket record
-        docket.date_reargued = now().date()
-        docket.save()
-
-        date_text = docket.date_reargued.strftime("%-d %B %Y")
-
-        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        self.assertEqual(cluster_doc.dateReargued_text, date_text)
-        self.assertEqual(opinion_doc.dateReargued_text, date_text)
-
-        # update the date_reargument_denied field in the docket record
-        docket.date_reargument_denied = now().date()
-        docket.save()
-
-        date_text = docket.date_reargument_denied.strftime("%-d %B %Y")
-
-        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        self.assertEqual(cluster_doc.dateReargumentDenied_text, date_text)
-        self.assertEqual(opinion_doc.dateReargumentDenied_text, date_text)
-
-        # update the attorneys field in the cluster record
-        opinion_cluster.judges = "first judge, second judge"
-        opinion_cluster.save()
-
-        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        self.assertEqual(cluster_doc.judge, "first judge, second judge")
-        self.assertEqual(opinion_doc.judge, "first judge, second judge")
-
-        # update the attorneys field in the cluster record
-        opinion_cluster.attorneys = "first attorney, second attorney"
-        opinion_cluster.save()
-
-        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        self.assertEqual(
-            cluster_doc.attorney, "first attorney, second attorney"
-        )
-        self.assertEqual(
-            opinion_doc.attorney, "first attorney, second attorney"
-        )
-
-        # update the nature_of_suit field in the cluster record
-        opinion_cluster.nature_of_suit = "test nature"
-        opinion_cluster.save()
-
-        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        self.assertEqual(cluster_doc.suitNature, "test nature")
-        self.assertEqual(opinion_doc.suitNature, "test nature")
-
-        # update the precedential_status field in the cluster record
-        opinion_cluster.precedential_status = "Separate"
-        opinion_cluster.save()
-
-        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        self.assertEqual(cluster_doc.status, "Separate Opinion")
-        self.assertEqual(opinion_doc.status, "Separate Opinion")
-
-        # update the procedural_history field in the cluster record
-        opinion_cluster.procedural_history = "random history"
-        opinion_cluster.save()
-
-        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        self.assertEqual(cluster_doc.proceduralHistory, "random history")
-        self.assertEqual(opinion_doc.proceduralHistory, "random history")
-
-        # update the posture in the opinion cluster record
-        opinion_cluster.posture = "random procedural posture"
-        opinion_cluster.save()
-
-        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        self.assertEqual(cluster_doc.posture, "random procedural posture")
-        self.assertEqual(opinion_doc.posture, "random procedural posture")
-
-        # update the syllabus in the opinion cluster record
-        opinion_cluster.syllabus = "random text for test"
-        opinion_cluster.save()
-
-        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        self.assertEqual(cluster_doc.syllabus, "random text for test")
-        self.assertEqual(opinion_doc.syllabus, "random text for test")
-
-        docket.delete()
-        opinion_cluster.delete()
 
     async def test_can_perform_a_regular_text_query(self) -> None:
         # Frontend
@@ -1580,3 +1110,576 @@ class GroupedSearchTest(EmptySolrTestCase):
             msg="Found %s items, but should have found %s if the items were "
             "grouped properly." % (result_count, num_expected),
         )
+
+
+class EsOpinionsIndexingTest(ESIndexTestCase, TransactionTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.rebuild_index("search.OpinionCluster")
+
+    def setUp(self):
+        self.court_1 = CourtFactory(
+            id="ca1",
+            full_name="First Circuit",
+            jurisdiction="F",
+            citation_string="1st Cir.",
+            url="http://www.ca1.uscourts.gov/",
+        )
+        self.court_2 = CourtFactory(
+            id="test",
+            full_name="Testing Supreme Court",
+            jurisdiction="F",
+            citation_string="Test",
+            url="https://www.courtlistener.com/",
+        )
+        self.docket = DocketFactory.create(
+            date_reargument_denied=datetime.date(2015, 8, 15),
+            court_id=self.court_2.pk,
+            case_name_full="case name full docket 1",
+            date_argued=datetime.date(2015, 8, 16),
+            case_name="case name docket 1",
+            case_name_short="case name short docket 1",
+            docket_number="docket number 1 005",
+            slug="case-name",
+            pacer_case_id="666666",
+            blocked=False,
+            source=0,
+        )
+        self.person = PersonFactory.create(
+            gender="f",
+            name_first="Judith",
+            name_last="Sheindlin",
+            date_dob=datetime.date(1942, 10, 21),
+            date_dod=datetime.date(2020, 11, 25),
+            date_granularity_dob="%Y-%m-%d",
+            date_granularity_dod="%Y-%m-%d",
+            name_middle="Susan",
+            dob_city="Brookyln",
+            dob_state="NY",
+        )
+
+    def test_remove_parent_child_objects_from_index(self) -> None:
+        """Confirm join child objects are removed from the index when the
+        parent objects is deleted.
+        """
+        cluster = OpinionClusterFactory.create(
+            case_name_full="Paul Debbas v. Franklin",
+            case_name_short="Debbas",
+            syllabus="some rando syllabus",
+            date_filed=datetime.date(2015, 8, 14),
+            procedural_history="some rando history",
+            source="C",
+            case_name="Debbas v. Franklin",
+            attorneys="a bunch of crooks!",
+            slug="case-name-cluster",
+            precedential_status="Errata",
+            citation_count=4,
+            docket=self.docket,
+        )
+        opinion_1 = OpinionFactory.create(
+            extracted_by_ocr=False,
+            author=self.person,
+            plain_text="my plain text",
+            cluster=cluster,
+            local_path="test/search/opinion_doc1.doc",
+            per_curiam=False,
+            type="010combined",
+        )
+
+        cluster_pk = cluster.pk
+        opinion_pk = opinion_1.pk
+        # Cluster instance is indexed.
+        self.assertTrue(OpinionClusterDocument.exists(id=cluster_pk))
+        # Opinion instance is indexed.
+        self.assertTrue(
+            OpinionDocument.exists(id=ES_CHILD_ID(opinion_pk).OPINION)
+        )
+
+        # Delete Cluster instance; it should be removed from the index along
+        # with its child documents.
+        cluster.delete()
+
+        # Cluster document should be removed.
+        self.assertFalse(OpinionClusterDocument.exists(id=cluster_pk))
+        # Opinion document is removed.
+        self.assertFalse(
+            OpinionDocument.exists(id=ES_CHILD_ID(opinion_pk).OPINION)
+        )
+
+    def test_remove_nested_objects_from_index(self) -> None:
+        """Confirm that child objects are removed from the index when they are
+        deleted independently of their parent object
+        """
+        cluster = OpinionClusterFactory.create(
+            case_name_full="Paul Debbas v. Franklin",
+            case_name_short="Debbas",
+            syllabus="some rando syllabus",
+            date_filed=datetime.date(2015, 8, 14),
+            procedural_history="some rando history",
+            source="C",
+            case_name="Debbas v. Franklin",
+            attorneys="a bunch of crooks!",
+            slug="case-name-cluster",
+            precedential_status="Errata",
+            citation_count=4,
+            docket=self.docket,
+        )
+        opinion_1 = OpinionFactory.create(
+            extracted_by_ocr=False,
+            author=self.person,
+            plain_text="my plain text",
+            cluster=cluster,
+            local_path="test/search/opinion_doc1.doc",
+            per_curiam=False,
+            type="010combined",
+        )
+
+        cluster_pk = cluster.pk
+        opinion_pk = opinion_1.pk
+
+        # Delete pos_1 and education, keep the parent person instance.
+        opinion_1.delete()
+
+        # Opinion cluster instance still exists.
+        self.assertTrue(OpinionClusterDocument.exists(id=cluster_pk))
+
+        # Opinion object is removed
+        self.assertFalse(
+            OpinionDocument.exists(id=ES_CHILD_ID(opinion_pk).OPINION)
+        )
+        cluster.delete()
+
+    def test_child_document_update_properly(self) -> None:
+        """Confirm that child fields are properly update when changing DB records"""
+        opinion_cluster = OpinionClusterFactory.create(
+            case_name_full="Paul Debbas v. Franklin",
+            case_name_short="Debbas",
+            syllabus="some rando syllabus",
+            date_filed=datetime.date(2015, 8, 14),
+            procedural_history="some rando history",
+            source="C",
+            case_name="Debbas v. Franklin",
+            attorneys="a bunch of crooks!",
+            slug="case-name-cluster",
+            precedential_status="Errata",
+            citation_count=4,
+            docket=self.docket,
+        )
+        opinion = OpinionFactory.create(
+            extracted_by_ocr=False,
+            author=self.person,
+            plain_text="my plain text secret word for queries",
+            cluster=opinion_cluster,
+            local_path="test/search/opinion_doc.doc",
+            per_curiam=False,
+            type="020lead",
+        )
+        # Update the author field in the opinion record.
+        opinion.author = self.person
+        opinion.save()
+
+        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(es_doc.author_id, self.person.pk)
+
+        # Update the type field in the opinion record.
+        opinion.type = "010combined"
+        opinion.save()
+
+        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(es_doc.type, "010combined")
+        self.assertEqual(es_doc.type_text, "Combined Opinion")
+
+        # Update the per_curiam field in the opinion record.
+        opinion.per_curiam = True
+        opinion.save()
+
+        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(es_doc.per_curiam, True)
+
+        # Update the text field in the opinion record.
+        opinion.plain_text = "This is a test"
+        opinion.save()
+
+        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(es_doc.text, "This is a test")
+
+        # Update cites field in the opinion record.
+        person_2 = PersonFactory.create(
+            gender="f",
+            name_first="Judith",
+            name_last="Sheindlin",
+            date_dob=datetime.date(1942, 10, 21),
+            date_dod=datetime.date(2020, 11, 25),
+            date_granularity_dob="%Y-%m-%d",
+            date_granularity_dod="%Y-%m-%d",
+            name_middle="Susan",
+            dob_city="Brookyln",
+            dob_state="NY",
+        )
+        opinion_2 = OpinionFactory.create(
+            extracted_by_ocr=False,
+            author=person_2,
+            plain_text="my plain text secret word for queries",
+            cluster=opinion_cluster,
+            local_path="test/search/opinion_wpd.wpd",
+            per_curiam=False,
+            type="010combined",
+        )
+        opinion.opinions_cited.add(opinion_2)
+
+        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        for cite in opinion.opinions_cited.all():
+            self.assertIn(cite.pk, es_doc.cites)
+
+        # Update joined_by field in the opinion record.
+        person_3 = PersonFactory.create(
+            gender="f",
+            name_first="Sheindlin",
+            name_last="Judith",
+            date_dob=datetime.date(1945, 11, 20),
+            date_granularity_dob="%Y-%m-%d",
+            name_middle="Olivia",
+            dob_city="Queens",
+            dob_state="NY",
+        )
+        opinion.joined_by.add(person_3)
+
+        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        for judge in opinion.joined_by.all():
+            self.assertIn(judge.pk, es_doc.joined_by_ids)
+
+        opinion.delete()
+
+    def test_parent_document_update_fields_properly(self) -> None:
+        """Confirm that parent fields are properly update when changing DB records"""
+        docket = DocketFactory(
+            court_id=self.court_2.pk,
+        )
+        opinion_cluster = OpinionClusterFactory.create(
+            case_name_full="Paul test v. Franklin",
+            case_name_short="Debbas",
+            syllabus="some rando syllabus",
+            date_filed=datetime.date(2015, 8, 14),
+            procedural_history="some rando history",
+            source="C",
+            case_name="Debbas v. Franklin",
+            attorneys="a bunch of crooks!",
+            slug="case-name-cluster",
+            precedential_status="Errata",
+            citation_count=4,
+            docket=docket,
+        )
+
+        # Update the court field in the docket record.
+        docket.court = self.court_1
+        docket.save()
+
+        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        self.assertEqual(es_doc.court_exact, "ca1")
+
+        # Update the absolute_url field in the cluster record.
+        opinion_cluster.case_name = "Debbas v. test"
+        opinion_cluster.save()
+
+        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        self.assertEqual(
+            es_doc.absolute_url,
+            f"/opinion/{opinion_cluster.pk}/debbas-v-test/",
+        )
+
+        # Update the case_name_short field in the cluster record.
+        opinion_cluster.case_name_short = "Franklin"
+        opinion_cluster.save()
+
+        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        self.assertEqual(es_doc.caseNameShort, "Franklin")
+
+        # Add a new opinion to the cluster record.
+        opinion_1 = OpinionFactory.create(
+            extracted_by_ocr=False,
+            plain_text="my plain text secret word for queries",
+            cluster=opinion_cluster,
+            type="020lead",
+        )
+
+        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        self.assertIn(opinion_1.pk, es_doc.sibling_ids)
+
+        opinion_2 = OpinionFactory.create(
+            extracted_by_ocr=False,
+            plain_text="my plain text secret word for queries",
+            cluster=opinion_cluster,
+            type="010combined",
+        )
+        opinion_2.save()
+
+        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        self.assertIn(opinion_2.pk, es_doc.sibling_ids)
+
+        # Add a new judge to the cluster record.
+        opinion_cluster.panel.add(self.person)
+
+        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        self.assertIn(self.person.pk, es_doc.panel_ids)
+
+        # Add a new non participating judge to the cluster record.
+        person_3 = PersonFactory.create(
+            gender="f",
+            name_first="Sheindlin",
+            name_last="Judith",
+            date_dob=datetime.date(1945, 11, 20),
+            date_granularity_dob="%Y-%m-%d",
+            name_middle="Olivia",
+            dob_city="Queens",
+            dob_state="NY",
+        )
+        opinion_cluster.non_participating_judges.add(person_3)
+
+        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        self.assertIn(person_3.pk, es_doc.non_participating_judge_ids)
+
+        # Update the scdb_id field in the cluster record.
+        opinion_cluster.scdb_id = "test"
+        opinion_cluster.save()
+
+        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        self.assertEqual(es_doc.scdb_id, "test")
+
+        # Add lexis citation to the cluster
+        lexis_citation = CitationWithParentsFactory.create(
+            volume=10,
+            reporter="Yeates",
+            page="4",
+            type=6,
+            cluster=opinion_cluster,
+        )
+
+        lexis_citation_str = str(lexis_citation)
+        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        self.assertEqual(lexis_citation_str, es_doc.lexisCite)
+
+        # Remove lexis citation from the db
+        lexis_citation.delete()
+
+        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        self.assertNotEqual(lexis_citation_str, es_doc.lexisCite)
+
+        # Add neutral citation to the cluster
+        neutral_citation = CitationWithParentsFactory.create(
+            volume=16,
+            reporter="Yeates",
+            page="58",
+            type=8,
+            cluster=opinion_cluster,
+        )
+
+        neutral_citation_str = str(neutral_citation)
+        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        self.assertEqual(neutral_citation_str, es_doc.neutralCite)
+
+        # Remove neutral citation from the db
+        neutral_citation.delete()
+
+        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        self.assertNotEqual(neutral_citation_str, es_doc.neutralCite)
+
+        # Update the source field in the cluster record.
+        opinion_cluster.source = "ZLCR"
+        opinion_cluster.save()
+
+        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        self.assertEqual(es_doc.source, "ZLCR")
+
+        # Update the cite_count field in the cluster record.
+        opinion_cluster.citation_count = 8
+        opinion_cluster.save()
+
+        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        self.assertEqual(es_doc.citeCount, 8)
+
+        docket.delete()
+        opinion_cluster.delete()
+
+    def test_update_shared_fields_related_documents(self) -> None:
+        """Confirm that related document are properly update using bulk approach"""
+        docket = DocketFactory(
+            court_id=self.court_2.pk,
+        )
+        opinion_cluster = OpinionClusterFactory.create(
+            case_name_full="Paul test v. Franklin",
+            case_name_short="Debbas",
+            syllabus="some rando syllabus",
+            date_filed=datetime.date(2015, 8, 14),
+            procedural_history="some rando history",
+            source="C",
+            case_name="Debbas v. Franklin",
+            attorneys="a bunch of crooks!",
+            slug="case-name-cluster",
+            precedential_status="Errata",
+            citation_count=4,
+            docket=docket,
+        )
+        opinion = OpinionFactory.create(
+            extracted_by_ocr=False,
+            author=self.person,
+            plain_text="my plain text secret word for queries",
+            cluster=opinion_cluster,
+            local_path="test/search/opinion_doc.doc",
+            per_curiam=False,
+            type="020lead",
+        )
+
+        # update docket number in parent document
+        docket.docket_number = "005"
+        print("updating docket number")
+        docket.save()
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.docketNumber, "005")
+        self.assertEqual(opinion_doc.docketNumber, "005")
+
+        # update the case name in the opinion cluster record
+        opinion_cluster.case_name = "Debbas v. Franklin2"
+        opinion_cluster.save()
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.caseName, "Debbas v. Franklin2")
+        self.assertEqual(opinion_doc.caseName, "Debbas v. Franklin2")
+
+        opinion_cluster.case_name = ""
+        opinion_cluster.case_name_full = "Franklin v. Debbas"
+        opinion_cluster.case_name_short = "Franklin"
+        opinion_cluster.save()
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.caseName, "Franklin v. Debbas")
+        self.assertEqual(cluster_doc.caseNameFull, "Franklin v. Debbas")
+        self.assertEqual(opinion_doc.caseName, "Franklin v. Debbas")
+        self.assertEqual(opinion_doc.caseNameFull, "Franklin v. Debbas")
+
+        opinion_cluster.case_name_full = ""
+        opinion_cluster.case_name_short = "Franklin50"
+        opinion_cluster.save()
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.caseName, "Franklin50")
+        self.assertEqual(opinion_doc.caseName, "Franklin50")
+
+        # update the date_field field in the cluster record
+        opinion_cluster.date_filed = now().date()
+        opinion_cluster.save()
+
+        date_text = opinion_cluster.date_filed.strftime("%-d %B %Y")
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.dateFiled_text, date_text)
+        self.assertEqual(opinion_doc.dateFiled_text, date_text)
+
+        # update the date_argued field in the docket record
+        docket.date_argued = now().date()
+        docket.save()
+
+        date_text = docket.date_argued.strftime("%-d %B %Y")
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.dateArgued_text, date_text)
+        self.assertEqual(opinion_doc.dateArgued_text, date_text)
+
+        # update the date_reargued field in the docket record
+        docket.date_reargued = now().date()
+        docket.save()
+
+        date_text = docket.date_reargued.strftime("%-d %B %Y")
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.dateReargued_text, date_text)
+        self.assertEqual(opinion_doc.dateReargued_text, date_text)
+
+        # update the date_reargument_denied field in the docket record
+        docket.date_reargument_denied = now().date()
+        docket.save()
+
+        date_text = docket.date_reargument_denied.strftime("%-d %B %Y")
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.dateReargumentDenied_text, date_text)
+        self.assertEqual(opinion_doc.dateReargumentDenied_text, date_text)
+
+        # update the attorneys field in the cluster record
+        opinion_cluster.judges = "first judge, second judge"
+        opinion_cluster.save()
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.judge, "first judge, second judge")
+        self.assertEqual(opinion_doc.judge, "first judge, second judge")
+
+        # update the attorneys field in the cluster record
+        opinion_cluster.attorneys = "first attorney, second attorney"
+        opinion_cluster.save()
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(
+            cluster_doc.attorney, "first attorney, second attorney"
+        )
+        self.assertEqual(
+            opinion_doc.attorney, "first attorney, second attorney"
+        )
+
+        # update the nature_of_suit field in the cluster record
+        opinion_cluster.nature_of_suit = "test nature"
+        opinion_cluster.save()
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.suitNature, "test nature")
+        self.assertEqual(opinion_doc.suitNature, "test nature")
+
+        # update the precedential_status field in the cluster record
+        opinion_cluster.precedential_status = "Separate"
+        opinion_cluster.save()
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.status, "Separate Opinion")
+        self.assertEqual(opinion_doc.status, "Separate Opinion")
+
+        # update the procedural_history field in the cluster record
+        opinion_cluster.procedural_history = "random history"
+        opinion_cluster.save()
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.proceduralHistory, "random history")
+        self.assertEqual(opinion_doc.proceduralHistory, "random history")
+
+        # update the posture in the opinion cluster record
+        opinion_cluster.posture = "random procedural posture"
+        opinion_cluster.save()
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.posture, "random procedural posture")
+        self.assertEqual(opinion_doc.posture, "random procedural posture")
+
+        # update the syllabus in the opinion cluster record
+        opinion_cluster.syllabus = "random text for test"
+        opinion_cluster.save()
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.syllabus, "random text for test")
+        self.assertEqual(opinion_doc.syllabus, "random text for test")
+
+        docket.delete()
+        opinion_cluster.delete()
