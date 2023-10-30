@@ -15,7 +15,16 @@ from cl.corpus_importer.management.commands.harvard_opinions import (
     parse_extra_fields,
     validate_dt,
 )
-from cl.corpus_importer.utils import match_lists
+from cl.corpus_importer.utils import (
+    AuthorException,
+    ClusterSourceException,
+    DocketSourceException,
+    EmptyOpinionException,
+    JudgeException,
+    OpinionMatchingException,
+    OpinionTypeException,
+    match_lists,
+)
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_diff import get_cosine_similarity
 from cl.people_db.lookup_utils import find_all_judges, find_just_name
@@ -35,56 +44,6 @@ class HarvardConversionUtil:
         "on-the-merits": "080onthemerits",
         "on-motion-to-strike-cost-bill": "090onmotiontostrike",
     }
-
-
-class AuthorException(Exception):
-    """Error found in author merger."""
-
-    def __init__(self, message: str) -> None:
-        self.message = message
-
-
-class JudgeException(Exception):
-    """An exception for wrong judges"""
-
-    def __init__(self, message: str) -> None:
-        self.message = message
-
-
-class OpinionMatchingException(Exception):
-    """An exception for wrong matching opinions"""
-
-    def __init__(self, message: str) -> None:
-        self.message = message
-
-
-class DocketSourceException(Exception):
-    """An exception for wrong docket source"""
-
-    def __init__(self, message: str) -> None:
-        self.message = message
-
-
-class ClusterSourceException(Exception):
-    """An exception for wrong cluster source"""
-
-    def __init__(self, message: str) -> None:
-        self.message = message
-
-
-class OpinionTypeException(Exception):
-    """An exception for incorrect opinion types"""
-
-    def __init__(self, message: str) -> None:
-        self.message = message
-
-
-class EmptyOpinionException(Exception):
-    """An exception for opinions that raise a ZeroDivisionError Exception due empty
-    opinion tag"""
-
-    def __init__(self, message: str) -> None:
-        self.message = message
 
 
 def find_data_fields(soup: BeautifulSoup, field_name: str) -> list:

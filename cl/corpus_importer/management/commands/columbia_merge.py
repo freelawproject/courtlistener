@@ -41,7 +41,16 @@ from cl.corpus_importer.import_columbia.columbia_utils import (
 from cl.corpus_importer.management.commands.harvard_opinions import (
     clean_docket_number,
 )
-from cl.corpus_importer.utils import similarity_scores
+from cl.corpus_importer.utils import (
+    AuthorException,
+    ClusterSourceException,
+    DateException,
+    DocketSourceException,
+    JudgeException,
+    OpinionMatchingException,
+    OpinionTypeException,
+    similarity_scores,
+)
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_diff import get_cosine_similarity
 from cl.people_db.lookup_utils import (
@@ -92,55 +101,6 @@ SIMPLE_TAGS = [
     "posture",
     "reporter_caption",
 ]
-
-
-class OpinionMatchingException(Exception):
-    """An exception for wrong matching opinions"""
-
-    def __init__(self, message: str) -> None:
-        self.message = message
-
-
-class AuthorException(Exception):
-    """Error found in author merger."""
-
-    def __init__(self, message: str) -> None:
-        self.message = message
-
-
-class JudgeException(Exception):
-    """An exception for wrong judges"""
-
-    def __init__(self, message: str) -> None:
-        self.message = message
-
-
-class OpinionTypeException(Exception):
-    """An exception for incorrect opinion types"""
-
-    def __init__(self, message: str) -> None:
-        self.message = message
-
-
-class DocketSourceException(Exception):
-    """An exception for wrong docket source"""
-
-    def __init__(self, message: str) -> None:
-        self.message = message
-
-
-class ClusterSourceException(Exception):
-    """An exception for wrong cluster source"""
-
-    def __init__(self, message: str) -> None:
-        self.message = message
-
-
-class DateException(Exception):
-    """Error found in date merger."""
-
-    def __init__(self, message: str) -> None:
-        self.message = message
 
 
 def format_case_name(name: str) -> str:
@@ -1150,9 +1110,6 @@ def update_cluster_source(cluster: OpinionCluster) -> None:
     :param cluster: cluster object
     :return: None
     """
-
-    # SOURCES.COLUMBIA_ARCHIVE in cluster.source
-
     new_cluster_source = SOURCES.COLUMBIA_ARCHIVE + cluster.source
     if new_cluster_source in VALID_MERGED_SOURCES:
         cluster.source = new_cluster_source
@@ -1332,7 +1289,9 @@ def process_cluster(
         )
 
 
-def process_csv_file(csv_path: str, mounted_xml_dir: str) -> None:
+def process_csv_file(
+    csv_path: str, mounted_xml_dir: str, skip_until_id: Optional[int]
+) -> None:
     """Process xml files from a list of cluster ids in csv file
     :param csv_path: Absolute path to csv file
     :param mounted_xml_dir: Path to mounted dir
@@ -1341,10 +1300,17 @@ def process_csv_file(csv_path: str, mounted_xml_dir: str) -> None:
 
     with open(csv_path, mode="r", encoding="utf-8") as csv_file:
         csv_reader = csv.DictReader(csv_file)
+        start = False
         for row in csv_reader:
             cluster_id = row.get("cluster_id")
             filepath = row.get("filepath")
             if cluster_id and filepath:
+                if skip_until_id and not start:
+                    if int(cluster_id) != skip_until_id:
+                        continue
+                    else:
+                        start = True
+
                 process_cluster(cluster_id=cluster_id, xml_dir=mounted_xml_dir, filepath=filepath, csv_file=True)  # type: ignore
 
 
@@ -1373,6 +1339,13 @@ class Command(VerboseCommand):
             help="The absolute path to the directory with columbia xml files",
         )
 
+        parser.add_argument(
+            "--skip-until-id",
+            type=int,
+            help="Skip until cluster ID",
+            required=False,
+        )
+
     def handle(self, *args, **options) -> None:
         if options["cluster_id"]:
             process_cluster(
@@ -1382,5 +1355,7 @@ class Command(VerboseCommand):
 
         if options["csv_file"]:
             process_csv_file(
-                options["csv_file"], mounted_xml_dir=options["xml_dir"]
+                options["csv_file"],
+                mounted_xml_dir=options["xml_dir"],
+                skip_until_id=options["skip_until_id"],
             )

@@ -9,6 +9,63 @@ from cl.lib.string_diff import get_cosine_similarity
 from cl.search.models import Docket
 
 
+class OpinionMatchingException(Exception):
+    """An exception for wrong matching opinions"""
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+
+class AuthorException(Exception):
+    """Error found in author merger."""
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+
+class JudgeException(Exception):
+    """An exception for wrong judges"""
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+
+class OpinionTypeException(Exception):
+    """An exception for incorrect opinion types"""
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+
+class DocketSourceException(Exception):
+    """An exception for wrong docket source"""
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+
+class ClusterSourceException(Exception):
+    """An exception for wrong cluster source"""
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+
+class DateException(Exception):
+    """Error found in date merger."""
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+
+class EmptyOpinionException(Exception):
+    """An exception for opinions that raise a ZeroDivisionError Exception due empty
+    opinion tag"""
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+
 async def mark_ia_upload_needed(d: Docket, save_docket: bool) -> None:
     """Mark the docket as needing upload if it's not already marked.
 
