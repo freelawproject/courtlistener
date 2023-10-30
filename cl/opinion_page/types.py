@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List
+from typing import List, Literal 
 
 from django.urls import reverse
 
@@ -40,6 +40,7 @@ class AuthoritiesContext:
     total_authorities_count: int
     top_authorities: List[ViewAuthority]
     view_all_url: str
+    doc_type: Literal["opinion", "document"] 
 
     @classmethod
     def from_opinion_cluster(

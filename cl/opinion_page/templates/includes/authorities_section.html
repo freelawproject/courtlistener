@@ -8,7 +8,7 @@
         {% if authorities_context.total_authorities_count > 0  %}
             <div id="authorities" class="sidebar-section">
                 <h3><span>Authorities ({{ authorities_context.total_authorities_count|intcomma }})</span></h3>
-                <p class="bottom">This opinion cites:</p>
+                <p class="bottom">This {{authorities_context.doc_type}} cites:</p>
                 <ul>
                     {% for authority in authorities_context.top_authorities %}
                         <li>
