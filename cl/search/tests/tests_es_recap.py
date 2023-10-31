@@ -573,7 +573,163 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         }
         async_to_sync(self._test_article_count)(params, 1, "available_only")
 
-        docket.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            docket.delete()
+
+    def test_show_documents_when_combining_the_is_available_filter(self):
+        """Confirm documents are being shown properly when using the is_available filter"""
+        # Add docket with available documents
+        with self.captureOnCommitCallbacks(execute=True):
+            docket = DocketFactory(
+                court=self.court,
+                case_name="NYU Hospitals Center v. League of Voluntary Hospitals",
+                date_filed=datetime.date(2015, 8, 16),
+                date_argued=datetime.date(2013, 5, 20),
+                docket_number="1:17-cv-04465",
+                nature_of_suit="440",
+            )
+            e_1_d_1 = DocketEntryWithParentsFactory(
+                docket=docket,
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="United Healthcare Workers East, League of Voluntary Hospitals and Homes of New York",
+            )
+            RECAPDocumentFactory(
+                docket_entry=e_1_d_1,
+                document_number="1",
+                is_available=True,
+                page_count=5,
+            )
+            e_2_d_1 = DocketEntryWithParentsFactory(
+                docket=docket,
+                entry_number=2,
+                date_filed=datetime.date(2015, 8, 19),
+                description="Not available document for the League of Voluntary Hospitals and Homes of New York",
+            )
+            RECAPDocumentFactory(
+                docket_entry=e_2_d_1,
+                document_number="2",
+                is_available=False,
+                page_count=5,
+            )
+
+            docket_2 = DocketFactory(
+                court=self.court,
+                case_name="Eaton Vance AZ Muni v. National Voluntary",
+                docket_number="1:17-cv-04465",
+            )
+            e_28_d_2 = DocketEntryWithParentsFactory(
+                docket=docket_2,
+                entry_number=28,
+                description="ORDER granting 27 Motion to Continue",
+            )
+            RECAPDocumentFactory(
+                docket_entry=e_28_d_2,
+                document_number="28",
+                is_available=False,
+                page_count=5,
+            )
+            e_29_d_2 = DocketEntryWithParentsFactory(
+                docket=docket_2,
+                entry_number=29,
+                description="ORDER granting 23 Motion for More Definite Statement. Signed by Judge Mary H Murguia",
+            )
+            RECAPDocumentFactory(
+                docket_entry=e_29_d_2,
+                document_number="29",
+                is_available=True,
+            )
+
+            docket_3 = DocketFactory(
+                court=self.court,
+                case_name="Kathleen B. Thomas",
+                docket_number="1:17-cv-04465",
+            )
+            e_14_d_3 = DocketEntryWithParentsFactory(
+                docket=docket_3,
+                entry_number=14,
+                description="Petition Completed March 29, 2019 Filed by Debtor Kathleen B. Thomas",
+            )
+            RECAPDocumentFactory(
+                docket_entry=e_14_d_3,
+                document_number="14",
+                is_available=False,
+            )
+            e_27_d_3 = DocketEntryWithParentsFactory(
+                docket=docket_3,
+                entry_number=27,
+                description="Financial Management Course Certificate Filed by Debtor Kathleen B. Thomas",
+            )
+            RECAPDocumentFactory(
+                docket_entry=e_27_d_3,
+                document_number="27",
+                is_available=True,
+            )
+
+        # Query all documents with the word "Voluntary" in the case name and only show results with PDFs
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Voluntary",
+            "available_only": True,
+        }
+        r = async_to_sync(self._test_article_count)(
+            params, 2, "case_name + available_only"
+        )
+        self.assertIn("Document #1", r.content.decode())
+        self.assertNotIn("Document #28", r.content.decode())
+        self.assertIn("Document #29", r.content.decode())
+
+        # Query all documents with the word "Kathleen" in the description and only show results with PDFs
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "description": "Kathleen",
+            "available_only": True,
+        }
+        r = async_to_sync(self._test_article_count)(
+            params, 1, "description + available_only"
+        )
+        self.assertIn("Document #27", r.content.decode())
+        self.assertNotIn("Document #14", r.content.decode())
+
+        # Query all documents with the word "Voluntary" in the description and case name
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Voluntary",
+            "description": "Voluntary",
+        }
+        r = async_to_sync(self._test_article_count)(
+            params, 1, "case_name + description + available_only"
+        )
+        self.assertIn("Document #1", r.content.decode())
+        self.assertIn("Document #2", r.content.decode())
+
+        # Query all documents with the word "Voluntary" in the description and case name and only show results with PDFs
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Voluntary",
+            "description": "Voluntary",
+            "available_only": True,
+        }
+        r = async_to_sync(self._test_article_count)(
+            params, 1, "case_name + description + available_only"
+        )
+        self.assertIn("Document #1", r.content.decode())
+
+        # test the combination of the text query and the available_only filter
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Voluntary Hospitals",
+            "available_only": True,
+        }
+        r = async_to_sync(self._test_article_count)(
+            params, 1, "case_name + available_only"
+        )
+        self.assertIn("Document #1", r.content.decode())
+
+        with self.captureOnCommitCallbacks(execute=True):
+            docket.delete()
+            docket_2.delete()
+            docket_3.delete()
 
     async def test_party_name_filter(self) -> None:
         """Confirm party_name filter works properly"""
@@ -585,6 +741,59 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         # Frontend, 1 result expected since RECAPDocuments are grouped by case
         await self._test_article_count(params, 1, "party_name")
+
+    def test_party_name_and_children_filter(self) -> None:
+        """Confirm dockets with children are shown when using the party filter"""
+        with self.captureOnCommitCallbacks(execute=True):
+            docket = DocketFactory(
+                court=self.court,
+                case_name="NYU Hospitals Center v. League of Voluntary Hospitals",
+                date_filed=datetime.date(2015, 8, 16),
+                date_argued=datetime.date(2013, 5, 20),
+                docket_number="1:17-cv-04465",
+                nature_of_suit="440",
+            )
+            e_1_d_1 = DocketEntryWithParentsFactory(
+                docket=docket,
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="United Healthcare Workers East, League of Voluntary Hospitals and Homes of New York",
+            )
+            RECAPDocumentFactory(
+                docket_entry=e_1_d_1,
+                document_number="1",
+                is_available=True,
+                page_count=5,
+            )
+            e_2_d_1 = DocketEntryWithParentsFactory(
+                docket=docket,
+                entry_number=2,
+                date_filed=datetime.date(2015, 8, 19),
+                description="Not available document for the League of Voluntary Hospitals and Homes of New York",
+            )
+            RECAPDocumentFactory(
+                docket_entry=e_2_d_1,
+                document_number="2",
+                is_available=False,
+                page_count=5,
+            )
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "hospital",
+            "description": "voluntary",
+            "party_name": "Frank Paul Sabatini",
+        }
+
+        # Frontend, 1 result expected since RECAPDocuments are grouped by case
+        r = async_to_sync(self._test_article_count)(
+            params, 1, "text query + description + party_name"
+        )
+        self.assertIn("Document #1", r.content.decode())
+        self.assertIn("Document #2", r.content.decode())
+
+        with self.captureOnCommitCallbacks(execute=True):
+            docket.delete()
 
     async def test_atty_name_filter(self) -> None:
         """Confirm atty_name filter works properly"""
@@ -679,6 +888,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = async_to_sync(self._test_article_count)(params, 1, "docket_number")
         # Count child documents under docket.
         self._count_child_documents(0, r.content.decode(), 6, "docket_number")
+        # The "See full docket for details" button is shown if the case has
+        # more entries than VIEW_MORE_CHILD_HITS.
+        self.assertIn("See full docket for details", r.content.decode())
         self.assertNotIn("View Additional Results for", r.content.decode())
 
         # Constraint filter:
@@ -700,7 +912,23 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "View Additional Results for this Case", r.content.decode()
         )
 
+        # Remove 1 RECAPDocument to ensure the docket does not contain more than
+        # VIEW_MORE_CHILD_HITS entries.
         rd_1.delete()
+        # View additional results query:
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": f"docket_id:{self.de.docket.id}",
+        }
+        # Frontend
+        r = async_to_sync(self._test_article_count)(params, 1, "docket_number")
+        # Count child documents under docket.
+        self._count_child_documents(0, r.content.decode(), 6, "docket_number")
+        # The "See full docket for details" button is not shown because the case
+        # does not contain more than VIEW_MORE_CHILD_HITS entries.
+        self.assertNotIn("See full docket for details", r.content.decode())
+        self.assertNotIn("View Additional Results for", r.content.decode())
+
         rd_2.delete()
         rd_3.delete()
         rd_4.delete()
@@ -1264,6 +1492,10 @@ class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):
         # API
         await self._test_api_results_count(params, 1, "available_only")
 
+    @unittest.skipIf(
+        tests_running_over_solr,
+        "Skip in SOlR due to we stopped indexing parties",
+    )
     async def test_party_name_filter(self) -> None:
         """Confirm party_name filter works properly"""
         params = {
@@ -1274,6 +1506,10 @@ class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):
         # API, 2 result expected since RECAPDocuments are not grouped.
         await self._test_api_results_count(params, 2, "party_name")
 
+    @unittest.skipIf(
+        tests_running_over_solr,
+        "Skip in SOlR due to we stopped indexing parties",
+    )
     async def test_atty_name_filter(self) -> None:
         """Confirm atty_name filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "atty_name": "Debbie Russell"}
@@ -1358,6 +1594,10 @@ class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):
             params, 4, "docket_number + available_only"
         )
 
+    @unittest.skipIf(
+        tests_running_over_solr,
+        "Skip in SOlR due to we stopped indexing parties",
+    )
     async def test_advanced_queries(self) -> None:
         """Confirm advance queries works properly"""
         # Advanced query string, firm
