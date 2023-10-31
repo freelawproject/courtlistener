@@ -1109,7 +1109,7 @@ def merge_highlights_into_result(
                     combined_highlights,
                 )
                 result[field] = combined_highlights
-            exact_hl_fields.append(field)
+                exact_hl_fields.append(field)
 
         if field not in exact_hl_fields:
             # If the "field.exact" version has not been set, set
