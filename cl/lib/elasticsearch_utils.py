@@ -42,6 +42,8 @@ from cl.search.constants import (
     RELATED_PATTERN,
     SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS,
     SEARCH_HL_TAG,
+    SEARCH_OPINION_CHILD_HL_FIELDS,
+    SEARCH_OPINION_QUERY_FIELDS,
     SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS,
     SEARCH_ORAL_ARGUMENT_QUERY_FIELDS,
     SEARCH_PEOPLE_CHILD_QUERY_FIELDS,
@@ -217,6 +219,7 @@ def add_fields_boosting(
         SEARCH_TYPES.ORAL_ARGUMENT,
         SEARCH_TYPES.RECAP,
         SEARCH_TYPES.DOCKETS,
+        SEARCH_TYPES.OPINION,
     ]:
         # Give a boost on the case_name field if it's obviously a case_name
         # query.
@@ -1682,14 +1685,24 @@ def build_full_join_es_queries(
     """
 
     q_should = []
-    child_type = "recap_document"
+
+    match cd["type"]:
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
+            child_type = "recap_document"
+        case SEARCH_TYPES.OPINION:
+            child_type = "opinion"
+
     join_query = None
-    if cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
+    if cd["type"] in [
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.DOCKETS,
+        SEARCH_TYPES.OPINION,
+    ]:
         # Build child filters.
         child_filters = build_has_child_filters(child_type, cd)
 
         # Build child text query.
-        child_fields = child_query_fields["recap_document"]
+        child_fields = child_query_fields[child_type]
         child_text_query = build_fulltext_query(
             child_fields, cd.get("q", ""), only_queries=True
         )
@@ -1735,11 +1748,16 @@ def build_full_join_es_queries(
 
         if child_text_query or child_filters:
             _, query_hits_limit = get_child_top_hits_limit(cd, cd["type"])
+            hl_fields = (
+                SEARCH_OPINION_CHILD_HL_FIELDS
+                if cd["type"] == SEARCH_TYPES.OPINION
+                else SEARCH_RECAP_CHILD_HL_FIELDS
+            )
             query = build_has_child_query(
                 join_query,
-                "recap_document",
+                child_type,
                 query_hits_limit,
-                SEARCH_RECAP_CHILD_HL_FIELDS,
+                hl_fields,
                 get_child_sorting_key(cd),
             )
             q_should.append(query)
@@ -1754,31 +1772,36 @@ def build_full_join_es_queries(
             parent_filters.append(
                 Q(
                     "has_child",
-                    type="recap_document",
+                    type=child_type,
                     score_mode="max",
                     query=Q("bool", filter=child_filters),
                 )
             )
         parent_query = None
+        default_parent_filter = (
+            Q("match", cluster_child="opinion_cluster")
+            if child_type == "opinion"
+            else Q("match", docket_child="docket")
+        )
         match parent_filters, string_query:
             case [], []:
                 pass
             case [], _:
                 parent_query = Q(
                     "bool",
-                    filter=Q("match", docket_child="docket"),
+                    filter=default_parent_filter,
                     should=string_query,
                     minimum_should_match=1,
                 )
             case _, []:
-                parent_filters.extend([Q("match", docket_child="docket")])
+                parent_filters.extend([default_parent_filter])
                 p_filters = reduce(operator.iand, parent_filters)
                 parent_query = Q(
                     "bool",
                     filter=p_filters,
                 )
             case _, _:
-                parent_filters.extend([Q("match", docket_child="docket")])
+                parent_filters.extend([default_parent_filter])
                 p_filters = reduce(operator.iand, parent_filters)
                 parent_query = Q(
                     "bool",
