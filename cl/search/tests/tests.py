@@ -682,6 +682,12 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
         )
         self.rebuild_index("search.OpinionCluster")
         super().setUp()
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+        )
 
     def _perform_wildcard_search(self):
         searchbox = self.browser.find_element(By.ID, "id_q")
