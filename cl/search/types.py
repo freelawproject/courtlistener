@@ -21,6 +21,7 @@ from cl.search.models import (
     OpinionCluster,
     Parenthetical,
     ParentheticalGroup,
+    RECAPDocument,
 )
 
 ESModelType = Union[
@@ -34,6 +35,20 @@ ESModelType = Union[
     Person,
     Position,
     Education,
+]
+
+ESModelClassType = Union[
+    Type[Citation],
+    Type[Docket],
+    Type[Opinion],
+    Type[OpinionCluster],
+    Type[Parenthetical],
+    Type[ParentheticalGroup],
+    Type[Audio],
+    Type[Person],
+    Type[Position],
+    Type[Education],
+    Type[RECAPDocument],
 ]
 
 ESDocumentInstanceType = Union[

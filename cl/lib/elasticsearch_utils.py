@@ -1484,7 +1484,16 @@ def build_full_join_es_queries(
         parent_filters = build_join_es_filters(cd)
         # If parent filters, extend into child_filters.
         if parent_filters:
-            child_filters.extend(parent_filters)
+            # Removes the party and attorney filter if they were provided because
+            # those fields are not part of the RECAPDocument mapping.
+            child_filters.extend(
+                [
+                    query
+                    for query in parent_filters
+                    if not isinstance(query, QueryString)
+                    or query.fields[0] not in ["party", "attorney"]
+                ]
+            )
         if child_filters:
             child_filters = reduce(operator.iand, child_filters)
         # Build the child query based on child_filters and child child_text_query
@@ -1527,13 +1536,13 @@ def build_full_join_es_queries(
         )
 
         # Adds filter to the parent query to exclude results with no children
-        if cd.get("available_only", ""):
+        if child_filters:
             parent_filters.append(
                 Q(
                     "has_child",
                     type="recap_document",
                     score_mode="max",
-                    query=Q("term", is_available=True),
+                    query=Q("bool", filter=child_filters),
                 )
             )
         parent_query = None
@@ -1597,6 +1606,9 @@ def limit_inner_hits(
             return
 
     for result in results:
+        result["child_docs"] = []
+        result["child_remaining"] = False
+        result["child_remaining_query_id"] = False
         try:
             inner_hits = [
                 hit
@@ -1605,17 +1617,18 @@ def limit_inner_hits(
                 ]["hits"]["hits"]
             ]
         except KeyError:
-            result["child_docs"] = []
-            result["child_remaining"] = False
             continue
 
+        docket_id_query = re.search(r"docket_id:\d+", get_params.get("q", ""))
         count_hits = len(inner_hits)
         if count_hits > hits_limit:
             result["child_docs"] = inner_hits[:hits_limit]
-            result["child_remaining"] = True
+            if docket_id_query:
+                result["child_remaining_query_id"] = True
+            else:
+                result["child_remaining"] = True
         else:
             result["child_docs"] = inner_hits
-            result["child_remaining"] = False
 
 
 def get_child_top_hits_limit(
@@ -1645,7 +1658,7 @@ def get_child_top_hits_limit(
     docket_id_query = re.search(r"docket_id:\d+", search_params.get("q", ""))
     if docket_id_query:
         frontend_hits_limit = settings.VIEW_MORE_CHILD_HITS
-        query_hits_limit = settings.VIEW_MORE_CHILD_HITS
+        query_hits_limit = settings.VIEW_MORE_CHILD_HITS + 1
 
     return frontend_hits_limit, query_hits_limit
 

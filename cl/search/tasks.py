@@ -1,14 +1,17 @@
 import logging
 import socket
+from collections import deque
 from datetime import timedelta
 from importlib import import_module
-from typing import Any
+from typing import Any, Generator
 
 import scorched
 import waffle
 from celery import Task
 from django.apps import apps
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import QuerySet
 from django.utils.timezone import now
 from elasticsearch.exceptions import (
     ConflictError,
@@ -16,7 +19,7 @@ from elasticsearch.exceptions import (
     NotFoundError,
     RequestError,
 )
-from elasticsearch.helpers import bulk
+from elasticsearch.helpers import parallel_bulk, streaming_bulk
 from elasticsearch_dsl import Document, UpdateByQuery, connections
 from requests import Session
 from scorched.exc import SolrError
@@ -42,8 +45,10 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.search.types import (
+    ESDictDocument,
     ESDocumentClassType,
     ESDocumentInstanceType,
+    ESModelClassType,
     ESModelType,
     SaveDocumentResponseType,
 )
@@ -242,100 +247,33 @@ def person_first_time_indexing(parent_id: int, position: Position) -> None:
         )
 
 
-# TODO Old task to be removed.
-@app.task(
-    bind=True,
-    autoretry_for=(ConnectionError,),
-    max_retries=3,
-    interval_start=5,
-)
-def save_document_in_es(
-    self: Task,
-    instance: ESModelType,
-    es_document: ESDocumentClassType,
-) -> SaveDocumentResponseType | None:
-    """Save a document in Elasticsearch using a provided callable.
+def get_instance_from_db(
+    instance_id: int, model: ESModelClassType
+) -> ESModelType | None:
+    """Get a model instance from DB or return None if it doesn't exist.
 
-    :param self: The celery task
-    :param instance: The instance of the document to save.
-    :param es_document: A Elasticsearch DSL document.
-    :return: SaveDocumentResponseType or None
+    :param instance_id: The primary key of the parent instance.
+    :param model: The model class of the instance.
+    :return: The object instance or None if it doesn't exist.
     """
-    es_args = {}
-    if isinstance(instance, Position):
-        parent_id = getattr(instance.person, "pk", None)
-        if not all(
-            [
-                es_index_exists(es_document._index._name),
-                parent_id,
-                # avoid indexing position records if the parent is not a judge
-                instance.person.is_judge,
-            ]
-        ):
-            return
-        if not PersonDocument.exists(id=parent_id):
-            person_first_time_indexing(parent_id, instance)
 
-        doc_id = ES_CHILD_ID(instance.pk).POSITION
-        es_args["_routing"] = parent_id
-    elif isinstance(instance, Person):
-        # index person records only if they were ever a judge.
-        if not instance.is_judge:
-            self.request.chain = None
-            return None
-        doc_id = instance.pk
-    elif isinstance(instance, RECAPDocument):
-        parent_id = getattr(instance.docket_entry.docket, "pk", None)
-        if not all(
-            [
-                es_index_exists(es_document._index._name),
-                parent_id,
-            ]
-        ):
-            self.request.chain = None
-            return None
-
-        if not DocketDocument.exists(id=parent_id):
-            # create the parent document if it does not exist in ES
-            docket_doc = DocketDocument()
-            doc = docket_doc.prepare(instance.docket_entry.docket)
-            DocketDocument(meta={"id": parent_id}, **doc).save(
-                skip_empty=False, return_doc_meta=True
-            )
-        doc_id = ES_CHILD_ID(instance.pk).RECAP
-        es_args["_routing"] = parent_id
-    else:
-        doc_id = instance.pk
-
-    es_args["meta"] = {"id": doc_id}
-    es_doc = es_document()
-    doc = es_doc.prepare(instance)
-    response = es_document(**es_args, **doc).save(
-        skip_empty=False,
-        return_doc_meta=True,
-        refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
-    )
-    if type(instance) in models_alert_support and response["_version"] == 1:
-        # Only send search alerts when a new instance of a model that support
-        # Alerts is indexed in ES _version:1
-        if es_document == AudioDocument and not waffle.switch_is_active(
-            "oa-es-alerts-active"
-        ):
-            # Disable ES Alerts if oa-es-alerts-active switch is not enabled
-            self.request.chain = None
-            return None
-        return response["_id"], doc
-    else:
-        self.request.chain = None
+    try:
+        return model.objects.get(pk=instance_id)
+    except ObjectDoesNotExist:
+        logger.warning(
+            f"The {model.__name__} with ID {instance_id} doesn't exists and it"
+            f"cannot be updated in ES."
+        )
         return None
 
 
-# New task.
 @app.task(
     bind=True,
-    autoretry_for=(ConnectionError,),
-    max_retries=3,
-    interval_start=5,
+    autoretry_for=(ConnectionError, ConflictError),
+    max_retries=5,
+    retry_backoff=2 * 60,
+    retry_backoff_max=10 * 60,
+    retry_jitter=True,
     queue=settings.CELERY_ETL_TASK_QUEUE,
 )
 def es_save_document(
@@ -355,55 +293,60 @@ def es_save_document(
     """
     es_args = {}
     es_document = getattr(es_document_module, es_document_name)
-    if app_label == "people_db.Position":
-        instance = Position.objects.get(pk=instance_id)
-        parent_id = getattr(instance.person, "pk", None)
-        if not all(
-            [
-                es_index_exists(es_document._index._name),
-                parent_id,
-                # avoid indexing position records if the parent is not a judge
-                instance.person.is_judge,
-            ]
-        ):
-            return
-        if not PersonDocument.exists(id=parent_id):
-            person_first_time_indexing(parent_id, instance)
 
-        doc_id = ES_CHILD_ID(instance.pk).POSITION
-        es_args["_routing"] = parent_id
-    elif app_label == "people_db.Person":
-        instance = Person.objects.get(pk=instance_id)
-        # index person records only if they were ever a judge.
-        if not instance.is_judge:
-            self.request.chain = None
-            return None
-        doc_id = instance.pk
-    elif app_label == "search.RECAPDocument":
-        instance = RECAPDocument.objects.get(pk=instance_id)
-        parent_id = getattr(instance.docket_entry.docket, "pk", None)
-        if not all(
-            [
-                es_index_exists(es_document._index._name),
-                parent_id,
-            ]
-        ):
-            self.request.chain = None
-            return None
+    # Get the instance to save in ES from DB.
+    model = apps.get_model(app_label)
+    instance = get_instance_from_db(instance_id, model)
+    if not instance:
+        # Abort task the instance is not found in DB.
+        self.request.chain = None
+        return None
+    match app_label:
+        case "people_db.Position":
+            parent_id = getattr(instance.person, "pk", None)
+            if not all(
+                [
+                    es_index_exists(es_document._index._name),
+                    parent_id,
+                    # avoid indexing position records if the parent is not a judge
+                    instance.person.is_judge,
+                ]
+            ):
+                self.request.chain = None
+                return
+            if not PersonDocument.exists(id=parent_id):
+                person_first_time_indexing(parent_id, instance)
 
-        if not DocketDocument.exists(id=parent_id):
-            # create the parent document if it does not exist in ES
-            docket_doc = DocketDocument()
-            doc = docket_doc.prepare(instance.docket_entry.docket)
-            DocketDocument(meta={"id": parent_id}, **doc).save(
-                skip_empty=False, return_doc_meta=True
-            )
-        doc_id = ES_CHILD_ID(instance.pk).RECAP
-        es_args["_routing"] = parent_id
-    else:
-        doc_id = instance_id
-        model = apps.get_model(app_label)
-        instance = model.objects.get(pk=instance_id)
+            doc_id = ES_CHILD_ID(instance.pk).POSITION
+            es_args["_routing"] = parent_id
+        case "people_db.Person":
+            # index person records only if they were ever a judge.
+            if not instance.is_judge:
+                self.request.chain = None
+                return None
+            doc_id = instance.pk
+        case "search.RECAPDocument":
+            parent_id = getattr(instance.docket_entry.docket, "pk", None)
+            if not all(
+                [
+                    es_index_exists(es_document._index._name),
+                    parent_id,
+                ]
+            ):
+                self.request.chain = None
+                return None
+
+            if not DocketDocument.exists(id=parent_id):
+                # create the parent document if it does not exist in ES
+                docket_doc = DocketDocument()
+                doc = docket_doc.prepare(instance.docket_entry.docket)
+                DocketDocument(meta={"id": parent_id}, **doc).save(
+                    skip_empty=False, return_doc_meta=True
+                )
+            doc_id = ES_CHILD_ID(instance.pk).RECAP
+            es_args["_routing"] = parent_id
+        case _:
+            doc_id = instance_id
 
     es_args["meta"] = {"id": doc_id}
     es_doc = es_document()
@@ -428,33 +371,136 @@ def es_save_document(
         return None
 
 
-# TODO Old task to be removed.
+def document_fields_to_update(
+    es_document: ESDocumentClassType,
+    main_instance: ESModelType,
+    affected_fields: list[str],
+    related_instance: ESModelType | None,
+    fields_map: dict,
+) -> dict[str, Any]:
+    """Generate a dictionary of fields and values to update based on a
+     provided map and an instance.
+
+    :param es_document: The Elasticsearch DSL document class.
+    :param main_instance: The main instance to update, this is the instance
+    that's directly related to the document mapping.
+    :param affected_fields: A list of field names that need to be updated.
+    :param related_instance: The related instance which is not directly
+    connected to the document mapping, although some of its fields are used to
+    populate the document.
+    :param fields_map: A map from which ES field names are to be extracted.
+    :return: A dictionary with fields and values to update.
+    """
+
+    fields_to_update = {}
+    if fields_map and related_instance:
+        # If a fields_maps and a related instance is provided, extract the
+        # fields values from the related instance or using the main instance
+        # prepare methods.
+        for field in affected_fields:
+            document_fields = fields_map[field]
+            for doc_field in document_fields:
+                if field.startswith("get_") and field.endswith("_display"):
+                    fields_to_update[doc_field] = getattr(
+                        related_instance, field
+                    )()
+                else:
+                    prepare_method = getattr(
+                        es_document(), f"prepare_{doc_field}", None
+                    )
+                    if prepare_method:
+                        field_value = prepare_method(main_instance)
+                    else:
+                        field_value = getattr(related_instance, field)
+                    fields_to_update[doc_field] = field_value
+    else:
+        # No fields_map is provided, extract field values only using the main
+        # instance prepare methods.
+        for field in affected_fields:
+            prepare_method = getattr(es_document(), f"prepare_{field}", None)
+            if not prepare_method:
+                continue
+            field_value = prepare_method(main_instance)
+            fields_to_update[field] = field_value
+    return fields_to_update
+
+
+# New task.
 @app.task(
     bind=True,
-    autoretry_for=(ConnectionError,),
-    max_retries=3,
-    interval_start=5,
+    autoretry_for=(ConnectionError, ConflictError),
+    max_retries=5,
+    retry_backoff=2 * 60,
+    retry_backoff_max=10 * 60,
+    retry_jitter=True,
+    queue=settings.CELERY_ETL_TASK_QUEUE,
 )
-def update_document_in_es(
+def update_es_document(
     self: Task,
-    es_document: ESDocumentInstanceType,
-    fields_values_to_update: dict[str, Any],
+    es_document_name: str,
+    fields_to_update: list[str],
+    main_instance_data: tuple[str, int],
+    related_instance_data: tuple[str, int] | None,
+    fields_map: dict | None,
 ) -> None:
     """Update a document in Elasticsearch.
     :param self: The celery task
-    :param es_document: The instance of the document to save.
-    :param fields_values_to_update: A dictionary with fields and values to update.
+    :param es_document_name: The Elasticsearch document type name.
+    :param fields_to_update: A list containing the fields to update.
+    :param main_instance_data: A two tuple, the main instance app label and the
+    main instance ID to update.
+    :param related_instance_data: A two-tuple: the related instance's app label
+    and the related instance ID from which to extract field values. None if the
+    update doesn't involve a related instance.
+    :param fields_map: A dict containing fields that can be updated or None if
+    mapping is not required for the update.
     :return: None
     """
 
-    Document.update(
+    es_document = getattr(es_document_module, es_document_name)
+    main_app_label, main_instance_id = main_instance_data
+    es_doc = get_doc_from_es(es_document, main_instance_id)
+    if not es_doc:
+        model_label = es_document.Django.model.__name__.capitalize()
+        logger.warning(
+            f"The {model_label} with ID:{main_instance_id} can't updated. "
+            "It has been removed from the index."
+        )
+        return
+
+    # Get the main instance from DB, to extract the latest values.
+    main_model = apps.get_model(main_app_label)
+    main_model_instance = get_instance_from_db(main_instance_id, main_model)
+    if not main_model_instance:
+        return
+
+    related_instance = None
+    # If provided, get the related instance from DB to extract the latest values.
+    if related_instance_data:
+        related_instance_app_label, related_instance_id = related_instance_data
+        related_instance_model = apps.get_model(related_instance_app_label)
+        related_instance = get_instance_from_db(
+            related_instance_id, related_instance_model
+        )
+        if not related_instance:
+            return
+
+    # Get the fields to update and their values from DB.
+    fields_values_to_update = document_fields_to_update(
         es_document,
+        main_model_instance,
+        fields_to_update,
+        related_instance,
+        fields_map,
+    )
+    Document.update(
+        es_doc,
         **fields_values_to_update,
         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
     )
 
 
-# New task.
+# TODO Old task to be removed.
 @app.task(
     bind=True,
     autoretry_for=(ConnectionError,),
@@ -521,17 +567,20 @@ def get_doc_from_es(
     return main_doc
 
 
-# TODO Old task to be removed.
+# New task.
 @app.task(
     bind=True,
-    autoretry_for=(ConnectionError, NotFoundError),
-    max_retries=3,
-    interval_start=5,
+    autoretry_for=(ConnectionError, ConflictError),
+    max_retries=5,
+    retry_backoff=2 * 60,
+    retry_backoff_max=10 * 60,
+    retry_jitter=True,
+    queue=settings.CELERY_ETL_TASK_QUEUE,
 )
-def update_child_documents_by_query(
+def update_children_docs_by_query(
     self: Task,
-    es_document: ESDocumentClassType,
-    parent_instance: ESModelType,
+    es_document_name: str,
+    parent_instance_id: int,
     fields_to_update: list[str],
     fields_map: dict[str, str] | None = None,
 ) -> None:
@@ -539,21 +588,32 @@ def update_child_documents_by_query(
     API.
 
     :param self: The celery task
-    :param es_document: The Elasticsearch Document type to update.
-    :param parent_instance: The parent instance containing the fields to update.
+    :param es_document_name: The Elasticsearch Document type name to update.
+    :param parent_instance_id: The parent instance ID containing the fields to update.
     :param fields_to_update: List of field names to be updated.
     :param fields_map: A mapping from model fields to Elasticsearch document fields.
     :return: None
     """
 
+    es_document = getattr(es_document_module, es_document_name)
     s = es_document.search()
     main_doc = None
+    parent_instance = None
+    parent_doc_class = None
     if es_document is PositionDocument:
-        s = s.query("parent_id", type="position", id=parent_instance.pk)
-        main_doc = get_doc_from_es(PersonDocument, parent_instance.pk)
+        s = s.query("parent_id", type="position", id=parent_instance_id)
+        parent_doc_class = PersonDocument
+        main_doc = parent_doc_class.exists(parent_instance_id)
+        parent_instance = get_instance_from_db(parent_instance_id, Person)
+        if not parent_instance:
+            return
     elif es_document is ESRECAPDocument:
-        s = s.query("parent_id", type="recap_document", id=parent_instance.pk)
-        main_doc = get_doc_from_es(DocketDocument, parent_instance.pk)
+        s = s.query("parent_id", type="recap_document", id=parent_instance_id)
+        parent_doc_class = DocketDocument
+        main_doc = parent_doc_class.exists(parent_instance_id)
+        parent_instance = get_instance_from_db(parent_instance_id, Docket)
+        if not parent_instance:
+            return
 
     if not main_doc:
         # Abort bulk update for a not supported document or non-existing parent
@@ -561,8 +621,12 @@ def update_child_documents_by_query(
         return
 
     client = connections.get_connection()
-    ubq = UpdateByQuery(using=client, index=es_document._index._name).query(
-        s.to_dict()["query"]
+    ubq = (
+        UpdateByQuery(using=client, index=es_document._index._name)
+        .query(s.to_dict()["query"])
+        .params(
+            slices=es_document._index._settings["number_of_shards"]
+        )  # Set slices equal to the number of shards.
     )
 
     script_lines = []
@@ -575,7 +639,9 @@ def update_child_documents_by_query(
             script_lines.append(
                 f"ctx._source.{field_name} = params.{field_name};"
             )
-            prepare_method = getattr(main_doc, f"prepare_{field_name}", None)
+            prepare_method = getattr(
+                parent_doc_class(), f"prepare_{field_name}", None
+            )
             if prepare_method:
                 params[field_name] = prepare_method(parent_instance)
             else:
@@ -590,7 +656,7 @@ def update_child_documents_by_query(
         es_document._index.refresh()
 
 
-# New task.
+# TODO Old task to be removed.
 @app.task(
     bind=True,
     autoretry_for=(ConnectionError,),
@@ -676,12 +742,13 @@ def update_children_documents_by_query(
 
 @app.task(
     bind=True,
-    autoretry_for=(ConnectionError, NotFoundError),
-    max_retries=8,
-    interval_start=5 * 60,
+    autoretry_for=(ConnectionError, NotFoundError, ConflictError),
+    max_retries=5,
+    retry_backoff=2 * 60,
+    retry_backoff_max=10 * 60,
+    retry_jitter=True,
     queue=settings.CELERY_ETL_TASK_QUEUE,
 )
-@throttle_task(settings.ELASTICSEARCH_THROTTLING_TASK_RATE, key="docket_id")
 def index_docket_parties_in_es(
     self: Task,
     docket_id: int,
@@ -691,7 +758,10 @@ def index_docket_parties_in_es(
     :param docket_id: The docket ID to update in ES.
     :return: None
     """
-    docket = Docket.objects.get(id=docket_id)
+
+    docket = get_instance_from_db(docket_id, Docket)
+    if not docket:
+        return
     parties_prepared = DocketDocument().prepare_parties(docket)
     fields_to_update = {
         key: list(set_values) for key, set_values in parties_prepared.items()
@@ -704,6 +774,36 @@ def index_docket_parties_in_es(
     )
 
 
+def bulk_indexing_generator(
+    child_docs: QuerySet,
+    child_es_document: ESDocumentClassType,
+    child_id_property: str,
+    instance_id: int,
+    base_doc: dict[str, str],
+) -> Generator[ESDictDocument, None, None]:
+    """Generate ES child documents for bulk indexing.
+
+    :param child_docs: The queryset of child model instances to be indexed.
+    :param child_es_document: The Elasticsearch document class corresponding to
+    the child model.
+    :param child_id_property: The property to be used for generating ES
+    child document ID.
+    :param instance_id: The parent instance ID used for routing in ES.
+    :param base_doc: The base ES document fields.
+    :return: Yields ES child documents for bulk indexing.
+    """
+
+    for child in child_docs.iterator():
+        child_doc = child_es_document().prepare(child)
+        child_params = {
+            "_id": getattr(ES_CHILD_ID(child.pk), child_id_property),
+            "_routing": f"{instance_id}",
+        }
+        child_doc.update(base_doc)
+        child_doc.update(child_params)
+        yield child_doc
+
+
 @app.task(
     bind=True,
     autoretry_for=(ConnectionError,),
@@ -714,12 +814,15 @@ def index_parent_and_child_docs(
     self: Task,
     instance_ids: list[int],
     search_type: str,
+    testing_mode: bool = False,
 ) -> None:
     """Index parent and child documents in Elasticsearch.
 
     :param self: The Celery task instance
     :param instance_ids: The parent instance IDs to index.
     :param search_type: The Search Type to index parent and child docs.
+    :param testing_mode: If True uses streaming_bulk in TestCase based tests,
+    otherwise uses parallel_bulk in production.
     :return: None
     """
 
@@ -735,6 +838,7 @@ def index_parent_and_child_docs(
         case _:
             return
 
+    model_label = parent_es_document.Django.model.__name__.capitalize()
     for instance_id in instance_ids:
         if search_type == SEARCH_TYPES.PEOPLE:
             instance = Person.objects.prefetch_related("positions").get(
@@ -762,9 +866,6 @@ def index_parent_and_child_docs(
                     refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
                 )
             except (ConflictError, RequestError) as exc:
-                model_label = (
-                    parent_es_document.Django.model.__name__.capitalize()
-                )
                 logger.error(
                     f"Error indexing the {model_label} with ID: {instance_id}. "
                     f"Exception was: {type(exc).__name__}"
@@ -777,19 +878,46 @@ def index_parent_and_child_docs(
             "_op_type": "index",
             "_index": parent_es_document._index._name,
         }
-        child_docs_to_index = []
-        for child in child_docs.iterator():
-            child_doc = child_es_document().prepare(child)
-            child_params = {
-                "_id": getattr(ES_CHILD_ID(child.pk), child_id_property),
-                "_routing": f"{instance_id}",
-            }
-            child_doc.update(base_doc)
-            child_doc.update(child_params)
-            child_docs_to_index.append(child_doc)
 
-        # Perform bulk indexing for child documents
-        bulk(client, child_docs_to_index)
+        failed_child_docs = []
+        if testing_mode:
+            # Use streaming_bulk in TestCase based tests. Since parallel_bulk
+            # doesn't work on them.
+            for success, info in streaming_bulk(
+                client,
+                bulk_indexing_generator(
+                    child_docs,
+                    child_es_document,
+                    child_id_property,
+                    instance_id,
+                    base_doc,
+                ),
+                chunk_size=settings.ELASTICSEARCH_BULK_BATCH_SIZE,
+            ):
+                if not success:
+                    failed_child_docs.append(info["index"]["_id"])
+        else:
+            # Use parallel_bulk in production and tests based on TransactionTestCase
+            for success, info in parallel_bulk(
+                client,
+                bulk_indexing_generator(
+                    child_docs,
+                    child_es_document,
+                    child_id_property,
+                    instance_id,
+                    base_doc,
+                ),
+                thread_count=settings.ELASTICSEARCH_PARALLEL_BULK_THREADS,
+                chunk_size=settings.ELASTICSEARCH_BULK_BATCH_SIZE,
+            ):
+                if not success:
+                    failed_child_docs.append(info["index"]["_id"])
+
+        if failed_child_docs:
+            logger.error(
+                f"Error indexing child documents from the {model_label}"
+                f" with ID: {instance_id}. Child IDs are: {failed_child_docs}"
+            )
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
@@ -798,9 +926,11 @@ def index_parent_and_child_docs(
 
 @app.task(
     bind=True,
-    autoretry_for=(ConnectionError,),
-    max_retries=3,
-    interval_start=5,
+    autoretry_for=(ConnectionError, ConflictError),
+    max_retries=5,
+    retry_backoff=2 * 60,
+    retry_backoff_max=10 * 60,
+    retry_jitter=True,
     ignore_result=True,
     queue=settings.CELERY_ETL_TASK_QUEUE,
 )
