@@ -1,14 +1,13 @@
 import datetime
 from collections import OrderedDict, defaultdict
 from itertools import groupby
-from typing import Dict, Tuple, Union
+from typing import Dict, Union
 from urllib.parse import urlencode
 
 import eyecite
 import natsort
 from asgiref.sync import sync_to_async
 from django.contrib import messages
-from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import F, IntegerField, Prefetch
@@ -22,7 +21,7 @@ from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
-from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from reporters_db import (
     EDITIONS,
     NAMES_TO_EDITIONS,
@@ -31,7 +30,6 @@ from reporters_db import (
 )
 from rest_framework.status import HTTP_300_MULTIPLE_CHOICES, HTTP_404_NOT_FOUND
 
-from cl.alerts.models import DocketAlert
 from cl.citations.parenthetical_utils import get_or_create_parenthetical_groups
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import NoteForm
@@ -41,6 +39,7 @@ from cl.lib.bot_detector import is_og_bot
 from cl.lib.http import is_ajax
 from cl.lib.model_helpers import choices_to_csv
 from cl.lib.models import THUMBNAIL_STATUSES
+from cl.lib.ratelimiter import ratelimiter_all_2_per_m
 from cl.lib.search_utils import (
     get_citing_clusters_with_cache,
     get_related_clusters_with_cache,
@@ -50,11 +49,13 @@ from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_404
 from cl.lib.view_utils import increment_view_count
+from cl.opinion_page.feeds import DocketFeed
 from cl.opinion_page.forms import (
     CitationRedirectorForm,
     CourtUploadForm,
     DocketEntryFilterForm,
 )
+from cl.opinion_page.utils import core_docket_data, get_case_title
 from cl.people_db.models import AttorneyOrganization, CriminalCount, Role
 from cl.recap.constants import COURT_TIMEZONES
 from cl.search.models import (
@@ -195,69 +196,6 @@ async def redirect_docket_recap(
     )
 
 
-def get_case_title(cluster: OpinionCluster) -> str:
-    return f"{trunc(best_case_name(cluster), 100)}, {cluster.citation_string}"
-
-
-def make_docket_title(docket: Docket) -> str:
-    title = ", ".join(
-        [
-            s
-            for s in [
-                trunc(best_case_name(docket), 100, ellipsis="..."),
-                docket.docket_number,
-            ]
-            if s and s.strip()
-        ]
-    )
-    return title
-
-
-def user_has_alert(user: Union[AnonymousUser, User], docket: Docket) -> bool:
-    has_alert = False
-    if user.is_authenticated:
-        has_alert = DocketAlert.objects.filter(
-            docket=docket, user=user, alert_type=DocketAlert.SUBSCRIPTION
-        ).exists()
-    return has_alert
-
-
-def core_docket_data(
-    request: HttpRequest,
-    pk: int,
-) -> Tuple[Docket, Dict[str, Union[bool, str, Docket, NoteForm]]]:
-    """Gather the core data for a docket, party, or IDB page."""
-    docket = get_object_or_404(Docket, pk=pk)
-    title = make_docket_title(docket)
-
-    try:
-        note = Note.objects.get(docket_id=docket.pk, user=request.user)
-    except (ObjectDoesNotExist, TypeError):
-        # Not saved in notes or anonymous user
-        note_form = NoteForm(
-            initial={
-                "docket_id": docket.pk,
-                "name": trunc(best_case_name(docket), 100, ellipsis="..."),
-            }
-        )
-    else:
-        note_form = NoteForm(instance=note)
-
-    has_alert = user_has_alert(request.user, docket)
-
-    return (
-        docket,
-        {
-            "docket": docket,
-            "title": title,
-            "note_form": note_form,
-            "has_alert": has_alert,
-            "timezone": COURT_TIMEZONES.get(docket.court_id, "US/Eastern"),
-            "private": docket.blocked,
-        },
-    )
-
-
 def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     docket, context = core_docket_data(request, pk)
     increment_view_count(docket, request)
@@ -302,6 +240,11 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
         }
     )
     return TemplateResponse(request, "docket.html", context)
+
+
+@ratelimiter_all_2_per_m
+def view_docket_feed(request: HttpRequest, docket_id: int) -> HttpResponse:
+    return DocketFeed()(request, docket_id=docket_id)
 
 
 def view_parties(
@@ -1103,6 +1046,7 @@ def citation_redirector(
     return HttpResponse(status=500)
 
 
+@csrf_exempt
 def citation_homepage(request: HttpRequest) -> HttpResponse:
     """Show the citation homepage"""
     if request.method == "POST":
