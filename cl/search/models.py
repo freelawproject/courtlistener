@@ -1009,33 +1009,6 @@ class Docket(AbstractDateTimeModel):
             }
         )
 
-        # Parties, attorneys, firms
-        if self.pk not in [
-            # Block mega cases that are too big
-            6245245,  # J&J Talcum Powder
-            4538381,  # Ethicon, Inc. Pelvic Repair System
-            4715020,  # Katrina Canal Breaches Litigation
-        ]:
-            out.update(
-                {
-                    "party_id": set(),
-                    "party": set(),
-                    "attorney_id": set(),
-                    "attorney": set(),
-                    "firm_id": set(),
-                    "firm": set(),
-                }
-            )
-            for p in self.prefetched_parties:
-                out["party_id"].add(p.pk)
-                out["party"].add(p.name)
-                for a in p.attys_in_docket:
-                    out["attorney_id"].add(a.pk)
-                    out["attorney"].add(a.name)
-                    for f in a.firms_in_docket:
-                        out["firm_id"].add(f.pk)
-                        out["firm"].add(f.name)
-
         # Do RECAPDocument and Docket Entries in a nested loop
         for de in self.docket_entries.all().iterator():
             # Docket Entry
@@ -1626,38 +1599,6 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
                 "court_citation_string": docket.court.citation_string,
             }
         )
-
-        # Parties, Attorneys, Firms
-        out.update(
-            {
-                "party_id": set(),
-                "party": set(),
-                "attorney_id": set(),
-                "attorney": set(),
-                "firm_id": set(),
-                "firm": set(),
-            }
-        )
-
-        if docket.pk in [
-            6245245,  # J&J Talcum Powder
-            4538381,  # Ethicon, Inc. Pelvic Repair System
-            4715020,  # Katrina Canal Breaches Litigation
-        ]:
-            # Skip the parties for mega cases that are too big to
-            # pull from the DB. Sorry folks.
-            return out
-
-        for p in docket.prefetched_parties:
-            out["party_id"].add(p.pk)
-            out["party"].add(p.name)
-            for a in p.attys_in_docket:
-                out["attorney_id"].add(a.pk)
-                out["attorney"].add(a.name)
-                for f in a.firms_in_docket:
-                    out["firm_id"].add(f.pk)
-                    out["firm"].add(f.name)
-
         return out
 
     def as_search_dict(self, docket_metadata=None):

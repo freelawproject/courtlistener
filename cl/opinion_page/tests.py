@@ -31,7 +31,8 @@ from cl.lib.test_helpers import (
     SitemapTest,
 )
 from cl.opinion_page.forms import CourtUploadForm
-from cl.opinion_page.views import get_prev_next_volumes, make_docket_title
+from cl.opinion_page.utils import make_docket_title
+from cl.opinion_page.views import get_prev_next_volumes
 from cl.people_db.factories import PersonFactory, PositionFactory
 from cl.people_db.models import Person
 from cl.recap.factories import (

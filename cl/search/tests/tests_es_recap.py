@@ -1494,6 +1494,10 @@ class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):
         # API
         await self._test_api_results_count(params, 1, "available_only")
 
+    @unittest.skipIf(
+        tests_running_over_solr,
+        "Skip in SOlR due to we stopped indexing parties",
+    )
     async def test_party_name_filter(self) -> None:
         """Confirm party_name filter works properly"""
         params = {
@@ -1504,6 +1508,10 @@ class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):
         # API, 2 result expected since RECAPDocuments are not grouped.
         await self._test_api_results_count(params, 2, "party_name")
 
+    @unittest.skipIf(
+        tests_running_over_solr,
+        "Skip in SOlR due to we stopped indexing parties",
+    )
     async def test_atty_name_filter(self) -> None:
         """Confirm atty_name filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "atty_name": "Debbie Russell"}
@@ -1588,6 +1596,10 @@ class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):
             params, 4, "docket_number + available_only"
         )
 
+    @unittest.skipIf(
+        tests_running_over_solr,
+        "Skip in SOlR due to we stopped indexing parties",
+    )
     async def test_advanced_queries(self) -> None:
         """Confirm advance queries works properly"""
         # Advanced query string, firm
