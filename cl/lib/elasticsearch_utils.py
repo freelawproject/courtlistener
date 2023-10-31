@@ -1605,7 +1605,6 @@ def build_join_es_filters(cd: CleanData) -> List:
 
         queries_list.extend(
             [
-                Q("match", cluster_child="opinion_cluster"),
                 *build_text_filter("caseName", cd.get("case_name", "")),
                 *build_daterange_query(
                     "dateFiled",
