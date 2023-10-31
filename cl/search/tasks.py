@@ -637,7 +637,9 @@ def update_children_docs_by_query(
         parent_instance = get_instance_from_db(parent_instance_id, Docket)
         if not parent_instance:
             return
-    elif es_document is OpinionDocument:
+    elif (
+        es_document is OpinionDocument or es_document is OpinionClusterDocument
+    ):
         s = s.query("parent_id", type="opinion", id=parent_instance_id)
         parent_doc_class = OpinionClusterDocument
         main_doc = parent_doc_class.exists(parent_instance_id)
