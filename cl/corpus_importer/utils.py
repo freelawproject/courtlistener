@@ -60,7 +60,7 @@ class DateException(Exception):
 
 class EmptyOpinionException(Exception):
     """An exception for opinions that raise a ZeroDivisionError Exception due empty
-    opinion tag"""
+    opinion tag or empty opinion content in cl"""
 
     def __init__(self, message: str) -> None:
         self.message = message

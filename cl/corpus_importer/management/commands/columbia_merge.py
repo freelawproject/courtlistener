@@ -12,7 +12,6 @@ Merge using a cluster id, it will work only if at least one opinion has a xml fi
 It requires passing the mounted directory path to the columbia xml files
 docker-compose -f docker/courtlistener/docker-compose.yml exec cl-django python manage.py columbia_merge --cluster-id 2336478 --xml-dir /opt/columbia
 """
-import csv
 import itertools
 import os.path
 import re
@@ -20,6 +19,7 @@ from datetime import date
 from difflib import SequenceMatcher
 from typing import Any, Optional
 
+import pandas as pd
 from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup, NavigableString, Tag
 from django.db import transaction
@@ -232,7 +232,6 @@ def is_opinion_published(soup: BeautifulSoup) -> bool:
     :param soup: The XML object
     :return: Published or Unpublished
     """
-    # TODO check this function
     opinion_tag = soup.find("opinion")
 
     if opinion_tag:
@@ -243,7 +242,7 @@ def is_opinion_published(soup: BeautifulSoup) -> bool:
     return True
 
 
-def read_xml_to_soup(filepath: str):
+def read_xml_to_soup(filepath: str) -> BeautifulSoup:
     """This function fixes the bad tags in columbia xml files
     :param filepath: path to xml file
     :return: string with content
@@ -294,11 +293,11 @@ def add_floating_opinion(opinions: list, floating_content: list) -> list:
     return opinions
 
 
-def extract_opinions_bs(outer_opinion: BeautifulSoup) -> list[Optional[dict]]:
+def extract_opinions(outer_opinion: BeautifulSoup) -> list[Optional[dict]]:
     """We extract all possible opinions from bs content, with and without author,
     and we create new opinions if floating content exists
-    :param outer_opinion:
-    :return:
+    :param outer_opinion: element containing all xml tags
+    :return: list of opinion dicts
     """
     opinions: list = []
     floating_content = []
@@ -362,8 +361,9 @@ def extract_opinions_bs(outer_opinion: BeautifulSoup) -> list[Optional[dict]]:
     return opinions
 
 
-def merge_opinions(opinions, content) -> list:
-    """Merge last and previous opinion if are the same type or create a new opinion if merge is not possible
+def merge_opinions(opinions: list, content: list) -> list:
+    """Merge last and previous opinion if are the same type or create a new opinion
+    if merge is not possible
     :param opinions: list of opinions that is being updated constantly
     :param content: list of opinions without an author
     :return: updated list of opinions
@@ -466,11 +466,8 @@ def prepare_opinions_found(extracted_opinions: list) -> list:
 
 
 def find_judge_and_type(columbia_data: dict):
-    """
-    # only first opinion with "opinion" type is a lead opinion, the next opinion with
-    # "opinion" type is an addendum
-    :param columbia_data:
-    :return:
+    """Find judges from opinions and map opinion type to model field choice
+    :param columbia_data: a dict that contains all parsed data
     """
 
     columbia_data["judges"] = []
@@ -484,6 +481,8 @@ def find_judge_and_type(columbia_data: dict):
             if judge_name not in columbia_data["judges"]:
                 columbia_data["judges"].append(judge_name)
 
+        # only first opinion with "opinion" type is a lead opinion, the next opinion
+        # with "opinion" type is an addendum
         if not lead and op_type and op_type == "opinion":
             lead = True
             op["type"] = "020lead"
@@ -518,10 +517,10 @@ def fix_reporter_caption(soup):
                     r.extract()
 
 
-def fix_simple_tags(soup, columbia_data):
-    """
-    :param soup:
-    :param columbia_data:
+def fix_simple_tags(soup: BeautifulSoup, columbia_data: dict):
+    """Parse and store data from SIMPLE_TAGS
+    :param soup: bs element containing all xml tags
+    :param columbia_data: a dict that contains all parsed data
     """
     for tag in SIMPLE_TAGS:
         found_tags = soup.findAll(tag)
@@ -576,8 +575,8 @@ def fix_simple_tags(soup, columbia_data):
 
 
 def extract_dates(columbia_data: dict):
-    """Get dates
-    :param columbia_data:
+    """Extract and parse all possible dates obtained from xml file
+    :param columbia_data: a dict that contains all parsed data
     """
     dates = columbia_data.get("date", []) + columbia_data.get(
         "hearing_date", []
@@ -647,7 +646,7 @@ def extract_dates(columbia_data: dict):
     # return data
 
 
-def format_additional_fields(data, soup):
+def format_additional_fields(data: dict, soup: BeautifulSoup):
     """Prepare data and rename key names to match model field names
     :param data: dict with data extracted from xml
     :param soup: bs object
@@ -676,7 +675,6 @@ def update_matching_opinions(
     :param matches: dict with matching position from cl and columbia opinions
     :param cl_cleaned_opinions: list of cl opinions
     :param columbia_opinions: list of columbia opinions
-    :return: None
     """
     for columbia_pos, cl_pos in matches.items():
         file_opinion = columbia_opinions[columbia_pos]  # type: dict
@@ -839,7 +837,6 @@ def merge_docket_numbers(cluster: OpinionCluster, docket_number: str) -> None:
     """Merge docket number
     :param cluster: The cluster of the merging item
     :param docket_number: The columbia docket number
-    :return: None
     """
     cl_docket = cluster.docket
     columbia_clean_docket = clean_docket_number(docket_number)
@@ -875,7 +872,6 @@ def merge_case_names(
     """Merge case names
     :param cluster: The cluster of the merging item
     :param columbia_data: json data from columbia
-    :return: None
     """
     columbia_case_name = titlecase(harmonize(columbia_data["case_name"]))
     columbia_case_name_full = titlecase(columbia_data["case_name_full"])
@@ -928,7 +924,6 @@ def merge_date_filed(
     """Merge date filed
     :param cluster: The cluster of the merging item
     :param columbia_data: json data from columbia
-    :return: None
     """
 
     columbia_date_filed = columbia_data.get("date_filed")
@@ -952,7 +947,6 @@ def merge_long_fields(
     :param field_name: Field name to update in opinion cluster
     :param overlapping_data: data to compare from columbia and courtlistener
     :param cluster_id: cluster id
-    :return: None
     """
     if not overlapping_data:
         return {}
@@ -977,10 +971,8 @@ def merge_strings(
     field_name: str, overlapping_data: tuple[str, str]
 ) -> dict[str, Any]:
     """Compare two strings and choose the largest
-
     :param field_name: field name to update in opinion cluster
     :param overlapping_data: data to compare from columbia and courtlistener
-    :return: None
     """
     if not overlapping_data:
         return {}
@@ -997,7 +989,6 @@ def merge_judges(
 ) -> dict[str, Any]:
     """Merge overlapping judge values
     :param overlapping_data: data to compare from columbia and courtlistener
-    :return: None
     """
 
     if not overlapping_data:
@@ -1037,7 +1028,6 @@ def merge_overlapping_data(
     """Merge overlapping data
     :param cluster: the cluster object
     :param changed_values_dictionary: the dictionary of data to merge
-    :return: None
     """
 
     if not changed_values_dictionary:
@@ -1077,7 +1067,6 @@ def merge_overlapping_data(
 def update_docket_source(cluster: OpinionCluster) -> None:
     """Update docket source and complete
     :param cluster: the cluster object
-    :return: None
     """
     docket = cluster.docket
     new_docket_source = Docket.COLUMBIA + docket.source
@@ -1095,7 +1084,6 @@ def update_docket_source(cluster: OpinionCluster) -> None:
 def update_cluster_source(cluster: OpinionCluster) -> None:
     """Update cluster source
     :param cluster: cluster object
-    :return: None
     """
     new_cluster_source = SOURCES.COLUMBIA_ARCHIVE + cluster.source
     if new_cluster_source in VALID_MERGED_SOURCES:
@@ -1107,12 +1095,12 @@ def update_cluster_source(cluster: OpinionCluster) -> None:
         )
 
 
-def update_panel(
+def update_cluster_panel(
     cluster: OpinionCluster,
     panel_list: list[str],
     panel_date: Optional[date] = None,
 ) -> None:
-    """Update cluster's panel
+    """Update cluster's panel, this is done independently since it is a m2m relationship
     :param cluster: the cluster object
     :param panel_list: list with people names
     :param panel_date: date used to find people
@@ -1164,8 +1152,9 @@ def process_cluster(
     if not outer_opinion:
         # opinion wraps around all xml content
         logger.warning("Ill formed xml columbia")
+        return
 
-    extracted_opinions = extract_opinions_bs(outer_opinion)
+    extracted_opinions = extract_opinions(outer_opinion)
     columbia_data["opinions"] = prepare_opinions_found(extracted_opinions)
     columbia_data["file"] = filepath
     find_judge_and_type(columbia_data)
@@ -1207,7 +1196,7 @@ def process_cluster(
             )
             # panel
             if columbia_data["panel"]:
-                update_panel(
+                update_cluster_panel(
                     cluster,
                     columbia_data["panel"],
                     columbia_data["panel_date"],
@@ -1261,34 +1250,36 @@ def merge_columbia_into_cl(options) -> None:
 
     total_processed = 0
     start = False if skip_until else True
-    with open(csv_filepath, mode="r", encoding="utf-8") as csv_file:
-        csv_reader = csv.DictReader(csv_file)
-        for row in csv_reader:
-            cluster_id = row.get("cluster_id")
-            filepath = row.get("filepath")
-            if not start and skip_until == cluster_id:
-                start = True
-            if not start:
-                continue
 
-            # TODO
-            # xml_path = f"{xml_dir}/documents/{filepath}"
-            xml_path = filepath
-            if not os.path.exists(xml_path):
-                logger.warning(
-                    f"No file at: {xml_path}, Cluster: {cluster_id}"
-                )
-                continue
+    data = pd.read_csv(
+        csv_filepath, delimiter=",", dtype={"cluster_id": int, "filepath": str}
+    )
 
-            process_cluster(
-                cluster_id=cluster_id,
-                filepath=xml_path,
-            )
+    for index, item in data.iterrows():
+        cluster_id = item["cluster_id"]
+        filepath = item["filepath"]
 
-            total_processed += 1
-            if limit and total_processed >= limit:
-                logger.info(f"Finished {limit} imports")
-                return
+        if not start and skip_until == cluster_id:
+            start = True
+        if not start:
+            continue
+
+        # TODO
+        # xml_path = f"{xml_dir}/documents/{filepath}"
+        xml_path = filepath
+        if not os.path.exists(xml_path):
+            logger.warning(f"No file at: {xml_path}, Cluster: {cluster_id}")
+            continue
+
+        process_cluster(
+            cluster_id=cluster_id,
+            filepath=xml_path,
+        )
+
+        total_processed += 1
+        if limit and total_processed >= limit:
+            logger.info(f"Finished {limit} imports")
+            return
 
 
 class Command(VerboseCommand):
