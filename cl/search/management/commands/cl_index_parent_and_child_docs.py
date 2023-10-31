@@ -65,7 +65,7 @@ class Command(VerboseCommand):
 
     def __init__(self, *args, **kwargs):
         super(Command, self).__init__(*args, **kwargs)
-        self.options = []
+        self.options = {}
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -99,6 +99,11 @@ class Command(VerboseCommand):
             action="store_true",
             help="Auto resume the command using the last document_id logged in Redis. "
             "If --pk-offset is provided, it'll be ignored.",
+        )
+        parser.add_argument(
+            "--testing-mode",
+            action="store_true",
+            help="Use this flag only when running the command in tests based on TestCase",
         )
 
     def handle(self, *args, **options):
@@ -142,6 +147,7 @@ class Command(VerboseCommand):
     ) -> None:
         queue = self.options["queue"]
         chunk_size = self.options["chunk_size"]
+        testing_mode = self.options.get("testing_mode", False)
 
         chunk = []
         processed_count = 0
@@ -153,9 +159,9 @@ class Command(VerboseCommand):
             chunk.append(item_id)
             if processed_count % chunk_size == 0 or last_item:
                 throttle.maybe_wait()
-                index_parent_and_child_docs.si(chunk, search_type).set(
-                    queue=queue
-                ).apply_async()
+                index_parent_and_child_docs.si(
+                    chunk, search_type, testing_mode=testing_mode
+                ).set(queue=queue).apply_async()
                 chunk = []
                 self.stdout.write(
                     "\rProcessed {}/{}, ({:.0%}), last PK indexed: {},".format(

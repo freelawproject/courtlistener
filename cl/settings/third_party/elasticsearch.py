@@ -185,3 +185,10 @@ ELASTICSEARCH_THROTTLING_TASK_RATE = env(
 ELASTICSEARCH_BULK_BATCH_SIZE = env(
     "ELASTICSEARCH_BULK_BATCH_SIZE", default=200
 )
+
+######################################################
+# ES parallel bulk indexing number of threads to use #
+######################################################
+ELASTICSEARCH_PARALLEL_BULK_THREADS = env(
+    "ELASTICSEARCH_PARALLEL_BULK_THREADS", default=5
+)
