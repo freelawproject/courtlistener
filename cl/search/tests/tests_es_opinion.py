@@ -7,11 +7,12 @@ from django.core.management import call_command
 from django.test import AsyncRequestFactory, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
+from elasticsearch_dsl import Q
 from factory import RelatedFactory
 from lxml import html
 from rest_framework.status import HTTP_200_OK
-from waffle.testutils import override_flag
 
+from cl.lib.redis_utils import make_redis_interface
 from cl.lib.test_helpers import (
     CourtTestCase,
     EmptySolrTestCase,
@@ -33,6 +34,9 @@ from cl.search.factories import (
     OpinionClusterFactoryWithChildrenAndParents,
     OpinionFactory,
     OpinionWithChildrenFactory,
+)
+from cl.search.management.commands.cl_index_parent_and_child_docs import (
+    compose_redis_key,
 )
 from cl.search.models import PRECEDENTIAL_STATUS, SEARCH_TYPES
 from cl.search.views import do_search
@@ -1110,6 +1114,60 @@ class GroupedSearchTest(EmptySolrTestCase):
             msg="Found %s items, but should have found %s if the items were "
             "grouped properly." % (result_count, num_expected),
         )
+
+
+class IndexOpinionDocumentsCommandTest(
+    ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
+):
+    """cl_index_parent_and_child_docs command tests for Elasticsearch"""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.rebuild_index("search.OpinionCluster")
+        super().setUpTestData()
+        cls.delete_index("search.OpinionCluster")
+        cls.create_index("search.OpinionCluster")
+
+    def setUp(self) -> None:
+        self.r = make_redis_interface("CACHE")
+        keys = self.r.keys(compose_redis_key(SEARCH_TYPES.RECAP))
+        if keys:
+            self.r.delete(*keys)
+
+    def test_cl_index_parent_and_child_docs_command(self):
+        """Confirm the command can properly index Dockets and their
+        RECAPDocuments into the ES."""
+
+        s = OpinionClusterDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0)
+        # Call cl_index_parent_and_child_docs command.
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+        )
+
+        s = OpinionClusterDocument.search()
+        s = s.query(Q("match", cluster_child="opinion_cluster"))
+        self.assertEqual(
+            s.count(), 3, msg="Wrong number of Clusters returned."
+        )
+
+        s = OpinionClusterDocument.search()
+        s = s.query(Q("match", cluster_child="opinion"))
+        self.assertEqual(
+            s.count(), 6, msg="Wrong number of Opinions returned."
+        )
+
+        # RECAPDocuments are indexed.
+        opinions_pks = [
+            self.opinion_1.pk,
+            self.opinion_2.pk,
+            self.opinion_3.pk,
+        ]
+        for pk in opinions_pks:
+            self.assertTrue(OpinionDocument.exists(id=ES_CHILD_ID(pk).OPINION))
 
 
 class EsOpinionsIndexingTest(ESIndexTestCase, TransactionTestCase):

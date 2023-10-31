@@ -835,6 +835,10 @@ def index_parent_and_child_docs(
             parent_es_document = DocketDocument
             child_es_document = ESRECAPDocument
             child_id_property = "RECAP"
+        case SEARCH_TYPES.OPINION:
+            parent_es_document = OpinionClusterDocument
+            child_es_document = OpinionDocument
+            child_id_property = "OPINION"
         case _:
             return
 
@@ -849,6 +853,9 @@ def index_parent_and_child_docs(
             child_docs = RECAPDocument.objects.filter(
                 docket_entry__docket=instance
             )
+        elif search_type == SEARCH_TYPES.OPINION:
+            instance = OpinionCluster.objects.get(pk=instance_id)
+            child_docs = instance.sub_opinions.all()
         else:
             return
 
