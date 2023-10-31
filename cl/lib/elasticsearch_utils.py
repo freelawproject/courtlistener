@@ -865,40 +865,32 @@ def build_es_base_query(
                 str_query = RELATED_PATTERN.sub(str_query, "").strip()
                 cluster_pks = related_match.group("pks").split(",")
                 mlt_query = build_more_like_this_query(cluster_pks)
-
-            child_query_fields = {
-                "opinion": add_fields_boosting(
+            opinion_search_fields = SEARCH_OPINION_QUERY_FIELDS
+            child_fields = opinion_search_fields.copy()
+            child_fields.extend(
+                add_fields_boosting(
                     cd,
                     [
                         "type",
                         "text",
-                        # Cluster fields
-                        "court",
-                        "citation",
-                        "judge",
                         "caseName",
                         "docketNumber",
-                        "caseNameFull",
-                        "caseNameShort",
-                        "status",
                     ],
                 ),
-            }
-            parent_query_fields = add_fields_boosting(
-                cd,
-                [
-                    "court",
-                    "citation",
-                    "judge",
-                    "caseName",
-                    "docketNumber",
-                    "caseNameFull",
-                    "caseNameShort",
-                    "status",
-                ],
             )
-            string_query = build_join_fulltext_queries(
-                child_query_fields, parent_query_fields, str_query, mlt_query
+            child_query_fields = {"opinion": child_fields}
+            parent_query_fields = opinion_search_fields.copy()
+            parent_query_fields.extend(
+                add_fields_boosting(
+                    cd,
+                    [
+                        "caseName",
+                        "docketNumber",
+                    ],
+                )
+            )
+            string_query, join_query = build_full_join_es_queries(
+                cd, child_query_fields, parent_query_fields
             )
 
     search_query = get_search_query(cd, search_query, filters, string_query)
