@@ -912,6 +912,12 @@ class RelatedSearchTest(
         admin.user.save()
 
         super(RelatedSearchTest, self).setUp()
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+        )
 
     def get_article_count(self, r):
         """Get the article count in a query response"""
