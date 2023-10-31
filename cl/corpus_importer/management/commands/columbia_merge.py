@@ -16,7 +16,6 @@ import csv
 import itertools
 import os.path
 import re
-import sys
 from datetime import date
 from difflib import SequenceMatcher
 from typing import Any, Optional
@@ -24,6 +23,7 @@ from typing import Any, Optional
 from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup, NavigableString, Tag
 from django.db import transaction
+from django.db.models import Q
 from juriscraper.lib.string_utils import harmonize, titlecase
 
 from cl.corpus_importer.import_columbia.columbia_utils import (
@@ -44,7 +44,6 @@ from cl.corpus_importer.management.commands.harvard_opinions import (
 from cl.corpus_importer.utils import (
     AuthorException,
     ClusterSourceException,
-    DateException,
     DocketSourceException,
     JudgeException,
     OpinionMatchingException,
@@ -165,15 +164,15 @@ def match_text_lists(
     return matches
 
 
-def clean_opinion_content(content: str, harvard_content: bool) -> str:
+def clean_opinion_content(content: str, is_harvard: bool) -> str:
     """Strip all non-alphanumeric characters
     :param content: content from opinion
-    :param harvard_content: true if content is from harvard
+    :param is_harvard: true if content is from harvard
     :return: cleaned content
     """
     soup = BeautifulSoup(content, features="html.parser")
 
-    if harvard_content:
+    if is_harvard:
         for op in soup.select("opinion"):
             # Remove any author tag inside opinion
             for extra in op.find_all(["author"]):
@@ -186,23 +185,21 @@ def clean_opinion_content(content: str, harvard_content: bool) -> str:
     return prep_text
 
 
-def get_cl_opinion_content(
-    cluster_id: int,
-) -> tuple[Optional[str], list[dict[Any, Any]]]:
+def get_cl_opinion_content(cluster_id: int) -> list[dict[Any, Any]]:
     """Get the opinions content for a cluster object
     :param cluster_id: Cluster ID for a set of opinions
-    :return: (xml path, list of extracted opinions)
+    :return: list with opinion content from cl
     """
     cl_cleaned_opinions = []
     opinions_from_cluster = Opinion.objects.filter(cluster_id=cluster_id)
-    xml_path = None
+    is_harvard = False
 
     for i, op in enumerate(opinions_from_cluster):
-        if op.local_path and not xml_path:
-            xml_path = str(op.local_path)
         content = None
-        harvard_content = False
-        if len(op.html_with_citations) > 1:
+        if len(op.xml_harvard) > 1:
+            content = op.xml_harvard
+            is_harvard = True
+        elif len(op.html_with_citations) > 1:
             content = op.html_with_citations
         elif len(op.html_columbia) > 1:
             content = op.html_columbia
@@ -212,328 +209,280 @@ def get_cl_opinion_content(
             content = op.plain_text
         elif len(op.html) > 1:
             content = op.html
-        elif len(op.xml_harvard) > 1:
-            content = op.xml_harvard
-            harvard_content = True
-        if content:
-            prep_text = clean_opinion_content(
-                content, harvard_content=harvard_content
-            )
-            cl_cleaned_opinions.append(
-                {
-                    "id": op.id,
-                    "byline": op.author_str,
-                    "type": op.type,
-                    "opinion": prep_text,
-                }
-            )
 
-    return xml_path, cl_cleaned_opinions
+        if not content:
+            raise "NO CONTENT in opinion"  # come back to this and fix this more formally
+
+        prep_text = clean_opinion_content(content, is_harvard=is_harvard)
+        cl_cleaned_opinions.append(
+            {
+                "id": op.id,
+                "byline": op.author_str,
+                "type": op.type,
+                "opinion": prep_text,
+            }
+        )
+
+    return cl_cleaned_opinions
 
 
-def fix_xml_tags(xml_filepath: str) -> tuple[str, bool]:
-    """This function fixes the bad tags in columbia xml files
-    :param xml_filepath: path to xml file
-    :return: string with content, bool that indicates if opinion is unpublished or not
+def is_opinion_published(soup: BeautifulSoup) -> bool:
+    """Check if opinion is unpublished or published
+    :param soup: The XML object
+    :return: Published or Unpublished
     """
-    with open(xml_filepath, "r", encoding="utf-8") as f:
-        file_content = f.read()
+    # TODO check this function
+    opinion_tag = soup.find("opinion")
 
+    if opinion_tag:
+        if opinion_tag.get("unpublished") == "true":
+            return False
+        if opinion_tag.find("unpublished"):
+            return False
+    return True
+
+
+def read_xml_to_soup(filepath: str):
+    """This function fixes the bad tags in columbia xml files
+    :param filepath: path to xml file
+    :return: string with content
+    """
+    with open(filepath, "r", encoding="utf-8") as f:
+        file_content = f.read()
         # Sometimes opening and ending tag mismatch (e.g. ed7c6b39dcb29c9c.xml)
         file_content = file_content.replace(
             "</footnote_body></block_quote>", "</block_quote></footnote_body>"
         )
-
         # Fix opinion with invalid attribute
         if "<opinion unpublished=true>" in file_content:
             file_content = file_content.replace(
-                "<opinion unpublished=true>", "<opinion>"
+                "<opinion unpublished=true>", "<opinion unpublished='true'>"
             )
             file_content = file_content.replace("<unpublished>", "").replace(
                 "</unpublished>", ""
             )
-
-            return file_content, True
-
-    return file_content, False
+    return BeautifulSoup(file_content, "lxml")
 
 
-def read_xml_file(xml_filepath: str) -> dict:
-    """Read the columbia xml file and convert the data into a dict
-    :param xml_filepath: path of xml file
-    :return: dict with data
+def add_floating_opinion(opinions: list, floating_content: list) -> list:
+    """We have found floating opinions in bs object, we keep the opinion content as a
+    new opinion
+    :param opinions: a list with opinions found
+    :param floating_content: content that is not in known non-opinion tags
+    :return: updated list of opinions
     """
 
-    data: dict = {"unpublished": False}
+    op_type = "opinion"
+    if opinions:
+        if opinions[-1].get("type"):
+            # Use type of previous opinion if exists
+            op_type = opinions[-1].get("type")
 
-    file_content, data["unpublished"] = fix_xml_tags(xml_filepath)
+    # Get rid of double spaces from floating content
+    opinion_content = re.sub(
+        " +", " ", "\n".join(floating_content)
+    ).strip()  # type: str
+    if opinion_content:
+        opinions.append(
+            {
+                "opinion": opinion_content,
+                "byline": "",
+                "type": op_type,
+            }
+        )
+    return opinions
 
-    soup = BeautifulSoup(file_content, "lxml")
 
-    # Find the outer <opinion> tag to have all elements inside
-    find_opinion = soup.find("opinion")
-
-    step_one_opinions: list = []
+def extract_opinions_bs(outer_opinion: BeautifulSoup) -> list[Optional[dict]]:
+    """We extract all possible opinions from bs content, with and without author,
+    and we create new opinions if floating content exists
+    :param outer_opinion:
+    :return:
+    """
     opinions: list = []
-    order = 0
+    floating_content = []
 
-    if find_opinion:
-        untagged_content = []
+    # We iterate all content to look for all possible opinions
+    for i, content in enumerate(outer_opinion):  # type: int, Tag
+        if type(content) == NavigableString:
+            # We found a raw string, store it
+            floating_content.append(str(content))
+        else:
+            if content.name in SIMPLE_TAGS + [
+                "citation_line",
+                "opinion_byline",
+                "dissent_byline",
+                "concurrence_byline",
+            ]:
+                # Ignore these tags, it will be processed later
+                continue
+            elif content.name in [
+                "opinion_text",
+                "dissent_text",
+                "concurrence_text",
+            ]:
+                if floating_content:
+                    # We have found an opinion, but there is floating content, we
+                    # create a dict with the opinion using the floating content with
+                    # default type = "opinion"
+                    opinions = add_floating_opinion(opinions, floating_content)
+                    floating_content = []
 
-        # We iterate all content, with and without tags
-        # STEP 1: Extract all content in multiple dict elements
-        for i, content in enumerate(find_opinion):  # type: int, Tag
-            if type(content) == NavigableString:
-                # We found a raw string, store it
-                untagged_content.append(str(content))
-            else:
-                if content.name in SIMPLE_TAGS + [
-                    "citation_line",
-                    "opinion_byline",
-                    "dissent_byline",
-                    "concurrence_byline",
-                ]:
-                    # Ignore these tags, it will be processed later
-                    continue
-                elif content.name in [
-                    "opinion_text",
-                    "dissent_text",
-                    "concurrence_text",
-                ]:
-                    if untagged_content:
-                        # We found something other than a navigable string that is
-                        # not an opinion, but now we have found an opinion,
-                        # let's create this content first
+                byline = content.find_previous_sibling()
+                opinion_author = ""
+                if byline and "_byline" in byline.name:
+                    opinion_author = byline.get_text()
 
-                        # default type = "opinion"
-                        op_type = "opinion"
-                        if step_one_opinions:
-                            if step_one_opinions[-1].get("type"):
-                                # use type of previous opinion if exists
-                                op_type = step_one_opinions[-1].get("type")
-
-                        # Get rid of double spaces
-                        opinion_content = re.sub(
-                            " +", " ", "\n".join(untagged_content)
-                        ).strip()  # type: str
-                        if opinion_content:
-                            step_one_opinions.append(
-                                {
-                                    "opinion": opinion_content,
-                                    "order": order,
-                                    "byline": "",
-                                    "type": op_type,
-                                }
-                            )
-                            order = order + 1
-                        untagged_content = []
-
-                    byline = content.find_previous_sibling()
-                    opinion_author = ""
-                    if byline and "_byline" in byline.name:
-                        opinion_author = byline.get_text()
-
-                    opinion_content = re.sub(
-                        " +", " ", content.decode_contents()
-                    ).strip()
-                    if opinion_content:
-                        step_one_opinions.append(
-                            {
-                                "opinion": opinion_content,
-                                "order": order,
-                                "byline": opinion_author,
-                                "type": content.name.replace("_text", ""),
-                            }
-                        )
-                        order = order + 1
-
-                else:
-                    if content.name not in SIMPLE_TAGS + ["syllabus"]:
-                        # We store content that is not inside _text tag and is not in
-                        # one of the known non-opinion tags
-                        untagged_content.append(str(content))
-
-        if untagged_content:
-            # If we end to go through all the found opinions and if we still have
-            # floating content out there, we create a new opinion with the last type
-            # of opinion
-
-            # default type = "opinion"
-            op_type = "opinion"
-            if step_one_opinions:
-                if step_one_opinions[-1].get("type"):
-                    # use type of previous opinion if exists
-                    op_type = step_one_opinions[-1].get("type")
-
-            opinion_content = re.sub(
-                " +", " ", "\n".join(untagged_content)
-            ).strip()
-            if opinion_content:
-                step_one_opinions.append(
-                    {
-                        "opinion": opinion_content,
-                        "order": order,
-                        "byline": "",
-                        "type": op_type,
-                    }
-                )
-
-        # Step 2: Merge found content in the xml file
-        new_order = 0
-        authorless_content = []
-
-        for i, found_content in enumerate(step_one_opinions, start=1):
-            byline = found_content.get("byline")
-            if not byline:
-                # Opinion has no byline, store it
-                authorless_content.append(found_content)
-
-            if byline:
-                # Opinion has byline
-                opinion_type = found_content.get("type")
-                opinion_content = found_content.get("opinion", "")
-                # Store content that doesn't match the current type
-                alternative_authorless_content = [
-                    z
-                    for z in authorless_content
-                    if z.get("type") != opinion_type
-                ]
-                # Keep content that matches the current type
-                authorless_content = [
-                    z
-                    for z in authorless_content
-                    if z.get("type") == opinion_type
-                ]
-
-                if alternative_authorless_content:
-                    # Keep floating text that are not from the same type,
-                    # we need to create a separate opinion for those,
-                    # for example: in 2713f39c5a8e8684.xml we have an opinion
-                    # without an author, and the next opinion with an author is
-                    # a dissent opinion, we can't combine both
-
-                    # We check if the previous stored opinion matches the type of the
-                    # content
-                    relevant_opinions = (
-                        [opinions[-1]]
-                        if opinions
-                        and opinions[-1]["type"]
-                        == alternative_authorless_content[0].get("type")
-                        else []
-                    )
-
-                    if relevant_opinions:
-                        previous_opinion = relevant_opinions[-1]
-                        if previous_opinion.get(
-                            "type"
-                        ) == alternative_authorless_content[0].get("type"):
-                            # Merge last opinion with previous opinion, it probably
-                            # belongs the same author
-                            relevant_opinions[-1][
-                                "opinion"
-                            ] += "\n" + "\n".join(
-                                [
-                                    f.get("opinion")
-                                    for f in alternative_authorless_content
-                                    if f.get("opinion")
-                                ]
-                            )
-                        authorless_content = []
-
-                    else:
-                        # No relevant opinions found, create a new opinion
-                        new_opinion = {
-                            "byline": None,
-                            "type": alternative_authorless_content[0].get(
-                                "type"
-                            ),
-                            "opinion": "\n".join(
-                                [
-                                    f.get("opinion")
-                                    for f in alternative_authorless_content
-                                    if f.get("opinion")
-                                ]
-                            ),
-                            "order": new_order,
+                opinion_content = re.sub(
+                    " +", " ", content.decode_contents()
+                ).strip()
+                if opinion_content:
+                    # Now we create a dict with current opinion
+                    opinions.append(
+                        {
+                            "opinion": opinion_content,
+                            "byline": opinion_author,
+                            "type": content.name.replace("_text", ""),
                         }
-                        new_order = new_order + 1
-                        opinions.append(new_opinion)
-
-                # Add new opinion
-                new_opinion = {
-                    "byline": byline,
-                    "type": opinion_type,
-                    "opinion": "\n".join(
-                        [
-                            f.get("opinion")
-                            for f in authorless_content
-                            if f.get("type") == opinion_type
-                        ]
                     )
-                    + "\n\n"
-                    + opinion_content,
-                    "order": new_order,
-                }
 
-                opinions.append(new_opinion)
-                new_order = new_order + 1
-                authorless_content = []
+            else:
+                if content.name not in SIMPLE_TAGS + ["syllabus"]:
+                    # We store content that is not inside _text tag and is not in
+                    # one of the known non-opinion tags
+                    floating_content.append(str(content))
 
-            if len(step_one_opinions) == i and authorless_content:
-                # If is the last opinion, and we still have opinions without
-                # byline, create an opinion without an author and the contents
-                # that couldn't be merged
+    # Combine the new content into another opinion. great.
+    if floating_content:
+        # If we end to go through all the found opinions and if we still have
+        # floating content out there, we create a new opinion with the last type
+        # of opinion
+        opinions = add_floating_opinion(opinions, floating_content)
+    return opinions
 
-                # We check if the previous stored opinion matches the type of the
-                # content
-                relevant_opinions = (
-                    [opinions[-1]]
-                    if opinions
-                    and opinions[-1]["type"]
-                    == authorless_content[0].get("type")
-                    else []
+
+def merge_opinions(opinions, content) -> list:
+    """Merge last and previous opinion if are the same type or create a new opinion if merge is not possible
+    :param opinions: list of opinions that is being updated constantly
+    :param content: list of opinions without an author
+    :return: updated list of opinions
+    """
+
+    # We check if the previous stored opinion matches the type of the
+    # content, and we store the opinion dict temporary
+    relevant_opinions = (
+        [opinions[-1]]
+        if opinions and opinions[-1]["type"] == content[0].get("type")
+        else []
+    )
+
+    if relevant_opinions:
+        relevant_opinions[-1]["opinion"] += "\n" + "\n".join(
+            [f.get("opinion") for f in content if f.get("opinion")]
+        )
+
+    else:
+        # No relevant opinions found, create a new opinion with the content
+        new_opinion = {
+            "byline": None,
+            "type": content[0].get("type"),
+            "opinion": "\n".join(
+                [f.get("opinion") for f in content if f.get("opinion")]
+            ),
+        }
+        opinions.append(new_opinion)
+
+    return opinions
+
+
+def prepare_opinions_found(extracted_opinions: list) -> list:
+    """We read the opinions found, and we combine or create floating opinions
+    :param extracted_opinions: list of opinions obtained from xml file
+    :return:
+    """
+
+    opinions: list = []
+    authorless_content = []
+
+    for i, found_content in enumerate(extracted_opinions, start=1):
+        byline = found_content.get("byline")
+        if not byline:
+            # Opinion has no byline, store opinion content
+            authorless_content.append(found_content)
+
+        if byline:
+            # Opinion has byline, get opinion type and content
+            opinion_type = found_content.get("type")
+            opinion_content = found_content.get("opinion", "")
+            # Store content that doesn't match the current opinion type
+            alternative_authorless_content = [
+                content
+                for content in authorless_content
+                if content.get("type") != opinion_type
+            ]
+            # Keep content that matches the current type
+            authorless_content = [
+                op_content
+                for op_content in authorless_content
+                if op_content.get("type") == opinion_type
+            ]
+
+            if alternative_authorless_content:
+                # Keep floating text that are not from the same type,
+                # we need to create a separate opinion for those,
+                # for example: in 2713f39c5a8e8684.xml we have an opinion
+                # without an author, and the next opinion with an author is
+                # a dissent opinion, we can't combine both
+                opinions = merge_opinions(
+                    opinions, alternative_authorless_content
                 )
 
-                if relevant_opinions:
-                    previous_opinion = relevant_opinions[-1]
-                    if previous_opinion.get("type") == authorless_content[
-                        0
-                    ].get("type"):
-                        # Merge last opinion with previous opinion, it probably
-                        # belongs the same author
-                        relevant_opinions[-1]["opinion"] += "\n" + "\n".join(
-                            [
-                                f.get("opinion")
-                                for f in authorless_content
-                                if f.get("opinion")
-                            ]
-                        )
+            # Add new opinion
+            new_opinion = {
+                "byline": byline,
+                "type": opinion_type,
+                "opinion": "\n".join(
+                    [
+                        f.get("opinion")
+                        for f in authorless_content
+                        if f.get("type") == opinion_type
+                    ]
+                )
+                + "\n\n"
+                + opinion_content,
+            }
 
-                else:
-                    # Create last floating opinion
-                    new_opinion = {
-                        "byline": None,
-                        "type": authorless_content[0].get("type"),
-                        "opinion": "\n".join(
-                            [
-                                f.get("opinion")
-                                for f in authorless_content
-                                if f.get("opinion")
-                            ]
-                        ),
-                        "order": new_order,
-                    }
-                    opinions.append(new_opinion)
+            opinions.append(new_opinion)
+            authorless_content = []
 
-    data["judges"] = []
+        if len(extracted_opinions) == i and authorless_content:
+            # If is the last opinion, and we still have opinions without
+            # byline, create an opinion without an author and the contents
+            # that couldn't be merged
+            opinions = merge_opinions(opinions, authorless_content)
+
+    return opinions
+
+
+def find_judge_and_type(columbia_data: dict):
+    """
     # only first opinion with "opinion" type is a lead opinion, the next opinion with
     # "opinion" type is an addendum
+    :param columbia_data:
+    :return:
+    """
+
+    columbia_data["judges"] = []
     lead = False
-    for op in opinions:
+    for op in columbia_data.get("opinions", []):
         op_type = op.get("type")
+
         op_byline = op.get("byline")
         if op_byline:
-            data["judges"].append(extract_judge_last_name(op_byline))
+            judge_name = extract_judge_last_name(op_byline)
+            if judge_name not in columbia_data["judges"]:
+                columbia_data["judges"].append(judge_name)
+
         if not lead and op_type and op_type == "opinion":
             lead = True
             op["type"] = "020lead"
@@ -545,6 +494,8 @@ def read_xml_file(xml_filepath: str) -> dict:
         elif op_type and op_type == "concurrence":
             op["type"] = "030concurrence"
 
+
+def fix_reporter_caption(soup):
     for tag in SIMPLE_TAGS:
         found_tags = soup.findAll(tag)
         for found_tag in found_tags:
@@ -565,29 +516,71 @@ def read_xml_file(xml_filepath: str) -> dict:
                                 r.next_sibling.extract()
                     r.extract()
 
+
+def fix_simple_tags(soup, columbia_data):
+    """
+    :param soup:
+    :param columbia_data:
+    """
+    for tag in SIMPLE_TAGS:
+        found_tags = soup.findAll(tag)
+        for found_tag in found_tags:
+            # found_tag.find("page_number").decompose()
+            # remove inner <citation> and <page_number> tags and content
+            extra_tags_to_remove = found_tag.findAll(
+                re.compile("citation|page_number")
+            )
+            if extra_tags_to_remove:
+                for r in extra_tags_to_remove:
+                    if tag == "reporter_caption":
+                        # The reporter_caption may contain the location, and we need
+                        # to remove it to make the name cleaner, e.g. Tex.App.-Ft.
+                        # Worth [2d Dist.] 2002
+                        if r.next_sibling:
+                            if type(r.next_sibling) == NavigableString:
+                                # The element is not tagged, it is just a text
+                                # string
+                                r.next_sibling.extract()
+                    r.extract()
+
         # We use space as a separator to add a space when we have one tag next to
         # other without a space
-        data[tag] = [
+        columbia_data[tag] = [
             found_tag.get_text(separator=" ").strip()
             for found_tag in found_tags
         ]
 
         if tag in ["attorneys", "posture"]:
             # Replace multiple line breaks in this specific fields
-            data[tag] = [re.sub("\n+", " ", c) for c in data.get(tag, [])]
+            columbia_data[tag] = [
+                re.sub("\n+", " ", c) for c in columbia_data.get(tag, [])
+            ]
 
         if tag in ["reporter_caption"]:
             # Remove the last comma from the case name
-            data[tag] = [c.rstrip(",") for c in data.get(tag, [])]
+            columbia_data[tag] = [
+                c.rstrip(",") for c in columbia_data.get(tag, [])
+            ]
 
         # Remove repeated spaces
-        data[tag] = [re.sub(" +", " ", c) for c in data.get(tag, [])]
+        columbia_data[tag] = [
+            re.sub(" +", " ", c) for c in columbia_data.get(tag, [])
+        ]
 
         if tag == "citation":
             # Remove duplicated citations,
-            data[tag] = list(set(data[tag]))
+            columbia_data[tag] = list(set(columbia_data[tag]))
 
-    dates = data.get("date", []) + data.get("hearing_date", [])
+    # return data
+
+
+def extract_dates(columbia_data: dict):
+    """Get dates
+    :param columbia_data:
+    """
+    dates = columbia_data.get("date", []) + columbia_data.get(
+        "hearing_date", []
+    )
     parsed_dates = parse_dates(dates)
     current_year = date.today().year
     date_filed = date_argued = date_reargued = date_reargument_denied = None
@@ -626,7 +619,7 @@ def read_xml_file(xml_filepath: str) -> dict:
                 unknown_date = date_info[1]
                 if date_info[0] not in UNKNOWN_TAGS:
                     logger.info(
-                        f"Found unknown date tag {date_info[0]} with date {date_info[1]} in file {xml_filepath}"
+                        f"Found unknown date tag {date_info[0]} with date {date_info[1]} in file FILEPATH?"
                     )
 
     # the main date (used for date_filed in OpinionCluster) and panel dates
@@ -639,10 +632,7 @@ def read_xml_file(xml_filepath: str) -> dict:
         or date_reargument_denied
         or unknown_date
     )
-    if main_date is None:
-        raise DateException(f"Failed to get a date for {xml_filepath}")
-
-    data["date_filed"] = main_date
+    columbia_data["date_filed"] = main_date
 
     panel_date = (
         date_argued
@@ -652,34 +642,30 @@ def read_xml_file(xml_filepath: str) -> dict:
         or unknown_date
     )
 
-    data["panel_date"] = panel_date if panel_date else None
+    columbia_data["panel_date"] = panel_date if panel_date else None
+    # return data
 
-    # Get syllabus from file
+
+def format_additional_fields(data, soup):
+    """Prepare data and rename key names to match model field names
+    :param data: dict with data extracted from xml
+    :param soup: bs object
+    """
     data["syllabus"] = "\n".join(
         [s.decode_contents() for s in soup.findAll("syllabus")]
     )
-
-    # Add opinions to dict
-    data["opinions"] = opinions
-
-    # Add file path to dict
-    data["file"] = xml_filepath
-
-    # Join fields values and set model field names
     data["docket"] = "".join(data.get("docket", [])) or None
-    data["attorneys"] = "".join(data.get("attorneys", [])) or None
+    data["attorneys"] = "\n".join(data.get("attorneys", [])) or None
     data["posture"] = "".join(data.get("posture", [])) or None
     data["case_name_full"] = (
-        format_case_name("".join(data.get("caption", []))) or ""
+        format_case_name("".join(data.pop("caption", []))) or ""
     )
     data["case_name"] = (
-        format_case_name("".join(data.get("reporter_caption", []))) or ""
+        format_case_name("".join(data.pop("reporter_caption", []))) or ""
     )
     data["panel"] = (
         extract_judge_last_name("".join(data.get("panel", []))) or []
     )
-
-    return data
 
 
 def update_matching_opinions(
@@ -752,7 +738,7 @@ def map_and_merge_opinions(
         # We need that both list to be cleaned, so we can have a more accurate match
         matches = match_text_lists(
             [
-                clean_opinion_content(op["opinion"], harvard_content=False)
+                clean_opinion_content(op["opinion"], is_harvard=False)
                 for op in columbia_opinions
             ],
             [op.get("opinion") for op in cl_cleaned_opinions],
@@ -1141,86 +1127,57 @@ def update_panel(
         cluster.panel.add(*Person.objects.filter(id__in=[p.id for p in panel]))
 
 
-def fix_filepath(xml_path: str, xml_dir: str) -> str:
-    """Build the correct filepath to xml file
-    :param xml_path: current file path
-    :param xml_dir: mounted dir where the xml files are
-    :return: fixed filepath with mounted dir
-    """
-    if (
-        xml_path
-        and "/home/mlissner/columbia/opinions/" in xml_path
-        or "/Users/Palin/Work/columbia/usb/" in xml_path
-    ):
-        filepath = xml_path.replace(
-            "/home/mlissner/columbia/opinions/", ""
-        ).replace("/Users/Palin/Work/columbia/usb/", "")
-        return os.path.join(xml_dir, filepath)
-
-    return os.path.join(xml_dir, xml_path)
-
-
 def process_cluster(
     cluster_id: int,
-    xml_dir: str,
-    filepath: str = "",
-    csv_file: bool = False,
+    filepath: str,
 ) -> None:
     """Merge specified cluster id
     :param cluster_id: Cluster object id to merge
-    :param xml_dir: path to mounted dir
     :param filepath: specified path to xml file
-    :param csv_file: set to true if using a csv file
     """
+    columbia_data: dict = {}
 
-    try:
-        cluster = OpinionCluster.objects.get(pk=cluster_id)
-    except OpinionCluster.DoesNotExist:
-        logger.info(f"Cluster ID: {cluster_id} doesn't exist")
-        return
-
-    if (
-        cluster.docket.source in VALID_UPDATED_DOCKET_SOURCES
-        or cluster.source in VALID_MERGED_SOURCES
-    ):
-        # Early abort if docket or cluster already merged
-        return
-
-    xml_path, cl_cleaned_opinions = get_cl_opinion_content(cluster.id)
-
-    if not xml_path and not csv_file:
-        # When we pass a cluster id directly to the command and the cluster opinions
-        # don't have a xml file
-        logger.info(
-            f"Cluster ID: {cluster_id} doesn't have a local_path field value."
+    cluster = (
+        OpinionCluster.objects.filter(id=cluster_id)
+        .exclude(
+            Q(source__in=VALID_MERGED_SOURCES)
+            | Q(docket__source__in=VALID_UPDATED_DOCKET_SOURCES)
         )
+        .first()
+    )
+    if not cluster:
         return
 
-    if filepath:
-        # Filepath from csv file
-        new_xml_filepath = fix_filepath(filepath, xml_dir)
-    else:
-        # Filepath from opinion local_path field
-        new_xml_filepath = fix_filepath(xml_path, xml_dir)  # type: ignore
-
+    logger.info(msg=f"Merging {cluster_id} at {filepath}")
     try:
-        logger.info(msg=f"Merging {cluster_id} at {new_xml_filepath}")
-        columbia_data = read_xml_file(new_xml_filepath)
-    except FileNotFoundError:
-        logger.warning(
-            f"File doesn't exist: {new_xml_filepath} to merge with cluster: {cluster_id}"
-        )
-        return
+        soup = read_xml_to_soup(filepath)
     except UnicodeDecodeError:
         logger.warning(
-            f"Cannot decode file: {new_xml_filepath} to merge with cluster: {cluster_id}"
+            f"UnicodeDecodeError: {filepath}, Cluster: {cluster_id}"
         )
         return
-    except DateException:
-        logger.warning(
-            msg=f"Date exception found in {new_xml_filepath} related to cluster id: {cluster_id}"
-        )
+
+    columbia_data["published"] = is_opinion_published(soup)
+
+    outer_opinion = soup.find("opinion")
+    if not outer_opinion:
+        # opinion wraps around all xml content
+        logger.warning("Ill formed xml columbia")
+
+    extracted_opinions = extract_opinions_bs(outer_opinion)
+    columbia_data["opinions"] = prepare_opinions_found(extracted_opinions)
+    columbia_data["file"] = filepath
+    find_judge_and_type(columbia_data)
+    fix_simple_tags(soup, columbia_data)
+    extract_dates(columbia_data)
+
+    if not columbia_data["date_filed"]:
+        logger.warning(msg=f"No Date found {filepath}, Cluster: {cluster_id}")
         return
+
+    format_additional_fields(columbia_data, soup)
+
+    cl_cleaned_opinions = get_cl_opinion_content(cluster.id)
 
     try:
         with transaction.atomic():
@@ -1289,29 +1246,44 @@ def process_cluster(
         )
 
 
-def process_csv_file(
-    csv_path: str, mounted_xml_dir: str, skip_until_id: Optional[int]
-) -> None:
-    """Process xml files from a list of cluster ids in csv file
-    :param csv_path: Absolute path to csv file
-    :param mounted_xml_dir: Path to mounted dir
+def merge_columbia_into_cl(options) -> None:
+    """Merge Columbia Data into CL
+    :param options: Absolute path to csv file
     """
-    logger.info(f"Loading csv file at {csv_path}")
+    csv_filepath, xml_dir = options["csv_file"], options["xml_dir"]
+    skip_until, limit = options["skip_until"], options["limit"]
+    logger.info(f"Loading csv file at {csv_filepath}")
 
-    with open(csv_path, mode="r", encoding="utf-8") as csv_file:
+    total_processed = 0
+    start = False if skip_until else True
+    with open(csv_filepath, mode="r", encoding="utf-8") as csv_file:
         csv_reader = csv.DictReader(csv_file)
-        start = False
         for row in csv_reader:
             cluster_id = row.get("cluster_id")
             filepath = row.get("filepath")
-            if cluster_id and filepath:
-                if skip_until_id and not start:
-                    if int(cluster_id) != skip_until_id:
-                        continue
-                    else:
-                        start = True
+            if not start and skip_until == cluster_id:
+                start = True
+            if not start:
+                continue
 
-                process_cluster(cluster_id=cluster_id, xml_dir=mounted_xml_dir, filepath=filepath, csv_file=True)  # type: ignore
+            # TODO
+            # xml_path = f"{xml_dir}/documents/{filepath}"
+            xml_path = filepath
+            if not os.path.exists(xml_path):
+                logger.warning(
+                    f"No file at: {xml_path}, Cluster: {cluster_id}"
+                )
+                continue
+
+            process_cluster(
+                cluster_id=cluster_id,
+                filepath=xml_path,
+            )
+
+            total_processed += 1
+            if limit and total_processed >= limit:
+                logger.info(f"Finished {limit} imports")
+                return
 
 
 class Command(VerboseCommand):
@@ -1319,7 +1291,7 @@ class Command(VerboseCommand):
 
     def add_arguments(self, parser) -> None:
         parser.add_argument(
-            "--cluster-id",
+            "--skip-until",
             type=int,
             help="An individual cluster ID to merge",
             required=False,
@@ -1327,35 +1299,25 @@ class Command(VerboseCommand):
 
         parser.add_argument(
             "--csv-file",
-            default="/opt/courtlistener/columbia_import.csv",
+            default="/opt/courtlistener/_columbia/columbia_import.csv",
             help="Csv file with cluster ids to merge.",
             required=False,
         )
 
         parser.add_argument(
+            "--limit",
+            default=1,
+            type=int,
+            help="Limit number of files to merge",
+            required=False,
+        )
+
+        parser.add_argument(
             "--xml-dir",
-            default="/tmp/columbia",
+            default="/opt/courtlistener/_columbia",
             required=False,
             help="The absolute path to the directory with columbia xml files",
         )
 
-        parser.add_argument(
-            "--skip-until-id",
-            type=int,
-            help="Skip until cluster ID",
-            required=False,
-        )
-
     def handle(self, *args, **options) -> None:
-        if options["cluster_id"]:
-            process_cluster(
-                cluster_id=options["cluster_id"], xml_dir=options["xml_dir"]
-            )
-            sys.exit()
-
-        if options["csv_file"]:
-            process_csv_file(
-                options["csv_file"],
-                mounted_xml_dir=options["xml_dir"],
-                skip_until_id=options["skip_until_id"],
-            )
+        merge_columbia_into_cl(options)
