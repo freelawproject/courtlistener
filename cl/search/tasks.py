@@ -838,6 +838,7 @@ def index_parent_and_child_docs(
         case _:
             return
 
+    model_label = parent_es_document.Django.model.__name__.capitalize()
     for instance_id in instance_ids:
         if search_type == SEARCH_TYPES.PEOPLE:
             instance = Person.objects.prefetch_related("positions").get(
@@ -865,9 +866,6 @@ def index_parent_and_child_docs(
                     refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
                 )
             except (ConflictError, RequestError) as exc:
-                model_label = (
-                    parent_es_document.Django.model.__name__.capitalize()
-                )
                 logger.error(
                     f"Error indexing the {model_label} with ID: {instance_id}. "
                     f"Exception was: {type(exc).__name__}"
@@ -881,6 +879,7 @@ def index_parent_and_child_docs(
             "_index": parent_es_document._index._name,
         }
 
+        failed_child_docs = []
         if testing_mode:
             # Use streaming_bulk in TestCase based tests. Since parallel_bulk
             # doesn't work on them.
@@ -896,23 +895,28 @@ def index_parent_and_child_docs(
                 chunk_size=settings.ELASTICSEARCH_BULK_BATCH_SIZE,
             ):
                 if not success:
-                    logger.error(f"Error indexing child document: {info}")
+                    failed_child_docs.append(info["index"]["_id"])
         else:
             # Use parallel_bulk in production and tests based on TransactionTestCase
-            deque(
-                parallel_bulk(
-                    client,
-                    bulk_indexing_generator(
-                        child_docs,
-                        child_es_document,
-                        child_id_property,
-                        instance_id,
-                        base_doc,
-                    ),
-                    thread_count=settings.ELASTICSEARCH_PARALLEL_BULK_THREADS,
-                    chunk_size=settings.ELASTICSEARCH_BULK_BATCH_SIZE,
+            for success, info in parallel_bulk(
+                client,
+                bulk_indexing_generator(
+                    child_docs,
+                    child_es_document,
+                    child_id_property,
+                    instance_id,
+                    base_doc,
                 ),
-                maxlen=0,
+                thread_count=settings.ELASTICSEARCH_PARALLEL_BULK_THREADS,
+                chunk_size=settings.ELASTICSEARCH_BULK_BATCH_SIZE,
+            ):
+                if not success:
+                    failed_child_docs.append(info["index"]["_id"])
+
+        if failed_child_docs:
+            logger.error(
+                f"Error indexing child documents from the {model_label}"
+                f" with ID: {instance_id}. Child IDs are: {failed_child_docs}"
             )
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
