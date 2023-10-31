@@ -431,6 +431,12 @@ class OpinionsESSearchTest(
             scdb_votes_minority=3,
             scdb_votes_majority=6,
         )
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+        )
 
     async def _test_article_count(self, params, expected_count, field_name):
         r = await self.async_client.get("/", params)
