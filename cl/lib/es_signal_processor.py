@@ -29,7 +29,13 @@ from cl.search.documents import (
     PersonDocument,
     PositionDocument,
 )
-from cl.search.models import BankruptcyInformation, Docket, OpinionCluster
+from cl.search.models import (
+    BankruptcyInformation,
+    Citation,
+    Docket,
+    Opinion,
+    OpinionCluster,
+)
 from cl.search.tasks import (
     es_save_document,
     remove_document_from_es_index,
@@ -384,6 +390,20 @@ def update_m2m_field_in_es_document(
         )
     )
 
+    if es_document is OpinionClusterDocument and isinstance(
+        instance, OpinionCluster
+    ):
+        transaction.on_commit(
+            partial(
+                update_children_docs_by_query.delay,
+                es_document.__name__,
+                instance.pk,
+                [
+                    affected_field,
+                ],
+            )
+        )
+
 
 def update_reverse_related_documents(
     main_model: ESModelType,
@@ -442,6 +462,21 @@ def update_reverse_related_documents(
                         affected_fields,
                     )
                 )
+        case Citation() | Opinion() if es_document is OpinionClusterDocument:  # type: ignore
+            main_doc = exists_or_create_doc(
+                es_document, instance.cluster, avoid_creation=True
+            )
+            if not main_doc:
+                # Abort bulk update for a non-existing parent document in ES.
+                return
+            transaction.on_commit(
+                partial(
+                    update_children_docs_by_query.delay,
+                    OpinionDocument.__name__,
+                    instance.cluster.pk,
+                    affected_fields,
+                )
+            )
         case BankruptcyInformation() if es_document is DocketDocument:  # type: ignore
             # bulk update RECAP documents when a reverse related record is created/updated.
             main_doc = exists_or_create_doc(
