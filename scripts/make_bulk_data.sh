@@ -181,6 +181,12 @@ politicalaffiliation_fields='(
 	   )'
 politicalaffiliation_csv_filename="people-db-political-affiliations-$(date -I).csv"
 
+# people_db_person_race
+people_db_person_race_fields='(
+	       id, person_id, race_id
+	   )'
+people_db_person_race_csv_filename="people-db-races-$(date -I).csv"
+
 # disclosures_financialdisclosure
 financialdisclosure_fields='(
 	       id, date_created, date_modified, year, download_filepath, filepath, thumbnail,
@@ -250,7 +256,7 @@ disclosures_debt_fields='(
 disclosures_debt_csv_filename="financial-disclosures-debts-$(date -I).csv"
 
 # If you add or remove a table, you need to update this number
-NUM_TABLES=27
+NUM_TABLES=28
 
 # Every new table added to bulk script should be added as an associative array
 declare -a t_1=("search_court" "$court_fields" "$court_csv_filename")
@@ -271,15 +277,16 @@ declare -a t_15=("people_db_position" "$people_db_position_fields" "$people_db_p
 declare -a t_16=("people_db_retentionevent" "$people_db_retentionevent_fields" "$people_db_retentionevent_csv_filename")
 declare -a t_17=("people_db_education" "$people_db_education_fields" "$people_db_education_csv_filename")
 declare -a t_18=("people_db_politicalaffiliation" "$politicalaffiliation_fields" "$politicalaffiliation_csv_filename")
-declare -a t_19=("disclosures_financialdisclosure" "$financialdisclosure_fields" "$financialdisclosure_csv_filename")
-declare -a t_20=("disclosures_investment" "$investment_fields" "$investment_csv_filename")
-declare -a t_21=("disclosures_position" "$disclosures_position_fields" "$disclosures_position_csv_filename")
-declare -a t_22=("disclosures_agreement" "$disclosures_agreement_fields" "$disclosures_agreement_csv_filename")
-declare -a t_23=("disclosures_noninvestmentincome" "$noninvestmentincome_fields" "$noninvestmentincome_csv_filename")
-declare -a t_24=("disclosures_spouseincome" "$spouseincome_fields" "$spouseincome_csv_filename")
-declare -a t_25=("disclosures_reimbursement" "$disclosures_reimbursement_fields" "$disclosures_reimbursement_csv_filename")
-declare -a t_26=("disclosures_gift" "$disclosures_gift_fields" "$disclosures_gift_csv_filename")
-declare -a t_27=("disclosures_debt" "$disclosures_debt_fields" "$disclosures_debt_csv_filename")
+declare -a t_19=("people_db_person_race" "$people_db_person_race_fields" "$people_db_person_race_csv_filename")
+declare -a t_20=("disclosures_financialdisclosure" "$financialdisclosure_fields" "$financialdisclosure_csv_filename")
+declare -a t_21=("disclosures_investment" "$investment_fields" "$investment_csv_filename")
+declare -a t_22=("disclosures_position" "$disclosures_position_fields" "$disclosures_position_csv_filename")
+declare -a t_23=("disclosures_agreement" "$disclosures_agreement_fields" "$disclosures_agreement_csv_filename")
+declare -a t_24=("disclosures_noninvestmentincome" "$noninvestmentincome_fields" "$noninvestmentincome_csv_filename")
+declare -a t_25=("disclosures_spouseincome" "$spouseincome_fields" "$spouseincome_csv_filename")
+declare -a t_26=("disclosures_reimbursement" "$disclosures_reimbursement_fields" "$disclosures_reimbursement_csv_filename")
+declare -a t_27=("disclosures_gift" "$disclosures_gift_fields" "$disclosures_gift_csv_filename")
+declare -a t_28=("disclosures_debt" "$disclosures_debt_fields" "$disclosures_debt_csv_filename")
 
 # Create a new array with the data of each associative array
 declare -a listOfLists
