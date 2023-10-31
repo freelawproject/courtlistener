@@ -45,6 +45,7 @@ from cl.corpus_importer.utils import (
     AuthorException,
     ClusterSourceException,
     DocketSourceException,
+    EmptyOpinionException,
     JudgeException,
     OpinionMatchingException,
     OpinionTypeException,
@@ -211,7 +212,7 @@ def get_cl_opinion_content(cluster_id: int) -> list[dict[Any, Any]]:
             content = op.html
 
         if not content:
-            raise "NO CONTENT in opinion"  # come back to this and fix this more formally
+            raise EmptyOpinionException("No content in opinion")
 
         prep_text = clean_opinion_content(content, is_harvard=is_harvard)
         cl_cleaned_opinions.append(
@@ -1177,7 +1178,11 @@ def process_cluster(
 
     format_additional_fields(columbia_data, soup)
 
-    cl_cleaned_opinions = get_cl_opinion_content(cluster.id)
+    try:
+        cl_cleaned_opinions = get_cl_opinion_content(cluster.id)
+    except EmptyOpinionException:
+        logger.warning(msg=f"No content in opinion from cluster: {cluster_id}")
+        return
 
     try:
         with transaction.atomic():
