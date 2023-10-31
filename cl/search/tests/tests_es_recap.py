@@ -58,6 +58,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             search_type=SEARCH_TYPES.RECAP,
             queue="celery",
             pk_offset=0,
+            testing_mode=True,
         )
         # Index parties in ES.
         index_docket_parties_in_es.delay(cls.de.docket.pk)
@@ -1829,6 +1830,7 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             search_type=SEARCH_TYPES.RECAP,
             queue="celery",
             pk_offset=0,
+            testing_mode=True,
         )
 
     def test_do_recap_search_feed_have_content(self) -> None:
@@ -1989,22 +1991,53 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
 
 class IndexDocketRECAPDocumentsCommandTest(
-    RECAPSearchTestCase, ESIndexTestCase, TestCase
+    ESIndexTestCase, TransactionTestCase
 ):
     """cl_index_parent_and_child_docs command tests for Elasticsearch"""
 
     @classmethod
-    def setUpTestData(cls):
+    def setUpClass(cls):
         cls.rebuild_index("search.Docket")
-        super().setUpTestData()
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.de = DocketEntryWithParentsFactory(
+            docket=DocketFactory(
+                court=cls.court,
+                date_filed=datetime.date(2015, 8, 16),
+                docket_number="1:21-bk-1234",
+                nature_of_suit="440",
+            ),
+            entry_number=1,
+            date_filed=datetime.date(2015, 8, 19),
+        )
+        cls.rd = RECAPDocumentFactory(
+            docket_entry=cls.de,
+            document_number="1",
+        )
+        cls.rd_att = RECAPDocumentFactory(
+            docket_entry=cls.de,
+            document_number="1",
+            attachment_number=2,
+        )
+        cls.de_1 = DocketEntryWithParentsFactory(
+            docket=DocketFactory(
+                court=cls.court,
+                date_filed=datetime.date(2016, 8, 16),
+                date_argued=datetime.date(2012, 6, 23),
+            ),
+            entry_number=None,
+            date_filed=datetime.date(2014, 7, 19),
+        )
+        cls.rd_2 = RECAPDocumentFactory(
+            docket_entry=cls.de_1,
+            document_number="",
+        )
         cls.delete_index("search.Docket")
         cls.create_index("search.Docket")
 
-    def setUp(self) -> None:
-        self.r = make_redis_interface("CACHE")
-        keys = self.r.keys(compose_redis_key(SEARCH_TYPES.RECAP))
+        cls.r = make_redis_interface("CACHE")
+        keys = cls.r.keys(compose_redis_key(SEARCH_TYPES.RECAP))
         if keys:
-            self.r.delete(*keys)
+            cls.r.delete(*keys)
 
     def test_cl_index_parent_and_child_docs_command(self):
         """Confirm the command can properly index Dockets and their

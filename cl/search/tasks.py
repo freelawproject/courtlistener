@@ -1,8 +1,9 @@
 import logging
 import socket
+from collections import deque
 from datetime import timedelta
 from importlib import import_module
-from typing import Any
+from typing import Any, Generator
 
 import scorched
 import waffle
@@ -10,6 +11,7 @@ from celery import Task
 from django.apps import apps
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import QuerySet
 from django.utils.timezone import now
 from elasticsearch.exceptions import (
     ConflictError,
@@ -17,7 +19,7 @@ from elasticsearch.exceptions import (
     NotFoundError,
     RequestError,
 )
-from elasticsearch.helpers import bulk
+from elasticsearch.helpers import parallel_bulk, streaming_bulk
 from elasticsearch_dsl import Document, UpdateByQuery, connections
 from requests import Session
 from scorched.exc import SolrError
@@ -43,6 +45,7 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.search.types import (
+    ESDictDocument,
     ESDocumentClassType,
     ESDocumentInstanceType,
     ESModelClassType,
@@ -771,6 +774,36 @@ def index_docket_parties_in_es(
     )
 
 
+def bulk_indexing_generator(
+    child_docs: QuerySet,
+    child_es_document: ESDocumentClassType,
+    child_id_property: str,
+    instance_id: int,
+    base_doc: dict[str, str],
+) -> Generator[ESDictDocument, None, None]:
+    """Generate ES child documents for bulk indexing.
+
+    :param child_docs: The queryset of child model instances to be indexed.
+    :param child_es_document: The Elasticsearch document class corresponding to
+    the child model.
+    :param child_id_property: The property to be used for generating ES
+    child document ID.
+    :param instance_id: The parent instance ID used for routing in ES.
+    :param base_doc: The base ES document fields.
+    :return: Yields ES child documents for bulk indexing.
+    """
+
+    for child in child_docs.iterator():
+        child_doc = child_es_document().prepare(child)
+        child_params = {
+            "_id": getattr(ES_CHILD_ID(child.pk), child_id_property),
+            "_routing": f"{instance_id}",
+        }
+        child_doc.update(base_doc)
+        child_doc.update(child_params)
+        yield child_doc
+
+
 @app.task(
     bind=True,
     autoretry_for=(ConnectionError,),
@@ -781,12 +814,15 @@ def index_parent_and_child_docs(
     self: Task,
     instance_ids: list[int],
     search_type: str,
+    testing_mode: bool = False,
 ) -> None:
     """Index parent and child documents in Elasticsearch.
 
     :param self: The Celery task instance
     :param instance_ids: The parent instance IDs to index.
     :param search_type: The Search Type to index parent and child docs.
+    :param testing_mode: If True uses streaming_bulk in TestCase based tests,
+    otherwise uses parallel_bulk in production.
     :return: None
     """
 
@@ -845,24 +881,39 @@ def index_parent_and_child_docs(
             "_index": parent_es_document._index._name,
         }
 
-        child_docs_to_index = []
-        for i, child in enumerate(child_docs.iterator()):
-            child_doc = child_es_document().prepare(child)
-            child_params = {
-                "_id": getattr(ES_CHILD_ID(child.pk), child_id_property),
-                "_routing": f"{instance_id}",
-            }
-            child_doc.update(base_doc)
-            child_doc.update(child_params)
-            child_docs_to_index.append(child_doc)
-
-            if i % settings.ELASTICSEARCH_BULK_BATCH_SIZE == 0:
-                bulk(client, child_docs_to_index)
-                child_docs_to_index.clear()
-
-        # Index the last batch
-        if child_docs_to_index:
-            bulk(client, child_docs_to_index)
+        if testing_mode:
+            # Use streaming_bulk in TestCase based tests. Since parallel_bulk
+            # doesn't work on them.
+            for success, info in streaming_bulk(
+                client,
+                bulk_indexing_generator(
+                    child_docs,
+                    child_es_document,
+                    child_id_property,
+                    instance_id,
+                    base_doc,
+                ),
+                chunk_size=settings.ELASTICSEARCH_BULK_BATCH_SIZE,
+            ):
+                if not success:
+                    logger.error(f"Error indexing child document: {info}")
+        else:
+            # Use parallel_bulk in production and tests based on TransactionTestCase
+            deque(
+                parallel_bulk(
+                    client,
+                    bulk_indexing_generator(
+                        child_docs,
+                        child_es_document,
+                        child_id_property,
+                        instance_id,
+                        base_doc,
+                    ),
+                    thread_count=settings.ELASTICSEARCH_PARALLEL_BULK_THREADS,
+                    chunk_size=settings.ELASTICSEARCH_BULK_BATCH_SIZE,
+                ),
+                maxlen=0,
+            )
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.

@@ -45,6 +45,7 @@ class PeopleSearchTestElasticSearch(
             search_type=SEARCH_TYPES.PEOPLE,
             queue="celery",
             pk_offset=0,
+            testing_mode=True,
         )
 
     def _test_article_count(self, params, expected_count, field_name):
@@ -1174,6 +1175,7 @@ class IndexJudgesPositionsCommandTest(
             search_type=SEARCH_TYPES.PEOPLE,
             queue="celery",
             pk_offset=0,
+            testing_mode=True,
         )
 
         s = PersonDocument.search()
