@@ -496,6 +496,8 @@ def build_sort_results(cd: CleanData) -> Dict:
 
     if cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
         random_order_field_id = "docket_id"
+    if cd["type"] in [SEARCH_TYPES.OPINION]:
+        random_order_field_id = "cluster_id"
     else:
         random_order_field_id = "id"
 
