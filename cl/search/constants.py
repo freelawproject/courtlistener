@@ -162,6 +162,10 @@ SEARCH_RECAP_CHILD_HL_FIELDS = {
     "plain_text": 100,
     "plain_text.exact": 100,
 }
+SEARCH_OPINION_CHILD_HL_FIELDS = {
+    "text": 100,
+    "text.exact": 100,
+}
 
 # Search query for related items
 RELATED_PATTERN = re.compile(
