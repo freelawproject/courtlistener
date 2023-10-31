@@ -496,7 +496,7 @@ def build_sort_results(cd: CleanData) -> Dict:
 
     if cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
         random_order_field_id = "docket_id"
-    if cd["type"] in [SEARCH_TYPES.OPINION]:
+    elif cd["type"] in [SEARCH_TYPES.OPINION]:
         random_order_field_id = "cluster_id"
     else:
         random_order_field_id = "id"
@@ -1381,6 +1381,7 @@ def fetch_es_results(
     # Compute "from" parameter for Elasticsearch
     es_from = (page - 1) * rows_per_page
     error = True
+    # Execute the Elasticsearch search with "size" and "from" parameters
     try:
         # Execute the Elasticsearch search with "size" and "from" parameters
         response = search_query.extra(
