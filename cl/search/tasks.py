@@ -574,8 +574,11 @@ def update_children_docs_by_query(
         UpdateByQuery(using=client, index=es_document._index._name)
         .query(s.to_dict()["query"])
         .params(
-            slices=es_document._index._settings["number_of_shards"]
-        )  # Set slices equal to the number of shards.
+            slices=es_document._index._settings[
+                "number_of_shards"
+            ],  # Set slices equal to the number of shards.
+            scroll="3m",  # Keep the search context alive for 3 minutes
+        )
     )
 
     script_lines = []
