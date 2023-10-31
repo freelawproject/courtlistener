@@ -394,16 +394,17 @@
   {% endwith %}
 
   {% if type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION and simple == False %}
-    {% for doc in result.child_hits %}
+    {% for doc in result.child_docs %}
       {% with doc=doc|get_attrdict:"_source" %}
         <div class="col-md-offset-half">
-          {% if result.child_hits|length > 1 or doc.type != '010combined' %}
+          {% if result.child_docs|length > 1 or doc.type != '010combined' %}
             <h4>
               <p>{{ doc.type_text }}</p>
             </h4>
           {% endif %}
-          <p {% if result.child_hits|length == 1 and doc.type == '010combined' %} class="representation" {% endif %}>
-            {{ doc.text| truncatechars:300 |safe }}
+          <p {% if result.child_docs|length == 1 and doc.type == '010combined' %} class="representation" {% endif %}>
+            {% contains_highlights doc.text as highlighted %}
+            {% if highlighted %}&hellip;{% endif %}{{ doc.text| safe }} &hellip;
           </p>
         </div>
       {% endwith %}
