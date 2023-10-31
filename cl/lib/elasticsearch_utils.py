@@ -163,20 +163,18 @@ def build_daterange_query(
 
 def build_more_like_this_query(related_id: list[str]):
     document_list = [{"_id": f"o_{id}"} for id in related_id]
-    return Q(
-        "more_like_this",
-        fields=[
+    more_like_this_fields = SEARCH_OPINION_QUERY_FIELDS
+    more_like_this_fields.extend(
+        [
             "type",
             "text",
-            "court",
-            "citation",
-            "judge",
             "caseName",
             "docketNumber",
-            "caseNameFull",
-            "caseNameShort",
-            "status",
-        ],
+        ]
+    )
+    return Q(
+        "more_like_this",
+        fields=more_like_this_fields,
         like=document_list,
         min_term_freq=1,
         max_query_terms=12,
