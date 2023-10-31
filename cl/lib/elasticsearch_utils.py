@@ -892,7 +892,7 @@ def build_es_base_query(
                 )
             )
             string_query, join_query = build_full_join_es_queries(
-                cd, child_query_fields, parent_query_fields
+                cd, child_query_fields, parent_query_fields, mlt_query
             )
 
     search_query = get_search_query(cd, search_query, filters, string_query)
@@ -1667,6 +1667,7 @@ def build_full_join_es_queries(
     cd: CleanData,
     child_query_fields: dict[str, list[str]],
     parent_query_fields: list[str],
+    mlt_query: Query | None = None,
 ) -> tuple[QueryString | list, QueryString | None]:
     """Build a complete Elasticsearch query with both parent and child document
       conditions.
@@ -1674,6 +1675,7 @@ def build_full_join_es_queries(
     :param cd: The query CleanedData
     :param child_query_fields: A dictionary mapping child fields document type.
     :param parent_query_fields: A list of fields for the parent document.
+    :param mlt_query: the More Like This Query object.
     :return: An Elasticsearch QueryString object.
     """
 
@@ -1699,6 +1701,9 @@ def build_full_join_es_queries(
         child_text_query = build_fulltext_query(
             child_fields, cd.get("q", ""), only_queries=True
         )
+
+        if mlt_query:
+            child_text_query.append(mlt_query)
 
         # Build parent filters.
         parent_filters = build_join_es_filters(cd)

@@ -634,7 +634,9 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
             "sub_opinion_ids": sub_opinion_ids,
             "related_algorithm": "mlt",
             "related_clusters": related_clusters,
-            "related_cluster_ids": [item["id"] for item in related_clusters],
+            "related_cluster_ids": [
+                item["cluster_id"] for item in related_clusters
+            ],
             "related_search_params": f"&{urlencode(related_search_params)}",
             "sponsored": sponsored,
         },
