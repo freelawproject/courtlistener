@@ -54,7 +54,18 @@ class AuthoritiesContext:
         citation_record: OpinionCluster | RECAPDocCitationRecord,
         request_query_string: str,
     ):
-        if isinstance(citation_record, OpinionCluster):
+        if isinstance(citation_record, RECAPDocCitationRecord):
+            top_authorities = [
+                ViewAuthority.from_recap_cit_record(
+                    cit_record, request_query_string
+                )
+                for cit_record in citation_record.cit_records
+            ]
+            view_all_url_base = ""  # TODO
+            total_authorities_count = citation_record.total_citation_count
+            doc_type = "document"
+
+        else:
             top_authorities = [
                 ViewAuthority.from_cluster_authority(ca, request_query_string)
                 for ca in citation_record.authorities_with_data[:5]
@@ -67,17 +78,6 @@ class AuthoritiesContext:
                 citation_record.authorities_with_data
             )
             doc_type = "opinion"
-
-        elif isinstance(citation_record, RECAPDocCitationRecord):
-            top_authorities = [
-                ViewAuthority.from_recap_cit_record(
-                    cit_record, request_query_string
-                )
-                for cit_record in citation_record.cit_records
-            ]
-            view_all_url_base = ""  # TODO
-            total_authorities_count = citation_record.total_citation_count
-            doc_type = "document"
 
         return cls(
             top_authorities=top_authorities,
