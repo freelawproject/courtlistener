@@ -676,37 +676,6 @@ def send_or_schedule_alerts(
     return alerts_triggered, document_content
 
 
-# TODO Old task to be removed.
-@app.task(
-    bind=True,
-    autoretry_for=(TransportError, ConnectionError, RequestError),
-    max_retries=3,
-    interval_start=5,
-    ignore_result=True,
-)
-def index_alert_document(
-    self: Task, alert: Alert, es_document=AudioPercolator
-) -> None:
-    """Helper method to prepare and index an Alert object into Elasticsearch.
-
-    :param self: The celery task
-    :param alert: The Alert instance to be indexed.
-    :param es_document: The Elasticsearch document percolator used for indexing
-    the Alert instance.
-    :return: Bool, True if document was properly indexed, otherwise None.
-    """
-
-    document = es_document()
-    doc = document.prepare(alert)
-    if not doc["percolator_query"]:
-        return None
-    doc_indexed = es_document(meta={"id": alert.pk}, **doc).save(
-        skip_empty=True, refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH
-    )
-    if not doc_indexed in ["created", "updated"]:
-        logger.warning(f"Error indexing Alert ID: {alert.pk}")
-
-
 # New task
 @app.task(
     bind=True,
@@ -742,41 +711,3 @@ def es_save_alert_document(
     )
     if not doc_indexed in ["created", "updated"]:
         logger.warning(f"Error indexing Alert ID: {alert.pk}")
-
-
-# TODO Old task to be removed.
-@app.task(
-    bind=True,
-    autoretry_for=(TransportError, ConnectionError, RequestError),
-    max_retries=3,
-    interval_start=5,
-    ignore_result=True,
-)
-def remove_doc_from_es_index(
-    self: Task, es_document: ESDocumentClassType, instance_id: int
-) -> None:
-    """Remove a document from an Elasticsearch index.
-
-    :param self: The celery task
-    :param es_document: The Elasticsearch document type.
-    :param instance_id: The ID of the instance to be removed from the
-    Elasticsearch index.
-    :return: None
-    """
-
-    if es_document is PositionDocument:
-        doc_id = ES_CHILD_ID(instance_id).POSITION
-    elif es_document is ESRECAPDocument:
-        doc_id = ES_CHILD_ID(instance_id).RECAP
-    else:
-        doc_id = instance_id
-
-    try:
-        doc = es_document.get(id=doc_id)
-        doc.delete(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)
-    except NotFoundError:
-        model_label = es_document.Django.model.__name__.capitalize()
-        logger.error(
-            f"The {model_label} with ID:{instance_id} can't be deleted from "
-            f"the ES index, it doesn't exists."
-        )

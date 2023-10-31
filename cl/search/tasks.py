@@ -271,10 +271,11 @@ def get_instance_from_db(
     bind=True,
     autoretry_for=(ConnectionError, ConflictError),
     max_retries=5,
-    retry_backoff=2 * 60,
+    retry_backoff=1 * 60,
     retry_backoff_max=10 * 60,
     retry_jitter=True,
     queue=settings.CELERY_ETL_TASK_QUEUE,
+    ignore_result=True,
 )
 def es_save_document(
     self: Task,
@@ -425,15 +426,15 @@ def document_fields_to_update(
     return fields_to_update
 
 
-# New task.
 @app.task(
     bind=True,
     autoretry_for=(ConnectionError, ConflictError),
     max_retries=5,
-    retry_backoff=2 * 60,
+    retry_backoff=1 * 60,
     retry_backoff_max=10 * 60,
     retry_jitter=True,
     queue=settings.CELERY_ETL_TASK_QUEUE,
+    ignore_result=True,
 )
 def update_es_document(
     self: Task,
@@ -523,11 +524,11 @@ def get_doc_from_es(
     return main_doc
 
 
-# New task.
 @app.task(
     bind=True,
     max_retries=5,
     queue=settings.CELERY_ETL_TASK_QUEUE,
+    ignore_result=True,
 )
 def update_children_docs_by_query(
     self: Task,
@@ -607,11 +608,15 @@ def update_children_docs_by_query(
     try:
         ubq.execute()
     except (ConnectionError, ConflictError) as exc:
-        if self.request.retries >= self.max_retries:
+        retry_count = self.request.retries
+        if retry_count >= self.max_retries:
             raise exc
-        min_delay = 5 * 60  # 5 minutes
-        max_delay = 15 * 60  # 15 minutes
-        raise self.retry(exc=exc, countdown=randint(min_delay, max_delay))
+        min_delay = 10  # 10 seconds
+        max_delay = 15  # 15 seconds
+        countdown = ((retry_count + 1) * min_delay) + randint(
+            min_delay, max_delay
+        )
+        raise self.retry(exc=exc, countdown=countdown)
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
@@ -622,10 +627,11 @@ def update_children_docs_by_query(
     bind=True,
     autoretry_for=(ConnectionError, NotFoundError, ConflictError),
     max_retries=5,
-    retry_backoff=2 * 60,
+    retry_backoff=1 * 60,
     retry_backoff_max=10 * 60,
     retry_jitter=True,
     queue=settings.CELERY_ETL_TASK_QUEUE,
+    ignore_result=True,
 )
 def index_docket_parties_in_es(
     self: Task,
@@ -687,6 +693,7 @@ def bulk_indexing_generator(
     autoretry_for=(ConnectionError,),
     max_retries=3,
     interval_start=5,
+    ignore_result=True,
 )
 def index_parent_and_child_docs(
     self: Task,
@@ -806,7 +813,7 @@ def index_parent_and_child_docs(
     bind=True,
     autoretry_for=(ConnectionError, ConflictError),
     max_retries=5,
-    retry_backoff=2 * 60,
+    retry_backoff=1 * 60,
     retry_backoff_max=10 * 60,
     retry_jitter=True,
     ignore_result=True,
