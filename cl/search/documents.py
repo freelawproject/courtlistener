@@ -1088,6 +1088,9 @@ class OpinionBaseDocument(Document):
     cluster_id = fields.IntegerField(
         attr="pk", fields={"raw": fields.KeywordField(attr="pk")}
     )
+    docket_id = fields.IntegerField(
+        attr="docket.pk", fields={"raw": fields.KeywordField(attr="docket.pk")}
+    )
     docketNumber = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
@@ -1109,6 +1112,10 @@ class OpinionBaseDocument(Document):
         },
         search_analyzer="search_analyzer",
     )
+    dateFiled = fields.DateField()
+    dateArgued = fields.DateField()
+    dateReargued = fields.DateField()
+    dateReargumentDenied = fields.DateField()
     dateFiled_text = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
@@ -1221,6 +1228,22 @@ class OpinionBaseDocument(Document):
         },
         search_analyzer="search_analyzer",
     )
+    scdb_id = fields.KeywordField(attr="scdb_id")
+    sibling_ids = fields.ListField(
+        fields.IntegerField(multi=True),
+    )
+    panel_ids = fields.ListField(
+        fields.IntegerField(multi=True),
+    )
+    neutralCite = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
+    )
+    lexisCite = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
+    )
+    citeCount = fields.IntegerField(attr="citation_count")
     cluster_child = JoinField(relations={"opinion_cluster": ["opinion"]})
     timestamp = fields.DateField()
 
@@ -1295,6 +1318,72 @@ class OpinionBaseDocument(Document):
 
     def prepare_syllabus(self, instance):
         return instance.syllabus
+
+    def prepare_sibling_ids(self, instance):
+        return [opinion.pk for opinion in instance.sub_opinions.all()]
+
+    def prepare_panel_ids(self, instance):
+        return [judge.pk for judge in instance.panel.all()]
+
+    def prepare_dateFiled(self, instance):
+        if instance.date_filed is None:
+            return
+
+        if isinstance(instance.date_filed, str):
+            datetime_object = datetime.strptime(
+                instance.date_filed, "%Y-%m-%d"
+            )
+            return midnight_pt(datetime_object)
+
+        return midnight_pt(instance.date_filed)
+
+    def prepare_dateArgued(self, instance):
+        if instance.docket.date_argued is None:
+            return
+
+        if isinstance(instance.docket.date_argued, str):
+            datetime_object = datetime.strptime(
+                instance.docket.date_argued, "%Y-%m-%d"
+            )
+            return midnight_pt(datetime_object)
+
+        return midnight_pt(instance.docket.date_argued)
+
+    def prepare_dateReargued(self, instance):
+        if instance.docket.date_reargued is None:
+            return
+
+        if isinstance(instance.docket.date_reargued, str):
+            datetime_object = datetime.strptime(
+                instance.docket.date_reargued, "%Y-%m-%d"
+            )
+            return midnight_pt(datetime_object)
+
+        return midnight_pt(instance.docket.date_reargued)
+
+    def prepare_dateReargumentDenied(self, instance):
+        if instance.docket.date_reargument_denied is None:
+            return
+
+        if isinstance(instance.docket.date_reargument_denied, str):
+            datetime_object = datetime.strptime(
+                instance.docket.date_reargument_denied, "%Y-%m-%d"
+            )
+            return midnight_pt(datetime_object)
+
+        return midnight_pt(instance.docket.date_reargument_denied)
+
+    def prepare_neutralCite(self, instance):
+        neutral_citations = instance.citations.filter(type=Citation.NEUTRAL)
+        if neutral_citations.count():
+            return str(neutral_citations[0])
+        return ""
+
+    def prepare_lexisCite(self, instance):
+        lexis_citations = instance.citations.filter(type=Citation.LEXIS)
+        if lexis_citations.count():
+            return str(lexis_citations[0])
+        return ""
 
     def prepare_timestamp(self, instance):
         return datetime.utcnow()
@@ -1378,6 +1467,88 @@ class OpinionDocument(OpinionBaseDocument):
         else:
             return instance.plain_text
 
+    def prepare_cluster_id(self, instance):
+        return instance.cluster.pk
+
+    def prepare_docket_id(self, instance):
+        return instance.cluster.docket.pk
+
+    def prepare_scdb_id(self, instance):
+        return instance.cluster.scdb_id
+
+    def prepare_sibling_ids(self, instance):
+        return [opinion.pk for opinion in instance.cluster.sub_opinions.all()]
+
+    def prepare_panel_ids(self, instance):
+        return [judge.pk for judge in instance.cluster.panel.all()]
+
+    def prepare_dateFiled(self, instance):
+        if instance.cluster.date_filed is None:
+            return
+
+        if isinstance(instance.cluster.date_filed, str):
+            datetime_object = datetime.strptime(
+                instance.cluster.date_filed, "%Y-%m-%d"
+            )
+            return midnight_pt(datetime_object)
+
+        return midnight_pt(instance.cluster.date_filed)
+
+    def prepare_dateArgued(self, instance):
+        if instance.cluster.docket.date_argued is None:
+            return
+
+        if isinstance(instance.cluster.docket.date_argued, str):
+            datetime_object = datetime.strptime(
+                instance.cluster.docket.date_argued, "%Y-%m-%d"
+            )
+            return midnight_pt(datetime_object)
+
+        return midnight_pt(instance.cluster.docket.date_argued)
+
+    def prepare_dateReargued(self, instance):
+        if instance.cluster.docket.date_reargued is None:
+            return
+
+        if isinstance(instance.cluster.docket.date_reargued, str):
+            datetime_object = datetime.strptime(
+                instance.cluster.docket.date_reargued, "%Y-%m-%d"
+            )
+            return midnight_pt(datetime_object)
+
+        return midnight_pt(instance.cluster.docket.date_reargued)
+
+    def prepare_dateReargumentDenied(self, instance):
+        if instance.cluster.docket.date_reargument_denied is None:
+            return
+
+        if isinstance(instance.cluster.docket.date_reargument_denied, str):
+            datetime_object = datetime.strptime(
+                instance.cluster.docket.date_reargument_denied, "%Y-%m-%d"
+            )
+            return midnight_pt(datetime_object)
+
+        return midnight_pt(instance.cluster.docket.date_reargument_denied)
+
+    def prepare_neutralCite(self, instance):
+        neutral_citations = instance.cluster.citations.filter(
+            type=Citation.NEUTRAL
+        )
+        if neutral_citations.count():
+            return str(neutral_citations[0])
+        return ""
+
+    def prepare_lexisCite(self, instance):
+        lexis_citations = instance.cluster.citations.filter(
+            type=Citation.LEXIS
+        )
+        if lexis_citations.count():
+            return str(lexis_citations[0])
+        return ""
+
+    def prepare_citeCount(self, instance):
+        return instance.cluster.citation_count
+
     def prepare_docketNumber(self, instance):
         return instance.cluster.docket.docket_number
 
@@ -1455,7 +1626,6 @@ class OpinionDocument(OpinionBaseDocument):
 
 @opinion_index.document
 class OpinionClusterDocument(OpinionBaseDocument):
-    docket_id = fields.IntegerField(attr="docket.pk")
     court_exact = fields.KeywordField(attr="docket.court_id")
     absolute_url = fields.KeywordField()
     caseNameShort = fields.TextField(
@@ -1466,24 +1636,9 @@ class OpinionClusterDocument(OpinionBaseDocument):
         },
         search_analyzer="search_analyzer",
     )
-    sibling_ids = fields.ListField(
-        fields.IntegerField(multi=True),
-    )
-    panel_ids = fields.ListField(
-        fields.IntegerField(multi=True),
-    )
     non_participating_judge_ids = fields.ListField(
         fields.IntegerField(multi=True),
     )
-    neutralCite = fields.TextField(
-        analyzer="text_en_splitting_cl",
-        search_analyzer="search_analyzer",
-    )
-    lexisCite = fields.TextField(
-        analyzer="text_en_splitting_cl",
-        search_analyzer="search_analyzer",
-    )
-    scdb_id = fields.KeywordField(attr="scdb_id")
     source = fields.TextField(
         attr="source",
         analyzer="text_en_splitting_cl",
@@ -1492,83 +1647,12 @@ class OpinionClusterDocument(OpinionBaseDocument):
         },
         search_analyzer="search_analyzer",
     )
-    citeCount = fields.IntegerField(attr="citation_count")
-    dateFiled = fields.DateField()
-    dateArgued = fields.DateField()
-    dateReargued = fields.DateField()
-    dateReargumentDenied = fields.DateField()
 
     def prepare_absolute_url(self, instance):
         return instance.get_absolute_url()
 
-    def prepare_sibling_ids(self, instance):
-        return [opinion.pk for opinion in instance.sub_opinions.all()]
-
-    def prepare_panel_ids(self, instance):
-        return [judge.pk for judge in instance.panel.all()]
-
     def prepare_non_participating_judge_ids(self, instance):
         return [judge.pk for judge in instance.non_participating_judges.all()]
-
-    def prepare_neutralCite(self, instance):
-        neutral_citations = instance.citations.filter(type=Citation.NEUTRAL)
-        if neutral_citations.count():
-            return str(neutral_citations[0])
-        return ""
-
-    def prepare_lexisCite(self, instance):
-        lexis_citations = instance.citations.filter(type=Citation.LEXIS)
-        if lexis_citations.count():
-            return str(lexis_citations[0])
-        return ""
-
-    def prepare_dateFiled(self, instance):
-        if instance.date_filed is None:
-            return
-
-        if isinstance(instance.date_filed, str):
-            datetime_object = datetime.strptime(
-                instance.date_filed, "%Y-%m-%d"
-            )
-            return midnight_pt(datetime_object)
-
-        return midnight_pt(instance.date_filed)
-
-    def prepare_dateArgued(self, instance):
-        if instance.docket.date_argued is None:
-            return
-
-        if isinstance(instance.docket.date_argued, str):
-            datetime_object = datetime.strptime(
-                instance.docket.date_argued, "%Y-%m-%d"
-            )
-            return midnight_pt(datetime_object)
-
-        return midnight_pt(instance.docket.date_argued)
-
-    def prepare_dateReargued(self, instance):
-        if instance.docket.date_reargued is None:
-            return
-
-        if isinstance(instance.docket.date_reargued, str):
-            datetime_object = datetime.strptime(
-                instance.docket.date_reargued, "%Y-%m-%d"
-            )
-            return midnight_pt(datetime_object)
-
-        return midnight_pt(instance.docket.date_reargued)
-
-    def prepare_dateReargumentDenied(self, instance):
-        if instance.docket.date_reargument_denied is None:
-            return
-
-        if isinstance(instance.docket.date_reargument_denied, str):
-            datetime_object = datetime.strptime(
-                instance.docket.date_reargument_denied, "%Y-%m-%d"
-            )
-            return midnight_pt(datetime_object)
-
-        return midnight_pt(instance.docket.date_reargument_denied)
 
     def prepare_cluster_child(self, instance):
         return "opinion_cluster"
