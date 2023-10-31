@@ -39,6 +39,7 @@ from cl.lib.bot_detector import is_og_bot
 from cl.lib.http import is_ajax
 from cl.lib.model_helpers import choices_to_csv
 from cl.lib.models import THUMBNAIL_STATUSES
+from cl.lib.ratelimiter import ratelimiter_all_2_per_m
 from cl.lib.search_utils import (
     get_citing_clusters_with_cache,
     get_related_clusters_with_cache,
@@ -48,6 +49,7 @@ from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_404
 from cl.lib.view_utils import increment_view_count
+from cl.opinion_page.feeds import DocketFeed
 from cl.opinion_page.forms import (
     CitationRedirectorForm,
     CourtUploadForm,
@@ -238,6 +240,11 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
         }
     )
     return TemplateResponse(request, "docket.html", context)
+
+
+@ratelimiter_all_2_per_m
+def view_docket_feed(request: HttpRequest, docket_id: int) -> HttpResponse:
+    return DocketFeed()(request, docket_id=docket_id)
 
 
 def view_parties(
