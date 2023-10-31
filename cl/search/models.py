@@ -2645,6 +2645,8 @@ class OpinionCluster(AbstractDateTimeModel):
             "procedural_history",
             "posture",
             "syllabus",
+            "scdb_id",
+            "citation_count",
         ]
     )
 

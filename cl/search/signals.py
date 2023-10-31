@@ -314,6 +314,8 @@ o_field_mapping = {
                 "procedural_history": ["proceduralHistory"],
                 "posture": ["posture"],
                 "syllabus": ["syllabus"],
+                "scdb_id": ["scdb_id"],
+                "citation_count": ["citeCount"],
             }
         },
         Opinion: {},
@@ -332,12 +334,7 @@ o_field_mapping = {
         },
     },
     "reverse": {},
-    "reverse-delete": {
-        Opinion: {"cluster": {"all": ["sibling_ids"]}},
-        Citation: {
-            "cluster": {"all": ["citation", "neutralCite", "lexisCite"]}
-        },
-    },
+    "reverse-delete": {},
 }
 
 o_cluster_field_mapping = {
