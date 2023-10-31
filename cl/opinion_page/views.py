@@ -56,7 +56,11 @@ from cl.opinion_page.forms import (
     CourtUploadForm,
     DocketEntryFilterForm,
 )
-from cl.opinion_page.types import AuthoritiesContext, RECAPCitationViewData
+from cl.opinion_page.types import (
+    AuthoritiesContext,
+    RECAPCitationViewData,
+    RECAPDocCitationRecord,
+)
 from cl.opinion_page.utils import core_docket_data, get_case_title
 from cl.people_db.models import AttorneyOrganization, CriminalCount, Role
 from cl.recap.constants import COURT_TIMEZONES
@@ -472,12 +476,12 @@ def view_recap_document(
     total_citation_count, citation_records = get_recap_citations(
         rd.pk, top_k=5
     )
-    authorities_context: AuthoritiesContext = (
-        AuthoritiesContext.from_recap_document_cits(
-            total_cit_count=total_citation_count,
+    authorities_context: AuthoritiesContext = AuthoritiesContext.construct(
+        citation_record=RECAPDocCitationRecord(
             cit_records=citation_records,
-            request_query_string=request.META["QUERY_STRING"],
-        )
+            total_citation_count=total_citation_count,
+        ),
+        request_query_string=request.META["QUERY_STRING"],
     )
 
     return TemplateResponse(
@@ -561,10 +565,8 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     ):
         sponsored = True
 
-    authorities_context: AuthoritiesContext = (
-        AuthoritiesContext.from_opinion_cluster(
-            cluster, request.META["QUERY_STRING"]
-        )
+    authorities_context: AuthoritiesContext = AuthoritiesContext.construct(
+        cluster, request.META["QUERY_STRING"]
     )
 
     return TemplateResponse(
