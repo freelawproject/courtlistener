@@ -1395,34 +1395,6 @@ class EsOpinionsIndexingTest(ESIndexTestCase, TransactionTestCase):
         es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         self.assertEqual(es_doc.caseNameShort, "Franklin")
 
-        # Add a new opinion to the cluster record.
-        opinion_1 = OpinionFactory.create(
-            extracted_by_ocr=False,
-            plain_text="my plain text secret word for queries",
-            cluster=opinion_cluster,
-            type="020lead",
-        )
-
-        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        self.assertIn(opinion_1.pk, es_doc.sibling_ids)
-
-        opinion_2 = OpinionFactory.create(
-            extracted_by_ocr=False,
-            plain_text="my plain text secret word for queries",
-            cluster=opinion_cluster,
-            type="010combined",
-        )
-        opinion_2.save()
-
-        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        self.assertIn(opinion_2.pk, es_doc.sibling_ids)
-
-        # Add a new judge to the cluster record.
-        opinion_cluster.panel.add(self.person)
-
-        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        self.assertIn(self.person.pk, es_doc.panel_ids)
-
         # Add a new non participating judge to the cluster record.
         person_3 = PersonFactory.create(
             gender="f",
@@ -1439,64 +1411,12 @@ class EsOpinionsIndexingTest(ESIndexTestCase, TransactionTestCase):
         es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         self.assertIn(person_3.pk, es_doc.non_participating_judge_ids)
 
-        # Update the scdb_id field in the cluster record.
-        opinion_cluster.scdb_id = "test"
-        opinion_cluster.save()
-
-        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        self.assertEqual(es_doc.scdb_id, "test")
-
-        # Add lexis citation to the cluster
-        lexis_citation = CitationWithParentsFactory.create(
-            volume=10,
-            reporter="Yeates",
-            page="4",
-            type=6,
-            cluster=opinion_cluster,
-        )
-
-        lexis_citation_str = str(lexis_citation)
-        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        self.assertEqual(lexis_citation_str, es_doc.lexisCite)
-
-        # Remove lexis citation from the db
-        lexis_citation.delete()
-
-        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        self.assertNotEqual(lexis_citation_str, es_doc.lexisCite)
-
-        # Add neutral citation to the cluster
-        neutral_citation = CitationWithParentsFactory.create(
-            volume=16,
-            reporter="Yeates",
-            page="58",
-            type=8,
-            cluster=opinion_cluster,
-        )
-
-        neutral_citation_str = str(neutral_citation)
-        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        self.assertEqual(neutral_citation_str, es_doc.neutralCite)
-
-        # Remove neutral citation from the db
-        neutral_citation.delete()
-
-        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        self.assertNotEqual(neutral_citation_str, es_doc.neutralCite)
-
         # Update the source field in the cluster record.
         opinion_cluster.source = "ZLCR"
         opinion_cluster.save()
 
         es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         self.assertEqual(es_doc.source, "ZLCR")
-
-        # Update the cite_count field in the cluster record.
-        opinion_cluster.citation_count = 8
-        opinion_cluster.save()
-
-        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        self.assertEqual(es_doc.citeCount, 8)
 
         docket.delete()
         opinion_cluster.delete()
@@ -1532,7 +1452,6 @@ class EsOpinionsIndexingTest(ESIndexTestCase, TransactionTestCase):
 
         # update docket number in parent document
         docket.docket_number = "005"
-        print("updating docket number")
         docket.save()
 
         cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
@@ -1680,6 +1599,104 @@ class EsOpinionsIndexingTest(ESIndexTestCase, TransactionTestCase):
         opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
         self.assertEqual(cluster_doc.syllabus, "random text for test")
         self.assertEqual(opinion_doc.syllabus, "random text for test")
+
+        # Update the scdb_id field in the cluster record.
+        opinion_cluster.scdb_id = "test"
+        opinion_cluster.save()
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.scdb_id, "test")
+        self.assertEqual(opinion_doc.scdb_id, "test")
+
+        # Add a new judge to the cluster record.
+        opinion_cluster.panel.add(self.person)
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertIn(self.person.pk, cluster_doc.panel_ids)
+        self.assertIn(self.person.pk, opinion_doc.panel_ids)
+
+        # Add a new opinion to the cluster record.
+        opinion_1 = OpinionFactory.create(
+            extracted_by_ocr=False,
+            plain_text="my plain text secret word for queries",
+            cluster=opinion_cluster,
+            type="020lead",
+        )
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertIn(opinion_1.pk, cluster_doc.sibling_ids)
+        self.assertIn(opinion_1.pk, opinion_doc.sibling_ids)
+
+        opinion_2 = OpinionFactory.create(
+            extracted_by_ocr=False,
+            plain_text="my plain text secret word for queries",
+            cluster=opinion_cluster,
+            type="010combined",
+        )
+        opinion_2.save()
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertIn(opinion_2.pk, cluster_doc.sibling_ids)
+        self.assertIn(opinion_2.pk, opinion_doc.sibling_ids)
+
+        # Add lexis citation to the cluster
+        lexis_citation = CitationWithParentsFactory.create(
+            volume=10,
+            reporter="Yeates",
+            page="4",
+            type=6,
+            cluster=opinion_cluster,
+        )
+
+        lexis_citation_str = str(lexis_citation)
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.lexisCite, lexis_citation_str)
+        self.assertEqual(opinion_doc.lexisCite, lexis_citation_str)
+
+        # Remove lexis citation from the db
+        lexis_citation.delete()
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertNotEqual(cluster_doc.lexisCite, lexis_citation_str)
+        self.assertNotEqual(opinion_doc.lexisCite, lexis_citation_str)
+
+        # Add neutral citation to the cluster
+        neutral_citation = CitationWithParentsFactory.create(
+            volume=16,
+            reporter="Yeates",
+            page="58",
+            type=8,
+            cluster=opinion_cluster,
+        )
+
+        neutral_citation_str = str(neutral_citation)
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.neutralCite, neutral_citation_str)
+        self.assertEqual(opinion_doc.neutralCite, neutral_citation_str)
+
+        # Remove neutral citation from the db
+        neutral_citation.delete()
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertNotEqual(cluster_doc.neutralCite, neutral_citation_str)
+        self.assertNotEqual(opinion_doc.neutralCite, neutral_citation_str)
+
+        # Update the cite_count field in the cluster record.
+        opinion_cluster.citation_count = 8
+        opinion_cluster.save()
+
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.citeCount, 8)
+        self.assertEqual(opinion_doc.citeCount, 8)
 
         docket.delete()
         opinion_cluster.delete()
