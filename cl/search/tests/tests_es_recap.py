@@ -718,7 +718,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # test the combination of the text query and the available_only filter
         params = {
             "type": SEARCH_TYPES.RECAP,
-            "q": "Voluntary Hospitals",
+            "q": "'Voluntary Hospitals'",
             "available_only": True,
         }
         r = async_to_sync(self._test_article_count)(
@@ -793,6 +793,8 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIn("Document #2", r.content.decode())
 
         with self.captureOnCommitCallbacks(execute=True):
+            e_2_d_1.delete()
+            e_1_d_1.delete()
             docket.delete()
 
     async def test_atty_name_filter(self) -> None:
