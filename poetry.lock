@@ -4230,17 +4230,18 @@ tests = ["cython", "littleutils", "pygments", "pytest", "typeguard"]
 
 [[package]]
 name = "stripe"
-version = "5.2.0"
+version = "7.2.0"
 description = "Python bindings for the Stripe API"
 optional = false
-python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
+python-versions = ">=3.6"
 files = [
-    {file = "stripe-5.2.0-py2.py3-none-any.whl", hash = "sha256:948482df33c5dc417097bb00c13f8b326f815ef5d1a21d84e697eb53ec5df9fd"},
-    {file = "stripe-5.2.0.tar.gz", hash = "sha256:a4372b9daf8312d82369aaa64997297a6f046bc07ca09f75d79f5ac80933b414"},
+    {file = "stripe-7.2.0-py2.py3-none-any.whl", hash = "sha256:2ac98a5ce45d102b8c95cf57259fb182a99043e7a5dae5559220102d34bcba5c"},
+    {file = "stripe-7.2.0.tar.gz", hash = "sha256:45edff0627217de5348cb4fcf397fff6d722c88cacc0ff7bc9d47b85139138bf"},
 ]
 
 [package.dependencies]
 requests = {version = ">=2.20", markers = "python_version >= \"3.0\""}
+typing-extensions = {version = ">=4.5.0", markers = "python_version >= \"3.7\""}
 
 [[package]]
 name = "tblib"
@@ -5121,4 +5122,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11, <3.12"
-content-hash = "311089a5787b9d91c13a3b151698c048f80d7dda802c6ff9ff15f17d1574aab9"
+content-hash = "1ab5593cc51ec31d469967c7c5fd41027f2ee480a1c9ecf27ae0629a9973ccb7"
