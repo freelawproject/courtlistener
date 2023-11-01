@@ -20,7 +20,7 @@ from django.template.defaultfilters import slugify
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.timezone import now
-from django.views.decorators.cache import never_cache
+from django.views.decorators.cache import cache_page, never_cache
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from reporters_db import (
     EDITIONS,
@@ -39,7 +39,6 @@ from cl.lib.bot_detector import is_og_bot
 from cl.lib.http import is_ajax
 from cl.lib.model_helpers import choices_to_csv
 from cl.lib.models import THUMBNAIL_STATUSES
-from cl.lib.ratelimiter import ratelimiter_all_2_per_m
 from cl.lib.search_utils import (
     get_citing_clusters_with_cache,
     get_related_clusters_with_cache,
@@ -242,7 +241,7 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     return TemplateResponse(request, "docket.html", context)
 
 
-@ratelimiter_all_2_per_m
+@cache_page(60)
 def view_docket_feed(request: HttpRequest, docket_id: int) -> HttpResponse:
     return DocketFeed()(request, docket_id=docket_id)
 

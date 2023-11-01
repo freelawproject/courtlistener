@@ -116,43 +116,6 @@ def get_fields_to_update(
     return fields_to_update
 
 
-def exists_or_create_doc(
-    es_document: ESDocumentClassType,
-    instance: ESModelType,
-    avoid_creation: bool = False,
-) -> bool:
-    """Get or create a document in Elasticsearch.
-    :param es_document: The Elasticsearch document type.
-    :param instance: The instance of the document to get or create.
-    :param avoid_creation: Whether the document shouldn't be created if it doesn't
-    exist.
-    :return: True if the ES document exists, False otherwise.
-    """
-
-    # Get doc_id for parent-child documents.
-    if es_document is PositionDocument:
-        doc_id = ES_CHILD_ID(instance.pk).POSITION
-    elif es_document is ESRECAPDocument:
-        doc_id = ES_CHILD_ID(instance.pk).RECAP
-    else:
-        doc_id = instance.pk
-
-    if es_document.exists(id=doc_id):
-        return True
-
-    if not avoid_creation:
-        transaction.on_commit(
-            partial(
-                es_save_document.delay,
-                instance.pk,
-                compose_app_label(instance),
-                es_document.__name__,
-            )
-        )
-        return False
-    return False
-
-
 def update_es_documents(
     main_model: ESModelType,
     es_document: ESDocumentClassType,
@@ -184,12 +147,6 @@ def update_es_documents(
                 This case handles the update of one or more fields that belongs to
                 the parent model(The person model).
                 """
-                main_doc = exists_or_create_doc(
-                    PersonDocument, instance, avoid_creation=True
-                )
-                if not main_doc:
-                    # Abort bulk update for a non-existing parent document in ES.
-                    return
                 transaction.on_commit(
                     partial(
                         update_children_docs_by_query.delay,
@@ -209,12 +166,6 @@ def update_es_documents(
                 """
                 related_record = Person.objects.filter(**{query: instance})
                 for person in related_record:
-                    main_doc = exists_or_create_doc(
-                        PersonDocument, person, avoid_creation=True
-                    )
-                    if not main_doc:
-                        # Abort bulk update for a non-existing parent document in ES.
-                        return
                     transaction.on_commit(
                         partial(
                             update_children_docs_by_query.delay,
@@ -225,12 +176,6 @@ def update_es_documents(
                         )
                     )
             case Docket() if es_document is ESRECAPDocument:  # type: ignore
-                main_doc = exists_or_create_doc(
-                    DocketDocument, instance, avoid_creation=True
-                )
-                if not main_doc:
-                    # Abort bulk update for a non-existing parent document in ES.
-                    return
                 transaction.on_commit(
                     partial(
                         update_children_docs_by_query.delay,
@@ -243,12 +188,6 @@ def update_es_documents(
             case Person() if es_document is ESRECAPDocument:  # type: ignore
                 related_dockets = Docket.objects.filter(**{query: instance})
                 for rel_docket in related_dockets:
-                    main_doc = exists_or_create_doc(
-                        DocketDocument, rel_docket, avoid_creation=True
-                    )
-                    if not main_doc:
-                        # Abort bulk update for a non-existing parent document in ES.
-                        return
                     transaction.on_commit(
                         partial(
                             update_children_docs_by_query.delay,
@@ -261,9 +200,6 @@ def update_es_documents(
             case _:
                 main_objects = main_model.objects.filter(**{query: instance})
                 for main_object in main_objects:
-                    main_doc = exists_or_create_doc(es_document, main_object)
-                    if not main_doc:
-                        continue
                     if fields_to_update:
                         # Update main document in ES, including fields to be
                         # extracted from a related instance.
@@ -325,9 +261,6 @@ def update_m2m_field_in_es_document(
     relationships with the instance.
     :return: None
     """
-    document = exists_or_create_doc(es_document, instance)
-    if not document:
-        return
     transaction.on_commit(
         partial(
             update_es_document.delay,
@@ -363,12 +296,6 @@ def update_reverse_related_documents(
     # Update parent instance
     main_objects = main_model.objects.filter(**{query_string: instance})
     for main_object in main_objects:
-        main_doc = exists_or_create_doc(
-            es_document, main_object, avoid_creation=True
-        )
-        if not main_doc:
-            # Abort update if the parent document doesn't exist in the index.
-            continue
         transaction.on_commit(
             partial(
                 update_es_document.delay,
@@ -385,12 +312,6 @@ def update_reverse_related_documents(
             # bulk update position documents when a reverse related record is created/updated.
             related_record = Person.objects.filter(**{query_string: instance})
             for person in related_record:
-                main_doc = exists_or_create_doc(
-                    es_document, person, avoid_creation=True
-                )
-                if not main_doc:
-                    # Abort bulk update for a non-existing parent document in ES.
-                    return
                 transaction.on_commit(
                     partial(
                         update_children_docs_by_query.delay,
@@ -401,12 +322,6 @@ def update_reverse_related_documents(
                 )
         case BankruptcyInformation() if es_document is DocketDocument:  # type: ignore
             # bulk update RECAP documents when a reverse related record is created/updated.
-            main_doc = exists_or_create_doc(
-                es_document, instance.docket, avoid_creation=True
-            )
-            if not main_doc:
-                # Abort bulk update for a non-existing parent document in ES.
-                return
             transaction.on_commit(
                 partial(
                     update_children_docs_by_query.delay,
@@ -439,76 +354,65 @@ def delete_reverse_related_documents(
     match instance:
         case Person() if es_document is PersonDocument:  # type: ignore
             # Update the Person document after the reverse instanced is deleted
-            main_doc = exists_or_create_doc(
-                es_document, instance, avoid_creation=True
+            # Update parent document in ES.
+            transaction.on_commit(
+                partial(
+                    update_es_document.delay,
+                    es_document.__name__,
+                    affected_fields,
+                    (compose_app_label(instance), instance.pk),
+                    None,
+                    None,
+                )
             )
-            if main_doc:
-                # Update parent document in ES.
-                transaction.on_commit(
-                    partial(
-                        update_es_document.delay,
-                        es_document.__name__,
-                        affected_fields,
-                        (compose_app_label(instance), instance.pk),
-                        None,
-                        None,
-                    )
+            # Then update all their child documents (Positions)
+            transaction.on_commit(
+                partial(
+                    update_children_docs_by_query.delay,
+                    PositionDocument.__name__,
+                    instance.pk,
+                    affected_fields,
                 )
-                # Then update all their child documents (Positions)
-                transaction.on_commit(
-                    partial(
-                        update_children_docs_by_query.delay,
-                        PositionDocument.__name__,
-                        instance.pk,
-                        affected_fields,
-                    )
-                )
+            )
         case Docket() if es_document is DocketDocument:  # type: ignore
             # Update the Docket document after the reverse instanced is deleted
-            main_doc = exists_or_create_doc(
-                es_document, instance, avoid_creation=True
+
+            # Update parent document in ES.
+            transaction.on_commit(
+                partial(
+                    update_es_document.delay,
+                    es_document.__name__,
+                    affected_fields,
+                    (compose_app_label(instance), instance.pk),
+                    None,
+                    None,
+                )
             )
-            if main_doc:
-                # Update parent document in ES.
-                transaction.on_commit(
-                    partial(
-                        update_es_document.delay,
-                        es_document.__name__,
-                        affected_fields,
-                        (compose_app_label(instance), instance.pk),
-                        None,
-                        None,
-                    )
+            # Then update all their child documents (RECAPDocuments)
+            transaction.on_commit(
+                partial(
+                    update_children_docs_by_query.delay,
+                    ESRECAPDocument.__name__,
+                    instance.pk,
+                    affected_fields,
                 )
-                # Then update all their child documents (RECAPDocuments)
-                transaction.on_commit(
-                    partial(
-                        update_children_docs_by_query.delay,
-                        ESRECAPDocument.__name__,
-                        instance.pk,
-                        affected_fields,
-                    )
-                )
+            )
         case _:
             main_objects = main_model.objects.filter(
                 **{query_string: instance}
             )
             for main_object in main_objects:
-                main_doc = exists_or_create_doc(
-                    es_document, main_object, avoid_creation=True
-                )
-                if main_doc:
-                    # Update main document in ES.
-                    transaction.on_commit(
-                        partial(
-                            update_es_document.delay,
-                            es_document.__name__,
-                            affected_fields,
-                            (compose_app_label(main_object), main_object.pk),
-                            None,
-                            None,
-                        )
+                # Update main document in ES.
+                transaction.on_commit(
+                    partial(
+                        update_es_document.delay,
+                        es_document.__name__,
+                        affected_fields,
+                        (compose_app_label(main_object), main_object.pk),
+                        None,
+                        None,
                     )
+                )
 
 
 def avoid_es_audio_indexing(
