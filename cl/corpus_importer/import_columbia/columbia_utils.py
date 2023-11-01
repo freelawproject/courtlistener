@@ -1,3 +1,4 @@
+import itertools
 import re
 from datetime import date
 from typing import Any, Optional
@@ -256,14 +257,16 @@ def read_xml_to_soup(filepath: str) -> BeautifulSoup:
     return BeautifulSoup(file_content, "lxml")
 
 
-def add_floating_opinion(opinions: list, floating_content: list) -> list:
+def add_floating_opinion(
+    opinions: list, floating_content: list, opinion_order: int
+) -> list:
     """We have found floating opinions in bs object, we keep the opinion content as a
     new opinion
     :param opinions: a list with opinions found
     :param floating_content: content that is not in known non-opinion tags
+    :param opinion_order: opinion position
     :return: updated list of opinions
     """
-
     op_type = "opinion"
     if opinions:
         if opinions[-1].get("type"):
@@ -278,6 +281,7 @@ def add_floating_opinion(opinions: list, floating_content: list) -> list:
         opinions.append(
             {
                 "opinion": opinion_content,
+                "order": opinion_order,
                 "byline": "",
                 "type": op_type,
             }
@@ -293,6 +297,7 @@ def extract_opinions(outer_opinion: BeautifulSoup) -> list[Optional[dict]]:
     """
     opinions: list = []
     floating_content = []
+    order = 0
 
     # We iterate all content to look for all possible opinions
     for i, content in enumerate(outer_opinion):  # type: int, Tag
@@ -317,7 +322,9 @@ def extract_opinions(outer_opinion: BeautifulSoup) -> list[Optional[dict]]:
                     # We have found an opinion, but there is floating content, we
                     # create a dict with the opinion using the floating content with
                     # default type = "opinion"
-                    opinions = add_floating_opinion(opinions, floating_content)
+                    opinions = add_floating_opinion(
+                        opinions, floating_content, order
+                    )
                     floating_content = []
 
                 byline = content.find_previous_sibling()
@@ -333,10 +340,12 @@ def extract_opinions(outer_opinion: BeautifulSoup) -> list[Optional[dict]]:
                     opinions.append(
                         {
                             "opinion": opinion_content,
+                            "order": order,
                             "byline": opinion_author,
                             "type": content.name.replace("_text", ""),
                         }
                     )
+                    order = order + 1
 
             else:
                 if content.name not in SIMPLE_TAGS + ["syllabus"]:
@@ -349,15 +358,18 @@ def extract_opinions(outer_opinion: BeautifulSoup) -> list[Optional[dict]]:
         # If we end to go through all the found opinions and if we still have
         # floating content out there, we create a new opinion with the last type
         # of opinion
-        opinions = add_floating_opinion(opinions, floating_content)
+        opinions = add_floating_opinion(opinions, floating_content, order)
     return opinions
 
 
-def merge_opinions(opinions: list, content: list) -> list:
+def merge_opinions(
+    opinions: list, content: list, current_order: int
+) -> tuple[list, int]:
     """Merge last and previous opinion if are the same type or create a new opinion
     if merge is not possible
     :param opinions: list of opinions that is being updated constantly
     :param content: list of opinions without an author
+    :param current_order: opinion position
     :return: updated list of opinions
     """
 
@@ -382,10 +394,12 @@ def merge_opinions(opinions: list, content: list) -> list:
             "opinion": "\n".join(
                 [f.get("opinion") for f in content if f.get("opinion")]
             ),
+            "order": current_order,
         }
         opinions.append(new_opinion)
+        current_order = current_order + 1
 
-    return opinions
+    return opinions, current_order
 
 
 def prepare_opinions_found(extracted_opinions: list) -> list:
@@ -396,6 +410,7 @@ def prepare_opinions_found(extracted_opinions: list) -> list:
 
     opinions: list = []
     authorless_content = []
+    order = 0
 
     for i, found_content in enumerate(extracted_opinions, start=1):
         byline = found_content.get("byline")
@@ -426,8 +441,8 @@ def prepare_opinions_found(extracted_opinions: list) -> list:
                 # for example: in 2713f39c5a8e8684.xml we have an opinion
                 # without an author, and the next opinion with an author is
                 # a dissent opinion, we can't combine both
-                opinions = merge_opinions(
-                    opinions, alternative_authorless_content
+                opinions, order = merge_opinions(
+                    opinions, alternative_authorless_content, order
                 )
 
             # Add new opinion
@@ -443,16 +458,20 @@ def prepare_opinions_found(extracted_opinions: list) -> list:
                 )
                 + "\n\n"
                 + opinion_content,
+                "order": order,
             }
 
             opinions.append(new_opinion)
+            order = order + 1
             authorless_content = []
 
         if len(extracted_opinions) == i and authorless_content:
             # If is the last opinion, and we still have opinions without
             # byline, create an opinion without an author and the contents
             # that couldn't be merged
-            opinions = merge_opinions(opinions, authorless_content)
+            opinions, order = merge_opinions(
+                opinions, authorless_content, order
+            )
 
     return opinions
 
@@ -765,14 +784,15 @@ def find_judge_and_type(columbia_data: dict):
 def format_additional_fields(data: dict, soup: BeautifulSoup):
     """Prepare data and rename key names to match model field names
     :param data: dict with data extracted from xml
-    :param soup: bs object
+    :param soup: bs object with all file content
     """
-    data["syllabus"] = "\n".join(
-        [s.decode_contents() for s in soup.findAll("syllabus")]
+    data["syllabus"] = (
+        "\n".join([s.decode_contents() for s in soup.findAll("syllabus")])
+        or ""
     )
     data["docket"] = "".join(data.get("docket", [])) or None
-    data["attorneys"] = "\n".join(data.get("attorneys", [])) or None
-    data["posture"] = "".join(data.get("posture", [])) or None
+    data["attorneys"] = "\n".join(data.get("attorneys", [])) or ""
+    data["posture"] = "".join(data.get("posture", [])) or ""
     data["case_name_full"] = (
         format_case_name("".join(data.pop("caption", []))) or ""
     )
@@ -782,3 +802,7 @@ def format_additional_fields(data: dict, soup: BeautifulSoup):
     data["panel"] = (
         extract_judge_last_name("".join(data.get("panel", []))) or []
     )
+    # Convert list of lists to list and titlecase names
+    judge_list = list(itertools.chain.from_iterable(data.get("judges", [])))
+    judge_list = list(map(titlecase, judge_list))
+    data["judges"] = ", ".join(sorted(list(set(judge_list))))

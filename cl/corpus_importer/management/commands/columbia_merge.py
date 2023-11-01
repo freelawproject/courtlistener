@@ -318,29 +318,6 @@ def map_and_merge_opinions(
         )
 
 
-def fetch_columbia_metadata(columbia_data: dict) -> dict[str, Any]:
-    """Extract only the desired fields
-    :param columbia_data: dict with columbia data
-    :return: reduced dict
-    """
-    data = {}
-
-    # List of fields that don't require any additional process
-    simple_fields = ["syllabus", "attorneys", "posture"]
-
-    # Convert list of lists to list and titlecase names
-    judge_list = list(
-        itertools.chain.from_iterable(columbia_data.get("judges", []))
-    )
-    judge_list = list(map(titlecase, judge_list))
-    data["judges"] = ", ".join(sorted(list(set(judge_list))))
-
-    for k, v in columbia_data.items():
-        if k in simple_fields:
-            data[k] = v if v else ""
-    return data
-
-
 def combine_non_overlapping_data(
     cluster: OpinionCluster, columbia_data: dict
 ) -> tuple[dict[str, tuple], dict[str, Any]]:
@@ -349,10 +326,16 @@ def combine_non_overlapping_data(
     :param columbia_data: The columbia data as json
     :return: Optional dictionary of data to continue to merge
     """
-    all_data = fetch_columbia_metadata(columbia_data)
+
+    # this function only applies to a few fields because some fields are processed
+    # into independent functions
+    fields_to_get = ["syllabus", "attorneys", "posture", "judges"]
+    fields_data = {
+        k: v for k, v in columbia_data.items() if k in fields_to_get
+    }
     changed_values_dictionary: dict[str, tuple] = {}
     new_values: dict[str, Any] = {}
-    for key, value in all_data.items():
+    for key, value in fields_data.items():
         cl_value = getattr(cluster, key)
         if not cl_value and value:
             # Value is empty in cl for key, we can add it directly to the object
@@ -550,7 +533,36 @@ def merge_judges(
     ) and columbia_clean != cl_clean:
         return {"judges": judges}
     elif not temp_columbia_clean.intersection(temp_cl_clean):
-        raise JudgeException("Judges are completely different.")
+        # Last resort, use distance between words to solve typos
+        cl_clean_list = list(cl_clean)
+        columbia_clean_list = list(columbia_clean)
+        judge_pairs = list(
+            itertools.product(cl_clean_list, columbia_clean_list)
+        )
+        success = False
+        for pair in judge_pairs:
+            s = SequenceMatcher(None, pair[0].lower(), pair[1].lower())
+            if s.ratio() >= 0.7:
+                # We found a match, we assume that the data in columbia is better,
+                # we keep the one from columbia and remove the one from cl
+                try:
+                    cl_clean_list.remove(pair[0])
+                except ValueError:
+                    # The value was removed in an earlier iteration, but we still
+                    # have the value in the remaining pairs to match, we simply
+                    # ignore it
+                    pass
+                success = True
+
+        if success:
+            # At least one success that matches the names, we can create a new judges
+            # list
+            new_judges_list = sorted(
+                list(set(cl_clean_list + columbia_clean_list))
+            )
+            return {"judges": titlecase(", ".join(new_judges_list))}
+        else:
+            raise JudgeException("Judges are completely different.")
 
     return {}
 
@@ -567,7 +579,7 @@ def merge_overlapping_data(
         # Empty dictionary means that we don't have overlapping data
         return {}
 
-    long_fields = ["syllabus", "posture", "judges"]
+    long_fields = ["syllabus", "posture"]
 
     data_to_update = {}
 
@@ -727,7 +739,7 @@ def process_cluster(
             overlapping_data_to_update = merge_overlapping_data(
                 cluster, changed_values_dictionary
             )
-            # panel
+            # update cluster panel
             if columbia_data["panel"]:
                 update_cluster_panel(
                     cluster,
@@ -771,6 +783,8 @@ def process_cluster(
         logger.warning(
             msg=f"Cluster source exception for cluster id: {cluster_id}"
         )
+    except JudgeException:
+        logger.warning(msg=f"Judge exception for cluster id: {cluster_id}")
 
 
 def merge_columbia_into_cl(options) -> None:
@@ -797,9 +811,8 @@ def merge_columbia_into_cl(options) -> None:
         if not start:
             continue
 
-        # TODO
-        # xml_path = f"{xml_dir}/documents/{filepath}"
-        xml_path = filepath
+        # filepath example: indiana\court_opinions\documents\2713f39c5a8e8684.xml
+        xml_path = os.path.join(xml_dir, filepath)
         if not os.path.exists(xml_path):
             logger.warning(f"No file at: {xml_path}, Cluster: {cluster_id}")
             continue
@@ -835,7 +848,7 @@ class Command(VerboseCommand):
 
         parser.add_argument(
             "--limit",
-            default=1,
+            default=10000,
             type=int,
             help="Limit number of files to merge",
             required=False,
