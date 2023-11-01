@@ -1,9 +1,13 @@
 import re
 from datetime import date
-from typing import Any
+from typing import Any, Optional
 
 import dateutil.parser as dparser
-from juriscraper.lib.string_utils import clean_string
+from bs4 import BeautifulSoup, NavigableString, Tag
+from juriscraper.lib.string_utils import clean_string, harmonize, titlecase
+
+from cl.lib.command_utils import logger
+from cl.people_db.lookup_utils import extract_judge_last_name
 
 FILED_TAGS = [
     "filed",
@@ -192,6 +196,321 @@ UNKNOWN_TAGS = [
 ]
 
 
+SIMPLE_TAGS = [
+    "attorneys",
+    "caption",
+    "citation",
+    "court",
+    "date",
+    "docket",
+    "hearing_date",
+    "panel",
+    "posture",
+    "reporter_caption",
+]
+
+
+def format_case_name(name: str) -> str:
+    """Applies standard harmonization methods after normalizing with
+    lowercase.
+    :param name: case name
+    :return: title cased name
+    """
+    return titlecase(harmonize(name.lower()))
+
+
+def is_opinion_published(soup: BeautifulSoup) -> bool:
+    """Check if opinion is unpublished or published
+    :param soup: The XML object
+    :return: Published or Unpublished
+    """
+    opinion_tag = soup.find("opinion")
+
+    if opinion_tag:
+        if opinion_tag.get("unpublished") == "true":
+            return False
+        if opinion_tag.find("unpublished"):
+            return False
+    return True
+
+
+def read_xml_to_soup(filepath: str) -> BeautifulSoup:
+    """This function fixes the bad tags in columbia xml files
+    :param filepath: path to xml file
+    :return: string with content
+    """
+    with open(filepath, "r", encoding="utf-8") as f:
+        file_content = f.read()
+        # Sometimes opening and ending tag mismatch (e.g. ed7c6b39dcb29c9c.xml)
+        file_content = file_content.replace(
+            "</footnote_body></block_quote>", "</block_quote></footnote_body>"
+        )
+        # Fix opinion with invalid attribute
+        if "<opinion unpublished=true>" in file_content:
+            file_content = file_content.replace(
+                "<opinion unpublished=true>", "<opinion unpublished='true'>"
+            )
+            file_content = file_content.replace("<unpublished>", "").replace(
+                "</unpublished>", ""
+            )
+    return BeautifulSoup(file_content, "lxml")
+
+
+def add_floating_opinion(opinions: list, floating_content: list) -> list:
+    """We have found floating opinions in bs object, we keep the opinion content as a
+    new opinion
+    :param opinions: a list with opinions found
+    :param floating_content: content that is not in known non-opinion tags
+    :return: updated list of opinions
+    """
+
+    op_type = "opinion"
+    if opinions:
+        if opinions[-1].get("type"):
+            # Use type of previous opinion if exists
+            op_type = opinions[-1].get("type")
+
+    # Get rid of double spaces from floating content
+    opinion_content = re.sub(
+        " +", " ", "\n".join(floating_content)
+    ).strip()  # type: str
+    if opinion_content:
+        opinions.append(
+            {
+                "opinion": opinion_content,
+                "byline": "",
+                "type": op_type,
+            }
+        )
+    return opinions
+
+
+def extract_opinions(outer_opinion: BeautifulSoup) -> list[Optional[dict]]:
+    """We extract all possible opinions from bs content, with and without author,
+    and we create new opinions if floating content exists
+    :param outer_opinion: element containing all xml tags
+    :return: list of opinion dicts
+    """
+    opinions: list = []
+    floating_content = []
+
+    # We iterate all content to look for all possible opinions
+    for i, content in enumerate(outer_opinion):  # type: int, Tag
+        if type(content) == NavigableString:
+            # We found a raw string, store it
+            floating_content.append(str(content))
+        else:
+            if content.name in SIMPLE_TAGS + [
+                "citation_line",
+                "opinion_byline",
+                "dissent_byline",
+                "concurrence_byline",
+            ]:
+                # Ignore these tags, it will be processed later
+                continue
+            elif content.name in [
+                "opinion_text",
+                "dissent_text",
+                "concurrence_text",
+            ]:
+                if floating_content:
+                    # We have found an opinion, but there is floating content, we
+                    # create a dict with the opinion using the floating content with
+                    # default type = "opinion"
+                    opinions = add_floating_opinion(opinions, floating_content)
+                    floating_content = []
+
+                byline = content.find_previous_sibling()
+                opinion_author = ""
+                if byline and "_byline" in byline.name:
+                    opinion_author = byline.get_text()
+
+                opinion_content = re.sub(
+                    " +", " ", content.decode_contents()
+                ).strip()
+                if opinion_content:
+                    # Now we create a dict with current opinion
+                    opinions.append(
+                        {
+                            "opinion": opinion_content,
+                            "byline": opinion_author,
+                            "type": content.name.replace("_text", ""),
+                        }
+                    )
+
+            else:
+                if content.name not in SIMPLE_TAGS + ["syllabus"]:
+                    # We store content that is not inside _text tag and is not in
+                    # one of the known non-opinion tags
+                    floating_content.append(str(content))
+
+    # Combine the new content into another opinion. great.
+    if floating_content:
+        # If we end to go through all the found opinions and if we still have
+        # floating content out there, we create a new opinion with the last type
+        # of opinion
+        opinions = add_floating_opinion(opinions, floating_content)
+    return opinions
+
+
+def merge_opinions(opinions: list, content: list) -> list:
+    """Merge last and previous opinion if are the same type or create a new opinion
+    if merge is not possible
+    :param opinions: list of opinions that is being updated constantly
+    :param content: list of opinions without an author
+    :return: updated list of opinions
+    """
+
+    # We check if the previous stored opinion matches the type of the
+    # content, and we store the opinion dict temporary
+    relevant_opinions = (
+        [opinions[-1]]
+        if opinions and opinions[-1]["type"] == content[0].get("type")
+        else []
+    )
+
+    if relevant_opinions:
+        relevant_opinions[-1]["opinion"] += "\n" + "\n".join(
+            [f.get("opinion") for f in content if f.get("opinion")]
+        )
+
+    else:
+        # No relevant opinions found, create a new opinion with the content
+        new_opinion = {
+            "byline": None,
+            "type": content[0].get("type"),
+            "opinion": "\n".join(
+                [f.get("opinion") for f in content if f.get("opinion")]
+            ),
+        }
+        opinions.append(new_opinion)
+
+    return opinions
+
+
+def prepare_opinions_found(extracted_opinions: list) -> list:
+    """We read the opinions found, and we combine or create floating opinions
+    :param extracted_opinions: list of opinions obtained from xml file
+    :return:
+    """
+
+    opinions: list = []
+    authorless_content = []
+
+    for i, found_content in enumerate(extracted_opinions, start=1):
+        byline = found_content.get("byline")
+        if not byline:
+            # Opinion has no byline, store opinion content
+            authorless_content.append(found_content)
+
+        if byline:
+            # Opinion has byline, get opinion type and content
+            opinion_type = found_content.get("type")
+            opinion_content = found_content.get("opinion", "")
+            # Store content that doesn't match the current opinion type
+            alternative_authorless_content = [
+                content
+                for content in authorless_content
+                if content.get("type") != opinion_type
+            ]
+            # Keep content that matches the current type
+            authorless_content = [
+                op_content
+                for op_content in authorless_content
+                if op_content.get("type") == opinion_type
+            ]
+
+            if alternative_authorless_content:
+                # Keep floating text that are not from the same type,
+                # we need to create a separate opinion for those,
+                # for example: in 2713f39c5a8e8684.xml we have an opinion
+                # without an author, and the next opinion with an author is
+                # a dissent opinion, we can't combine both
+                opinions = merge_opinions(
+                    opinions, alternative_authorless_content
+                )
+
+            # Add new opinion
+            new_opinion = {
+                "byline": byline,
+                "type": opinion_type,
+                "opinion": "\n".join(
+                    [
+                        f.get("opinion")
+                        for f in authorless_content
+                        if f.get("type") == opinion_type
+                    ]
+                )
+                + "\n\n"
+                + opinion_content,
+            }
+
+            opinions.append(new_opinion)
+            authorless_content = []
+
+        if len(extracted_opinions) == i and authorless_content:
+            # If is the last opinion, and we still have opinions without
+            # byline, create an opinion without an author and the contents
+            # that couldn't be merged
+            opinions = merge_opinions(opinions, authorless_content)
+
+    return opinions
+
+
+def fix_simple_tags(soup: BeautifulSoup, columbia_data: dict):
+    """Parse and store data from SIMPLE_TAGS
+    :param soup: bs element containing all xml tags
+    :param columbia_data: a dict that contains all parsed data
+    """
+    for tag in SIMPLE_TAGS:
+        found_tags = soup.findAll(tag)
+        for found_tag in found_tags:
+            # remove inner <citation> and <page_number> tags and content
+            extra_tags_to_remove = found_tag.findAll(
+                ["citation", "page_number"]
+            )
+            if extra_tags_to_remove:
+                for r in extra_tags_to_remove:
+                    if tag == "reporter_caption":
+                        # The reporter_caption may contain the location, and we need
+                        # to remove it to make the name cleaner, e.g. Tex.App.-Ft.
+                        # Worth [2d Dist.] 2002
+                        if r.next_sibling:
+                            if type(r.next_sibling) == NavigableString:
+                                # The element is not tagged, it is just a text
+                                # string
+                                r.next_sibling.extract()
+                    r.extract()
+
+        # We use space as a separator to add a space when we have one tag next to
+        # other without a space
+        columbia_data[tag] = [
+            found_tag.get_text(separator=" ").strip()
+            for found_tag in found_tags
+        ]
+
+        if tag in ["attorneys", "posture"]:
+            # Replace multiple line breaks in this specific fields
+            columbia_data[tag] = [
+                re.sub("\n+", " ", c) for c in columbia_data.get(tag, [])
+            ]
+
+        if tag in ["reporter_caption"]:
+            # Remove the last comma from the case name
+            columbia_data[tag] = [
+                c.rstrip(",") for c in columbia_data.get(tag, [])
+            ]
+
+        # Remove repeated spaces
+        columbia_data[tag] = [
+            re.sub(" +", " ", c) for c in columbia_data.get(tag, [])
+        ]
+
+        if tag == "citation":
+            # Remove duplicated citations,
+            columbia_data[tag] = list(set(columbia_data[tag]))
+
+
 def convert_columbia_html(text: str, opinion_index: int) -> str:
     """Convert xml tags to html tags and process additional data from opinions
     like footnotes,
@@ -339,3 +658,127 @@ def parse_dates(
         dates.append(inner_dates)
 
     return dates
+
+
+def extract_dates(columbia_data: dict):
+    """Extract and parse all possible dates obtained from xml file
+    :param columbia_data: a dict that contains all parsed data
+    """
+    dates = columbia_data.get("date", []) + columbia_data.get(
+        "hearing_date", []
+    )
+    parsed_dates = parse_dates(dates)
+    current_year = date.today().year
+    date_filed = (
+        date_argued
+    ) = (
+        date_reargued
+    ) = date_reargument_denied = date_cert_granted = date_cert_denied = None
+    unknown_date = None
+
+    for date_cluster in parsed_dates:
+        for date_info in date_cluster:
+            # check for any dates that clearly aren't dates
+            if date_info[1].year < 1600 or date_info[1].year > current_year:
+                continue
+            # check for untagged dates that will be assigned to date_filed
+            if date_info[0] is None:
+                date_filed = date_info[1]
+                continue
+            # try to figure out what type of date it is based on its tag string
+            if date_info[0] in FILED_TAGS:
+                date_filed = date_info[1]
+            elif date_info[0] in DECIDED_TAGS:
+                if not date_filed:
+                    date_filed = date_info[1]
+            elif date_info[0] in ARGUED_TAGS:
+                date_argued = date_info[1]
+            elif date_info[0] in REARGUE_TAGS:
+                date_reargued = date_info[1]
+            elif date_info[0] in REARGUE_DENIED_TAGS:
+                date_reargument_denied = date_info[1]
+            elif date_info[0] in CERT_GRANTED_TAGS:
+                date_cert_granted = date_info[1]
+            elif date_info[0] in CERT_DENIED_TAGS:
+                date_cert_denied = date_info[1]
+            else:
+                unknown_date = date_info[1]
+                if date_info[0] not in UNKNOWN_TAGS:
+                    logger.info(
+                        f"Found unknown date tag {date_info[0]} with date {date_info[1]} in file FILEPATH?"
+                    )
+
+    # the main date (used for date_filed in OpinionCluster) and panel dates
+    # (used for finding judges) are ordered in terms of which type of dates
+    # best reflect them
+    main_date = (
+        date_filed
+        or date_argued
+        or date_reargued
+        or date_reargument_denied
+        or unknown_date
+    )
+    panel_date = (
+        date_argued
+        or date_reargued
+        or date_reargument_denied
+        or date_filed
+        or unknown_date
+    )
+
+    columbia_data["date_filed"] = main_date
+    columbia_data["date_cert_granted"] = date_cert_granted
+    columbia_data["date_cert_denied"] = date_cert_denied
+    columbia_data["panel_date"] = panel_date if panel_date else None
+
+
+def find_judge_and_type(columbia_data: dict):
+    """Find judges from opinions and map opinion type to model field choice
+    :param columbia_data: a dict that contains all parsed data
+    """
+
+    columbia_data["judges"] = []
+    lead = False
+    for op in columbia_data.get("opinions", []):
+        op_type = op.get("type")
+
+        op_byline = op.get("byline")
+        if op_byline:
+            judge_name = extract_judge_last_name(op_byline)
+            if judge_name not in columbia_data["judges"]:
+                columbia_data["judges"].append(judge_name)
+
+        # only first opinion with "opinion" type is a lead opinion, the next opinion
+        # with "opinion" type is an addendum
+        if not lead and op_type and op_type == "opinion":
+            lead = True
+            op["type"] = "020lead"
+            continue
+        elif lead and op_type and op_type == "opinion":
+            op["type"] = "050addendum"
+        elif op_type and op_type == "dissent":
+            op["type"] = "040dissent"
+        elif op_type and op_type == "concurrence":
+            op["type"] = "030concurrence"
+
+
+def format_additional_fields(data: dict, soup: BeautifulSoup):
+    """Prepare data and rename key names to match model field names
+    :param data: dict with data extracted from xml
+    :param soup: bs object
+    """
+    data["syllabus"] = "\n".join(
+        [s.decode_contents() for s in soup.findAll("syllabus")]
+    )
+    data["docket"] = "".join(data.get("docket", [])) or None
+    data["attorneys"] = "\n".join(data.get("attorneys", [])) or None
+    data["posture"] = "".join(data.get("posture", [])) or None
+    data["case_name_full"] = (
+        format_case_name("".join(data.pop("caption", []))) or ""
+    )
+    data["case_name"] = (
+        format_case_name("".join(data.pop("reporter_caption", []))) or ""
+    )
+    data["panel"] = (
+        extract_judge_last_name("".join(data.get("panel", []))) or []
+    )
