@@ -337,7 +337,8 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIn("3 Cases", r.content.decode())
         # 3 Docket entries in count.
         self.assertIn("3 Docket", r.content.decode())
-        empty_docket.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            empty_docket.delete()
 
     def test_sorting(self) -> None:
         """Can we do sorting on various fields?"""
@@ -719,7 +720,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # test the combination of the text query and the available_only filter
         params = {
             "type": SEARCH_TYPES.RECAP,
-            "q": "Voluntary Hospitals",
+            "q": '"Voluntary Hospitals"',
             "available_only": True,
         }
         r = async_to_sync(self._test_article_count)(
@@ -915,7 +916,8 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         # Remove 1 RECAPDocument to ensure the docket does not contain more than
         # VIEW_MORE_CHILD_HITS entries.
-        rd_1.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            rd_1.delete()
         # View additional results query:
         params = {
             "type": SEARCH_TYPES.RECAP,
@@ -930,10 +932,11 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertNotIn("See full docket for details", r.content.decode())
         self.assertNotIn("View Additional Results for", r.content.decode())
 
-        rd_2.delete()
-        rd_3.delete()
-        rd_4.delete()
-        rd_5.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            rd_2.delete()
+            rd_3.delete()
+            rd_4.delete()
+            rd_5.delete()
 
     async def test_advanced_queries(self) -> None:
         """Confirm advance queries works properly"""
@@ -1295,9 +1298,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             < r.content.decode().index("12-1237"),
             msg="'12-1235' should come BEFORE '1:21-bk-1234' when order_by entry_date_filed asc.",
         )
-
-        rd_4.docket_entry.docket.delete()
-        empty_docket.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            rd_4.docket_entry.docket.delete()
+            empty_docket.delete()
 
         # Order by dateFiled desc
         params = {
@@ -1331,7 +1334,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             < r.content.decode().index("12-1235"),
             msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by dateFiled asc.",
         )
-        de_4.delete()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            de_4.delete()
 
     @mock.patch("cl.lib.es_signal_processor.chain")
     def test_avoid_updating_docket_in_es_on_view_count_increment(
@@ -1339,17 +1344,18 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
     ) -> None:
         """Confirm a docket is not updated in ES on a view_count increment."""
 
-        docket = DocketFactory(
-            court=self.court,
-            case_name="Lorem Ipsum",
-            case_name_full="Jackson & Sons Holdings vs. Bank",
-            date_filed=datetime.date(2015, 8, 16),
-            date_argued=datetime.date(2013, 5, 20),
-            docket_number="1:21-bk-1234",
-            assigned_to=None,
-            referred_to=None,
-            nature_of_suit="440",
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            docket = DocketFactory(
+                court=self.court,
+                case_name="Lorem Ipsum",
+                case_name_full="Jackson & Sons Holdings vs. Bank",
+                date_filed=datetime.date(2015, 8, 16),
+                date_argued=datetime.date(2013, 5, 20),
+                docket_number="1:21-bk-1234",
+                assigned_to=None,
+                referred_to=None,
+                nature_of_suit="440",
+            )
         # Restart save chain mock count.
         mock_es_save_chain.reset_mock()
         self.assertEqual(mock_es_save_chain.call_count, 0)
@@ -1362,7 +1368,8 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         # The save chain shouldn't be called.
         self.assertEqual(mock_es_save_chain.call_count, 0)
-        docket.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            docket.delete()
 
 
 class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):
