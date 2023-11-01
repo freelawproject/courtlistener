@@ -42,7 +42,7 @@ django-filter = "^21.1"
 django-localflavor = "^4.0"
 django-markdown-deux = "^1.0.6"
 django-mathfilters = "*"
-django-pghistory = "^2.8.0"
+django-pghistory = "^2.9.0"
 django-ratelimit = "^4.1.0"
 django-storages = "^1.13.2"
 djangorestframework = {git = "https://github.com/encode/django-rest-framework.git", rev = "cc3c89a11c7ee9cf7cfd732e0a329c318ace71b2"}
@@ -108,7 +108,7 @@ dateparser = "1.1.8"
 types-dateparser = "^1.1.4.6"
 uvicorn = {extras = ["standard"], version = "^0.23.2"}
 daphne = "^4.0.0"
-psycopg2 = "^2.9.7"
+psycopg = {extras = ["binary"], version = "^3.1.12"}
 juriscraper = "^2.5.54"
 httpx = {extras = ["http2"], version = "^0.24.1"}
 django-model-utils = "^4.3.1"
