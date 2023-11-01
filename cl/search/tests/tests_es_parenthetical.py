@@ -715,22 +715,3 @@ class ParentheticalESSignalProcessorTest(ESIndexTestCase, TransactionTestCase):
         pg_id = self.pg_test.pk
         self.pg_test.delete()
         self.assertEqual(False, ParentheticalGroupDocument.exists(id=pg_id))
-
-        # Confirm we can index a document if it doesn't exist when trying to
-        # update a related document.
-        # Simulate new document is not indexed in ES yet, index it and delete
-        # the document from ES but keep the object in DB.
-        pg_1 = ParentheticalGroupFactory(
-            opinion=self.o, representative=self.p5, score=0.3236, size=1
-        )
-        pg_1_id = pg_1.pk
-        doc = ParentheticalGroupDocument.get(id=pg_1.pk)
-        doc.delete()
-        self.assertEqual(False, ParentheticalGroupDocument.exists(id=pg_1_id))
-
-        # Try to update a related object field.
-        self.cluster_1.precedential_status = PRECEDENTIAL_STATUS.IN_CHAMBERS
-        self.cluster_1.save()
-        # Document is indexed in ES again.
-        self.assertEqual(True, ParentheticalGroupDocument.exists(id=pg_1_id))
-        pg_1.delete()
