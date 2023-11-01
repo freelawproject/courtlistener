@@ -465,7 +465,7 @@ def update_es_document(
         model_label = es_document.Django.model.__name__.capitalize()
         logger.warning(
             f"The {model_label} with ID:{main_instance_id} can't updated. "
-            "It has been removed from the index."
+            "It's not indexed."
         )
         return
 
