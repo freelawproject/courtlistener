@@ -749,7 +749,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         with self.captureOnCommitCallbacks(execute=True):
             docket = DocketFactory(
                 court=self.court,
-                case_name="NYU Hospitals Center v. League of Voluntary Hospitals",
+                case_name="Mott v. NYU Hospitals Center",
                 date_filed=datetime.date(2015, 8, 16),
                 date_argued=datetime.date(2013, 5, 20),
                 docket_number="1:17-cv-04465",
@@ -759,7 +759,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2015, 8, 19),
-                description="United Healthcare Workers East, League of Voluntary Hospitals and Homes of New York",
+                description="COMPLAINT against NYU Hospitals Center, Tisch Hospital",
             )
             RECAPDocumentFactory(
                 docket_entry=e_1_d_1,
@@ -771,7 +771,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 docket=docket,
                 entry_number=2,
                 date_filed=datetime.date(2015, 8, 19),
-                description="Not available document for the League of Voluntary Hospitals and Homes of New York",
+                description="Not available document for Mott v. NYU Hospitals Center",
             )
             RECAPDocumentFactory(
                 docket_entry=e_2_d_1,
@@ -783,7 +783,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         params = {
             "type": SEARCH_TYPES.RECAP,
             "q": "hospital",
-            "description": "voluntary",
+            "description": "center",
             "party_name": "Frank Paul Sabatini",
         }
 
