@@ -733,6 +733,39 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             docket_2.delete()
             docket_3.delete()
 
+    def test_filter_docket_with_no_documents(self) -> None:
+        """Confirm we can filter dockets with no documents"""
+
+        # Add dockets with no documents
+        with self.captureOnCommitCallbacks(execute=True):
+            docket = DocketFactory(
+                court=self.court,
+                case_name="Ready Mix Hampton",
+                date_filed=datetime.date(2021, 8, 16),
+            )
+            BankruptcyInformationFactory(docket=docket, chapter="7")
+
+            docket_2 = DocketFactory(
+                court=self.court,
+                case_name="Ready Mix Hampton",
+                date_filed=datetime.date(2021, 8, 16),
+            )
+            BankruptcyInformationFactory(docket=docket_2, chapter="8")
+
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "chapter:7",
+            "court": f"{self.court.pk} innb",
+            "case_name": "ready mix",
+            "filed_after": datetime.date(2020, 1, 1),
+        }
+        async_to_sync(self._test_article_count)(
+            cd, 1, "court + case_name + filed_after + query_string"
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            docket.delete()
+            docket_2.delete()
+
     async def test_party_name_filter(self) -> None:
         """Confirm party_name filter works properly"""
 
