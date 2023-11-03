@@ -79,7 +79,7 @@ from cl.lib.recap_utils import (
     get_docket_filename,
     get_document_filename,
 )
-from cl.lib.redis_utils import delete_redis_semaphore
+from cl.lib.redis_utils import delete_redis_semaphore, make_redis_interface
 from cl.lib.types import TaskData
 from cl.people_db.models import Attorney, Role
 from cl.recap.constants import CR_2017, CR_OLD, CV_2017, CV_2020, CV_OLD
@@ -1145,6 +1145,7 @@ def make_docket_by_iquery(
     pacer_case_id: int,
     using: str = "default",
     tag_names: Optional[List[str]] = None,
+    log_results_redis: bool = False,
 ) -> Optional[int]:
     """
     Using the iquery endpoint, create or update a docket
@@ -1155,6 +1156,7 @@ def make_docket_by_iquery(
     :param using: The database to use for the docket lookup
     :param tag_names: A list of strings that should be added to the docket as
     tags
+    :param log_results_redis: Log results in redis for the ready mix project
     :return: None if failed, else the ID of the created/updated docket
     """
     cookies = get_or_cache_pacer_cookies(
@@ -1179,13 +1181,21 @@ def make_docket_by_iquery(
             return None
         raise self.retry(exc=exc)
 
+    r = make_redis_interface("CACHE")
     if not report.data:
         logger.info(
             "No valid data found in iquery page for %s.%s",
             court_id,
             pacer_case_id,
         )
+        if log_results_redis:
+            # Increase iquery_empty_results for this court in Redis
+            r.hincrby("iquery_empty_results", court_id, 1)
         return None
+
+    if log_results_redis:
+        # Restart iquery_empty_results if got a valid iquery page.
+        r.hset("iquery_empty_results", court_id, 0)
 
     d = async_to_sync(find_docket_object)(
         court_id,
@@ -1202,6 +1212,7 @@ def make_docket_by_iquery(
         d,
         tag_names,
         add_to_solr=True,
+        log_results_redis=True,
     )
 
 

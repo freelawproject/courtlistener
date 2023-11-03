@@ -26,6 +26,7 @@ from cl.lib.pacer import (
     normalize_attorney_role,
 )
 from cl.lib.privacy_tools import anonymize
+from cl.lib.redis_utils import make_redis_interface
 from cl.lib.timezone_helpers import localize_date_and_time
 from cl.lib.utils import previous_and_next, remove_duplicate_dicts
 from cl.people_db.lookup_utils import lookup_judge_by_full_name_and_set_attr
@@ -1604,6 +1605,7 @@ def save_iquery_to_docket(
     d: Docket,
     tag_names: Optional[List[str]],
     add_to_solr: bool = False,
+    log_results_redis=False,
 ) -> Optional[int]:
     """Merge iquery results into a docket
 
@@ -1612,11 +1614,16 @@ def save_iquery_to_docket(
     :param d: A docket object to work with
     :param tag_names: Tags to add to the items
     :param add_to_solr: Whether to save the completed docket to solr
+    :param log_results_redis: Log results in redis for the ready mix project
     :return: The pk of the docket if successful. Else, None.
     """
     d = async_to_sync(update_docket_metadata)(d, iquery_data)
     try:
         d.save()
+        if log_results_redis:
+            # Log the Docket id in Redis.
+            r = make_redis_interface("CACHE")
+            r.sadd("iquery_dockets", d.pk)
         add_bankruptcy_data_to_docket(d, iquery_data)
     except IntegrityError as exc:
         msg = "Integrity error while saving iquery response."
