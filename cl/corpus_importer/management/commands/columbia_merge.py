@@ -42,15 +42,14 @@ from cl.corpus_importer.utils import (
     JudgeException,
     OpinionMatchingException,
     OpinionTypeException,
+    match_text_lists,
     merge_case_names,
     merge_docket_numbers,
     merge_judges,
     merge_long_fields,
     merge_strings,
-    similarity_scores,
 )
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.string_diff import get_cosine_similarity
 from cl.people_db.lookup_utils import (
     find_just_name,
     lookup_judges_by_last_name_list,
@@ -203,60 +202,6 @@ def update_matching_opinions(
         )
         op.html_columbia = str(converted_text)
         op.save()
-
-
-def match_text_lists(
-    file_opinions_list: list[Any], cl_opinions_list: list[Any]
-) -> dict[int, int]:
-    """Generate matching lists above threshold
-
-    :param file_opinions_list: Opinions from file
-    :param cl_opinions_list: CL opinions
-    :return: Matches if found or empty dict
-    """
-    # We import this here to avoid a circular import
-    from cl.corpus_importer.management.commands.harvard_opinions import (
-        compare_documents,
-    )
-
-    scores = similarity_scores(file_opinions_list, cl_opinions_list)
-
-    matches = {}
-    for i, row in enumerate(scores):
-        j = row.argmax()  # type: ignore
-        # Lower threshold for small opinions.
-        # Remove non-alphanumeric and non-whitespace characters from lowercased text,
-        # this tries to make both texts in equal conditions to prove if both are
-        # similar or equal
-        file_opinion = re.sub(
-            r"[^a-zA-Z0-9 ]", "", file_opinions_list[i].lower()
-        )
-        cl_opinion = re.sub(r"[^a-zA-Z0-9 ]", "", cl_opinions_list[j].lower())
-
-        # NOTE: get_cosine_similarity works great when both texts are almost the same
-        # with very small variations
-        cosine_sim = get_cosine_similarity(file_opinion, cl_opinion)
-        # NOTE: compare_documents works good when the opinion from the file is a
-        # subset of the opinion in CL, the percentage represents how much of the
-        # opinion of the file is in the opinion from cl (content in cl opinion can
-        # have other data in the body like posture, attorneys, etc. e.g. in cluster
-        # id: 7643871 we have the posture and the opinion text but in the xml file we
-        # only have the opinion text, cosine_sim: 0.1639075094124459 and
-        # percent_match: 73)
-        percent_match = compare_documents(file_opinion, cl_opinion)
-
-        # Sometimes one algorithm performs better than the other, this is due to some
-        # additional text, such as editor's notes, or the author, page number or posture
-        # added to the opinion
-        if cosine_sim < 0.60 and percent_match < 60:
-            continue
-
-        matches[i] = j
-
-    # Key is opinion position from file, Value is opinion position from cl opinion
-    # e.g. matches {0: 1, 1: 2} 0 is file opinion and 1 in cl opinion, 1 is file
-    # opinion and 2 is cl opinion
-    return matches
 
 
 def map_and_merge_opinions(
@@ -530,11 +475,6 @@ def process_cluster(
     map_opinion_types(columbia_data)
     fix_simple_tags(soup, columbia_data)
     extract_dates(columbia_data)
-
-    if not columbia_data["date_filed"]:
-        logger.warning(msg=f"No Date found {filepath}, Cluster: {cluster_id}")
-        return
-
     format_additional_fields(columbia_data, soup)
 
     try:
@@ -545,23 +485,18 @@ def process_cluster(
                 changed_values_dictionary,
                 new_values,
             ) = combine_non_overlapping_data(cluster, columbia_data)
-            # docket number
             if columbia_data["docket"]:
                 merge_docket_numbers(cluster, columbia_data["docket"])
-            # case names
             case_names_to_update = merge_case_names(
                 cluster,
                 columbia_data,
                 case_name_key="case_name",
                 case_name_full_key="case_name_full",
             )
-            # date filed
             date_filed_to_update = merge_date_filed(cluster, columbia_data)
-            # overlapping data
             overlapping_data_to_update = merge_overlapping_data(
                 cluster, changed_values_dictionary
             )
-            # update cluster panel
             if columbia_data["panel"]:
                 update_cluster_panel(
                     cluster,

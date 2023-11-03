@@ -4,7 +4,6 @@ from datetime import date
 from difflib import SequenceMatcher
 from typing import Any, Iterator, Optional
 
-import bs4
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import harmonize, titlecase
 
@@ -233,42 +232,60 @@ def similarity_scores(
     return scores
 
 
-def match_lists(
-    harvard_opinions_list: list[bs4.element.Tag], cl_opinions_list: list[str]
-) -> dict[int, Any]:
+def match_text_lists(
+    file_opinions_list: list[Any], cl_opinions_list: list[Any]
+) -> dict[int, int]:
     """Generate matching lists above threshold
 
-    :param harvard_opinions_list: Harvard Opinions
+    Remove non-alphanumeric and non-whitespace characters from lowercased text,
+    this tries to make both texts in equal conditions to prove if both are similar or
+    equal
+
+    get_cosine_similarity works great when both texts are almost the same with very
+    small variations
+
+    Sometimes cosine similarity fails when there are small variations in text,
+    such as parties, attorneys, case name, or court that are included in the content
+    of the opinion, compare_documents() checks the percentage of the harvard opinion
+    text that it is in courtlistener opinion, having a large percentage means that
+    almost all the harvard opinion is in courtlistener opinion, but there is a
+    possibility that the courtlistener opinion contains some additional data in que
+    opinion content (such as case name, parties, etc.)
+
+    compare_documents works good when the opinion from the file is a subset of the
+    opinion in CL, the percentage represents how much of the opinion of the file is
+    in the opinion from cl (content in cl opinion can have other data in the body
+    like posture, attorneys, etc. e.g. in cluster id: 7643871 we have the posture and
+    the opinion text but in the xml file we only have the opinion text, cosine_sim:
+    0.1639075094124459 and percent_match: 73)
+
+    Sometimes one algorithm performs better than the other, this is due to some
+    additional text, such as editor's notes, or the author, page number or posture
+    added to the opinion
+
+    Key is opinion position from file, Value is opinion position from cl opinion e.g.
+    matches {0: 1, 1: 2} 0 is file opinion and 1 in cl opinion, 1 is file opinion and
+    2 is cl opinion
+
+    :param file_opinions_list: Opinions from file
     :param cl_opinions_list: CL opinions
-    :return: Matches if found or False
+    :return: Matches if found or empty dict
     """
 
-    # Convert harvard HTML to Text to compare
-    harvard_opinions_list = [h.getText() for h in harvard_opinions_list]
-    scores = similarity_scores(harvard_opinions_list, cl_opinions_list)
+    scores = similarity_scores(file_opinions_list, cl_opinions_list)
 
     matches = {}
     for i, row in enumerate(scores):
         j = row.argmax()  # type: ignore
-        # Lower threshold for small opinions.
-        # Remove non-alphanumeric and non-whitespace characters from lowercased text,
-        # this tries to make both texts in equal conditions to prove if both are
-        # similar or equal
-        h_opinion = re.sub(
-            r"[^a-zA-Z0-9 ]", "", harvard_opinions_list[i].lower()
+        file_opinion = re.sub(
+            r"[^a-zA-Z0-9 ]", "", file_opinions_list[i].lower()
         )
         cl_opinion = re.sub(r"[^a-zA-Z0-9 ]", "", cl_opinions_list[j].lower())
 
-        cosine_sim = get_cosine_similarity(h_opinion, cl_opinion)
-        percent_match = compare_documents(h_opinion, cl_opinion)
+        cosine_sim = get_cosine_similarity(file_opinion, cl_opinion)
 
-        # Sometimes cosine similarity fails when there are small variations in text,
-        # such as parties, attorneys, case name, or court that are included in the
-        # content of the opinion, compare_documents() checks the percentage of the
-        # harvard opinion text that it is in courtlistener opinion, having a large
-        # percentage means that almost all the harvard opinion is in courtlistener
-        # opinion, but there is a possibility that the courtlistener opinion contains
-        # some additional data in que opinion content (such as case name, parties, etc.)
+        percent_match = compare_documents(file_opinion, cl_opinion)
+
         if cosine_sim < 0.60 and percent_match < 60:
             continue
 

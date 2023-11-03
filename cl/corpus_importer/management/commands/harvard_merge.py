@@ -21,7 +21,7 @@ from cl.corpus_importer.utils import (
     JudgeException,
     OpinionMatchingException,
     OpinionTypeException,
-    match_lists,
+    match_text_lists,
     merge_case_names,
     merge_docket_numbers,
     merge_judges,
@@ -678,8 +678,8 @@ def map_and_merge_opinions(
 
     if len(harvard_opinions) == len(cl_opinions):
         try:
-            matches = match_lists(
-                [op for op in harvard_opinions],
+            matches = match_text_lists(
+                [op.getText() for op in harvard_opinions],
                 fetch_cl_opinion_content(sub_opinions=cl_opinions),
             )
         except ZeroDivisionError:
