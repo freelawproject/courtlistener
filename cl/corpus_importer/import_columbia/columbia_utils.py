@@ -214,6 +214,7 @@ SIMPLE_TAGS = [
 def format_case_name(name: str) -> str:
     """Applies standard harmonization methods after normalizing with
     lowercase.
+
     :param name: case name
     :return: title cased name
     """
@@ -222,8 +223,9 @@ def format_case_name(name: str) -> str:
 
 def is_opinion_published(soup: BeautifulSoup) -> bool:
     """Check if opinion is unpublished or published
+
     :param soup: The XML object
-    :return: Published or Unpublished
+    :return: true if opinion is published
     """
     opinion_tag = soup.find("opinion")
 
@@ -237,8 +239,9 @@ def is_opinion_published(soup: BeautifulSoup) -> bool:
 
 def read_xml_to_soup(filepath: str) -> BeautifulSoup:
     """This function fixes the bad tags in columbia xml files
+
     :param filepath: path to xml file
-    :return: string with content
+    :return: BeautifulSoup object of parsed content
     """
     with open(filepath, "r", encoding="utf-8") as f:
         file_content = f.read()
@@ -262,6 +265,7 @@ def add_floating_opinion(
 ) -> list:
     """We have found floating opinions in bs object, we keep the opinion content as a
     new opinion
+
     :param opinions: a list with opinions found
     :param floating_content: content that is not in known non-opinion tags
     :param opinion_order: opinion position
@@ -292,6 +296,7 @@ def add_floating_opinion(
 def extract_opinions(outer_opinion: BeautifulSoup) -> list[Optional[dict]]:
     """We extract all possible opinions from bs content, with and without author,
     and we create new opinions if floating content exists
+
     :param outer_opinion: element containing all xml tags
     :return: list of opinion dicts
     """
@@ -367,6 +372,7 @@ def merge_opinions(
 ) -> tuple[list, int]:
     """Merge last and previous opinion if are the same type or create a new opinion
     if merge is not possible
+
     :param opinions: list of opinions that is being updated constantly
     :param content: list of opinions without an author
     :param current_order: opinion position
@@ -404,8 +410,9 @@ def merge_opinions(
 
 def prepare_opinions_found(extracted_opinions: list) -> list:
     """We read the opinions found, and we combine or create floating opinions
+
     :param extracted_opinions: list of opinions obtained from xml file
-    :return:
+    :return: a list with extracted and processed opinions
     """
 
     opinions: list = []
@@ -476,10 +483,12 @@ def prepare_opinions_found(extracted_opinions: list) -> list:
     return opinions
 
 
-def fix_simple_tags(soup: BeautifulSoup, columbia_data: dict):
+def fix_simple_tags(soup: BeautifulSoup, columbia_data: dict) -> None:
     """Parse and store data from SIMPLE_TAGS
+
     :param soup: bs element containing all xml tags
     :param columbia_data: a dict that contains all parsed data
+    :return: None
     """
     for tag in SIMPLE_TAGS:
         found_tags = soup.findAll(tag)
@@ -532,7 +541,8 @@ def fix_simple_tags(soup: BeautifulSoup, columbia_data: dict):
 
 def convert_columbia_html(text: str, opinion_index: int) -> str:
     """Convert xml tags to html tags and process additional data from opinions
-    like footnotes,
+    like footnotes
+
     :param text: Text to convert to html
     :param opinion_index: opinion index from a list of all opinions
     :return: converted text
@@ -628,9 +638,9 @@ def parse_dates(
     raw_dates: list[str],
 ) -> list[list[tuple[Any, date] | tuple[None, date]]]:
     """Parses the dates from a list of string.
-    Returns a list of lists of (string, datetime) tuples if there is a string
-    before the date (or None).
+
     :param raw_dates: A list of (probably) date-containing strings
+    :return: Returns a list of lists of (string, datetime) tuples if there is a string before the date (or None).
     """
     months = re.compile(
         "january|february|march|april|may|june|july|august|"
@@ -679,9 +689,11 @@ def parse_dates(
     return dates
 
 
-def extract_dates(columbia_data: dict):
+def extract_dates(columbia_data: dict) -> None:
     """Extract and parse all possible dates obtained from xml file
+
     :param columbia_data: a dict that contains all parsed data
+    :return: None
     """
     dates = columbia_data.get("date", []) + columbia_data.get(
         "hearing_date", []
@@ -751,23 +763,33 @@ def extract_dates(columbia_data: dict):
     columbia_data["panel_date"] = panel_date if panel_date else None
 
 
-def find_judge_and_type(columbia_data: dict):
-    """Find judges from opinions and map opinion type to model field choice
+def find_judges(columbia_data: dict) -> None:
+    """Find judges from opinions
+
     :param columbia_data: a dict that contains all parsed data
+    :return: None
     """
-
     columbia_data["judges"] = []
-    lead = False
     for op in columbia_data.get("opinions", []):
-        op_type = op.get("type")
-
         op_byline = op.get("byline")
         if op_byline:
             judge_name = extract_judge_last_name(op_byline)
             if judge_name not in columbia_data["judges"]:
                 columbia_data["judges"].append(judge_name)
 
-        # only first opinion with "opinion" type is a lead opinion, the next opinion
+
+def map_opinion_types(columbia_data: dict) -> None:
+    """Map opinion type to model field choice
+
+    :param columbia_data: a dict that contains all parsed data
+    :return: None
+    """
+
+    lead = False
+    for op in columbia_data.get("opinions", []):
+        op_type = op.get("type")
+
+        # Only first opinion with "opinion" type is a lead opinion, the next opinion
         # with "opinion" type is an addendum
         if not lead and op_type and op_type == "opinion":
             lead = True
@@ -781,10 +803,12 @@ def find_judge_and_type(columbia_data: dict):
             op["type"] = "030concurrence"
 
 
-def format_additional_fields(data: dict, soup: BeautifulSoup):
+def format_additional_fields(data: dict, soup: BeautifulSoup) -> None:
     """Prepare data and rename key names to match model field names
+
     :param data: dict with data extracted from xml
     :param soup: bs object with all file content
+    :return: None
     """
     data["syllabus"] = (
         "\n".join([s.decode_contents() for s in soup.findAll("syllabus")])

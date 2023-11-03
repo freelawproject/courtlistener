@@ -8,11 +8,7 @@ Csv example:
 cluster_id,filepath
 825802,/opt/columbia/michigan/supreme_court_opinions/documents/d5a484f1bad20ba0.xml
 
-Merge using a cluster id, it will work only if at least one opinion has a xml file path in local_path field
-It requires passing the mounted directory path to the columbia xml files
-docker-compose -f docker/courtlistener/docker-compose.yml exec cl-django python manage.py columbia_merge --cluster-id 2336478 --xml-dir /opt/columbia
 """
-import itertools
 import os.path
 import re
 from datetime import date
@@ -24,21 +20,19 @@ from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup
 from django.db import transaction
 from django.db.models import Q
-from juriscraper.lib.string_utils import harmonize, titlecase
+from juriscraper.lib.string_utils import titlecase
 
 from cl.corpus_importer.import_columbia.columbia_utils import (
     convert_columbia_html,
     extract_dates,
     extract_opinions,
-    find_judge_and_type,
+    find_judges,
     fix_simple_tags,
     format_additional_fields,
     is_opinion_published,
+    map_opinion_types,
     prepare_opinions_found,
     read_xml_to_soup,
-)
-from cl.corpus_importer.management.commands.harvard_opinions import (
-    clean_docket_number,
 )
 from cl.corpus_importer.utils import (
     AuthorException,
@@ -48,12 +42,16 @@ from cl.corpus_importer.utils import (
     JudgeException,
     OpinionMatchingException,
     OpinionTypeException,
+    merge_case_names,
+    merge_docket_numbers,
+    merge_judges,
+    merge_long_fields,
+    merge_strings,
     similarity_scores,
 )
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_diff import get_cosine_similarity
 from cl.people_db.lookup_utils import (
-    find_all_judges,
     find_just_name,
     lookup_judges_by_last_name_list,
 )
@@ -89,6 +87,7 @@ VALID_MERGED_SOURCES = [
 
 def clean_opinion_content(content: str, is_harvard: bool) -> str:
     """Strip all non-alphanumeric characters
+
     :param content: content from opinion
     :param is_harvard: true if content is from harvard
     :return: cleaned content
@@ -110,6 +109,7 @@ def clean_opinion_content(content: str, is_harvard: bool) -> str:
 
 def get_cl_opinion_content(cluster_id: int) -> list[dict[Any, Any]]:
     """Get the opinions content for a cluster object
+
     :param cluster_id: Cluster ID for a set of opinions
     :return: list with opinion content from cl
     """
@@ -153,9 +153,11 @@ def update_matching_opinions(
     matches: dict, cl_cleaned_opinions: list, columbia_opinions: list
 ) -> None:
     """Store matching opinion content in html_columbia
+
     :param matches: dict with matching position from cl and columbia opinions
     :param cl_cleaned_opinions: list of cl opinions
     :param columbia_opinions: list of columbia opinions
+    :return: None
     """
     for columbia_pos, cl_pos in matches.items():
         file_opinion = columbia_opinions[columbia_pos]  # type: dict
@@ -207,6 +209,7 @@ def match_text_lists(
     file_opinions_list: list[Any], cl_opinions_list: list[Any]
 ) -> dict[int, int]:
     """Generate matching lists above threshold
+
     :param file_opinions_list: Opinions from file
     :param cl_opinions_list: CL opinions
     :return: Matches if found or empty dict
@@ -258,14 +261,16 @@ def match_text_lists(
 
 def map_and_merge_opinions(
     cluster_id: int,
-    cl_cleaned_opinions: list[dict],
     columbia_opinions: list[dict],
 ) -> None:
     """Map and merge opinion data
+
     :param cluster_id: Cluster id
-    :param cl_cleaned_opinions: list of cl opinions
     :param columbia_opinions: list of columbia opinions from file
+    :return: None
     """
+
+    cl_cleaned_opinions = get_cl_opinion_content(cluster_id)
 
     if len(columbia_opinions) == len(cl_cleaned_opinions):
         # We need that both list to be cleaned, so we can have a more accurate match
@@ -322,6 +327,7 @@ def combine_non_overlapping_data(
     cluster: OpinionCluster, columbia_data: dict
 ) -> tuple[dict[str, tuple], dict[str, Any]]:
     """Combine non overlapping data and return dictionary of data for merging
+
     :param cluster: Cluster to merge
     :param columbia_data: The columbia data as json
     :return: Optional dictionary of data to continue to merge
@@ -349,97 +355,14 @@ def combine_non_overlapping_data(
     return changed_values_dictionary, new_values
 
 
-def merge_docket_numbers(cluster: OpinionCluster, docket_number: str) -> None:
-    """Merge docket number
-    :param cluster: The cluster of the merging item
-    :param docket_number: The columbia docket number
-    """
-    cl_docket = cluster.docket
-    columbia_clean_docket = clean_docket_number(docket_number)
-
-    if cl_docket.docket_number:
-        # Check if docket number exists
-        cl_clean_docket = clean_docket_number(cl_docket.docket_number)
-        if (
-            cl_clean_docket in columbia_clean_docket
-            and cl_docket.docket_number != columbia_clean_docket
-        ):
-            cl_docket.docket_number = columbia_clean_docket
-            cl_docket.save()
-        else:
-            # Check if their relatively similar and if so save the columbia one
-            # if its longer
-            similarity = get_cosine_similarity(
-                cl_clean_docket, columbia_clean_docket
-            )
-            if similarity > 0.8:
-                if len(columbia_clean_docket) > len(cl_clean_docket):
-                    cl_docket.docket_number = columbia_clean_docket
-                    cl_docket.save()
-    else:
-        # CL docket doesn't have a docket number, add the one from json file
-        cl_docket.docket_number = columbia_clean_docket
-        cl_docket.save()
-
-
-def merge_case_names(
-    cluster: OpinionCluster, columbia_data: dict[str, Any]
-) -> dict[str, Any]:
-    """Merge case names
-    :param cluster: The cluster of the merging item
-    :param columbia_data: json data from columbia
-    """
-    columbia_case_name = titlecase(harmonize(columbia_data["case_name"]))
-    columbia_case_name_full = titlecase(columbia_data["case_name_full"])
-    cluster_case_name = titlecase(harmonize(cluster.case_name))
-    cluster_case_name_full = titlecase(cluster.case_name_full)
-
-    update_dict = {}
-    # Case with full case names
-    if not cluster_case_name_full and columbia_case_name_full:
-        update_dict["case_name_full"] = columbia_case_name_full
-        # Change stored value to new
-        cluster_case_name_full = columbia_case_name_full
-    elif cluster_case_name_full and columbia_case_name_full:
-        if len(columbia_case_name_full) > len(cluster_case_name_full):
-            # Select best case name based on string length
-            update_dict["case_name_full"] = columbia_case_name_full
-            # Change stored value to new
-            cluster_case_name_full = columbia_case_name_full
-    else:
-        # We don't care if data is empty or both are empty
-        pass
-
-    # Case with abbreviated case names
-    if not cluster_case_name and columbia_case_name:
-        update_dict["case_name"] = columbia_case_name
-        # Change stored value to new
-        cluster_case_name = columbia_case_name
-    elif cluster_case_name and columbia_case_name:
-        if len(columbia_case_name) > len(cluster_case_name):
-            # Select best case name based on string length
-            update_dict["case_name"] = columbia_case_name
-            # Change stored value to new
-            cluster_case_name = columbia_case_name
-    else:
-        # We don't care if data is empty or both are empty
-        pass
-
-    if cluster_case_name_full and cluster_case_name:
-        if len(cluster_case_name) > len(cluster_case_name_full):
-            # Swap field values
-            update_dict["case_name"] = cluster_case_name_full
-            update_dict["case_name_full"] = cluster_case_name
-
-    return update_dict
-
-
 def merge_date_filed(
     cluster: OpinionCluster, columbia_data: dict
 ) -> dict[str, Any]:
     """Merge date filed
+
     :param cluster: The cluster of the merging item
     :param columbia_data: json data from columbia
+    :return: empty dict or dict with new value for field
     """
 
     columbia_date_filed = columbia_data.get("date_filed")
@@ -454,125 +377,17 @@ def merge_date_filed(
     return {}
 
 
-def merge_long_fields(
-    field_name: str,
-    overlapping_data: Optional[tuple[str, str]],
-    cluster_id: int,
-) -> dict[str, Any]:
-    """Merge two long text fields
-    :param field_name: Field name to update in opinion cluster
-    :param overlapping_data: data to compare from columbia and courtlistener
-    :param cluster_id: cluster id
-    """
-    if not overlapping_data:
-        return {}
-
-    columbia_data, cl_data = overlapping_data
-    # Do some text comparison
-    similarity = get_cosine_similarity(columbia_data, cl_data)
-    if similarity < 0.9:
-        # they are not too similar, choose the larger one
-        if len(columbia_data) > len(cl_data):
-            return {field_name: columbia_data}
-
-    else:
-        if similarity <= 0.5:
-            logger.info(
-                f"The content compared is very different. Cluster id: {cluster_id}"
-            )
-    return {}
-
-
-def merge_strings(
-    field_name: str, overlapping_data: tuple[str, str]
-) -> dict[str, Any]:
-    """Compare two strings and choose the largest
-    :param field_name: field name to update in opinion cluster
-    :param overlapping_data: data to compare from columbia and courtlistener
-    """
-    if not overlapping_data:
-        return {}
-
-    columbia_data, cl_data = overlapping_data
-    if len(columbia_data) > len(cl_data):
-        return {field_name: columbia_data}
-
-    return {}
-
-
-def merge_judges(
-    overlapping_data: Optional[tuple[str, str]],
-) -> dict[str, Any]:
-    """Merge overlapping judge values
-    :param overlapping_data: data to compare from columbia and courtlistener
-    """
-
-    if not overlapping_data:
-        return {}
-
-    columbia_data, cl_data = overlapping_data
-    # We check if any word in the string is uppercase
-    cl_data_upper = (
-        True if [s for s in cl_data.split(",") if s.isupper()] else False
-    )
-
-    # Get last names keeping case and cleaning the string (We could have
-    # the judge names in capital letters)
-    cl_clean = set(find_all_judges(cl_data))
-    # Lowercase courtlistener judge names for set operations
-    temp_cl_clean = set([c.lower() for c in cl_clean])
-    # Get last names in lowercase and cleaned
-    columbia_clean = set(find_all_judges(columbia_data))
-    # Lowercase columbia judge names for set operations
-    temp_columbia_clean = set([h.lower() for h in columbia_clean])
-    # Prepare judges string
-    judges = titlecase(", ".join(find_all_judges(columbia_data)))
-
-    if (
-        temp_columbia_clean.issuperset(temp_cl_clean) or cl_data_upper
-    ) and columbia_clean != cl_clean:
-        return {"judges": judges}
-    elif not temp_columbia_clean.intersection(temp_cl_clean):
-        # Last resort, use distance between words to solve typos
-        cl_clean_list = list(cl_clean)
-        columbia_clean_list = list(columbia_clean)
-        judge_pairs = list(
-            itertools.product(cl_clean_list, columbia_clean_list)
-        )
-        success = False
-        for pair in judge_pairs:
-            s = SequenceMatcher(None, pair[0].lower(), pair[1].lower())
-            if s.ratio() >= 0.7:
-                # We found a match, we assume that the data in columbia is better,
-                # we keep the one from columbia and remove the one from cl
-                try:
-                    cl_clean_list.remove(pair[0])
-                except ValueError:
-                    # The value was removed in an earlier iteration, but we still
-                    # have the value in the remaining pairs to match, we simply
-                    # ignore it
-                    pass
-                success = True
-
-        if success:
-            # At least one success that matches the names, we can create a new judges
-            # list
-            new_judges_list = sorted(
-                list(set(cl_clean_list + columbia_clean_list))
-            )
-            return {"judges": titlecase(", ".join(new_judges_list))}
-        else:
-            raise JudgeException("Judges are completely different.")
-
-    return {}
-
-
 def merge_overlapping_data(
-    cluster: OpinionCluster, changed_values_dictionary: dict
+    cluster: OpinionCluster,
+    changed_values_dictionary: dict,
+    skip_judge_merger: bool = False,
 ) -> dict[str, Any]:
     """Merge overlapping data
+
     :param cluster: the cluster object
     :param changed_values_dictionary: the dictionary of data to merge
+    :param skip_judge_merger: skip judge merger
+    :return: empty dict or dict with new values for fields
     """
 
     if not changed_values_dictionary:
@@ -601,7 +416,12 @@ def merge_overlapping_data(
             )
         elif field_name == "judges":
             data_to_update.update(
-                merge_judges(changed_values_dictionary.get(field_name, ""))
+                merge_judges(
+                    changed_values_dictionary.get(field_name, ""),
+                    cluster.id,
+                    is_columbia=True,
+                    skip_judge_merger=skip_judge_merger,
+                )
             )
         else:
             logger.info(f"Field not considered in the process: {field_name}")
@@ -611,7 +431,9 @@ def merge_overlapping_data(
 
 def update_docket_source(cluster: OpinionCluster) -> None:
     """Update docket source and complete
+
     :param cluster: the cluster object
+    :return: None
     """
     docket = cluster.docket
     new_docket_source = Docket.COLUMBIA + docket.source
@@ -628,7 +450,9 @@ def update_docket_source(cluster: OpinionCluster) -> None:
 
 def update_cluster_source(cluster: OpinionCluster) -> None:
     """Update cluster source
+
     :param cluster: cluster object
+    :return: None
     """
     new_cluster_source = SOURCES.COLUMBIA_ARCHIVE + cluster.source
     if new_cluster_source in VALID_MERGED_SOURCES:
@@ -646,9 +470,11 @@ def update_cluster_panel(
     panel_date: Optional[date] = None,
 ) -> None:
     """Update cluster's panel, this is done independently since it is a m2m relationship
+
     :param cluster: the cluster object
     :param panel_list: list with people names
     :param panel_date: date used to find people
+    :return: None
     """
 
     panel_list = [titlecase(p) for p in panel_list]
@@ -666,8 +492,10 @@ def process_cluster(
     filepath: str,
 ) -> None:
     """Merge specified cluster id
+
     :param cluster_id: Cluster object id to merge
     :param filepath: specified path to xml file
+    :return: None
     """
     columbia_data: dict = {}
 
@@ -694,15 +522,12 @@ def process_cluster(
     columbia_data["published"] = is_opinion_published(soup)
 
     outer_opinion = soup.find("opinion")
-    if not outer_opinion:
-        # opinion wraps around all xml content
-        logger.warning("Ill formed xml columbia")
-        return
-
     extracted_opinions = extract_opinions(outer_opinion)
-    columbia_data["opinions"] = prepare_opinions_found(extracted_opinions)
-    columbia_data["file"] = filepath
-    find_judge_and_type(columbia_data)
+    opinions = prepare_opinions_found(extracted_opinions)
+    columbia_data["opinions"] = opinions
+
+    find_judges(columbia_data)
+    map_opinion_types(columbia_data)
     fix_simple_tags(soup, columbia_data)
     extract_dates(columbia_data)
 
@@ -713,16 +538,8 @@ def process_cluster(
     format_additional_fields(columbia_data, soup)
 
     try:
-        cl_cleaned_opinions = get_cl_opinion_content(cluster.id)
-    except EmptyOpinionException:
-        logger.warning(msg=f"No content in opinion from cluster: {cluster_id}")
-        return
-
-    try:
         with transaction.atomic():
-            map_and_merge_opinions(
-                cluster_id, cl_cleaned_opinions, columbia_data["opinions"]
-            )
+            map_and_merge_opinions(cluster_id, columbia_data["opinions"])
             # Non overlapping data and new values for cluster fields
             (
                 changed_values_dictionary,
@@ -732,7 +549,12 @@ def process_cluster(
             if columbia_data["docket"]:
                 merge_docket_numbers(cluster, columbia_data["docket"])
             # case names
-            case_names_to_update = merge_case_names(cluster, columbia_data)
+            case_names_to_update = merge_case_names(
+                cluster,
+                columbia_data,
+                case_name_key="case_name",
+                case_name_full_key="case_name_full",
+            )
             # date filed
             date_filed_to_update = merge_date_filed(cluster, columbia_data)
             # overlapping data
@@ -785,11 +607,15 @@ def process_cluster(
         )
     except JudgeException:
         logger.warning(msg=f"Judge exception for cluster id: {cluster_id}")
+    except EmptyOpinionException:
+        logger.warning(msg=f"No content in opinion from cluster: {cluster_id}")
 
 
 def merge_columbia_into_cl(options) -> None:
     """Merge Columbia Data into CL
+
     :param options: Absolute path to csv file
+    :return: None
     """
     csv_filepath, xml_dir = options["csv_file"], options["xml_dir"]
     skip_until, limit = options["skip_until"], options["limit"]

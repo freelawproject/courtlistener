@@ -1,6 +1,3 @@
-# !/usr/bin/python
-# -*- coding: utf-8 -*-
-
 import difflib
 import itertools
 import json
@@ -24,7 +21,7 @@ from juriscraper.lib.diff_tools import normalize_phrase
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize, titlecase
 
 from cl.citations.utils import map_reporter_db_cite_type
-from cl.corpus_importer.utils import compare_documents
+from cl.corpus_importer.utils import clean_docket_number, compare_documents
 from cl.lib.argparse_types import _argparse_volumes
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_diff import get_cosine_similarity
@@ -156,6 +153,7 @@ def check_for_match(new_case: str, possibilities: List[str]) -> bool:
     This code is a variation of get_closest_match_index used in juriscraper.
     It checks if the case name we are trying to add matches any duplicate
     citation cases already in the system.
+
     :param new_case: The importing case name
     :param possibilities: The array of cases already in the
     system with the same citation
@@ -195,8 +193,7 @@ def map_opinion_type(harvard_opinion_type: str) -> str:
 
 
 def parse_extra_fields(soup, fields, long_field=False):
-    """
-    Parse the remaining extra fields into long or short strings
+    """Parse the remaining extra fields into long or short strings
     returned as dict
 
     :param soup: The bs4 representaion of the case data xml
@@ -698,18 +695,6 @@ def get_opinion_content(cluster):
     return soup.text
 
 
-def clean_docket_number(docket_number: str) -> str:
-    """Strip non-numeric content from docket numbers
-
-    :param docket_number: Case docket number
-    :return: A stripped down docket number.
-    """
-
-    docket_number = re.sub("Department.*", "", docket_number)
-    docket_number = re.sub("Nos?. ", "", docket_number)
-    return docket_number
-
-
 def clean_body_content(case_body: str, harvard: bool = False) -> str:
     """Strip all non-alphanumeric characters
 
@@ -938,6 +923,7 @@ def find_previously_imported_cases(
     citation: Citation,
 ) -> Optional[OpinionCluster]:
     """Check if opinion is in Courtlistener
+
     :param data: The harvard data
     :param court_id: Court ID
     :param date_filed: The date filed

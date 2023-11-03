@@ -2,16 +2,14 @@ import itertools
 import json
 import logging
 from datetime import date
-from difflib import SequenceMatcher
 from typing import Any, Dict, Optional, Tuple
 
 import requests
 from bs4 import BeautifulSoup
 from django.db import transaction
-from juriscraper.lib.string_utils import harmonize, titlecase
+from juriscraper.lib.string_utils import titlecase
 
 from cl.corpus_importer.management.commands.harvard_opinions import (
-    clean_docket_number,
     parse_extra_fields,
     validate_dt,
 )
@@ -24,9 +22,13 @@ from cl.corpus_importer.utils import (
     OpinionMatchingException,
     OpinionTypeException,
     match_lists,
+    merge_case_names,
+    merge_docket_numbers,
+    merge_judges,
+    merge_long_fields,
+    merge_strings,
 )
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.string_diff import get_cosine_similarity
 from cl.people_db.lookup_utils import find_all_judges, find_just_name
 from cl.search.models import SOURCES, Docket, Opinion, OpinionCluster
 
@@ -48,6 +50,7 @@ class HarvardConversionUtil:
 
 def find_data_fields(soup: BeautifulSoup, field_name: str) -> list:
     """Find field by tag name or data-type attribute
+
     :param soup: parsed document
     :param field_name: field to find
     :return: all fields found
@@ -216,116 +219,6 @@ def combine_non_overlapping_data(
     return changed_values_dictionary
 
 
-def merge_long_fields(
-    field_name: str,
-    overlapping_data: Optional[Tuple[str, str]],
-    cluster_id: int,
-) -> dict[str, Any]:
-    """Merge two long text fields
-    :param field_name: field name to update in opinion cluster
-    :param overlapping_data: data to compare from harvard and courtlistener
-    :param cluster_id: cluster id
-    :return: None
-    """
-    if not overlapping_data:
-        return {}
-
-    harvard_data, cl_data = overlapping_data
-    # Do some text comparison
-    similarity = get_cosine_similarity(harvard_data, cl_data)
-    if similarity < 0.9:
-        # they are not too similar, choose the larger one
-        if len(harvard_data) > len(cl_data):
-            return {field_name: harvard_data}
-
-    else:
-        if similarity <= 0.5:
-            logger.info(
-                f"The content compared is very different. Cluster id: {cluster_id}"
-            )
-    return {}
-
-
-def merge_judges(
-    overlapping_data: Optional[Tuple[str, str]],
-    cluster_id: int,
-    skip_judge_merger: bool = False,
-) -> dict[str, Any]:
-    """Merge overlapping judge values
-
-    :param overlapping_data: data to compare from harvard and courtlistener
-    :param cluster_id: opinion cluster id
-    :param skip_judge_merger: skip judge merger instead of raise exception
-    :return: None
-    """
-
-    if not overlapping_data:
-        return {}
-
-    harvard_data, cl_data = overlapping_data
-    # We check if any word in the string is uppercase
-    cl_data_upper = (
-        True if [s for s in cl_data.split(",") if s.isupper()] else False
-    )
-
-    # Get last names keeping case and cleaning the string (We could have
-    # the judge names in capital letters)
-    cl_clean = set(find_all_judges(cl_data))
-    # Lowercase courtlistener judge names for set operations
-    temp_cl_clean = set([c.lower() for c in cl_clean])
-    # Get last names in lowercase and cleaned
-    harvard_clean = set(find_all_judges(harvard_data))
-    # Lowercase harvard judge names for set operations
-    temp_harvard_clean = set([h.lower() for h in harvard_clean])
-    # Prepare judges string
-    judges = titlecase(", ".join(find_all_judges(harvard_data)))
-    if (
-        temp_harvard_clean.issuperset(temp_cl_clean) or cl_data_upper
-    ) and harvard_clean != cl_clean:
-        return {"judges": judges}
-    elif not temp_harvard_clean.intersection(temp_cl_clean):
-        # Last resort, use distance between words to solve typos
-        cl_clean_list = list(cl_clean)
-        harvard_clean_list = list(harvard_clean)
-        judge_pairs = list(
-            itertools.product(cl_clean_list, harvard_clean_list)
-        )
-        success = False
-        for pair in judge_pairs:
-            s = SequenceMatcher(None, pair[0].lower(), pair[1].lower())
-            if s.ratio() >= 0.7:
-                # We found a match, we assume that the data in CL is better, we keep
-                # the one from CL and remove the one from harvard
-                try:
-                    harvard_clean_list.remove(pair[1])
-                except ValueError:
-                    # The value was removed in an earlier iteration, but we still
-                    # have the value in the remaining pairs to match, we simply
-                    # ignore it
-                    pass
-                success = True
-
-        if success:
-            # At least one success that matches the names, we can create a new judges
-            # list
-            new_judges_list = sorted(
-                list(set(cl_clean_list + harvard_clean_list))
-            )
-            return {"judges": titlecase(", ".join(new_judges_list))}
-        else:
-            if skip_judge_merger:
-                # Fail silently but continue to merge
-                logger.info(
-                    f"Can't merge judges, something failed, cluster id: {cluster_id}"
-                )
-                return {}
-            else:
-                # Stop merge raising an exception
-                raise JudgeException("Judges are completely different.")
-
-    return {}
-
-
 def merge_cluster_dates(
     cluster: OpinionCluster,
     field_name: str,
@@ -361,118 +254,11 @@ def merge_cluster_dates(
     return {}
 
 
-def merge_strings(
-    field_name: str, overlapping_data: Tuple[str, str]
-) -> dict[str, Any]:
-    """Compare two strings and choose the largest
-
-    :param field_name: field name to update in opinion cluster
-    :param overlapping_data: data to compare from harvard and courtlistener
-    :return: None
-    """
-    if not overlapping_data:
-        return {}
-
-    harvard_data, cl_data = overlapping_data
-    if len(harvard_data) > len(cl_data):
-        return {field_name: harvard_data}
-
-    return {}
-
-
-def merge_docket_numbers(
-    cluster: OpinionCluster, harvard_docket_number: str
-) -> None:
-    """Merge Docket Numbers
-
-    :param cluster: The cluster id of the merging item
-    :param harvard_docket_number: The harvard docket number
-    :return: None
-    """
-    cl_docket = cluster.docket
-    h_clean_docket = clean_docket_number(harvard_docket_number)
-
-    if cl_docket.docket_number:
-        # Check if docket number exists
-        # e.g. CL docket id #3952066 doesn't have
-        cl_clean_docket = clean_docket_number(cl_docket.docket_number)
-        if (
-            cl_clean_docket in h_clean_docket
-            and cl_docket.docket_number != h_clean_docket
-        ):
-            cl_docket.docket_number = h_clean_docket
-            cl_docket.save()
-        else:
-            # Check if their relatively similar and if so save the harvard one
-            # if its longer
-            similarity = get_cosine_similarity(cl_clean_docket, h_clean_docket)
-            if similarity > 0.8:
-                if len(h_clean_docket) > len(cl_clean_docket):
-                    cl_docket.docket_number = h_clean_docket
-                    cl_docket.save()
-    else:
-        # CL docket doesn't have a docket number, add the one from json file
-        cl_docket.docket_number = h_clean_docket
-        cl_docket.save()
-
-
-def merge_case_names(
-    cluster: OpinionCluster, harvard_data: Dict[str, Any]
-) -> dict[str, Any]:
-    """Merge case names
-    :param cluster: The cluster of the merging item
-    :param harvard_data: json data from harvard case
-    :return: None
-    """
-    harvard_case_name = titlecase(harmonize(harvard_data["name_abbreviation"]))
-    harvard_case_name_full = titlecase(harvard_data["name"])
-    cluster_case_name = titlecase(harmonize(cluster.case_name))
-    cluster_case_name_full = titlecase(cluster.case_name_full)
-
-    update_dict = {}
-    # Case with full case names
-    if not cluster_case_name_full and harvard_case_name_full:
-        update_dict["case_name_full"] = harvard_case_name_full
-        # Change stored value to new
-        cluster_case_name_full = harvard_case_name_full
-    elif cluster_case_name_full and harvard_case_name_full:
-        if len(harvard_case_name_full) > len(cluster_case_name_full):
-            # Select best case name based on string length
-            update_dict["case_name_full"] = harvard_case_name_full
-            # Change stored value to new
-            cluster_case_name_full = harvard_case_name_full
-    else:
-        # We don't care if harvard data is empty or both are empty
-        pass
-
-    # Case with abbreviated case names
-    if not cluster_case_name and harvard_case_name:
-        update_dict["case_name"] = harvard_case_name
-        # Change stored value to new
-        cluster_case_name = harvard_case_name
-    elif cluster_case_name and harvard_case_name:
-        if len(harvard_case_name) > len(cluster_case_name):
-            # Select best case name based on string length
-            update_dict["case_name"] = harvard_case_name
-            # Change stored value to new
-            cluster_case_name = harvard_case_name
-    else:
-        # We don't care if harvard data is empty or both are empty
-        pass
-
-    if cluster_case_name_full and cluster_case_name:
-        if len(cluster_case_name) > len(cluster_case_name_full):
-            # Swap field values
-            update_dict["case_name"] = cluster_case_name_full
-            update_dict["case_name_full"] = cluster_case_name
-
-    return update_dict
-
-
 def merge_date_filed(
     cluster: OpinionCluster, harvard_data: dict
 ) -> dict[str, Any]:
     """Merge date filed
+
     :param cluster: The cluster of the merging item
     :param harvard_data: json data from harvard case
     :return: None
@@ -491,6 +277,7 @@ def merge_overlapping_data(
     skip_judge_merger: bool = False,
 ) -> dict[str, Any]:
     """Merge overlapping data
+
     :param cluster: the cluster object
     :param changed_values_dictionary: the dictionary of data to merge
     :param skip_judge_merger: skip judge merger
@@ -536,7 +323,8 @@ def merge_overlapping_data(
                 merge_judges(
                     changed_values_dictionary.get(field_name),
                     cluster.id,
-                    skip_judge_merger,
+                    is_columbia=False,
+                    skip_judge_merger=skip_judge_merger,
                 )
             )
         elif field_name == "attorneys":
@@ -554,6 +342,7 @@ def merge_overlapping_data(
 
 def update_docket_source(cluster: OpinionCluster) -> None:
     """Update docket source and complete
+
     :param cluster: the cluster object
     :return: None
     """
@@ -583,6 +372,7 @@ def update_docket_source(cluster: OpinionCluster) -> None:
 
 def update_cluster_source(cluster: OpinionCluster) -> None:
     """Update cluster source
+
     :param cluster: cluster object
     :return: None
     """
@@ -609,7 +399,9 @@ def update_cluster_source(cluster: OpinionCluster) -> None:
 
 def save_headmatter(harvard_data: Dict[str, Any]) -> dict[str, Any]:
     """Save and update headmatter
+
     Clean up the headmatter content - (pre opinion content) and save it
+
     :param harvard_data: json data from harvard case
     :return: None
     """
@@ -671,7 +463,10 @@ def merge_opinion_clusters(
             )
 
             case_names_to_update = merge_case_names(
-                opinion_cluster, harvard_data
+                opinion_cluster,
+                harvard_data,
+                case_name_key="name_abbreviation",
+                case_name_full_key="name",
             )
             date_filed_to_update = merge_date_filed(
                 opinion_cluster, harvard_data
@@ -733,6 +528,7 @@ def fetch_cl_opinion_content(sub_opinions: list[Opinion]) -> list[str]:
 
     This is a simple helper function to grab an opinion content to compare
     against the harvard xml
+
     :param sub_opinions: Sub opinions for a cluster
     :return: Opinion text as a list
     """
@@ -766,6 +562,7 @@ def fix_pagination(soup: BeautifulSoup) -> BeautifulSoup:
     """Add pagination to harvard XML
 
     Add star pagination to page number XML/HTML
+
     :param soup: The content to clean up
     :return: soup
     """
@@ -780,7 +577,6 @@ def fix_footnotes(soup: BeautifulSoup) -> BeautifulSoup:
     """Make Footnotes work with CL
 
     Enable footnote linking between footnotes and footnotemark
-
     :param soup: Bs4 object to clean up
     :return:Content with working footnotes
     """

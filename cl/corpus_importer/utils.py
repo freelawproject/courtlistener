@@ -1,12 +1,17 @@
+import itertools
 import re
 from datetime import date
+from difflib import SequenceMatcher
 from typing import Any, Iterator, Optional
 
 import bs4
 from django.utils.timezone import now
+from juriscraper.lib.string_utils import harmonize, titlecase
 
+from cl.lib.command_utils import logger
 from cl.lib.string_diff import get_cosine_similarity
-from cl.search.models import Docket
+from cl.people_db.lookup_utils import find_all_judges
+from cl.search.models import Docket, OpinionCluster
 
 
 class OpinionMatchingException(Exception):
@@ -138,6 +143,7 @@ def is_subset(match: list[int], other_match: list[int]) -> bool:
     """Check if match is a subset of other matches
 
     Check if needle is ordered subset of haystack in O(n)
+
     :param match: Matching range of text as the indices
     :param other_match: Other matching range of text as indices
     :return: Is match a subset of other match
@@ -194,25 +200,6 @@ def compare_documents(harvard_characters: str, cl_characters: str) -> int:
         100 * (count / min([len(harvard_characters), len(cl_characters)]))
     )
     return percent_match
-
-
-def wrap_text(length, text):
-    """Wrap text to specified length without cutting words
-    :param length: max length to wrap
-    :param text: text to wrap
-    :return: text wrapped
-    """
-    words = text.split(" ")
-    if words:
-        lines = [words[0]]
-        for word in words[1:]:
-            if len(lines[-1]) + len(word) < length:
-                lines[-1] += f" {word}"
-            else:
-                lines.append(word)
-                break
-        return " ".join(lines)
-    return ""
 
 
 def similarity_scores(
@@ -288,3 +275,248 @@ def match_lists(
         matches[i] = j
 
     return matches
+
+
+def clean_docket_number(docket_number: str) -> str:
+    """Strip non-numeric content from docket numbers
+
+    :param docket_number: Case docket number
+    :return: A stripped down docket number.
+    """
+
+    docket_number = re.sub("Department.*", "", docket_number)
+    docket_number = re.sub("Nos?. ", "", docket_number)
+    return docket_number
+
+
+def merge_docket_numbers(cluster: OpinionCluster, docket_number: str) -> None:
+    """Merge docket number
+
+    :param cluster: The cluster of the merging item
+    :param docket_number: The docket number from file
+    :return: None
+    """
+    cl_docket = cluster.docket
+    file_cleaned_docket = clean_docket_number(docket_number)
+
+    if cl_docket.docket_number:
+        # Check if docket number exists
+        # e.g. CL docket id #3952066 doesn't have
+        cl_clean_docket = clean_docket_number(cl_docket.docket_number)
+        if (
+            cl_clean_docket in file_cleaned_docket
+            and cl_docket.docket_number != file_cleaned_docket
+        ):
+            cl_docket.docket_number = file_cleaned_docket
+            cl_docket.save()
+        else:
+            # Check if their relatively similar and if so save the columbia one
+            # if its longer
+            similarity = get_cosine_similarity(
+                cl_clean_docket, file_cleaned_docket
+            )
+            if similarity > 0.8:
+                if len(file_cleaned_docket) > len(cl_clean_docket):
+                    cl_docket.docket_number = file_cleaned_docket
+                    cl_docket.save()
+    else:
+        # CL docket doesn't have a docket number, add the one from json file
+        cl_docket.docket_number = file_cleaned_docket
+        cl_docket.save()
+
+
+def merge_case_names(
+    cluster: OpinionCluster,
+    file_data: dict[str, Any],
+    case_name_key: str,
+    case_name_full_key: str,
+) -> dict[str, Any]:
+    """Merge case names
+
+    :param cluster: The cluster of the merging item
+    :param file_data: json data from file(columbia, harvard, etc.)
+    :param case_name_key: dict key that contains case_name value from file
+    :param case_name_full_key: dict key that contains case_name_key value from file
+    :return: empty dict or dict with new value for field
+    """
+    columbia_case_name = titlecase(harmonize(file_data[case_name_key]))
+    columbia_case_name_full = titlecase(file_data[case_name_full_key])
+    cluster_case_name = titlecase(harmonize(cluster.case_name))
+    cluster_case_name_full = titlecase(cluster.case_name_full)
+
+    update_dict = {}
+    # Case with full case names
+    if not cluster_case_name_full and columbia_case_name_full:
+        update_dict["case_name_full"] = columbia_case_name_full
+        # Change stored value to new
+        cluster_case_name_full = columbia_case_name_full
+    elif cluster_case_name_full and columbia_case_name_full:
+        if len(columbia_case_name_full) > len(cluster_case_name_full):
+            # Select best case name based on string length
+            update_dict["case_name_full"] = columbia_case_name_full
+            # Change stored value to new
+            cluster_case_name_full = columbia_case_name_full
+    else:
+        # We don't care if data is empty or both are empty
+        pass
+
+    # Case with abbreviated case names
+    if not cluster_case_name and columbia_case_name:
+        update_dict["case_name"] = columbia_case_name
+        # Change stored value to new
+        cluster_case_name = columbia_case_name
+    elif cluster_case_name and columbia_case_name:
+        if len(columbia_case_name) > len(cluster_case_name):
+            # Select best case name based on string length
+            update_dict["case_name"] = columbia_case_name
+            # Change stored value to new
+            cluster_case_name = columbia_case_name
+    else:
+        # We don't care if data is empty or both are empty
+        pass
+
+    if cluster_case_name_full and cluster_case_name:
+        if len(cluster_case_name) > len(cluster_case_name_full):
+            # Swap field values
+            update_dict["case_name"] = cluster_case_name_full
+            update_dict["case_name_full"] = cluster_case_name
+
+    return update_dict
+
+
+def merge_strings(
+    field_name: str, overlapping_data: tuple[str, str]
+) -> dict[str, Any]:
+    """Compare two strings and choose the largest
+
+    :param field_name: field name to update in opinion cluster
+    :param overlapping_data: data to compare from file and courtlistener
+    :return: empty dict or dict with new value for field
+    """
+    if not overlapping_data:
+        return {}
+
+    file_data, cl_data = overlapping_data
+    if len(file_data) > len(cl_data):
+        return {field_name: file_data}
+
+    return {}
+
+
+def merge_long_fields(
+    field_name: str,
+    overlapping_data: Optional[tuple[str, str]],
+    cluster_id: int,
+) -> dict[str, Any]:
+    """Merge two long text fields
+
+    :param field_name: Field name to update in opinion cluster
+    :param overlapping_data: data to compare from columbia and courtlistener
+    :param cluster_id: cluster id
+    :return: empty dict or dict with new value for field
+    """
+    if not overlapping_data:
+        return {}
+
+    file_data, cl_data = overlapping_data
+    # Do some text comparison
+    similarity = get_cosine_similarity(file_data, cl_data)
+    if similarity < 0.9:
+        # they are not too similar, choose the larger one
+        if len(file_data) > len(cl_data):
+            return {field_name: file_data}
+
+    else:
+        if similarity <= 0.5:
+            logger.info(
+                f"The content compared is very different. Cluster id: {cluster_id}"
+            )
+    return {}
+
+
+def merge_judges(
+    overlapping_data: Optional[tuple[str, str]],
+    cluster_id: int,
+    is_columbia: bool = False,
+    skip_judge_merger: bool = False,
+) -> dict[str, Any]:
+    """Merge overlapping judge values
+
+    :param overlapping_data: data to compare from file and courtlistener
+    :param cluster_id: opinion cluster id
+    :param is_columbia: True if merging judges from columbia
+    :param skip_judge_merger: skip judge merger instead of raise exception
+    :return: empty dict or dict with new value for field
+    """
+
+    if not overlapping_data:
+        return {}
+
+    file_data, cl_data = overlapping_data
+    # We check if any word in the string is uppercase
+    cl_data_upper = (
+        True if [s for s in cl_data.split(",") if s.isupper()] else False
+    )
+
+    # Get last names keeping case and cleaning the string (We could have
+    # the judge names in capital letters)
+    cl_clean = set(find_all_judges(cl_data))
+    # Lowercase courtlistener judge names for set operations
+    temp_cl_clean = set([c.lower() for c in cl_clean])
+    # Get last names in lowercase and cleaned
+    file_data_cleaned = set(find_all_judges(file_data))
+    # Lowercase file judge names for set operations
+    temp_file_data_clean = set([h.lower() for h in file_data_cleaned])
+    # Prepare judges string
+    judges = titlecase(", ".join(find_all_judges(file_data)))
+    if (
+        temp_file_data_clean.issuperset(temp_cl_clean) or cl_data_upper
+    ) and file_data_cleaned != cl_clean:
+        return {"judges": judges}
+    elif not temp_file_data_clean.intersection(temp_cl_clean):
+        # Last resort, use distance between words to solve typos
+        cl_data_clean_list = list(cl_clean)
+        file_data_clean_list = list(file_data_cleaned)
+        judge_pairs = list(
+            itertools.product(cl_data_clean_list, file_data_clean_list)
+        )
+        success = False
+        for pair in judge_pairs:
+            s = SequenceMatcher(None, pair[0].lower(), pair[1].lower())
+            if s.ratio() >= 0.7:
+                # We found a match
+                try:
+                    if is_columbia:
+                        # we assume that the data in columbia is better, we keep the
+                        # one from columbia and remove the one from cl
+                        cl_data_clean_list.remove(pair[0])
+                    else:
+                        # we assume that the data in CL is better, we keep the one from
+                        # CL and remove the one from harvard
+                        file_data_clean_list.remove(pair[1])
+                except ValueError:
+                    # The value was removed in an earlier iteration, but we still
+                    # have the value in the remaining pairs to match, we simply
+                    # ignore it
+                    pass
+                success = True
+
+        if success:
+            # At least one success that matches the names, we can create a new judges
+            # list
+            new_judges_list = sorted(
+                list(set(cl_data_clean_list + file_data_clean_list))
+            )
+            return {"judges": titlecase(", ".join(new_judges_list))}
+        else:
+            if skip_judge_merger:
+                # Fail silently but continue to merge
+                logger.info(
+                    f"Can't merge judges, something failed, cluster id: {cluster_id}"
+                )
+                return {}
+            else:
+                # Stop merge raising an exception
+                raise JudgeException("Judges are completely different.")
+
+    return {}
