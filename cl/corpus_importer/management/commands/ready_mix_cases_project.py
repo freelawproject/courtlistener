@@ -1,6 +1,10 @@
+import json
+import os
 import time
+from datetime import date
 from typing import List, TypedDict
 
+from django.conf import settings
 from django.core.management import CommandParser  # type: ignore
 from redis import Redis
 from redis.exceptions import ConnectionError
@@ -8,8 +12,10 @@ from redis.exceptions import ConnectionError
 from cl.corpus_importer.tasks import make_docket_by_iquery
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.elasticsearch_utils import build_es_base_query
 from cl.lib.redis_utils import make_redis_interface
-from cl.search.models import Court, Docket
+from cl.search.documents import DocketDocument
+from cl.search.models import SEARCH_TYPES, Court, Docket
 
 
 class OptionsType(TypedDict):
@@ -81,13 +87,56 @@ def get_and_store_starting_case_ids(options: OptionsType, r: Redis) -> None:
     logger.info(f"Finished setting starting pacer_case_ids.")
 
 
-def query_results_in_es(r):
+def query_results_in_es(options):
     """Query results in ES.
-    :param r: The Redis DB to connect to as a connection interface or str that
-    can be handed off to make_redis_interface.
+    :param options: The options from the handle method
     :return None
     """
-    pass
+
+    court_ids = get_bankruptcy_courts(["all"])
+    # The params to perform the query.
+    cd = {
+        "type": SEARCH_TYPES.RECAP,
+        "q": "chapter:7",
+        "court": " ".join(court_ids),
+        "case_name": "ready mix",
+        "filed_after": date(2020, 1, 1),
+    }
+
+    search_query = DocketDocument.search()
+    s, _ = build_es_base_query(search_query, cd)
+    s = s.extra(size=options["results_size"])
+    response = s.execute().to_dict()
+    extracted_data = [
+        {
+            "docket_absolute_url": item["_source"]["docket_absolute_url"],
+            "dateFiled": item["_source"]["dateFiled"],
+            "caseName": item["_source"]["caseName"],
+            "docketNumber": item["_source"]["docketNumber"],
+            "court_exact": item["_source"]["court_exact"],
+            "chapter": item["_source"]["chapter"],
+        }
+        for item in response["hits"]["hits"]
+    ]
+
+    # Save the json results file to: "ready_mix_cases/extracted_ready_mix_cases.json"
+    json_path = os.path.join(settings.MEDIA_ROOT, "ready_mix_cases")
+    if not os.path.exists(json_path):
+        os.makedirs(json_path)
+
+    json_file = os.path.join(
+        settings.MEDIA_ROOT,
+        "ready_mix_cases",
+        f"extracted_ready_mix_cases.json",
+    )
+    with open(json_file, "w", encoding="utf-8") as file:
+        json.dump(
+            extracted_data,
+            file,
+            indent=2,
+            sort_keys=True,
+        )
+    logger.info(f"Finished querying results in ES.")
 
 
 def add_bank_cases_to_cl(options: OptionsType, r) -> None:
@@ -219,6 +268,12 @@ class Command(VerboseCommand):
             default=2019,
             help="The year to extract the latest case from.",
         )
+        parser.add_argument(
+            "--results-size",
+            type=int,
+            default=1000,
+            help="The number of results to retrieve from the ES query.",
+        )
 
     def handle(self, *args, **options):
         r = make_redis_interface("CACHE")
@@ -229,4 +284,4 @@ class Command(VerboseCommand):
             get_and_store_starting_case_ids(options, r)
 
         if options["task"] == "query-results":
-            query_results_in_es(r)
+            query_results_in_es(options)
