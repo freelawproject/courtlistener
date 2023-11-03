@@ -101,7 +101,8 @@ def add_bank_cases_to_cl(options: OptionsType, r) -> None:
     stop_threshold = options["stop_threshold"]
     r = make_redis_interface("CACHE")
 
-    court_ids = get_bankruptcy_courts(options["courts"])
+    # Only process court with a pacer_case_id from the provided year.
+    court_ids = r.hkeys("iquery_status")
     for court_id in court_ids:
         # Restart empty iquery results to 0.
         r.hset("iquery_empty_results", court_id, 0)
@@ -136,6 +137,12 @@ def add_bank_cases_to_cl(options: OptionsType, r) -> None:
                         f"Aborting court: {court_id}, no pacer_case_id "
                         f"found in {options['year']}"
                     )
+                    continue
+
+                if iquery_empty_count >= stop_threshold:
+                    # Abort for consecutive empty results.
+                    # Stop doing this court.
+                    court_ids.remove(court_id)
                     continue
                 pacer_case_id = r.hincrby("iquery_status", court_id, 1)
                 make_docket_by_iquery.apply_async(
