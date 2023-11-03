@@ -26,6 +26,7 @@ from cl.lib.pacer import (
     normalize_attorney_role,
 )
 from cl.lib.privacy_tools import anonymize
+from cl.lib.redis_utils import make_redis_interface
 from cl.lib.timezone_helpers import localize_date_and_time
 from cl.lib.utils import previous_and_next, remove_duplicate_dicts
 from cl.people_db.lookup_utils import lookup_judge_by_full_name_and_set_attr
