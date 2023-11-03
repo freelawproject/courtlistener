@@ -1212,7 +1212,7 @@ def make_docket_by_iquery(
         d,
         tag_names,
         add_to_solr=True,
-        log_results_redis=True,
+        log_results_redis=log_results_redis,
     )
 
 
