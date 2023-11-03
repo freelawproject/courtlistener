@@ -87,7 +87,7 @@ def query_results_in_es(r):
     can be handed off to make_redis_interface.
     :return None
     """
-    docket_ids = r.smembers("iquery_dockets")
+    pass
 
 
 def add_bank_cases_to_cl(options: OptionsType, r) -> None:
@@ -119,17 +119,16 @@ def add_bank_cases_to_cl(options: OptionsType, r) -> None:
             break
 
         for court_id in court_ids:
+            iquery_empty_count = int(r.hget("iquery_empty_results", court_id))
+            if iquery_empty_count >= stop_threshold:
+                # Abort for consecutive empty results.
+                # Stop doing this court.
+                court_ids.remove(court_id)
+                continue
+
             throttle.maybe_wait()
             try:
                 pacer_case_id = r.hget("iquery_status", court_id)
-                iquery_empty_count = int(
-                    r.hget("iquery_empty_results", court_id)
-                )
-                if iquery_empty_count >= stop_threshold:
-                    # Abort for consecutive empty results.
-                    # Stop doing this court.
-                    court_ids.remove(court_id)
-                    continue
                 if pacer_case_id is None:
                     # Abort, no pacer_case_id found for the given year
                     court_ids.remove(court_id)

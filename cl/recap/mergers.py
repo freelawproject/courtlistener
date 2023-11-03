@@ -1605,7 +1605,6 @@ def save_iquery_to_docket(
     d: Docket,
     tag_names: Optional[List[str]],
     add_to_solr: bool = False,
-    log_results_redis=False,
 ) -> Optional[int]:
     """Merge iquery results into a docket
 
@@ -1614,16 +1613,11 @@ def save_iquery_to_docket(
     :param d: A docket object to work with
     :param tag_names: Tags to add to the items
     :param add_to_solr: Whether to save the completed docket to solr
-    :param log_results_redis: Log results in redis for the ready mix project
     :return: The pk of the docket if successful. Else, None.
     """
     d = async_to_sync(update_docket_metadata)(d, iquery_data)
     try:
         d.save()
-        if log_results_redis:
-            # Log the Docket id in Redis.
-            r = make_redis_interface("CACHE")
-            r.sadd("iquery_dockets", d.pk)
         add_bankruptcy_data_to_docket(d, iquery_data)
     except IntegrityError as exc:
         msg = "Integrity error while saving iquery response."
