@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -312,13 +313,14 @@ _position_signal_processor = ESSignalProcessor(
     Position, PositionDocument, position_field_mapping
 )
 
-_docket_signal_processor = ESSignalProcessor(
-    Docket, DocketDocument, docket_field_mapping
-)
-
-_recap_document_signal_processor = ESSignalProcessor(
-    RECAPDocument, ESRECAPDocument, recap_document_field_mapping
-)
+if not settings.ELASTICSEARCH_RECAP_SIGNALS_DISABLED:
+    # Temporarily disable ES indexing signals for RECAP documents.
+    _docket_signal_processor = ESSignalProcessor(
+        Docket, DocketDocument, docket_field_mapping
+    )
+    _recap_document_signal_processor = ESSignalProcessor(
+        RECAPDocument, ESRECAPDocument, recap_document_field_mapping
+    )
 
 
 @receiver(

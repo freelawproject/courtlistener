@@ -6,10 +6,15 @@ from ..django import TESTING
 
 if TESTING:
     ELASTICSEARCH_DISABLED = True
+    ELASTICSEARCH_RECAP_SIGNALS_DISABLED = False
 else:
     ELASTICSEARCH_DISABLED = env(
         "ELASTICSEARCH_DISABLED",
         default=False,
+    )
+    ELASTICSEARCH_RECAP_SIGNALS_DISABLED = env(
+        "ELASTICSEARCH_RECAP_SIGNALS_DISABLED",
+        default=True,
     )
 
 #
