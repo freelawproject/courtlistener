@@ -483,60 +483,62 @@ def prepare_opinions_found(extracted_opinions: list) -> list:
     return opinions
 
 
-def fix_simple_tags(soup: BeautifulSoup, columbia_data: dict) -> None:
-    """Parse and store data from SIMPLE_TAGS
+def fix_reporter_caption(found_tags) -> None:
+    """Remove unnecessary information from reporter_caption tag
 
-    :param soup: bs element containing all xml tags
-    :param columbia_data: a dict that contains all parsed data
+    The reporter_caption may contain the location, and we need to remove it to make the name cleaner e.g. Tex.App.-Ft.Worth [2d Dist.] 2002
+    :param found_tags: a list of found tags
     :return: None
     """
-    for tag in SIMPLE_TAGS:
-        found_tags = soup.findAll(tag)
-        for found_tag in found_tags:
-            # remove inner <citation> and <page_number> tags and content
-            extra_tags_to_remove = found_tag.findAll(
-                ["citation", "page_number"]
-            )
-            if extra_tags_to_remove:
-                for r in extra_tags_to_remove:
-                    if tag == "reporter_caption":
-                        # The reporter_caption may contain the location, and we need
-                        # to remove it to make the name cleaner, e.g. Tex.App.-Ft.
-                        # Worth [2d Dist.] 2002
-                        if r.next_sibling:
-                            if type(r.next_sibling) == NavigableString:
-                                # The element is not tagged, it is just a text
-                                # string
-                                r.next_sibling.extract()
-                    r.extract()
+    for found_tag in found_tags:
+        # Remove inner <citation> and <page_number> tags and content
+        extra_tags_to_remove = found_tag.findAll(["citation", "page_number"])
+        if extra_tags_to_remove:
+            for r in extra_tags_to_remove:
+                if r.next_sibling:
+                    if type(r.next_sibling) == NavigableString:
+                        # The element is not tagged, it is just a text
+                        # string
+                        r.next_sibling.extract()
+                r.extract()
+
+
+def fetch_simple_tags(soup, tag_name: str) -> list:
+    """Find data for specified tag name
+
+    :param soup: bs element containing all xml tags
+    :param tag_name: xml tag name to find
+    :return: a list containing the data found using tag_name
+    """
+    tag_data = []
+    if tag_name in SIMPLE_TAGS:
+        found_tags = soup.findAll(tag_name)
+
+        if tag_name == "reporter_caption":
+            fix_reporter_caption(found_tags)
 
         # We use space as a separator to add a space when we have one tag next to
         # other without a space
-        columbia_data[tag] = [
+        tag_data = [
             found_tag.get_text(separator=" ").strip()
             for found_tag in found_tags
         ]
 
-        if tag in ["attorneys", "posture"]:
+        if tag_name in ["attorneys", "posture"]:
             # Replace multiple line breaks in this specific fields
-            columbia_data[tag] = [
-                re.sub("\n+", " ", c) for c in columbia_data.get(tag, [])
-            ]
+            tag_data = [re.sub("\n+", " ", c) for c in tag_data]
 
-        if tag in ["reporter_caption"]:
+        if tag_name == "reporter_caption":
             # Remove the last comma from the case name
-            columbia_data[tag] = [
-                c.rstrip(",") for c in columbia_data.get(tag, [])
-            ]
+            tag_data = [c.rstrip(",") for c in tag_data]
 
-        # Remove repeated spaces
-        columbia_data[tag] = [
-            re.sub(" +", " ", c) for c in columbia_data.get(tag, [])
-        ]
+        tag_data = [re.sub(" +", " ", c) for c in tag_data]
 
-        if tag == "citation":
-            # Remove duplicated citations,
-            columbia_data[tag] = list(set(columbia_data[tag]))
+        if tag_name == "citation":
+            # Remove duplicated citations
+            tag_data = list(set(tag_data))
+
+    return tag_data
 
 
 def convert_columbia_html(text: str, opinion_index: int) -> str:
@@ -763,32 +765,39 @@ def extract_dates(columbia_data: dict) -> None:
     columbia_data["panel_date"] = panel_date if panel_date else None
 
 
-def find_judges(columbia_data: dict) -> None:
+def find_judges(opinions=None) -> str:
     """Find judges from opinions
 
-    :param columbia_data: a dict that contains all parsed data
-    :return: None
+    :param opinions: a list that contains all opinions as dict elements
+    :return: list of judges
     """
-    columbia_data["judges"] = []
-    for op in columbia_data.get("opinions", []):
+    if opinions is None:
+        opinions = []
+    judges = []
+    for op in opinions:
         op_byline = op.get("byline")
         if op_byline:
             judge_name = extract_judge_last_name(op_byline)
-            if judge_name not in columbia_data["judges"]:
-                columbia_data["judges"].append(judge_name)
+            if judge_name not in judges:
+                judges.append(judge_name)
+
+    judge_list = list(itertools.chain.from_iterable(judges))
+    judge_list = list(map(titlecase, judge_list))
+    return ", ".join(sorted(list(set(judge_list))))
 
 
-def map_opinion_types(columbia_data: dict) -> None:
+def map_opinion_types(opinions=None) -> None:
     """Map opinion type to model field choice
 
-    :param columbia_data: a dict that contains all parsed data
+    :param opinions: a list that contains all opinions as dict elements
     :return: None
     """
 
+    if opinions is None:
+        opinions = []
     lead = False
-    for op in columbia_data.get("opinions", []):
+    for op in opinions:
         op_type = op.get("type")
-
         # Only first opinion with "opinion" type is a lead opinion, the next opinion
         # with "opinion" type is an addendum
         if not lead and op_type and op_type == "opinion":
@@ -801,32 +810,3 @@ def map_opinion_types(columbia_data: dict) -> None:
             op["type"] = "040dissent"
         elif op_type and op_type == "concurrence":
             op["type"] = "030concurrence"
-
-
-def format_additional_fields(data: dict, soup: BeautifulSoup) -> None:
-    """Prepare data and rename key names to match model field names
-
-    :param data: dict with data extracted from xml
-    :param soup: bs object with all file content
-    :return: None
-    """
-    data["syllabus"] = (
-        "\n".join([s.decode_contents() for s in soup.findAll("syllabus")])
-        or ""
-    )
-    data["docket"] = "".join(data.get("docket", [])) or None
-    data["attorneys"] = "\n".join(data.get("attorneys", [])) or ""
-    data["posture"] = "".join(data.get("posture", [])) or ""
-    data["case_name_full"] = (
-        format_case_name("".join(data.pop("caption", []))) or ""
-    )
-    data["case_name"] = (
-        format_case_name("".join(data.pop("reporter_caption", []))) or ""
-    )
-    data["panel"] = (
-        extract_judge_last_name("".join(data.get("panel", []))) or []
-    )
-    # Convert list of lists to list and titlecase names
-    judge_list = list(itertools.chain.from_iterable(data.get("judges", [])))
-    judge_list = list(map(titlecase, judge_list))
-    data["judges"] = ", ".join(sorted(list(set(judge_list))))

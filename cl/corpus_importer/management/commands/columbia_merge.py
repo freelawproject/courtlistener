@@ -26,9 +26,9 @@ from cl.corpus_importer.import_columbia.columbia_utils import (
     convert_columbia_html,
     extract_dates,
     extract_opinions,
+    fetch_simple_tags,
     find_judges,
-    fix_simple_tags,
-    format_additional_fields,
+    format_case_name,
     is_opinion_published,
     map_opinion_types,
     prepare_opinions_found,
@@ -51,6 +51,7 @@ from cl.corpus_importer.utils import (
 )
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.people_db.lookup_utils import (
+    extract_judge_last_name,
     find_just_name,
     lookup_judges_by_last_name_list,
 )
@@ -442,7 +443,6 @@ def process_cluster(
     :param filepath: specified path to xml file
     :return: None
     """
-    columbia_data: dict = {}
 
     cluster = (
         OpinionCluster.objects.filter(id=cluster_id)
@@ -464,18 +464,41 @@ def process_cluster(
         )
         return
 
-    columbia_data["published"] = is_opinion_published(soup)
-
     outer_opinion = soup.find("opinion")
     extracted_opinions = extract_opinions(outer_opinion)
     opinions = prepare_opinions_found(extracted_opinions)
-    columbia_data["opinions"] = opinions
+    map_opinion_types(opinions)
 
-    find_judges(columbia_data)
-    map_opinion_types(columbia_data)
-    fix_simple_tags(soup, columbia_data)
+    columbia_data: dict = {
+        "published": is_opinion_published(soup),
+        "file": filepath,
+        "attorneys": "\n".join(fetch_simple_tags(soup, "attorneys")) or "",
+        "citations": fetch_simple_tags(soup, "citation"),
+        "date": fetch_simple_tags(soup, "date"),
+        "docket": "".join(fetch_simple_tags(soup, "docket")) or None,
+        "hearing_date": fetch_simple_tags(soup, "hearing_date"),
+        "panel": extract_judge_last_name(
+            "".join(fetch_simple_tags(soup, "panel"))
+        )
+        or [],
+        "posture": "".join(fetch_simple_tags(soup, "posture")) or "",
+        "case_name": format_case_name(
+            "".join(fetch_simple_tags(soup, "reporter_caption"))
+        )
+        or "",
+        "case_name_full": format_case_name(
+            "".join(fetch_simple_tags(soup, "caption"))
+        )
+        or "",
+        "judges": find_judges(opinions),
+        "syllabus": "\n".join(
+            [s.decode_contents() for s in soup.findAll("syllabus")]
+        )
+        or "",
+        "opinions": opinions,
+    }
+
     extract_dates(columbia_data)
-    format_additional_fields(columbia_data, soup)
 
     try:
         with transaction.atomic():
