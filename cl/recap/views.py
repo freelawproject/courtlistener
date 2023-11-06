@@ -1,3 +1,5 @@
+import asyncio
+
 from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib.auth.models import User
 from rest_framework.exceptions import ValidationError
@@ -53,7 +55,8 @@ class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
     @async_to_sync
     async def perform_create(self, serializer):
         pq = await sync_to_async(serializer.save)(uploader=self.request.user)
-        await process_recap_upload(pq)
+        recap_upload_task = asyncio.create_task(process_recap_upload(pq))
+        await asyncio.shield(recap_upload_task)
 
 
 class EmailProcessingQueueViewSet(LoggingMixin, ModelViewSet):
