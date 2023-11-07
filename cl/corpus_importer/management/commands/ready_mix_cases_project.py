@@ -15,7 +15,11 @@ from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.elasticsearch_utils import build_es_base_query
 from cl.lib.redis_utils import make_redis_interface
 from cl.search.documents import DocketDocument
+from cl.search.management.commands.cl_index_parent_and_child_docs import (
+    log_last_document_indexed,
+)
 from cl.search.models import SEARCH_TYPES, Court, Docket
+from cl.search.tasks import index_dockets_in_bulk
 
 
 class OptionsType(TypedDict):
@@ -25,6 +29,48 @@ class OptionsType(TypedDict):
     iteration_delay: float
     stop_threshold: int
     year: int
+
+
+def confirm_es_indexing(options):
+    queue = options["queue"]
+    chunk_size = options["chunk_size"]
+    pk_offset = options["pk_offset"]
+    chunk = []
+    processed_count = 0
+    court_ids = get_bankruptcy_courts(["all"])
+    dockets = (
+        Docket.objects.filter(
+            pk__gte=pk_offset,
+            court__in=court_ids,
+            date_filed__gt=date(2020, 1, 1),
+        )
+        .order_by("pk")
+        .values_list("pk", flat=True)
+    )
+    count = dockets.count()
+    throttle = CeleryThrottle(queue_name=queue)
+    for d_id in dockets.iterator():
+        processed_count += 1
+        last_item = count == processed_count
+        chunk.append(d_id)
+        if processed_count % chunk_size == 0 or last_item:
+            throttle.maybe_wait()
+            index_dockets_in_bulk.si(
+                chunk,
+            ).set(queue=queue).apply_async()
+            chunk = []
+            logger.info(
+                "\rProcessed {}/{}, ({:.0%}) Dockets, last PK indexed: {},".format(
+                    processed_count,
+                    count,
+                    processed_count * 1.0 / count,
+                    d_id,
+                )
+            )
+        if not processed_count % 1000:
+            # Log every 1000 dockets indexed.
+            log_last_document_indexed(d_id, "es_bankr_indexing:log")
+    logger.info(f"Successfully indexed {processed_count} dockets.")
 
 
 def get_bankruptcy_courts(court_ids: list[str]) -> list[str]:
@@ -253,7 +299,12 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--task",
             type=str,
-            choices=["scrape-iquery", "set-case-ids", "query-results"],
+            choices=[
+                "scrape-iquery",
+                "set-case-ids",
+                "query-results",
+                "re-index-dockets",
+            ],
             help="Which task do you want to do?",
         )
         parser.add_argument(
@@ -274,6 +325,18 @@ class Command(VerboseCommand):
             default=1000,
             help="The number of results to retrieve from the ES query.",
         )
+        parser.add_argument(
+            "--chunk-size",
+            type=int,
+            default="100",
+            help="The number of items to index in a single celery task.",
+        )
+        parser.add_argument(
+            "--pk-offset",
+            type=int,
+            default=0,
+            help="The parent document pk to start indexing from.",
+        )
 
     def handle(self, *args, **options):
         r = make_redis_interface("CACHE")
@@ -285,3 +348,6 @@ class Command(VerboseCommand):
 
         if options["task"] == "query-results":
             query_results_in_es(options)
+
+        if options["task"] == "re-index-dockets":
+            confirm_es_indexing(options)
