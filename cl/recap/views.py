@@ -55,7 +55,7 @@ class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
     @async_to_sync
     async def perform_create(self, serializer):
         pq = await sync_to_async(serializer.save)(uploader=self.request.user)
-        recap_upload_task = process_recap_upload(pq)
+        recap_upload_task = asyncio.create_task(process_recap_upload(pq))
         await asyncio.shield(recap_upload_task)
 
 
