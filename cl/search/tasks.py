@@ -659,33 +659,38 @@ def index_docket_parties_in_es(
 
 
 def bulk_indexing_generator(
-    child_docs: QuerySet,
-    child_es_document: ESDocumentClassType,
-    child_id_property: str,
-    instance_id: int,
+    docs_query_set: QuerySet,
+    es_document: ESDocumentClassType,
     base_doc: dict[str, str],
+    child_id_property: str | None = None,
+    instance_id: int | None = None,
 ) -> Generator[ESDictDocument, None, None]:
-    """Generate ES child documents for bulk indexing.
+    """Generate ES documents for bulk indexing.
 
-    :param child_docs: The queryset of child model instances to be indexed.
-    :param child_es_document: The Elasticsearch document class corresponding to
-    the child model.
-    :param child_id_property: The property to be used for generating ES
-    child document ID.
-    :param instance_id: The parent instance ID used for routing in ES.
+    :param docs_query_set: The queryset of model instances to be indexed.
+    :param es_document: The Elasticsearch document class corresponding to
+    the instance model.
+    :param child_id_property: Optional, the property to be used for generating
+     ES child document ID.
+    :param instance_id: Optional, the parent instance ID used for routing in ES.
     :param base_doc: The base ES document fields.
     :return: Yields ES child documents for bulk indexing.
     """
 
-    for child in child_docs.iterator():
-        child_doc = child_es_document().prepare(child)
-        child_params = {
-            "_id": getattr(ES_CHILD_ID(child.pk), child_id_property),
-            "_routing": f"{instance_id}",
-        }
-        child_doc.update(base_doc)
-        child_doc.update(child_params)
-        yield child_doc
+    for doc in docs_query_set.iterator():
+        es_doc = es_document().prepare(doc)
+        if child_id_property:
+            doc_params = {
+                "_id": getattr(ES_CHILD_ID(doc.pk), child_id_property),
+                "_routing": f"{instance_id}",
+            }
+        else:
+            doc_params = {
+                "_id": doc.pk,
+            }
+        es_doc.update(base_doc)
+        es_doc.update(doc_params)
+        yield es_doc
 
 
 @app.task(
@@ -773,9 +778,9 @@ def index_parent_and_child_docs(
                 bulk_indexing_generator(
                     child_docs,
                     child_es_document,
+                    base_doc,
                     child_id_property,
                     instance_id,
-                    base_doc,
                 ),
                 chunk_size=settings.ELASTICSEARCH_BULK_BATCH_SIZE,
             ):
@@ -788,9 +793,9 @@ def index_parent_and_child_docs(
                 bulk_indexing_generator(
                     child_docs,
                     child_es_document,
+                    base_doc,
                     child_id_property,
                     instance_id,
-                    base_doc,
                 ),
                 thread_count=settings.ELASTICSEARCH_PARALLEL_BULK_THREADS,
                 chunk_size=settings.ELASTICSEARCH_BULK_BATCH_SIZE,
@@ -848,3 +853,50 @@ def remove_document_from_es_index(
             f"The {model_label} with ID:{instance_id} can't be deleted from "
             f"the ES index, it doesn't exists."
         )
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(ConnectionError,),
+    max_retries=5,
+    interval_start=5,
+    ignore_result=True,
+)
+def index_dockets_in_bulk(
+    self: Task,
+    instance_ids: list[int],
+) -> None:
+    """Index dockets in bulk in Elasticsearch.
+
+    :param self: The Celery task instance
+    :param instance_ids: The Docket IDs to index.
+    :return: None
+    """
+
+    dockets = Docket.objects.filter(pk__in=instance_ids)
+    # Index dockets in bulk.
+    client = connections.get_connection()
+    base_doc = {
+        "_op_type": "index",
+        "_index": DocketDocument._index._name,
+    }
+    failed_docs = []
+    for success, info in parallel_bulk(
+        client,
+        bulk_indexing_generator(
+            dockets,
+            DocketDocument,
+            base_doc,
+        ),
+        thread_count=settings.ELASTICSEARCH_PARALLEL_BULK_THREADS,
+        chunk_size=settings.ELASTICSEARCH_BULK_BATCH_SIZE,
+    ):
+        if not success:
+            failed_docs.append(info["index"]["_id"])
+
+    if failed_docs:
+        logger.error(f"Error indexing Dockets in bulk IDs are: {failed_docs}")
+
+    if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
+        # Set auto-refresh, used for testing.
+        DocketDocument._index.refresh()
