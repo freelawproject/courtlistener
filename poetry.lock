@@ -61,14 +61,18 @@ name = "asgiref"
 version = "3.7.2"
 description = "ASGI specs, helper code, and adapters"
 optional = false
-python-versions = ">=3.7"
-files = [
-    {file = "asgiref-3.7.2-py3-none-any.whl", hash = "sha256:89b2ef2247e3b562a16eef663bc0e2e703ec6468e2fa8a5cd61cd449786d4f6e"},
-    {file = "asgiref-3.7.2.tar.gz", hash = "sha256:9e0ce3aa93a819ba5b45120216b23878cf6e8525eb3848653452b4192b92afed"},
-]
+python-versions = ">=3.8"
+files = []
+develop = false
 
 [package.extras]
 tests = ["mypy (>=0.800)", "pytest", "pytest-asyncio"]
+
+[package.source]
+type = "git"
+url = "https://github.com/django/asgiref.git"
+reference = "d920c3c44f59ef037be3a09a41a5640014cfb1e2"
+resolved_reference = "d920c3c44f59ef037be3a09a41a5640014cfb1e2"
 
 [[package]]
 name = "astor"
@@ -5183,4 +5187,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11, <3.12"
-content-hash = "bb0da23150a5d5b195950046af483cdf22b47d0f96320112b185297c775bc04b"
+content-hash = "d268577be2b2eba62ae5b3268df332a86dc3c6a1ab23fe433fb0fbbf16471679"
