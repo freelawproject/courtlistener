@@ -4,13 +4,17 @@ from datetime import date
 from difflib import SequenceMatcher
 from typing import Any, Iterator, Optional
 
+from django.db.utils import IntegrityError
 from django.utils.timezone import now
+from eyecite import get_citations
+from eyecite.models import FullCaseCitation
 from juriscraper.lib.string_utils import harmonize, titlecase
 
+from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.command_utils import logger
 from cl.lib.string_diff import get_cosine_similarity
 from cl.people_db.lookup_utils import find_all_judges
-from cl.search.models import Docket, OpinionCluster
+from cl.search.models import Citation, Docket, OpinionCluster
 
 
 class OpinionMatchingException(Exception):
@@ -537,3 +541,47 @@ def merge_judges(
                 raise JudgeException("Judges are completely different.")
 
     return {}
+
+
+def add_citations_to_cluster(cites: list[str], cluster_id: int) -> None:
+    """Add string citations to OpinionCluster if it has not yet been added
+
+    :param cites: citation list
+    :param cluster_id: cluster id related to citations
+    :return: None
+    """
+    for cite in cites:
+        clean_cite = re.sub(r"\s+", " ", cite)
+        citation = get_citations(clean_cite)
+        if (
+            not citation
+            or not isinstance(citation[0], FullCaseCitation)
+            or not citation[0].groups.get("volume", False)
+        ):
+            logger.warning(f"Citation parsing failed for {clean_cite}")
+            continue
+
+        if not citation[0].corrected_reporter():
+            reporter_type = Citation.STATE
+        else:
+            cite_type_str = citation[0].all_editions[0].reporter.cite_type
+            reporter_type = map_reporter_db_cite_type(cite_type_str)
+
+        try:
+            o, created = Citation.objects.get_or_create(
+                volume=citation[0].groups["volume"],
+                reporter=citation[0].corrected_reporter(),
+                page=citation[0].groups["page"],
+                type=reporter_type,
+                cluster_id=cluster_id,
+            )
+            if created:
+                logger.info(
+                    f"New citation: {cite} added to cluster id: {cluster_id}"
+                )
+        except IntegrityError:
+            logger.warning(
+                f"Reporter mismatch for cluster: {cluster_id} on cite: {cite}"
+            )
+
+    pass

@@ -14,14 +14,17 @@ from courts_db import find_court
 from django.conf import settings
 from django.db import transaction
 from django.db.models import QuerySet
-from django.db.utils import IntegrityError, OperationalError
+from django.db.utils import OperationalError
 from eyecite.find import get_citations
 from eyecite.models import FullCaseCitation
 from juriscraper.lib.diff_tools import normalize_phrase
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize, titlecase
 
-from cl.citations.utils import map_reporter_db_cite_type
-from cl.corpus_importer.utils import clean_docket_number, compare_documents
+from cl.corpus_importer.utils import (
+    add_citations_to_cluster,
+    clean_docket_number,
+    compare_documents,
+)
 from cl.lib.argparse_types import _argparse_volumes
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_diff import get_cosine_similarity
@@ -399,8 +402,9 @@ def parse_harvard_opinions(options: OptionsType) -> None:
             # upgrade this to do a full merge.
 
             with transaction.atomic():
-                add_citations(
-                    data["citations"], cluster_id=previously_imported_case.id
+                add_citations_to_cluster(
+                    [c.get("cite") for c in data.get("citations", [])],
+                    cluster_id=previously_imported_case.id,
                 )
                 logger.info(
                     f"Adding citations for case at https://www.courtlistener.com/opinion/{previously_imported_case.id}/{previously_imported_case.slug}"
@@ -547,7 +551,9 @@ def add_new_case(
         logger.info("Saving cluster for: %s", cluster.id)
 
         logger.info("Adding citation for: %s", citation.corrected_citation())
-        add_citations(data["citations"], cluster.id)
+        add_citations_to_cluster(
+            [c.get("cite") for c in data.get("citations", [])], cluster.id
+        )
         new_op_pks = add_opinions(soup, cluster.id, citation)
 
     if make_searchable:
@@ -557,63 +563,6 @@ def add_new_case(
     logger.info(
         f"Finished adding case at https://www.courtlistener.com/opinion/{cluster.id}/{cluster.slug}"
     )
-
-
-class CitationType(TypedDict):
-    cite: str
-    type: str
-
-
-def add_citations(cites: List[CitationType], cluster_id: int) -> None:
-    """Add citations to OpinionClusters
-
-    :param cites: Harvard Citation data
-    :param cluster_id: Cluster of found opinion in DB
-    :return: None
-    """
-    for cite in cites:
-        # Cleanup citations with extra spaces
-        clean_cite = re.sub(r"\s+", " ", cite["cite"])
-        citation = get_citations(clean_cite)
-        if (
-            not citation
-            or not isinstance(citation[0], FullCaseCitation)
-            or not citation[0].groups.get("volume", False)
-        ):
-            logger.warning(f"Citation parsing failed for {clean_cite}")
-            continue
-
-        # Because of non-canonical reporters this code breaks for states like
-        # Washington, where there are reporter abbreviations like "wash", that
-        # refer to more than one reporter series. The fix here is to eventually
-        # look up the abbreviation in reporters DB and see if the cite_type
-        # varies across the reporter series it refers to. If so, we have a hard
-        # problem -- maybe unsolveable -- if not, we can just use the value we
-        # get. In the case of Wash., it refers to two reporter series, both of
-        # which are of type "state", so it's easy.
-
-        # We now have an example of non-canonical reporters that do not have
-        # the same type, in Arkansas and Ark App. - We can resolve these by
-        # defining the regex pattern much more narrowly.  The neutral cite
-        # follows a four digit year volume while the state reporter does not.
-        if not citation[0].corrected_reporter():
-            reporter_type = Citation.STATE
-        else:
-            cite_type_str = citation[0].all_editions[0].reporter.cite_type
-            reporter_type = map_reporter_db_cite_type(cite_type_str)
-
-        try:
-            Citation.objects.get_or_create(
-                volume=citation[0].groups["volume"],
-                reporter=citation[0].corrected_reporter(),
-                page=citation[0].groups["page"],
-                type=reporter_type,
-                cluster_id=cluster_id,
-            )
-        except IntegrityError:
-            logger.warning(
-                f"Reporter mismatch for cluster: {cluster_id} on cite: {cite['cite']}"
-            )
 
 
 def add_opinions(
@@ -920,7 +869,7 @@ def find_previously_imported_cases(
     date_filed: date,
     harvard_characters: str,
     case_name_full: str,
-    citation: Citation,
+    citation: FullCaseCitation,
 ) -> Optional[OpinionCluster]:
     """Check if opinion is in Courtlistener
 

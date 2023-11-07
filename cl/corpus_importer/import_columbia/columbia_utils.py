@@ -238,7 +238,8 @@ def is_opinion_published(soup: BeautifulSoup) -> bool:
 
 
 def read_xml_to_soup(filepath: str) -> BeautifulSoup:
-    """This function fixes the bad tags in columbia xml files
+    """This function reads the xml file, fixes the bad tags in columbia xml files and
+    returns a BeautifulSoup object
 
     :param filepath: path to xml file
     :return: BeautifulSoup object of parsed content
@@ -294,8 +295,9 @@ def add_floating_opinion(
 
 
 def extract_opinions(outer_opinion: BeautifulSoup) -> list[Optional[dict]]:
-    """We extract all possible opinions from bs content, with and without author,
-    and we create new opinions if floating content exists
+    """We extract all possible opinions from BeautifulSoup, with and without author,
+    and we create new opinions if floating content exists(content that is not
+    explicitly defined within the opinion tag)
 
     :param outer_opinion: element containing all xml tags
     :return: list of opinion dicts
@@ -691,8 +693,8 @@ def parse_dates(
     return dates
 
 
-def extract_dates(columbia_data: dict) -> None:
-    """Extract and parse all possible dates obtained from xml file
+def parse_and_extract_dates(columbia_data: dict) -> None:
+    """Parse and extract all possible dates obtained from xml file
 
     :param columbia_data: a dict that contains all parsed data
     :return: None

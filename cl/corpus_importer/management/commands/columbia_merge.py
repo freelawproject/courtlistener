@@ -1,12 +1,16 @@
 """
 Command to merge opinions with columbia xml file
 
-Merge using a csv file with cluster id and xml file path pointing to mounted directory and file path
-docker-compose -f docker/courtlistener/docker-compose.yml exec cl-django python manage.py columbia_merge --csv-file /opt/courtlistener/cl/assets/media/test1.csv
+Merge using a csv file with cluster id and xml file path pointing to a file path
+manage.py columbia_merge --csv-file /opt/courtlistener/cl/assets/media/test1.csv
+
+The absolute path to the xml file is a combination of xml-dir param and xml filepath,
+e.g. "/opt/courtlistener/_columbia" +
+"michigan/supreme_court_opinions/documents/d5a484f1bad20ba0.xml"
 
 Csv example:
 cluster_id,filepath
-825802,/opt/columbia/michigan/supreme_court_opinions/documents/d5a484f1bad20ba0.xml
+825802,michigan/supreme_court_opinions/documents/d5a484f1bad20ba0.xml
 
 """
 import os.path
@@ -24,13 +28,13 @@ from juriscraper.lib.string_utils import titlecase
 
 from cl.corpus_importer.import_columbia.columbia_utils import (
     convert_columbia_html,
-    extract_dates,
     extract_opinions,
     fetch_simple_tags,
     find_judges,
     format_case_name,
     is_opinion_published,
     map_opinion_types,
+    parse_and_extract_dates,
     prepare_opinions_found,
     read_xml_to_soup,
 )
@@ -42,6 +46,7 @@ from cl.corpus_importer.utils import (
     JudgeException,
     OpinionMatchingException,
     OpinionTypeException,
+    add_citations_to_cluster,
     match_text_lists,
     merge_case_names,
     merge_docket_numbers,
@@ -234,10 +239,7 @@ def map_and_merge_opinions(
         else:
             raise OpinionMatchingException("Failed to match opinions")
 
-    elif (
-        len(columbia_opinions) > len(cl_cleaned_opinions)
-        and len(cl_cleaned_opinions) == 1
-    ):
+    elif len(columbia_opinions) > len(cl_cleaned_opinions) == 1:
         for op in columbia_opinions:
             opinion_type = op.get("type")
             file = op.get("file")
@@ -415,7 +417,10 @@ def update_cluster_panel(
     panel_list: list[str],
     panel_date: Optional[date] = None,
 ) -> None:
-    """Update cluster's panel, this is done independently since it is a m2m relationship
+    """Update cluster's panel
+
+    This is done independently since it is a m2m relationship, we collect the
+    corrected names, find the Person ids and then add them to the relation
 
     :param cluster: the cluster object
     :param panel_list: list with people names
@@ -424,11 +429,9 @@ def update_cluster_panel(
     """
 
     panel_list = [titlecase(p) for p in panel_list]
-
     panel = async_to_sync(lookup_judges_by_last_name_list)(
-        panel_list, cluster.docket.court.id, panel_date
+        panel_list, cluster.docket.court.id, panel_date, True
     )
-
     if panel:
         cluster.panel.add(*Person.objects.filter(id__in=[p.id for p in panel]))
 
@@ -436,11 +439,13 @@ def update_cluster_panel(
 def process_cluster(
     cluster_id: int,
     filepath: str,
+    skip_judge_merger: bool = False,
 ) -> None:
     """Merge specified cluster id
 
     :param cluster_id: Cluster object id to merge
     :param filepath: specified path to xml file
+    :param skip_judge_merger: skip judge merger
     :return: None
     """
 
@@ -498,12 +503,11 @@ def process_cluster(
         "opinions": opinions,
     }
 
-    extract_dates(columbia_data)
+    parse_and_extract_dates(columbia_data)
 
     try:
         with transaction.atomic():
             map_and_merge_opinions(cluster_id, columbia_data["opinions"])
-            # Non overlapping data and new values for cluster fields
             (
                 changed_values_dictionary,
                 new_values,
@@ -518,7 +522,7 @@ def process_cluster(
             )
             date_filed_to_update = merge_date_filed(cluster, columbia_data)
             overlapping_data_to_update = merge_overlapping_data(
-                cluster, changed_values_dictionary
+                cluster, changed_values_dictionary, skip_judge_merger
             )
             if columbia_data["panel"]:
                 update_cluster_panel(
@@ -540,6 +544,8 @@ def process_cluster(
                 OpinionCluster.objects.filter(id=cluster_id).update(
                     **data_to_update
                 )
+
+            add_citations_to_cluster(columbia_data["citations"], cluster_id)
 
             # We need to refresh the object before trying to use it to
             # update the cluster source
@@ -570,18 +576,18 @@ def process_cluster(
 
 
 def merge_columbia_into_cl(options) -> None:
-    """Merge Columbia Data into CL
+    """Merge columbia data into CL
 
-    :param options: Absolute path to csv file
+    :param options: options passed to management command
     :return: None
     """
     csv_filepath, xml_dir = options["csv_file"], options["xml_dir"]
     skip_until, limit = options["skip_until"], options["limit"]
-    logger.info(f"Loading csv file at {csv_filepath}")
-
+    skip_judge_merger = options["skip_judge_merger"]
     total_processed = 0
     start = False if skip_until else True
 
+    logger.info(f"Loading csv file at {csv_filepath}")
     data = pd.read_csv(
         csv_filepath, delimiter=",", dtype={"cluster_id": int, "filepath": str}
     )
@@ -604,6 +610,7 @@ def merge_columbia_into_cl(options) -> None:
         process_cluster(
             cluster_id=cluster_id,
             filepath=xml_path,
+            skip_judge_merger=skip_judge_merger,
         )
 
         total_processed += 1
@@ -643,6 +650,12 @@ class Command(VerboseCommand):
             default="/opt/courtlistener/_columbia",
             required=False,
             help="The absolute path to the directory with columbia xml files",
+        )
+
+        parser.add_argument(
+            "--skip-judge-merger",
+            action="store_true",
+            help="Set flag to skip judge merger if the judges do not match",
         )
 
     def handle(self, *args, **options) -> None:
