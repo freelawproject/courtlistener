@@ -126,11 +126,9 @@ def get_and_store_starting_case_ids(options: OptionsType, r: Redis) -> None:
         latest_pacer_case_id = get_latest_pacer_case_id(
             court_id, options["year"]
         )
-        # if not latest_pacer_case_id:
-        # r.hdel("iquery_status", court_id)
-        # continue
         if not latest_pacer_case_id:
-            latest_pacer_case_id = 0
+            r.hdel("iquery_status", court_id)
+            continue
         r.hset("iquery_status", court_id, latest_pacer_case_id)
     logger.info(f"Finished setting starting pacer_case_ids.")
 
