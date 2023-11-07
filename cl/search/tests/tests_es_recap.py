@@ -33,7 +33,7 @@ from cl.search.factories import (
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
     compose_redis_key,
     get_last_parent_document_id_processed,
-    log_last_parent_document_processed,
+    log_last_document_indexed,
 )
 from cl.search.models import SEARCH_TYPES, RECAPDocument
 from cl.search.tasks import (
@@ -2129,13 +2129,13 @@ class IndexDocketRECAPDocumentsCommandTest(
     def test_log_and_get_last_document_id(self):
         """Can we log and get the last docket indexed to/from redis?"""
 
-        last_values = log_last_parent_document_processed(
-            SEARCH_TYPES.RECAP, 1001
+        last_values = log_last_document_indexed(
+            1001, compose_redis_key(SEARCH_TYPES.RECAP)
         )
         self.assertEqual(last_values["last_document_id"], 1001)
 
-        last_values = log_last_parent_document_processed(
-            SEARCH_TYPES.RECAP, 2001
+        last_values = log_last_document_indexed(
+            2001, compose_redis_key(SEARCH_TYPES.RECAP)
         )
         self.assertEqual(last_values["last_document_id"], 2001)
 
@@ -2147,6 +2147,56 @@ class IndexDocketRECAPDocumentsCommandTest(
         keys = self.r.keys(compose_redis_key(SEARCH_TYPES.RECAP))
         if keys:
             self.r.delete(*keys)
+
+    def test_index_dockets_in_bulk_task(self):
+        """Confirm the command can properly index dockets in bulk from the
+        ready_mix_cases_project command.
+        """
+
+        court = CourtFactory(id="canb", jurisdiction="FB")
+        d_1 = DocketFactory(
+            court=court,
+            date_filed=datetime.date(2019, 8, 16),
+        )
+        BankruptcyInformationFactory(docket=d_1, chapter="7")
+
+        d_2 = DocketFactory(
+            court=court,
+            date_filed=datetime.date(2020, 8, 16),
+        )
+        BankruptcyInformationFactory(docket=d_2, chapter="7")
+
+        d_3 = DocketFactory(
+            court=court,
+            date_filed=datetime.date(2021, 8, 16),
+        )
+        BankruptcyInformationFactory(docket=d_3, chapter="7")
+
+        d_4 = DocketFactory(
+            court=court,
+            date_filed=datetime.date(2021, 8, 16),
+        )
+        BankruptcyInformationFactory(docket=d_4, chapter="13")
+
+        self.delete_index("search.Docket")
+        self.create_index("search.Docket")
+
+        s = DocketDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0)
+        # Call cl_index_parent_and_child_docs command.
+        call_command(
+            "ready_mix_cases_project",
+            task="re-index-dockets",
+            queue="celery",
+        )
+
+        s = DocketDocument.search().query("match_all")
+        self.assertEqual(s.count(), 3)
+
+        d_1.delete()
+        d_2.delete()
+        d_3.delete()
+        d_4.delete()
 
 
 class RECAPIndexingTest(ESIndexTestCase, TransactionTestCase):
