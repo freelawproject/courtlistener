@@ -28,13 +28,13 @@ from juriscraper.lib.string_utils import titlecase
 
 from cl.corpus_importer.import_columbia.columbia_utils import (
     convert_columbia_html,
-    extract_opinions,
+    extract_columbia_opinions,
     fetch_simple_tags,
+    find_dates_in_xml,
     find_judges,
     format_case_name,
     is_opinion_published,
     map_opinion_types,
-    parse_and_extract_dates,
     process_extracted_opinions,
     read_xml_to_soup,
 )
@@ -47,7 +47,9 @@ from cl.corpus_importer.utils import (
     match_opinion_lists,
     merge_case_names,
     merge_docket_numbers,
-    merge_overlapping_data,
+    merge_judges,
+    merge_long_fields,
+    merge_strings,
 )
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.people_db.lookup_utils import (
@@ -263,38 +265,6 @@ def map_and_merge_opinions(
         )
 
 
-def combine_non_overlapping_data(
-    cluster: OpinionCluster, columbia_data: dict
-) -> tuple[dict[str, tuple], dict[str, Any]]:
-    """Combine non overlapping data and return dictionary of data for merging
-
-    :param cluster: Cluster to merge
-    :param columbia_data: The columbia data as json
-    :return: Optional dictionary of data to continue to merge
-    """
-
-    # this function only applies to a few fields because some fields are processed
-    # into independent functions
-    fields_to_get = ["syllabus", "attorneys", "posture", "judges"]
-    fields_data = {
-        k: v for k, v in columbia_data.items() if k in fields_to_get
-    }
-    changed_values_dictionary: dict[str, tuple] = {}
-    new_values: dict[str, Any] = {}
-    for key, value in fields_data.items():
-        cl_value = getattr(cluster, key)
-        if not cl_value and value:
-            # Value is empty in cl for key, we can add it directly to the object
-            new_values[key] = value
-        else:
-            if value != cl_value and value:
-                # We have different values and value from file exists, update dict
-                # Tuple format: (new value, old value)
-                changed_values_dictionary[key] = (value, cl_value)
-
-    return changed_values_dictionary, new_values
-
-
 def merge_date_filed(
     cluster: OpinionCluster, columbia_data: dict
 ) -> dict[str, Any]:
@@ -362,6 +332,45 @@ def update_cluster_panel(
         cluster.panel.add(*Person.objects.filter(id__in=[p.id for p in panel]))
 
 
+def merge_field(
+    cluster: OpinionCluster,
+    file_value: Optional[str],
+    field_name: str,
+    skip_judge_merger: bool = False,
+) -> dict:
+    """Try to merge the cluster data and file field data
+
+    :param cluster: the cluster object
+    :param file_value: the value from file field
+    :param field_name: the field name to work with
+    :param skip_judge_merger: skip judge merger
+    :return: dict
+    """
+    cl_value = getattr(cluster, field_name)
+    if not file_value:
+        return {}
+    if file_value and not cl_value:
+        return {field_name: file_value}
+    if file_value and cl_value:
+        if field_name in ["syllabus", "posture"]:
+            return merge_long_fields(
+                field_name, (file_value, cl_value), cluster.id
+            )
+        elif field_name == "attorneys":
+            return merge_strings(field_name, (file_value, cl_value))
+        elif field_name == "judges":
+            return merge_judges(
+                (file_value, cl_value),
+                cluster.id,
+                is_columbia=True,
+                skip_judge_merger=skip_judge_merger,
+            )
+        else:
+            logger.info(f"Field not considered in the process: {field_name}")
+
+    return {}
+
+
 def process_cluster(
     cluster_id: int,
     filepath: str,
@@ -396,48 +405,53 @@ def process_cluster(
         return
 
     outer_opinion = soup.find("opinion")
-    extracted_opinions = extract_opinions(outer_opinion)
+    extracted_opinions = extract_columbia_opinions(outer_opinion)
     opinions = process_extracted_opinions(extracted_opinions)
     map_opinion_types(opinions)
+
+    panel_tags = "".join(fetch_simple_tags(soup, "panel"))
+    reporter_captions = "".join(fetch_simple_tags(soup, "reporter_caption"))
+    captions = "".join(fetch_simple_tags(soup, "caption"))
+    syllabus = "\n".join(
+        [s.decode_contents() for s in soup.findAll("syllabus")]
+    )
+    docket = "".join(fetch_simple_tags(soup, "docket")) or None
+    attorneys = "\n".join(fetch_simple_tags(soup, "attorneys"))
+    posture = "".join(fetch_simple_tags(soup, "posture"))
 
     columbia_data: dict = {
         "published": is_opinion_published(soup),
         "file": filepath,
-        "attorneys": "\n".join(fetch_simple_tags(soup, "attorneys")) or "",
+        "attorneys": attorneys,
         "citations": fetch_simple_tags(soup, "citation"),
-        "date": fetch_simple_tags(soup, "date"),
-        "docket": "".join(fetch_simple_tags(soup, "docket")) or None,
-        "hearing_date": fetch_simple_tags(soup, "hearing_date"),
-        "panel": extract_judge_last_name(
-            "".join(fetch_simple_tags(soup, "panel"))
-        )
-        or [],
-        "posture": "".join(fetch_simple_tags(soup, "posture")) or "",
-        "case_name": format_case_name(
-            "".join(fetch_simple_tags(soup, "reporter_caption"))
-        )
-        or "",
-        "case_name_full": format_case_name(
-            "".join(fetch_simple_tags(soup, "caption"))
-        )
-        or "",
+        "docket": docket,
+        "panel": extract_judge_last_name(panel_tags),
+        "posture": posture,
+        "case_name": format_case_name(reporter_captions),
+        "case_name_full": format_case_name(captions),
         "judges": find_judges(opinions),
-        "syllabus": "\n".join(
-            [s.decode_contents() for s in soup.findAll("syllabus")]
-        )
-        or "",
+        "syllabus": syllabus,
         "opinions": opinions,
     }
 
-    parse_and_extract_dates(columbia_data)
+    # Add date data into columbia dict
+    columbia_data.update(find_dates_in_xml(soup))
 
     try:
         with transaction.atomic():
             map_and_merge_opinions(cluster_id, columbia_data["opinions"])
-            (
-                changed_values_dictionary,
-                new_values,
-            ) = combine_non_overlapping_data(cluster, columbia_data)
+
+            merged_data = {}
+            for field in ["syllabus", "attorneys", "posture", "judges"]:
+                columbia_value = columbia_data.get(field)
+                if data := merge_field(
+                    cluster,
+                    columbia_value,
+                    field,
+                    skip_judge_merger=skip_judge_merger,
+                ):
+                    merged_data.update(data)
+
             if columbia_data["docket"]:
                 merge_docket_numbers(cluster, columbia_data["docket"])
             case_names_to_update = merge_case_names(
@@ -447,14 +461,7 @@ def process_cluster(
                 case_name_full_key="case_name_full",
             )
             date_filed_to_update = merge_date_filed(cluster, columbia_data)
-            overlapping_data_long_fields = ["syllabus", "posture"]
-            overlapping_data_to_update = merge_overlapping_data(
-                cluster,
-                overlapping_data_long_fields,
-                changed_values_dictionary,
-                skip_judge_merger,
-                is_columbia=True,
-            )
+
             if columbia_data["panel"]:
                 update_cluster_panel(
                     cluster,
@@ -464,10 +471,7 @@ def process_cluster(
 
             # Merge results into a single dict
             data_to_update = (
-                new_values
-                | case_names_to_update
-                | date_filed_to_update
-                | overlapping_data_to_update
+                merged_data | case_names_to_update | date_filed_to_update
             )
 
             if data_to_update:
@@ -499,7 +503,7 @@ def process_cluster(
 def merge_columbia_into_cl(options) -> None:
     """Merge columbia data into CL
 
-    :param options: options passed to management command
+    :param options: options passed from management command
     :return: None
     """
     csv_filepath, xml_dir = options["csv_file"], options["xml_dir"]

@@ -294,7 +294,9 @@ def add_floating_opinion(
     return opinions
 
 
-def extract_opinions(outer_opinion: BeautifulSoup) -> list[Optional[dict]]:
+def extract_columbia_opinions(
+    outer_opinion: BeautifulSoup,
+) -> list[Optional[dict]]:
     """We extract all possible opinions from BeautifulSoup, with and without author,
     and we create new opinions if floating content exists(content that is not
     explicitly defined within an opinion tag or doesn't have an author)
@@ -507,7 +509,7 @@ def fix_reporter_caption(found_tags) -> None:
                 r.extract()
 
 
-def fetch_simple_tags(soup, tag_name: str) -> list:
+def fetch_simple_tags(soup: BeautifulSoup, tag_name: str) -> list:
     """Find data for specified tag name
 
     :param soup: bs element containing all xml tags
@@ -695,16 +697,17 @@ def parse_dates(
     return dates
 
 
-def parse_and_extract_dates(columbia_data: dict) -> None:
-    """Parse and extract all possible dates obtained from xml file
+def find_dates_in_xml(soup: BeautifulSoup) -> dict:
+    """Find and extract all possible dates obtained from xml file
 
-    :param columbia_data: a dict that contains all parsed data
-    :return: None
+    :param soup: BeautifulSoup object containing all xml tags
+    :return: dict with found dates
     """
-    dates = columbia_data.get("date", []) + columbia_data.get(
-        "hearing_date", []
+
+    found_dates = fetch_simple_tags(soup, "date") + fetch_simple_tags(
+        soup, "hearing_date"
     )
-    parsed_dates = parse_dates(dates)
+    parsed_dates = parse_dates(found_dates)
     current_year = date.today().year
     date_filed = (
         date_argued
@@ -740,10 +743,6 @@ def parse_and_extract_dates(columbia_data: dict) -> None:
                 date_cert_denied = date_info[1]
             else:
                 unknown_date = date_info[1]
-                if date_info[0] not in UNKNOWN_TAGS:
-                    logger.info(
-                        f"Found unknown date tag {date_info[0]} with date {date_info[1]} in file FILEPATH?"
-                    )
 
     # the main date (used for date_filed in OpinionCluster) and panel dates
     # (used for finding judges) are ordered in terms of which type of dates
@@ -763,10 +762,12 @@ def parse_and_extract_dates(columbia_data: dict) -> None:
         or unknown_date
     )
 
-    columbia_data["date_filed"] = main_date
-    columbia_data["date_cert_granted"] = date_cert_granted
-    columbia_data["date_cert_denied"] = date_cert_denied
-    columbia_data["panel_date"] = panel_date if panel_date else None
+    return {
+        "date_filed": main_date,
+        "date_cert_granted": date_cert_granted,
+        "date_cert_denied": date_cert_denied,
+        "panel_date": panel_date,
+    }
 
 
 def find_judges(opinions=None) -> str:
