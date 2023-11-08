@@ -220,7 +220,7 @@ def combine_non_overlapping_data(
 def merge_cluster_dates(
     cluster: OpinionCluster,
     field_name: str,
-    overlapping_data: Optional[Tuple[str | None, date]],
+    overlapping_data: Optional[Tuple],
 ) -> dict[str, Any]:
     """Compare two dates and choose the best to update the opinion cluster
     the value if one value is better than the other
@@ -429,13 +429,14 @@ def merge_opinion_clusters(
                 | headmatter_data
             )
 
-            data_to_update.update(
-                merge_cluster_dates(
-                    opinion_cluster,
-                    "other_dates",
-                    changed_values_dictionary.get("other_dates"),
+            if "other_dates" in changed_values_dictionary:
+                data_to_update.update(
+                    merge_cluster_dates(
+                        opinion_cluster,
+                        "other_dates",
+                        changed_values_dictionary.get("other_dates"),
+                    )
                 )
-            )
 
             if data_to_update:
                 OpinionCluster.objects.filter(id=cluster_id).update(
