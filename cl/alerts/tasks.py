@@ -1,6 +1,7 @@
 import copy
 from dataclasses import dataclass
 from datetime import datetime
+from importlib import import_module
 from typing import Dict, List, Tuple, Union, cast
 
 from celery import Task
@@ -11,6 +12,7 @@ from django.db import transaction
 from django.template import loader
 from django.utils.timezone import now
 from elasticsearch.exceptions import (
+    ConnectionError,
     NotFoundError,
     RequestError,
     TransportError,
@@ -37,9 +39,10 @@ from cl.lib.redis_utils import create_redis_semaphore, delete_redis_semaphore
 from cl.lib.string_utils import trunc
 from cl.recap.constants import COURT_TIMEZONES
 from cl.search.constants import ALERTS_HL_TAG
-from cl.search.documents import AudioPercolator
-from cl.search.models import SEARCH_TYPES, Docket, DocketEntry
+from cl.search.documents import ES_CHILD_ID, ESRECAPDocument, PositionDocument
+from cl.search.models import Docket, DocketEntry
 from cl.search.types import (
+    AudioPercolator,
     ESDocumentClassType,
     PercolatorResponseType,
     SaveDocumentResponseType,
@@ -47,6 +50,8 @@ from cl.search.types import (
 )
 from cl.stats.utils import tally_stat
 from cl.users.models import UserProfile
+
+es_document_module = import_module("cl.search.documents")
 
 
 def make_alert_key(d_pk: int) -> str:
@@ -600,7 +605,7 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
 
 @app.task(
     bind=True,
-    autoretry_for=(TransportError, ConnectionError, RequestError),
+    autoretry_for=(ConnectionError,),
     max_retries=3,
     interval_start=5,
 )
@@ -671,26 +676,33 @@ def send_or_schedule_alerts(
     return alerts_triggered, document_content
 
 
+# New task
 @app.task(
     bind=True,
-    autoretry_for=(TransportError, ConnectionError, RequestError),
+    autoretry_for=(ConnectionError,),
     max_retries=3,
     interval_start=5,
     ignore_result=True,
+    queue=settings.CELERY_ETL_TASK_QUEUE,
 )
-def index_alert_document(
-    self: Task, alert: Alert, es_document=AudioPercolator
+def es_save_alert_document(
+    self: Task,
+    alert_id: int,
+    es_document_name: str,
 ) -> None:
     """Helper method to prepare and index an Alert object into Elasticsearch.
 
     :param self: The celery task
-    :param alert: The Alert instance to be indexed.
-    :param es_document: The Elasticsearch document percolator used for indexing
+    :param alert_id: The Alert instance ID to be indexed.
+    :param es_document_name: The Elasticsearch document percolator name used
+    for indexing.
     the Alert instance.
     :return: Bool, True if document was properly indexed, otherwise None.
     """
 
+    es_document = getattr(es_document_module, es_document_name)
     document = es_document()
+    alert = Alert.objects.get(pk=alert_id)
     doc = document.prepare(alert)
     if not doc["percolator_query"]:
         return None
@@ -699,33 +711,3 @@ def index_alert_document(
     )
     if not doc_indexed in ["created", "updated"]:
         logger.warning(f"Error indexing Alert ID: {alert.pk}")
-
-
-@app.task(
-    bind=True,
-    autoretry_for=(TransportError, ConnectionError, RequestError),
-    max_retries=3,
-    interval_start=5,
-    ignore_result=True,
-)
-def remove_doc_from_es_index(
-    self: Task, es_document: ESDocumentClassType, instance_id: int
-) -> None:
-    """Remove a document from an Elasticsearch index.
-
-    :param self: The celery task
-    :param es_document: The Elasticsearch document type.
-    :param instance_id: The ID of the instance to be removed from the
-    Elasticsearch index.
-    :return: None
-    """
-
-    try:
-        doc = es_document.get(id=instance_id)
-        doc.delete(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)
-    except NotFoundError:
-        model_label = es_document.Django.model._meta.app_label.capitalize()
-        logger.error(
-            f"The {model_label} with ID:{instance_id} can't be deleted from "
-            f"the ES index, it doesn't exists."
-        )

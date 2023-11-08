@@ -19,10 +19,11 @@ from cl.lib.model_helpers import clean_docket_number, is_docket_number
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.types import CleanData, SearchParam
 from cl.search.constants import (
+    BOOSTS,
     SEARCH_ORAL_ARGUMENT_HL_FIELDS,
+    SEARCH_RECAP_HL_FIELDS,
     SOLR_OPINION_HL_FIELDS,
     SOLR_PEOPLE_HL_FIELDS,
-    SOLR_RECAP_HL_FIELDS,
 )
 from cl.search.forms import SearchForm
 from cl.search.models import (
@@ -32,51 +33,6 @@ from cl.search.models import (
     OpinionCluster,
     RECAPDocument,
 )
-
-recap_boosts_qf = {
-    "text": 1.0,
-    "caseName": 4.0,
-    "docketNumber": 3.0,
-    "description": 2.0,
-}
-recap_boosts_pf = {"text": 3.0, "caseName": 3.0, "description": 3.0}
-BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
-    "qf": {
-        SEARCH_TYPES.OPINION: {
-            "text": 1.0,
-            "caseName": 4.0,
-            "docketNumber": 2.0,
-        },
-        SEARCH_TYPES.RECAP: recap_boosts_qf,
-        SEARCH_TYPES.DOCKETS: recap_boosts_qf,
-        SEARCH_TYPES.ORAL_ARGUMENT: {
-            "text": 1.0,
-            "caseName": 4.0,
-            "docketNumber": 2.0,
-        },
-        SEARCH_TYPES.PEOPLE: {
-            "text": 1,
-            # Was previously 4, but that had bad results for the name "William"
-            # due to Williams and Mary College.
-            "name": 8,
-            # Suppress these fields b/c a match on them returns the wrong
-            # person.
-            "appointer": 0.3,
-            "supervisor": 0.3,
-            "predecessor": 0.3,
-        },
-    },
-    # Phrase-based boosts.
-    "pf": {
-        SEARCH_TYPES.OPINION: {"text": 3.0, "caseName": 3.0},
-        SEARCH_TYPES.RECAP: recap_boosts_pf,
-        SEARCH_TYPES.DOCKETS: recap_boosts_pf,
-        SEARCH_TYPES.ORAL_ARGUMENT: {"caseName": 3.0},
-        SEARCH_TYPES.PEOPLE: {
-            # None here. Phrases don't make much sense for people.
-        },
-    },
-}
 
 
 def get_solr_interface(
@@ -590,7 +546,7 @@ def add_highlighting(
             "party",
             "referred_to_id",
         ]
-        hlfl = SOLR_RECAP_HL_FIELDS
+        hlfl = SEARCH_RECAP_HL_FIELDS
     elif cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
         fl = [
             "id",
