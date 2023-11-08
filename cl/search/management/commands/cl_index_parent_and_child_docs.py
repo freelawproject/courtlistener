@@ -20,19 +20,18 @@ def compose_redis_key(search_type: str) -> str:
     return f"es_{search_type}_indexing:log"
 
 
-def log_last_parent_document_processed(
-    search_type: str, document_pk: int
+def log_last_document_indexed(
+    document_pk: int, log_key: str
 ) -> Mapping[str | bytes, int | str]:
     """Log the last document_id indexed.
 
-    :param search_type: The search type key to log.
     :param document_pk: The last document_id processed.
+    :param log_key: The log key to use in redis.
     :return: The data logged to redis.
     """
 
     r = make_redis_interface("CACHE")
     pipe = r.pipeline()
-    log_key = compose_redis_key(search_type)
     pipe.hgetall(log_key)
     log_info: Mapping[str | bytes, int | str] = {
         "last_document_id": document_pk,
@@ -75,7 +74,6 @@ class Command(VerboseCommand):
             choices=[SEARCH_TYPES.PEOPLE, SEARCH_TYPES.RECAP],
             help=f"The search type models to index: ({', '.join([SEARCH_TYPES.PEOPLE, SEARCH_TYPES.RECAP])})",
         )
-
         parser.add_argument(
             "--pk-offset",
             type=int,
@@ -173,7 +171,9 @@ class Command(VerboseCommand):
                 )
             if not processed_count % 1000:
                 # Log every 1000 parent documents processed.
-                log_last_parent_document_processed(search_type, item_id)
+                log_last_document_indexed(
+                    item_id, compose_redis_key(search_type)
+                )
         self.stdout.write(
             f"Successfully indexed {processed_count} items from pk {pk_offset}."
         )
