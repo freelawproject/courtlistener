@@ -118,7 +118,7 @@ def get_cl_opinion_content(cluster_id: int) -> list[dict[Any, Any]]:
     is_harvard = False
 
     for i, op in enumerate(opinions_from_cluster):
-        content = None
+        content = ""
         if len(op.xml_harvard) > 1:
             content = op.xml_harvard
             is_harvard = True
