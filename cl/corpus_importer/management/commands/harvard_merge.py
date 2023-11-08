@@ -21,12 +21,10 @@ from cl.corpus_importer.utils import (
     JudgeException,
     OpinionMatchingException,
     OpinionTypeException,
-    match_text_lists,
+    match_opinion_lists,
     merge_case_names,
     merge_docket_numbers,
-    merge_judges,
-    merge_long_fields,
-    merge_strings,
+    merge_overlapping_data,
 )
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.people_db.lookup_utils import find_all_judges, find_just_name
@@ -271,75 +269,6 @@ def merge_date_filed(
     )
 
 
-def merge_overlapping_data(
-    cluster: OpinionCluster,
-    changed_values_dictionary: dict,
-    skip_judge_merger: bool = False,
-) -> dict[str, Any]:
-    """Merge overlapping data
-
-    :param cluster: the cluster object
-    :param changed_values_dictionary: the dictionary of data to merge
-    :param skip_judge_merger: skip judge merger
-    :return: None
-    """
-
-    if not changed_values_dictionary:
-        # Empty dictionary means that we don't have overlapping data
-        return {}
-
-    long_fields = [
-        "syllabus",
-        "summary",
-        "history",
-        "headnotes",
-        "correction",
-        "cross_reference",
-        "disposition",
-        "arguments",
-    ]
-
-    data_to_update = {}
-
-    for field_name in changed_values_dictionary.keys():
-        if field_name in long_fields:
-            data_to_update.update(
-                merge_long_fields(
-                    field_name,
-                    changed_values_dictionary.get(field_name),
-                    cluster.id,
-                )
-            )
-        elif field_name in ["other_dates"]:
-            data_to_update.update(
-                merge_cluster_dates(
-                    cluster,
-                    field_name,
-                    changed_values_dictionary.get(field_name),
-                )
-            )
-        elif field_name == "judges":
-            data_to_update.update(
-                merge_judges(
-                    changed_values_dictionary.get(field_name),
-                    cluster.id,
-                    is_columbia=False,
-                    skip_judge_merger=skip_judge_merger,
-                )
-            )
-        elif field_name == "attorneys":
-            data_to_update.update(
-                merge_strings(
-                    field_name,
-                    changed_values_dictionary.get(field_name, ""),
-                )
-            )
-        else:
-            logger.info(f"Field not considered in the process: {field_name}")
-
-    return data_to_update
-
-
 def update_docket_source(cluster: OpinionCluster) -> None:
     """Update docket source and complete
 
@@ -471,9 +400,25 @@ def merge_opinion_clusters(
             date_filed_to_update = merge_date_filed(
                 opinion_cluster, harvard_data
             )
+
+            overlapping_data_long_fields = [
+                "syllabus",
+                "summary",
+                "history",
+                "headnotes",
+                "correction",
+                "cross_reference",
+                "disposition",
+                "arguments",
+            ]
             overlapping_data_to_update = merge_overlapping_data(
-                opinion_cluster, changed_values_dictionary, skip_judge_merger
+                opinion_cluster,
+                overlapping_data_long_fields,
+                changed_values_dictionary,
+                skip_judge_merger,
+                is_columbia=False,
             )
+
             headmatter_data = save_headmatter(harvard_data)
 
             # Merge results
@@ -482,6 +427,14 @@ def merge_opinion_clusters(
                 | date_filed_to_update
                 | overlapping_data_to_update
                 | headmatter_data
+            )
+
+            data_to_update.update(
+                merge_cluster_dates(
+                    opinion_cluster,
+                    "other_dates",
+                    changed_values_dictionary.get("other_dates"),
+                )
             )
 
             if data_to_update:
@@ -678,7 +631,7 @@ def map_and_merge_opinions(
 
     if len(harvard_opinions) == len(cl_opinions):
         try:
-            matches = match_text_lists(
+            matches = match_opinion_lists(
                 [op.getText() for op in harvard_opinions],
                 fetch_cl_opinion_content(sub_opinions=cl_opinions),
             )

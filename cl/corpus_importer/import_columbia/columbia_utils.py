@@ -297,7 +297,7 @@ def add_floating_opinion(
 def extract_opinions(outer_opinion: BeautifulSoup) -> list[Optional[dict]]:
     """We extract all possible opinions from BeautifulSoup, with and without author,
     and we create new opinions if floating content exists(content that is not
-    explicitly defined within the opinion tag)
+    explicitly defined within an opinion tag or doesn't have an author)
 
     :param outer_opinion: element containing all xml tags
     :return: list of opinion dicts
@@ -410,8 +410,10 @@ def merge_opinions(
     return opinions, current_order
 
 
-def prepare_opinions_found(extracted_opinions: list) -> list:
-    """We read the opinions found, and we combine or create floating opinions
+def process_extracted_opinions(extracted_opinions: list) -> list:
+    """We read the extracted data in extract_opinions function to merge all possible
+    floating opinions (it is not explicitly defined within an opinion tag or doesn't
+    have an author)
 
     :param extracted_opinions: list of opinions obtained from xml file
     :return: a list with extracted and processed opinions

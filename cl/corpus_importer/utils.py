@@ -236,10 +236,11 @@ def similarity_scores(
     return scores
 
 
-def match_text_lists(
+def match_opinion_lists(
     file_opinions_list: list[Any], cl_opinions_list: list[Any]
 ) -> dict[int, int]:
-    """Generate matching lists above threshold
+    """Try to match the opinions on two lists and generate a dict with position of
+    matching opinions
 
     Remove non-alphanumeric and non-whitespace characters from lowercased text,
     this tries to make both texts in equal conditions to prove if both are similar or
@@ -541,6 +542,61 @@ def merge_judges(
                 raise JudgeException("Judges are completely different.")
 
     return {}
+
+
+def merge_overlapping_data(
+    cluster: OpinionCluster,
+    long_fields,
+    changed_values_dictionary: dict,
+    skip_judge_merger: bool = False,
+    is_columbia: bool = False,
+) -> dict[str, Any]:
+    """Merge overlapping data
+
+    :param cluster: the cluster object
+    :param long_fields: skip judge merger
+    :param changed_values_dictionary: the dictionary of data to merge
+    :param skip_judge_merger: skip judge merger
+
+    :param is_columbia: skip judge merger
+    :return: empty dict or dict with new values for fields
+    """
+
+    if not changed_values_dictionary:
+        # Empty dictionary means that we don't have overlapping data
+        return {}
+
+    data_to_update = {}
+
+    for field_name in changed_values_dictionary.keys():
+        if field_name in long_fields:
+            data_to_update.update(
+                merge_long_fields(
+                    field_name,
+                    changed_values_dictionary.get(field_name),
+                    cluster.id,
+                )
+            )
+        elif field_name == "attorneys":
+            data_to_update.update(
+                merge_strings(
+                    field_name,
+                    changed_values_dictionary.get(field_name, ""),
+                )
+            )
+        elif field_name == "judges":
+            data_to_update.update(
+                merge_judges(
+                    changed_values_dictionary.get(field_name, ""),
+                    cluster.id,
+                    is_columbia=is_columbia,
+                    skip_judge_merger=skip_judge_merger,
+                )
+            )
+        else:
+            logger.info(f"Field not considered in the process: {field_name}")
+
+    return data_to_update
 
 
 def add_citations_to_cluster(cites: list[str], cluster_id: int) -> None:

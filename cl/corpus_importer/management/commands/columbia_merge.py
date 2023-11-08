@@ -35,24 +35,19 @@ from cl.corpus_importer.import_columbia.columbia_utils import (
     is_opinion_published,
     map_opinion_types,
     parse_and_extract_dates,
-    prepare_opinions_found,
+    process_extracted_opinions,
     read_xml_to_soup,
 )
 from cl.corpus_importer.utils import (
     AuthorException,
-    ClusterSourceException,
-    DocketSourceException,
-    EmptyOpinionException,
     JudgeException,
     OpinionMatchingException,
     OpinionTypeException,
     add_citations_to_cluster,
-    match_text_lists,
+    match_opinion_lists,
     merge_case_names,
     merge_docket_numbers,
-    merge_judges,
-    merge_long_fields,
-    merge_strings,
+    merge_overlapping_data,
 )
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.people_db.lookup_utils import (
@@ -138,9 +133,6 @@ def get_cl_opinion_content(cluster_id: int) -> list[dict[Any, Any]]:
         elif len(op.html) > 1:
             content = op.html
 
-        if not content:
-            raise EmptyOpinionException("No content in opinion")
-
         prep_text = clean_opinion_content(content, is_harvard=is_harvard)
         cl_cleaned_opinions.append(
             {
@@ -157,7 +149,7 @@ def get_cl_opinion_content(cluster_id: int) -> list[dict[Any, Any]]:
 def update_matching_opinions(
     matches: dict, cl_cleaned_opinions: list, columbia_opinions: list
 ) -> None:
-    """Store matching opinion content in html_columbia
+    """Store matching opinion content in html_columbia field from Opinion object
 
     :param matches: dict with matching position from cl and columbia opinions
     :param cl_cleaned_opinions: list of cl opinions
@@ -225,7 +217,7 @@ def map_and_merge_opinions(
 
     if len(columbia_opinions) == len(cl_cleaned_opinions):
         # We need that both list to be cleaned, so we can have a more accurate match
-        matches = match_text_lists(
+        matches = match_opinion_lists(
             [
                 clean_opinion_content(op["opinion"], is_harvard=False)
                 for op in columbia_opinions
@@ -263,9 +255,9 @@ def map_and_merge_opinions(
             logger.info(f"Opinion created for cluster: {cluster_id}")
 
     else:
-        # Skip creating new opinion cluster due to differences between data
-        # NOTE: this may happen because some opinions were incorrectly combined when
-        # imported with the old columbia importer, or we have combined opinions
+        # Skip creating new opinions due to differences between data, this may happen
+        # because some opinions were incorrectly combined when imported with the old
+        # columbia importer, or we have combined opinions
         logger.info(
             msg=f"Skip merging mismatched opinions on cluster: {cluster_id}"
         )
@@ -325,58 +317,6 @@ def merge_date_filed(
     return {}
 
 
-def merge_overlapping_data(
-    cluster: OpinionCluster,
-    changed_values_dictionary: dict,
-    skip_judge_merger: bool = False,
-) -> dict[str, Any]:
-    """Merge overlapping data
-
-    :param cluster: the cluster object
-    :param changed_values_dictionary: the dictionary of data to merge
-    :param skip_judge_merger: skip judge merger
-    :return: empty dict or dict with new values for fields
-    """
-
-    if not changed_values_dictionary:
-        # Empty dictionary means that we don't have overlapping data
-        return {}
-
-    long_fields = ["syllabus", "posture"]
-
-    data_to_update = {}
-
-    for field_name in changed_values_dictionary.keys():
-        if field_name in long_fields:
-            data_to_update.update(
-                merge_long_fields(
-                    field_name,
-                    changed_values_dictionary.get(field_name),
-                    cluster.id,
-                )
-            )
-        elif field_name == "attorneys":
-            data_to_update.update(
-                merge_strings(
-                    field_name,
-                    changed_values_dictionary.get(field_name, ""),
-                )
-            )
-        elif field_name == "judges":
-            data_to_update.update(
-                merge_judges(
-                    changed_values_dictionary.get(field_name, ""),
-                    cluster.id,
-                    is_columbia=True,
-                    skip_judge_merger=skip_judge_merger,
-                )
-            )
-        else:
-            logger.info(f"Field not considered in the process: {field_name}")
-
-    return data_to_update
-
-
 def update_docket_source(cluster: OpinionCluster) -> None:
     """Update docket source and complete
 
@@ -384,16 +324,8 @@ def update_docket_source(cluster: OpinionCluster) -> None:
     :return: None
     """
     docket = cluster.docket
-    new_docket_source = Docket.COLUMBIA + docket.source
-    if new_docket_source in VALID_UPDATED_DOCKET_SOURCES:
-        # Source is limited to those options because those are the only
-        # valid options when we sum the source with columbia source
-        docket.source = new_docket_source
-        docket.save()
-    else:
-        raise DocketSourceException(
-            f"Unexpected docket source: {new_docket_source}"
-        )
+    docket.source = Docket.COLUMBIA + docket.source
+    docket.save()
 
 
 def update_cluster_source(cluster: OpinionCluster) -> None:
@@ -402,14 +334,8 @@ def update_cluster_source(cluster: OpinionCluster) -> None:
     :param cluster: cluster object
     :return: None
     """
-    new_cluster_source = SOURCES.COLUMBIA_ARCHIVE + cluster.source
-    if new_cluster_source in VALID_MERGED_SOURCES:
-        cluster.source = new_cluster_source
-        cluster.save()
-    else:
-        raise ClusterSourceException(
-            f"Unexpected cluster source: {new_cluster_source}"
-        )
+    cluster.source = SOURCES.COLUMBIA_ARCHIVE + cluster.source
+    cluster.save()
 
 
 def update_cluster_panel(
@@ -471,7 +397,7 @@ def process_cluster(
 
     outer_opinion = soup.find("opinion")
     extracted_opinions = extract_opinions(outer_opinion)
-    opinions = prepare_opinions_found(extracted_opinions)
+    opinions = process_extracted_opinions(extracted_opinions)
     map_opinion_types(opinions)
 
     columbia_data: dict = {
@@ -521,8 +447,13 @@ def process_cluster(
                 case_name_full_key="case_name_full",
             )
             date_filed_to_update = merge_date_filed(cluster, columbia_data)
+            overlapping_data_long_fields = ["syllabus", "posture"]
             overlapping_data_to_update = merge_overlapping_data(
-                cluster, changed_values_dictionary, skip_judge_merger
+                cluster,
+                overlapping_data_long_fields,
+                changed_values_dictionary,
+                skip_judge_merger,
+                is_columbia=True,
             )
             if columbia_data["panel"]:
                 update_cluster_panel(
@@ -561,18 +492,8 @@ def process_cluster(
         logger.warning(
             msg=f"Opinions don't match for on cluster id: {cluster_id}"
         )
-    except DocketSourceException:
-        logger.warning(
-            msg=f"Docket source exception related to cluster id: {cluster_id}"
-        )
-    except ClusterSourceException:
-        logger.warning(
-            msg=f"Cluster source exception for cluster id: {cluster_id}"
-        )
     except JudgeException:
         logger.warning(msg=f"Judge exception for cluster id: {cluster_id}")
-    except EmptyOpinionException:
-        logger.warning(msg=f"No content in opinion from cluster: {cluster_id}")
 
 
 def merge_columbia_into_cl(options) -> None:
