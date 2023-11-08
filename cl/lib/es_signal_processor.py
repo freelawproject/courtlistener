@@ -1,23 +1,50 @@
+from functools import partial
 from typing import Any
 
 from celery.canvas import chain
+from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist
+from django.db import transaction
 from django.db.models.signals import m2m_changed, post_delete, post_save
-from elasticsearch.exceptions import NotFoundError
 
 from cl.alerts.tasks import (
     process_percolator_response,
-    remove_doc_from_es_index,
     send_or_schedule_alerts,
 )
 from cl.audio.models import Audio
 from cl.lib.elasticsearch_utils import elasticsearch_enabled
-from cl.search.documents import AudioDocument
-from cl.search.tasks import save_document_in_es, update_document_in_es
-from cl.search.types import (
-    ESDocumentClassType,
-    ESDocumentInstanceType,
-    ESModelType,
+from cl.people_db.models import (
+    ABARating,
+    Education,
+    Person,
+    PoliticalAffiliation,
+    School,
 )
+from cl.search.documents import (
+    ES_CHILD_ID,
+    AudioDocument,
+    DocketDocument,
+    ESRECAPDocument,
+    ParentheticalGroupDocument,
+    PersonDocument,
+    PositionDocument,
+)
+from cl.search.models import BankruptcyInformation, Docket
+from cl.search.tasks import (
+    es_save_document,
+    remove_document_from_es_index,
+    update_children_docs_by_query,
+    update_es_document,
+)
+from cl.search.types import ESDocumentClassType, ESModelType
+
+
+def compose_app_label(instance: ESModelType) -> str:
+    """Compose the app label and model class name for an ES model instance.
+
+    :param instance: The ES Model instance.
+    :return: A string combining the app label and the Model class name.
+    """
+    return f"{instance._meta.app_label}.{instance.__class__.__name__}"
 
 
 def updated_fields(
@@ -29,20 +56,45 @@ def updated_fields(
     :return: A list of the names of fields that have changed in the instance.
     """
     # Get the field names being tracked
-
+    tracked_set = None
     if es_document is AudioDocument:
         tracked_set = getattr(instance, "es_oa_field_tracker", None)
-    else:
+    elif es_document is ParentheticalGroupDocument:
         tracked_set = getattr(instance, "es_pa_field_tracker", None)
+    elif es_document is ESRECAPDocument or es_document is DocketDocument:
+        tracked_set = getattr(instance, "es_rd_field_tracker", None)
+    elif es_document is PositionDocument:
+        tracked_set = getattr(instance, "es_p_field_tracker", None)
+
     # Check the set before trying to get the fields
     if not tracked_set:
         return []
+
     # Check each tracked field to see if it has changed
-    changed_fields = [
-        field
-        for field in tracked_set.fields
-        if getattr(instance, field) != tracked_set.previous(field)
-    ]
+    changed_fields = []
+    for field in tracked_set.fields:
+        current_value = getattr(instance, field)
+        try:
+            # If field is a ForeignKey relation, the current value is the
+            # related object, while the previous value is the ID, get the id.
+            # See https://django-model-utils.readthedocs.io/en/latest/utilities.html#field-tracker
+            field_type = instance.__class__._meta.get_field(field)
+            if (
+                field_type.get_internal_type() == "ForeignKey"
+                and current_value
+                and not field.endswith("_id")
+            ):
+                current_value = current_value.pk
+        except FieldDoesNotExist:
+            # Support tracking for properties, only abort if it's not a model
+            # property
+            if not hasattr(instance, field) and not isinstance(
+                getattr(instance.__class__, field, None), property
+            ):
+                continue
+
+        if current_value != tracked_set.previous(field):
+            changed_fields.append(field)
     return changed_fields
 
 
@@ -64,58 +116,6 @@ def get_fields_to_update(
     return fields_to_update
 
 
-def document_fields_to_update(
-    main_doc: ESDocumentInstanceType,
-    main_object: ESModelType,
-    field_list: list[str],
-    instance: ESModelType,
-    fields_map: dict,
-) -> dict[str, Any]:
-    """Generate a dictionary of fields and values to update based on a
-     provided map and an instance.
-
-    :param main_doc: A Elasticsearch DSL document.
-    :param main_object: The main object instance that changed.
-    :param field_list: A list of field names that need to be updated.
-    :param instance: The instance from which field values are to be extracted.
-    :param fields_map: A map from which ES field names are to be extracted.
-    :return: A dictionary with fields and values to update.
-    """
-
-    fields_to_update = {}
-    for field in field_list:
-        document_fields = fields_map[field]
-        for doc_field in document_fields:
-            if field.startswith("get_") and field.endswith("_display"):
-                fields_to_update[doc_field] = getattr(instance, field)()
-            else:
-                prepare_method = getattr(
-                    main_doc, f"prepare_{doc_field}", None
-                )
-                if prepare_method:
-                    field_value = prepare_method(main_object)
-                else:
-                    field_value = getattr(instance, field)
-                fields_to_update[doc_field] = field_value
-    return fields_to_update
-
-
-def get_or_create_doc(
-    es_document: ESDocumentClassType, instance: ESModelType
-) -> ESDocumentInstanceType | None:
-    """Get or create a document in Elasticsearch.
-    :param es_document: The Elasticsearch document type.
-    :param instance: The instance of the document to get or create.
-    :return: An Elasticsearch document if found, otherwise None.
-    """
-    try:
-        main_doc = es_document.get(id=instance.pk)
-    except NotFoundError:
-        save_document_in_es.delay(instance, es_document)
-        return None
-    return main_doc
-
-
 def update_es_documents(
     main_model: ESModelType,
     es_document: ESDocumentClassType,
@@ -134,28 +134,88 @@ def update_es_documents(
     """
     if created:
         return
+
     changed_fields = updated_fields(instance, es_document)
-    if changed_fields:
-        for query, fields_map in mapping_fields.items():
-            main_objects = main_model.objects.filter(**{query: instance})
-            for main_object in main_objects:
-                main_doc = get_or_create_doc(es_document, main_object)
-                if not main_doc:
-                    return
-                fields_to_update = get_fields_to_update(
-                    changed_fields, fields_map
-                )
-                if fields_to_update:
-                    update_document_in_es.delay(
-                        main_doc,
-                        document_fields_to_update(
-                            main_doc,
-                            main_object,
-                            fields_to_update,
-                            instance,
-                            fields_map,
-                        ),
+    if not changed_fields:
+        return
+
+    for query, fields_map in mapping_fields.items():
+        fields_to_update = get_fields_to_update(changed_fields, fields_map)
+        match instance:
+            case Person() if es_document is PositionDocument and query == "person":  # type: ignore
+                """
+                This case handles the update of one or more fields that belongs to
+                the parent model(The person model).
+                """
+                transaction.on_commit(
+                    partial(
+                        update_children_docs_by_query.delay,
+                        es_document.__name__,
+                        instance.pk,
+                        fields_to_update,
+                        fields_map,
                     )
+                )
+            case ABARating() | PoliticalAffiliation() | School() if es_document is PositionDocument:  # type: ignore
+                """
+                This code handles the update of fields that belongs to records associated with
+                the parent document using ForeignKeys.
+
+                First, we get the list of all the Person objects related to the instance object
+                and then we use the update_children_docs_by_query method to update their positions.
+                """
+                related_record = Person.objects.filter(**{query: instance})
+                for person in related_record:
+                    transaction.on_commit(
+                        partial(
+                            update_children_docs_by_query.delay,
+                            es_document.__name__,
+                            person.pk,
+                            fields_to_update,
+                            fields_map,
+                        )
+                    )
+            case Docket() if es_document is ESRECAPDocument:  # type: ignore
+                transaction.on_commit(
+                    partial(
+                        update_children_docs_by_query.delay,
+                        es_document.__name__,
+                        instance.pk,
+                        fields_to_update,
+                        fields_map,
+                    )
+                )
+            case Person() if es_document is ESRECAPDocument:  # type: ignore
+                related_dockets = Docket.objects.filter(**{query: instance})
+                for rel_docket in related_dockets:
+                    transaction.on_commit(
+                        partial(
+                            update_children_docs_by_query.delay,
+                            es_document.__name__,
+                            rel_docket.pk,
+                            fields_to_update,
+                            fields_map,
+                        )
+                    )
+            case _:
+                main_objects = main_model.objects.filter(**{query: instance})
+                for main_object in main_objects:
+                    if fields_to_update:
+                        # Update main document in ES, including fields to be
+                        # extracted from a related instance.
+                        transaction.on_commit(
+                            partial(
+                                update_es_document.delay,
+                                es_document.__name__,
+                                fields_to_update,
+                                (
+                                    compose_app_label(main_object),
+                                    main_object.pk,
+                                ),
+                                (compose_app_label(instance), instance.pk),
+                                fields_map,
+                            )
+                        )
 
 
 def update_remove_m2m_documents(
@@ -201,11 +261,18 @@ def update_m2m_field_in_es_document(
     relationships with the instance.
     :return: None
     """
-    document = get_or_create_doc(es_document, instance)
-    if not document:
-        return
-    get_m2m_value = getattr(document, f"prepare_{affected_field}")(instance)
-    update_document_in_es.delay(document, {affected_field: get_m2m_value})
+    transaction.on_commit(
+        partial(
+            update_es_document.delay,
+            es_document.__name__,
+            [
+                affected_field,
+            ],
+            (compose_app_label(instance), instance.pk),
+            None,
+            None,
+        )
+    )
 
 
 def update_reverse_related_documents(
@@ -225,19 +292,127 @@ def update_reverse_related_documents(
     the instance.
     :return: None
     """
+
+    # Update parent instance
     main_objects = main_model.objects.filter(**{query_string: instance})
     for main_object in main_objects:
-        main_doc = get_or_create_doc(es_document, main_object)
-        if not main_doc:
-            return
-
-        update_document_in_es.delay(
-            main_doc,
-            {
-                field: getattr(main_doc, f"prepare_{field}")(main_object)
-                for field in affected_fields
-            },
+        transaction.on_commit(
+            partial(
+                update_es_document.delay,
+                es_document.__name__,
+                affected_fields,
+                (compose_app_label(main_object), main_object.pk),
+                None,
+                None,
+            )
         )
+
+    match instance:
+        case ABARating() | PoliticalAffiliation() | Education() if es_document is PersonDocument:  # type: ignore
+            # bulk update position documents when a reverse related record is created/updated.
+            related_record = Person.objects.filter(**{query_string: instance})
+            for person in related_record:
+                transaction.on_commit(
+                    partial(
+                        update_children_docs_by_query.delay,
+                        PositionDocument.__name__,
+                        person.pk,
+                        affected_fields,
+                    )
+                )
+        case BankruptcyInformation() if es_document is DocketDocument:  # type: ignore
+            # bulk update RECAP documents when a reverse related record is created/updated.
+            transaction.on_commit(
+                partial(
+                    update_children_docs_by_query.delay,
+                    ESRECAPDocument.__name__,
+                    instance.docket.pk,
+                    affected_fields,
+                )
+            )
+
+
+def delete_reverse_related_documents(
+    main_model: ESModelType,
+    es_document: ESDocumentClassType,
+    instance: ESModelType,
+    query_string: str,
+    affected_fields: list[str],
+) -> None:
+    """Update reverse related document fields in Elasticsearch when the reverse
+    instance is removed.
+    :param main_model: The main model to fetch objects from.
+    :param es_document: The Elasticsearch document type.
+    :param instance: The instance for which the reverse related documents are
+    to be updated.
+    :param query_string: The query string to filter the main model objects.
+    :param affected_fields: The list of field names that are reverse related to
+    the instance.
+    :return: None
+    """
+
+    match instance:
+        case Person() if es_document is PersonDocument:  # type: ignore
+            # Update the Person document after the reverse instanced is deleted
+            # Update parent document in ES.
+            transaction.on_commit(
+                partial(
+                    update_es_document.delay,
+                    es_document.__name__,
+                    affected_fields,
+                    (compose_app_label(instance), instance.pk),
+                    None,
+                    None,
+                )
+            )
+            # Then update all their child documents (Positions)
+            transaction.on_commit(
+                partial(
+                    update_children_docs_by_query.delay,
+                    PositionDocument.__name__,
+                    instance.pk,
+                    affected_fields,
+                )
+            )
+        case Docket() if es_document is DocketDocument:  # type: ignore
+            # Update the Docket document after the reverse instanced is deleted
+
+            # Update parent document in ES.
+            transaction.on_commit(
+                partial(
+                    update_es_document.delay,
+                    es_document.__name__,
+                    affected_fields,
+                    (compose_app_label(instance), instance.pk),
+                    None,
+                    None,
+                )
+            )
+            # Then update all their child documents (RECAPDocuments)
+            transaction.on_commit(
+                partial(
+                    update_children_docs_by_query.delay,
+                    ESRECAPDocument.__name__,
+                    instance.pk,
+                    affected_fields,
+                )
+            )
+        case _:
+            main_objects = main_model.objects.filter(
+                **{query_string: instance}
+            )
+            for main_object in main_objects:
+                # Update main document in ES.
+                transaction.on_commit(
+                    partial(
+                        update_es_document.delay,
+                        es_document.__name__,
+                        affected_fields,
+                        (compose_app_label(main_object), main_object.pk),
+                        None,
+                        None,
+                    )
+                )
 
 
 def avoid_es_audio_indexing(
@@ -289,6 +464,9 @@ class ESSignalProcessor(object):
         models_reverse_foreign_key = list(
             self.documents_model_mapping["reverse"].keys()
         )
+        models_reverse_foreign_key_delete = list(
+            self.documents_model_mapping["reverse-delete"].keys()
+        )
         main_model = self.main_model.__name__.lower()
 
         # Connect signals for save
@@ -309,12 +487,19 @@ class ESSignalProcessor(object):
             self.handle_m2m,
             {m2m_changed: f"update_{main_model}_m2m_in_es_index"},
         )
-        # Connect signals for save and delete on models with reverse foreign keys
+        # Connect signals for save on models with reverse foreign keys
         self.connect_signals(
             models_reverse_foreign_key,
             self.handle_reverse_actions,
             {
                 post_save: f"update_reverse_related_{main_model}_on_save",
+            },
+        )
+        # Connect signals for delete on models with reverse-delete foreign keys
+        self.connect_signals(
+            models_reverse_foreign_key_delete,
+            self.handle_reverse_actions_delete,
+            {
                 post_delete: f"update_reverse_related_{main_model}_on_delete",
             },
         )
@@ -342,6 +527,13 @@ class ESSignalProcessor(object):
         **kwargs,
     ):
         """Receiver function that gets called after an object instance is saved"""
+
+        if update_fields and "view_count" in update_fields:
+            # If the save includes 'view_count' in the update fields, abort
+            # the operation.This indicates that a user view is incrementing
+            # the 'view_count' for dockets and opinions.
+            return None
+
         mapping_fields = self.documents_model_mapping["save"][sender]
         if not created:
             update_es_documents(
@@ -359,16 +551,25 @@ class ESSignalProcessor(object):
                 # search alerts for Audio instances whose MP3 files have not
                 # yet been processed by process_audio_file.
                 return None
-            chain(
-                save_document_in_es.si(instance, self.es_document),
-                send_or_schedule_alerts.s(self.es_document._index._name),
-                process_percolator_response.s(),
-            ).apply_async()
+
+            transaction.on_commit(
+                lambda: chain(
+                    es_save_document.si(
+                        instance.pk,
+                        compose_app_label(instance),
+                        self.es_document.__name__,
+                    ),
+                    send_or_schedule_alerts.s(self.es_document._index._name),
+                    process_percolator_response.s(),
+                ).apply_async()
+            )
 
     @elasticsearch_enabled
     def handle_delete(self, sender, instance, **kwargs):
         """Receiver function that gets called after an object instance is deleted"""
-        remove_doc_from_es_index.delay(self.es_document, instance.pk)
+        remove_document_from_es_index.delay(
+            self.es_document.__name__, instance.pk
+        )
 
     @elasticsearch_enabled
     def handle_m2m(self, sender, instance=None, action=None, **kwargs):
@@ -392,15 +593,56 @@ class ESSignalProcessor(object):
         """
         mapping_fields = self.documents_model_mapping["reverse"][sender]
         for query_string, fields_map in mapping_fields.items():
-            try:
-                affected_fields = fields_map[instance.type]
-            except KeyError:
-                affected_fields = fields_map["all"]
+            match instance:
+                case BankruptcyInformation() if self.es_document is DocketDocument:  # type: ignore
+                    # BankruptcyInformation is a one-to-one relation that can
+                    # be re-saved many times without changes. It's better to
+                    # check if the indexed fields have changed before
+                    # triggering an update.
+                    changed_fields = updated_fields(instance, self.es_document)
+                    affected_fields = get_fields_to_update(
+                        changed_fields, fields_map
+                    )
+                    if not affected_fields:
+                        return None
+                case _:
+                    try:
+                        affected_fields = fields_map[instance.type]
+                    except (KeyError, AttributeError):
+                        affected_fields = fields_map["all"]
+
             instance_field = query_string.split("__")[-1]
             update_reverse_related_documents(
                 self.main_model,
                 self.es_document,
-                getattr(instance, instance_field),
+                getattr(instance, instance_field, instance),
+                query_string,
+                affected_fields,
+            )
+
+    @elasticsearch_enabled
+    def handle_reverse_actions_delete(self, sender, instance=None, **kwargs):
+        """Receiver function that gets called after a reverse relation is
+        removed.
+        """
+        mapping_fields = self.documents_model_mapping["reverse-delete"][sender]
+        for query_string, fields_map in mapping_fields.items():
+            try:
+                affected_fields = fields_map[instance.type]
+            except (KeyError, AttributeError):
+                affected_fields = fields_map["all"]
+
+            instance_field = query_string.split("__")[-1]
+            try:
+                instance = getattr(instance, instance_field, instance)
+            except ObjectDoesNotExist:
+                # The related objects has already been removed, abort.
+                return
+
+            delete_reverse_related_documents(
+                self.main_model,
+                self.es_document,
+                instance,
                 query_string,
                 affected_fields,
             )

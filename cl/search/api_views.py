@@ -1,5 +1,6 @@
 import waffle
 from rest_framework import pagination, permissions, response, status, viewsets
+from rest_framework.pagination import PageNumberPagination
 
 from cl.api.utils import CacheListMixin, LoggingMixin, RECAPUsersReadOnly
 from cl.search import api_utils
@@ -7,16 +8,16 @@ from cl.search.api_serializers import (
     CourtSerializer,
     DocketEntrySerializer,
     DocketSerializer,
+    ExtendedPersonESSerializer,
+    OAESResultSerializer,
     OpinionClusterSerializer,
     OpinionsCitedSerializer,
     OpinionSerializer,
     OriginalCourtInformationSerializer,
     RECAPDocumentSerializer,
-    SearchESResultSerializer,
     SearchResultSerializer,
     TagSerializer,
 )
-from cl.search.documents import AudioDocument
 from cl.search.filters import (
     CourtFilter,
     DocketEntryFilter,
@@ -119,6 +120,10 @@ class CourtViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Court.objects.exclude(
         jurisdiction=Court.TESTING_COURT
     ).order_by("position")
+    # Our default pagination blocks deep pagination by overriding
+    # PageNumberPagination. Allow deep pagination, by overriding our default
+    # with this base class.
+    pagination_class = PageNumberPagination
 
 
 class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -173,8 +178,6 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
         search_form = SearchForm(request.GET)
         if search_form.is_valid():
             cd = search_form.cleaned_data
-            if cd["q"] == "":
-                cd["q"] = "*"  # Get everything
 
             search_type = cd["type"]
             paginator = pagination.PageNumberPagination()
@@ -184,16 +187,14 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
                 search_type == SEARCH_TYPES.ORAL_ARGUMENT
                 and waffle.flag_is_active(request, "oa-es-active")
             ):
-                serializer = SearchESResultSerializer(
-                    result_page,
-                    many=True,
-                    context={
-                        "schema": AudioDocument._index.get_mapping()[
-                            AudioDocument._index._name
-                        ]["mappings"]
-                    },
-                )
+                serializer = OAESResultSerializer(result_page, many=True)
+            elif search_type == SEARCH_TYPES.PEOPLE and waffle.flag_is_active(
+                request, "p-es-active"
+            ):
+                serializer = ExtendedPersonESSerializer(result_page, many=True)
             else:
+                if cd["q"] == "":
+                    cd["q"] = "*"  # Get everything
                 serializer = SearchResultSerializer(
                     result_page, many=True, context={"schema": sl.conn.schema}
                 )

@@ -3,7 +3,7 @@ from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
 from cl.alerts.models import Alert
-from cl.alerts.tasks import index_alert_document
+from cl.alerts.tasks import es_save_alert_document
 from cl.lib.command_utils import logger
 from cl.search.documents import AudioPercolator
 from cl.search.models import SEARCH_TYPES
@@ -22,7 +22,7 @@ def create_or_update_alert_in_es_index(sender, instance=None, **kwargs):
         return
 
     if f"type={SEARCH_TYPES.ORAL_ARGUMENT}" in instance.query:
-        index_alert_document.delay(instance, AudioPercolator)
+        es_save_alert_document.delay(instance.pk, AudioPercolator.__name__)
 
 
 @receiver(

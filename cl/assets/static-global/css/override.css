@@ -1565,10 +1565,19 @@ textarea {
   height: 100vh;
 }
 
-@media (max-width: 780px) {
+@media (max-width: 1000px) {
     #toc-container {
         overflow-y: initial;
         position: relative;
         height: min-content;
     }
+}
+
+.brusher {
+  display: none;
+}
+
+rect.series-segment {
+  fill: rgb(49, 54, 149) !important;
+  fill-opacity: 1.0 !important;
 }
