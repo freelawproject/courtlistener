@@ -1,4 +1,5 @@
 import random
+import re
 
 from django import template
 from django.core.exceptions import ValidationError
@@ -193,3 +194,15 @@ def citation(obj) -> SafeString:
     if ecf:
         result = f"{result} ECF No. {ecf}"
     return result
+
+
+@register.simple_tag
+def contains_highlights(content: str) -> bool:
+    """Check if a given string contains the mark tag used in highlights.
+
+    :param content: The input string to check.
+    :return: True if the mark highlight tag is found, otherwise False.
+    """
+    pattern = r"<mark>.*?</mark>"
+    matches = re.findall(pattern, content)
+    return bool(matches)

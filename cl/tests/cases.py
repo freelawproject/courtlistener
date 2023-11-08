@@ -166,3 +166,15 @@ class ESIndexTestCase(SimpleTestCase):
     def delete_index(self, model):
         """Delete the elasticsearch index."""
         call_command("search_index", "--delete", "-f", "--models", model)
+
+    @classmethod
+    def restart_celery_throttle_key(self):
+        r = make_redis_interface("CACHE")
+        keys = r.keys("celery_throttle:*")
+        if keys:
+            r.delete(*keys)
+        keys = r.keys("celery_throttle:*")
+
+    def tearDown(self) -> None:
+        self.restart_celery_throttle_key()
+        super().tearDown()

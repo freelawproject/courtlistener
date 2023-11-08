@@ -28,6 +28,7 @@ from cl.people_db.models import AttorneyOrganization, Role
 from cl.people_db.types import RoleType
 from cl.recap.models import UPLOAD_TYPE
 from cl.search.models import Court, Docket
+from cl.search.tasks import index_docket_parties_in_es
 
 logger = logging.getLogger(__name__)
 
@@ -277,6 +278,9 @@ def process_docket_data(
         UPLOAD_TYPE.IA_XML_FILE,
     ):
         add_parties_and_attorneys(d, data["parties"])
+        if data["parties"]:
+            # Index or re-index parties only if the docket has parties.
+            index_docket_parties_in_es.delay(d.pk)
     return d.pk
 
 

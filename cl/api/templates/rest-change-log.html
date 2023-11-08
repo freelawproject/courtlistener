@@ -31,7 +31,10 @@
   <h1 id="about">REST API Change Log</h1>
   <ul>
     <li>
-      <p><strong>v3.14</strong> &mdash; This release blocks users from paginating past page 100 in the API. This release is not backwards incompatible, but is being released on an emergency basis to stop crawlers that have been impacting our database tier. In our performance documentation, we have long warned against using deep pagination. Now it is blocked. If you need this functionality for your application, please consider using filters to complete your crawling instead.
+      <p><strong>v3.15</strong> — Allow deep pagination on the Court endpoint, add <code>docket_id</code> to the Clusters endpoint, and add <code>cluster_id</code> and <code>author_id</code> to the Opinions endpoint.</p>
+    </li>
+    <li>
+      <p><strong>v3.14</strong> &mdash; This release blocks users from paginating past page 100 in the API. This release is not backwards incompatible, but is being released on an emergency basis to stop crawlers that have been impacting our database tier. In our performance documentation, we have long warned against using deep pagination. Now it is blocked. If you need this functionality for your application, please consider using filters to complete your crawling instead.</p>
     </li>
     <li>
       <p><strong>v3.13</strong> &mdash; This version adds data from newly added judicial financial disclosure documents. This data is now included in a series of new endpoints to explore financial disclosures. For example, you can filter by gifts received by a specific federal judge or district.</p>

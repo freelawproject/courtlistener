@@ -183,10 +183,11 @@ class RECAPDocumentAdmin(CursorPaginatorAdmin):
                 rd.filepath_local.delete()
 
             # Internet Archive
-            url = rd.filepath_ia
-            r = delete_from_ia(url)
-            if not r.ok:
-                ia_failures.append(url)
+            if rd.filepath_ia:
+                url = rd.filepath_ia
+                r = delete_from_ia(url)
+                if not r.ok:
+                    ia_failures.append(url)
 
         queryset.update(
             date_upload=None,

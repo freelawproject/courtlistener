@@ -23,7 +23,7 @@ def increment_view_count(obj, request):
 
         with suppress_autotime(obj, ["date_modified"]):
             obj.view_count = F("view_count") + 1
-            obj.save()
+            obj.save(update_fields=["view_count"])
 
         # To get the new value, you either need to get the item from the DB a
         # second time, or just manipulate it manually....

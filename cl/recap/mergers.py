@@ -26,6 +26,7 @@ from cl.lib.pacer import (
     normalize_attorney_role,
 )
 from cl.lib.privacy_tools import anonymize
+from cl.lib.redis_utils import make_redis_interface
 from cl.lib.timezone_helpers import localize_date_and_time
 from cl.lib.utils import previous_and_next, remove_duplicate_dicts
 from cl.people_db.lookup_utils import lookup_judge_by_full_name_and_set_attr
@@ -56,7 +57,7 @@ from cl.search.models import (
     RECAPDocument,
     Tag,
 )
-from cl.search.tasks import add_items_to_solr
+from cl.search.tasks import add_items_to_solr, index_docket_parties_in_es
 
 logger = logging.getLogger(__name__)
 
@@ -1404,6 +1405,9 @@ def merge_pacer_docket_into_cl_docket(
         add_docket_entries
     )(d, docket_data["docket_entries"], tags=tags)
     add_parties_and_attorneys(d, docket_data["parties"])
+    if docket_data["parties"]:
+        # Index or re-index parties only if the docket has parties.
+        index_docket_parties_in_es.delay(d.pk)
     async_to_sync(process_orphan_documents)(
         rds_created, d.court_id, d.date_filed
     )
