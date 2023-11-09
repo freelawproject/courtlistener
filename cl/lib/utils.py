@@ -104,8 +104,9 @@ def human_sort(
     return sorted(unordered_list, key=sorter)
 
 
-def wrap_text(length, text):
+def wrap_text(length: int, text: str) -> str:
     """Wrap text to specified length without cutting words
+
     :param length: max length to wrap
     :param text: text to wrap
     :return: text wrapped
