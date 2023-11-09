@@ -131,7 +131,7 @@ class ProcessingQueue(AbstractDateTimeModel):
         db_index=True,
     )
     acms_document_guid = models.CharField(
-        help_text="The ID of the document in PACER.",
+        help_text="The GUID of the document in ACMS.",
         max_length=64,
         blank=True,
     )
