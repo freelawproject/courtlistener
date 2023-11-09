@@ -2071,7 +2071,6 @@ class OralArgumentIndexingTest(
 
         # When the Audio is created the file processing is not complete.
         # The Audio indexing is avoided.
-        self.assertEqual(self.task_call_count, 0)
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -2084,7 +2083,7 @@ class OralArgumentIndexingTest(
             )
         # 0 es_save_document task calls for Audio creation, due to processing
         # is not complete.
-        self.assertEqual(self.task_call_count, 0)
+        self.reset_and_assert_task_count(expected=0)
         self.assertFalse(AudioDocument.exists(id=audio.pk))
 
         # Index the document for first time when file processing is completed.
@@ -2100,11 +2099,10 @@ class OralArgumentIndexingTest(
                 ]
             )
         # 1 es_save_document task calls for Audio after processing is complete
-        self.assertEqual(self.task_call_count, 1)
+        self.reset_and_assert_task_count(expected=1)
         self.assertTrue(AudioDocument.exists(id=audio.pk))
 
         # Update an Audio without changes.
-        self.task_call_count = 0
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.delay",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -2113,10 +2111,9 @@ class OralArgumentIndexingTest(
         ):
             audio.save()
         # update_es_document task shouldn't be called on save() without changes
-        self.assertEqual(self.task_call_count, 0)
+        self.reset_and_assert_task_count(expected=0)
 
         # Update an Audio tracked field.
-        self.task_call_count = 0
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.delay",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -2126,11 +2123,10 @@ class OralArgumentIndexingTest(
             audio.case_name = "Bank vs America"
             audio.save()
         # update_es_document task should be called 1 on tracked fields updates
-        self.assertEqual(self.task_call_count, 1)
+        self.reset_and_assert_task_count(expected=1)
         a_doc = AudioDocument.get(id=audio.pk)
         self.assertEqual(a_doc.caseName, "Bank vs America")
 
-        self.task_call_count = 0
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.delay",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -2140,7 +2136,7 @@ class OralArgumentIndexingTest(
             audio.docket = self.docket_2
             audio.save()
         # update_es_document task should be called 1 on tracked fields updates
-        self.assertEqual(self.task_call_count, 1)
+        self.reset_and_assert_task_count(expected=1)
         a_doc = AudioDocument.get(id=audio.pk)
         self.assertEqual(a_doc.docket_id, self.docket_2.pk)
 
@@ -2151,7 +2147,6 @@ class OralArgumentIndexingTest(
 
         self.assertFalse(AudioDocument.exists(id=audio.pk))
         # Audio creation on update.
-        self.task_call_count = 0
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.delay",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -2162,7 +2157,7 @@ class OralArgumentIndexingTest(
             audio.save()
 
         # update_es_document task should be called 1 on tracked fields update
-        self.assertEqual(self.task_call_count, 1)
+        self.reset_and_assert_task_count(expected=1)
         a_doc = AudioDocument.get(id=audio.pk)
         self.assertEqual(a_doc.caseName, "Lorem Ipsum")
 

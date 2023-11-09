@@ -2748,7 +2748,6 @@ class RECAPIndexingTest(
         """
 
         # Index docket on creation.
-        self.assertEqual(self.task_call_count, 0)
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -2763,11 +2762,10 @@ class RECAPIndexingTest(
             )
 
         # Only one es_save_document task should be called on creation.
-        self.assertEqual(self.task_call_count, 1)
+        self.reset_and_assert_task_count(expected=1)
         self.assertTrue(DocketDocument.exists(id=docket.pk))
 
         # Restart task counter.
-        self.task_call_count = 0
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.delay",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -2781,11 +2779,10 @@ class RECAPIndexingTest(
             )
 
         # No update_es_document task should be called on creation.
-        self.assertEqual(self.task_call_count, 0)
+        self.reset_and_assert_task_count(expected=0)
         self.assertTrue(DocketDocument.exists(id=docket_2.pk))
 
         # Update a Docket without changes.
-        self.task_call_count = 0
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.delay",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -2795,7 +2792,8 @@ class RECAPIndexingTest(
             docket.save()
 
         # update_es_document task shouldn't be called on save() without changes
-        self.assertEqual(self.task_call_count, 0)
+        self.reset_and_assert_task_count(expected=0)
+
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -2805,7 +2803,7 @@ class RECAPIndexingTest(
             docket.save()
 
         # es_save_document task shouldn't be called on save() without changes
-        self.assertEqual(self.task_call_count, 0)
+        self.reset_and_assert_task_count(expected=0)
 
         # Update a Docket untracked field.
         with mock.patch(
@@ -2818,7 +2816,7 @@ class RECAPIndexingTest(
             docket.save()
         # update_es_document task shouldn't be called on save() for untracked
         # fields
-        self.assertEqual(self.task_call_count, 0)
+        self.reset_and_assert_task_count(expected=0)
 
         # Update a Docket tracked field.
         with mock.patch(
@@ -2832,7 +2830,7 @@ class RECAPIndexingTest(
             docket.save()
 
         # update_es_document task should be called 1 on tracked fields updates
-        self.assertEqual(self.task_call_count, 1)
+        self.reset_and_assert_task_count(expected=1)
         d_doc = DocketDocument.get(id=docket.pk)
         self.assertEqual(d_doc.docketNumber, "21-43434")
 
@@ -2841,7 +2839,6 @@ class RECAPIndexingTest(
         self.delete_index("search.Docket")
         self.create_index("search.Docket")
 
-        self.task_call_count = 0
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.delay",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -2852,7 +2849,7 @@ class RECAPIndexingTest(
             docket.save()
 
         # update_es_document task should be called 1 on tracked fields update
-        self.assertEqual(self.task_call_count, 1)
+        self.reset_and_assert_task_count(expected=1)
         d_doc = DocketDocument.get(id=docket.pk)
         self.assertEqual(d_doc.docketNumber, "21-43435")
         self.assertEqual(d_doc.caseName, "Vargas v. Lorem")
@@ -2872,7 +2869,6 @@ class RECAPIndexingTest(
         )
 
         # RECAP Document creation:
-        self.task_call_count = 0
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -2893,12 +2889,10 @@ class RECAPIndexingTest(
                 page_count=5,
             )
         # Only 1 es_save_document task should be called on creation.
-        self.assertEqual(self.task_call_count, 1)
+        self.reset_and_assert_task_count(expected=1)
         r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
         self.assertEqual(r_doc.docket_child["parent"], docket.pk)
 
-        # Restart task counter.
-        self.task_call_count = 0
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.delay",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -2913,10 +2907,9 @@ class RECAPIndexingTest(
             )
 
         # No update_es_document task should be called on creation.
-        self.assertEqual(self.task_call_count, 0)
+        self.reset_and_assert_task_count(expected=0)
 
         # Update a RECAPDocument without changes.
-        self.task_call_count = 0
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.delay",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -2925,7 +2918,7 @@ class RECAPIndexingTest(
         ):
             rd_1.save()
         # update_es_document task shouldn't be called on save() without changes
-        self.assertEqual(self.task_call_count, 0)
+        self.reset_and_assert_task_count(expected=0)
 
         # Update a RECAPDocument untracked field.
         with mock.patch(
@@ -2938,10 +2931,9 @@ class RECAPIndexingTest(
             rd_1.save()
         # update_es_document task shouldn't be called on save() for untracked
         # fields
-        self.assertEqual(self.task_call_count, 0)
+        self.reset_and_assert_task_count(expected=0)
 
         # Update a RECAPDocument tracked field.
-        self.task_call_count = 0
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.delay",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -2953,12 +2945,11 @@ class RECAPIndexingTest(
             rd_1.save()
 
         # update_es_document task should be called 1 on tracked fields updates
-        self.assertEqual(self.task_call_count, 1)
+        self.reset_and_assert_task_count(expected=1)
         r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
         self.assertEqual(r_doc.short_description, "Lorem Ipsum")
         self.assertEqual(r_doc.page_count, 5)
 
-        self.task_call_count = 0
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -2969,7 +2960,7 @@ class RECAPIndexingTest(
             rd_1.save()
 
         # es_save_document task shouldn't be called on document updates.
-        self.assertEqual(self.task_call_count, 0)
+        self.reset_and_assert_task_count(expected=0)
 
         # Create a new Docket and DocketEntry.
         docket_2 = DocketFactory(court=self.court, docket_number="21-0000")
@@ -2980,7 +2971,6 @@ class RECAPIndexingTest(
             entry_number=2,
         )
         # Update the RECAPDocument docket_entry.
-        self.task_call_count = 0
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.delay",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -2991,7 +2981,7 @@ class RECAPIndexingTest(
             rd_1.save()
 
         # update_es_document task should be called 1 on tracked fields updates
-        self.assertEqual(self.task_call_count, 1)
+        self.reset_and_assert_task_count(expected=1)
         r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
         self.assertEqual(r_doc.description, de_2.description)
         self.assertEqual(r_doc.entry_number, de_2.entry_number)
@@ -3009,7 +2999,6 @@ class RECAPIndexingTest(
 
         self.assertFalse(DocketDocument.exists(id=ES_CHILD_ID(rd_1.pk).RECAP))
         # RECAP Document creation on update.
-        self.task_call_count = 0
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.delay",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -3020,7 +3009,7 @@ class RECAPIndexingTest(
             rd_1.save()
 
         # update_es_document task should be called 1 on tracked fields update
-        self.assertEqual(self.task_call_count, 1)
+        self.reset_and_assert_task_count(expected=1)
         r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
         self.assertEqual(r_doc.pacer_doc_id, "99999999")
         self.assertEqual(r_doc.docket_child["parent"], docket_2.pk)

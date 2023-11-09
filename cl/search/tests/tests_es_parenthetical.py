@@ -730,7 +730,6 @@ class ParentheticalESSignalProcessorTest(
         """
 
         # Index ParentheticalGroup on creation.
-        self.assertEqual(self.task_call_count, 0)
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -765,11 +764,10 @@ class ParentheticalESSignalProcessorTest(
         # 3 es_save_document task calls. 1 for ParentheticalGroup creation.
         # 2 for Person indexing due to the OpinionWithParentsFactory creates a
         # Person
-        self.assertEqual(self.task_call_count, 3)
+        self.reset_and_assert_task_count(expected=3)
         self.assertTrue(ParentheticalGroupDocument.exists(id=pg_test.pk))
 
         # Update a ParentheticalGroup without changes.
-        self.task_call_count = 0
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.delay",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -778,10 +776,9 @@ class ParentheticalESSignalProcessorTest(
         ):
             pg_test.save()
         # update_es_document task shouldn't be called on save() without changes
-        self.assertEqual(self.task_call_count, 0)
+        self.reset_and_assert_task_count(expected=0)
 
         # Update a ParentheticalGroup tracked field.
-        self.task_call_count = 0
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.delay",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -800,7 +797,7 @@ class ParentheticalESSignalProcessorTest(
             pg_test.save()
 
         # update_es_document task should be called 1 on tracked fields updates
-        self.assertEqual(self.task_call_count, 1)
+        self.reset_and_assert_task_count(expected=1)
         pg_doc = ParentheticalGroupDocument.get(id=pg_test.pk)
         self.assertEqual(pg_doc.caseName, o_2.cluster.case_name)
         self.assertEqual(pg_doc.representative_text, p6.text)
@@ -813,7 +810,6 @@ class ParentheticalESSignalProcessorTest(
 
         self.assertFalse(ParentheticalGroupDocument.exists(id=pg_test.pk))
         # ParentheticalGroup creation on update.
-        self.task_call_count = 0
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.delay",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -824,7 +820,7 @@ class ParentheticalESSignalProcessorTest(
             pg_test.save()
 
         # update_es_document task should be called 1 on tracked fields update
-        self.assertEqual(self.task_call_count, 1)
+        self.reset_and_assert_task_count(expected=1)
         pg_doc = ParentheticalGroupDocument.get(id=pg_test.pk)
         self.assertEqual(pg_doc.caseName, o.cluster.case_name)
 

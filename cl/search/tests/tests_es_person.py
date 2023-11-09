@@ -1787,7 +1787,6 @@ class PeopleIndexingTest(
         indexing tasks.
         """
 
-        self.assertEqual(self.task_call_count, 0)
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -1803,12 +1802,11 @@ class PeopleIndexingTest(
                 date_dod=datetime.date(2022, 11, 25),
             )
         # 1 es_save_document task calls for Person creation.
-        self.assertEqual(self.task_call_count, 1)
+        self.reset_and_assert_task_count(expected=1)
         # The person is not indexed since it's not a Judge.
         self.assertFalse(PersonDocument.exists(id=person.pk))
 
         # Add a Judge Position to person.
-        self.task_call_count = 0
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -1829,7 +1827,7 @@ class PeopleIndexingTest(
                 nomination_process="fed_senate",
             )
         # 1 es_save_document task calls for Position creation.
-        self.assertEqual(self.task_call_count, 1)
+        self.reset_and_assert_task_count(expected=1)
         # The Person and the Position are now indexed.
         self.assertTrue(PersonDocument.exists(id=person.pk))
         self.assertTrue(
@@ -1837,7 +1835,6 @@ class PeopleIndexingTest(
         )
 
         # Update a Person without changes.
-        self.task_call_count = 0
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.delay",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -1846,10 +1843,9 @@ class PeopleIndexingTest(
         ):
             person.save()
         # update_es_document task shouldn't be called on save() without changes
-        self.assertEqual(self.task_call_count, 0)
+        self.reset_and_assert_task_count(expected=0)
 
         # Update a Position without changes.
-        self.task_call_count = 0
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.delay",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -1858,10 +1854,9 @@ class PeopleIndexingTest(
         ):
             position.save()
         # update_es_document task shouldn't be called on save() without changes
-        self.assertEqual(self.task_call_count, 0)
+        self.reset_and_assert_task_count(expected=0)
 
         # Update a Person tracked field.
-        self.task_call_count = 0
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.delay",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -1871,7 +1866,7 @@ class PeopleIndexingTest(
             person.name_first = "Barack"
             person.save()
         # update_es_document task should be called 1 on tracked fields updates
-        self.assertEqual(self.task_call_count, 1)
+        self.reset_and_assert_task_count(expected=1)
         p_doc = PersonDocument.get(id=person.pk)
         self.assertIn("Barack", p_doc.name)
 
@@ -1884,8 +1879,8 @@ class PeopleIndexingTest(
         self.assertFalse(
             PersonDocument.exists(id=ES_CHILD_ID(position.pk).POSITION)
         )
+
         # Person creation on update.
-        self.task_call_count = 0
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.delay",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -1896,12 +1891,11 @@ class PeopleIndexingTest(
             person.save()
 
         # update_es_document task should be called 1 on tracked fields update
-        self.assertEqual(self.task_call_count, 1)
+        self.reset_and_assert_task_count(expected=1)
         p_doc = PersonDocument.get(id=person.pk)
         self.assertEqual(p_doc.religion, "pr")
 
         # Position creation on update.
-        self.task_call_count = 0
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.delay",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -1912,12 +1906,11 @@ class PeopleIndexingTest(
             position.save()
 
         # update_es_document task should be called 1 on tracked fields update
-        self.assertEqual(self.task_call_count, 1)
+        self.reset_and_assert_task_count(expected=1)
         po_doc = PersonDocument.get(id=ES_CHILD_ID(position.pk).POSITION)
         self.assertEqual(po_doc.nomination_process, "State Senate")
 
         # Position ForeignKey field update.
-        self.task_call_count = 0
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.delay",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
@@ -1928,7 +1921,7 @@ class PeopleIndexingTest(
             position.save()
 
         # update_es_document task should be called 1 on tracked fields update
-        self.assertEqual(self.task_call_count, 1)
+        self.reset_and_assert_task_count(expected=1)
         po_doc = PersonDocument.get(id=ES_CHILD_ID(position.pk).POSITION)
         self.assertEqual(po_doc.predecessor, self.person_2.name_full_reverse)
 
