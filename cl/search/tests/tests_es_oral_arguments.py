@@ -2082,7 +2082,8 @@ class OralArgumentIndexingTest(
                 case_name="Lorem Ipsum Dolor vs. USA",
                 docket_id=self.docket.pk,
             )
-        # 1 es_save_document task calls for Audio creation.
+        # 0 es_save_document task calls for Audio creation, due to processing
+        # is not complete.
         self.assertEqual(self.task_call_count, 0)
         self.assertFalse(AudioDocument.exists(id=audio.pk))
 
@@ -2098,7 +2099,7 @@ class OralArgumentIndexingTest(
                     "processing_complete",
                 ]
             )
-        # 1 es_save_document task calls for Audio creation.
+        # 1 es_save_document task calls for Audio after processing is complete
         self.assertEqual(self.task_call_count, 1)
         self.assertTrue(AudioDocument.exists(id=audio.pk))
 

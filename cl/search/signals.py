@@ -342,6 +342,7 @@ recap_document_field_mapping = {
                 "is_available": ["is_available"],
                 "page_count": ["page_count"],
                 "filepath_local": ["filepath_local"],
+                "docket_entry": ["prepare"],
             },
         },
         DocketEntry: {

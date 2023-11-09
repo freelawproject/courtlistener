@@ -1328,6 +1328,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
 
     es_rd_field_tracker = FieldTracker(
         fields=[
+            "docket_entry",
             "document_type",
             "document_number",
             "description",

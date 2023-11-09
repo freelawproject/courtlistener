@@ -2892,9 +2892,10 @@ class RECAPIndexingTest(
                 is_available=True,
                 page_count=5,
             )
-        # Only one es_save_document task should be called on creation.
+        # Only 1 es_save_document task should be called on creation.
         self.assertEqual(self.task_call_count, 1)
-        self.assertTrue(DocketDocument.exists(id=ES_CHILD_ID(rd_1.pk).RECAP))
+        r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
+        self.assertEqual(r_doc.docket_child["parent"], docket.pk)
 
         # Restart task counter.
         self.task_call_count = 0
@@ -2907,9 +2908,10 @@ class RECAPIndexingTest(
             de_2 = DocketEntryWithParentsFactory(
                 docket=docket,
             )
-            rd_2 = RECAPDocumentFactory(
+            RECAPDocumentFactory(
                 docket_entry=de_2,
             )
+
         # No update_es_document task should be called on creation.
         self.assertEqual(self.task_call_count, 0)
 
@@ -2956,14 +2958,54 @@ class RECAPIndexingTest(
         self.assertEqual(r_doc.short_description, "Lorem Ipsum")
         self.assertEqual(r_doc.page_count, 5)
 
+        self.task_call_count = 0
+        with mock.patch(
+            "cl.lib.es_signal_processor.es_save_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                es_save_document, *args, **kwargs
+            ),
+        ):
+            rd_1.page_count = 6
+            rd_1.save()
+
+        # es_save_document task shouldn't be called on document updates.
+        self.assertEqual(self.task_call_count, 0)
+
+        # Create a new Docket and DocketEntry.
+        docket_2 = DocketFactory(court=self.court, docket_number="21-0000")
+        de_2 = DocketEntryWithParentsFactory(
+            docket=docket_2,
+            date_filed=datetime.date(2016, 8, 19),
+            description="Notification for Lorem Ipsum",
+            entry_number=2,
+        )
+        # Update the RECAPDocument docket_entry.
+        self.task_call_count = 0
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            rd_1.docket_entry = de_2
+            rd_1.save()
+
+        # update_es_document task should be called 1 on tracked fields updates
+        self.assertEqual(self.task_call_count, 1)
+        r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
+        self.assertEqual(r_doc.description, de_2.description)
+        self.assertEqual(r_doc.entry_number, de_2.entry_number)
+        self.assertEqual(r_doc.docketNumber, docket_2.docket_number)
+
         # Confirm a RECAPDocument is indexed if it doesn't exist in the
         # index on a tracked field update.
+        # Clean the RECAP index.
         self.delete_index("search.Docket")
         self.create_index("search.Docket")
 
         # Index Docket
-        docket.docket_number = "21-43436"
-        docket.save()
+        docket_2.docket_number = "21-43436"
+        docket_2.save()
 
         self.assertFalse(DocketDocument.exists(id=ES_CHILD_ID(rd_1.pk).RECAP))
         # RECAP Document creation on update.
@@ -2981,5 +3023,6 @@ class RECAPIndexingTest(
         self.assertEqual(self.task_call_count, 1)
         r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
         self.assertEqual(r_doc.pacer_doc_id, "99999999")
+        self.assertEqual(r_doc.docket_child["parent"], docket_2.pk)
 
-        docket.delete()
+        docket_2.delete()

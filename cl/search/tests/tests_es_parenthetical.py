@@ -729,7 +729,7 @@ class ParentheticalESSignalProcessorTest(
         right number of indexing tasks.
         """
 
-        # Index parenthetical group on creation.
+        # Index ParentheticalGroup on creation.
         self.assertEqual(self.task_call_count, 0)
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
@@ -762,8 +762,10 @@ class ParentheticalESSignalProcessorTest(
             p5.group = pg_test
             p5.save()
 
-        # 1 es_save_document task calls for ParentheticalGroup creation.
-        self.assertEqual(self.task_call_count, 1)
+        # 3 es_save_document task calls. 1 for ParentheticalGroup creation.
+        # 2 for Person indexing due to the OpinionWithParentsFactory creates a
+        # Person
+        self.assertEqual(self.task_call_count, 3)
         self.assertTrue(ParentheticalGroupDocument.exists(id=pg_test.pk))
 
         # Update a ParentheticalGroup without changes.
@@ -805,6 +807,7 @@ class ParentheticalESSignalProcessorTest(
 
         # Confirm a ParentheticalGroup is indexed if it doesn't exist in the
         # index on a tracked field update.
+        # Clean the ParentheticalGroup index.
         self.delete_index("search.ParentheticalGroup")
         self.create_index("search.ParentheticalGroup")
 
