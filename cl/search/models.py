@@ -1328,7 +1328,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
 
     es_rd_field_tracker = FieldTracker(
         fields=[
-            "docket_entry",
+            "docket_entry_id",
             "document_type",
             "document_number",
             "description",
@@ -3406,7 +3406,9 @@ class ParentheticalGroup(models.Model):
         help_text="The number of parentheticals that belong to the group"
     )
 
-    es_pa_field_tracker = FieldTracker(fields=["opinion", "representative"])
+    es_pa_field_tracker = FieldTracker(
+        fields=["opinion_id", "representative_id"]
+    )
 
     def __str__(self) -> str:
         return (

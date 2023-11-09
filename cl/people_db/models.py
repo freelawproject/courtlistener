@@ -972,7 +972,7 @@ class Position(AbstractDateTimeModel):
 
     es_p_field_tracker = FieldTracker(
         fields=[
-            "court",
+            "court_id",
             "organization_name",
             "job_title",
             "position_type",
@@ -992,10 +992,10 @@ class Position(AbstractDateTimeModel):
             "nomination_process",
             "how_selected",
             "termination_reason",
-            "person",
-            "appointer",
-            "supervisor",
-            "predecessor",
+            "person_id",
+            "appointer_id",
+            "supervisor_id",
+            "predecessor_id",
         ]
     )
 

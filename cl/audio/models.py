@@ -159,7 +159,7 @@ class Audio(AbstractDateTimeModel):
             "sha1",
             "source",
             "stt_google_response",
-            "docket",
+            "docket_id",
         ]
     )
 

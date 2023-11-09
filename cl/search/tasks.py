@@ -404,7 +404,8 @@ def document_fields_to_update(
         # If any of the changed fields has a "prepare" value, extract all the
         # values based on the foreign key relations.
         contains_prepare = any(
-            "prepare" in value_list for value_list in fields_map.values()
+            fields_map.get(field, []) == ["prepare"]
+            for field in affected_fields
         )
         if contains_prepare:
             return es_document().prepare(main_instance)

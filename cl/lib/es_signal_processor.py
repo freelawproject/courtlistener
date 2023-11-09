@@ -145,7 +145,9 @@ def update_es_documents(
 
     for query, fields_map in mapping_fields.items():
         fields_to_update = get_fields_to_update(changed_fields, fields_map)
-
+        if not fields_to_update:
+            # No fields from the current mapping need updating. Omit it.
+            continue
         match instance:
             case Person() if es_document is PositionDocument and query == "person":  # type: ignore
                 """

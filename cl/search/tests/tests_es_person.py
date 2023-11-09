@@ -1916,4 +1916,20 @@ class PeopleIndexingTest(
         po_doc = PersonDocument.get(id=ES_CHILD_ID(position.pk).POSITION)
         self.assertEqual(po_doc.nomination_process, "State Senate")
 
+        # Position ForeignKey field update.
+        self.task_call_count = 0
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            position.predecessor = self.person_2
+            position.save()
+
+        # update_es_document task should be called 1 on tracked fields update
+        self.assertEqual(self.task_call_count, 1)
+        po_doc = PersonDocument.get(id=ES_CHILD_ID(position.pk).POSITION)
+        self.assertEqual(po_doc.predecessor, self.person_2.name_full_reverse)
+
         person.delete()
