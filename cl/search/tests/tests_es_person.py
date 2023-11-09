@@ -2,6 +2,7 @@ import datetime
 import operator
 from collections import Counter
 from functools import reduce
+from unittest import mock
 
 from django.core.management import call_command
 from django.urls import reverse
@@ -28,7 +29,13 @@ from cl.people_db.models import Race
 from cl.search.documents import ES_CHILD_ID, PersonDocument, PositionDocument
 from cl.search.factories import CourtFactory
 from cl.search.models import SEARCH_TYPES
-from cl.tests.cases import ESIndexTestCase, TestCase, TransactionTestCase
+from cl.search.tasks import es_save_document, update_es_document
+from cl.tests.cases import (
+    CountESTasksTestCase,
+    ESIndexTestCase,
+    TestCase,
+    TransactionTestCase,
+)
 
 
 class PeopleSearchTestElasticSearch(
@@ -1208,13 +1215,16 @@ class IndexJudgesPositionsCommandTest(
         self.assertEqual(s.count(), 1)
 
 
-class PeopleIndexingTest(ESIndexTestCase, TransactionTestCase):
+class PeopleIndexingTest(
+    CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
+):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         cls.rebuild_index("people_db.Person")
 
     def setUp(self):
+        super().setUp()
         self.court_1 = CourtFactory(
             id="ca1",
             full_name="First Circuit",
@@ -1771,3 +1781,139 @@ class PeopleIndexingTest(ESIndexTestCase, TransactionTestCase):
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         self.assertEqual(None, person_3_doc.aba_rating)
         self.assertEqual(None, pos_doc.aba_rating)
+
+    def test_person_indexing_and_tasks_count(self) -> None:
+        """Confirm a Person is properly indexed in ES with the right number of
+        indexing tasks.
+        """
+
+        self.assertEqual(self.task_call_count, 0)
+        with mock.patch(
+            "cl.lib.es_signal_processor.es_save_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                es_save_document, *args, **kwargs
+            ),
+        ):
+            person = PersonFactory.create(
+                name_first="Bill Clinton",
+                date_granularity_dob="%Y-%m-%d",
+                date_granularity_dod="%Y-%m-%d",
+                religion="ca",
+                date_dob=datetime.date(1941, 10, 21),
+                date_dod=datetime.date(2022, 11, 25),
+            )
+        # 1 es_save_document task calls for Person creation.
+        self.assertEqual(self.task_call_count, 1)
+        # The person is not indexed since it's not a Judge.
+        self.assertFalse(PersonDocument.exists(id=person.pk))
+
+        # Add a Judge Position to person.
+        self.task_call_count = 0
+        with mock.patch(
+            "cl.lib.es_signal_processor.es_save_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                es_save_document, *args, **kwargs
+            ),
+        ):
+            position = PositionFactory.create(
+                date_granularity_start="%Y-%m-%d",
+                court=self.court_2,
+                date_start=datetime.date(2020, 12, 14),
+                predecessor=self.person_3,
+                appointer=self.position_1,
+                judicial_committee_action="no_rep",
+                termination_reason="retire_mand",
+                position_type="c-jud",
+                person=person,
+                how_selected="a_legis",
+                nomination_process="fed_senate",
+            )
+        # 1 es_save_document task calls for Position creation.
+        self.assertEqual(self.task_call_count, 1)
+        # The Person and the Position are now indexed.
+        self.assertTrue(PersonDocument.exists(id=person.pk))
+        self.assertTrue(
+            PersonDocument.exists(id=ES_CHILD_ID(position.pk).POSITION)
+        )
+
+        # Update a Person without changes.
+        self.task_call_count = 0
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            person.save()
+        # update_es_document task shouldn't be called on save() without changes
+        self.assertEqual(self.task_call_count, 0)
+
+        # Update a Position without changes.
+        self.task_call_count = 0
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            position.save()
+        # update_es_document task shouldn't be called on save() without changes
+        self.assertEqual(self.task_call_count, 0)
+
+        # Update a Person tracked field.
+        self.task_call_count = 0
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            person.name_first = "Barack"
+            person.save()
+        # update_es_document task should be called 1 on tracked fields updates
+        self.assertEqual(self.task_call_count, 1)
+        p_doc = PersonDocument.get(id=person.pk)
+        self.assertIn("Barack", p_doc.name)
+
+        # Confirm a Person is indexed if it doesn't exist in the index on a
+        # tracked field update.
+        self.delete_index("people_db.Person")
+        self.create_index("people_db.Person")
+
+        self.assertFalse(PersonDocument.exists(id=person.pk))
+        self.assertFalse(
+            PersonDocument.exists(id=ES_CHILD_ID(position.pk).POSITION)
+        )
+        # Person creation on update.
+        self.task_call_count = 0
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            person.religion = "pr"
+            person.save()
+
+        # update_es_document task should be called 1 on tracked fields update
+        self.assertEqual(self.task_call_count, 1)
+        p_doc = PersonDocument.get(id=person.pk)
+        self.assertEqual(p_doc.religion, "pr")
+
+        # Position creation on update.
+        self.task_call_count = 0
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            position.nomination_process = "state_senate"
+            position.save()
+
+        # update_es_document task should be called 1 on tracked fields update
+        self.assertEqual(self.task_call_count, 1)
+        po_doc = PersonDocument.get(id=ES_CHILD_ID(position.pk).POSITION)
+        self.assertEqual(po_doc.nomination_process, "State Senate")
+
+        person.delete()

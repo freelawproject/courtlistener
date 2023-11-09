@@ -13,7 +13,6 @@ from cl.people_db.models import (
     Person,
     PoliticalAffiliation,
     Position,
-    Race,
     School,
 )
 from cl.search.documents import (
@@ -93,8 +92,12 @@ pa_field_mapping = {
                 "text": ["representative_text"],
             },
         },
-        ParentheticalGroup: {},  # For the main model, a field mapping is not
-        # required, since all its fields will be indexed/updated.
+        ParentheticalGroup: {
+            "self": {
+                "representative": ["prepare"],
+                "opinion": ["prepare"],
+            },
+        },
     },
     "delete": {ParentheticalGroup: {}},  # Delete action, this only applies to
     # the main model, no field mapping is required.
@@ -144,7 +147,20 @@ oa_field_mapping = {
                 "slug": ["docket_slug"],
             }
         },
-        Audio: {},
+        Audio: {
+            "self": {
+                "case_name": ["caseName"],
+                "case_name_full": ["case_name_full"],
+                "duration": ["duration"],
+                "download_url": ["download_url"],
+                "local_path_mp3": ["file_size_mp3", "local_path"],
+                "judges": ["judge"],
+                "sha1": ["sha1"],
+                "source": ["source"],
+                "stt_google_response": ["prepare"],
+                "docket": ["prepare"],
+            },
+        },
     },
     "delete": {Audio: {}},
     "m2m": {Audio.panel.through: {"audio": {"panel_ids": "panel_ids"}}},
@@ -154,7 +170,22 @@ oa_field_mapping = {
 
 p_field_mapping = {
     "save": {
-        Person: {},
+        Person: {
+            "self": {
+                "name_full": ["name"],
+                "name_full_reverse": ["name_reverse"],
+                "religion": ["religion"],
+                "gender": ["gender"],
+                "dob_city": ["dob_city"],
+                "dob_state": ["dob_state", "dob_state_id"],
+                "fjc_id": ["fjc_id"],
+                "date_dob": ["dob"],
+                "date_dod": ["dod"],
+                "date_granularity_dob": ["date_granularity_dob"],
+                "date_granularity_dod": ["date_granularity_dod"],
+                "slug": ["absolute_url"],
+            },
+        },
     },
     "delete": {Person: {}},
     "m2m": {Person.race.through: {"person": {"races": "races"}}},
@@ -212,7 +243,40 @@ position_field_mapping = {
             }
         },
         ABARating: {"aba_ratings": {"rating": ["aba_rating"]}},
-        Position: {},
+        Position: {
+            "self": {
+                "organization_name": ["organization_name"],
+                "job_title": ["job_title"],
+                "position_type": ["position_type"],
+                "date_nominated": ["date_nominated"],
+                "date_elected": ["date_elected"],
+                "date_recess_appointment": ["date_recess_appointment"],
+                "date_referred_to_judicial_committee": [
+                    "date_referred_to_judicial_committee"
+                ],
+                "date_judicial_committee_action": [
+                    "date_judicial_committee_action"
+                ],
+                "date_hearing": ["date_hearing"],
+                "date_confirmation": ["date_confirmation"],
+                "date_start": ["date_start"],
+                "date_granularity_start": ["date_granularity_start"],
+                "date_retirement": ["date_retirement"],
+                "date_termination": ["date_termination"],
+                "date_granularity_termination": [
+                    "date_granularity_termination"
+                ],
+                "judicial_committee_action": ["judicial_committee_action"],
+                "nomination_process": ["nomination_process"],
+                "how_selected": ["selection_method", "selection_method_id"],
+                "termination_reason": ["termination_reason"],
+                "court": ["prepare"],
+                "person": ["prepare"],
+                "appointer": ["prepare"],
+                "supervisor": ["prepare"],
+                "predecessor": ["prepare"],
+            },
+        },
     },
     "delete": {Position: {}},
     "m2m": {Person.race.through: {"person": {"races": "races"}}},
@@ -222,7 +286,25 @@ position_field_mapping = {
 
 docket_field_mapping = {
     "save": {
-        Docket: {},
+        Docket: {
+            "self": {
+                "case_name": ["caseName"],
+                "case_name_full": ["case_name_full"],
+                "docket_number": ["docketNumber"],
+                "nature_of_suit": ["suitNature"],
+                "cause": ["cause"],
+                "jury_demand": ["juryDemand"],
+                "jurisdiction_type": ["jurisdictionType"],
+                "date_argued": ["dateArgued"],
+                "date_filed": ["dateFiled"],
+                "date_terminated": ["dateTerminated"],
+                "assigned_to_id": ["assigned_to_id", "assignedTo"],
+                "referred_to_id": ["referred_to_id", "referredTo"],
+                "assigned_to_str": ["assignedTo"],
+                "referred_to_str": ["referredTo"],
+                "slug": ["docket_slug", "docket_absolute_url"],
+            },
+        },
         Person: {
             "assigned_to": {
                 "name_full": ["assignedTo"],
@@ -249,7 +331,19 @@ docket_field_mapping = {
 
 recap_document_field_mapping = {
     "save": {
-        RECAPDocument: {},
+        RECAPDocument: {
+            "self": {
+                "description": ["short_description"],
+                "document_type": ["document_type"],
+                "document_number": ["document_number", "absolute_url"],
+                "pacer_doc_id": ["pacer_doc_id"],
+                "plain_text": ["plain_text"],
+                "attachment_number": ["attachment_number"],
+                "is_available": ["is_available"],
+                "page_count": ["page_count"],
+                "filepath_local": ["filepath_local"],
+            },
+        },
         DocketEntry: {
             "docket_entry": {
                 "description": ["description"],

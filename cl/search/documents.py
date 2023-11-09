@@ -360,9 +360,7 @@ class PersonBaseDocument(Document):
     dob_city = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(
-                attr="person.dob_city", analyzer="english_exact"
-            ),
+            "exact": fields.TextField(analyzer="english_exact"),
         },
         search_analyzer="search_analyzer",
     )

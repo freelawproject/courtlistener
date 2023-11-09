@@ -38,9 +38,16 @@ from cl.search.management.commands.cl_index_parent_and_child_docs import (
 from cl.search.models import SEARCH_TYPES, RECAPDocument
 from cl.search.tasks import (
     add_docket_to_solr_by_rds,
+    es_save_document,
     index_docket_parties_in_es,
+    update_es_document,
 )
-from cl.tests.cases import ESIndexTestCase, TestCase, TransactionTestCase
+from cl.tests.cases import (
+    CountESTasksTestCase,
+    ESIndexTestCase,
+    TestCase,
+    TransactionTestCase,
+)
 
 
 class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
@@ -2199,7 +2206,9 @@ class IndexDocketRECAPDocumentsCommandTest(
         d_4.delete()
 
 
-class RECAPIndexingTest(ESIndexTestCase, TransactionTestCase):
+class RECAPIndexingTest(
+    CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
+):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -2208,6 +2217,7 @@ class RECAPIndexingTest(ESIndexTestCase, TransactionTestCase):
 
     def setUp(self):
         self.court = CourtFactory(id="canb", jurisdiction="FB")
+        super().setUp()
 
     def _compare_response_child_value(
         self,
@@ -2731,3 +2741,245 @@ class RECAPIndexingTest(ESIndexTestCase, TransactionTestCase):
             self.assertFalse(
                 DocketDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP)
             )
+
+    def test_docket_indexing_and_tasks_count(self) -> None:
+        """Confirm a Docket is properly indexed in ES with the right number of
+        indexing tasks.
+        """
+
+        # Index docket on creation.
+        self.assertEqual(self.task_call_count, 0)
+        with mock.patch(
+            "cl.lib.es_signal_processor.es_save_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                es_save_document, *args, **kwargs
+            ),
+        ):
+            docket = DocketFactory(
+                court=self.court,
+                pacer_case_id="asdf",
+                docket_number="12-cv-02354",
+                case_name="Vargas v. Wilkins",
+            )
+
+        # Only one es_save_document task should be called on creation.
+        self.assertEqual(self.task_call_count, 1)
+        self.assertTrue(DocketDocument.exists(id=docket.pk))
+
+        # Restart task counter.
+        self.task_call_count = 0
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            docket_2 = DocketFactory(
+                court=self.court,
+                pacer_case_id="aaaaa",
+                docket_number="12-cv-02358",
+            )
+
+        # No update_es_document task should be called on creation.
+        self.assertEqual(self.task_call_count, 0)
+        self.assertTrue(DocketDocument.exists(id=docket_2.pk))
+
+        # Update a Docket without changes.
+        self.task_call_count = 0
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            docket.save()
+
+        # update_es_document task shouldn't be called on save() without changes
+        self.assertEqual(self.task_call_count, 0)
+        with mock.patch(
+            "cl.lib.es_signal_processor.es_save_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                es_save_document, *args, **kwargs
+            ),
+        ):
+            docket.save()
+
+        # es_save_document task shouldn't be called on save() without changes
+        self.assertEqual(self.task_call_count, 0)
+
+        # Update a Docket untracked field.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            docket.blocked = True
+            docket.save()
+        # update_es_document task shouldn't be called on save() for untracked
+        # fields
+        self.assertEqual(self.task_call_count, 0)
+
+        # Update a Docket tracked field.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            docket.docket_number = "21-43434"
+            docket.case_name = "Vargas v. Lorem"
+            docket.save()
+
+        # update_es_document task should be called 1 on tracked fields updates
+        self.assertEqual(self.task_call_count, 1)
+        d_doc = DocketDocument.get(id=docket.pk)
+        self.assertEqual(d_doc.docketNumber, "21-43434")
+
+        # Confirm a Docket is indexed if it doesn't exist in the
+        # index on a tracked field update.
+        self.delete_index("search.Docket")
+        self.create_index("search.Docket")
+
+        self.task_call_count = 0
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            docket.docket_number = "21-43435"
+            docket.save()
+
+        # update_es_document task should be called 1 on tracked fields update
+        self.assertEqual(self.task_call_count, 1)
+        d_doc = DocketDocument.get(id=docket.pk)
+        self.assertEqual(d_doc.docketNumber, "21-43435")
+        self.assertEqual(d_doc.caseName, "Vargas v. Lorem")
+
+        docket.delete()
+        docket_2.delete()
+
+    def test_recap_document_indexing_and_tasks_count(self) -> None:
+        """Confirm a RECAPDocument is properly indexed in ES with the right
+        number of indexing tasks.
+        """
+        docket = DocketFactory(
+            court=self.court,
+            pacer_case_id="asdf",
+            docket_number="12-cv-02354",
+            case_name="Vargas v. Wilkins",
+        )
+
+        # RECAP Document creation:
+        self.task_call_count = 0
+        with mock.patch(
+            "cl.lib.es_signal_processor.es_save_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                es_save_document, *args, **kwargs
+            ),
+        ):
+            de_1 = DocketEntryWithParentsFactory(
+                docket=docket,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem",
+                entry_number=None,
+            )
+            rd_1 = RECAPDocumentFactory(
+                docket_entry=de_1,
+                description="Leave to File",
+                document_number="",
+                is_available=True,
+                page_count=5,
+            )
+        # Only one es_save_document task should be called on creation.
+        self.assertEqual(self.task_call_count, 1)
+        self.assertTrue(DocketDocument.exists(id=ES_CHILD_ID(rd_1.pk).RECAP))
+
+        # Restart task counter.
+        self.task_call_count = 0
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            de_2 = DocketEntryWithParentsFactory(
+                docket=docket,
+            )
+            rd_2 = RECAPDocumentFactory(
+                docket_entry=de_2,
+            )
+        # No update_es_document task should be called on creation.
+        self.assertEqual(self.task_call_count, 0)
+
+        # Update a RECAPDocument without changes.
+        self.task_call_count = 0
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            rd_1.save()
+        # update_es_document task shouldn't be called on save() without changes
+        self.assertEqual(self.task_call_count, 0)
+
+        # Update a RECAPDocument untracked field.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            rd_1.is_sealed = True
+            rd_1.save()
+        # update_es_document task shouldn't be called on save() for untracked
+        # fields
+        self.assertEqual(self.task_call_count, 0)
+
+        # Update a RECAPDocument tracked field.
+        self.task_call_count = 0
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            rd_1.description = "Lorem Ipsum"
+            rd_1.page_count = 5
+            rd_1.save()
+
+        # update_es_document task should be called 1 on tracked fields updates
+        self.assertEqual(self.task_call_count, 1)
+        r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
+        self.assertEqual(r_doc.short_description, "Lorem Ipsum")
+        self.assertEqual(r_doc.page_count, 5)
+
+        # Confirm a RECAPDocument is indexed if it doesn't exist in the
+        # index on a tracked field update.
+        self.delete_index("search.Docket")
+        self.create_index("search.Docket")
+
+        # Index Docket
+        docket.docket_number = "21-43436"
+        docket.save()
+
+        self.assertFalse(DocketDocument.exists(id=ES_CHILD_ID(rd_1.pk).RECAP))
+        # RECAP Document creation on update.
+        self.task_call_count = 0
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            rd_1.pacer_doc_id = "99999999"
+            rd_1.save()
+
+        # update_es_document task should be called 1 on tracked fields update
+        self.assertEqual(self.task_call_count, 1)
+        r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
+        self.assertEqual(r_doc.pacer_doc_id, "99999999")
+
+        docket.delete()

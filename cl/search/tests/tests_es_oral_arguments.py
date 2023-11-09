@@ -20,7 +20,13 @@ from cl.lib.test_helpers import AudioESTestCase
 from cl.search.documents import AudioDocument, AudioPercolator
 from cl.search.factories import CourtFactory, DocketFactory, PersonFactory
 from cl.search.models import SEARCH_TYPES
-from cl.tests.cases import ESIndexTestCase, TestCase, TransactionTestCase
+from cl.search.tasks import es_save_document, update_es_document
+from cl.tests.cases import (
+    CountESTasksTestCase,
+    ESIndexTestCase,
+    TestCase,
+    TransactionTestCase,
+)
 
 
 class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
@@ -1108,8 +1114,8 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             )
 
     @mock.patch(
-        "cl.lib.es_signal_processor.avoid_es_audio_indexing",
-        side_effect=lambda x, y, z: False,
+        "cl.lib.es_signal_processor.allow_es_audio_indexing",
+        side_effect=lambda x, y: True,
     )
     def test_oa_results_pagination(self, mock_abort_audio) -> None:
         created_audios = []
@@ -1932,22 +1938,35 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         self.assertIn("<mark>transcript</mark>", r.content.decode())
 
 
-class OralArgumentIndexingTest(ESIndexTestCase, TransactionTestCase):
-    @mock.patch(
-        "cl.lib.es_signal_processor.avoid_es_audio_indexing",
-        side_effect=lambda x, y, z: False,
-    )
-    def test_keep_in_sync_related_OA_objects(self, mock_abort_audio) -> None:
-        """Test Audio documents are updated when related objects change."""
-        court_1 = CourtFactory(
+class OralArgumentIndexingTest(
+    CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
+):
+    def setUp(self):
+        self.court_1 = CourtFactory(
             id="cabc",
             full_name="Testing Supreme Court",
             jurisdiction="FB",
             citation_string="Bankr. C.D. Cal.",
         )
+        self.docket = DocketFactory.create(
+            court_id=self.court_1.pk,
+        )
+        self.docket_2 = DocketFactory.create(
+            court_id=self.court_1.pk,
+        )
+
+        super().setUp()
+
+    @mock.patch(
+        "cl.lib.es_signal_processor.allow_es_audio_indexing",
+        side_effect=lambda x, y: True,
+    )
+    def test_keep_in_sync_related_OA_objects(self, mock_abort_audio) -> None:
+        """Test Audio documents are updated when related objects change."""
+
         docket_5 = DocketFactory.create(
             docket_number="1:22-bk-12345",
-            court_id=court_1.pk,
+            court_id=self.court_1.pk,
             date_argued=datetime.date(2015, 8, 16),
         )
         audio_6 = AudioFactory.create(
@@ -2044,3 +2063,106 @@ class OralArgumentIndexingTest(ESIndexTestCase, TransactionTestCase):
             total_child_results,
         ) = build_es_main_query(search_query, cd)
         self.assertEqual(s.count(), 0)
+
+    def test_oa_indexing_and_tasks_count(self) -> None:
+        """Confirm an Audio is properly indexed in ES with the right number of
+        indexing tasks.
+        """
+
+        # When the Audio is created the file processing is not complete.
+        # The Audio indexing is avoided.
+        self.assertEqual(self.task_call_count, 0)
+        with mock.patch(
+            "cl.lib.es_signal_processor.es_save_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                es_save_document, *args, **kwargs
+            ),
+        ):
+            audio = AudioFactory.create(
+                case_name="Lorem Ipsum Dolor vs. USA",
+                docket_id=self.docket.pk,
+            )
+        # 1 es_save_document task calls for Audio creation.
+        self.assertEqual(self.task_call_count, 0)
+        self.assertFalse(AudioDocument.exists(id=audio.pk))
+
+        # Index the document for first time when file processing is completed.
+        with mock.patch(
+            "cl.lib.es_signal_processor.es_save_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                es_save_document, *args, **kwargs
+            ),
+        ):
+            audio.save(
+                update_fields=[
+                    "processing_complete",
+                ]
+            )
+        # 1 es_save_document task calls for Audio creation.
+        self.assertEqual(self.task_call_count, 1)
+        self.assertTrue(AudioDocument.exists(id=audio.pk))
+
+        # Update an Audio without changes.
+        self.task_call_count = 0
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            audio.save()
+        # update_es_document task shouldn't be called on save() without changes
+        self.assertEqual(self.task_call_count, 0)
+
+        # Update an Audio tracked field.
+        self.task_call_count = 0
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            audio.case_name = "Bank vs America"
+            audio.save()
+        # update_es_document task should be called 1 on tracked fields updates
+        self.assertEqual(self.task_call_count, 1)
+        a_doc = AudioDocument.get(id=audio.pk)
+        self.assertEqual(a_doc.caseName, "Bank vs America")
+
+        self.task_call_count = 0
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            audio.docket = self.docket_2
+            audio.save()
+        # update_es_document task should be called 1 on tracked fields updates
+        self.assertEqual(self.task_call_count, 1)
+        a_doc = AudioDocument.get(id=audio.pk)
+        self.assertEqual(a_doc.docket_id, self.docket_2.pk)
+
+        # Confirm an Audio is indexed if it doesn't exist in the
+        # index on a tracked field update.
+        self.delete_index("audio.Audio")
+        self.create_index("audio.Audio")
+
+        self.assertFalse(AudioDocument.exists(id=audio.pk))
+        # Audio creation on update.
+        self.task_call_count = 0
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            audio.case_name = "Lorem Ipsum"
+            audio.save()
+
+        # update_es_document task should be called 1 on tracked fields update
+        self.assertEqual(self.task_call_count, 1)
+        a_doc = AudioDocument.get(id=audio.pk)
+        self.assertEqual(a_doc.caseName, "Lorem Ipsum")
+
+        audio.delete()

@@ -178,3 +178,17 @@ class ESIndexTestCase(SimpleTestCase):
     def tearDown(self) -> None:
         self.restart_celery_throttle_key()
         super().tearDown()
+
+
+class CountESTasksTestCase(SimpleTestCase):
+    def setUp(self):
+        self.task_call_count = 0
+
+    def count_task_calls(self, task, *args, **kwargs):
+        # Increment the call count
+        self.task_call_count += 1
+        if task.__name__ == "es_save_document":
+            return task.s(*args, **kwargs)
+        else:
+            task.apply_async(args=args)
+            return

@@ -1,5 +1,4 @@
 from functools import partial
-from typing import Any
 
 from celery.canvas import chain
 from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist
@@ -17,10 +16,10 @@ from cl.people_db.models import (
     Education,
     Person,
     PoliticalAffiliation,
+    Position,
     School,
 )
 from cl.search.documents import (
-    ES_CHILD_ID,
     AudioDocument,
     DocketDocument,
     ESRECAPDocument,
@@ -28,7 +27,12 @@ from cl.search.documents import (
     PersonDocument,
     PositionDocument,
 )
-from cl.search.models import BankruptcyInformation, Docket
+from cl.search.models import (
+    BankruptcyInformation,
+    Docket,
+    ParentheticalGroup,
+    RECAPDocument,
+)
 from cl.search.tasks import (
     es_save_document,
     remove_document_from_es_index,
@@ -63,7 +67,7 @@ def updated_fields(
         tracked_set = getattr(instance, "es_pa_field_tracker", None)
     elif es_document is ESRECAPDocument or es_document is DocketDocument:
         tracked_set = getattr(instance, "es_rd_field_tracker", None)
-    elif es_document is PositionDocument:
+    elif es_document is PositionDocument or es_document is PersonDocument:
         tracked_set = getattr(instance, "es_p_field_tracker", None)
 
     # Check the set before trying to get the fields
@@ -141,6 +145,7 @@ def update_es_documents(
 
     for query, fields_map in mapping_fields.items():
         fields_to_update = get_fields_to_update(changed_fields, fields_map)
+
         match instance:
             case Person() if es_document is PositionDocument and query == "person":  # type: ignore
                 """
@@ -185,6 +190,108 @@ def update_es_documents(
                         fields_map,
                     )
                 )
+            case RECAPDocument() if es_document is ESRECAPDocument:  # type: ignore
+                # Update main document in ES, including fields to be
+                # extracted from a related instance.
+                transaction.on_commit(
+                    partial(
+                        update_es_document.delay,
+                        es_document.__name__,
+                        fields_to_update,
+                        (
+                            compose_app_label(instance),
+                            instance.pk,
+                        ),
+                        (compose_app_label(instance), instance.pk),
+                        fields_map,
+                    )
+                )
+
+            case Docket() if es_document is DocketDocument:  # type: ignore
+                # Update main document in ES, including fields to be
+                # extracted from a related instance.
+                transaction.on_commit(
+                    partial(
+                        update_es_document.delay,
+                        es_document.__name__,
+                        fields_to_update,
+                        (
+                            compose_app_label(instance),
+                            instance.pk,
+                        ),
+                        (compose_app_label(instance), instance.pk),
+                        fields_map,
+                    )
+                )
+
+            case ParentheticalGroup() if es_document is ParentheticalGroupDocument:  # type: ignore
+                # Update main document in ES, including fields to be
+                # extracted from a related instance.
+                transaction.on_commit(
+                    partial(
+                        update_es_document.delay,
+                        es_document.__name__,
+                        fields_to_update,
+                        (
+                            compose_app_label(instance),
+                            instance.pk,
+                        ),
+                        (compose_app_label(instance), instance.pk),
+                        fields_map,
+                    )
+                )
+
+            case Audio() if es_document is AudioDocument:  # type: ignore
+                # Update main document in ES, including fields to be
+                # extracted from a related instance.
+                transaction.on_commit(
+                    partial(
+                        update_es_document.delay,
+                        es_document.__name__,
+                        fields_to_update,
+                        (
+                            compose_app_label(instance),
+                            instance.pk,
+                        ),
+                        (compose_app_label(instance), instance.pk),
+                        fields_map,
+                    )
+                )
+
+            case Person() if es_document is PersonDocument:  # type: ignore
+                # Update main document in ES, including fields to be
+                # extracted from a related instance.
+                transaction.on_commit(
+                    partial(
+                        update_es_document.delay,
+                        es_document.__name__,
+                        fields_to_update,
+                        (
+                            compose_app_label(instance),
+                            instance.pk,
+                        ),
+                        (compose_app_label(instance), instance.pk),
+                        fields_map,
+                    )
+                )
+
+            case Position() if es_document is PositionDocument:  # type: ignore
+                # Update main document in ES, including fields to be
+                # extracted from a related instance.
+                transaction.on_commit(
+                    partial(
+                        update_es_document.delay,
+                        es_document.__name__,
+                        fields_to_update,
+                        (
+                            compose_app_label(instance),
+                            instance.pk,
+                        ),
+                        (compose_app_label(instance), instance.pk),
+                        fields_map,
+                    )
+                )
+
             case Person() if es_document is ESRECAPDocument:  # type: ignore
                 related_dockets = Docket.objects.filter(**{query: instance})
                 for rel_docket in related_dockets:
@@ -415,9 +522,8 @@ def delete_reverse_related_documents(
                 )
 
 
-def avoid_es_audio_indexing(
+def allow_es_audio_indexing(
     instance: ESModelType,
-    es_document: ESDocumentClassType,
     update_fields: list[str] | None,
 ):
     """Check conditions to abort Elasticsearch indexing for Audio instances.
@@ -425,21 +531,15 @@ def avoid_es_audio_indexing(
     processed yet by process_audio_file.
 
     :param instance: The Audio instance to evaluate for Elasticsearch indexing.
-    :param es_document: The Elasticsearch document class.
     :param update_fields: List of fields being updated, or None.
     :return: True if indexing should be avoided, False otherwise.
     """
 
-    if (
-        type(instance) == Audio
-        and not es_document.exists(instance.pk)
-        and (
-            not update_fields
-            or (update_fields and "processing_complete" not in update_fields)
-        )
+    if type(instance) == Audio and (
+        update_fields and "processing_complete" in update_fields
     ):
-        # Avoid indexing Audio instances that haven't been previously indexed
-        # in ES and for which 'processing_complete' is not present in update_fields.
+        # Allow indexing Audio instances for which 'processing_complete' is
+        # present in update_fields.
         return True
     return False
 
@@ -535,23 +635,14 @@ class ESSignalProcessor(object):
             return None
 
         mapping_fields = self.documents_model_mapping["save"][sender]
-        if not created:
-            update_es_documents(
-                self.main_model,
-                self.es_document,
-                instance,
-                created,
-                mapping_fields,
-            )
-        if not mapping_fields:
-            if avoid_es_audio_indexing(
-                instance, self.es_document, update_fields
-            ):
-                # This check is required to avoid indexing and triggering
-                # search alerts for Audio instances whose MP3 files have not
-                # yet been processed by process_audio_file.
-                return None
-
+        if (
+            created
+            and mapping_fields.get("self", None)
+            and type(instance) != Audio
+        ) or (
+            allow_es_audio_indexing(instance, update_fields)
+            and mapping_fields.get("self", None)
+        ):
             transaction.on_commit(
                 lambda: chain(
                     es_save_document.si(
@@ -563,6 +654,15 @@ class ESSignalProcessor(object):
                     process_percolator_response.s(),
                 ).apply_async()
             )
+            return
+
+        update_es_documents(
+            self.main_model,
+            self.es_document,
+            instance,
+            created,
+            mapping_fields,
+        )
 
     @elasticsearch_enabled
     def handle_delete(self, sender, instance, **kwargs):
