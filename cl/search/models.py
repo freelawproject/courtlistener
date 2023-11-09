@@ -945,6 +945,12 @@ class Docket(AbstractDateTimeModel):
             f"incDktEntries=Y"
         )
 
+    def pacer_acms_url(self):
+        return (
+            f"https://{self.pacer_court_id}-showdoc.azurewebsites.us/"
+            f"{self.docket_number}"
+        )
+
     @property
     def pacer_docket_url(self):
         if self.court.jurisdiction == Court.FEDERAL_APPELLATE:
@@ -955,6 +961,8 @@ class Docket(AbstractDateTimeModel):
 
             if not self.pacer_case_id:
                 return self.pacer_appellate_url_with_caseNum(path)
+            elif self.pacer_case_id.count("-") > 1:
+                return self.pacer_acms_url()
             else:
                 return self.pacer_appellate_url_with_caseId(path)
         else:
