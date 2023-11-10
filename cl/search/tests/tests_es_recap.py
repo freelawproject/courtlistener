@@ -4,6 +4,7 @@ import unittest
 from unittest import mock
 
 from asgiref.sync import async_to_sync, sync_to_async
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.test import RequestFactory, override_settings
 from django.urls import reverse
@@ -2446,14 +2447,55 @@ class RECAPIndexingTest(
         de_1.docket.case_name = "USA vs Bank"
         de_1.docket.assigned_to = judge
         de_1.docket.referred_to = judge_2
+
+        de_1.docket.docket_number = "21-0000"
+        de_1.docket.nature_of_suit = "Test nature of suit"
+        de_1.docket.cause = "Test Cause"
+        de_1.docket.jury_demand = "50,000"
+        de_1.docket.jurisdiction_type = "U.S. Government Defendant"
+        de_1.docket.date_argued = datetime.date(2021, 8, 19)
+        de_1.docket.date_filed = datetime.date(2022, 8, 19)
+        de_1.docket.date_terminated = datetime.date(2023, 8, 19)
+
         de_1.docket.save()
 
         docket_doc = DocketDocument.get(id=docket_pk)
-        self.assertIn("USA vs Bank", docket_doc.caseName)
+        self.assertIn(de_1.docket.case_name, docket_doc.caseName)
+        self.assertEqual(de_1.docket.docket_number, docket_doc.docketNumber)
+        self.assertEqual(de_1.docket.nature_of_suit, docket_doc.suitNature)
+        self.assertEqual(de_1.docket.cause, docket_doc.cause)
+        self.assertEqual(de_1.docket.jury_demand, docket_doc.juryDemand)
+        self.assertEqual(
+            de_1.docket.jurisdiction_type, docket_doc.jurisdictionType
+        )
+        self.assertEqual(de_1.docket.date_argued, docket_doc.dateArgued.date())
+        self.assertEqual(de_1.docket.date_filed, docket_doc.dateFiled.date())
+        self.assertEqual(
+            de_1.docket.date_terminated, docket_doc.dateTerminated.date()
+        )
         self.assertIn(judge.name_full, docket_doc.assignedTo)
         self.assertIn(judge_2.name_full, docket_doc.referredTo)
         self.assertEqual(judge.pk, docket_doc.assigned_to_id)
         self.assertEqual(judge_2.pk, docket_doc.referred_to_id)
+
+        # Confirm docket best case name and slug.
+        de_1.docket.case_name = ""
+        de_1.docket.case_name_full = ""
+        de_1.docket.case_name_short = "USA vs Bank Short"
+        de_1.docket.save()
+        docket_doc = DocketDocument.get(id=docket_pk)
+        self.assertEqual(de_1.docket.case_name_short, docket_doc.caseName)
+
+        de_1.docket.case_name = ""
+        de_1.docket.case_name_full = "USA vs Bank Full"
+        de_1.docket.save()
+        docket_doc = DocketDocument.get(id=docket_pk)
+        self.assertEqual(de_1.docket.case_name_full, docket_doc.caseName)
+        self.assertEqual(de_1.docket.case_name_full, docket_doc.case_name_full)
+        self.assertEqual("usa-vs-bank-full", docket_doc.docket_slug)
+        self.assertEqual(
+            de_1.docket.get_absolute_url(), docket_doc.docket_absolute_url
+        )
 
         # Update judges name.
         judge.name_first = "William"
@@ -2477,8 +2519,62 @@ class RECAPIndexingTest(
         self.assertEqual("Notification to File Ipsum", rd_doc.description)
         self.assertEqual(99, rd_doc.entry_number)
 
-        # Add a Bankruptcy document.
+        # Update RECAPDocument fields.
+        f = SimpleUploadedFile("recap_filename", b"file content more content")
+        rd_1.description = "RD short description"
+        rd_1.document_type = RECAPDocument.ATTACHMENT
+        rd_1.document_number = "5"
+        rd_1.pacer_doc_id = "103005"
+        rd_1.plain_text = "Plain text testing"
+        rd_1.attachment_number = "1"
+        rd_1.is_available = True
+        rd_1.page_count = 5
+        rd_1.filepath_local = f
+        rd_1.save()
+        rd_doc = DocketDocument.get(id=ES_CHILD_ID(rd_pk).RECAP)
+        self.assertEqual(rd_1.description, rd_doc.short_description)
+        self.assertEqual(
+            rd_1.get_document_type_display(), rd_doc.document_type
+        )
+        self.assertEqual(rd_1.document_number, rd_doc.document_number)
+        self.assertEqual(rd_1.pacer_doc_id, rd_doc.pacer_doc_id)
+        self.assertEqual(rd_1.plain_text, rd_doc.plain_text)
+        self.assertEqual(rd_1.attachment_number, str(rd_doc.attachment_number))
+        self.assertEqual(rd_1.is_available, rd_doc.is_available)
+        self.assertEqual(rd_1.page_count, rd_doc.page_count)
+        self.assertEqual(rd_1.filepath_local, rd_doc.filepath_local)
+        self.assertEqual(rd_1.get_absolute_url(), rd_doc.absolute_url)
 
+        # Confirm Docket fields are updated in RDDocument:
+        self.assertIn(de_1.docket.case_name, rd_doc.caseName)
+        self.assertEqual(de_1.docket.docket_number, rd_doc.docketNumber)
+        self.assertEqual(de_1.docket.nature_of_suit, rd_doc.suitNature)
+        self.assertEqual(de_1.docket.cause, rd_doc.cause)
+        self.assertEqual(de_1.docket.jury_demand, rd_doc.juryDemand)
+        self.assertEqual(
+            de_1.docket.jurisdiction_type, rd_doc.jurisdictionType
+        )
+        self.assertEqual(de_1.docket.date_argued, rd_doc.dateArgued.date())
+        self.assertEqual(de_1.docket.date_filed, rd_doc.dateFiled.date())
+        self.assertEqual(
+            de_1.docket.date_terminated, rd_doc.dateTerminated.date()
+        )
+        self.assertIn(judge.name_full, rd_doc.assignedTo)
+        self.assertIn(judge_2.name_full, rd_doc.referredTo)
+        self.assertEqual(judge.pk, rd_doc.assigned_to_id)
+        self.assertEqual(judge_2.pk, rd_doc.referred_to_id)
+
+        # Update docket entry ID.
+        de_2 = DocketEntryWithParentsFactory(
+            docket=de_1.docket,
+            description="Notification docket entry 2",
+        )
+        rd_1.docket_entry = de_2
+        rd_1.save()
+        rd_doc = DocketDocument.get(id=ES_CHILD_ID(rd_pk).RECAP)
+        self.assertEqual(de_2.description, rd_doc.description)
+
+        # Add a Bankruptcy document.
         bank = BankruptcyInformationFactory(docket=de_1.docket)
         docket_doc = DocketDocument.get(id=docket_pk)
         self.assertEqual(str(bank.chapter), docket_doc.chapter)
