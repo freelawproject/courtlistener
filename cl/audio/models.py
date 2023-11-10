@@ -151,6 +151,7 @@ class Audio(AbstractDateTimeModel):
     es_oa_field_tracker = FieldTracker(
         fields=[
             "case_name",
+            "case_name_short",
             "case_name_full",
             "duration",
             "download_url",

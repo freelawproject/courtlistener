@@ -144,12 +144,13 @@ oa_field_mapping = {
                     "dateReargumentDenied_text",
                 ],
                 "docket_number": ["docketNumber"],
-                "slug": ["docket_slug"],
+                "slug": ["docket_slug", "absolute_url"],
             }
         },
         Audio: {
             "self": {
                 "case_name": ["caseName"],
+                "case_name_short": ["caseName"],
                 "case_name_full": ["case_name_full"],
                 "duration": ["duration"],
                 "download_url": ["download_url"],
@@ -289,6 +290,7 @@ docket_field_mapping = {
         Docket: {
             "self": {
                 "case_name": ["caseName"],
+                "case_name_short": ["caseName"],
                 "case_name_full": ["case_name_full"],
                 "docket_number": ["docketNumber"],
                 "nature_of_suit": ["suitNature"],

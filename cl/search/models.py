@@ -721,6 +721,7 @@ class Docket(AbstractDateTimeModel):
         fields=[
             "docket_number",
             "case_name",
+            "case_name_short",
             "case_name_full",
             "nature_of_suit",
             "cause",

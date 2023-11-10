@@ -149,11 +149,33 @@ def update_es_documents(
             # No fields from the current mapping need updating. Omit it.
             continue
         match instance:
+            case RECAPDocument() | Docket() | ParentheticalGroup() | Audio() | Person() | Position() if mapping_fields.get(
+                "self", None
+            ):  # type: ignore
+                # Update main document in ES, including fields to be
+                # extracted from a related instance.
+                transaction.on_commit(
+                    partial(
+                        update_es_document.delay,
+                        es_document.__name__,
+                        fields_to_update,
+                        (
+                            compose_app_label(instance),
+                            instance.pk,
+                        ),
+                        (compose_app_label(instance), instance.pk),
+                        fields_map,
+                    )
+                )
             case Person() if es_document is PositionDocument and query == "person":  # type: ignore
                 """
                 This case handles the update of one or more fields that belongs to
                 the parent model(The person model).
                 """
+                # Avoid calling update_children_docs_by_query if the Person
+                # doesn't have any positions.
+                if not instance.positions.exists():
+                    continue
                 transaction.on_commit(
                     partial(
                         update_children_docs_by_query.delay,
@@ -173,6 +195,10 @@ def update_es_documents(
                 """
                 related_record = Person.objects.filter(**{query: instance})
                 for person in related_record:
+                    # Avoid calling update_children_docs_by_query if the Person
+                    # doesn't have any positions.
+                    if not person.positions.exists():
+                        continue
                     transaction.on_commit(
                         partial(
                             update_children_docs_by_query.delay,
@@ -183,6 +209,10 @@ def update_es_documents(
                         )
                     )
             case Docket() if es_document is ESRECAPDocument:  # type: ignore
+                # Avoid calling update_children_docs_by_query if the Docket
+                # doesn't have any docket entries.
+                if not instance.docket_entries.exists():
+                    continue
                 transaction.on_commit(
                     partial(
                         update_children_docs_by_query.delay,
@@ -192,26 +222,13 @@ def update_es_documents(
                         fields_map,
                     )
                 )
-            case RECAPDocument() | Docket() | ParentheticalGroup() | Audio() | Person() | Position() if mapping_fields.get("self", None):  # type: ignore
-                # Update main document in ES, including fields to be
-                # extracted from a related instance.
-                transaction.on_commit(
-                    partial(
-                        update_es_document.delay,
-                        es_document.__name__,
-                        fields_to_update,
-                        (
-                            compose_app_label(instance),
-                            instance.pk,
-                        ),
-                        (compose_app_label(instance), instance.pk),
-                        fields_map,
-                    )
-                )
-
             case Person() if es_document is ESRECAPDocument:  # type: ignore
                 related_dockets = Docket.objects.filter(**{query: instance})
                 for rel_docket in related_dockets:
+                    # Avoid calling update_children_docs_by_query if the Docket
+                    # doesn't have any docket entries.
+                    if not rel_docket.docket_entries.exists():
+                        continue
                     transaction.on_commit(
                         partial(
                             update_children_docs_by_query.delay,
@@ -336,6 +353,10 @@ def update_reverse_related_documents(
             # bulk update position documents when a reverse related record is created/updated.
             related_record = Person.objects.filter(**{query_string: instance})
             for person in related_record:
+                # Avoid calling update_children_docs_by_query if the Person
+                # doesn't have any positions.
+                if not person.positions.exists():
+                    continue
                 transaction.on_commit(
                     partial(
                         update_children_docs_by_query.delay,
@@ -346,6 +367,10 @@ def update_reverse_related_documents(
                 )
         case BankruptcyInformation() if es_document is DocketDocument:  # type: ignore
             # bulk update RECAP documents when a reverse related record is created/updated.
+            # Avoid calling update_children_docs_by_query if the Docket
+            # doesn't have any entries.
+            if not instance.docket.docket_entries.exists():
+                return
             transaction.on_commit(
                 partial(
                     update_children_docs_by_query.delay,
@@ -389,6 +414,10 @@ def delete_reverse_related_documents(
                     None,
                 )
             )
+            # Avoid calling update_children_docs_by_query if the Person
+            # doesn't have any positions.
+            if not instance.positions.exists():
+                return
             # Then update all their child documents (Positions)
             transaction.on_commit(
                 partial(
@@ -412,6 +441,10 @@ def delete_reverse_related_documents(
                     None,
                 )
             )
+            # Avoid calling update_children_docs_by_query if the Docket
+            # doesn't have any entries.
+            if not instance.docket_entries.exists():
+                return
             # Then update all their child documents (RECAPDocuments)
             transaction.on_commit(
                 partial(
