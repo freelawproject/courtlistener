@@ -1,7 +1,6 @@
 import itertools
 import json
 import logging
-from datetime import date
 from typing import Any, Dict, Optional, Tuple
 
 import requests
@@ -51,7 +50,7 @@ def find_data_fields(soup: BeautifulSoup, field_name: str) -> list:
 
     :param soup: parsed document
     :param field_name: field to find
-    :return: all fields found
+    :return: list of all fields found
     """
     return soup.find_all(
         lambda tag: (tag.name == field_name and tag.get("data-type") is None)
@@ -387,9 +386,12 @@ def merge_opinion_clusters(
             # in combine_non_overlapping_data
             opinion_cluster.refresh_from_db()
 
-            merge_docket_numbers(
+            updated_docket_number = merge_docket_numbers(
                 opinion_cluster, harvard_data["docket_number"]
             )
+            if updated_docket_number:
+                opinion_cluster.docket.docket_number = updated_docket_number
+                opinion_cluster.docket.save()
 
             case_names_to_update = merge_case_names(
                 opinion_cluster,

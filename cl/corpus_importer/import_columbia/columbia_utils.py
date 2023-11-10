@@ -744,16 +744,8 @@ def find_dates_in_xml(soup: BeautifulSoup) -> dict:
             else:
                 unknown_date = date_info[1]
 
-    # the main date (used for date_filed in OpinionCluster) and panel dates
-    # (used for finding judges) are ordered in terms of which type of dates
-    # best reflect them
-    main_date = (
-        date_filed
-        or date_argued
-        or date_reargued
-        or date_reargument_denied
-        or unknown_date
-    )
+    # panel_date is used for finding judges, dates are ordered in terms of which type
+    # of dates best reflect them
     panel_date = (
         date_argued
         or date_reargued
@@ -763,10 +755,13 @@ def find_dates_in_xml(soup: BeautifulSoup) -> dict:
     )
 
     return {
-        "date_filed": main_date,
+        "date_filed": date_filed,
+        "panel_date": panel_date,
         "date_cert_granted": date_cert_granted,
         "date_cert_denied": date_cert_denied,
-        "panel_date": panel_date,
+        "date_argued": date_argued,
+        "date_reargued": date_reargued,
+        "date_reargument_denied": date_reargument_denied,
     }
 
 

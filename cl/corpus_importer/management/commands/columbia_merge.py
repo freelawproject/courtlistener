@@ -12,6 +12,10 @@ Csv example:
 cluster_id,filepath
 825802,michigan/supreme_court_opinions/documents/d5a484f1bad20ba0.xml
 
+You can revert the changes if you pass --debug option to command
+manage.py columbia_merge --debug --csv-file /opt/courtlistener/cl/assets/media/test1.csv
+
+
 """
 import os.path
 import re
@@ -260,8 +264,8 @@ def map_and_merge_opinions(
         # Skip creating new opinions due to differences between data, this may happen
         # because some opinions were incorrectly combined when imported with the old
         # columbia importer, or we have combined opinions
-        logger.info(
-            msg=f"Skip merging mismatched opinions on cluster: {cluster_id}"
+        raise OpinionMatchingException(
+            f"Skip merging mismatched opinions on cluster: {cluster_id}"
         )
 
 
@@ -371,16 +375,60 @@ def merge_field(
     return {}
 
 
+def merge_docket_data(docket_data: dict, cluster: OpinionCluster) -> None:
+    """Update docket with new or better data
+
+    For dates, we only care if we have a date in the file but not in the Docket object
+
+    :param docket_data: dict with data from file
+    :param cluster: OpinionCluster object
+    :return: None
+    """
+
+    data_to_update = {}
+
+    if docket_data["docket_number"]:
+        merge_docket_numbers(cluster, docket_data["docket_number"])
+        cluster.docket.refresh_from_db()
+    if (
+        docket_data["date_cert_granted"]
+        and not cluster.docket.date_cert_granted
+    ):
+        data_to_update["date_cert_granted"] = docket_data["date_cert_granted"]
+
+    if docket_data["date_cert_denied"] and not cluster.docket.date_cert_denied:
+        data_to_update["date_cert_denied"] = docket_data["date_cert_denied"]
+
+    if docket_data["date_argued"] and not cluster.docket.date_argued:
+        data_to_update["date_argued"] = docket_data["date_argued"]
+
+    if docket_data["date_reargued"] and not cluster.docket.date_reargued:
+        data_to_update["date_reargued"] = docket_data["date_reargued"]
+
+    if (
+        docket_data["date_reargument_denied"]
+        and not cluster.docket.date_reargument_denied
+    ):
+        data_to_update["date_reargument_denied"] = docket_data[
+            "date_reargument_denied"
+        ]
+
+    if data_to_update:
+        Docket.objects.filter(id=cluster.docket_id).update(**data_to_update)
+
+
 def process_cluster(
     cluster_id: int,
     filepath: str,
     skip_judge_merger: bool = False,
+    debug: bool = False,
 ) -> None:
     """Merge specified cluster id
 
     :param cluster_id: Cluster object id to merge
     :param filepath: specified path to xml file
     :param skip_judge_merger: skip judge merger
+    :param debug: True if it should roll back the changes
     :return: None
     """
 
@@ -415,7 +463,7 @@ def process_cluster(
     syllabus = "\n".join(
         [s.decode_contents() for s in soup.findAll("syllabus")]
     )
-    docket = "".join(fetch_simple_tags(soup, "docket")) or None
+    docket_number = "".join(fetch_simple_tags(soup, "docket")) or None
     attorneys = "\n".join(fetch_simple_tags(soup, "attorneys"))
     posture = "".join(fetch_simple_tags(soup, "posture"))
 
@@ -424,7 +472,7 @@ def process_cluster(
         "file": filepath,
         "attorneys": attorneys,
         "citations": fetch_simple_tags(soup, "citation"),
-        "docket": docket,
+        "docket_number": docket_number,
         "panel": extract_judge_last_name(panel_tags),
         "posture": posture,
         "case_name": format_case_name(reporter_captions),
@@ -436,6 +484,21 @@ def process_cluster(
 
     # Add date data into columbia dict
     columbia_data.update(find_dates_in_xml(soup))
+
+    # Extract all data related to docket
+    docket_data = {
+        k: v
+        for k, v in columbia_data.items()
+        if k
+        in [
+            "docket_number",
+            "date_cert_granted",
+            "date_cert_denied",
+            "date_argued",
+            "date_reargued",
+            "date_reargument_denied",
+        ]
+    }
 
     try:
         with transaction.atomic():
@@ -452,8 +515,6 @@ def process_cluster(
                 ):
                     merged_data.update(data)
 
-            if columbia_data["docket"]:
-                merge_docket_numbers(cluster, columbia_data["docket"])
             case_names_to_update = merge_case_names(
                 cluster,
                 columbia_data,
@@ -482,6 +543,8 @@ def process_cluster(
 
             add_citations_to_cluster(columbia_data["citations"], cluster_id)
 
+            merge_docket_data(docket_data, cluster)
+
             # We need to refresh the object before trying to use it to
             # update the cluster source
             cluster.refresh_from_db()
@@ -489,6 +552,8 @@ def process_cluster(
             update_docket_source(cluster)
             update_cluster_source(cluster)
             logger.info(msg=f"Finished merging cluster: {cluster_id}")
+            if debug:
+                transaction.set_rollback(True)
 
     except AuthorException:
         logger.warning(msg=f"Author exception for cluster id: {cluster_id}")
@@ -509,6 +574,7 @@ def merge_columbia_into_cl(options) -> None:
     csv_filepath, xml_dir = options["csv_file"], options["xml_dir"]
     skip_until, limit = options["skip_until"], options["limit"]
     skip_judge_merger = options["skip_judge_merger"]
+    debug = options["debug"]
     total_processed = 0
     start = False if skip_until else True
 
@@ -527,7 +593,9 @@ def merge_columbia_into_cl(options) -> None:
             continue
 
         # filepath example: indiana\court_opinions\documents\2713f39c5a8e8684.xml
-        xml_path = os.path.join(xml_dir, filepath)
+        xml_path = os.path.join(
+            xml_dir, filepath.replace("/Users/Palin/Work/columbia/usb/", "")
+        )
         if not os.path.exists(xml_path):
             logger.warning(f"No file at: {xml_path}, Cluster: {cluster_id}")
             continue
@@ -536,6 +604,7 @@ def merge_columbia_into_cl(options) -> None:
             cluster_id=cluster_id,
             filepath=xml_path,
             skip_judge_merger=skip_judge_merger,
+            debug=debug,
         )
 
         total_processed += 1
@@ -581,6 +650,13 @@ class Command(VerboseCommand):
             "--skip-judge-merger",
             action="store_true",
             help="Set flag to skip judge merger if the judges do not match",
+        )
+
+        parser.add_argument(
+            "--debug",
+            action="store_true",
+            default=False,
+            help="Don't change the data. Only pretend.",
         )
 
     def handle(self, *args, **options) -> None:

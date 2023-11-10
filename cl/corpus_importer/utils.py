@@ -311,7 +311,9 @@ def clean_docket_number(docket_number: str) -> str:
     return docket_number
 
 
-def merge_docket_numbers(cluster: OpinionCluster, docket_number: str) -> None:
+def merge_docket_numbers(
+    cluster: OpinionCluster, docket_number: str
+) -> Optional[str]:
     """Merge docket number
 
     :param cluster: The cluster of the merging item
@@ -329,22 +331,21 @@ def merge_docket_numbers(cluster: OpinionCluster, docket_number: str) -> None:
             cl_clean_docket in file_cleaned_docket
             and cl_docket.docket_number != file_cleaned_docket
         ):
-            cl_docket.docket_number = file_cleaned_docket
-            cl_docket.save()
+            return file_cleaned_docket
         else:
-            # Check if their relatively similar and if so save the columbia one
+            # Check if their relatively similar and if so save the one from file
             # if its longer
             similarity = get_cosine_similarity(
                 cl_clean_docket, file_cleaned_docket
             )
             if similarity > 0.8:
                 if len(file_cleaned_docket) > len(cl_clean_docket):
-                    cl_docket.docket_number = file_cleaned_docket
-                    cl_docket.save()
+                    return file_cleaned_docket
     else:
-        # CL docket doesn't have a docket number, add the one from json file
-        cl_docket.docket_number = file_cleaned_docket
-        cl_docket.save()
+        # CL docket doesn't have a docket number, add the one from  file
+        return file_cleaned_docket
+
+    return None
 
 
 def merge_case_names(
@@ -557,7 +558,6 @@ def merge_overlapping_data(
     :param long_fields: skip judge merger
     :param changed_values_dictionary: the dictionary of data to merge
     :param skip_judge_merger: skip judge merger
-
     :param is_columbia: skip judge merger
     :return: empty dict or dict with new values for fields
     """

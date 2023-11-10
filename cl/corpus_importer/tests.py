@@ -2544,7 +2544,11 @@ class HarvardMergerTests(TestCase):
         """Can we choose the correct docket number"""
         docket = DocketFactory(docket_number="17-3000")
         cluster = OpinionClusterWithParentsFactory(id=4, docket=docket)
-        merge_docket_numbers(cluster, "Master Docket No. 17-3000L")
+        updated_docket_number = merge_docket_numbers(
+            cluster, "Master Docket No. 17-3000L"
+        )
+        docket.docket_number = updated_docket_number
+        docket.save()
         docket.refresh_from_db()
         self.assertEqual(docket.docket_number, "Master Docket 17-3000L")
 
