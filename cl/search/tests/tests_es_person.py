@@ -1328,6 +1328,7 @@ class PeopleIndexingTest(
             date_granularity_dob="%Y-%m-%d",
             date_granularity_dod="%Y-%m-%d",
         )
+        person_id = person.pk
         no_jud_position = PositionFactory.create(
             date_granularity_start="%Y-%m-%d",
             date_start=datetime.date(2015, 12, 14),
@@ -1339,7 +1340,7 @@ class PeopleIndexingTest(
 
         # At this point there is no judiciary position for person, so the
         # person and no_jud_position are not indexed yet.
-        self.assertFalse(PersonDocument.exists(id=person.pk))
+        self.assertFalse(PersonDocument.exists(id=person_id))
         self.assertFalse(
             PersonDocument.exists(id=ES_CHILD_ID(no_jud_position.pk).POSITION)
         )
@@ -1356,12 +1357,13 @@ class PeopleIndexingTest(
             nomination_process="fed_senate",
             date_elected=datetime.date(2015, 11, 12),
         )
+        jud_position_id = jud_position.pk
 
         # Confirm now the Person is indexed in ES.
-        self.assertTrue(PersonDocument.exists(id=person.pk))
+        self.assertTrue(PersonDocument.exists(id=person_id))
         # Also the judiciary position is indexed.
         self.assertTrue(
-            PositionDocument.exists(id=ES_CHILD_ID(jud_position.pk).POSITION)
+            PositionDocument.exists(id=ES_CHILD_ID(jud_position_id).POSITION)
         )
         # Previous no judiciary positions should also been indexed now.
         self.assertTrue(
@@ -1379,9 +1381,10 @@ class PeopleIndexingTest(
             position_type=None,
             person=person,
         )
+        no_jud_position_2_id = no_jud_position_2.pk
         self.assertTrue(
             PositionDocument.exists(
-                id=ES_CHILD_ID(no_jud_position_2.pk).POSITION
+                id=ES_CHILD_ID(no_jud_position_2_id).POSITION
             )
         )
 
@@ -1396,9 +1399,32 @@ class PeopleIndexingTest(
             nomination_process="fed_senate",
             date_elected=datetime.date(2015, 11, 12),
         )
+        jud_position_2_id = jud_position_2.pk
         self.assertTrue(
-            PositionDocument.exists(id=ES_CHILD_ID(jud_position_2.pk).POSITION)
+            PositionDocument.exists(id=ES_CHILD_ID(jud_position_2_id).POSITION)
         )
+
+        # If Judge Positions are removed and the Person is not a Judge anymore,
+        # remove it from the index with all the other positions.
+
+        jud_position.delete()
+        jud_position_2.delete()
+        self.assertFalse(
+            PositionDocument.exists(id=ES_CHILD_ID(jud_position_id).POSITION)
+        )
+        self.assertFalse(
+            PositionDocument.exists(id=ES_CHILD_ID(jud_position_2_id).POSITION)
+        )
+
+        # Non-judiciary positions and the Person should be also removed from
+        # the index
+        self.assertFalse(
+            PositionDocument.exists(
+                id=ES_CHILD_ID(no_jud_position_2_id).POSITION
+            )
+        )
+        self.assertFalse(PersonDocument.exists(id=person_id))
+
         person.delete()
 
     def test_remove_parent_child_objects_from_index(self) -> None:
@@ -1465,6 +1491,12 @@ class PeopleIndexingTest(
             date_start=datetime.date(1993, 1, 20),
             date_retirement=datetime.date(2001, 1, 20),
             termination_reason="retire_mand",
+            position_type="c-jud",
+            how_selected="e_part",
+            nomination_process="fed_senate",
+        )
+        PositionFactory.create(
+            person=person,
             position_type="c-jud",
             how_selected="e_part",
             nomination_process="fed_senate",

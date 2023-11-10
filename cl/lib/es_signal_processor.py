@@ -492,6 +492,38 @@ def allow_es_audio_indexing(
     return False
 
 
+def remove_non_judge_person_and_positions_from_index(
+    instance: Position,
+) -> None:
+    """Remove non-judge person and associated positions from ES index if a
+     Judiciary position is removed.
+
+    :param instance: The Position instance being removed.
+    :return: None
+    """
+    try:
+        if instance.person.is_judge:
+            # The Person is still a Judge, return.
+            return
+
+        person_positions = Position.objects.filter(person_id=instance.person)
+        # Remove all the remaining positions from the index.
+        for position in person_positions:
+            remove_document_from_es_index.delay(
+                PositionDocument.__name__, position.pk
+            )
+
+        # Remove the Person from the index.
+        remove_document_from_es_index.delay(
+            PersonDocument.__name__, instance.person.pk
+        )
+
+    except (Person.DoesNotExist, ValueError):
+        # The Person was removed before the Positions.
+        # Do nothing all the Positions were removed from the index.
+        pass
+
+
 class ESSignalProcessor(object):
     """Custom signal processor for Elasticsearch documents. It is responsible
     for managing the Elasticsearch index after certain events happen, such as
@@ -617,6 +649,14 @@ class ESSignalProcessor(object):
         """Receiver function that gets called after an object instance is deleted"""
         remove_document_from_es_index.delay(
             self.es_document.__name__, instance.pk
+        )
+
+        # If a Position is removed and the Person is not a Judge anymore,
+        # remove it from the index with all the other positions.
+        if not isinstance(instance, Position):
+            return
+        transaction.on_commit(
+            partial(remove_non_judge_person_and_positions_from_index, instance)
         )
 
     @elasticsearch_enabled
