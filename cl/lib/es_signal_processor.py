@@ -171,8 +171,8 @@ def update_es_documents(
                 the parent model(The person model).
                 """
                 # Avoid calling update_children_docs_by_query if the Person
-                # doesn't have any positions.
-                if not instance.positions.exists():
+                # doesn't have any positions or is not a Judge.
+                if not instance.positions.exists() or not instance.is_judge:
                     continue
                 transaction.on_commit(
                     partial(
@@ -183,7 +183,7 @@ def update_es_documents(
                         fields_map,
                     )
                 )
-            case ABARating() | PoliticalAffiliation() | School() if es_document is PositionDocument:  # type: ignore
+            case School() if es_document is PositionDocument:  # type: ignore
                 """
                 This code handles the update of fields that belongs to records associated with
                 the parent document using ForeignKeys.
@@ -194,8 +194,8 @@ def update_es_documents(
                 related_record = Person.objects.filter(**{query: instance})
                 for person in related_record:
                     # Avoid calling update_children_docs_by_query if the Person
-                    # doesn't have any positions.
-                    if not person.positions.exists():
+                    # doesn't have any positions or is not a Judge.
+                    if not person.positions.exists() or not person.is_judge:
                         continue
                     transaction.on_commit(
                         partial(
@@ -335,6 +335,9 @@ def update_reverse_related_documents(
     # Update parent instance
     main_objects = main_model.objects.filter(**{query_string: instance})
     for main_object in main_objects:
+        # Avoid calling update_es_document if the Person is not a Judge.
+        if isinstance(main_object, Person) and not main_object.is_judge:
+            continue
         transaction.on_commit(
             partial(
                 update_es_document.delay,
@@ -352,9 +355,10 @@ def update_reverse_related_documents(
             related_record = Person.objects.filter(**{query_string: instance})
             for person in related_record:
                 # Avoid calling update_children_docs_by_query if the Person
-                # doesn't have any positions.
-                if not person.positions.exists():
+                # doesn't have any positions or is not a Judge.
+                if not person.positions.exists() or not person.is_judge:
                     continue
+
                 transaction.on_commit(
                     partial(
                         update_children_docs_by_query.delay,
@@ -413,8 +417,8 @@ def delete_reverse_related_documents(
                 )
             )
             # Avoid calling update_children_docs_by_query if the Person
-            # doesn't have any positions.
-            if not instance.positions.exists():
+            # doesn't have any positions or is not a Judge.
+            if not instance.positions.exists() or not instance.is_judge:
                 return
             # Then update all their child documents (Positions)
             transaction.on_commit(
@@ -623,6 +627,9 @@ class ESSignalProcessor(object):
             allow_es_audio_indexing(instance, update_fields)
             and mapping_fields.get("self", None)
         ):
+            if isinstance(instance, Person) and not instance.is_judge:
+                # Avoid calling es_save_document if the Person is not a Judge.
+                return
             transaction.on_commit(
                 lambda: chain(
                     es_save_document.si(

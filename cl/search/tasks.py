@@ -535,6 +535,9 @@ def get_doc_from_es(
     try:
         main_doc = es_document.get(id=instance_id)
     except NotFoundError:
+        if isinstance(instance, Person) and not instance.is_judge:
+            # If the instance is a Person and is not a Judge, avoid indexing.
+            return None
         doc = es_document().prepare(instance)
         es_args["meta"] = {"id": instance_id}
         try:

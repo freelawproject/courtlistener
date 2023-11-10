@@ -235,15 +235,6 @@ position_field_mapping = {
             },
         },
         School: {"educations__school": {"name": ["school"]}},
-        PoliticalAffiliation: {
-            "political_affiliations": {
-                "political_party": [
-                    "political_affiliation",
-                    "political_affiliation_id",
-                ],
-            }
-        },
-        ABARating: {"aba_ratings": {"rating": ["aba_rating"]}},
         Position: {
             "self": {
                 "organization_name": ["organization_name"],

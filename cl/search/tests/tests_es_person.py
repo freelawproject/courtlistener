@@ -1425,6 +1425,18 @@ class PeopleIndexingTest(
         )
         self.assertFalse(PersonDocument.exists(id=person_id))
 
+        # Avoid indexing Person if a reverse related for a non-judge Person
+        # is added or updated.
+        aba_rating = ABARatingFactory(
+            rating="nq",
+            person=person,
+            year_rated="2015",
+        )
+        self.assertFalse(PersonDocument.exists(id=person_id))
+        aba_rating.year_rated = "2023"
+        aba_rating.save()
+        self.assertFalse(PersonDocument.exists(id=person_id))
+
         person.delete()
 
     def test_remove_parent_child_objects_from_index(self) -> None:
@@ -1443,7 +1455,6 @@ class PeopleIndexingTest(
             nomination_process="fed_senate",
         )
         PoliticalAffiliationFactory.create(person=person)
-        school = SchoolFactory.create(name="Harvard University")
 
         person_pk = person.pk
         pos_1_pk = pos_1.pk
@@ -1833,12 +1844,13 @@ class PeopleIndexingTest(
                 date_dob=datetime.date(1941, 10, 21),
                 date_dod=datetime.date(2022, 11, 25),
             )
-        # 1 es_save_document task calls for Person creation.
-        self.reset_and_assert_task_count(expected=1)
+        # 0 es_save_document task calls for Person creation since it's not a
+        # Judge.
+        self.reset_and_assert_task_count(expected=0)
         # The person is not indexed since it's not a Judge.
         self.assertFalse(PersonDocument.exists(id=person.pk))
 
-        # Add a Judge Position to person.
+        # Add a judiciaryPosition to person.
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
