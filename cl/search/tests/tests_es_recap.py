@@ -33,7 +33,7 @@ from cl.search.factories import (
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
     compose_redis_key,
     get_last_parent_document_id_processed,
-    log_last_parent_document_processed,
+    log_last_document_indexed,
 )
 from cl.search.models import SEARCH_TYPES, RECAPDocument
 from cl.search.tasks import (
@@ -58,6 +58,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             search_type=SEARCH_TYPES.RECAP,
             queue="celery",
             pk_offset=0,
+            testing_mode=True,
         )
         # Index parties in ES.
         index_docket_parties_in_es.delay(cls.de.docket.pk)
@@ -336,7 +337,8 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIn("3 Cases", r.content.decode())
         # 3 Docket entries in count.
         self.assertIn("3 Docket", r.content.decode())
-        empty_docket.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            empty_docket.delete()
 
     def test_sorting(self) -> None:
         """Can we do sorting on various fields?"""
@@ -718,7 +720,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # test the combination of the text query and the available_only filter
         params = {
             "type": SEARCH_TYPES.RECAP,
-            "q": "'Voluntary Hospitals'",
+            "q": '"Voluntary Hospitals"',
             "available_only": True,
         }
         r = async_to_sync(self._test_article_count)(
@@ -730,6 +732,39 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             docket.delete()
             docket_2.delete()
             docket_3.delete()
+
+    def test_filter_docket_with_no_documents(self) -> None:
+        """Confirm we can filter dockets with no documents"""
+
+        # Add dockets with no documents
+        with self.captureOnCommitCallbacks(execute=True):
+            docket = DocketFactory(
+                court=self.court,
+                case_name="Ready Mix Hampton",
+                date_filed=datetime.date(2021, 8, 16),
+            )
+            BankruptcyInformationFactory(docket=docket, chapter="7")
+
+            docket_2 = DocketFactory(
+                court=self.court,
+                case_name="Ready Mix Hampton",
+                date_filed=datetime.date(2021, 8, 16),
+            )
+            BankruptcyInformationFactory(docket=docket_2, chapter="8")
+
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "chapter:7",
+            "court": f"{self.court.pk} innb",
+            "case_name": "ready mix",
+            "filed_after": datetime.date(2020, 1, 1),
+        }
+        async_to_sync(self._test_article_count)(
+            cd, 1, "court + case_name + filed_after + query_string"
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            docket.delete()
+            docket_2.delete()
 
     async def test_party_name_filter(self) -> None:
         """Confirm party_name filter works properly"""
@@ -747,7 +782,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         with self.captureOnCommitCallbacks(execute=True):
             docket = DocketFactory(
                 court=self.court,
-                case_name="NYU Hospitals Center v. League of Voluntary Hospitals",
+                case_name="Mott v. NYU Hospitals Center",
                 date_filed=datetime.date(2015, 8, 16),
                 date_argued=datetime.date(2013, 5, 20),
                 docket_number="1:17-cv-04465",
@@ -757,7 +792,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2015, 8, 19),
-                description="United Healthcare Workers East, League of Voluntary Hospitals and Homes of New York",
+                description="COMPLAINT against NYU Hospitals Center, Tisch Hospital",
             )
             RECAPDocumentFactory(
                 docket_entry=e_1_d_1,
@@ -769,7 +804,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 docket=docket,
                 entry_number=2,
                 date_filed=datetime.date(2015, 8, 19),
-                description="Not available document for the League of Voluntary Hospitals and Homes of New York",
+                description="Not available document for Mott v. NYU Hospitals Center",
             )
             RECAPDocumentFactory(
                 docket_entry=e_2_d_1,
@@ -781,7 +816,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         params = {
             "type": SEARCH_TYPES.RECAP,
             "q": "hospital",
-            "description": "voluntary",
+            "description": "center",
             "party_name": "Frank Paul Sabatini",
         }
 
@@ -916,7 +951,8 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         # Remove 1 RECAPDocument to ensure the docket does not contain more than
         # VIEW_MORE_CHILD_HITS entries.
-        rd_1.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            rd_1.delete()
         # View additional results query:
         params = {
             "type": SEARCH_TYPES.RECAP,
@@ -931,10 +967,11 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertNotIn("See full docket for details", r.content.decode())
         self.assertNotIn("View Additional Results for", r.content.decode())
 
-        rd_2.delete()
-        rd_3.delete()
-        rd_4.delete()
-        rd_5.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            rd_2.delete()
+            rd_3.delete()
+            rd_4.delete()
+            rd_5.delete()
 
     async def test_advanced_queries(self) -> None:
         """Confirm advance queries works properly"""
@@ -1296,9 +1333,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             < r.content.decode().index("12-1237"),
             msg="'12-1235' should come BEFORE '1:21-bk-1234' when order_by entry_date_filed asc.",
         )
-
-        rd_4.docket_entry.docket.delete()
-        empty_docket.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            rd_4.docket_entry.docket.delete()
+            empty_docket.delete()
 
         # Order by dateFiled desc
         params = {
@@ -1332,7 +1369,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             < r.content.decode().index("12-1235"),
             msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by dateFiled asc.",
         )
-        de_4.delete()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            de_4.delete()
 
     @mock.patch("cl.lib.es_signal_processor.chain")
     def test_avoid_updating_docket_in_es_on_view_count_increment(
@@ -1340,17 +1379,18 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
     ) -> None:
         """Confirm a docket is not updated in ES on a view_count increment."""
 
-        docket = DocketFactory(
-            court=self.court,
-            case_name="Lorem Ipsum",
-            case_name_full="Jackson & Sons Holdings vs. Bank",
-            date_filed=datetime.date(2015, 8, 16),
-            date_argued=datetime.date(2013, 5, 20),
-            docket_number="1:21-bk-1234",
-            assigned_to=None,
-            referred_to=None,
-            nature_of_suit="440",
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            docket = DocketFactory(
+                court=self.court,
+                case_name="Lorem Ipsum",
+                case_name_full="Jackson & Sons Holdings vs. Bank",
+                date_filed=datetime.date(2015, 8, 16),
+                date_argued=datetime.date(2013, 5, 20),
+                docket_number="1:21-bk-1234",
+                assigned_to=None,
+                referred_to=None,
+                nature_of_suit="440",
+            )
         # Restart save chain mock count.
         mock_es_save_chain.reset_mock()
         self.assertEqual(mock_es_save_chain.call_count, 0)
@@ -1363,7 +1403,8 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         # The save chain shouldn't be called.
         self.assertEqual(mock_es_save_chain.call_count, 0)
-        docket.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            docket.delete()
 
 
 class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):
@@ -1831,6 +1872,7 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             search_type=SEARCH_TYPES.RECAP,
             queue="celery",
             pk_offset=0,
+            testing_mode=True,
         )
 
     def test_do_recap_search_feed_have_content(self) -> None:
@@ -1991,22 +2033,53 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
 
 class IndexDocketRECAPDocumentsCommandTest(
-    RECAPSearchTestCase, ESIndexTestCase, TestCase
+    ESIndexTestCase, TransactionTestCase
 ):
     """cl_index_parent_and_child_docs command tests for Elasticsearch"""
 
     @classmethod
-    def setUpTestData(cls):
+    def setUpClass(cls):
         cls.rebuild_index("search.Docket")
-        super().setUpTestData()
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.de = DocketEntryWithParentsFactory(
+            docket=DocketFactory(
+                court=cls.court,
+                date_filed=datetime.date(2015, 8, 16),
+                docket_number="1:21-bk-1234",
+                nature_of_suit="440",
+            ),
+            entry_number=1,
+            date_filed=datetime.date(2015, 8, 19),
+        )
+        cls.rd = RECAPDocumentFactory(
+            docket_entry=cls.de,
+            document_number="1",
+        )
+        cls.rd_att = RECAPDocumentFactory(
+            docket_entry=cls.de,
+            document_number="1",
+            attachment_number=2,
+        )
+        cls.de_1 = DocketEntryWithParentsFactory(
+            docket=DocketFactory(
+                court=cls.court,
+                date_filed=datetime.date(2016, 8, 16),
+                date_argued=datetime.date(2012, 6, 23),
+            ),
+            entry_number=None,
+            date_filed=datetime.date(2014, 7, 19),
+        )
+        cls.rd_2 = RECAPDocumentFactory(
+            docket_entry=cls.de_1,
+            document_number="",
+        )
         cls.delete_index("search.Docket")
         cls.create_index("search.Docket")
 
-    def setUp(self) -> None:
-        self.r = make_redis_interface("CACHE")
-        keys = self.r.keys(compose_redis_key(SEARCH_TYPES.RECAP))
+        cls.r = make_redis_interface("CACHE")
+        keys = cls.r.keys(compose_redis_key(SEARCH_TYPES.RECAP))
         if keys:
-            self.r.delete(*keys)
+            cls.r.delete(*keys)
 
     def test_cl_index_parent_and_child_docs_command(self):
         """Confirm the command can properly index Dockets and their
@@ -2058,13 +2131,13 @@ class IndexDocketRECAPDocumentsCommandTest(
     def test_log_and_get_last_document_id(self):
         """Can we log and get the last docket indexed to/from redis?"""
 
-        last_values = log_last_parent_document_processed(
-            SEARCH_TYPES.RECAP, 1001
+        last_values = log_last_document_indexed(
+            1001, compose_redis_key(SEARCH_TYPES.RECAP)
         )
         self.assertEqual(last_values["last_document_id"], 1001)
 
-        last_values = log_last_parent_document_processed(
-            SEARCH_TYPES.RECAP, 2001
+        last_values = log_last_document_indexed(
+            2001, compose_redis_key(SEARCH_TYPES.RECAP)
         )
         self.assertEqual(last_values["last_document_id"], 2001)
 
@@ -2076,6 +2149,56 @@ class IndexDocketRECAPDocumentsCommandTest(
         keys = self.r.keys(compose_redis_key(SEARCH_TYPES.RECAP))
         if keys:
             self.r.delete(*keys)
+
+    def test_index_dockets_in_bulk_task(self):
+        """Confirm the command can properly index dockets in bulk from the
+        ready_mix_cases_project command.
+        """
+
+        court = CourtFactory(id="canb", jurisdiction="FB")
+        d_1 = DocketFactory(
+            court=court,
+            date_filed=datetime.date(2019, 8, 16),
+        )
+        BankruptcyInformationFactory(docket=d_1, chapter="7")
+
+        d_2 = DocketFactory(
+            court=court,
+            date_filed=datetime.date(2020, 8, 16),
+        )
+        BankruptcyInformationFactory(docket=d_2, chapter="7")
+
+        d_3 = DocketFactory(
+            court=court,
+            date_filed=datetime.date(2021, 8, 16),
+        )
+        BankruptcyInformationFactory(docket=d_3, chapter="7")
+
+        d_4 = DocketFactory(
+            court=court,
+            date_filed=datetime.date(2021, 8, 16),
+        )
+        BankruptcyInformationFactory(docket=d_4, chapter="13")
+
+        self.delete_index("search.Docket")
+        self.create_index("search.Docket")
+
+        s = DocketDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0)
+        # Call cl_index_parent_and_child_docs command.
+        call_command(
+            "ready_mix_cases_project",
+            task="re-index-dockets",
+            queue="celery",
+        )
+
+        s = DocketDocument.search().query("match_all")
+        self.assertEqual(s.count(), 3)
+
+        d_1.delete()
+        d_2.delete()
+        d_3.delete()
+        d_4.delete()
 
 
 class RECAPIndexingTest(ESIndexTestCase, TransactionTestCase):

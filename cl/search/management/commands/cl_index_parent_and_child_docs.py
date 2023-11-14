@@ -20,19 +20,18 @@ def compose_redis_key(search_type: str) -> str:
     return f"es_{search_type}_indexing:log"
 
 
-def log_last_parent_document_processed(
-    search_type: str, document_pk: int
+def log_last_document_indexed(
+    document_pk: int, log_key: str
 ) -> Mapping[str | bytes, int | str]:
     """Log the last document_id indexed.
 
-    :param search_type: The search type key to log.
     :param document_pk: The last document_id processed.
+    :param log_key: The log key to use in redis.
     :return: The data logged to redis.
     """
 
     r = make_redis_interface("CACHE")
     pipe = r.pipeline()
-    log_key = compose_redis_key(search_type)
     pipe.hgetall(log_key)
     log_info: Mapping[str | bytes, int | str] = {
         "last_document_id": document_pk,
@@ -65,7 +64,7 @@ class Command(VerboseCommand):
 
     def __init__(self, *args, **kwargs):
         super(Command, self).__init__(*args, **kwargs)
-        self.options = []
+        self.options = {}
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -79,7 +78,6 @@ class Command(VerboseCommand):
             ],
             help=f"The search type models to index: ({', '.join([SEARCH_TYPES.PEOPLE, SEARCH_TYPES.RECAP, SEARCH_TYPES.OPINION])})",
         )
-
         parser.add_argument(
             "--pk-offset",
             type=int,
@@ -103,6 +101,11 @@ class Command(VerboseCommand):
             action="store_true",
             help="Auto resume the command using the last document_id logged in Redis. "
             "If --pk-offset is provided, it'll be ignored.",
+        )
+        parser.add_argument(
+            "--testing-mode",
+            action="store_true",
+            help="Use this flag only when running the command in tests based on TestCase",
         )
 
     def handle(self, *args, **options):
@@ -158,6 +161,7 @@ class Command(VerboseCommand):
     ) -> None:
         queue = self.options["queue"]
         chunk_size = self.options["chunk_size"]
+        testing_mode = self.options.get("testing_mode", False)
 
         chunk = []
         processed_count = 0
@@ -169,9 +173,9 @@ class Command(VerboseCommand):
             chunk.append(item_id)
             if processed_count % chunk_size == 0 or last_item:
                 throttle.maybe_wait()
-                index_parent_and_child_docs.si(chunk, search_type).set(
-                    queue=queue
-                ).apply_async()
+                index_parent_and_child_docs.si(
+                    chunk, search_type, testing_mode=testing_mode
+                ).set(queue=queue).apply_async()
                 chunk = []
                 self.stdout.write(
                     "\rProcessed {}/{}, ({:.0%}), last PK indexed: {},".format(
@@ -183,7 +187,9 @@ class Command(VerboseCommand):
                 )
             if not processed_count % 1000:
                 # Log every 1000 parent documents processed.
-                log_last_parent_document_processed(search_type, item_id)
+                log_last_document_indexed(
+                    item_id, compose_redis_key(search_type)
+                )
         self.stdout.write(
             f"Successfully indexed {processed_count} items from pk {pk_offset}."
         )

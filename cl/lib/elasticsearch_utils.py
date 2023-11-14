@@ -3,6 +3,7 @@ import operator
 import re
 import time
 import traceback
+from copy import deepcopy
 from dataclasses import fields
 from datetime import date, datetime
 from functools import reduce, wraps
@@ -1694,7 +1695,9 @@ def build_full_join_es_queries(
     ]:
         # Build child filters.
         child_filters = build_has_child_filters(child_type, cd)
-
+        # Copy the original child_filters before appending parent fields.
+        # For its use later in the parent filters.
+        child_filters_original = deepcopy(child_filters)
         # Build child text query.
         child_fields = child_query_fields[child_type]
         child_text_query = build_fulltext_query(
@@ -1764,14 +1767,15 @@ def build_full_join_es_queries(
             parent_query_fields, cd.get("q", ""), only_queries=True
         )
 
-        # Adds filter to the parent query to exclude results with no children
-        if child_filters:
+        # If child filters are set, add a has_child query as a filter to the
+        # parent query to exclude results without matching children.
+        if child_filters_original:
             parent_filters.append(
                 Q(
                     "has_child",
                     type=child_type,
                     score_mode="max",
-                    query=Q("bool", filter=child_filters),
+                    query=Q("bool", filter=child_filters_original),
                 )
             )
         parent_query = None
