@@ -154,12 +154,6 @@ def update_es_documents(
         fields_to_update = get_fields_to_update(changed_fields, fields_map)
         match instance:
             case OpinionCluster() if es_document is OpinionDocument:  # type: ignore
-                main_doc = exists_or_create_doc(
-                    OpinionClusterDocument, instance, avoid_creation=True
-                )
-                if not main_doc:
-                    # Abort bulk update for a non-existing parent document in ES.
-                    return
                 transaction.on_commit(
                     partial(
                         update_children_docs_by_query.delay,
@@ -174,12 +168,6 @@ def update_es_documents(
                     **{query: instance}
                 )
                 for cluster in related_record:
-                    main_doc = exists_or_create_doc(
-                        OpinionClusterDocument, cluster, avoid_creation=True
-                    )
-                    if not main_doc:
-                        # Abort bulk update for a non-existing parent document in ES.
-                        return
                     transaction.on_commit(
                         partial(
                             update_children_docs_by_query.delay,
@@ -382,12 +370,6 @@ def update_reverse_related_documents(
                     )
                 )
         case Citation() | Opinion() if es_document is OpinionClusterDocument:  # type: ignore
-            main_doc = exists_or_create_doc(
-                es_document, instance.cluster, avoid_creation=True
-            )
-            if not main_doc:
-                # Abort bulk update for a non-existing parent document in ES.
-                return
             transaction.on_commit(
                 partial(
                     update_children_docs_by_query.delay,
