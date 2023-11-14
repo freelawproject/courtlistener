@@ -1552,19 +1552,24 @@ async def merge_attachment_page_data(
             main_rd.document_type = RECAPDocument.ATTACHMENT
             main_rd.attachment_number = attachment["attachment_number"]
             rd = main_rd
-            created = False
         else:
-            rd, created = await RECAPDocument.objects.aupdate_or_create(
-                docket_entry=de,
-                document_number=document_number,
-                attachment_number=attachment["attachment_number"],
-                document_type=RECAPDocument.ATTACHMENT,
-            )
+            try:
+                rd = await RECAPDocument.objects.aget(
+                    docket_entry=de,
+                    document_number=document_number,
+                    attachment_number=attachment["attachment_number"],
+                    document_type=RECAPDocument.ATTACHMENT,
+                )
+            except RECAPDocument.DoesNotExist:
+                rd = RECAPDocument(
+                    docket_entry=de,
+                    document_number=document_number,
+                    attachment_number=attachment["attachment_number"],
+                    document_type=RECAPDocument.ATTACHMENT,
+                )
+                rds_created.append(rd)
 
-        if created:
-            rds_created.append(rd)
         rds_affected.append(rd)
-
         for field in ["description", "pacer_doc_id"]:
             if attachment[field]:
                 setattr(rd, field, attachment[field])

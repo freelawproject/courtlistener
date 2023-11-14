@@ -599,8 +599,8 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
                 "cl.scrapers.tasks.microservice",
                 side_effect=lambda *args, **kwargs: MockResponse(200, b"10"),
             ), mock.patch(
-                "cl.lib.es_signal_processor.avoid_es_audio_indexing",
-                side_effect=lambda x, y, z: False,
+                "cl.lib.es_signal_processor.allow_es_audio_indexing",
+                side_effect=lambda x, y: True,
             ):
                 cls.dly_oral_argument = AudioWithParentsFactory.create(
                     case_name="Dly Test OA",
@@ -1532,8 +1532,8 @@ class DocketAlertGetNotesTagsTests(TestCase):
 
 @override_switch("oa-es-alerts-active", active=True)
 @mock.patch(
-    "cl.lib.es_signal_processor.avoid_es_audio_indexing",
-    side_effect=lambda x, y, z: False,
+    "cl.lib.es_signal_processor.allow_es_audio_indexing",
+    side_effect=lambda x, y: True,
 )
 class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
     """Test ES Search Alerts"""

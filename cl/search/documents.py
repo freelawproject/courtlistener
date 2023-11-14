@@ -117,7 +117,7 @@ class ParentheticalGroupDocument(Document):
 
 
 class AudioDocumentBase(Document):
-    absolute_url = fields.KeywordField(attr="get_absolute_url", index=False)
+    absolute_url = fields.KeywordField(index=False)
     caseName = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
@@ -229,6 +229,9 @@ class AudioDocument(AudioDocumentBase):
     class Django:
         model = Audio
         ignore_signals = True
+
+    def prepare_absolute_url(self, instance):
+        return instance.get_absolute_url()
 
     def prepare_caseName(self, instance):
         return best_case_name(instance)
@@ -360,9 +363,7 @@ class PersonBaseDocument(Document):
     dob_city = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(
-                attr="person.dob_city", analyzer="english_exact"
-            ),
+            "exact": fields.TextField(analyzer="english_exact"),
         },
         search_analyzer="search_analyzer",
     )
@@ -679,10 +680,13 @@ class PersonDocument(PersonBaseDocument):
     )
     date_granularity_dob = fields.KeywordField(attr="date_granularity_dob")
     date_granularity_dod = fields.KeywordField(attr="date_granularity_dod")
-    absolute_url = fields.KeywordField(attr="get_absolute_url")
+    absolute_url = fields.KeywordField()
 
     def prepare_person_child(self, instance):
         return "person"
+
+    def prepare_absolute_url(self, instance):
+        return instance.get_absolute_url()
 
 
 # RECAP
