@@ -436,6 +436,7 @@ class OpinionsESSearchTest(
             search_type=SEARCH_TYPES.OPINION,
             queue="celery",
             pk_offset=0,
+            testing_mode=True,
         )
 
     async def _test_article_count(self, params, expected_count, field_name):
@@ -917,6 +918,7 @@ class RelatedSearchTest(
             search_type=SEARCH_TYPES.OPINION,
             queue="celery",
             pk_offset=0,
+            testing_mode=True,
         )
 
     def get_article_count(self, r):
@@ -1158,6 +1160,7 @@ class IndexOpinionDocumentsCommandTest(
             search_type=SEARCH_TYPES.OPINION,
             queue="celery",
             pk_offset=0,
+            testing_mode=True,
         )
 
         s = OpinionClusterDocument.search()
