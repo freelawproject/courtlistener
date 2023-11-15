@@ -496,9 +496,9 @@
                                 {% if sub_opinion.html_with_citations %}
                                   {% if cluster.source == "C" %}
                                     {# It's a PDF with no HTML enrichment #}
-                                    <div class="plaintext">{{ sub_opinion.html_with_citations|safe }}</div>
+                                    <div class="plaintext">{{ sub_opinion.html_with_citations|safe|linebreaksbr }}</div>
                                   {% else %}
-                                    <div class="serif-text">{{ sub_opinion.html_with_citations|safe }}</div>
+                                    <div class="serif-text">{{ sub_opinion.html_with_citations|safe|linebreaksbr }}</div>
                                   {% endif %}
                                 {% elif sub_opinion.html_columbia %}
                                   <div class="serif-text">{{ sub_opinion.html_columbia|safe }}</div>
@@ -509,7 +509,7 @@
                                 {% elif sub_opinion.html_anon_2020 %}
                                   <div class="serif-text">{{ sub_opinion.html_anon_2020|safe }}</div>
                                 {% elif sub_opinion.html %}
-                                  <div class="serif-text">{{sub_opinion.html|safe}}</div>
+                                  <div class="serif-text">{{sub_opinion.html|safe|linebreaksbr}}</div>
                                 {% else %}
                                   <pre>{{sub_opinion.plain_text}}</pre>
                                 {% endif %}
