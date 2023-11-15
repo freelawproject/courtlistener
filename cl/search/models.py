@@ -1519,15 +1519,21 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         court = self.docket_entry.docket.court
         court_id = map_cl_to_pacer_id(court.pk)
         if self.pacer_doc_id:
-            if court.jurisdiction == Court.FEDERAL_APPELLATE:
-                template = "https://ecf.%s.uscourts.gov/docs1/%s?caseId=%s"
+            if self.pacer_doc_id.count("-") > 1:
+                # Redirects users to the ACMS Docket Report page.
+                # Loading the docket report is an essential step to
+                # access the download confirmation page.
+                return self.docket_entry.docket.pacer_docket_url
             else:
-                template = "https://ecf.%s.uscourts.gov/doc1/%s?caseid=%s"
-            return template % (
-                court_id,
-                self.pacer_doc_id,
-                self.docket_entry.docket.pacer_case_id,
-            )
+                if court.jurisdiction == Court.FEDERAL_APPELLATE:
+                    template = "https://ecf.%s.uscourts.gov/docs1/%s?caseId=%s"
+                else:
+                    template = "https://ecf.%s.uscourts.gov/doc1/%s?caseid=%s"
+                return template % (
+                    court_id,
+                    self.pacer_doc_id,
+                    self.docket_entry.docket.pacer_case_id,
+                )
         else:
             if court.jurisdiction == Court.FEDERAL_APPELLATE:
                 return ""
