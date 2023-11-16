@@ -321,7 +321,11 @@ async def process_recap_pdf(pk):
                     )
                 break
 
-    rd.document_number = pq.document_number
+    # document_number field is a CharField in RECAPDocument and a
+    # BigIntegerField in ProcessingQueue. To prevent the ES signal
+    # processor fields tracker from detecting it as a value change, it should
+    # be converted to a string.
+    rd.document_number = str(pq.document_number)
     rd.attachment_number = pq.attachment_number
 
     # Do the file, finally.

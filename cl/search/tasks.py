@@ -292,6 +292,7 @@ def es_save_document(
     :param es_document_name: A Elasticsearch DSL document name.
     :return: SaveDocumentResponseType or None
     """
+
     es_args = {}
     es_document = getattr(es_document_module, es_document_name)
 
@@ -394,10 +395,21 @@ def document_fields_to_update(
     """
 
     fields_to_update = {}
+
     if fields_map and related_instance:
         # If a fields_maps and a related instance is provided, extract the
         # fields values from the related instance or using the main instance
         # prepare methods.
+
+        # If any of the changed fields has a "prepare" value, extract all the
+        # values based on the foreign key relations.
+        contains_prepare = any(
+            fields_map.get(field, []) == ["prepare"]
+            for field in affected_fields
+        )
+        if contains_prepare:
+            return es_document().prepare(main_instance)
+
         for field in affected_fields:
             document_fields = fields_map[field]
             for doc_field in document_fields:
@@ -441,8 +453,8 @@ def update_es_document(
     es_document_name: str,
     fields_to_update: list[str],
     main_instance_data: tuple[str, int],
-    related_instance_data: tuple[str, int] | None,
-    fields_map: dict | None,
+    related_instance_data: tuple[str, int] | None = None,
+    fields_map: dict | None = None,
 ) -> None:
     """Update a document in Elasticsearch.
     :param self: The celery task
@@ -460,19 +472,14 @@ def update_es_document(
 
     es_document = getattr(es_document_module, es_document_name)
     main_app_label, main_instance_id = main_instance_data
-    es_doc = get_doc_from_es(es_document, main_instance_id)
-    if not es_doc:
-        model_label = es_document.Django.model.__name__.capitalize()
-        logger.warning(
-            f"The {model_label} with ID:{main_instance_id} can't updated. "
-            "It's not indexed."
-        )
-        return
-
     # Get the main instance from DB, to extract the latest values.
     main_model = apps.get_model(main_app_label)
     main_model_instance = get_instance_from_db(main_instance_id, main_model)
     if not main_model_instance:
+        return
+
+    es_doc = get_doc_from_es(es_document, main_model_instance)
+    if not es_doc:
         return
 
     related_instance = None
@@ -494,6 +501,7 @@ def update_es_document(
         related_instance,
         fields_map,
     )
+
     Document.update(
         es_doc,
         **fields_values_to_update,
@@ -503,23 +511,47 @@ def update_es_document(
 
 def get_doc_from_es(
     es_document: ESDocumentClassType,
-    instance_id: int,
+    instance: ESModelType,
 ) -> ESDocumentInstanceType | None:
     """Get a document in Elasticsearch.
     :param es_document: The Elasticsearch document type.
-    :param instance_id: The instance ID of the document to retrieve.
+    :param instance: The instance of the document to retrieve.
     :return: An Elasticsearch document if found, otherwise None.
     """
 
     # Get doc_id for parent-child documents.
+    es_args = {}
+    instance_id = instance.pk
     if es_document is PositionDocument:
-        instance_id = ES_CHILD_ID(instance_id).POSITION
+        instance_id = ES_CHILD_ID(instance.pk).POSITION
+        parent_id = getattr(instance.person, "pk", None)
+        es_args["_routing"] = parent_id
+
     elif es_document is ESRECAPDocument:
-        instance_id = ES_CHILD_ID(instance_id).RECAP
+        instance_id = ES_CHILD_ID(instance.pk).RECAP
+        parent_id = getattr(instance.docket_entry.docket, "pk", None)
+        es_args["_routing"] = parent_id
 
     try:
         main_doc = es_document.get(id=instance_id)
     except NotFoundError:
+        if isinstance(instance, Person) and not instance.is_judge:
+            # If the instance is a Person and is not a Judge, avoid indexing.
+            return None
+        doc = es_document().prepare(instance)
+        es_args["meta"] = {"id": instance_id}
+        try:
+            es_document(**es_args, **doc).save(
+                skip_empty=False,
+                return_doc_meta=False,
+                refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
+            )
+        except (ConflictError, RequestError) as exc:
+            logger.error(
+                f"Error indexing the {es_document.Django.model.__name__.capitalize()} with ID: {main_instance_id}. "
+                f"Exception was: {type(exc).__name__}"
+            )
+
         return None
     return main_doc
 
