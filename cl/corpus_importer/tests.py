@@ -29,25 +29,17 @@ from cl.corpus_importer.management.commands.clean_up_mis_matched_dockets import 
     find_and_fix_mis_matched_dockets,
 )
 from cl.corpus_importer.management.commands.harvard_merge import (
-    ClusterSourceException,
-    DocketSourceException,
     combine_non_overlapping_data,
     fetch_non_harvard_data,
-    merge_case_names,
     merge_cluster_dates,
-    merge_docket_numbers,
-    merge_judges,
     merge_opinion_clusters,
-    merge_strings,
     update_cluster_source,
     update_docket_source,
 )
 from cl.corpus_importer.management.commands.harvard_opinions import (
     clean_body_content,
-    compare_documents,
     parse_harvard_opinions,
     validate_dt,
-    winnow_case_name,
 )
 from cl.corpus_importer.management.commands.import_columbia import get_court_id
 from cl.corpus_importer.management.commands.normalize_judges_opinions import (
@@ -60,7 +52,17 @@ from cl.corpus_importer.management.commands.troller_bk import (
     merge_rss_data,
 )
 from cl.corpus_importer.tasks import generate_ia_json
-from cl.corpus_importer.utils import get_start_of_quarter
+from cl.corpus_importer.utils import (
+    ClusterSourceException,
+    DocketSourceException,
+    compare_documents,
+    get_start_of_quarter,
+    merge_case_names,
+    merge_docket_numbers,
+    merge_judges,
+    merge_strings,
+    winnow_case_name,
+)
 from cl.lib.pacer import process_docket_data
 from cl.lib.redis_utils import make_redis_interface
 from cl.lib.timezone_helpers import localize_date_and_time
@@ -2464,7 +2466,11 @@ class HarvardMergerTests(TestCase):
         """Can we choose the correct docket number"""
         docket = DocketFactory(docket_number="17-3000")
         cluster = OpinionClusterWithParentsFactory(id=4, docket=docket)
-        merge_docket_numbers(cluster, "Master Docket No. 17-3000L")
+        updated_docket_number = merge_docket_numbers(
+            cluster, "Master Docket No. 17-3000L"
+        )
+        docket.docket_number = updated_docket_number
+        docket.save()
         docket.refresh_from_db()
         self.assertEqual(docket.docket_number, "Master Docket 17-3000L")
 
@@ -2783,7 +2789,12 @@ class HarvardMergerTests(TestCase):
                 case_name_full=item[1].get("cl_case_name_full"),
             )
 
-            data_to_update = merge_case_names(cluster, item[0])
+            data_to_update = merge_case_names(
+                cluster,
+                item[0],
+                case_name_key="name_abbreviation",
+                case_name_full_key="name",
+            )
 
             self.assertEqual(
                 data_to_update.get("case_name", ""),
