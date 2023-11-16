@@ -593,9 +593,7 @@ def merge_columbia_into_cl(options) -> None:
             continue
 
         # filepath example: indiana\court_opinions\documents\2713f39c5a8e8684.xml
-        xml_path = os.path.join(
-            xml_dir, filepath.replace("/Users/Palin/Work/columbia/usb/", "")
-        )
+        xml_path = os.path.join(xml_dir, filepath)
         if not os.path.exists(xml_path):
             logger.warning(f"No file at: {xml_path}, Cluster: {cluster_id}")
             continue
