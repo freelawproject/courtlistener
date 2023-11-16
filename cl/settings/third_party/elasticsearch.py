@@ -6,9 +6,19 @@ from ..django import TESTING
 
 if TESTING:
     ELASTICSEARCH_DISABLED = True
+    ELASTICSEARCH_RECAP_DOCS_SIGNALS_DISABLED = False
+    ELASTICSEARCH_DOCKETS_SIGNALS_DISABLED = False
 else:
     ELASTICSEARCH_DISABLED = env(
         "ELASTICSEARCH_DISABLED",
+        default=False,
+    )
+    ELASTICSEARCH_RECAP_DOCS_SIGNALS_DISABLED = env(
+        "ELASTICSEARCH_RECAP_DOCS_SIGNALS_DISABLED",
+        default=False,
+    )
+    ELASTICSEARCH_DOCKETS_SIGNALS_DISABLED = env(
+        "ELASTICSEARCH_DOCKETS_SIGNALS_DISABLED",
         default=False,
     )
 
@@ -170,14 +180,6 @@ PERCOLATOR_PAGE_SIZE = 100
 # The maximum number of scheduled hits per alert. #
 ###################################################
 SCHEDULED_ALERT_HITS_LIMIT = 30
-
-
-####################################
-# ES Indexing Throttling task rate #
-####################################
-ELASTICSEARCH_THROTTLING_TASK_RATE = env(
-    "ELASTICSEARCH_THROTTLING_TASK_RATE", default="30/m"
-)
 
 ################################
 # ES bulk indexing batch size #

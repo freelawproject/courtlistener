@@ -28,8 +28,8 @@ class PodcastTest(ESIndexTestCase, TestCase):
             citation_string="Appeals. CA8.",
         )
         with mock.patch(
-            "cl.lib.es_signal_processor.avoid_es_audio_indexing",
-            side_effect=lambda x, y, z: False,
+            "cl.lib.es_signal_processor.allow_es_audio_indexing",
+            side_effect=lambda x, y: True,
         ), cls.captureOnCommitCallbacks(execute=True):
             cls.audio = AudioWithParentsFactory.create(
                 docket=DocketFactory(

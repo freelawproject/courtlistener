@@ -4,6 +4,7 @@ import unittest
 from unittest import mock
 
 from asgiref.sync import async_to_sync, sync_to_async
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.test import RequestFactory, override_settings
 from django.urls import reverse
@@ -33,14 +34,21 @@ from cl.search.factories import (
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
     compose_redis_key,
     get_last_parent_document_id_processed,
-    log_last_parent_document_processed,
+    log_last_document_indexed,
 )
 from cl.search.models import SEARCH_TYPES, RECAPDocument
 from cl.search.tasks import (
     add_docket_to_solr_by_rds,
+    es_save_document,
     index_docket_parties_in_es,
+    update_es_document,
 )
-from cl.tests.cases import ESIndexTestCase, TestCase, TransactionTestCase
+from cl.tests.cases import (
+    CountESTasksTestCase,
+    ESIndexTestCase,
+    TestCase,
+    TransactionTestCase,
+)
 
 
 class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
@@ -337,7 +345,8 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIn("3 Cases", r.content.decode())
         # 3 Docket entries in count.
         self.assertIn("3 Docket", r.content.decode())
-        empty_docket.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            empty_docket.delete()
 
     def test_sorting(self) -> None:
         """Can we do sorting on various fields?"""
@@ -719,7 +728,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # test the combination of the text query and the available_only filter
         params = {
             "type": SEARCH_TYPES.RECAP,
-            "q": "Voluntary Hospitals",
+            "q": '"Voluntary Hospitals"',
             "available_only": True,
         }
         r = async_to_sync(self._test_article_count)(
@@ -731,6 +740,39 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             docket.delete()
             docket_2.delete()
             docket_3.delete()
+
+    def test_filter_docket_with_no_documents(self) -> None:
+        """Confirm we can filter dockets with no documents"""
+
+        # Add dockets with no documents
+        with self.captureOnCommitCallbacks(execute=True):
+            docket = DocketFactory(
+                court=self.court,
+                case_name="Ready Mix Hampton",
+                date_filed=datetime.date(2021, 8, 16),
+            )
+            BankruptcyInformationFactory(docket=docket, chapter="7")
+
+            docket_2 = DocketFactory(
+                court=self.court,
+                case_name="Ready Mix Hampton",
+                date_filed=datetime.date(2021, 8, 16),
+            )
+            BankruptcyInformationFactory(docket=docket_2, chapter="8")
+
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "chapter:7",
+            "court": f"{self.court.pk} innb",
+            "case_name": "ready mix",
+            "filed_after": datetime.date(2020, 1, 1),
+        }
+        async_to_sync(self._test_article_count)(
+            cd, 1, "court + case_name + filed_after + query_string"
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            docket.delete()
+            docket_2.delete()
 
     async def test_party_name_filter(self) -> None:
         """Confirm party_name filter works properly"""
@@ -748,7 +790,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         with self.captureOnCommitCallbacks(execute=True):
             docket = DocketFactory(
                 court=self.court,
-                case_name="NYU Hospitals Center v. League of Voluntary Hospitals",
+                case_name="Mott v. NYU Hospitals Center",
                 date_filed=datetime.date(2015, 8, 16),
                 date_argued=datetime.date(2013, 5, 20),
                 docket_number="1:17-cv-04465",
@@ -758,7 +800,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2015, 8, 19),
-                description="United Healthcare Workers East, League of Voluntary Hospitals and Homes of New York",
+                description="COMPLAINT against NYU Hospitals Center, Tisch Hospital",
             )
             RECAPDocumentFactory(
                 docket_entry=e_1_d_1,
@@ -770,7 +812,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 docket=docket,
                 entry_number=2,
                 date_filed=datetime.date(2015, 8, 19),
-                description="Not available document for the League of Voluntary Hospitals and Homes of New York",
+                description="Not available document for Mott v. NYU Hospitals Center",
             )
             RECAPDocumentFactory(
                 docket_entry=e_2_d_1,
@@ -782,7 +824,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         params = {
             "type": SEARCH_TYPES.RECAP,
             "q": "hospital",
-            "description": "voluntary",
+            "description": "center",
             "party_name": "Frank Paul Sabatini",
         }
 
@@ -915,7 +957,8 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         # Remove 1 RECAPDocument to ensure the docket does not contain more than
         # VIEW_MORE_CHILD_HITS entries.
-        rd_1.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            rd_1.delete()
         # View additional results query:
         params = {
             "type": SEARCH_TYPES.RECAP,
@@ -930,10 +973,11 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertNotIn("See full docket for details", r.content.decode())
         self.assertNotIn("View Additional Results for", r.content.decode())
 
-        rd_2.delete()
-        rd_3.delete()
-        rd_4.delete()
-        rd_5.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            rd_2.delete()
+            rd_3.delete()
+            rd_4.delete()
+            rd_5.delete()
 
     async def test_advanced_queries(self) -> None:
         """Confirm advance queries works properly"""
@@ -1295,9 +1339,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             < r.content.decode().index("12-1237"),
             msg="'12-1235' should come BEFORE '1:21-bk-1234' when order_by entry_date_filed asc.",
         )
-
-        rd_4.docket_entry.docket.delete()
-        empty_docket.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            rd_4.docket_entry.docket.delete()
+            empty_docket.delete()
 
         # Order by dateFiled desc
         params = {
@@ -1331,7 +1375,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             < r.content.decode().index("12-1235"),
             msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by dateFiled asc.",
         )
-        de_4.delete()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            de_4.delete()
 
     @mock.patch("cl.lib.es_signal_processor.chain")
     def test_avoid_updating_docket_in_es_on_view_count_increment(
@@ -1339,17 +1385,18 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
     ) -> None:
         """Confirm a docket is not updated in ES on a view_count increment."""
 
-        docket = DocketFactory(
-            court=self.court,
-            case_name="Lorem Ipsum",
-            case_name_full="Jackson & Sons Holdings vs. Bank",
-            date_filed=datetime.date(2015, 8, 16),
-            date_argued=datetime.date(2013, 5, 20),
-            docket_number="1:21-bk-1234",
-            assigned_to=None,
-            referred_to=None,
-            nature_of_suit="440",
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            docket = DocketFactory(
+                court=self.court,
+                case_name="Lorem Ipsum",
+                case_name_full="Jackson & Sons Holdings vs. Bank",
+                date_filed=datetime.date(2015, 8, 16),
+                date_argued=datetime.date(2013, 5, 20),
+                docket_number="1:21-bk-1234",
+                assigned_to=None,
+                referred_to=None,
+                nature_of_suit="440",
+            )
         # Restart save chain mock count.
         mock_es_save_chain.reset_mock()
         self.assertEqual(mock_es_save_chain.call_count, 0)
@@ -1362,7 +1409,8 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         # The save chain shouldn't be called.
         self.assertEqual(mock_es_save_chain.call_count, 0)
-        docket.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            docket.delete()
 
 
 class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):
@@ -2089,13 +2137,13 @@ class IndexDocketRECAPDocumentsCommandTest(
     def test_log_and_get_last_document_id(self):
         """Can we log and get the last docket indexed to/from redis?"""
 
-        last_values = log_last_parent_document_processed(
-            SEARCH_TYPES.RECAP, 1001
+        last_values = log_last_document_indexed(
+            1001, compose_redis_key(SEARCH_TYPES.RECAP)
         )
         self.assertEqual(last_values["last_document_id"], 1001)
 
-        last_values = log_last_parent_document_processed(
-            SEARCH_TYPES.RECAP, 2001
+        last_values = log_last_document_indexed(
+            2001, compose_redis_key(SEARCH_TYPES.RECAP)
         )
         self.assertEqual(last_values["last_document_id"], 2001)
 
@@ -2108,8 +2156,60 @@ class IndexDocketRECAPDocumentsCommandTest(
         if keys:
             self.r.delete(*keys)
 
+    def test_index_dockets_in_bulk_task(self):
+        """Confirm the command can properly index dockets in bulk from the
+        ready_mix_cases_project command.
+        """
 
-class RECAPIndexingTest(ESIndexTestCase, TransactionTestCase):
+        court = CourtFactory(id="canb", jurisdiction="FB")
+        d_1 = DocketFactory(
+            court=court,
+            date_filed=datetime.date(2019, 8, 16),
+        )
+        BankruptcyInformationFactory(docket=d_1, chapter="7")
+
+        d_2 = DocketFactory(
+            court=court,
+            date_filed=datetime.date(2020, 8, 16),
+        )
+        BankruptcyInformationFactory(docket=d_2, chapter="7")
+
+        d_3 = DocketFactory(
+            court=court,
+            date_filed=datetime.date(2021, 8, 16),
+        )
+        BankruptcyInformationFactory(docket=d_3, chapter="7")
+
+        d_4 = DocketFactory(
+            court=court,
+            date_filed=datetime.date(2021, 8, 16),
+        )
+        BankruptcyInformationFactory(docket=d_4, chapter="13")
+
+        self.delete_index("search.Docket")
+        self.create_index("search.Docket")
+
+        s = DocketDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0)
+        # Call cl_index_parent_and_child_docs command.
+        call_command(
+            "ready_mix_cases_project",
+            task="re-index-dockets",
+            queue="celery",
+        )
+
+        s = DocketDocument.search().query("match_all")
+        self.assertEqual(s.count(), 3)
+
+        d_1.delete()
+        d_2.delete()
+        d_3.delete()
+        d_4.delete()
+
+
+class RECAPIndexingTest(
+    CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
+):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -2118,6 +2218,7 @@ class RECAPIndexingTest(ESIndexTestCase, TransactionTestCase):
 
     def setUp(self):
         self.court = CourtFactory(id="canb", jurisdiction="FB")
+        super().setUp()
 
     def _compare_response_child_value(
         self,
@@ -2346,14 +2447,55 @@ class RECAPIndexingTest(ESIndexTestCase, TransactionTestCase):
         de_1.docket.case_name = "USA vs Bank"
         de_1.docket.assigned_to = judge
         de_1.docket.referred_to = judge_2
+
+        de_1.docket.docket_number = "21-0000"
+        de_1.docket.nature_of_suit = "Test nature of suit"
+        de_1.docket.cause = "Test Cause"
+        de_1.docket.jury_demand = "50,000"
+        de_1.docket.jurisdiction_type = "U.S. Government Defendant"
+        de_1.docket.date_argued = datetime.date(2021, 8, 19)
+        de_1.docket.date_filed = datetime.date(2022, 8, 19)
+        de_1.docket.date_terminated = datetime.date(2023, 8, 19)
+
         de_1.docket.save()
 
         docket_doc = DocketDocument.get(id=docket_pk)
-        self.assertIn("USA vs Bank", docket_doc.caseName)
+        self.assertIn(de_1.docket.case_name, docket_doc.caseName)
+        self.assertEqual(de_1.docket.docket_number, docket_doc.docketNumber)
+        self.assertEqual(de_1.docket.nature_of_suit, docket_doc.suitNature)
+        self.assertEqual(de_1.docket.cause, docket_doc.cause)
+        self.assertEqual(de_1.docket.jury_demand, docket_doc.juryDemand)
+        self.assertEqual(
+            de_1.docket.jurisdiction_type, docket_doc.jurisdictionType
+        )
+        self.assertEqual(de_1.docket.date_argued, docket_doc.dateArgued.date())
+        self.assertEqual(de_1.docket.date_filed, docket_doc.dateFiled.date())
+        self.assertEqual(
+            de_1.docket.date_terminated, docket_doc.dateTerminated.date()
+        )
         self.assertIn(judge.name_full, docket_doc.assignedTo)
         self.assertIn(judge_2.name_full, docket_doc.referredTo)
         self.assertEqual(judge.pk, docket_doc.assigned_to_id)
         self.assertEqual(judge_2.pk, docket_doc.referred_to_id)
+
+        # Confirm docket best case name and slug.
+        de_1.docket.case_name = ""
+        de_1.docket.case_name_full = ""
+        de_1.docket.case_name_short = "USA vs Bank Short"
+        de_1.docket.save()
+        docket_doc = DocketDocument.get(id=docket_pk)
+        self.assertEqual(de_1.docket.case_name_short, docket_doc.caseName)
+
+        de_1.docket.case_name = ""
+        de_1.docket.case_name_full = "USA vs Bank Full"
+        de_1.docket.save()
+        docket_doc = DocketDocument.get(id=docket_pk)
+        self.assertEqual(de_1.docket.case_name_full, docket_doc.caseName)
+        self.assertEqual(de_1.docket.case_name_full, docket_doc.case_name_full)
+        self.assertEqual("usa-vs-bank-full", docket_doc.docket_slug)
+        self.assertEqual(
+            de_1.docket.get_absolute_url(), docket_doc.docket_absolute_url
+        )
 
         # Update judges name.
         judge.name_first = "William"
@@ -2377,8 +2519,62 @@ class RECAPIndexingTest(ESIndexTestCase, TransactionTestCase):
         self.assertEqual("Notification to File Ipsum", rd_doc.description)
         self.assertEqual(99, rd_doc.entry_number)
 
-        # Add a Bankruptcy document.
+        # Update RECAPDocument fields.
+        f = SimpleUploadedFile("recap_filename", b"file content more content")
+        rd_1.description = "RD short description"
+        rd_1.document_type = RECAPDocument.ATTACHMENT
+        rd_1.document_number = "5"
+        rd_1.pacer_doc_id = "103005"
+        rd_1.plain_text = "Plain text testing"
+        rd_1.attachment_number = "1"
+        rd_1.is_available = True
+        rd_1.page_count = 5
+        rd_1.filepath_local = f
+        rd_1.save()
+        rd_doc = DocketDocument.get(id=ES_CHILD_ID(rd_pk).RECAP)
+        self.assertEqual(rd_1.description, rd_doc.short_description)
+        self.assertEqual(
+            rd_1.get_document_type_display(), rd_doc.document_type
+        )
+        self.assertEqual(rd_1.document_number, rd_doc.document_number)
+        self.assertEqual(rd_1.pacer_doc_id, rd_doc.pacer_doc_id)
+        self.assertEqual(rd_1.plain_text, rd_doc.plain_text)
+        self.assertEqual(rd_1.attachment_number, str(rd_doc.attachment_number))
+        self.assertEqual(rd_1.is_available, rd_doc.is_available)
+        self.assertEqual(rd_1.page_count, rd_doc.page_count)
+        self.assertEqual(rd_1.filepath_local, rd_doc.filepath_local)
+        self.assertEqual(rd_1.get_absolute_url(), rd_doc.absolute_url)
 
+        # Confirm Docket fields are updated in RDDocument:
+        self.assertIn(de_1.docket.case_name, rd_doc.caseName)
+        self.assertEqual(de_1.docket.docket_number, rd_doc.docketNumber)
+        self.assertEqual(de_1.docket.nature_of_suit, rd_doc.suitNature)
+        self.assertEqual(de_1.docket.cause, rd_doc.cause)
+        self.assertEqual(de_1.docket.jury_demand, rd_doc.juryDemand)
+        self.assertEqual(
+            de_1.docket.jurisdiction_type, rd_doc.jurisdictionType
+        )
+        self.assertEqual(de_1.docket.date_argued, rd_doc.dateArgued.date())
+        self.assertEqual(de_1.docket.date_filed, rd_doc.dateFiled.date())
+        self.assertEqual(
+            de_1.docket.date_terminated, rd_doc.dateTerminated.date()
+        )
+        self.assertIn(judge.name_full, rd_doc.assignedTo)
+        self.assertIn(judge_2.name_full, rd_doc.referredTo)
+        self.assertEqual(judge.pk, rd_doc.assigned_to_id)
+        self.assertEqual(judge_2.pk, rd_doc.referred_to_id)
+
+        # Update docket entry ID.
+        de_2 = DocketEntryWithParentsFactory(
+            docket=de_1.docket,
+            description="Notification docket entry 2",
+        )
+        rd_1.docket_entry = de_2
+        rd_1.save()
+        rd_doc = DocketDocument.get(id=ES_CHILD_ID(rd_pk).RECAP)
+        self.assertEqual(de_2.description, rd_doc.description)
+
+        # Add a Bankruptcy document.
         bank = BankruptcyInformationFactory(docket=de_1.docket)
         docket_doc = DocketDocument.get(id=docket_pk)
         self.assertEqual(str(bank.chapter), docket_doc.chapter)
@@ -2641,3 +2837,277 @@ class RECAPIndexingTest(ESIndexTestCase, TransactionTestCase):
             self.assertFalse(
                 DocketDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP)
             )
+
+    def test_docket_indexing_and_tasks_count(self) -> None:
+        """Confirm a Docket is properly indexed in ES with the right number of
+        indexing tasks.
+        """
+
+        # Index docket on creation.
+        with mock.patch(
+            "cl.lib.es_signal_processor.es_save_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                es_save_document, *args, **kwargs
+            ),
+        ):
+            docket = DocketFactory(
+                court=self.court,
+                pacer_case_id="asdf",
+                docket_number="12-cv-02354",
+                case_name="Vargas v. Wilkins",
+            )
+
+        # Only one es_save_document task should be called on creation.
+        self.reset_and_assert_task_count(expected=1)
+        self.assertTrue(DocketDocument.exists(id=docket.pk))
+
+        # Restart task counter.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            docket_2 = DocketFactory(
+                court=self.court,
+                pacer_case_id="aaaaa",
+                docket_number="12-cv-02358",
+            )
+
+        # No update_es_document task should be called on creation.
+        self.reset_and_assert_task_count(expected=0)
+        self.assertTrue(DocketDocument.exists(id=docket_2.pk))
+
+        # Update a Docket without changes.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            docket.save()
+
+        # update_es_document task shouldn't be called on save() without changes
+        self.reset_and_assert_task_count(expected=0)
+
+        with mock.patch(
+            "cl.lib.es_signal_processor.es_save_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                es_save_document, *args, **kwargs
+            ),
+        ):
+            docket.save()
+
+        # es_save_document task shouldn't be called on save() without changes
+        self.reset_and_assert_task_count(expected=0)
+
+        # Update a Docket untracked field.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            docket.blocked = True
+            docket.save()
+        # update_es_document task shouldn't be called on save() for untracked
+        # fields
+        self.reset_and_assert_task_count(expected=0)
+
+        # Update a Docket tracked field.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            docket.docket_number = "21-43434"
+            docket.case_name = "Vargas v. Lorem"
+            docket.save()
+
+        # update_es_document task should be called 1 on tracked fields updates
+        self.reset_and_assert_task_count(expected=1)
+        d_doc = DocketDocument.get(id=docket.pk)
+        self.assertEqual(d_doc.docketNumber, "21-43434")
+
+        # Confirm a Docket is indexed if it doesn't exist in the
+        # index on a tracked field update.
+        self.delete_index("search.Docket")
+        self.create_index("search.Docket")
+
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            docket.docket_number = "21-43435"
+            docket.save()
+
+        # update_es_document task should be called 1 on tracked fields update
+        self.reset_and_assert_task_count(expected=1)
+        d_doc = DocketDocument.get(id=docket.pk)
+        self.assertEqual(d_doc.docketNumber, "21-43435")
+        self.assertEqual(d_doc.caseName, "Vargas v. Lorem")
+
+        docket.delete()
+        docket_2.delete()
+
+    def test_recap_document_indexing_and_tasks_count(self) -> None:
+        """Confirm a RECAPDocument is properly indexed in ES with the right
+        number of indexing tasks.
+        """
+        docket = DocketFactory(
+            court=self.court,
+            pacer_case_id="asdf",
+            docket_number="12-cv-02354",
+            case_name="Vargas v. Wilkins",
+        )
+
+        # RECAP Document creation:
+        with mock.patch(
+            "cl.lib.es_signal_processor.es_save_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                es_save_document, *args, **kwargs
+            ),
+        ):
+            de_1 = DocketEntryWithParentsFactory(
+                docket=docket,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem",
+                entry_number=None,
+            )
+            rd_1 = RECAPDocumentFactory(
+                docket_entry=de_1,
+                description="Leave to File",
+                document_number="",
+                is_available=True,
+                page_count=5,
+            )
+        # Only 1 es_save_document task should be called on creation.
+        self.reset_and_assert_task_count(expected=1)
+        r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
+        self.assertEqual(r_doc.docket_child["parent"], docket.pk)
+
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            de_2 = DocketEntryWithParentsFactory(
+                docket=docket,
+            )
+            RECAPDocumentFactory(
+                docket_entry=de_2,
+            )
+
+        # No update_es_document task should be called on creation.
+        self.reset_and_assert_task_count(expected=0)
+
+        # Update a RECAPDocument without changes.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            rd_1.save()
+        # update_es_document task shouldn't be called on save() without changes
+        self.reset_and_assert_task_count(expected=0)
+
+        # Update a RECAPDocument untracked field.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            rd_1.is_sealed = True
+            rd_1.save()
+        # update_es_document task shouldn't be called on save() for untracked
+        # fields
+        self.reset_and_assert_task_count(expected=0)
+
+        # Update a RECAPDocument tracked field.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            rd_1.description = "Lorem Ipsum"
+            rd_1.page_count = 5
+            rd_1.save()
+
+        # update_es_document task should be called 1 on tracked fields updates
+        self.reset_and_assert_task_count(expected=1)
+        r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
+        self.assertEqual(r_doc.short_description, "Lorem Ipsum")
+        self.assertEqual(r_doc.page_count, 5)
+
+        with mock.patch(
+            "cl.lib.es_signal_processor.es_save_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                es_save_document, *args, **kwargs
+            ),
+        ):
+            rd_1.page_count = 6
+            rd_1.save()
+
+        # es_save_document task shouldn't be called on document updates.
+        self.reset_and_assert_task_count(expected=0)
+
+        # Create a new Docket and DocketEntry.
+        docket_2 = DocketFactory(court=self.court, docket_number="21-0000")
+        de_2 = DocketEntryWithParentsFactory(
+            docket=docket_2,
+            date_filed=datetime.date(2016, 8, 19),
+            description="Notification for Lorem Ipsum",
+            entry_number=2,
+        )
+        # Update the RECAPDocument docket_entry.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            rd_1.docket_entry = de_2
+            rd_1.save()
+
+        # update_es_document task should be called 1 on tracked fields updates
+        self.reset_and_assert_task_count(expected=1)
+        r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
+        self.assertEqual(r_doc.description, de_2.description)
+        self.assertEqual(r_doc.entry_number, de_2.entry_number)
+        self.assertEqual(r_doc.docketNumber, docket_2.docket_number)
+
+        # Confirm a RECAPDocument is indexed if it doesn't exist in the
+        # index on a tracked field update.
+        # Clean the RECAP index.
+        self.delete_index("search.Docket")
+        self.create_index("search.Docket")
+
+        # Index Docket
+        docket_2.docket_number = "21-43436"
+        docket_2.save()
+
+        self.assertFalse(DocketDocument.exists(id=ES_CHILD_ID(rd_1.pk).RECAP))
+        # RECAP Document creation on update.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            rd_1.pacer_doc_id = "99999999"
+            rd_1.save()
+
+        # update_es_document task should be called 1 on tracked fields update
+        self.reset_and_assert_task_count(expected=1)
+        r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
+        self.assertEqual(r_doc.pacer_doc_id, "99999999")
+        self.assertEqual(r_doc.docket_child["parent"], docket_2.pk)
+
+        docket_2.delete()

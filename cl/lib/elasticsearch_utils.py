@@ -3,6 +3,7 @@ import operator
 import re
 import time
 import traceback
+from copy import deepcopy
 from dataclasses import fields
 from datetime import date, datetime
 from functools import reduce, wraps
@@ -699,14 +700,14 @@ def build_es_base_query(
                 ["representative_text"], cd.get("q", "")
             )
         case SEARCH_TYPES.ORAL_ARGUMENT:
-            fields = SEARCH_ORAL_ARGUMENT_QUERY_FIELDS
+            fields = SEARCH_ORAL_ARGUMENT_QUERY_FIELDS.copy()
             fields.extend(add_fields_boosting(cd))
             string_query = build_fulltext_query(
                 fields,
                 cd.get("q", ""),
             )
         case SEARCH_TYPES.PEOPLE:
-            child_fields = SEARCH_PEOPLE_CHILD_QUERY_FIELDS
+            child_fields = SEARCH_PEOPLE_CHILD_QUERY_FIELDS.copy()
             child_fields.extend(
                 add_fields_boosting(
                     cd,
@@ -720,7 +721,7 @@ def build_es_base_query(
             child_query_fields = {
                 "position": child_fields,
             }
-            parent_query_fields = SEARCH_PEOPLE_PARENT_QUERY_FIELDS
+            parent_query_fields = SEARCH_PEOPLE_PARENT_QUERY_FIELDS.copy()
             parent_query_fields.extend(
                 add_fields_boosting(
                     cd,
@@ -735,7 +736,7 @@ def build_es_base_query(
                 cd.get("q", ""),
             )
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
-            child_fields = SEARCH_RECAP_CHILD_QUERY_FIELDS
+            child_fields = SEARCH_RECAP_CHILD_QUERY_FIELDS.copy()
             child_fields.extend(
                 add_fields_boosting(
                     cd,
@@ -748,7 +749,7 @@ def build_es_base_query(
                 )
             )
             child_query_fields = {"recap_document": child_fields}
-            parent_query_fields = SEARCH_RECAP_PARENT_QUERY_FIELDS
+            parent_query_fields = SEARCH_RECAP_PARENT_QUERY_FIELDS.copy()
             parent_query_fields.extend(
                 add_fields_boosting(
                     cd,
@@ -1473,7 +1474,9 @@ def build_full_join_es_queries(
     if cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
         # Build child filters.
         child_filters = build_has_child_filters(child_type, cd)
-
+        # Copy the original child_filters before appending parent fields.
+        # For its use later in the parent filters.
+        child_filters_original = deepcopy(child_filters)
         # Build child text query.
         child_fields = child_query_fields["recap_document"]
         child_text_query = build_fulltext_query(
@@ -1535,14 +1538,15 @@ def build_full_join_es_queries(
             parent_query_fields, cd.get("q", ""), only_queries=True
         )
 
-        # Adds filter to the parent query to exclude results with no children
-        if child_filters:
+        # If child filters are set, add a has_child query as a filter to the
+        # parent query to exclude results without matching children.
+        if child_filters_original:
             parent_filters.append(
                 Q(
                     "has_child",
                     type="recap_document",
                     score_mode="max",
-                    query=Q("bool", filter=child_filters),
+                    query=Q("bool", filter=child_filters_original),
                 )
             )
         parent_query = None
