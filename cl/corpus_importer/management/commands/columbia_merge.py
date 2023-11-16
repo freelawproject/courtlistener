@@ -19,12 +19,10 @@ manage.py columbia_merge --debug --csv-file /opt/courtlistener/cl/assets/media/t
 """
 import os.path
 import re
-from datetime import date
 from difflib import SequenceMatcher
 from typing import Any, Optional
 
 import pandas as pd
-from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup
 from django.db import transaction
 from django.db.models import Q
@@ -54,14 +52,10 @@ from cl.corpus_importer.utils import (
     merge_judges,
     merge_long_fields,
     merge_strings,
+    update_cluster_panel,
 )
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.people_db.lookup_utils import (
-    extract_judge_last_name,
-    find_just_name,
-    lookup_judges_by_last_name_list,
-)
-from cl.people_db.models import Person
+from cl.people_db.lookup_utils import extract_judge_last_name, find_just_name
 from cl.search.models import SOURCES, Docket, Opinion, OpinionCluster
 
 VALID_UPDATED_DOCKET_SOURCES = [
