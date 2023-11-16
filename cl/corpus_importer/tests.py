@@ -41,10 +41,8 @@ from cl.corpus_importer.management.commands.harvard_merge import (
 )
 from cl.corpus_importer.management.commands.harvard_opinions import (
     clean_body_content,
-    compare_documents,
     parse_harvard_opinions,
     validate_dt,
-    winnow_case_name,
 )
 from cl.corpus_importer.management.commands.normalize_judges_opinions import (
     normalize_authors_in_opinions,
@@ -59,11 +57,13 @@ from cl.corpus_importer.tasks import generate_ia_json
 from cl.corpus_importer.utils import (
     ClusterSourceException,
     DocketSourceException,
+    compare_documents,
     get_start_of_quarter,
     merge_case_names,
     merge_docket_numbers,
     merge_judges,
     merge_strings,
+    winnow_case_name,
 )
 from cl.lib.pacer import process_docket_data
 from cl.lib.redis_utils import make_redis_interface

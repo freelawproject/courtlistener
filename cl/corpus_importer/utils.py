@@ -2,8 +2,10 @@ import itertools
 import re
 from datetime import date
 from difflib import SequenceMatcher
-from typing import Any, Iterator, Optional
+from typing import Any, Iterator, Optional, Set
 
+from bs4 import BeautifulSoup
+from django.db.models import QuerySet
 from django.db.utils import IntegrityError
 from django.utils.timezone import now
 from eyecite import get_citations
@@ -14,7 +16,7 @@ from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.command_utils import logger
 from cl.lib.string_diff import get_cosine_similarity
 from cl.people_db.lookup_utils import find_all_judges
-from cl.search.models import Citation, Docket, OpinionCluster
+from cl.search.models import Citation, Docket, Opinion, OpinionCluster
 
 
 class OpinionMatchingException(Exception):
@@ -164,13 +166,13 @@ def is_subset(match: list[int], other_match: list[int]) -> bool:
         return True
 
 
-def compare_documents(harvard_characters: str, cl_characters: str) -> int:
-    """Compare Harvard text to CL opinion text
+def compare_documents(file_characters: str, cl_characters: str) -> int:
+    """Compare text from file/source to CL opinion text
 
     This code iterates over two opinions logging similar stretches and then
     returns a percentage of the total overlapping characters
 
-    :param harvard_characters: The stripped down opinion text from Harvard
+    :param file_characters: The stripped down opinion text from file/source
     :param cl_characters: The stripped down opinion text on Courtlistener
     :return: Percentage (as integer) overlapping content
     """
@@ -178,11 +180,11 @@ def compare_documents(harvard_characters: str, cl_characters: str) -> int:
     start, stop, count = 0, 0, 0
     matched_substring = ""
     found_overlaps = []
-    while stop < len(harvard_characters):
+    while stop < len(file_characters):
         stop += 1
-        harvard_substring = harvard_characters[start:stop]
-        if harvard_substring in cl_characters:
-            matched_substring = harvard_substring
+        source_substring = file_characters[start:stop]
+        if source_substring in cl_characters:
+            matched_substring = source_substring
         else:
             if len(matched_substring) > 5:
                 subset = make_subset_range(cl_characters, matched_substring)
@@ -200,7 +202,7 @@ def compare_documents(harvard_characters: str, cl_characters: str) -> int:
         count += len(overlap)
 
     percent_match = int(
-        100 * (count / min([len(harvard_characters), len(cl_characters)]))
+        100 * (count / min([len(file_characters), len(cl_characters)]))
     )
     return percent_match
 
@@ -251,9 +253,9 @@ def match_opinion_lists(
 
     Sometimes cosine similarity fails when there are small variations in text,
     such as parties, attorneys, case name, or court that are included in the content
-    of the opinion, compare_documents() checks the percentage of the harvard opinion
+    of the opinion, compare_documents() checks the percentage of the file opinion
     text that it is in courtlistener opinion, having a large percentage means that
-    almost all the harvard opinion is in courtlistener opinion, but there is a
+    almost all the file opinion is in courtlistener opinion, but there is a
     possibility that the courtlistener opinion contains some additional data in que
     opinion content (such as case name, parties, etc.)
 
@@ -511,11 +513,11 @@ def merge_judges(
                 try:
                     if is_columbia:
                         # we assume that the data in columbia is better, we keep the
-                        # one from columbia and remove the one from cl
+                        # one from file and remove the one from cl
                         cl_data_clean_list.remove(pair[0])
                     else:
                         # we assume that the data in CL is better, we keep the one from
-                        # CL and remove the one from harvard
+                        # CL and remove the one from file
                         file_data_clean_list.remove(pair[1])
                 except ValueError:
                     # The value was removed in an earlier iteration, but we still
@@ -640,4 +642,316 @@ def add_citations_to_cluster(cites: list[str], cluster_id: int) -> None:
                 f"Reporter mismatch for cluster: {cluster_id} on cite: {cite}"
             )
 
-    pass
+
+def get_opinion_text(cluster: OpinionCluster) -> str:
+    """Get the opinions text for a cluster object
+
+    :param cluster: Cluster ID for a set of opinions
+    :return: Combined opinion text
+    """
+    opinions = []
+    for op in Opinion.objects.filter(cluster_id=cluster.id):
+        if len(op.html_with_citations) > 1:
+            opinions.append(op.html_with_citations)
+        elif len(op.html_columbia) > 1:
+            opinions.append(op.html_columbia)
+        elif len(op.html_lawbox) > 1:
+            opinions.append(op.html_lawbox)
+        elif len(op.plain_text) > 1:
+            opinions.append(op.plain_text)
+        elif len(op.html) > 1:
+            opinions.append(op.html)
+        elif len(op.xml_harvard) > 1:
+            opinions.append(op.xml_harvard)
+    op = " ".join(opinions)
+    soup = BeautifulSoup(op, features="html.parser")
+    return soup.text
+
+
+def winnow_case_name(case_name: str) -> Set:
+    """Reduce each case title to a set of words worth comparing
+
+    :param case_name: The name of a case or combination of case names
+    :return: A set of words worth comparing
+    """
+    false_positive_set = {
+        "and",
+        "personal",
+        "restraint",
+        "matter",
+        "washington",
+        "florida",
+        "county",
+        "city",
+        "of",
+        "the",
+        "state",
+        "estate",
+        "in",
+        "inc",
+        "st",
+        "ex",
+        "rel",
+    }
+
+    # strings where order matters
+    false_positive_strings = ["united states"]
+
+    false_positive_strings_regex = re.compile(
+        "|".join(map(re.escape, false_positive_strings))
+    )
+
+    # Fix case name to be cleaner
+    case_name = harmonize(case_name)
+
+    # Join abbreviations/acronyms. e.g. "D.L.M. v. T.J.S." -> "DLM v. TJS"
+    case_name = re.sub(
+        r"\b[a-zA-Z][a-zA-Z\.]*[A-Za-z]\b\.?",
+        lambda m: m.group().replace(".", ""),
+        case_name,
+    )
+
+    # Remove all non-alphanumeric characters
+    case_title = re.sub(r"[^a-z0-9 ]", " ", case_name.lower())
+
+    # Remove strings that can cause an unnecessary overlap
+    case_title = false_positive_strings_regex.sub("", case_title)
+
+    # Remove one-letter words, initials etc.
+    case_title = re.sub(r"\b[^ ]\b", "", case_title)
+
+    if not case_title:
+        # Log case name if the process reduce it to blank
+        logger.warning(f"Case name: {case_name} reduced to blank.")
+
+    # Convert case name to set of words
+    cleaned_set = set(case_title.split())
+
+    # Lastly remove our ever-growing set of false positive words
+    # This is different from bad words, but may have some overlap.
+    return cleaned_set - (cleaned_set & false_positive_set)
+
+
+def clean_body_content(case_body: str, harvard_file: bool = False) -> str:
+    """Strip all non-alphanumeric characters
+
+    :param case_body: Opinion text
+    :param harvard_file: is this a harvard json file or not
+    :return:Opinion text with only alphanumeric characters
+    """
+    soup = BeautifulSoup(case_body, "lxml")
+    if not harvard_file:
+        opinion_text = soup.text
+    else:
+        opinions = []
+        for op in soup.find_all(
+            lambda tag: (
+                tag.name == "opinion" and tag.get("data-type") is None
+            )
+            or tag.get("data-type") == "opinion"
+        ):
+            opinions.append(op.text)
+        opinion_text = "".join(
+            [
+                op.text
+                for op in soup.find_all(
+                    lambda tag: (
+                        tag.name == "opinion" and tag.get("data-type") is None
+                    )
+                    or tag.get("data-type") == "opinion"
+                )
+            ]
+        )
+
+    return re.sub(r"[^a-zA-Z0-9 ]", "", opinion_text.lower())
+
+
+def length_too_different(
+    case: OpinionCluster, file_characters: str, cl_characters: str
+) -> bool:
+    """Check if length is too different between texts
+
+    :param case: The opinion cluster for the case
+    :param file_characters: The opinion content characters
+    :param cl_characters: The CL opinion content characters
+    :return: Whether the content is too different in length
+    """
+    if len(cl_characters) == 0:
+        logger.info(f"Empty Courtlistener opinion cluster: {case.id}")
+        return True
+
+    diff = len(file_characters) / len(cl_characters)
+    if not (0.3 < diff < 3):
+        # Content too dissimilar in length to compare
+        return True
+    return False
+
+
+def content_too_different(
+    case: OpinionCluster,
+    file_characters: str,
+    cl_characters: str,
+    docket: str,
+) -> bool:
+    """Is the content too different
+
+    Check the percentage overlap of two blocks of text
+
+    Florida uses some pretty rote language in the ~650 character
+    length that requires a bump in the length for stricter checking.
+
+    This also means the matching threshold has to go for small cases
+    completely so a 98% match in washington is not the
+    same as a 99% match in Florida
+
+    Require a very close match - with name overlap and
+    docket number for very small cases.
+
+    :param case: Opinion cluster for case
+    :param file_characters: The opinion content characters
+    :param cl_characters: The CL opinion content characters
+    :param docket: The docket number from file/source to compare
+    :return: Whether the opinion content is too dissimilar
+    """
+
+    if len(file_characters) > 10000:
+        cosine_sim = get_cosine_similarity(file_characters, cl_characters)
+        if cosine_sim > 0.97:
+            return False
+        else:
+            return True
+
+    percent_match = compare_documents(file_characters, cl_characters)
+    if percent_match < 60:
+        return True
+
+    if len(file_characters) > 1000:
+        return False
+
+    if percent_match < 90:
+        return True
+
+    # If a docket number exists: check against it.
+    if case.docket.docket_number is not None:
+        clean_docket = clean_docket_number(docket)
+        if clean_docket not in case.docket.docket_number:
+            return True
+    return False
+
+
+def case_names_dont_overlap(
+    case: OpinionCluster, case_name_full: str, case_name_abbreviation: str
+) -> bool:
+    """Case names not overlap
+
+    Check if the case names have quality overlapping case name words.
+    Excludes 'bad words' and other common words.
+
+    :param case: The case opinion cluster
+    :param case_name_full: The case name full from file/source to compare
+    :param case_name_abbreviation: The case name abbreviation from file/source
+    to compare
+    :return: Do the case names share quality overlapping words
+    """
+
+    file_case = f"{case_name_full} {case_name_abbreviation}"
+    overlap = winnow_case_name(case.case_name) & winnow_case_name(file_case)
+
+    if not overlap:
+        return True
+    return False
+
+
+def cosine_similarity_too_different(
+    case: OpinionCluster, case_name_full: str, case_name_abbreviation: str
+) -> bool:
+    """Cosine similarity comparison between case names
+
+    Checks the cosine similarity between a case in CL and file/source data
+
+    :param case: The case opinion cluster
+    :param case_name_full: The case name full from file/source to compare
+    :param case_name_abbreviation: The case name abbreviation from file/source
+    to compare
+    :return: Is the cosine similarity too different
+    """
+
+    similarities = []
+    for title in [case_name_full, case_name_abbreviation]:
+        similarity = get_cosine_similarity(title, case.case_name)
+        similarities.append(similarity)
+    max_similarity = max(similarities)
+
+    if max_similarity < 0.3:
+        return True
+    return False
+
+
+def has_too_similar_citation(
+    case: OpinionCluster, citation: FullCaseCitation
+) -> bool:
+    """Has a citation associated with cluster in same volume
+
+    If you make it this far - we should check if this small case has
+    an identical volume reporter citation attached to it already.
+    I think this may help us with the wilder v. state issue of having
+    four identical opinions only differentiated by page number
+
+    :param case: The case opinion cluster
+    :param citation: The citation of a potential matching
+    :return: Whether the citation matches to the reporter and volume.
+    """
+
+    return (
+        Citation.objects.filter(
+            cluster_id=case.id,
+            reporter=citation.corrected_reporter(),
+        )
+        .exclude(
+            page=citation.groups["page"], volume=citation.groups["volume"]
+        )
+        .exists()
+    )
+
+
+def match_based_text(
+    file_characters: str,
+    docket_number: str,
+    case_name_full: str,
+    possible_cases: QuerySet,
+    case_name_abbreviation: str,
+    citation: FullCaseCitation,
+) -> Optional[OpinionCluster]:
+    """Compare CL text to file content to establish duplicates
+
+    :param file_characters: stripped characters to compare from file/source
+    :param possible_cases: List of opinions to check against
+    :param docket_number: The docket number
+    :param case_name_full: The full case name
+    :param case_name_abbreviation: The case name abbreviation
+    :param citation: The citation obtained from file/source to compare
+    :return: OpinionCluster or None
+    """
+    for case in possible_cases:
+        cl_case_body = get_opinion_text(case)
+        cl_characters = clean_body_content(cl_case_body)
+
+        if len(cl_characters) == 0:
+            logger.warning(
+                f"Empty opinion at https://www.courtlistener.com/opinion/{case.id}/{case.slug}"
+            )
+            continue
+
+        case_and_texts = [case, file_characters, cl_characters]
+        case_and_texts_and_docket = case_and_texts + [docket_number]
+        case_and_titles = [case, case_name_full, case_name_abbreviation]
+        if (
+            length_too_different(*case_and_texts)
+            or has_too_similar_citation(case, citation)
+            or case_names_dont_overlap(*case_and_titles)
+            or cosine_similarity_too_different(*case_and_titles)
+            or content_too_different(*case_and_texts_and_docket)
+        ):
+            continue
+        return case
+    return None
