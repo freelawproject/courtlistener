@@ -312,30 +312,6 @@ def update_cluster_source(cluster: OpinionCluster) -> None:
     cluster.save()
 
 
-def update_cluster_panel(
-    cluster: OpinionCluster,
-    panel_list: list[str],
-    panel_date: Optional[date] = None,
-) -> None:
-    """Update cluster's panel
-
-    This is done independently since it is a m2m relationship, we collect the
-    corrected names, find the Person ids and then add them to the relation
-
-    :param cluster: the cluster object
-    :param panel_list: list with people names
-    :param panel_date: date used to find people
-    :return: None
-    """
-
-    panel_list = [titlecase(p) for p in panel_list]
-    panel = async_to_sync(lookup_judges_by_last_name_list)(
-        panel_list, cluster.docket.court.id, panel_date, True
-    )
-    if panel:
-        cluster.panel.add(*Person.objects.filter(id__in=[p.id for p in panel]))
-
-
 def merge_field(
     cluster: OpinionCluster,
     file_value: Optional[str],
