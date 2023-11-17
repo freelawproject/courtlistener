@@ -1307,7 +1307,17 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 plain_text="Lorem this was finished, this unwieldy process has led ipsum",
             )
 
-        search_phrase = '"this unwieldy process has led"'
+        # This phrase shouldn't return results since it doesn't match the
+        # original content.
+        search_phrase = '"this was finished, unwieldy process"'
+        params = {"type": SEARCH_TYPES.RECAP, "q": search_phrase}
+        # Frontend
+        async_to_sync(self._test_article_count)(
+            params, 0, "phrase_search_duplicated_terms"
+        )
+
+        # This phrase should match a result.
+        search_phrase = '"this was finished, this unwieldy process"'
         params = {"type": SEARCH_TYPES.RECAP, "q": search_phrase}
         # Frontend
         r = async_to_sync(self._test_article_count)(
