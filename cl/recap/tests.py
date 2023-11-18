@@ -190,7 +190,7 @@ class RecapUploadsTest(TestCase):
 
         j = json.loads(r.content)
         self.assertEqual(j["court"], self.court.id)
-        self.assertEqual(j["document_number"], 1)
+        self.assertEqual(j["document_number"], "1")
         self.assertEqual(j["pacer_case_id"], "asdf")
         mock.assert_called()
 
