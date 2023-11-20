@@ -834,7 +834,17 @@ async def add_docket_entries(
                 "Multiple recap documents found for document entry number'%s' "
                 "while processing '%s'" % (docket_entry["document_number"], d)
             )
-            continue
+            if params["document_type"] == RECAPDocument.ATTACHMENT:
+                continue
+            duplicate_rd_queryset = RECAPDocument.objects.filter(**params)
+            rd_with_pdf_queryset = duplicate_rd_queryset.filter(
+                is_available=True
+            ).exclude(filepath_local="")
+            if await rd_with_pdf_queryset.aexists():
+                rd = await rd_with_pdf_queryset.alatest("date_created")
+            else:
+                rd = await duplicate_rd_queryset.alatest("date_created")
+            await duplicate_rd_queryset.exclude(pk=rd.pk).adelete()
 
         rd.pacer_doc_id = rd.pacer_doc_id or docket_entry["pacer_doc_id"]
         rd.description = (
@@ -1480,20 +1490,34 @@ async def merge_attachment_page_data(
     and the DocketEntry object associated with the RECAPDocuments
     :raises: RECAPDocument.MultipleObjectsReturned, RECAPDocument.DoesNotExist
     """
+    params = {
+        "pacer_doc_id": pacer_doc_id,
+        "docket_entry__docket__court": court,
+    }
+    if pacer_case_id:
+        params["docket_entry__docket__pacer_case_id"] = pacer_case_id
     try:
-        params = {
-            "pacer_doc_id": pacer_doc_id,
-            "docket_entry__docket__court": court,
-        }
-        if pacer_case_id:
-            params["docket_entry__docket__pacer_case_id"] = pacer_case_id
         main_rd = await RECAPDocument.objects.select_related(
             "docket_entry", "docket_entry__docket"
         ).aget(**params)
     except RECAPDocument.MultipleObjectsReturned as exc:
-        # Unclear how to proceed and we don't want to associate this data with
-        # the wrong case. We must punt.
-        raise exc
+        if pacer_case_id:
+            duplicate_rd_queryset = RECAPDocument.objects.filter(**params)
+            rd_with_pdf_queryset = duplicate_rd_queryset.filter(
+                is_available=True
+            ).exclude(filepath_local="")
+            if await rd_with_pdf_queryset.aexists():
+                keep_rd = await rd_with_pdf_queryset.alatest("date_created")
+            else:
+                keep_rd = await duplicate_rd_queryset.alatest("date_created")
+            await duplicate_rd_queryset.exclude(pk=keep_rd.pk).adelete()
+            main_rd = await RECAPDocument.objects.select_related(
+                "docket_entry", "docket_entry__docket"
+            ).aget(**params)
+        else:
+            # Unclear how to proceed and we don't want to associate this data
+            # with the wrong case. We must punt.
+            raise exc
     except RECAPDocument.DoesNotExist as exc:
         # Can't find the docket to associate with the attachment metadata
         # It may be possible to go look for orphaned documents at this stage
