@@ -492,7 +492,8 @@ def process_extracted_opinions(extracted_opinions: list) -> list:
 def fix_reporter_caption(found_tags) -> None:
     """Remove unnecessary information from reporter_caption tag
 
-    The reporter_caption may contain the location, and we need to remove it to make the name cleaner e.g. Tex.App.-Ft.Worth [2d Dist.] 2002
+    The reporter_caption may contain the location, and we need to remove it
+    to make the name cleaner e.g. Tex.App.-Ft.Worth [2d Dist.] 2002
     :param found_tags: a list of found tags
     :return: None
     """
@@ -502,10 +503,16 @@ def fix_reporter_caption(found_tags) -> None:
         if extra_tags_to_remove:
             for r in extra_tags_to_remove:
                 if r.next_sibling:
-                    if type(r.next_sibling) == NavigableString:
+                    if isinstance(r.next_sibling, NavigableString):
                         # The element is not tagged, it is just a text
                         # string
                         r.next_sibling.extract()
+                if r.name == "citation":
+                    # Extract and insert citation tag before
+                    # reporter_caption tag
+                    citation = r.extract()
+                    found_tag.insert_before(citation)
+                    continue
                 r.extract()
 
 

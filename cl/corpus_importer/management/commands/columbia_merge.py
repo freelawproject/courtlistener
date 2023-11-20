@@ -46,6 +46,7 @@ from cl.corpus_importer.utils import (
     OpinionMatchingException,
     OpinionTypeException,
     add_citations_to_cluster,
+    clean_docket_number,
     match_opinion_lists,
     merge_case_names,
     merge_docket_numbers,
@@ -216,7 +217,8 @@ def map_and_merge_opinions(
     cl_cleaned_opinions = get_cl_opinion_content(cluster_id)
 
     if len(columbia_opinions) == len(cl_cleaned_opinions):
-        # We need that both list to be cleaned, so we can have a more accurate match
+        # We need that both list to be cleaned, so we can have a more
+        # accurate match
         matches = match_opinion_lists(
             [
                 clean_opinion_content(op["opinion"], is_harvard=False)
@@ -255,9 +257,10 @@ def map_and_merge_opinions(
             logger.info(f"Opinion created for cluster: {cluster_id}")
 
     else:
-        # Skip creating new opinions due to differences between data, this may happen
-        # because some opinions were incorrectly combined when imported with the old
-        # columbia importer, or we have combined opinions
+        # Skip creating new opinions due to differences between data,
+        # this may happen because some opinions were incorrectly combined
+        # when imported with the old columbia importer, or we have combined
+        # opinions
         raise OpinionMatchingException(
             f"Skip merging mismatched opinions on cluster: {cluster_id}"
         )
@@ -433,7 +436,7 @@ def process_cluster(
     syllabus = "\n".join(
         [s.decode_contents() for s in soup.findAll("syllabus")]
     )
-    docket_number = "".join(fetch_simple_tags(soup, "docket")) or None
+    docket_number = "".join(fetch_simple_tags(soup, "docket"))
     attorneys = "\n".join(fetch_simple_tags(soup, "attorneys"))
     posture = "".join(fetch_simple_tags(soup, "posture"))
 
@@ -442,7 +445,9 @@ def process_cluster(
         "file": filepath,
         "attorneys": attorneys,
         "citations": fetch_simple_tags(soup, "citation"),
-        "docket_number": docket_number,
+        "docket_number": clean_docket_number(docket_number)
+        if docket_number
+        else None,
         "panel": extract_judge_last_name(panel_tags),
         "posture": posture,
         "case_name": format_case_name(reporter_captions),
