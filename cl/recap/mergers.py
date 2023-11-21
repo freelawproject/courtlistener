@@ -1487,6 +1487,7 @@ async def merge_attachment_page_data(
     text: str | None,
     attachment_dicts: List[Dict[str, Union[int, str]]],
     debug: bool = False,
+    is_acms_attachment: bool = False,
 ) -> Tuple[List[RECAPDocument], DocketEntry]:
     """Merge attachment page data into the docket
 
@@ -1498,6 +1499,7 @@ async def merge_attachment_page_data(
     :param attachment_dicts: A list of Juriscraper-parsed dicts for each
     attachment.
     :param debug: Whether to do saves during this process.
+    :param is_acms_attachment: Whether the attachments come from ACMS.
     :return: A list of RECAPDocuments modified or created during the process,
     and the DocketEntry object associated with the RECAPDocuments
     :raises: RECAPDocument.MultipleObjectsReturned, RECAPDocument.DoesNotExist
@@ -1509,9 +1511,27 @@ async def merge_attachment_page_data(
     if pacer_case_id:
         params["docket_entry__docket__pacer_case_id"] = pacer_case_id
     try:
-        main_rd = await RECAPDocument.objects.select_related(
-            "docket_entry", "docket_entry__docket"
-        ).aget(**params)
+        if is_acms_attachment:
+            # Recap documents on ACMS attachment pages share the same pacer_case_id
+            # which causes an issue when using the aget method. Since the aget
+            # method expects a unique identifier to retrieve a specific document,
+            # utilizing it in this scenario would inevitably result in the
+            # MultipleObjectsReturned exception.
+            #
+            # An alternative approach is to employ the filter method in conjunction
+            # with the afirst method. This combination allows for efficient retrieval
+            # of the main RD (record) of a docket entry.
+            main_rd = (
+                await RECAPDocument.objects.select_related(
+                    "docket_entry", "docket_entry__docket"
+                )
+                .filter(**params)
+                .afirst()
+            )
+        else:
+            main_rd = await RECAPDocument.objects.select_related(
+                "docket_entry", "docket_entry__docket"
+            ).aget(**params)
     except RECAPDocument.MultipleObjectsReturned as exc:
         if pacer_case_id:
             duplicate_rd_queryset = RECAPDocument.objects.filter(**params)
@@ -1567,6 +1587,7 @@ async def merge_attachment_page_data(
     court_is_appellate = await appellate_court_ids.filter(
         pk=court.pk
     ).aexists()
+    main_rd_to_att = False
     for attachment in attachment_dicts:
         sanity_checks = [
             attachment["attachment_number"],
@@ -1580,29 +1601,33 @@ async def merge_attachment_page_data(
             continue
 
         # Appellate entries with attachments don't have a main RD, transform it
-        # to an attachment.
+        # to an attachment. In ACMS attachment pages, all the documents use the
+        # same pacer_doc_id, so we need to make sure only one is matched to the
+        # main RD, while the remaining ones are created separately.
         if (
             court_is_appellate
             and attachment["pacer_doc_id"] == main_rd.pacer_doc_id
+            and not main_rd_to_att
         ):
+            main_rd_to_att = True
             main_rd.document_type = RECAPDocument.ATTACHMENT
             main_rd.attachment_number = attachment["attachment_number"]
+            if "acms_document_guid" in attachment:
+                main_rd.acms_document_guid = attachment["acms_document_guid"]
             rd = main_rd
         else:
+            params = {
+                "docket_entry": de,
+                "document_number": document_number,
+                "attachment_number": attachment["attachment_number"],
+                "document_type": RECAPDocument.ATTACHMENT,
+            }
+            if "acms_document_guid" in attachment:
+                params["acms_document_guid"] = attachment["acms_document_guid"]
             try:
-                rd = await RECAPDocument.objects.aget(
-                    docket_entry=de,
-                    document_number=document_number,
-                    attachment_number=attachment["attachment_number"],
-                    document_type=RECAPDocument.ATTACHMENT,
-                )
+                rd = await RECAPDocument.objects.aget(**params)
             except RECAPDocument.DoesNotExist:
-                rd = RECAPDocument(
-                    docket_entry=de,
-                    document_number=document_number,
-                    attachment_number=attachment["attachment_number"],
-                    document_type=RECAPDocument.ATTACHMENT,
-                )
+                rd = RECAPDocument(**params)
                 rds_created.append(rd)
 
         rds_affected.append(rd)

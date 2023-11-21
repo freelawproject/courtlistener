@@ -1139,6 +1139,7 @@ async def process_recap_acms_appellate_attachment(
             text,
             data["attachments"],
             pq.debug,
+            True,
         )
     except RECAPDocument.MultipleObjectsReturned:
         msg = (
