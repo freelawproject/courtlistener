@@ -195,6 +195,7 @@ class ProcessingQueue(AbstractDateTimeModel):
             UPLOAD_TYPE.DOCKET_HISTORY_REPORT,
             UPLOAD_TYPE.APPELLATE_DOCKET,
             UPLOAD_TYPE.DOCUMENT_ZIP,
+            UPLOAD_TYPE.ACMS_ATTACHMENT_PAGE,
         ]:
             return "ProcessingQueue %s: %s case #%s (%s)" % (
                 self.pk,
