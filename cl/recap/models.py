@@ -24,6 +24,7 @@ class UPLOAD_TYPE:
     APPELLATE_CASE_QUERY_PAGE = 13
     CASE_QUERY_RESULT_PAGE = 14
     APPELLATE_CASE_QUERY_RESULT_PAGE = 15
+    ACMS_ATTACHMENT_PAGE = 17
     NAMES = (
         (DOCKET, "HTML Docket"),
         (ATTACHMENT_PAGE, "HTML attachment page"),
@@ -40,6 +41,7 @@ class UPLOAD_TYPE:
         (APPELLATE_CASE_QUERY_PAGE, "Appellate Case query page"),
         (CASE_QUERY_RESULT_PAGE, "Case query result page"),
         (APPELLATE_CASE_QUERY_RESULT_PAGE, "Appellate Case query result page"),
+        (ACMS_ATTACHMENT_PAGE, "ACMS attachmente page JSON object"),
     )
 
 
