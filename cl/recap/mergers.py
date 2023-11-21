@@ -776,13 +776,7 @@ async def add_docket_entries(
         # Then make the RECAPDocument object. Try to find it. If we do, update
         # the pacer_doc_id field if it's blank. If we can't find it, create it
         # or throw an error.
-        params = {
-            "docket_entry": de,
-            # Normalize to "" here. Unsure why, but RECAPDocuments have a
-            # char field for this field while DocketEntries have a integer
-            # field.
-            "document_number": docket_entry["document_number"] or "",
-        }
+        params = {"docket_entry": de}
         if not docket_entry["document_number"] and docket_entry.get(
             "short_description"
         ):
@@ -816,11 +810,13 @@ async def add_docket_entries(
             ).aexists()
             if appellate_rd_att_exists:
                 params["document_type"] = RECAPDocument.ATTACHMENT
+                params["pacer_doc_id"] = docket_entry["pacer_doc_id"]
         try:
             rd = await RECAPDocument.objects.aget(**params)
         except RECAPDocument.DoesNotExist:
             try:
                 rd = await RECAPDocument.objects.acreate(
+                    document_number=docket_entry["document_number"] or "",
                     pacer_doc_id=docket_entry["pacer_doc_id"],
                     is_available=False,
                     **params,
@@ -850,6 +846,7 @@ async def add_docket_entries(
         rd.description = (
             docket_entry.get("short_description") or rd.description
         )
+        rd.document_number = docket_entry["document_number"] or ""
         try:
             await rd.asave()
         except ValidationError:
@@ -1427,22 +1424,20 @@ def merge_pacer_docket_into_cl_docket(
 
 async def clean_duplicate_attachment_entries(
     de: DocketEntry,
-    document_number: int,
     attachment_dicts: List[Dict[str, Union[int, str]]],
 ):
     """Remove attachment page entries with duplicate pacer_doc_id's that
     have incorrect attachment numbers. This is needed because older attachment
     pages were incorrectly parsed. See: freelawproject/juriscraper#721
 
+    Also generically remove attachments with duplicate pacer_doc_id's which
+    may have been duplicated due to issues with document_number parsing.
+
     :param de: A DocketEntry object
-    :param document_number: The docket entry number
     :param attachment_dicts: A list of Juriscraper-parsed dicts for each
     attachment.
     """
-    rds = RECAPDocument.objects.filter(
-        docket_entry=de,
-        document_number=document_number,
-    )
+    rds = RECAPDocument.objects.filter(docket_entry=de)
 
     dupe_doc_ids = (
         rds.values("pacer_doc_id")
@@ -1465,6 +1460,23 @@ async def clean_duplicate_attachment_entries(
             if dupe.pacer_doc_id == pacer_doc_id:
                 if dupe.attachment_number != attachment_number:
                     await dupe.adelete()
+    if not await dupe_doc_ids.aexists():
+        return
+    dupes = rds.filter(
+        pacer_doc_id__in=[
+            i["pacer_doc_id"] async for i in dupe_doc_ids.aiterator()
+        ]
+    )
+    async for dupe in dupes.aiterator():
+        duplicate_rd_queryset = rds.filter(pacer_doc_id=dupe.pacer_doc_id)
+        rd_with_pdf_queryset = duplicate_rd_queryset.filter(
+            is_available=True
+        ).exclude(filepath_local="")
+        if await rd_with_pdf_queryset.aexists():
+            keep_rd = await rd_with_pdf_queryset.alatest("date_created")
+        else:
+            keep_rd = await duplicate_rd_queryset.alatest("date_created")
+        await duplicate_rd_queryset.exclude(pk=keep_rd.pk).adelete()
 
 
 async def merge_attachment_page_data(
@@ -1618,9 +1630,7 @@ async def merge_attachment_page_data(
         # Do *not* do this async — that can cause race conditions.
         await sync_to_async(add_items_to_solr)([rd.pk], "search.RECAPDocument")
 
-    await clean_duplicate_attachment_entries(
-        de, document_number, attachment_dicts
-    )
+    await clean_duplicate_attachment_entries(de, attachment_dicts)
     await mark_ia_upload_needed(de.docket, save_docket=True)
     await process_orphan_documents(
         rds_created, court.pk, main_rd.docket_entry.docket.date_filed
