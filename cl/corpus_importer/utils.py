@@ -6,6 +6,7 @@ from typing import Any, Iterator, Optional, Set
 
 from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup
+from courts_db import find_court
 from django.db.models import QuerySet
 from django.db.utils import IntegrityError
 from django.utils.timezone import now
@@ -984,3 +985,30 @@ def match_based_text(
             continue
         return case
     return None
+
+
+def get_court_id(raw_court: str) -> list[str]:
+    """Get court id using courts-db
+
+    :param raw_court: Court name
+    return: court id or None
+    """
+
+    # Replace double spaces,
+    court_text = re.sub(" +", " ", raw_court)
+    # Replace \n and remove dot at end
+    court_text = court_text.replace("\n", "").strip(".")
+
+    for bankruptcy in [False, True]:
+        # Remove dot at end, try to get a partial string match, try with and
+        # without bankruptcy flag
+        found_court = find_court(
+            court_text,
+            bankruptcy=bankruptcy,
+            location=None,
+            allow_partial_matches=True,
+        )
+        if found_court:
+            return found_court
+
+    return []

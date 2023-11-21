@@ -309,7 +309,7 @@ def extract_columbia_opinions(
 
     # We iterate all content to look for all possible opinions
     for i, content in enumerate(outer_opinion):  # type: int, Tag
-        if type(content) == NavigableString:
+        if isinstance(content, NavigableString):
             # We found a raw string, store it
             floating_content.append(str(content))
         else:
@@ -397,18 +397,35 @@ def merge_opinions(
 
     else:
         # No relevant opinions found, create a new opinion with the content
+        opinion_content = "\n".join(
+            [f.get("opinion") for f in content if f.get("opinion")]
+        )
         new_opinion = {
             "byline": None,
             "type": content[0].get("type"),
-            "opinion": "\n".join(
-                [f.get("opinion") for f in content if f.get("opinion")]
-            ),
+            "opinion": opinion_content,
             "order": current_order,
+            "per_curiam": is_per_curiam_opinion(opinion_content, None),
         }
         opinions.append(new_opinion)
         current_order = current_order + 1
 
     return opinions, current_order
+
+
+def is_per_curiam_opinion(
+    content: Optional[str], byline: Optional[str]
+) -> bool:
+    """Check if opinion author is per curiam
+    :param content: opinion content
+    :param byline: opinion text author
+    :return: True if opinion author is per curiam
+    """
+    if byline and "per curiam" in byline[:1000].lower():
+        return True
+    if content and "per curiam" in content[:1000].lower():
+        return True
+    return False
 
 
 def process_extracted_opinions(extracted_opinions: list) -> list:
@@ -457,11 +474,8 @@ def process_extracted_opinions(extracted_opinions: list) -> list:
                     opinions, alternative_authorless_content, order
                 )
 
-            # Add new opinion
-            new_opinion = {
-                "byline": byline,
-                "type": opinion_type,
-                "opinion": "\n".join(
+            opinion_content = (
+                "\n".join(
                     [
                         f.get("opinion")
                         for f in authorless_content
@@ -469,8 +483,16 @@ def process_extracted_opinions(extracted_opinions: list) -> list:
                     ]
                 )
                 + "\n\n"
-                + opinion_content,
+                + opinion_content
+            )
+
+            # Add new opinion
+            new_opinion = {
+                "byline": byline,
+                "type": opinion_type,
+                "opinion": opinion_content,
                 "order": order,
+                "per_curiam": is_per_curiam_opinion(opinion_content, byline),
             }
 
             opinions.append(new_opinion)
@@ -501,10 +523,15 @@ def fix_reporter_caption(found_tags) -> None:
         if extra_tags_to_remove:
             for r in extra_tags_to_remove:
                 if r.next_sibling:
-                    if type(r.next_sibling) == NavigableString:
+                    if isinstance(r.next_sibling, NavigableString):
                         # The element is not tagged, it is just a text
                         # string
                         r.next_sibling.extract()
+                if r.name == "citation":
+                    # Extract and insert citation tag before reporter_caption tag
+                    citation = r.extract()
+                    found_tag.insert_before(citation)
+                    continue
                 r.extract()
 
 

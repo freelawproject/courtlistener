@@ -170,11 +170,10 @@ def add_case(item: dict, debug: bool = False) -> None:
             opinion_info["byline"], item["court_id"], item["panel_date"], True
         )
 
-        # TODO per_curiam value
         opinion = Opinion(
             author=author,
             author_str=titlecase(opinion_info["byline"]),
-            # per_curiam=opinion_info["per_curiam"],
+            per_curiam=opinion_info["per_curiam"],
             type=opinion_info["type"],
             # type=OPINION_TYPE_MAPPING[opinion_info['type']],
             html_columbia=convert_columbia_html(
