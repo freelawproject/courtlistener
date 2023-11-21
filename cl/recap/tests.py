@@ -254,6 +254,24 @@ class RecapUploadsTest(TestCase):
         r = self.client.get(path)
         self.assertEqual(r.status_code, HTTP_200_OK)
 
+    def test_uploading_an_acms_attachment_page(self, mock):
+        """Can we upload an ACMS attachment page and have it be saved correctly?"""
+        self.data.update(
+            {
+                "upload_type": UPLOAD_TYPE.ACMS_ATTACHMENT_PAGE,
+                "document_number": "",
+            }
+        )
+        r = self.client.post(self.path, self.data)
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+
+        j = json.loads(r.content)
+        path = reverse(
+            "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
+        )
+        r = self.client.get(path)
+        self.assertEqual(r.status_code, HTTP_200_OK)
+
     def test_numbers_in_docket_uploads_fail(self, mock):
         """Are invalid uploads denied?
 
