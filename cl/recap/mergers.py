@@ -1655,7 +1655,8 @@ async def merge_attachment_page_data(
         # Do *not* do this async — that can cause race conditions.
         await sync_to_async(add_items_to_solr)([rd.pk], "search.RECAPDocument")
 
-    await clean_duplicate_attachment_entries(de, attachment_dicts)
+    if not is_acms_attachment:
+        await clean_duplicate_attachment_entries(de, attachment_dicts)
     await mark_ia_upload_needed(de.docket, save_docket=True)
     await process_orphan_documents(
         rds_created, court.pk, main_rd.docket_entry.docket.date_filed
