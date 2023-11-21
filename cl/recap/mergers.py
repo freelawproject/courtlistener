@@ -776,13 +776,7 @@ async def add_docket_entries(
         # Then make the RECAPDocument object. Try to find it. If we do, update
         # the pacer_doc_id field if it's blank. If we can't find it, create it
         # or throw an error.
-        params = {
-            "docket_entry": de,
-            # Normalize to "" here. Unsure why, but RECAPDocuments have a
-            # char field for this field while DocketEntries have a integer
-            # field.
-            "document_number": docket_entry["document_number"] or "",
-        }
+        params = {"docket_entry": de}
         if not docket_entry["document_number"] and docket_entry.get(
             "short_description"
         ):
@@ -816,11 +810,13 @@ async def add_docket_entries(
             ).aexists()
             if appellate_rd_att_exists:
                 params["document_type"] = RECAPDocument.ATTACHMENT
+                params["pacer_doc_id"] = docket_entry["pacer_doc_id"]
         try:
             rd = await RECAPDocument.objects.aget(**params)
         except RECAPDocument.DoesNotExist:
             try:
                 rd = await RECAPDocument.objects.acreate(
+                    document_number=docket_entry["document_number"] or "",
                     pacer_doc_id=docket_entry["pacer_doc_id"],
                     is_available=False,
                     **params,
@@ -850,6 +846,7 @@ async def add_docket_entries(
         rd.description = (
             docket_entry.get("short_description") or rd.description
         )
+        rd.document_number = docket_entry["document_number"] or ""
         try:
             await rd.asave()
         except ValidationError:
