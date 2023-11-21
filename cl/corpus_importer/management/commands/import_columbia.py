@@ -1,22 +1,20 @@
 """
 Command to import opinions from columbia xlml file
 
-Import using a csv file with xml file path pointing to mounted directory and file path
-docker-compose -f docker/courtlistener/docker-compose.yml exec cl-django python manage.py import_columbia --csv-file /opt/courtlistener/cl/assets/media/testfile.csv
+Import using a csv file with xml file path pointing to mounted directory and filepath
+manage.py import_columbia --csv-file /opt/courtlistener/cl/assets/media/testfile.csv
 
 Csv example:
 filepath
-/opt/columbia/michigan/supreme_court_opinions/documents/d5a484f1bad20ba0.xml
+michigan/supreme_court_opinions/documents/d5a484f1bad20ba0.xml
 
 """
 import os
-import re
 from typing import Optional
 
 import pandas as pd
 from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup
-from courts_db import find_court
 from django.conf import settings
 from django.db import transaction
 from eyecite import get_citations
@@ -38,6 +36,7 @@ from cl.corpus_importer.utils import (
     add_citations_to_cluster,
     clean_body_content,
     clean_docket_number,
+    get_court_id,
     match_based_text,
     update_cluster_panel,
 )
@@ -50,33 +49,6 @@ from cl.people_db.lookup_utils import (
 from cl.search.models import SOURCES, Court, Docket, Opinion, OpinionCluster
 
 CASE_NAME_TWEAKER = CaseNameTweaker()
-
-
-def get_court_id(raw_court: str) -> list[str]:
-    """Get court id using courts-db
-
-    :param raw_court: Court text
-    return: court id or None
-    """
-
-    # Replace double spaces,
-    court_text = re.sub(" +", " ", raw_court)
-    # Replace \n and remove dot at end
-    court_text = court_text.replace("\n", "").strip(".")
-
-    for bankruptcy in [False, True]:
-        # Remove dot at end, try to get a partial string match, try with and
-        # without bankruptcy flag
-        found_court = find_court(
-            court_text,
-            bankruptcy=bankruptcy,
-            location=None,
-            allow_partial_matches=True,
-        )
-        if found_court:
-            return found_court
-
-    return []
 
 
 def find_duplicates(data) -> Optional[OpinionCluster]:
