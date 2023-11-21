@@ -150,7 +150,8 @@ def get_cl_opinion_content(cluster_id: int) -> list[dict[Any, Any]]:
 def update_matching_opinions(
     matches: dict, cl_cleaned_opinions: list, columbia_opinions: list
 ) -> None:
-    """Store matching opinion content in html_columbia field from Opinion object
+    """Store matching opinion content in html_columbia field from Opinion
+    object
 
     :param matches: dict with matching position from cl and columbia opinions
     :param cl_cleaned_opinions: list of cl opinions
@@ -247,6 +248,7 @@ def map_and_merge_opinions(
 
             Opinion.objects.create(
                 html_columbia=converted_text,
+                per_curiam=op["per_curiam"],
                 cluster_id=cluster_id,
                 type=opinion_type,
                 author_str=titlecase(find_just_name(author.strip(":")))
@@ -351,7 +353,8 @@ def merge_field(
 def merge_docket_data(docket_data: dict, cluster: OpinionCluster) -> None:
     """Update docket with new or better data
 
-    For dates, we only care if we have a date in the file but not in the Docket object
+    For dates, we only care if we have a date in the file but not in the
+    Docket object
 
     :param docket_data: dict with data from file
     :param cluster: OpinionCluster object

@@ -7,7 +7,6 @@ import dateutil.parser as dparser
 from bs4 import BeautifulSoup, NavigableString, Tag
 from juriscraper.lib.string_utils import clean_string, harmonize, titlecase
 
-from cl.lib.command_utils import logger
 from cl.people_db.lookup_utils import extract_judge_last_name
 
 FILED_TAGS = [
@@ -238,8 +237,8 @@ def is_opinion_published(soup: BeautifulSoup) -> bool:
 
 
 def read_xml_to_soup(filepath: str) -> BeautifulSoup:
-    """This function reads the xml file, fixes the bad tags in columbia xml files and
-    returns a BeautifulSoup object
+    """This function reads the xml file, fixes the bad tags in columbia xml
+    files and returns a BeautifulSoup object
 
     :param filepath: path to xml file
     :return: BeautifulSoup object of parsed content
@@ -264,8 +263,8 @@ def read_xml_to_soup(filepath: str) -> BeautifulSoup:
 def add_floating_opinion(
     opinions: list, floating_content: list, opinion_order: int
 ) -> list:
-    """We have found floating opinions in bs object, we keep the opinion content as a
-    new opinion
+    """We have found floating opinions in bs object, we keep the opinion
+    content as a new opinion
 
     :param opinions: a list with opinions found
     :param floating_content: content that is not in known non-opinion tags
@@ -297,9 +296,9 @@ def add_floating_opinion(
 def extract_columbia_opinions(
     outer_opinion: BeautifulSoup,
 ) -> list[Optional[dict]]:
-    """We extract all possible opinions from BeautifulSoup, with and without author,
-    and we create new opinions if floating content exists(content that is not
-    explicitly defined within an opinion tag or doesn't have an author)
+    """We extract all possible opinions from BeautifulSoup, with and without
+    author, and we create new opinions if floating content exists(content that
+    is not explicitly defined within an opinion tag or doesn't have an author)
 
     :param outer_opinion: element containing all xml tags
     :return: list of opinion dicts
@@ -310,7 +309,7 @@ def extract_columbia_opinions(
 
     # We iterate all content to look for all possible opinions
     for i, content in enumerate(outer_opinion):  # type: int, Tag
-        if type(content) == NavigableString:
+        if isinstance(content, NavigableString):
             # We found a raw string, store it
             floating_content.append(str(content))
         else:
@@ -328,9 +327,9 @@ def extract_columbia_opinions(
                 "concurrence_text",
             ]:
                 if floating_content:
-                    # We have found an opinion, but there is floating content, we
-                    # create a dict with the opinion using the floating content with
-                    # default type = "opinion"
+                    # We have found an opinion, but there is floating
+                    # content, we create a dict with the opinion using the
+                    # floating content with default type = "opinion"
                     opinions = add_floating_opinion(
                         opinions, floating_content, order
                     )
@@ -358,15 +357,15 @@ def extract_columbia_opinions(
 
             else:
                 if content.name not in SIMPLE_TAGS + ["syllabus"]:
-                    # We store content that is not inside _text tag and is not in
-                    # one of the known non-opinion tags
+                    # We store content that is not inside _text tag and is
+                    # not in one of the known non-opinion tags
                     floating_content.append(str(content))
 
     # Combine the new content into another opinion. great.
     if floating_content:
-        # If we end to go through all the found opinions and if we still have
-        # floating content out there, we create a new opinion with the last type
-        # of opinion
+        # If we end to go through all the found opinions and if we still
+        # have floating content out there, we create a new opinion with the
+        # last type of opinion
         opinions = add_floating_opinion(opinions, floating_content, order)
     return opinions
 
@@ -374,8 +373,8 @@ def extract_columbia_opinions(
 def merge_opinions(
     opinions: list, content: list, current_order: int
 ) -> tuple[list, int]:
-    """Merge last and previous opinion if are the same type or create a new opinion
-    if merge is not possible
+    """Merge last and previous opinion if are the same type or create a new
+    opinion if merge is not possible
 
     :param opinions: list of opinions that is being updated constantly
     :param content: list of opinions without an author
@@ -398,13 +397,15 @@ def merge_opinions(
 
     else:
         # No relevant opinions found, create a new opinion with the content
+        opinion_content = "\n".join(
+            [f.get("opinion") for f in content if f.get("opinion")]
+        )
         new_opinion = {
             "byline": None,
             "type": content[0].get("type"),
-            "opinion": "\n".join(
-                [f.get("opinion") for f in content if f.get("opinion")]
-            ),
+            "opinion": opinion_content,
             "order": current_order,
+            "per_curiam": is_per_curiam_opinion(opinion_content, None),
         }
         opinions.append(new_opinion)
         current_order = current_order + 1
@@ -412,10 +413,25 @@ def merge_opinions(
     return opinions, current_order
 
 
+def is_per_curiam_opinion(
+    content: Optional[str], byline: Optional[str]
+) -> bool:
+    """Check if opinion author is per curiam
+    :param content: opinion content
+    :param byline: opinion text author
+    :return: True if opinion author is per curiam
+    """
+    if byline and "per curiam" in byline[:1000].lower():
+        return True
+    if content and "per curiam" in content[:1000].lower():
+        return True
+    return False
+
+
 def process_extracted_opinions(extracted_opinions: list) -> list:
-    """We read the extracted data in extract_opinions function to merge all possible
-    floating opinions (it is not explicitly defined within an opinion tag or doesn't
-    have an author)
+    """We read the extracted data in extract_opinions function to merge all
+    possible floating opinions (it is not explicitly defined within an opinion
+    tag or doesn't have an author)
 
     :param extracted_opinions: list of opinions obtained from xml file
     :return: a list with extracted and processed opinions
@@ -458,11 +474,8 @@ def process_extracted_opinions(extracted_opinions: list) -> list:
                     opinions, alternative_authorless_content, order
                 )
 
-            # Add new opinion
-            new_opinion = {
-                "byline": byline,
-                "type": opinion_type,
-                "opinion": "\n".join(
+            opinion_content = (
+                "\n".join(
                     [
                         f.get("opinion")
                         for f in authorless_content
@@ -470,8 +483,16 @@ def process_extracted_opinions(extracted_opinions: list) -> list:
                     ]
                 )
                 + "\n\n"
-                + opinion_content,
+                + opinion_content
+            )
+
+            # Add new opinion
+            new_opinion = {
+                "byline": byline,
+                "type": opinion_type,
+                "opinion": opinion_content,
                 "order": order,
+                "per_curiam": is_per_curiam_opinion(opinion_content, byline),
             }
 
             opinions.append(new_opinion)
@@ -530,8 +551,8 @@ def fetch_simple_tags(soup: BeautifulSoup, tag_name: str) -> list:
         if tag_name == "reporter_caption":
             fix_reporter_caption(found_tags)
 
-        # We use space as a separator to add a space when we have one tag next to
-        # other without a space
+        # We use space as a separator to add a space when we have one tag
+        # next to other without a space
         tag_data = [
             found_tag.get_text(separator=" ").strip()
             for found_tag in found_tags
@@ -655,7 +676,8 @@ def parse_dates(
     """Parses the dates from a list of string.
 
     :param raw_dates: A list of (probably) date-containing strings
-    :return: Returns a list of lists of (string, datetime) tuples if there is a string before the date (or None).
+    :return: Returns a list of lists of (string, datetime) tuples if there is
+    a string before the date (or None).
     """
     months = re.compile(
         "january|february|march|april|may|june|july|august|"
@@ -751,8 +773,8 @@ def find_dates_in_xml(soup: BeautifulSoup) -> dict:
             else:
                 unknown_date = date_info[1]
 
-    # panel_date is used for finding judges, dates are ordered in terms of which type
-    # of dates best reflect them
+    # panel_date is used for finding judges, dates are ordered in terms of
+    # which type of dates best reflect them
     panel_date = (
         date_argued
         or date_reargued
@@ -805,8 +827,8 @@ def map_opinion_types(opinions=None) -> None:
     lead = False
     for op in opinions:
         op_type = op.get("type")
-        # Only first opinion with "opinion" type is a lead opinion, the next opinion
-        # with "opinion" type is an addendum
+        # Only first opinion with "opinion" type is a lead opinion, the next
+        # opinion with "opinion" type is an addendum
         if not lead and op_type and op_type == "opinion":
             lead = True
             op["type"] = "020lead"
