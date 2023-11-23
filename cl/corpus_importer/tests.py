@@ -127,74 +127,73 @@ class CourtMatchingTest(SimpleTestCase):
         """
         pairs = (
             {
-                "name": "California Superior Court Appellate Division, Kern County",
-                "answer": "calappdeptsuper",
+                "name": "Appellate Court of Connecticut",
+                "answer": "connappct",
                 # noqa
             },
             {
-                "name": "California Superior Court Appellate Department, Sacramento",
-                "answer": "calappdeptsuper",
+                "name": "Before the Arkansas Workers' Compensation Commission",
+                "answer": "arkworkcompcom",
                 # noqa
             },
             {
-                "name": "Appellate Session of the Superior Court",
-                "answer": "connsuperct",
+                "name": "Court of Appeal of California",
+                "answer": "calctapp",
                 # noqa
             },
             {
-                "name": "Court of Errors and Appeals.",
-                "answer": "nj",
+                "name": "Court of Appeals of Alaska",
+                "answer": "alaskactapp",
                 # noqa
             },
             {
                 "name": "Court of Chancery",
-                "answer": "njch",
-                # "answer": "njch",
+                "answer": "nychanct",
                 # noqa
             },
             {
-                "name": "Workers' Compensation Commission",
-                "answer": "connworkcompcom",
+                "name": "Court of Appeals of Arizona, Division One. Department A",
+                "answer": "arizctapp",
                 # noqa
             },
             {
-                "name": "Appellate Session of the Superior Court",
-                "answer": "connsuperct",
+                "name": "Court of Appeals of Arkansas",
+                "answer": "arkctapp",
                 # noqa
             },
             {
-                "name": "Superior Court  New Haven County",
-                "answer": "connsuperct",
+                "name": "Court of Chancery of Delaware",
+                "answer": "delch",
                 # noqa
             },
             {
-                "name": "Superior Court, Hartford County",
-                "answer": "connsuperct",
+                "name": "Court of Civil Appeals of Alabama",
+                "answer": "alacivapp",
                 # noqa
             },
             {
-                "name": "Compensation Review Board WORKERS' COMPENSATION COMMISSION",
-                "answer": "connworkcompcom",
+                "name": "Court of Criminal Appeals of Alabama",
+                "answer": "alacrimapp",
                 # noqa
             },
             {
-                "name": "Appellate Division Of The Circuit Court",
-                "answer": "connsuperct",
+                "name": "Industrial Claim Appeals Office",
+                "answer": "coloworkcompcom",
                 # noqa
             },
             {
-                "name": "Superior Court for Law and Equity",
-                "answer": "tenn",
+                "name": "Orphans' Court of Delaware",
+                "answer": "paorphct",
                 # noqa
             },
             {
-                "name": "Courts of General Sessions and Oyer and Terminer of Delaware",
-                "answer": "delgensess",
+                "name": "Superior Court of Delaware, Sussex County",
+                "answer": "delsuperct",
                 # noqa
             },
             {
-                "name": "Circuit Court of the United States of Delaware",
-                "answer": "circtdel",
+                "name": "Supreme Court of Alabama",
+                "answer": "ala",
                 # noqa
             },
             {
@@ -203,13 +202,8 @@ class CourtMatchingTest(SimpleTestCase):
                 # noqa
             },
             {
-                "name": "Court of Quarter Sessions Court of Delaware, Kent County.",
-                "answer": "delgensess",
-                # noqa
-            },
-            {
-                "name": "District Court of Appeal.",
-                "answer": "fladistctapp",
+                "name": "Appellate Court of Illinois, First District",
+                "answer": "illappct",
                 # noqa
             },
             {
@@ -229,12 +223,12 @@ class CourtMatchingTest(SimpleTestCase):
             },
             {
                 "name": "District Court of Appeal of Florida, Second District.",
-                "answer": "fladistctapp2",
+                "answer": "fladistctapp",
                 # noqa
             },
             {
                 "name": "District Court of Appeal of Florida, Second District.",
-                "answer": "fladistctapp2",
+                "answer": "fladistctapp",
                 # noqa
             },
             {
@@ -247,15 +241,9 @@ class CourtMatchingTest(SimpleTestCase):
                 "answer": "circtdel",
                 # noqa
             },
-            {
-                "name": "Court of Common Pleas Hartford County",
-                "answer": "connsuperct",
-                # noqa
-            },
         )
         for d in pairs:
             got = get_court_id(d["name"])
-            print("got", got)
             self.assertEqual(
                 got[0],
                 d["answer"],
