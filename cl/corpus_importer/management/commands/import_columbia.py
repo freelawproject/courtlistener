@@ -10,6 +10,7 @@ michigan/supreme_court_opinions/documents/d5a484f1bad20ba0.xml
 
 """
 import os
+from datetime import timedelta
 from typing import Optional
 
 import pandas as pd
@@ -18,6 +19,7 @@ from bs4 import BeautifulSoup
 from django.conf import settings
 from django.db import transaction
 from eyecite import get_citations
+from eyecite.models import FullCaseCitation
 from juriscraper.lib.string_utils import CaseNameTweaker, titlecase
 
 from cl.corpus_importer.import_columbia.columbia_utils import (
@@ -57,10 +59,18 @@ def find_duplicates(data) -> Optional[OpinionCluster]:
     :param data: The columbia data
     :return: cluster match or None
     """
+
+    docket_number = data["docket_number"] or ""
+    case_name = data["case_name"] or ""
+    case_name_short = data["case_name_short"] or ""
+
     for citation in data["citations"]:
         cites = get_citations(citation)
-
-        if cites:
+        if (
+            cites
+            and isinstance(cites[0], FullCaseCitation)
+            and cites[0].groups.get("volume", False)
+        ):
             xml_opinions_content = []
             for op in data["opinions"]:
                 xml_opinions_content.append(op["opinion"])
@@ -69,6 +79,7 @@ def find_duplicates(data) -> Optional[OpinionCluster]:
             all_opinions_soup = BeautifulSoup(
                 all_opinions_content, features="html.parser"
             )
+            cleaned_content = clean_body_content(all_opinions_soup.text)
             possible_clusters = OpinionCluster.objects.filter(
                 citations__reporter=cites[0].corrected_reporter(),
                 citations__volume=cites[0].groups["volume"],
@@ -76,11 +87,56 @@ def find_duplicates(data) -> Optional[OpinionCluster]:
             ).order_by("id")
 
             match = match_based_text(
-                clean_body_content(all_opinions_soup.text),
-                data["docket_number"],
-                data["case_name"],
+                cleaned_content,
+                docket_number,
+                case_name,
                 possible_clusters,
-                data["case_name_short"],
+                case_name_short,
+                cites[0],
+            )
+
+            if match:
+                return match
+
+            possible_clusters = (
+                OpinionCluster.objects.filter(
+                    date_filed=data["date_filed"],
+                    docket__court_id=data["court_id"],
+                )
+                .exclude(citations__reporter=cites[0].corrected_reporter())
+                .order_by("id")
+            )
+            match = match_based_text(
+                cleaned_content,
+                docket_number,
+                case_name,
+                possible_clusters,
+                case_name_short,
+                cites[0],
+            )
+
+            if match:
+                return match
+
+            month = timedelta(days=31)
+            possible_clusters = (
+                OpinionCluster.objects.filter(
+                    date_filed__range=[
+                        data["date_filed"] - month,
+                        data["date_filed"] + month,
+                    ],
+                    docket__court_id=data["court_id"],
+                )
+                .exclude(citations__reporter=cites[0].corrected_reporter())
+                .exclude(date_filed=data["date_filed"])
+                .order_by("id")
+            )
+            match = match_based_text(
+                cleaned_content,
+                docket_number,
+                case_name,
+                possible_clusters,  # type: ignore
+                case_name_short,
                 cites[0],
             )
 
@@ -90,20 +146,15 @@ def find_duplicates(data) -> Optional[OpinionCluster]:
     return None
 
 
-def add_case(item: dict, debug: bool = False) -> None:
-    """Add new case
+def add_new_case(item: dict, debug: bool = False) -> None:
+    """Add a new case
 
-    :param item: dict with data to create new docket, cluster, opinions and citations
+    Create new docket, cluster, opinions and citations
+
+    :param item: dict with data to add new case
     :param debug: True if it should roll back the changes
     :return: None
     """
-    if not item["date_filed"]:
-        raise Exception(f"Failed to get a date for {item['file']}")
-
-    if not Court.objects.filter(id=item["court_id"]).exists():
-        raise Exception(
-            f"Court doesn't exist in CourtListener with id: {item['court_id']}"
-        )
 
     docket = Docket(
         source=Docket.COLUMBIA,
@@ -116,7 +167,9 @@ def add_case(item: dict, debug: bool = False) -> None:
         case_name_short=item["case_name_short"] or "",
         case_name=item["case_name"] or "",
         case_name_full=item["case_name_full"] or "",
-        docket_number=clean_docket_number(item["docket_number"]),
+        docket_number=clean_docket_number(item["docket_number"])
+        if item["docket_number"]
+        else None,
     )
 
     cluster = OpinionCluster(
@@ -144,16 +197,15 @@ def add_case(item: dict, debug: bool = False) -> None:
 
         opinion = Opinion(
             author=author,
-            author_str=titlecase(opinion_info["byline"]),
+            author_str=titlecase(opinion_info["byline"])
+            if opinion_info["byline"]
+            else "",
             per_curiam=opinion_info["per_curiam"],
             type=opinion_info["type"],
-            # type=OPINION_TYPE_MAPPING[opinion_info['type']],
             html_columbia=convert_columbia_html(
                 opinion_info["opinion"], opinion_info["order"]
             ),
             sha1=opinion_info["sha1"],
-            # This is surely not updated for the new S3 world. If you're
-            # reading this, you'll need to update this code.
             local_path=opinion_info["local_path"],
         )
 
@@ -171,7 +223,6 @@ def add_case(item: dict, debug: bool = False) -> None:
         if item["panel"]:
             update_cluster_panel(cluster, item["panel"], item["panel_date"])
 
-        # Finally add citations
         add_citations_to_cluster(item["citations"], cluster.id)
 
         domain = "https://www.courtlistener.com"
@@ -211,6 +262,7 @@ def import_opinion(filepath, debug: bool = False) -> None:
         opinion["sha1"] = sha1
         opinion["local_path"] = filepath
 
+    # Prepare data
     panel_tags = "".join(fetch_simple_tags(soup, "panel"))
     reporter_captions = "".join(fetch_simple_tags(soup, "reporter_caption"))
     captions = "".join(fetch_simple_tags(soup, "caption"))
@@ -246,16 +298,36 @@ def import_opinion(filepath, debug: bool = False) -> None:
     columbia_data.update(find_dates_in_xml(soup))
 
     if not columbia_data["courts"]:
-        raise Exception(
-            f"Failed to find a court ID for \"{','.join(fetch_simple_tags(soup, 'court'))}\"."
+        logger.warning(
+            f"Failed to find a court ID for: \"{', '.join(fetch_simple_tags(soup, 'court'))}\""
         )
+        return
 
     if len(columbia_data["courts"]) == 1:
         columbia_data["court_id"] = columbia_data["courts"][0]
     else:
-        raise Exception(
+        logger.warning(
             f"Multiple matches found for court: \"{', '.join(fetch_simple_tags(soup, 'court'))}\""
         )
+        return
+
+    if not Court.objects.filter(id=columbia_data["court_id"]).exists():
+        logger.warning(
+            f"Court doesn't exist in CourtListener with id: {columbia_data['court_id']}"
+        )
+        return
+
+    if not columbia_data["date_filed"]:
+        logger.warning(
+            f"Failed to get a filed date for: {columbia_data['file']}"
+        )
+        return
+
+    if not columbia_data["citations"]:
+        logger.warning(
+            f"Failed to get a citation for: {columbia_data['file']}"
+        )
+        return
 
     previously_imported_case = find_duplicates(columbia_data)
 
@@ -271,18 +343,12 @@ def import_opinion(filepath, debug: bool = False) -> None:
                 columbia_data["citations"], previously_imported_case.id
             )
             logger.info(
-                f"Adding citations for case at {domain}/opinion/{previously_imported_case.id}/{previously_imported_case.slug}"
+                f"Adding citations for case at: {domain}/opinion/{previously_imported_case.id}/{previously_imported_case.slug}"
             )
         return
 
     # No duplicates, create new case
-    add_case(columbia_data, debug)
-
-    # try:
-    #     add_case(columbia_data, debug)
-    # except Exception as e:
-    #     logger.warning(e)
-    #     pass
+    add_new_case(columbia_data, debug)
 
 
 def parse_columbia_opinions(options) -> None:
@@ -322,6 +388,10 @@ def parse_columbia_opinions(options) -> None:
         )
 
         total_processed += 1
+
+        if total_processed % 10000 == 0:
+            logger.info(f"Files imported: {total_processed}")
+
         if limit and total_processed >= limit:
             logger.info(f"Finished {limit} imports")
             return
