@@ -816,6 +816,31 @@ label="194">*194</page-number>
         self.read_json_func.return_value = case_law
         self.assertSuccessfulParse(1)
 
+    def test_winnow_case_name(self):
+        """Can the winnow_case_name function reduce the case names correctly to a set
+        of relevant words?"""
+        case_names = [
+            ("D.L.M. v. T.J.S.", {"dlm", "tjs"}),
+            ("In the Matter of E. B.", {"eb"}),
+            ("R. L. C. R. v. L. Z. S.", {"rlcr", "lzs"}),
+            ("J. B. v. C. E.", {"jb", "ce"}),
+            ("County v. A. D. B. County", {"adb"}),
+            ("United States v. Frank Esquivel", {"frank", "esquivel"}),
+            (
+                "UNITED STATES of America, Plaintiff-Appellee, v. Wayne VINSON, "
+                "Defendant-Appellant",
+                {"wayne", "vinson"},
+            ),
+        ]
+
+        for case_name in case_names:
+            result_set = winnow_case_name(case_name[0])
+            self.assertEqual(
+                result_set,
+                case_name[1],
+                msg="Case name can't be " "reduced correctly",
+            )
+
     def test_case_name_winnowing_comparison(self):
         """
         Test removing "United States" from case names and check if there is an
