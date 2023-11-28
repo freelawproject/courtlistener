@@ -9,9 +9,8 @@ filepath
 michigan/supreme_court_opinions/documents/d5a484f1bad20ba0.xml
 
 """
-import logging
 import os
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Optional
 
 import pandas as pd
@@ -54,14 +53,9 @@ from cl.search.models import SOURCES, Court, Docket, Opinion, OpinionCluster
 CASE_NAME_TWEAKER = CaseNameTweaker()
 
 
-logging.basicConfig(
-    filename=f"columbia_importer_dupes_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.txt",
-    filemode="a",
-    # level=logging.DEBUG,
-)
-
-
-def find_duplicates(data, valid_citations) -> Optional[OpinionCluster]:
+def find_duplicates(
+    data: dict, valid_citations: list
+) -> Optional[OpinionCluster]:
     """Check if there is a duplicate cluster
 
     :param data: The columbia data
@@ -241,7 +235,7 @@ def add_new_case(item: dict, debug: bool = False) -> None:
         logger.info(f"Created item at: {domain}{cluster.get_absolute_url()}")
 
 
-def import_opinion(filepath, debug: bool = False) -> None:
+def import_opinion(filepath: str, debug: bool = False) -> None:
     """Try to import xml opinion from columbia
 
     :param filepath: specified path to xml file
@@ -381,7 +375,7 @@ def import_opinion(filepath, debug: bool = False) -> None:
     add_new_case(columbia_data, debug)
 
 
-def parse_columbia_opinions(options) -> None:
+def parse_columbia_opinions(options: dict) -> None:
     """Try to import each opinion from csv file
 
     :param options: options passed from management command
@@ -405,9 +399,7 @@ def parse_columbia_opinions(options) -> None:
             continue
 
         # filepath example: indiana\court_opinions\documents\2713f39c5a8e8684.xml
-        xml_path = os.path.join(
-            xml_dir, filepath.replace("/Users/Palin/Work/columbia/usb/", "")
-        )
+        xml_path = os.path.join(xml_dir, filepath)
         if not os.path.exists(xml_path):
             logger.warning(f"No file at: {xml_path}")
             continue
@@ -430,7 +422,7 @@ def parse_columbia_opinions(options) -> None:
 class Command(VerboseCommand):
     help = (
         "Parses the xml files in the specified csv file into opinion objects that are "
-        "saved."
+        "saved in the database."
     )
 
     def add_arguments(self, parser):
