@@ -9,8 +9,9 @@ filepath
 michigan/supreme_court_opinions/documents/d5a484f1bad20ba0.xml
 
 """
+import logging
 import os
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Optional
 
 import pandas as pd
@@ -53,10 +54,18 @@ from cl.search.models import SOURCES, Court, Docket, Opinion, OpinionCluster
 CASE_NAME_TWEAKER = CaseNameTweaker()
 
 
-def find_duplicates(data) -> Optional[OpinionCluster]:
+logging.basicConfig(
+    filename=f"columbia_importer_dupes_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.txt",
+    filemode="a",
+    # level=logging.DEBUG,
+)
+
+
+def find_duplicates(data, valid_citations) -> Optional[OpinionCluster]:
     """Check if there is a duplicate cluster
 
     :param data: The columbia data
+    :param valid_citations: list with valid citations
     :return: cluster match or None
     """
 
@@ -64,84 +73,80 @@ def find_duplicates(data) -> Optional[OpinionCluster]:
     case_name = data["case_name"] or ""
     case_name_short = data["case_name_short"] or ""
 
-    for citation in data["citations"]:
-        cites = get_citations(citation)
-        if (
-            cites
-            and isinstance(cites[0], FullCaseCitation)
-            and cites[0].groups.get("volume", False)
-        ):
-            xml_opinions_content = []
-            for op in data["opinions"]:
-                xml_opinions_content.append(op["opinion"])
+    for citation in valid_citations:
+        xml_opinions_content = []
+        for op in data["opinions"]:
+            xml_opinions_content.append(op["opinion"])
 
-            all_opinions_content = " ".join(xml_opinions_content)
-            all_opinions_soup = BeautifulSoup(
-                all_opinions_content, features="html.parser"
+        all_opinions_content = " ".join(xml_opinions_content)
+        all_opinions_soup = BeautifulSoup(
+            all_opinions_content, features="html.parser"
+        )
+        cleaned_content = clean_body_content(
+            all_opinions_soup.getText(separator=" ", strip=True)
+        )
+        possible_clusters = OpinionCluster.objects.filter(
+            citations__reporter=citation.corrected_reporter(),
+            citations__volume=citation.groups["volume"],
+            citations__page=citation.groups["page"],
+        ).order_by("id")
+
+        match = match_based_text(
+            cleaned_content,
+            docket_number,
+            case_name,
+            possible_clusters,
+            case_name_short,
+            citation,
+        )
+
+        if match:
+            return match
+
+        possible_clusters = (
+            OpinionCluster.objects.filter(
+                date_filed=data["date_filed"],
+                docket__court_id=data["court_id"],
             )
-            cleaned_content = clean_body_content(all_opinions_soup.text)
-            possible_clusters = OpinionCluster.objects.filter(
-                citations__reporter=cites[0].corrected_reporter(),
-                citations__volume=cites[0].groups["volume"],
-                citations__page=cites[0].groups["page"],
-            ).order_by("id")
+            .exclude(citations__reporter=citation.corrected_reporter())
+            .order_by("id")
+        )
+        match = match_based_text(
+            cleaned_content,
+            docket_number,
+            case_name,
+            possible_clusters,
+            case_name_short,
+            citation,
+        )
 
-            match = match_based_text(
-                cleaned_content,
-                docket_number,
-                case_name,
-                possible_clusters,
-                case_name_short,
-                cites[0],
+        if match:
+            return match
+
+        month = timedelta(days=31)
+        possible_clusters = (
+            OpinionCluster.objects.filter(
+                date_filed__range=[
+                    data["date_filed"] - month,
+                    data["date_filed"] + month,
+                ],
+                docket__court_id=data["court_id"],
             )
+            .exclude(citations__reporter=citation.corrected_reporter())
+            .exclude(date_filed=data["date_filed"])
+            .order_by("id")
+        )
+        match = match_based_text(
+            cleaned_content,
+            docket_number,
+            case_name,
+            possible_clusters,  # type: ignore
+            case_name_short,
+            citation,
+        )
 
-            if match:
-                return match
-
-            possible_clusters = (
-                OpinionCluster.objects.filter(
-                    date_filed=data["date_filed"],
-                    docket__court_id=data["court_id"],
-                )
-                .exclude(citations__reporter=cites[0].corrected_reporter())
-                .order_by("id")
-            )
-            match = match_based_text(
-                cleaned_content,
-                docket_number,
-                case_name,
-                possible_clusters,
-                case_name_short,
-                cites[0],
-            )
-
-            if match:
-                return match
-
-            month = timedelta(days=31)
-            possible_clusters = (
-                OpinionCluster.objects.filter(
-                    date_filed__range=[
-                        data["date_filed"] - month,
-                        data["date_filed"] + month,
-                    ],
-                    docket__court_id=data["court_id"],
-                )
-                .exclude(citations__reporter=cites[0].corrected_reporter())
-                .exclude(date_filed=data["date_filed"])
-                .order_by("id")
-            )
-            match = match_based_text(
-                cleaned_content,
-                docket_number,
-                case_name,
-                possible_clusters,  # type: ignore
-                case_name_short,
-                cites[0],
-            )
-
-            if match:
-                return match
+        if match:
+            return match
 
     return None
 
@@ -184,7 +189,7 @@ def add_new_case(item: dict, debug: bool = False) -> None:
         source=SOURCES.COLUMBIA_ARCHIVE,
         attorneys=item["attorneys"] or "",
         posture=item["posture"] or "",
-        syllabus=convert_columbia_html(item.get("syllabus"), opinion_index=99)
+        syllabus=convert_columbia_html(item["syllabus"], opinion_index=99)
         if item.get("syllabus")
         else "",
     )
@@ -297,6 +302,12 @@ def import_opinion(filepath, debug: bool = False) -> None:
     # Add date data into columbia dict
     columbia_data.update(find_dates_in_xml(soup))
 
+    if not columbia_data["opinions"]:
+        logger.warning(
+            f"There is no opinion in the file: {columbia_data['file']}"
+        )
+        return
+
     if not columbia_data["courts"]:
         logger.warning(
             f"Failed to find a court ID for: \"{', '.join(fetch_simple_tags(soup, 'court'))}\""
@@ -323,13 +334,32 @@ def import_opinion(filepath, debug: bool = False) -> None:
         )
         return
 
-    if not columbia_data["citations"]:
+    valid_citations = []
+    for citation in columbia_data["citations"]:
+        cites = get_citations(citation)
+        if (
+            cites
+            and isinstance(cites[0], FullCaseCitation)
+            and cites[0].groups.get("volume", False)
+        ):
+            valid_citations.append(cites[0])
+
+    if not valid_citations:
         logger.warning(
-            f"Failed to get a citation for: {columbia_data['file']}"
+            f"Failed to get a valid citation for: {columbia_data['file']}"
         )
         return
 
-    previously_imported_case = find_duplicates(columbia_data)
+    try:
+        previously_imported_case = find_duplicates(
+            columbia_data, valid_citations
+        )
+    except ZeroDivisionError:
+        logger.warning(
+            f"It is not possible to find duplicates, the opinion is probably empty in "
+            f"the columbia file: {columbia_data['file']}"
+        )
+        return
 
     domain = "https://www.courtlistener.com"
 

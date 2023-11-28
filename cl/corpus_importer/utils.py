@@ -695,7 +695,7 @@ def get_opinion_text(cluster: OpinionCluster) -> str:
             opinions.append(op.xml_harvard)
     op = " ".join(opinions)
     soup = BeautifulSoup(op, features="html.parser")
-    return soup.text
+    return soup.getText(separator=" ", strip=True)
 
 
 def winnow_case_name(case_name: str) -> Set:
@@ -709,13 +709,11 @@ def winnow_case_name(case_name: str) -> Set:
         "personal",
         "restraint",
         "matter",
-        "washington",
         "florida",
         "county",
         "city",
         "of",
         "the",
-        "state",
         "estate",
         "in",
         "inc",
@@ -734,10 +732,16 @@ def winnow_case_name(case_name: str) -> Set:
     # Fix case name to be cleaner
     case_name = harmonize(case_name)
 
-    # Join abbreviations/acronyms. e.g. "D.L.M. v. T.J.S." -> "DLM v. TJS"
+    # Join abbreviations/acronyms
+    # e.g.
+    # "D.L.M. v. T.J.S." -> "DLM v. TJS"
+    # "In the Matter of E. B." -> "In the Matter of EB"
+    # "R. L. C. R. v. L. Z. S." -> "RLCR v. LZS"
+    # "J. B. v. C. E." -> "JB v. CE"
+    # "County v. A. D. B. County" -> "County v. ADB County"
     case_name = re.sub(
-        r"\b[a-zA-Z][a-zA-Z\.]*[A-Za-z]\b\.?",
-        lambda m: m.group().replace(".", ""),
+        r"\b[A-Z][A-Z\.\s]*[A-Z]\b\.?",
+        lambda m: m.group().replace(".", "").replace(" ", ""),
         case_name,
     )
 
@@ -771,7 +775,7 @@ def clean_body_content(case_body: str, harvard_file: bool = False) -> str:
     """
     soup = BeautifulSoup(case_body, "lxml")
     if not harvard_file:
-        opinion_text = soup.text
+        opinion_text = soup.getText(separator=" ", strip=True)
     else:
         opinions = []
         for op in soup.find_all(
@@ -793,6 +797,10 @@ def clean_body_content(case_body: str, harvard_file: bool = False) -> str:
             ]
         )
 
+    # Replace line breaks with spaces and get rid of double spaces
+    opinion_text = re.sub(
+        " +", " ", " ".join(opinion_text.split("\n"))
+    ).strip()
     return re.sub(r"[^a-zA-Z0-9 ]", "", opinion_text.lower())
 
 
@@ -967,9 +975,7 @@ def match_based_text(
         cl_characters = clean_body_content(cl_case_body)
 
         if len(cl_characters) == 0:
-            logger.warning(
-                f"Empty opinion at https://www.courtlistener.com/opinion/{case.id}/{case.slug}"
-            )
+            logger.warning(f"Empty opinion in cluster id: {case.id}")
             continue
 
         case_and_texts = [case, file_characters, cl_characters]
