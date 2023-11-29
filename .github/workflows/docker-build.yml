@@ -44,7 +44,7 @@ jobs:
       - name: Launch Temporary Pod
         id: tempPod
         run: |
-          kubectl run temp-pod-${{ steps.vars.outputs.sha_short }} --rm -i -n ${{ env.EKS_NAMESPACE }} --image=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod --restart Never --pod-running-timeout=120s --overrides='
+          kubectl run temp-pod-${{ steps.vars.outputs.sha_short }} --rm -n ${{ env.EKS_NAMESPACE }} --image=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod --restart Never --pod-running-timeout=120s --overrides='
           {
               "spec": {
               "containers": [{
