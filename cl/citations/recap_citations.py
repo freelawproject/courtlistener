@@ -61,7 +61,7 @@ def store_recap_citations(document: RECAPDocument) -> None:
 
 
 def get_recap_citations(
-    recap_doc_id: int, top_k: int = None
+    recap_doc_id: int, top_k: int | None = None
 ) -> Tuple[int, List[OpinionsCitedByRECAPDocument]]:
     """
     The purpose of this function is to retrieve the OpinionClusters for Opinions cited
@@ -70,25 +70,31 @@ def get_recap_citations(
     also loaded in memory.
     If top_k is provided -> returns the objects for the k most-cited opinions.
     """
-
-    # Getting the count in a separate query doesn't feel good, but should be O(lg n)
-    # because of index on FK
-    # Anyways, we need to do this here because
-    # we want to return total number for certain purposes
-    # even when external fn only wants top k
-    total_count = OpinionsCitedByRECAPDocument.objects.filter(
-        citing_document_id=recap_doc_id
-    ).count()
-
     query = (
         OpinionsCitedByRECAPDocument.objects.filter(
             citing_document_id=recap_doc_id
         )
-        .select_related("cited_opinion__cluster")
+        .select_related("cited_opinion__cluster__docket__court")
+        .prefetch_related(
+            "cited_opinion__cluster__citations",
+        )
+        .only(
+            "depth",
+            "cited_opinion__cluster__slug",
+            "cited_opinion__cluster__case_name",
+            "cited_opinion__cluster__case_name_full",
+            "cited_opinion__cluster__case_name_short",
+            "cited_opinion__cluster__docket_id",
+            "cited_opinion__cluster__date_filed",
+            "cited_opinion__cluster__docket__docket_number",
+            "cited_opinion__cluster__docket__court_id",
+            "cited_opinion__cluster__docket__court__citation_string",
+        )
         .order_by("-depth")
     )
+    total_count = query.count()
 
-    if top_k is not None:
-        query = query[:top_k]
+    if top_k:
+        return total_count, query[:top_k]
 
     return total_count, list(query)
