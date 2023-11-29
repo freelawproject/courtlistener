@@ -56,11 +56,7 @@ from cl.opinion_page.forms import (
     CourtUploadForm,
     DocketEntryFilterForm,
 )
-from cl.opinion_page.types import (
-    AuthoritiesContext,
-    RECAPCitationViewData,
-    RECAPDocCitationRecord,
-)
+from cl.opinion_page.types import AuthoritiesContext, RECAPDocCitationRecord
 from cl.opinion_page.utils import core_docket_data, get_case_title
 from cl.people_db.models import AttorneyOrganization, CriminalCount, Role
 from cl.recap.constants import COURT_TIMEZONES

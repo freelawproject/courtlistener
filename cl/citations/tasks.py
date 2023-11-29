@@ -24,7 +24,6 @@ from cl.citations.parenthetical_utils import create_parenthetical_groups
 from cl.citations.recap_citations import store_recap_citations
 from cl.citations.score_parentheticals import parenthetical_score
 from cl.lib.types import MatchedResourceType, SupportedCitationType
-from cl.opinion_page.types import RECAPCitationViewData
 from cl.search.models import (
     Opinion,
     OpinionCluster,
