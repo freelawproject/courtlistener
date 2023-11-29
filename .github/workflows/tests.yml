@@ -3,10 +3,10 @@ name: docker build and test
 on:
   push:
     branches:
-      - '**'
+      - "**"
   pull_request:
     branches:
-      - 'main'
+      - "main"
 
 jobs:
   build:
@@ -62,7 +62,6 @@ jobs:
           context: ./courtlistener
           file: ./courtlistener/docker/django/Dockerfile
           load: true
-          target: web-dev
           build-args: |
             BUILD_ENV=dev
           cache-from: type=gha
@@ -73,7 +72,6 @@ jobs:
           context: ./courtlistener
           file: ./courtlistener/docker/django/Dockerfile
           load: true
-          target: celery
           build-args: |
             BUILD_ENV=dev
           cache-from: type=gha
