@@ -98,6 +98,7 @@ def get_extension(content: bytes) -> str:
 def get_binary_content(
     download_url: str,
     cookies: RequestsCookieJar,
+    headers: dict,
     method: str = "GET",
 ) -> Tuple[str, Optional[Response]]:
     """Downloads the file, covering a few special cases such as invalid SSL
@@ -105,6 +106,7 @@ def get_binary_content(
 
     :param download_url: The URL for the item you wish to download.
     :param cookies: Cookies that might be necessary to download the item.
+    :param headers: Headers that might be necessary to download the item.
     :param method: The HTTP method used to get the item, or "LOCAL" to get an
     item during testing
     :return: Two values. The first is a msg indicating any errors encountered.
@@ -126,7 +128,6 @@ def get_binary_content(
         # Note that we do a GET even if site.method is POST. This is
         # deliberate.
         s = requests.session()
-        headers = {"User-Agent": "CourtListener"}
 
         r = s.get(
             download_url,

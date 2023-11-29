@@ -1,4 +1,11 @@
+{% load extras %}
 {% with doc0=obj.doclist.docs.0|default:obj %}
-    <p>{{ doc0.text|safe|truncatewords:"500" }}</p><br>
-    <a href="{{doc0.absolute_url}}">Original document</a>
+  {% with plain_text=doc0.plain_text %}
+    {% if plain_text %}
+      <p>{{ plain_text|safe|truncatewords:"500" }}</p><br>
+    {% else %}
+      <p>{{ doc0.text|safe|truncatewords:"500" }}</p><br>
+    {% endif %}
+    <a href="{{doc0.absolute_url}}">Original document ES</a>
+  {% endwith %}
 {% endwith %}

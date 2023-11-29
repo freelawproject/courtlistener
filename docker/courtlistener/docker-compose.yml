@@ -71,7 +71,7 @@ services:
       dockerfile: "./docker/django/Dockerfile"
       args:
         BUILD_ENV: dev
-      target: celery
+    command: celery
     depends_on:
       - cl-postgresql
       - cl-redis
@@ -92,7 +92,7 @@ services:
       dockerfile: "./docker/django/Dockerfile"
       args:
         BUILD_ENV: dev
-      target: web-dev
+    command: web-dev
     depends_on:
       - cl-postgresql
       - cl-redis

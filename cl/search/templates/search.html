@@ -8,9 +8,9 @@
 
 {% block title %}
     {% if search_summary_str %}
-        Search Results for {{ search_summary_str }} &mdash; {% if not error %}{{ results.paginator.count|intcomma }} Result{{ results.paginator.count|pluralize }} &mdash; {% endif %}CourtListener.com
+      Search Results for {{ search_summary_str }} &mdash; {% if not error %}{% if results_details %}{{ results_details.1|intcomma }}{% else %}{{ results.paginator.count|intcomma }}{% endif %} Result{{results.paginator.count|pluralize }} &mdash; {% endif %}CourtListener.com
     {% else %}
-        Free Legal Search Engine and Alert System &mdash; CourtListener.com
+      Free Legal Search Engine and Alert System &mdash; CourtListener.com
     {% endif %}
 {% endblock %}
 {% block og_title %}
@@ -248,10 +248,21 @@
                         {% elif type == SEARCH_TYPES.PARENTHETICAL %}
                             {{ results_details.1|intcomma }} Parenthetical{{ results_details.1|pluralize }} Summarizing {{ results.paginator.count|intcomma }} Opinion{{ results.paginator.count|pluralize }}
                         {% elif type == SEARCH_TYPES.RECAP or type == SEARCH_TYPES.DOCKETS %}
-                            {% with matches=results.object_list.groups.docket_id.matches count=results.paginator.count %}
-                            {{ count|intcomma }} Case{{ count|pluralize }} <span class="gray">&mdash;</span>
-                            {{ matches|intcomma }} Docket&nbsp;Entr{{ matches|pluralize:"y,ies" }}
+                          {% flag "r-es-active" %}
+                            {% with matches=results_details.3 count=results_details.1 %}
+                              {{ count|intcomma }} Case{{ count|pluralize }}
+                              {% if matches %}
+                                <span class="gray">&mdash;</span>
+                                {{ matches|intcomma }} Docket&nbsp;Entr{{ matches|pluralize:"y,ies" }}
+                              {% endif %}
                             {% endwith %}
+                          {% else %}
+                            {% with matches=results.object_list.groups.docket_id.matches count=results.paginator.count %}
+                              {{ count|intcomma }} Case{{ count|pluralize }} <span class="gray">&mdash;</span>
+                              {{ matches|intcomma }} Docket&nbsp;Entr{{ matches|pluralize:"y,ies" }}
+                            {% endwith %}
+                          {% endflag %}
+
                         {% elif type == SEARCH_TYPES.ORAL_ARGUMENT %}
                             {% flag "oa-es-active" %}
                               {{ results_details.1|intcomma }}
@@ -260,7 +271,12 @@
                             {% endflag %}
                               Oral Argument{{ results.paginator.count|pluralize }}
                         {% elif type == SEARCH_TYPES.PEOPLE %}
-                            {{ results.paginator.count|intcomma }} Judge{{ results.paginator.count|pluralize }}
+                            {% flag "p-es-active" %}
+                              {{ results_details.1|intcomma }}
+                            {% else %}
+                              {{ results.paginator.count|intcomma }}
+                            {% endflag %}
+                              Judge{{ results.paginator.count|pluralize }}
                         {% endif %}
                         {% if type == SEARCH_TYPES.OPINION or type == SEARCH_TYPES.RECAP or type == SEARCH_TYPES.DOCKETS %}
                             <a href="/feed/search/?{{ get_string }}">
@@ -274,8 +290,14 @@
                             </a>
                         {% endif %}
                     </h2>
-                    {% if type == SEARCH_TYPES.PARENTHETICAL or type == SEARCH_TYPES.ORAL_ARGUMENT %}
+                    {% if type == SEARCH_TYPES.PARENTHETICAL or type == SEARCH_TYPES.ORAL_ARGUMENT or type == SEARCH_TYPES.PEOPLE %}
                       <span class="small gray top">{{ results_details.0|intcomma }}ms</span>
+                    {% elif type == SEARCH_TYPES.RECAP %}
+                      {% flag "r-es-active" %}
+                         <span class="small gray top">{{ results_details.0|intcomma }}ms</span>
+                      {% else %}
+                         <span class="small gray top">{{ results.object_list.QTime|intcomma }}ms</span>
+                      {% endflag %}
                     {% else %}
                       <span class="small gray top">{{ results.object_list.QTime|intcomma }}ms</span>
                     {% endif %}
@@ -285,6 +307,18 @@
               {% include "includes/pa_search_result.html" %}
             {% elif type == SEARCH_TYPES.ORAL_ARGUMENT %}
               {% flag "oa-es-active" %}
+                {% include "includes/search_result.html" %}
+              {% else %}
+                {% include "includes/search_result_solr.html" %}
+              {% endflag %}
+            {% elif type == SEARCH_TYPES.PEOPLE %}
+              {% flag "p-es-active" %}
+                {% include "includes/search_result.html" %}
+              {% else %}
+                {% include "includes/search_result_solr.html" %}
+              {% endflag %}
+            {% elif type == SEARCH_TYPES.RECAP or type == SEARCH_TYPES.DOCKETS%}
+              {% flag "r-es-active" %}
                 {% include "includes/search_result.html" %}
               {% else %}
                 {% include "includes/search_result_solr.html" %}

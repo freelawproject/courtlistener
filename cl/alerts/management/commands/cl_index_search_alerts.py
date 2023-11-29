@@ -1,5 +1,5 @@
 from cl.alerts.models import Alert
-from cl.alerts.tasks import index_alert_document
+from cl.alerts.tasks import es_save_alert_document
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.search.documents import AudioPercolator
 from cl.search.models import SEARCH_TYPES
@@ -48,7 +48,7 @@ class Command(VerboseCommand):
         # Indexing the Alert objects
         for alert in queryset.iterator():
             logger.info(f"Indexing Alert with ID: {alert.pk}")
-            index_alert_document.delay(alert, es_document)
+            es_save_alert_document.delay(alert.pk, es_document.__name__)
             indexing_counter += 1
 
         self.stdout.write(

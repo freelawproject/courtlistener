@@ -290,6 +290,17 @@ class Docket(AbstractDateTimeModel):
     SCRAPER_AND_HARVARD = 18
     RECAP_AND_SCRAPER_AND_HARVARD = 19
     HARVARD_AND_COLUMBIA = 20
+    COLUMBIA_AND_RECAP_AND_HARVARD = 21
+    COLUMBIA_AND_SCRAPER_AND_HARVARD = 22
+    COLUMBIA_AND_RECAP_AND_SCRAPER_AND_HARVARD = 23
+    IDB_AND_HARVARD = 24
+    RECAP_AND_IDB_AND_HARVARD = 25
+    SCRAPER_AND_IDB_AND_HARVARD = 26
+    RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD = 27
+    COLUMBIA_AND_IDB_AND_HARVARD = 28
+    COLUMBIA_AND_RECAP_AND_IDB_AND_HARVARD = 29
+    COLUMBIA_AND_SCRAPER_AND_IDB_AND_HARVARD = 30
+    COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD = 31
     DIRECT_INPUT = 32
     DIRECT_INPUT_AND_HARVARD = 48
     ANON_2020 = 64
@@ -321,6 +332,32 @@ class Docket(AbstractDateTimeModel):
         (SCRAPER_AND_HARVARD, "Scraper and Harvard"),
         (RECAP_AND_SCRAPER_AND_HARVARD, "RECAP, Scraper and Harvard"),
         (HARVARD_AND_COLUMBIA, "Harvard and Columbia"),
+        (COLUMBIA_AND_RECAP_AND_HARVARD, "Columbia, RECAP, and Harvard"),
+        (COLUMBIA_AND_SCRAPER_AND_HARVARD, "Columbia, Scraper, and Harvard"),
+        (
+            COLUMBIA_AND_RECAP_AND_SCRAPER_AND_HARVARD,
+            "Columbia, RECAP, Scraper, and Harvard",
+        ),
+        (IDB_AND_HARVARD, "IDB and Harvard"),
+        (RECAP_AND_IDB_AND_HARVARD, "RECAP, IDB and Harvard"),
+        (SCRAPER_AND_IDB_AND_HARVARD, "Scraper, IDB and Harvard"),
+        (
+            RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
+            "RECAP, Scraper, IDB and Harvard",
+        ),
+        (COLUMBIA_AND_IDB_AND_HARVARD, "Columbia, IDB, and Harvard"),
+        (
+            COLUMBIA_AND_RECAP_AND_IDB_AND_HARVARD,
+            "Columbia, Recap, IDB, and Harvard",
+        ),
+        (
+            COLUMBIA_AND_SCRAPER_AND_IDB_AND_HARVARD,
+            "Columbia, Scraper, IDB, and Harvard",
+        ),
+        (
+            COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
+            "Columbia, Recap, Scraper, IDB, and Harvard",
+        ),
         (DIRECT_INPUT, "Direct court input"),
         (DIRECT_INPUT_AND_HARVARD, "Direct court input and Harvard"),
         (ANON_2020, "2020 anonymous database"),
@@ -681,6 +718,26 @@ class Docket(AbstractDateTimeModel):
             "slug",
         ]
     )
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "docket_number",
+            "case_name",
+            "case_name_short",
+            "case_name_full",
+            "nature_of_suit",
+            "cause",
+            "jury_demand",
+            "jurisdiction_type",
+            "date_argued",
+            "date_filed",
+            "date_terminated",
+            "assigned_to_id",
+            "assigned_to_str",
+            "referred_to_id",
+            "referred_to_str",
+            "slug",
+        ]
+    )
 
     class Meta:
         unique_together = ("docket_number", "pacer_case_id", "court")
@@ -946,33 +1003,6 @@ class Docket(AbstractDateTimeModel):
             }
         )
 
-        # Parties, attorneys, firms
-        if self.pk not in [
-            # Block mega cases that are too big
-            6245245,  # J&J Talcum Powder
-            4538381,  # Ethicon, Inc. Pelvic Repair System
-            4715020,  # Katrina Canal Breaches Litigation
-        ]:
-            out.update(
-                {
-                    "party_id": set(),
-                    "party": set(),
-                    "attorney_id": set(),
-                    "attorney": set(),
-                    "firm_id": set(),
-                    "firm": set(),
-                }
-            )
-            for p in self.prefetched_parties:
-                out["party_id"].add(p.pk)
-                out["party"].add(p.name)
-                for a in p.attys_in_docket:
-                    out["attorney_id"].add(a.pk)
-                    out["attorney"].add(a.name)
-                    for f in a.firms_in_docket:
-                        out["firm_id"].add(f.pk)
-                        out["firm"].add(f.name)
-
         # Do RECAPDocument and Docket Entries in a nested loop
         for de in self.docket_entries.all().iterator():
             # Docket Entry
@@ -1165,6 +1195,13 @@ class DocketEntry(AbstractDateTimeModel):
         ),
         blank=True,
     )
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "description",
+            "entry_number",
+            "date_filed",
+        ]
+    )
 
     class Meta:
         verbose_name_plural = "Docket Entries"
@@ -1289,6 +1326,21 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             "the attachments page."
         ),
         blank=True,
+    )
+
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "docket_entry_id",
+            "document_type",
+            "document_number",
+            "description",
+            "pacer_doc_id",
+            "plain_text",
+            "attachment_number",
+            "is_available",
+            "page_count",
+            "filepath_local",
+        ]
     )
 
     class Meta:
@@ -1556,38 +1608,6 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
                 "court_citation_string": docket.court.citation_string,
             }
         )
-
-        # Parties, Attorneys, Firms
-        out.update(
-            {
-                "party_id": set(),
-                "party": set(),
-                "attorney_id": set(),
-                "attorney": set(),
-                "firm_id": set(),
-                "firm": set(),
-            }
-        )
-
-        if docket.pk in [
-            6245245,  # J&J Talcum Powder
-            4538381,  # Ethicon, Inc. Pelvic Repair System
-            4715020,  # Katrina Canal Breaches Litigation
-        ]:
-            # Skip the parties for mega cases that are too big to
-            # pull from the DB. Sorry folks.
-            return out
-
-        for p in docket.prefetched_parties:
-            out["party_id"].add(p.pk)
-            out["party"].add(p.name)
-            for a in p.attys_in_docket:
-                out["attorney_id"].add(a.pk)
-                out["attorney"].add(a.name)
-                for f in a.firms_in_docket:
-                    out["firm_id"].add(f.pk)
-                    out["firm"].add(f.name)
-
         return out
 
     def as_search_dict(self, docket_metadata=None):
@@ -1684,6 +1704,12 @@ class BankruptcyInformation(AbstractDateTimeModel):
     )
     trustee_str = models.TextField(
         help_text="The name of the trustee handling the case.", blank=True
+    )
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "chapter",
+            "trustee_str",
+        ]
     )
 
     class Meta:
@@ -2189,7 +2215,7 @@ class Courthouse(models.Model):
     court = models.ForeignKey(
         Court,
         help_text="The court object associated with this courthouse.",
-        related_name="courts",
+        related_name="courthouses",
         on_delete=models.CASCADE,
     )
     court_seat = models.BooleanField(
@@ -3384,6 +3410,10 @@ class ParentheticalGroup(models.Model):
     )
     size = models.IntegerField(
         help_text="The number of parentheticals that belong to the group"
+    )
+
+    es_pa_field_tracker = FieldTracker(
+        fields=["opinion_id", "representative_id"]
     )
 
     def __str__(self) -> str:
