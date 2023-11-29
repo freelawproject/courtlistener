@@ -166,3 +166,39 @@ class ESIndexTestCase(SimpleTestCase):
     def delete_index(self, model):
         """Delete the elasticsearch index."""
         call_command("search_index", "--delete", "-f", "--models", model)
+
+    @classmethod
+    def restart_celery_throttle_key(self):
+        r = make_redis_interface("CACHE")
+        keys = r.keys("celery_throttle:*")
+        if keys:
+            r.delete(*keys)
+        keys = r.keys("celery_throttle:*")
+
+    def tearDown(self) -> None:
+        self.restart_celery_throttle_key()
+        super().tearDown()
+
+
+class CountESTasksTestCase(SimpleTestCase):
+    def setUp(self):
+        self.task_call_count = 0
+
+    def count_task_calls(self, task, *args, **kwargs) -> None:
+        """Wraps the task to count its calls and assert the expected count."""
+        # Increment the call count
+        self.task_call_count += 1
+
+        # Call the task
+        if task.__name__ == "es_save_document":
+            return task.s(*args, **kwargs)
+        else:
+            task.apply_async(args=args, kwargs=kwargs)
+
+    def reset_and_assert_task_count(self, expected) -> None:
+        """Resets the task call count and asserts the expected number of calls."""
+
+        assert (
+            self.task_call_count == expected
+        ), f"Expected {expected} task calls, but got {self.task_call_count}"
+        self.task_call_count = 0

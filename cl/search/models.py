@@ -721,6 +721,7 @@ class Docket(AbstractDateTimeModel):
         fields=[
             "docket_number",
             "case_name",
+            "case_name_short",
             "case_name_full",
             "nature_of_suit",
             "cause",
@@ -733,6 +734,7 @@ class Docket(AbstractDateTimeModel):
             "assigned_to_str",
             "referred_to_id",
             "referred_to_str",
+            "slug",
         ]
     )
 
@@ -999,33 +1001,6 @@ class Docket(AbstractDateTimeModel):
                 "court_citation_string": self.court.citation_string,
             }
         )
-
-        # Parties, attorneys, firms
-        if self.pk not in [
-            # Block mega cases that are too big
-            6245245,  # J&J Talcum Powder
-            4538381,  # Ethicon, Inc. Pelvic Repair System
-            4715020,  # Katrina Canal Breaches Litigation
-        ]:
-            out.update(
-                {
-                    "party_id": set(),
-                    "party": set(),
-                    "attorney_id": set(),
-                    "attorney": set(),
-                    "firm_id": set(),
-                    "firm": set(),
-                }
-            )
-            for p in self.prefetched_parties:
-                out["party_id"].add(p.pk)
-                out["party"].add(p.name)
-                for a in p.attys_in_docket:
-                    out["attorney_id"].add(a.pk)
-                    out["attorney"].add(a.name)
-                    for f in a.firms_in_docket:
-                        out["firm_id"].add(f.pk)
-                        out["firm"].add(f.name)
 
         # Do RECAPDocument and Docket Entries in a nested loop
         for de in self.docket_entries.all().iterator():
@@ -1352,6 +1327,21 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         blank=True,
     )
 
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "docket_entry_id",
+            "document_type",
+            "document_number",
+            "description",
+            "pacer_doc_id",
+            "plain_text",
+            "attachment_number",
+            "is_available",
+            "page_count",
+            "filepath_local",
+        ]
+    )
+
     class Meta:
         unique_together = (
             "docket_entry",
@@ -1617,38 +1607,6 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
                 "court_citation_string": docket.court.citation_string,
             }
         )
-
-        # Parties, Attorneys, Firms
-        out.update(
-            {
-                "party_id": set(),
-                "party": set(),
-                "attorney_id": set(),
-                "attorney": set(),
-                "firm_id": set(),
-                "firm": set(),
-            }
-        )
-
-        if docket.pk in [
-            6245245,  # J&J Talcum Powder
-            4538381,  # Ethicon, Inc. Pelvic Repair System
-            4715020,  # Katrina Canal Breaches Litigation
-        ]:
-            # Skip the parties for mega cases that are too big to
-            # pull from the DB. Sorry folks.
-            return out
-
-        for p in docket.prefetched_parties:
-            out["party_id"].add(p.pk)
-            out["party"].add(p.name)
-            for a in p.attys_in_docket:
-                out["attorney_id"].add(a.pk)
-                out["attorney"].add(a.name)
-                for f in a.firms_in_docket:
-                    out["firm_id"].add(f.pk)
-                    out["firm"].add(f.name)
-
         return out
 
     def as_search_dict(self, docket_metadata=None):
@@ -3447,6 +3405,10 @@ class ParentheticalGroup(models.Model):
     )
     size = models.IntegerField(
         help_text="The number of parentheticals that belong to the group"
+    )
+
+    es_pa_field_tracker = FieldTracker(
+        fields=["opinion_id", "representative_id"]
     )
 
     def __str__(self) -> str:

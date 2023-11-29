@@ -3,6 +3,7 @@ import operator
 import re
 import time
 import traceback
+from copy import deepcopy
 from dataclasses import fields
 from datetime import date, datetime
 from functools import reduce, wraps
@@ -584,21 +585,35 @@ def build_has_child_query(
         highlighting_fields = {}
     highlight_options: dict[str, dict[str, Any]] = {"fields": {}}
 
+    fields_to_exclude = []
     for field, fragment_size in highlighting_fields.items():
-        number_of_fragments = 0
-        if fragment_size:
-            number_of_fragments = 1
+        number_of_fragments = 1 if fragment_size else 0
+        # In fields that have a defined fragment size in their HL mapping
+        # e.g., SEARCH_RECAP_CHILD_HL_FIELDS, a 'no_match_size' parameter
+        # is also set. If there are no matching fragments to highlight,
+        # this setting will return a specified amount of text from the
+        # beginning of the field.
+        no_match_size = settings.NO_MATCH_HL_SIZE if fragment_size else 0
+        if fragment_size and not field.endswith("exact"):
+            # The original field is excluded from the response to avoid
+            # returning the entire field from the index.
+            fields_to_exclude.append(field)
         highlight_options["fields"][field] = {
             "type": "plain",
             "fragment_size": fragment_size,
+            "no_match_size": no_match_size,
             "number_of_fragments": number_of_fragments,
             "pre_tags": ["<mark>"],
             "post_tags": ["</mark>"],
+            "max_analyzed_offset": 999_999,
         }
 
     inner_hits = {
         "name": f"filter_query_inner_{child_type}",
         "size": child_hits_limit,
+        "_source": {
+            "excludes": fields_to_exclude,
+        },
     }
     if highlight_options:
         inner_hits["highlight"] = highlight_options
@@ -638,7 +653,7 @@ def get_search_query(
                     "match_all",
                     "recap_document",
                     query_hits_limit,
-                    None,
+                    SEARCH_RECAP_CHILD_HL_FIELDS,
                     get_child_sorting_key(cd),
                 )
                 match_all_parent_query = Q("match", docket_child="docket")
@@ -685,14 +700,14 @@ def build_es_base_query(
                 ["representative_text"], cd.get("q", "")
             )
         case SEARCH_TYPES.ORAL_ARGUMENT:
-            fields = SEARCH_ORAL_ARGUMENT_QUERY_FIELDS
+            fields = SEARCH_ORAL_ARGUMENT_QUERY_FIELDS.copy()
             fields.extend(add_fields_boosting(cd))
             string_query = build_fulltext_query(
                 fields,
                 cd.get("q", ""),
             )
         case SEARCH_TYPES.PEOPLE:
-            child_fields = SEARCH_PEOPLE_CHILD_QUERY_FIELDS
+            child_fields = SEARCH_PEOPLE_CHILD_QUERY_FIELDS.copy()
             child_fields.extend(
                 add_fields_boosting(
                     cd,
@@ -706,7 +721,7 @@ def build_es_base_query(
             child_query_fields = {
                 "position": child_fields,
             }
-            parent_query_fields = SEARCH_PEOPLE_PARENT_QUERY_FIELDS
+            parent_query_fields = SEARCH_PEOPLE_PARENT_QUERY_FIELDS.copy()
             parent_query_fields.extend(
                 add_fields_boosting(
                     cd,
@@ -721,7 +736,7 @@ def build_es_base_query(
                 cd.get("q", ""),
             )
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
-            child_fields = SEARCH_RECAP_CHILD_QUERY_FIELDS
+            child_fields = SEARCH_RECAP_CHILD_QUERY_FIELDS.copy()
             child_fields.extend(
                 add_fields_boosting(
                     cd,
@@ -734,7 +749,7 @@ def build_es_base_query(
                 )
             )
             child_query_fields = {"recap_document": child_fields}
-            parent_query_fields = SEARCH_RECAP_PARENT_QUERY_FIELDS
+            parent_query_fields = SEARCH_RECAP_PARENT_QUERY_FIELDS.copy()
             parent_query_fields.extend(
                 add_fields_boosting(
                     cd,
@@ -918,40 +933,44 @@ def merge_highlights_into_result(
 
         if "exact" in field:
             field = field.split(".exact")[0]
-            marked_strings_2 = []
+            marked_strings_exact = []
             # Extract all unique marked strings from "field.exact"
-            marked_strings_1 = re.findall(
+            marked_strings = re.findall(
                 rf"<{tag}>.*?</{tag}>", highlight_list[0]
             )
-            # Extract all unique marked strings from "field" if
-            # available
             if field in highlights:
-                marked_strings_2 = re.findall(
+                # Extract all unique marked strings from "field" if
+                # available
+                marked_strings_exact = re.findall(
                     rf"<{tag}>.*?</{tag}>",
                     highlights[field][0],
                 )
 
-            unique_marked_strings = list(
-                set(marked_strings_1 + marked_strings_2)
-            )
-            combined_highlights = highlight_list[0]
-            for marked_string in unique_marked_strings:
-                # Replace unique highlighted terms in a single
-                # field.
-                unmarked_string = marked_string.replace(
-                    f"<{tag}>", ""
-                ).replace(f"</{tag}>", "")
-                combined_highlights = combined_highlights.replace(
-                    unmarked_string, marked_string
+            # Merge highlights only if the exact.field contains highlight tags.
+            # This avoids merging highlights when there are no matching terms,
+            # yet highlights are returned due to the NO_MATCH_HL_SIZE setting.
+            if marked_strings:
+                unique_marked_strings = list(
+                    set(marked_strings + marked_strings_exact)
                 )
+                combined_highlights = highlight_list[0]
+                for marked_string in unique_marked_strings:
+                    # Replace unique highlighted terms in a single
+                    # field.
+                    unmarked_string = marked_string.replace(
+                        f"<{tag}>", ""
+                    ).replace(f"</{tag}>", "")
+                    combined_highlights = combined_highlights.replace(
+                        unmarked_string, marked_string
+                    )
 
-            # Remove nested <mark> tags after replace.
-            combined_highlights = re.sub(
-                rf"<{tag}><{tag}>(.*?)</{tag}></{tag}>",
-                rf"<{tag}>\1</{tag}>",
-                combined_highlights,
-            )
-            result[field] = combined_highlights
+                # Remove nested <mark> tags after replace.
+                combined_highlights = re.sub(
+                    rf"<{tag}><{tag}>(.*?)</{tag}></{tag}>",
+                    rf"<{tag}>\1</{tag}>",
+                    combined_highlights,
+                )
+                result[field] = combined_highlights
             exact_hl_fields.append(field)
 
         if field not in exact_hl_fields:
@@ -1455,7 +1474,9 @@ def build_full_join_es_queries(
     if cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
         # Build child filters.
         child_filters = build_has_child_filters(child_type, cd)
-
+        # Copy the original child_filters before appending parent fields.
+        # For its use later in the parent filters.
+        child_filters_original = deepcopy(child_filters)
         # Build child text query.
         child_fields = child_query_fields["recap_document"]
         child_text_query = build_fulltext_query(
@@ -1466,7 +1487,16 @@ def build_full_join_es_queries(
         parent_filters = build_join_es_filters(cd)
         # If parent filters, extend into child_filters.
         if parent_filters:
-            child_filters.extend(parent_filters)
+            # Removes the party and attorney filter if they were provided because
+            # those fields are not part of the RECAPDocument mapping.
+            child_filters.extend(
+                [
+                    query
+                    for query in parent_filters
+                    if not isinstance(query, QueryString)
+                    or query.fields[0] not in ["party", "attorney"]
+                ]
+            )
         if child_filters:
             child_filters = reduce(operator.iand, child_filters)
         # Build the child query based on child_filters and child child_text_query
@@ -1507,6 +1537,18 @@ def build_full_join_es_queries(
         string_query = build_fulltext_query(
             parent_query_fields, cd.get("q", ""), only_queries=True
         )
+
+        # If child filters are set, add a has_child query as a filter to the
+        # parent query to exclude results without matching children.
+        if child_filters_original:
+            parent_filters.append(
+                Q(
+                    "has_child",
+                    type="recap_document",
+                    score_mode="max",
+                    query=Q("bool", filter=child_filters_original),
+                )
+            )
         parent_query = None
         match parent_filters, string_query:
             case [], []:
@@ -1568,6 +1610,9 @@ def limit_inner_hits(
             return
 
     for result in results:
+        result["child_docs"] = []
+        result["child_remaining"] = False
+        result["child_remaining_query_id"] = False
         try:
             inner_hits = [
                 hit
@@ -1576,17 +1621,18 @@ def limit_inner_hits(
                 ]["hits"]["hits"]
             ]
         except KeyError:
-            result["child_docs"] = []
-            result["child_remaining"] = False
             continue
 
+        docket_id_query = re.search(r"docket_id:\d+", get_params.get("q", ""))
         count_hits = len(inner_hits)
         if count_hits > hits_limit:
             result["child_docs"] = inner_hits[:hits_limit]
-            result["child_remaining"] = True
+            if docket_id_query:
+                result["child_remaining_query_id"] = True
+            else:
+                result["child_remaining"] = True
         else:
             result["child_docs"] = inner_hits
-            result["child_remaining"] = False
 
 
 def get_child_top_hits_limit(
@@ -1616,7 +1662,7 @@ def get_child_top_hits_limit(
     docket_id_query = re.search(r"docket_id:\d+", search_params.get("q", ""))
     if docket_id_query:
         frontend_hits_limit = settings.VIEW_MORE_CHILD_HITS
-        query_hits_limit = settings.VIEW_MORE_CHILD_HITS
+        query_hits_limit = settings.VIEW_MORE_CHILD_HITS + 1
 
     return frontend_hits_limit, query_hits_limit
 

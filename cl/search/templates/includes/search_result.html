@@ -20,7 +20,7 @@
       <a href="{% url 'view_docket' result.docket_id result.docket_slug %}"
          class="visitable">
       {{ result.caseName|safe }}
-      ({% if result.court_id != 'scotus' %}{{ result.court_citation_string|nbsp|safe }}{% endif %}{% if result.court_citation_string and result.dateFiled %}&nbsp;{% endif %}{{ result.dateFiled|date:"Y" }})
+      ({% if result.court_id != 'scotus' %}{{ result.court_citation_string|safe|nbsp }}{% endif %}{% if result.court_citation_string and result.dateFiled %}&nbsp;{% endif %}{{ result.dateFiled|date:"Y" }})
       </a>
 
     {% elif type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION %}
@@ -183,13 +183,14 @@
             <div class="inline-block">
               <span class="meta-data-header">Description:</span>
               <span class="meta-data-value">
-                  {{ doc.description|safe }}
+                {{ doc.description|safe|read_more:"100" }}
               </span>
             </div>
           {% endif %}
-          <p>
+          <p class="v-offset-above-1">
             {% if doc.plain_text %}
-              &hellip;{{ doc.plain_text|safe }}&hellip;
+              {% contains_highlights doc.plain_text as highlighted %}
+              {% if highlighted %}&hellip;{% endif %}{{ doc.plain_text|safe|underscore_to_space }} &hellip;
             {% endif %}
           </p>
         </div>
@@ -197,9 +198,13 @@
     {% endfor %}
     <div class="col-md-offset-half">
       {% if result.child_remaining %}
-      <a href="{% url "show_results" %}?type={{ type|urlencode }}&q={% if request.GET.q %}({{ request.GET.q|urlencode }})%20AND%20{% endif %}docket_id%3A{{ result.docket_id|urlencode }}" class="btn-default btn">
-        View Additional Results for this Case
-      </a>
+        <a href="{% url "show_results" %}?type={{ type|urlencode }}&q={% if request.GET.q %}({{ request.GET.q|urlencode }})%20AND%20{% endif %}docket_id%3A{{ result.docket_id|urlencode }}" class="btn-default btn">
+          View Additional Results for this Case
+        </a>
+      {% elif result.child_remaining_query_id %}
+        <a href="{% url 'view_docket' result.docket_id result.docket_slug %}" class="btn-default btn">
+          {{ results_details.3 }} total filings. See full docket for details
+        </a>
       {% endif %}
     </div>
   </div>

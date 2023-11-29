@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from django.http import QueryDict
-from django.template import loader
+from django.utils.html import escape
 from django_elasticsearch_dsl import Document, fields
 
 from cl.alerts.models import Alert
@@ -10,7 +10,6 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.command_utils import logger
 from cl.lib.elasticsearch_utils import build_es_base_query
 from cl.lib.fields import JoinField, PercolatorField
-from cl.lib.search_index_utils import null_map
 from cl.lib.utils import deepgetattr
 from cl.people_db.models import Person, Position
 from cl.search.es_indices import (
@@ -118,7 +117,7 @@ class ParentheticalGroupDocument(Document):
 
 
 class AudioDocumentBase(Document):
-    absolute_url = fields.KeywordField(attr="get_absolute_url", index=False)
+    absolute_url = fields.KeywordField(index=False)
     caseName = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
@@ -230,6 +229,9 @@ class AudioDocument(AudioDocumentBase):
     class Django:
         model = Audio
         ignore_signals = True
+
+    def prepare_absolute_url(self, instance):
+        return instance.get_absolute_url()
 
     def prepare_caseName(self, instance):
         return best_case_name(instance)
@@ -361,9 +363,7 @@ class PersonBaseDocument(Document):
     dob_city = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(
-                attr="person.dob_city", analyzer="english_exact"
-            ),
+            "exact": fields.TextField(analyzer="english_exact"),
         },
         search_analyzer="search_analyzer",
     )
@@ -680,10 +680,13 @@ class PersonDocument(PersonBaseDocument):
     )
     date_granularity_dob = fields.KeywordField(attr="date_granularity_dob")
     date_granularity_dod = fields.KeywordField(attr="date_granularity_dod")
-    absolute_url = fields.KeywordField(attr="get_absolute_url")
+    absolute_url = fields.KeywordField()
 
     def prepare_person_child(self, instance):
         return "person"
+
+    def prepare_absolute_url(self, instance):
+        return instance.get_absolute_url()
 
 
 # RECAP
@@ -862,12 +865,9 @@ class ESRECAPDocument(DocketBaseDocument):
     document_number = fields.LongField()
     pacer_doc_id = fields.KeywordField(attr="pacer_doc_id")
     plain_text = fields.TextField(
-        attr="plain_text",
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(
-                attr="plain_text", analyzer="english_exact"
-            ),
+            "exact": fields.TextField(analyzer="english_exact"),
         },
         search_analyzer="search_analyzer",
     )
@@ -969,6 +969,9 @@ class ESRECAPDocument(DocketBaseDocument):
             return (
                 instance.docket_entry.docket.bankruptcy_information.trustee_str
             )
+
+    def prepare_plain_text(self, instance):
+        return escape(instance.plain_text)
 
 
 @recap_index.document

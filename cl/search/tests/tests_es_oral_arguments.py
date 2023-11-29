@@ -18,9 +18,15 @@ from cl.lib.elasticsearch_utils import (
 )
 from cl.lib.test_helpers import AudioESTestCase
 from cl.search.documents import AudioDocument, AudioPercolator
-from cl.search.factories import DocketFactory
+from cl.search.factories import CourtFactory, DocketFactory, PersonFactory
 from cl.search.models import SEARCH_TYPES
-from cl.tests.cases import ESIndexTestCase, TestCase
+from cl.search.tasks import es_save_document, update_es_document
+from cl.tests.cases import (
+    CountESTasksTestCase,
+    ESIndexTestCase,
+    TestCase,
+    TransactionTestCase,
+)
 
 
 class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
@@ -1108,17 +1114,18 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             )
 
     @mock.patch(
-        "cl.lib.es_signal_processor.avoid_es_audio_indexing",
-        side_effect=lambda x, y, z: False,
+        "cl.lib.es_signal_processor.allow_es_audio_indexing",
+        side_effect=lambda x, y: True,
     )
     def test_oa_results_pagination(self, mock_abort_audio) -> None:
         created_audios = []
         audios_to_create = 20
-        for i in range(audios_to_create):
-            audio = AudioFactory.create(
-                docket_id=self.audio_3.docket.pk,
-            )
-            created_audios.append(audio)
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            for i in range(audios_to_create):
+                audio = AudioFactory.create(
+                    docket_id=self.audio_3.docket.pk,
+                )
+                created_audios.append(audio)
 
         # Confirm that fetch_es_results works properly with different sorting
         # types, returning sequential results for each requested page.
@@ -1712,112 +1719,6 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         self.assertEqual(actual, expected)
         self.assertIn("Freedom of", r.content.decode())
 
-    @mock.patch(
-        "cl.lib.es_signal_processor.avoid_es_audio_indexing",
-        side_effect=lambda x, y, z: False,
-    )
-    def test_keep_in_sync_related_OA_objects(self, mock_abort_audio) -> None:
-        """Test Audio documents are updated when related objects change."""
-        with transaction.atomic():
-            docket_5 = DocketFactory.create(
-                docket_number="1:22-bk-12345",
-                court_id=self.court_1.pk,
-                date_argued=datetime.date(2015, 8, 16),
-            )
-            audio_6 = AudioFactory.create(
-                case_name="Lorem Ipsum Dolor vs. USA",
-                docket_id=docket_5.pk,
-            )
-            audio_7 = AudioFactory.create(
-                case_name="Lorem Ipsum Dolor vs. IRS",
-                docket_id=docket_5.pk,
-            )
-            cd = {
-                "type": SEARCH_TYPES.ORAL_ARGUMENT,
-                "q": "Lorem Ipsum Dolor vs. United States",
-                "order_by": "score desc",
-            }
-            search_query = AudioDocument.search()
-            (
-                s,
-                total_query_results,
-                top_hits_limit,
-                total_child_results,
-            ) = build_es_main_query(search_query, cd)
-            self.assertEqual(s.count(), 1)
-            results = s.execute()
-            self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. USA")
-            self.assertEqual(results[0].docketNumber, "1:22-bk-12345")
-            self.assertEqual(results[0].panel_ids, [])
-
-            # Update docket number and dateArgued
-            docket_5.docket_number = "23-98765"
-            docket_5.date_argued = datetime.date(2023, 5, 15)
-            docket_5.date_reargued = datetime.date(2022, 5, 15)
-            docket_5.date_reargument_denied = datetime.date(2021, 5, 15)
-            docket_5.save()
-            # Confirm docket number and dateArgued are updated in the index.
-            (
-                s,
-                total_query_results,
-                top_hits_limit,
-                total_child_results,
-            ) = build_es_main_query(search_query, cd)
-            self.assertEqual(s.count(), 1)
-            results = s.execute()
-            self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. USA")
-            self.assertEqual(results[0].docketNumber, "23-98765")
-            self.assertIn("15 May 2023", results[0].dateArgued_text)
-            self.assertIn("15 May 2022", results[0].dateReargued_text)
-            self.assertIn("15 May 2021", results[0].dateReargumentDenied_text)
-            self.assertEqual(
-                results[0].dateArgued, datetime.datetime(2023, 5, 15, 0, 0)
-            )
-
-            # Trigger a ManyToMany insert.
-            audio_7.refresh_from_db()
-            audio_7.panel.add(self.author)
-            # Confirm ManyToMany field is updated in the index.
-            cd["q"] = "Lorem Ipsum Dolor vs. IRS"
-            (
-                s,
-                total_query_results,
-                top_hits_limit,
-                total_child_results,
-            ) = build_es_main_query(search_query, cd)
-            self.assertEqual(s.count(), 1)
-            results = s.execute()
-            self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. IRS")
-            self.assertEqual(results[0].panel_ids, [self.author.pk])
-
-            # Confirm duration is updated in the index after Audio is updated.
-            audio_7.duration = 322
-            audio_7.save()
-            audio_7.refresh_from_db()
-            (
-                s,
-                total_query_results,
-                top_hits_limit,
-                total_child_results,
-            ) = build_es_main_query(search_query, cd)
-            self.assertEqual(s.count(), 1)
-            results = s.execute()
-            self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. IRS")
-            self.assertEqual(results[0].duration, audio_7.duration)
-
-            # Delete parent docket.
-            docket_5.delete()
-            # Confirm that docket-related audio objects are removed from the
-            # index.
-            cd["q"] = "Lorem Ipsum Dolor"
-            (
-                s,
-                total_query_results,
-                top_hits_limit,
-                total_child_results,
-            ) = build_es_main_query(search_query, cd)
-            self.assertEqual(s.count(), 0)
-
     def test_exact_and_synonyms_query(self) -> None:
         """Test exact and synonyms in the same query."""
 
@@ -2035,3 +1936,229 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         self.assertEqual(actual, expected)
         # Transcript highlights
         self.assertIn("<mark>transcript</mark>", r.content.decode())
+
+
+class OralArgumentIndexingTest(
+    CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
+):
+    def setUp(self):
+        self.court_1 = CourtFactory(
+            id="cabc",
+            full_name="Testing Supreme Court",
+            jurisdiction="FB",
+            citation_string="Bankr. C.D. Cal.",
+        )
+        self.docket = DocketFactory.create(
+            court_id=self.court_1.pk,
+        )
+        self.docket_2 = DocketFactory.create(
+            court_id=self.court_1.pk,
+        )
+
+        super().setUp()
+
+    @mock.patch(
+        "cl.lib.es_signal_processor.allow_es_audio_indexing",
+        side_effect=lambda x, y: True,
+    )
+    def test_keep_in_sync_related_OA_objects(self, mock_abort_audio) -> None:
+        """Test Audio documents are updated when related objects change."""
+
+        docket_5 = DocketFactory.create(
+            docket_number="1:22-bk-12345",
+            court_id=self.court_1.pk,
+            date_argued=datetime.date(2015, 8, 16),
+        )
+        audio_6 = AudioFactory.create(
+            case_name="Lorem Ipsum Dolor vs. USA",
+            docket_id=docket_5.pk,
+        )
+        audio_7 = AudioFactory.create(
+            case_name="Lorem Ipsum Dolor vs. IRS",
+            docket_id=docket_5.pk,
+        )
+        cd = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": "Lorem Ipsum Dolor vs. United States",
+            "order_by": "score desc",
+        }
+        search_query = AudioDocument.search()
+        (
+            s,
+            total_query_results,
+            top_hits_limit,
+            total_child_results,
+        ) = build_es_main_query(search_query, cd)
+        self.assertEqual(s.count(), 1)
+        results = s.execute()
+        self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. USA")
+        self.assertEqual(results[0].docketNumber, "1:22-bk-12345")
+        self.assertEqual(results[0].panel_ids, [])
+
+        # Update docket number and dateArgued
+        docket_5.docket_number = "23-98765"
+        docket_5.date_argued = datetime.date(2023, 5, 15)
+        docket_5.date_reargued = datetime.date(2022, 5, 15)
+        docket_5.date_reargument_denied = datetime.date(2021, 5, 15)
+        docket_5.save()
+        # Confirm docket number and dateArgued are updated in the index.
+        (
+            s,
+            total_query_results,
+            top_hits_limit,
+            total_child_results,
+        ) = build_es_main_query(search_query, cd)
+        self.assertEqual(s.count(), 1)
+        results = s.execute()
+        self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. USA")
+        self.assertEqual(results[0].docketNumber, "23-98765")
+        self.assertIn("15 May 2023", results[0].dateArgued_text)
+        self.assertIn("15 May 2022", results[0].dateReargued_text)
+        self.assertIn("15 May 2021", results[0].dateReargumentDenied_text)
+        self.assertEqual(
+            results[0].dateArgued, datetime.datetime(2023, 5, 15, 0, 0)
+        )
+
+        # Trigger a ManyToMany insert.
+        audio_7.refresh_from_db()
+        author = PersonFactory.create()
+        audio_7.panel.add(author)
+        # Confirm ManyToMany field is updated in the index.
+        cd["q"] = "Lorem Ipsum Dolor vs. IRS"
+        (
+            s,
+            total_query_results,
+            top_hits_limit,
+            total_child_results,
+        ) = build_es_main_query(search_query, cd)
+        self.assertEqual(s.count(), 1)
+        results = s.execute()
+        self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. IRS")
+        self.assertEqual(results[0].panel_ids, [author.pk])
+
+        # Confirm duration is updated in the index after Audio is updated.
+        audio_7.duration = 322
+        audio_7.save()
+        audio_7.refresh_from_db()
+        (
+            s,
+            total_query_results,
+            top_hits_limit,
+            total_child_results,
+        ) = build_es_main_query(search_query, cd)
+        self.assertEqual(s.count(), 1)
+        results = s.execute()
+        self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. IRS")
+        self.assertEqual(results[0].duration, audio_7.duration)
+
+        # Delete parent docket.
+        docket_5.delete()
+        # Confirm that docket-related audio objects are removed from the
+        # index.
+        cd["q"] = "Lorem Ipsum Dolor"
+        (
+            s,
+            total_query_results,
+            top_hits_limit,
+            total_child_results,
+        ) = build_es_main_query(search_query, cd)
+        self.assertEqual(s.count(), 0)
+
+    def test_oa_indexing_and_tasks_count(self) -> None:
+        """Confirm an Audio is properly indexed in ES with the right number of
+        indexing tasks.
+        """
+
+        # When the Audio is created the file processing is not complete.
+        # The Audio indexing is avoided.
+        with mock.patch(
+            "cl.lib.es_signal_processor.es_save_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                es_save_document, *args, **kwargs
+            ),
+        ):
+            audio = AudioFactory.create(
+                case_name="Lorem Ipsum Dolor vs. USA",
+                docket_id=self.docket.pk,
+            )
+        # 0 es_save_document task calls for Audio creation, due to processing
+        # is not complete.
+        self.reset_and_assert_task_count(expected=0)
+        self.assertFalse(AudioDocument.exists(id=audio.pk))
+
+        # Index the document for first time when file processing is completed.
+        with mock.patch(
+            "cl.lib.es_signal_processor.es_save_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                es_save_document, *args, **kwargs
+            ),
+        ):
+            audio.save(
+                update_fields=[
+                    "processing_complete",
+                ]
+            )
+        # 1 es_save_document task calls for Audio after processing is complete
+        self.reset_and_assert_task_count(expected=1)
+        self.assertTrue(AudioDocument.exists(id=audio.pk))
+
+        # Update an Audio without changes.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            audio.save()
+        # update_es_document task shouldn't be called on save() without changes
+        self.reset_and_assert_task_count(expected=0)
+
+        # Update an Audio tracked field.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            audio.case_name = "Bank vs America"
+            audio.save()
+        # update_es_document task should be called 1 on tracked fields updates
+        self.reset_and_assert_task_count(expected=1)
+        a_doc = AudioDocument.get(id=audio.pk)
+        self.assertEqual(a_doc.caseName, "Bank vs America")
+
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            audio.docket = self.docket_2
+            audio.save()
+        # update_es_document task should be called 1 on tracked fields updates
+        self.reset_and_assert_task_count(expected=1)
+        a_doc = AudioDocument.get(id=audio.pk)
+        self.assertEqual(a_doc.docket_id, self.docket_2.pk)
+
+        # Confirm an Audio is indexed if it doesn't exist in the
+        # index on a tracked field update.
+        self.delete_index("audio.Audio")
+        self.create_index("audio.Audio")
+
+        self.assertFalse(AudioDocument.exists(id=audio.pk))
+        # Audio creation on update.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            audio.case_name = "Lorem Ipsum"
+            audio.save()
+
+        # update_es_document task should be called 1 on tracked fields update
+        self.reset_and_assert_task_count(expected=1)
+        a_doc = AudioDocument.get(id=audio.pk)
+        self.assertEqual(a_doc.caseName, "Lorem Ipsum")
+
+        audio.delete()
