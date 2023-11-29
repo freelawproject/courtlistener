@@ -19,15 +19,18 @@ case "$1" in
     exec python /opt/courtlistener/manage.py runserver 0.0.0.0:8000
     ;;
 'web-prod')
+    # Tips:
+    # 1. Set high number of --workers. Docs recommend 2-4× core count
+    # 2. Set --limit-request-line to high value to allow long Solr queries
+    # 3. Set --max-requests to reset each worker once in a while
     exec gunicorn cl.asgi:application \
         --chdir /opt/courtlistener/ \
         --user www-data \
         --group www-data \
-        --workers ${NUM_WORKERS:-48} \ # Set high number of workers. Docs recommend 2-4× core count
-    --worker-class cl.workers.UvicornWorker \
-        --limit-request-line 6000 \ # Allow longer queries to solr.
-    # Reset each worker once in a while
-    --max-requests 10000 \
+        --workers ${NUM_WORKERS:-48} \
+        --worker-class cl.workers.UvicornWorker \
+        --limit-request-line 6000 \
+        --max-requests 10000 \
         --max-requests-jitter 100 \
         --timeout 180 \
         --bind 0.0.0.0:8000
