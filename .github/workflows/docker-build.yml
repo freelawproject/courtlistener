@@ -59,7 +59,8 @@ jobs:
               }]
               }
           }'
-
+      - name: Wait for temp pod to start
+        run: kubectl wait pods -n court-listener --for condition=Ready --timeout=90s temp-pod-${{ steps.vars.outputs.sha_short }}
       - name: Collect Static Assets
         id: collectStatic
         run: |
