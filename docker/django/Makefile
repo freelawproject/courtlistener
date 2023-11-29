@@ -20,7 +20,7 @@ push-image: build-image
 	@if [ $(UNAME) != "x86_64" ]; then \
 		echo "Only amd64 machines can push single-architecture builds. This \
 protects against arm64 builds being accidentally deployed to the server (which uses amd64).";\
-		exit 1;
+		exit 1;\
 	fi
 
 	    echo "Architecture is OK. Pushing.";\
