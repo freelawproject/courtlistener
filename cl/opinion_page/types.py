@@ -54,6 +54,7 @@ class AuthoritiesContext:
         citation_record: OpinionCluster | RECAPDocCitationRecord,
         request_query_string: str,
     ):
+        doc_type: Literal["opinion", "document"]
         if isinstance(citation_record, RECAPDocCitationRecord):
             top_authorities = [
                 ViewAuthority.from_recap_cit_record(
