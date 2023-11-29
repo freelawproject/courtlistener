@@ -4,6 +4,7 @@ import time
 from datetime import date
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+from asgiref.sync import async_to_sync
 from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
 from django.db import transaction
@@ -153,7 +154,7 @@ def save_everything(
         citation.save()
 
     if cluster.judges:
-        candidate_judges = lookup_judges_by_messy_str(
+        candidate_judges = async_to_sync(lookup_judges_by_messy_str)(
             cluster.judges, docket.court.pk, cluster.date_filed
         )
         if len(candidate_judges) == 1:
@@ -237,9 +238,16 @@ class Command(VerboseCommand):
         logger.debug(f"#{len(site)} opinions found.")
         added = 0
         for i, item in enumerate(site):
+            # Minnesota currently rejects Courtlistener and Juriscraper as a User Agent
+            if court_str in ["minn", "minnctapp"]:
+                headers = site.headers
+            else:
+                headers = {"User-Agent": "CourtListener"}
+
             msg, r = get_binary_content(
                 item["download_urls"],
                 site.cookies,
+                headers,
                 method=site.method,
             )
             if msg:

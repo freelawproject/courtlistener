@@ -1,6 +1,7 @@
 import datetime
 from typing import Tuple, TypedDict, cast
 
+from asgiref.sync import async_to_sync
 from django.contrib.auth.hashers import make_password
 from django.core.files.base import ContentFile
 from django.db.models import F
@@ -9,6 +10,7 @@ from django.urls import reverse
 from rest_framework.status import HTTP_200_OK, HTTP_503_SERVICE_UNAVAILABLE
 
 from cl.lib.date_time import midnight_pt
+from cl.lib.elasticsearch_utils import append_query_conjunctions
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import (
@@ -47,12 +49,14 @@ class TestPacerUtils(TestCase):
         """Do we properly set small bankruptcy dockets to private?"""
         d = Docket()
         d.court = Court.objects.get(pk="akb")
-        blocked, date_blocked = get_blocked_status(d)
+        blocked, date_blocked = async_to_sync(get_blocked_status)(d)
         self.assertTrue(
             blocked,
             msg="Bankruptcy dockets with few entries should be blocked.",
         )
-        blocked, date_blocked = get_blocked_status(d, count_override=501)
+        blocked, date_blocked = async_to_sync(get_blocked_status)(
+            d, count_override=501
+        )
         self.assertFalse(
             blocked,
             msg="Bankruptcy dockets with many entries "
@@ -60,7 +64,9 @@ class TestPacerUtils(TestCase):
         )
         # This should stay blocked even though it's a big bankruptcy docket.
         d.blocked = True
-        blocked, date_blocked = get_blocked_status(d, count_override=501)
+        blocked, date_blocked = async_to_sync(get_blocked_status)(
+            d, count_override=501
+        )
         self.assertTrue(
             blocked,
             msg="Bankruptcy dockets that start blocked "
@@ -957,3 +963,52 @@ class TestDateTimeHelpers(SimpleTestCase):
         pdt_date_time = midnight_pt(pdt_date)
         pdt_utc_offset_hours = pdt_date_time.utcoffset().total_seconds() / 3600  # type: ignore
         self.assertEqual(pdt_utc_offset_hours, -7.0)
+
+
+class TestAppendQueryConjunctions(SimpleTestCase):
+    def test_can_add_conjunction(self) -> None:
+        tests = [
+            {"input": "a", "output": "a"},
+            {"input": "a b", "output": "a AND b"},
+            {"input": "a b (c d)", "output": "a AND b AND (c d)"},
+            {
+                "input": f"caseName:Loretta AND docketNumber:(ASBCA No. 59126)",
+                "output": "caseName:Loretta AND docketNumber:(ASBCA No. 59126)",
+            },
+            {
+                "input": "a b (c d) [a b]",
+                "output": "a AND b AND (c d) AND [a b]",
+            },
+            {
+                "input": 'a b (c d) [a b] "a c"',
+                "output": 'a AND b AND (c d) AND [a b] AND "a c"',
+            },
+            {
+                "input": "a b (c d) [a b] NOT word1",
+                "output": "a AND b AND (c d) AND [a b] AND NOT word1",
+            },
+            {
+                "input": 'a b NOT word1 (c d) [a b] NOT (word1 word2) "a z" NOT [word3 word4]',
+                "output": 'a AND b AND NOT word1 AND (c d) AND [a b] AND NOT (word1 word2) AND "a z" AND NOT [word3 word4]',
+            },
+            {
+                "input": 'a b NOT a (c d) [a b] NOT (a w) "a z" word1 AND word2',
+                "output": 'a AND b AND NOT a AND (c d) AND [a b] AND NOT (a w) AND "a z" AND word1 AND word2',
+            },
+            {
+                "input": 'a b NOT a (c d) [a b] AND (a w) "a z" word1 OR word2',
+                "output": 'a AND b AND NOT a AND (c d) AND [a b] AND (a w) AND "a z" AND word1 OR word2',
+            },
+            {
+                "input": "(A AND B) (a bc (a b)) and word1",
+                "output": "(A AND B) AND (a bc (a b)) and word1",
+            },
+            {
+                "input": 'field:"a w c" (a bc (a b) and w) and docket:"word1 word3"',
+                "output": 'field:"a w c" AND (a bc (a b) and w) and docket:"word1 word3"',
+            },
+        ]
+
+        for test in tests:
+            ouput_str = append_query_conjunctions(test["input"])
+            self.assertEqual(ouput_str, test["output"])

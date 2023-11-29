@@ -16,7 +16,7 @@ from cl.alerts.models import Alert, DocketAlert
 from cl.alerts.tasks import send_unsubscription_confirmation
 from cl.lib.http import is_ajax
 from cl.lib.types import AuthenticatedHttpRequest
-from cl.opinion_page.views import make_docket_title, user_has_alert
+from cl.opinion_page.utils import make_docket_title, user_has_alert
 from cl.search.models import Docket
 
 

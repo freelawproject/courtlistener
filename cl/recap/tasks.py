@@ -94,7 +94,11 @@ from cl.recap.models import (
 )
 from cl.scrapers.tasks import extract_recap_pdf, extract_recap_pdf_base
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
-from cl.search.tasks import add_items_to_solr, add_or_update_recap_docket
+from cl.search.tasks import (
+    add_items_to_solr,
+    add_or_update_recap_docket,
+    index_docket_parties_in_es,
+)
 
 logger = logging.getLogger(__name__)
 cnt = CaseNameTweaker()
@@ -108,17 +112,17 @@ async def process_recap_upload(pq: ProcessingQueue) -> None:
     """
     if pq.upload_type == UPLOAD_TYPE.DOCKET:
         docket = await process_recap_docket(pq.pk)
-        await sync_to_async(add_or_update_recap_docket)(docket)
+        await sync_to_async(add_or_update_recap_docket.delay)(docket)
     elif pq.upload_type == UPLOAD_TYPE.ATTACHMENT_PAGE:
         await process_recap_attachment(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.PDF:
         await process_recap_pdf(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.DOCKET_HISTORY_REPORT:
         docket = await process_recap_docket_history_report(pq.pk)
-        await sync_to_async(add_or_update_recap_docket)(docket)
+        await sync_to_async(add_or_update_recap_docket.delay)(docket)
     elif pq.upload_type == UPLOAD_TYPE.APPELLATE_DOCKET:
         docket = await process_recap_appellate_docket(pq.pk)
-        await sync_to_async(add_or_update_recap_docket)(docket)
+        await sync_to_async(add_or_update_recap_docket.delay)(docket)
     elif pq.upload_type == UPLOAD_TYPE.APPELLATE_ATTACHMENT_PAGE:
         await process_recap_appellate_attachment(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.CLAIMS_REGISTER:
@@ -127,7 +131,7 @@ async def process_recap_upload(pq: ProcessingQueue) -> None:
         await process_recap_zip(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.CASE_QUERY_PAGE:
         docket = await process_case_query_page(pq.pk)
-        await sync_to_async(add_or_update_recap_docket)(docket)
+        await sync_to_async(add_or_update_recap_docket.delay)(docket)
     elif pq.upload_type == UPLOAD_TYPE.APPELLATE_CASE_QUERY_PAGE:
         await sync_to_async(process_recap_appellate_case_query_page)(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.CASE_QUERY_RESULT_PAGE:
@@ -317,7 +321,11 @@ async def process_recap_pdf(pk):
                     )
                 break
 
-    rd.document_number = pq.document_number
+    # document_number field is a CharField in RECAPDocument and a
+    # BigIntegerField in ProcessingQueue. To prevent the ES signal
+    # processor fields tracker from detecting it as a value change, it should
+    # be converted to a string.
+    rd.document_number = str(pq.document_number)
     rd.attachment_number = pq.attachment_number
 
     # Do the file, finally.
@@ -392,7 +400,7 @@ async def process_recap_pdf(pk):
         rd_id=rd.pk,
     )
     docket = await Docket.objects.aget(id=de.docket_id)
-    await sync_to_async(mark_ia_upload_needed)(docket, save_docket=True)
+    await mark_ia_upload_needed(docket, save_docket=True)
     return rd
 
 
@@ -540,7 +548,7 @@ async def process_recap_docket(pk):
     )
 
     d.add_recap_source()
-    await sync_to_async(update_docket_metadata)(d, data)
+    await update_docket_metadata(d, data)
     if not d.pacer_case_id:
         d.pacer_case_id = pq.pacer_case_id
 
@@ -559,17 +567,18 @@ async def process_recap_docket(pk):
         ContentFile(text.encode()),
     )
 
-    des_returned, rds_created, content_updated = await sync_to_async(
-        add_docket_entries
-    )(d, data["docket_entries"])
-    await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
-    await sync_to_async(process_orphan_documents)(
-        rds_created, pq.court_id, d.date_filed
+    des_returned, rds_created, content_updated = await add_docket_entries(
+        d, data["docket_entries"]
     )
+    await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
+    if data["parties"]:
+        # Index or re-index parties only if the docket has parties.
+        await sync_to_async(index_docket_parties_in_es.delay)(d.pk)
+    await process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
-            await sync_to_async(send_alert_and_webhook)(d.pk, start_time)
+            await sync_to_async(send_alert_and_webhook.delay)(d.pk, start_time)
     await mark_pq_successful(pq, d_id=d.pk)
     return {
         "docket_pk": d.pk,
@@ -627,7 +636,7 @@ async def process_recap_attachment(
         document_number = att_data["document_number"]
     try:
         court = await Court.objects.aget(id=pq.court_id)
-        rds_affected, de = await sync_to_async(merge_attachment_page_data)(
+        rds_affected, de = await merge_attachment_page_data(
             court,
             pq.pacer_case_id,
             att_data["pacer_doc_id"],
@@ -716,7 +725,7 @@ async def process_recap_claims_register(pk):
 
     # Merge the contents into CL
     d.add_recap_source()
-    await sync_to_async(update_docket_metadata)(d, data)
+    await update_docket_metadata(d, data)
 
     retries = 5
     while True:
@@ -805,7 +814,7 @@ async def process_recap_docket_history_report(pk):
     )
 
     d.add_recap_source()
-    await sync_to_async(update_docket_metadata)(d, data)
+    await update_docket_metadata(d, data)
 
     if pq.debug:
         await mark_pq_successful(pq, d_id=d.pk)
@@ -842,16 +851,14 @@ async def process_recap_docket_history_report(pk):
         ContentFile(text.encode()),
     )
 
-    des_returned, rds_created, content_updated = await sync_to_async(
-        add_docket_entries
-    )(d, data["docket_entries"])
-    await sync_to_async(process_orphan_documents)(
-        rds_created, pq.court_id, d.date_filed
+    des_returned, rds_created, content_updated = await add_docket_entries(
+        d, data["docket_entries"]
     )
+    await process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
-            await sync_to_async(send_alert_and_webhook)(d.pk, start_time)
+            await sync_to_async(send_alert_and_webhook.delay)(d.pk, start_time)
     await mark_pq_successful(pq, d_id=d.pk)
     return {
         "docket_pk": d.pk,
@@ -909,7 +916,7 @@ async def process_case_query_page(pk):
     )
     current_case_name = d.case_name
     d.add_recap_source()
-    await sync_to_async(update_docket_metadata)(d, data)
+    await update_docket_metadata(d, data)
 
     # Update the docket in SOLR if the case name has changed and contains
     # docket entries
@@ -1024,8 +1031,8 @@ async def process_recap_appellate_docket(pk):
     )
 
     d.add_recap_source()
-    await sync_to_async(update_docket_metadata)(d, data)
-    d, og_info = await sync_to_async(update_docket_appellate_metadata)(d, data)
+    await update_docket_metadata(d, data)
+    d, og_info = await update_docket_appellate_metadata(d, data)
     if not d.pacer_case_id:
         d.pacer_case_id = pq.pacer_case_id
 
@@ -1047,17 +1054,18 @@ async def process_recap_appellate_docket(pk):
         ContentFile(text.encode()),
     )
 
-    des_returned, rds_created, content_updated = await sync_to_async(
-        add_docket_entries
-    )(d, data["docket_entries"])
-    await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
-    await sync_to_async(process_orphan_documents)(
-        rds_created, pq.court_id, d.date_filed
+    des_returned, rds_created, content_updated = await add_docket_entries(
+        d, data["docket_entries"]
     )
+    await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
+    if data["parties"]:
+        # Index or re-index parties only if the docket has parties.
+        await sync_to_async(index_docket_parties_in_es.delay)(d.pk)
+    await process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
-            await sync_to_async(send_alert_and_webhook)(d.pk, start_time)
+            await sync_to_async(send_alert_and_webhook.delay)(d.pk, start_time)
     await mark_pq_successful(pq, d_id=d.pk)
     return {
         "docket_pk": d.pk,
@@ -1107,7 +1115,7 @@ async def process_recap_appellate_attachment(
 
     try:
         court = await Court.objects.aget(id=pq.court_id)
-        rds_affected, de = await sync_to_async(merge_attachment_page_data)(
+        rds_affected, de = await merge_attachment_page_data(
             court,
             pq.pacer_case_id,
             att_data["pacer_doc_id"],
@@ -1542,7 +1550,7 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> None:
         return
 
     try:
-        merge_attachment_page_data(
+        async_to_sync(merge_attachment_page_data)(
             rd.docket_entry.docket.court,
             rd.docket_entry.docket.pacer_case_id,
             att_data["pacer_doc_id"],
@@ -2259,7 +2267,7 @@ def process_recap_email(
                 docket_data["docket_number"],
             )
             docket.add_recap_source()
-            update_docket_metadata(docket, docket_data)
+            async_to_sync(update_docket_metadata)(docket, docket_data)
 
             if not docket.pacer_case_id:
                 docket.pacer_case_id = docket_entry["pacer_case_id"]
@@ -2275,9 +2283,9 @@ def process_recap_email(
                 ContentFile(body.encode()),
             )
             # Add docket entries for each docket
-            des_returned, rds_created, content_updated = add_docket_entries(
-                docket, docket_data["docket_entries"]
-            )
+            des_returned, rds_created, content_updated = async_to_sync(
+                add_docket_entries
+            )(docket, docket_data["docket_entries"])
             d_updated = DocketUpdatedData(
                 docket=docket,
                 des_returned=des_returned,

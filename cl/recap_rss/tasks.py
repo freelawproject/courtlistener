@@ -335,7 +335,7 @@ def merge_rss_feed_contents(self, feed_data, court_pk, metadata_only=False):
             continue
 
         with transaction.atomic():
-            cached_ok = cache_hash(item_hash)
+            cached_ok = async_to_sync(cache_hash)(item_hash)
             if not cached_ok:
                 # The item is already in the cache, ergo it's getting processed
                 # in another thread/process and we had a race condition.
@@ -345,7 +345,7 @@ def merge_rss_feed_contents(self, feed_data, court_pk, metadata_only=False):
             )
 
             d.add_recap_source()
-            update_docket_metadata(d, docket)
+            async_to_sync(update_docket_metadata)(d, docket)
             if not d.pacer_case_id:
                 d.pacer_case_id = docket["pacer_case_id"]
             try:
@@ -358,9 +358,9 @@ def merge_rss_feed_contents(self, feed_data, court_pk, metadata_only=False):
             if metadata_only:
                 continue
 
-            des_returned, rds_created, content_updated = add_docket_entries(
-                d, docket["docket_entries"]
-            )
+            des_returned, rds_created, content_updated = async_to_sync(
+                add_docket_entries
+            )(d, docket["docket_entries"])
 
         if content_updated:
             newly_enqueued = enqueue_docket_alert(d.pk)

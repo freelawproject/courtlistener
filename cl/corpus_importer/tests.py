@@ -573,10 +573,15 @@ class HarvardTests(TestCase):
             "cl.corpus_importer.management.commands.harvard_opinions.find_court"
         )
         self.find_court_func = self.find_court_patch.start()
+        self.get_fix_list_patch = patch(
+            "cl.corpus_importer.management.commands.harvard_opinions.get_fix_list"
+        )
+        self.get_fix_list = self.get_fix_list_patch.start()
 
         # Default values for Harvard Tests
         self.filepath_list_func.return_value = ["/one/fake/filepath.json"]
         self.find_court_func.return_value = ["harvard"]
+        self.get_fix_list.return_value = []
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -2593,7 +2598,7 @@ class HarvardMergerTests(TestCase):
             .values_list("id", flat=True)
         )
 
-        self.assertEqual([1, 4], list(cluster_ids))
+        self.assertEqual([1, 4], list(sorted(cluster_ids)))
 
         case_data = {
             "docket_number": "345",
@@ -2772,8 +2777,16 @@ class HarvardMergerTests(TestCase):
                 "Leavitt",
                 "",  # extracted data is the same, no need to update
             ),
+            # CL item #1301211
+            (
+                "Mikell",
+                "MlKELL",  # there is a typo in the name, but it is very similar, we shouldn't be throwing an exception
+                "Mikell",
+            ),
         ]:
-            data_to_update = merge_judges((item[1], item[0]))
+            # Pass a fake cluster id, it is only necessary to log a message when
+            # skip_judge_merger option is set
+            data_to_update = merge_judges((item[1], item[0]), cluster_id=12345)
             self.assertEqual(data_to_update.get("judges", ""), item[2])
 
     def test_merge_overlap_casenames(self):

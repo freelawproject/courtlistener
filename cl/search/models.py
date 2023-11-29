@@ -15,6 +15,8 @@ from django.urls import NoReverseMatch, reverse
 from django.utils.encoding import force_str
 from django.utils.text import slugify
 from eyecite import get_citations
+from localflavor.us.models import USPostalCodeField, USZipCodeField
+from localflavor.us.us_states import OBSOLETE_STATES, USPS_CHOICES
 from model_utils import FieldTracker
 from ordered_model.models import OrderedModel
 
@@ -288,6 +290,17 @@ class Docket(AbstractDateTimeModel):
     SCRAPER_AND_HARVARD = 18
     RECAP_AND_SCRAPER_AND_HARVARD = 19
     HARVARD_AND_COLUMBIA = 20
+    COLUMBIA_AND_RECAP_AND_HARVARD = 21
+    COLUMBIA_AND_SCRAPER_AND_HARVARD = 22
+    COLUMBIA_AND_RECAP_AND_SCRAPER_AND_HARVARD = 23
+    IDB_AND_HARVARD = 24
+    RECAP_AND_IDB_AND_HARVARD = 25
+    SCRAPER_AND_IDB_AND_HARVARD = 26
+    RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD = 27
+    COLUMBIA_AND_IDB_AND_HARVARD = 28
+    COLUMBIA_AND_RECAP_AND_IDB_AND_HARVARD = 29
+    COLUMBIA_AND_SCRAPER_AND_IDB_AND_HARVARD = 30
+    COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD = 31
     DIRECT_INPUT = 32
     DIRECT_INPUT_AND_HARVARD = 48
     ANON_2020 = 64
@@ -319,6 +332,32 @@ class Docket(AbstractDateTimeModel):
         (SCRAPER_AND_HARVARD, "Scraper and Harvard"),
         (RECAP_AND_SCRAPER_AND_HARVARD, "RECAP, Scraper and Harvard"),
         (HARVARD_AND_COLUMBIA, "Harvard and Columbia"),
+        (COLUMBIA_AND_RECAP_AND_HARVARD, "Columbia, RECAP, and Harvard"),
+        (COLUMBIA_AND_SCRAPER_AND_HARVARD, "Columbia, Scraper, and Harvard"),
+        (
+            COLUMBIA_AND_RECAP_AND_SCRAPER_AND_HARVARD,
+            "Columbia, RECAP, Scraper, and Harvard",
+        ),
+        (IDB_AND_HARVARD, "IDB and Harvard"),
+        (RECAP_AND_IDB_AND_HARVARD, "RECAP, IDB and Harvard"),
+        (SCRAPER_AND_IDB_AND_HARVARD, "Scraper, IDB and Harvard"),
+        (
+            RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
+            "RECAP, Scraper, IDB and Harvard",
+        ),
+        (COLUMBIA_AND_IDB_AND_HARVARD, "Columbia, IDB, and Harvard"),
+        (
+            COLUMBIA_AND_RECAP_AND_IDB_AND_HARVARD,
+            "Columbia, Recap, IDB, and Harvard",
+        ),
+        (
+            COLUMBIA_AND_SCRAPER_AND_IDB_AND_HARVARD,
+            "Columbia, Scraper, IDB, and Harvard",
+        ),
+        (
+            COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
+            "Columbia, Recap, Scraper, IDB, and Harvard",
+        ),
         (DIRECT_INPUT, "Direct court input"),
         (DIRECT_INPUT_AND_HARVARD, "Direct court input and Harvard"),
         (ANON_2020, "2020 anonymous database"),
@@ -670,6 +709,35 @@ class Docket(AbstractDateTimeModel):
         default=False,
     )
     es_pa_field_tracker = FieldTracker(fields=["docket_number", "court_id"])
+    es_oa_field_tracker = FieldTracker(
+        fields=[
+            "date_argued",
+            "date_reargued",
+            "date_reargument_denied",
+            "docket_number",
+            "slug",
+        ]
+    )
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "docket_number",
+            "case_name",
+            "case_name_short",
+            "case_name_full",
+            "nature_of_suit",
+            "cause",
+            "jury_demand",
+            "jurisdiction_type",
+            "date_argued",
+            "date_filed",
+            "date_terminated",
+            "assigned_to_id",
+            "assigned_to_str",
+            "referred_to_id",
+            "referred_to_str",
+            "slug",
+        ]
+    )
 
     class Meta:
         unique_together = ("docket_number", "pacer_case_id", "court")
@@ -935,29 +1003,6 @@ class Docket(AbstractDateTimeModel):
             }
         )
 
-        # Parties, attorneys, firms
-        if self.pk != 6245245:
-            # Don't do parties for the J&J talcum powder case. It's too big.
-            out.update(
-                {
-                    "party_id": set(),
-                    "party": set(),
-                    "attorney_id": set(),
-                    "attorney": set(),
-                    "firm_id": set(),
-                    "firm": set(),
-                }
-            )
-            for p in self.prefetched_parties:
-                out["party_id"].add(p.pk)
-                out["party"].add(p.name)
-                for a in p.attys_in_docket:
-                    out["attorney_id"].add(a.pk)
-                    out["attorney"].add(a.name)
-                    for f in a.firms_in_docket:
-                        out["firm_id"].add(f.pk)
-                        out["firm"].add(f.name)
-
         # Do RECAPDocument and Docket Entries in a nested loop
         for de in self.docket_entries.all().iterator():
             # Docket Entry
@@ -1150,6 +1195,13 @@ class DocketEntry(AbstractDateTimeModel):
         ),
         blank=True,
     )
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "description",
+            "entry_number",
+            "date_filed",
+        ]
+    )
 
     class Meta:
         verbose_name_plural = "Docket Entries"
@@ -1274,6 +1326,21 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             "the attachments page."
         ),
         blank=True,
+    )
+
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "docket_entry_id",
+            "document_type",
+            "document_number",
+            "description",
+            "pacer_doc_id",
+            "plain_text",
+            "attachment_number",
+            "is_available",
+            "page_count",
+            "filepath_local",
+        ]
     )
 
     class Meta:
@@ -1541,34 +1608,6 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
                 "court_citation_string": docket.court.citation_string,
             }
         )
-
-        # Parties, Attorneys, Firms
-        out.update(
-            {
-                "party_id": set(),
-                "party": set(),
-                "attorney_id": set(),
-                "attorney": set(),
-                "firm_id": set(),
-                "firm": set(),
-            }
-        )
-
-        if docket.pk == 6245245:
-            # Skip the parties for the J&J talcum powder case, it's just too
-            # big to pull from the DB. Sorry folks.
-            return out
-
-        for p in docket.prefetched_parties:
-            out["party_id"].add(p.pk)
-            out["party"].add(p.name)
-            for a in p.attys_in_docket:
-                out["attorney_id"].add(a.pk)
-                out["attorney"].add(a.name)
-                for f in a.firms_in_docket:
-                    out["firm_id"].add(f.pk)
-                    out["firm"].add(f.name)
-
         return out
 
     def as_search_dict(self, docket_metadata=None):
@@ -1665,6 +1704,12 @@ class BankruptcyInformation(AbstractDateTimeModel):
     )
     trustee_str = models.TextField(
         help_text="The name of the trustee handling the case.", blank=True
+    )
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "chapter",
+            "trustee_str",
+        ]
     )
 
     class Meta:
@@ -1915,6 +1960,9 @@ class FederalCourtsQuerySet(models.QuerySet):
     def territorial_courts(self) -> models.QuerySet:
         return self.filter(jurisdictions__in=Court.TERRITORY_JURISDICTIONS)
 
+    def military_courts(self) -> models.QuerySet:
+        return self.filter(jurisdictions__in=Court.MILITARY_JURISDICTIONS)
+
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Court(models.Model):
@@ -1941,6 +1989,8 @@ class Court(models.Model):
     TERRITORY_APPELLATE = "TA"
     TERRITORY_TRIAL = "TT"
     TERRITORY_SPECIAL = "TSP"
+    MILITARY_APPELLATE = "MA"
+    MILITARY_TRIAL = "MT"
     COMMITTEE = "C"
     INTERNATIONAL = "I"
     TESTING_COURT = "T"
@@ -1963,6 +2013,8 @@ class Court(models.Model):
         (TERRITORY_TRIAL, "Territory Trial"),
         (TERRITORY_SPECIAL, "Territory Special"),
         (STATE_ATTORNEY_GENERAL, "State Attorney General"),
+        (MILITARY_APPELLATE, "Military Appellate"),
+        (MILITARY_TRIAL, "Military Trial"),
         (COMMITTEE, "Committee"),
         (INTERNATIONAL, "International"),
         (TESTING_COURT, "Testing"),
@@ -1997,13 +2049,31 @@ class Court(models.Model):
         TERRITORY_TRIAL,
         TERRITORY_SPECIAL,
     ]
+    MILITARY_JURISDICTIONS = [
+        MILITARY_APPELLATE,
+        MILITARY_TRIAL,
+    ]
 
     id = models.CharField(
         help_text="a unique ID for each court as used in URLs",
         max_length=15,  # Changes here will require updates in urls.py
         primary_key=True,
     )
-
+    parent_court = models.ForeignKey(
+        "self",
+        help_text="Parent court for subdivisions",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="child_courts",
+    )
+    appeals_to = models.ManyToManyField(
+        "self",
+        help_text="Appellate courts for this court",
+        blank=True,
+        symmetrical=False,
+        related_name="appeals_from",
+    )
     # Pacer fields
     pacer_court_id = models.PositiveSmallIntegerField(
         help_text=(
@@ -2126,6 +2196,75 @@ class Court(models.Model):
 
     class Meta:
         ordering = ["position"]
+
+
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
+class CourtAppealsTo(Court.appeals_to.through):
+    """A model class to track court appeals_to m2m relation"""
+
+    class Meta:
+        proxy = True
+
+
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
+class Courthouse(models.Model):
+    """A class to represent the physical location of a court."""
+
+    COUNTRY_CHOICES = (("GB", "United Kingdom"), ("US", "United States"))
+
+    court = models.ForeignKey(
+        Court,
+        help_text="The court object associated with this courthouse.",
+        related_name="courthouses",
+        on_delete=models.CASCADE,
+    )
+    court_seat = models.BooleanField(
+        help_text="Is this the seat of the Court?",
+        default=False,
+        null=True,
+    )
+    building_name = models.TextField(
+        help_text="Ex. John Adams Courthouse.",
+        blank=True,
+    )
+    address1 = models.TextField(
+        help_text="The normalized address1 of the courthouse.",
+        blank=True,
+    )
+    address2 = models.TextField(
+        help_text="The normalized address2 of the courthouse.",
+        blank=True,
+    )
+    city = models.TextField(
+        help_text="The normalized city of the courthouse.",
+        blank=True,
+    )
+    county = models.TextField(
+        help_text="The county, if any, where the courthouse resides.",
+        blank=True,
+    )
+    state = USPostalCodeField(
+        help_text="The two-letter USPS postal abbreviation for the "
+        "organization w/ obsolete state options.",
+        choices=USPS_CHOICES + OBSOLETE_STATES,
+        blank=True,
+    )
+    zip_code = USZipCodeField(
+        help_text="The zip code for the organization, XXXXX or XXXXX-XXXX "
+        "work.",
+        blank=True,
+    )
+    country_code = models.TextField(
+        help_text="The two letter country code.",
+        choices=COUNTRY_CHOICES,
+        default="US",
+    )
+
+    def __str__(self):
+        return f"{self.court.short_name} Courthouse"
+
+    class Meta:
+        verbose_name_plural = "Courthouses"
 
 
 class ClusterCitationQuerySet(models.query.QuerySet):
@@ -3271,6 +3410,10 @@ class ParentheticalGroup(models.Model):
     )
     size = models.IntegerField(
         help_text="The number of parentheticals that belong to the group"
+    )
+
+    es_pa_field_tracker = FieldTracker(
+        fields=["opinion_id", "representative_id"]
     )
 
     def __str__(self) -> str:

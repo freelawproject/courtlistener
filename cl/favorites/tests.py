@@ -14,7 +14,7 @@ from timeout_decorator import timeout_decorator
 
 from cl.favorites.factories import NoteFactory
 from cl.favorites.models import DocketTag, Note, UserTag
-from cl.lib.test_helpers import SimpleUserDataMixin
+from cl.lib.test_helpers import AudioTestCase, SimpleUserDataMixin
 from cl.search.views import get_homepage_stats
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import APITestCase, TestCase
@@ -22,12 +22,11 @@ from cl.tests.utils import make_client
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
 
-class NoteTest(SimpleUserDataMixin, TestCase):
+class NoteTest(SimpleUserDataMixin, TestCase, AudioTestCase):
     fixtures = [
         "test_court.json",
         "test_objects_search.json",
         "judge_judy.json",
-        "test_objects_audio.json",
     ]
 
     def setUp(self) -> None:
@@ -39,7 +38,7 @@ class NoteTest(SimpleUserDataMixin, TestCase):
             "notes": "testing notes",
         }
         self.note_audio_params = {
-            "audio_id": 1,
+            "audio_id": self.audio_1.pk,
             "name": "foo",
             "notes": "testing notes",
         }
@@ -412,9 +411,9 @@ class APITests(APITestCase):
         self.client = make_client(self.pandora.user.pk)
         self.client2 = make_client(self.unconfirmed.user.pk)
 
-    async def tearDown(cls):
-        await UserTag.objects.all().adelete()
-        await DocketTag.objects.all().adelete()
+    def tearDown(cls):
+        UserTag.objects.all().delete()
+        DocketTag.objects.all().delete()
 
     async def make_a_good_tag(self, client, tag_name="taggy-tag"):
         data = {

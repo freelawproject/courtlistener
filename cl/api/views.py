@@ -1,14 +1,19 @@
 import logging
+from datetime import date, timedelta
+from typing import Optional
 
+import waffle
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.template import TemplateDoesNotExist
+from django.views.decorators.cache import cache_page
 from requests import Session
 from rest_framework import status
 from rest_framework.status import HTTP_400_BAD_REQUEST
 
+from cl.lib.elasticsearch_utils import build_es_base_query
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import (
     build_alert_estimation_query,
@@ -16,8 +21,10 @@ from cl.lib.search_utils import (
     build_coverage_query,
     get_solr_interface,
 )
+from cl.search.documents import AudioDocument
 from cl.search.forms import SearchForm
-from cl.search.models import Court
+from cl.search.models import SEARCH_TYPES, Court, OpinionCluster
+from cl.simple_pages.coverage_utils import build_chart_data
 from cl.simple_pages.views import get_coverage_data_fds
 
 logger = logging.getLogger(__name__)
@@ -159,6 +166,39 @@ def coverage_data(request, version, court):
     )
 
 
+def fetch_first_last_date_filed(
+    court_id: str,
+) -> tuple[Optional[date], Optional[date]]:
+    """Fetch first and last date for court
+
+    :param court_id: Court object id
+    :return: First/last date filed, if any
+    """
+    query = OpinionCluster.objects.filter(docket__court=court_id).order_by(
+        "date_filed"
+    )
+    first, last = query.first(), query.last()
+    if first:
+        return first.date_filed, last.date_filed
+    return None, None
+
+
+@cache_page(7 * 60 * 60 * 24, key_prefix="coverage")
+def coverage_data_opinions(request: HttpRequest):
+    """Generate Coverage Chart Data
+
+    Accept GET to query court data for timelines-chart on coverage page
+
+    :param request: The HTTP request
+    :return: Timeline data for court(s)
+    """
+    chart_data = []
+    if request.method == "GET":
+        court_ids = request.GET.get("court_ids").split(",")  # type: ignore
+        chart_data = build_chart_data(court_ids)
+    return JsonResponse(chart_data, safe=False)
+
+
 async def get_result_count(request, version, day_count):
     """Get the count of results for the past `day_count` number of days
 
@@ -171,6 +211,7 @@ async def get_result_count(request, version, day_count):
     :return: A JSON object with the number of hits during the last day_range
     period.
     """
+
     search_form = await sync_to_async(SearchForm)(request.GET.copy())
     if not search_form.is_valid():
         return JsonResponse(
@@ -178,25 +219,39 @@ async def get_result_count(request, version, day_count):
             safe=True,
             status=HTTP_400_BAD_REQUEST,
         )
-
     cd = search_form.cleaned_data
-    with Session() as session:
-        try:
-            si = get_solr_interface(cd, http_connection=session)
-        except NotImplementedError:
-            logger.error(
-                "Tried getting solr connection for %s, but it's not "
-                "implemented yet",
-                cd["type"],
-            )
-            raise
+    search_type = cd["type"]
+    es_flag_for_oa = await sync_to_async(waffle.flag_is_active)(
+        request, "oa-es-active"
+    )
+    if (
+        search_type == SEARCH_TYPES.ORAL_ARGUMENT and es_flag_for_oa
+    ):  # Elasticsearch version for OA
+        document_type = AudioDocument
+        cd["argued_after"] = date.today() - timedelta(days=int(day_count))
+        cd["argued_before"] = None
+        search_query = document_type.search()
+        s, _ = build_es_base_query(search_query, cd)
+        total_query_results = s.count()
+    else:
+        with Session() as session:
+            try:
+                si = get_solr_interface(cd, http_connection=session)
+            except NotImplementedError:
+                logger.error(
+                    "Tried getting solr connection for %s, but it's not "
+                    "implemented yet",
+                    cd["type"],
+                )
+                raise
 
-        response = (
-            si.query()
-            .add_extra(**build_alert_estimation_query(cd, int(day_count)))
-            .execute()
-        )
-    return JsonResponse({"count": response.result.numFound}, safe=True)
+            response = (
+                si.query()
+                .add_extra(**build_alert_estimation_query(cd, int(day_count)))
+                .execute()
+            )
+            total_query_results = response.result.numFound
+    return JsonResponse({"count": total_query_results}, safe=True)
 
 
 async def deprecated_api(request, v):

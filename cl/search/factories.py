@@ -19,6 +19,7 @@ from cl.people_db.factories import PersonFactory
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SOURCES,
+    BankruptcyInformation,
     Citation,
     Court,
     Docket,
@@ -306,7 +307,7 @@ class OpinionClusterFactoryMultipleOpinions(
 
 
 class OpinionsCitedWithParentsFactory(DjangoModelFactory):
-    """Make a DocketEntry with Docket parents"""
+    """Make a OpinionCited with Opinion parents"""
 
     class Meta:
         model = OpinionsCited
@@ -317,3 +318,11 @@ class OpinionsCitedWithParentsFactory(DjangoModelFactory):
     cited_opinion = SubFactory(
         "cl.search.factories.OpinionFactory",
     )
+
+
+class BankruptcyInformationFactory(DjangoModelFactory):
+    class Meta:
+        model = BankruptcyInformation
+
+    chapter = Faker("random_id_string")
+    trustee_str = Faker("name_female")

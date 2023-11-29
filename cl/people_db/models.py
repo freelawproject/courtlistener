@@ -8,6 +8,7 @@ from localflavor.us.models import (
     USStateField,
     USZipCodeField,
 )
+from model_utils import FieldTracker
 
 from cl.custom_filters.templatetags.extras import granular_date
 from cl.lib.date_time import midnight_pt
@@ -207,6 +208,23 @@ class Person(AbstractDateTimeModel):
         "the judge pics project.",
         default=False,
     )
+    es_p_field_tracker = FieldTracker(
+        fields=[
+            "name_full",
+            "name_full_reverse",
+            "religion",
+            "gender",
+            "dob_city",
+            "dob_state",
+            "fjc_id",
+            "date_dob",
+            "date_dod",
+            "date_granularity_dob",
+            "date_granularity_dod",
+            "slug",
+        ]
+    )
+    es_rd_field_tracker = FieldTracker(fields=["name_full"])
 
     def __str__(self) -> str:
         return f"{self.pk}: {self.name_full}"
@@ -414,6 +432,7 @@ class School(AbstractDateTimeModel):
         blank=True,
         db_index=True,
     )
+    es_p_field_tracker = FieldTracker(fields=["name"])
 
     def __str__(self) -> str:
         if self.is_alias_of:
@@ -951,6 +970,35 @@ class Position(AbstractDateTimeModel):
         default=False,
     )
 
+    es_p_field_tracker = FieldTracker(
+        fields=[
+            "court_id",
+            "organization_name",
+            "job_title",
+            "position_type",
+            "date_nominated",
+            "date_elected",
+            "date_recess_appointment",
+            "date_referred_to_judicial_committee",
+            "date_judicial_committee_action",
+            "date_hearing",
+            "date_confirmation",
+            "date_start",
+            "date_granularity_start",
+            "date_retirement",
+            "date_termination",
+            "date_granularity_termination",
+            "judicial_committee_action",
+            "nomination_process",
+            "how_selected",
+            "termination_reason",
+            "person_id",
+            "appointer_id",
+            "supervisor_id",
+            "predecessor_id",
+        ]
+    )
+
     def __str__(self) -> str:
         return f"{self.pk}: {self.person.name_full} at {self.court_id}"
 
@@ -1294,6 +1342,7 @@ class PoliticalAffiliation(AbstractDateTimeModel):
         max_length=15,
         blank=True,
     )
+    es_p_field_tracker = FieldTracker(fields=["political_party"])
 
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -1356,6 +1405,7 @@ class ABARating(AbstractDateTimeModel):
         choices=ABA_RATINGS,
         max_length=5,
     )
+    es_p_field_tracker = FieldTracker(fields=["rating"])
 
     class Meta:
         verbose_name = "American Bar Association Rating"

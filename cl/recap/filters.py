@@ -21,6 +21,7 @@ class ProcessingQueueFilter(NoEmptyFilterSet):
             "pacer_case_id": ["exact", "in"],
             "status": ["exact", "in"],
             "upload_type": ["exact", "in"],
+            "date_created": DATETIME_LOOKUPS,
         }
 
 
@@ -31,6 +32,7 @@ class EmailProcessingQueueFilter(NoEmptyFilterSet):
             "status": ["exact", "in"],
             "court": ["exact"],
             "recap_documents": ["exact", "in"],
+            "date_created": DATETIME_LOOKUPS,
         }
 
 

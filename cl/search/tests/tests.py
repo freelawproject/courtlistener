@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 import pytz
-from asgiref.sync import sync_to_async
+from asgiref.sync import async_to_sync, sync_to_async
 from dateutil.tz import tzoffset, tzutc
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
@@ -29,6 +29,7 @@ from timeout_decorator import timeout_decorator
 from cl.lib.search_utils import cleanup_main_query, make_fq
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
+    AudioTestCase,
     EmptySolrTestCase,
     IndexedSolrTestCase,
     SolrTestCase,
@@ -65,7 +66,7 @@ from cl.search.models import (
 from cl.search.tasks import add_docket_to_solr_by_rds
 from cl.search.views import do_search
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
-from cl.tests.cases import TestCase
+from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.utils import get_with_wait
 from cl.users.factories import UserProfileWithParentsFactory
 
@@ -113,7 +114,7 @@ class UpdateIndexCommandTest(SolrTestCase):
         )
 
         # Check a simple citation query
-        results = self.si_opinion.query(cites=3).execute()
+        results = self.si_opinion.query(cites=self.opinion_3.pk).execute()
         actual_count = self._get_result_count(results)
         expected_citation_count = 2
         self.assertEqual(
@@ -155,9 +156,9 @@ class UpdateIndexCommandTest(SolrTestCase):
                 f"{settings.SOLR_HOST}/solr/{self.core_name_opinion}",
                 "--update",
                 "--items",
-                "1",
-                "2",
-                "3",
+                f"{self.opinion_1.pk}",
+                f"{self.opinion_2.pk}",
+                f"{self.opinion_3.pk}",
                 "--do-commit",
             ]
         )
@@ -453,8 +454,6 @@ class AdvancedTest(IndexedSolrTestCase):
     Advanced query techniques
     """
 
-    fixtures = ["test_objects_search.json", "judge_judy.json"]
-
     @classmethod
     def setUpTestData(cls):
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
@@ -477,6 +476,7 @@ class AdvancedTest(IndexedSolrTestCase):
         cls.rd_1 = RECAPDocumentFactory(
             docket_entry=cls.de_1, description="Leave to File"
         )
+        super().setUpTestData()
 
     async def test_a_intersection_query(self) -> None:
         """Does AND queries work"""
@@ -665,7 +665,7 @@ class AdvancedTest(IndexedSolrTestCase):
         )
 
 
-class SearchTest(IndexedSolrTestCase):
+class SearchTest(ESIndexTestCase, IndexedSolrTestCase):
     @classmethod
     def setUpTestData(cls):
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
@@ -687,6 +687,7 @@ class SearchTest(IndexedSolrTestCase):
             docket=DocketFactory(court=cls.court, docket_number="123456"),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
         )
+        super().setUpTestData()
 
     @staticmethod
     def get_article_count(r):
@@ -842,85 +843,6 @@ class SearchTest(IndexedSolrTestCase):
             reverse("show_results"), {"q": "*", "order_by": "random_123 desc"}
         )
         self.assertNotIn("an error", r.content.decode())
-
-    async def test_oa_results_basic(self) -> None:
-        r = await self.async_client.get(
-            reverse("show_results"), {"type": SEARCH_TYPES.ORAL_ARGUMENT}
-        )
-        self.assertIn("Jose", r.content.decode())
-
-    async def test_oa_results_date_argued_ordering(self) -> None:
-        r = await self.async_client.get(
-            reverse("show_results"),
-            {
-                "type": SEARCH_TYPES.ORAL_ARGUMENT,
-                "order_by": "dateArgued desc",
-            },
-        )
-        self.assertTrue(
-            r.content.decode().index("SEC") < r.content.decode().index("Jose"),
-            msg="'SEC' should come BEFORE 'Jose' when order_by desc.",
-        )
-
-        r = await self.async_client.get(
-            reverse("show_results"),
-            {"type": SEARCH_TYPES.ORAL_ARGUMENT, "order_by": "dateArgued asc"},
-        )
-        self.assertTrue(
-            r.content.decode().index("Jose") < r.content.decode().index("SEC"),
-            msg="'Jose' should come AFTER 'SEC' when order_by asc.",
-        )
-
-    async def test_oa_case_name_filtering(self) -> None:
-        r = await self.async_client.get(
-            reverse("show_results"),
-            {"type": SEARCH_TYPES.ORAL_ARGUMENT, "case_name": "jose"},
-        )
-        actual = self.get_article_count(r)
-        expected = 1
-        self.assertEqual(
-            actual,
-            expected,
-            msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
-        )
-
-    async def test_oa_jurisdiction_filtering(self) -> None:
-        r = await self.async_client.get(
-            reverse("show_results"),
-            {"type": SEARCH_TYPES.ORAL_ARGUMENT, "court": "test"},
-        )
-        actual = self.get_article_count(r)
-        expected = 2
-        self.assertEqual(
-            actual,
-            expected,
-            msg="Did not get expected number of results when filtering by "
-            "jurisdiction. Expected %s, but got %s." % (actual, expected),
-        )
-
-    async def test_oa_date_argued_filtering(self) -> None:
-        r = await self.async_client.get(
-            reverse("show_results"),
-            {"type": SEARCH_TYPES.ORAL_ARGUMENT, "argued_after": "2014-10-01"},
-        )
-        self.assertNotIn(
-            "an error",
-            r.content.decode(),
-            msg="Got an error when doing a Date Argued filter.",
-        )
-
-    async def test_oa_search_api(self) -> None:
-        """Can we get oa results on the search endpoint?"""
-        r = await self.async_client.get(
-            reverse("search-list", kwargs={"version": "v3"}),
-            {"type": SEARCH_TYPES.ORAL_ARGUMENT},
-        )
-        self.assertEqual(
-            r.status_code,
-            HTTP_200_OK,
-            msg="Did not get good status code from oral arguments API endpoint",
-        )
 
     async def test_homepage(self) -> None:
         """Is the homepage loaded when no GET parameters are provided?"""
@@ -1098,10 +1020,10 @@ class RelatedSearchTest(IndexedSolrTestCase):
     async def test_more_like_this_opinion(self) -> None:
         """Does the MoreLikeThis query return the correct number and order of
         articles."""
-        seed_pk = 1  # Paul Debbas v. Franklin
+        seed_pk = self.opinion_1.pk  # Paul Debbas v. Franklin
         expected_article_count = 3
-        expected_first_pk = 2  # Howard v. Honda
-        expected_second_pk = 3  # case name cluster 3
+        expected_first_pk = self.opinion_cluster_2.pk  # Howard v. Honda
+        expected_second_pk = self.opinion_cluster_3.pk  # case name cluster 3
 
         params = {
             "type": "o",
@@ -1127,7 +1049,7 @@ class RelatedSearchTest(IndexedSolrTestCase):
 
     async def test_more_like_this_opinion_detail_detail(self) -> None:
         """MoreLikeThis query on opinion detail page with status filter"""
-        seed_pk = 3  # case name cluster 3
+        seed_pk = self.opinion_cluster_3.pk  # case name cluster 3
 
         # Login as staff user (related items are by default disabled for guests)
         self.assertTrue(
@@ -1147,11 +1069,26 @@ class RelatedSearchTest(IndexedSolrTestCase):
         ]
 
         recommendations_expected = [
-            ("/opinion/2/case-name-cluster/?", "Howard v. Honda"),
-            ("/opinion/1/case-name-cluster/?", "Debbas v. Franklin"),
-            ("/opinion/1/case-name-cluster/?", "Debbas v. Franklin"),
-            ("/opinion/1/case-name-cluster/?", "Debbas v. Franklin"),
-            ("/opinion/1/case-name-cluster/?", "Debbas v. Franklin"),
+            (
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
+                "Debbas v. Franklin",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
+                "Debbas v. Franklin",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
+                "Debbas v. Franklin",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
+                "Debbas v. Franklin",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                "Howard v. Honda",
+            ),
         ]
 
         # Test if related opinion exist in expected order
@@ -1166,7 +1103,7 @@ class RelatedSearchTest(IndexedSolrTestCase):
     @override_settings(RELATED_FILTER_BY_STATUS=None)
     async def test_more_like_this_opinion_detail_no_filter(self) -> None:
         """MoreLikeThis query on opinion detail page (without filter)"""
-        seed_pk = 1  # Paul Debbas v. Franklin
+        seed_pk = self.opinion_cluster_1.pk  # Paul Debbas v. Franklin
 
         # Login as staff user (related items are by default disabled for guests)
         self.assertTrue(
@@ -1186,11 +1123,26 @@ class RelatedSearchTest(IndexedSolrTestCase):
         ]
 
         recommendations_expected = [
-            ("/opinion/2/case-name-cluster/?", "Howard v. Honda"),
-            ("/opinion/2/case-name-cluster/?", "Howard v. Honda"),
-            ("/opinion/2/case-name-cluster/?", "Howard v. Honda"),
-            ("/opinion/2/case-name-cluster/?", "Howard v. Honda"),
-            ("/opinion/3/case-name-cluster/?", "case name cluster 3"),
+            (
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                "Howard v. Honda",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                "Howard v. Honda",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                "Howard v. Honda",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                "Howard v. Honda",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_3.pk}/{self.opinion_cluster_3.slug}/?",
+                "case name cluster 3",
+            ),
         ]
 
         # Test if related opinion exist in expected order
@@ -1235,158 +1187,6 @@ class GroupedSearchTest(EmptySolrTestCase):
             num_expected,
             msg="Found %s items, but should have found %s if the items were "
             "grouped properly." % (result_count, num_expected),
-        )
-
-
-class JudgeSearchTest(IndexedSolrTestCase):
-    async def test_sorting(self) -> None:
-        """Can we do sorting on various fields?"""
-        sort_fields = [
-            "score desc",
-            "name_reverse asc",
-            "dob desc,name_reverse asc",
-            "dod desc,name_reverse asc",
-        ]
-        for sort_field in sort_fields:
-            r = await self.async_client.get(
-                "/", {"type": SEARCH_TYPES.PEOPLE, "ordered_by": sort_field}
-            )
-            self.assertNotIn(
-                "an error",
-                r.content.decode().lower(),
-                msg=f"Got an error when doing a judge search ordered by {sort_field}",
-            )
-
-    async def _test_article_count(self, params, expected_count, field_name):
-        r = await self.async_client.get("/", params)
-        tree = html.fromstring(r.content.decode())
-        got = len(tree.xpath("//article"))
-        self.assertEqual(
-            got,
-            expected_count,
-            msg="Did not get the right number of search results with %s "
-            "filter applied.\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            "Params were: %s" % (field_name, expected_count, got, params),
-        )
-
-    def test_name_field(self) -> None:
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "name": "judith"}, 1, "name"
-        )
-
-    def test_court_filter(self) -> None:
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "court": "ca1"}, 1, "court"
-        )
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "court": "scotus"}, 0, "court"
-        )
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "court": "scotus ca1"}, 1, "court"
-        )
-
-    def test_dob_filters(self) -> None:
-        self._test_article_count(
-            {
-                "type": SEARCH_TYPES.PEOPLE,
-                "born_after": "1941",
-                "born_before": "1943",
-            },
-            1,
-            "born_{before|after}",
-        )
-        # Are reversed dates corrected?
-        self._test_article_count(
-            {
-                "type": SEARCH_TYPES.PEOPLE,
-                "born_after": "1943",
-                "born_before": "1941",
-            },
-            1,
-            "born_{before|after}",
-        )
-        # Just one filter, but Judy is older than this.
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "born_after": "1946"},
-            0,
-            "born_{before|after}",
-        )
-
-    def test_birth_location(self) -> None:
-        """Can we filter by city and state?"""
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "dob_city": "brookyln"},
-            1,
-            "dob_city",
-        )
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "dob_city": "brooklyn2"},
-            0,
-            "dob_city",
-        )
-        self._test_article_count(
-            {
-                "type": SEARCH_TYPES.PEOPLE,
-                "dob_city": "brookyln",
-                "dob_state": "NY",
-            },
-            1,
-            "dob_city",
-        )
-        self._test_article_count(
-            {
-                "type": SEARCH_TYPES.PEOPLE,
-                "dob_city": "brookyln",
-                "dob_state": "OK",
-            },
-            0,
-            "dob_city",
-        )
-
-    def test_schools_filter(self) -> None:
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "school": "american"}, 1, "school"
-        )
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "school": "pitzer"}, 0, "school"
-        )
-
-    def test_appointer_filter(self) -> None:
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "appointer": "clinton"},
-            1,
-            "appointer",
-        )
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "appointer": "obama"},
-            0,
-            "appointer",
-        )
-
-    def test_selection_method_filter(self) -> None:
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "selection_method": "e_part"},
-            1,
-            "selection_method",
-        )
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "selection_method": "e_non_part"},
-            0,
-            "selection_method",
-        )
-
-    def test_political_affiliation_filter(self) -> None:
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "political_affiliation": "d"},
-            1,
-            "political_affiliation",
-        )
-        self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "political_affiliation": "r"},
-            0,
-            "political_affiliation",
         )
 
 
@@ -1535,7 +1335,7 @@ class PagerankTest(TestCase):
             )
 
 
-class OpinionSearchFunctionalTest(BaseSeleniumTest):
+class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
     """
     Test some of the primary search functionality of CL: searching opinions.
     These tests should exercise all aspects of using the search box and SERP.
@@ -1546,7 +1346,6 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         "judge_judy.json",
         "test_objects_search.json",
         "functest_opinions.json",
-        "test_objects_audio.json",
     ]
 
     def setUp(self) -> None:
@@ -2121,7 +1920,9 @@ class DocketEntriesTimezone(TestCase):
         ingesting docket entries with no time info?
         """
 
-        add_docket_entries(self.d_cand, self.de_date_data["docket_entries"])
+        async_to_sync(add_docket_entries)(
+            self.d_cand, self.de_date_data["docket_entries"]
+        )
         de_cand_date = DocketEntry.objects.get(
             docket__court=self.cand, entry_number=1
         )
@@ -2136,10 +1937,14 @@ class DocketEntriesTimezone(TestCase):
         """
 
         # Add docket entries with UTC datetime for CAND
-        add_docket_entries(self.d_cand, self.de_utc_data["docket_entries"])
+        async_to_sync(add_docket_entries)(
+            self.d_cand, self.de_utc_data["docket_entries"]
+        )
 
         # Add docket entries with a different time offset than UTC datetime
-        add_docket_entries(self.d_cand, self.de_pdt_data["docket_entries"])
+        async_to_sync(add_docket_entries)(
+            self.d_cand, self.de_pdt_data["docket_entries"]
+        )
 
         de_cand_utc = DocketEntry.objects.get(
             docket__court=self.cand, entry_number=1
@@ -2155,10 +1960,14 @@ class DocketEntriesTimezone(TestCase):
         self.assertEqual(de_cand_pdt.time_filed, datetime.time(2, 46, 51))
 
         # Add docket entries with UTC datetime for NYED
-        add_docket_entries(self.d_nyed, self.de_utc_data["docket_entries"])
+        async_to_sync(add_docket_entries)(
+            self.d_nyed, self.de_utc_data["docket_entries"]
+        )
 
         # Add docket entries with a different time offset than UTC datetime
-        add_docket_entries(self.d_nyed, self.de_pdt_data["docket_entries"])
+        async_to_sync(add_docket_entries)(
+            self.d_nyed, self.de_pdt_data["docket_entries"]
+        )
 
         de_nyed_utc = DocketEntry.objects.get(
             docket__court=self.nyed, entry_number=1
@@ -2179,7 +1988,9 @@ class DocketEntriesTimezone(TestCase):
         """
 
         # Add docket entries with UTC datetime for CAND
-        add_docket_entries(self.d_cand, self.de_utc_data["docket_entries"])
+        async_to_sync(add_docket_entries)(
+            self.d_cand, self.de_utc_data["docket_entries"]
+        )
 
         de_cand = DocketEntry.objects.get(
             docket__court=self.cand, entry_number=1
@@ -2189,7 +2000,9 @@ class DocketEntriesTimezone(TestCase):
         self.assertEqual(de_cand.time_filed, datetime.time(19, 46, 51))
 
         # Add docket entries with null date_filed
-        add_docket_entries(self.d_cand, self.de_no_date["docket_entries"])
+        async_to_sync(add_docket_entries)(
+            self.d_cand, self.de_no_date["docket_entries"]
+        )
         de_cand.refresh_from_db()
         # Docket entry date_filed and time_filed are remain the same
         self.assertEqual(de_cand.date_filed, datetime.date(2021, 10, 15))
@@ -2201,7 +2014,9 @@ class DocketEntriesTimezone(TestCase):
         """
 
         # Add docket entries with UTC datetime for CAND
-        add_docket_entries(self.d_cand, self.de_utc_data["docket_entries"])
+        async_to_sync(add_docket_entries)(
+            self.d_cand, self.de_utc_data["docket_entries"]
+        )
 
         de_cand = DocketEntry.objects.get(
             docket__court=self.cand, entry_number=1
@@ -2211,14 +2026,16 @@ class DocketEntriesTimezone(TestCase):
         self.assertEqual(de_cand.time_filed, datetime.time(19, 46, 51))
 
         # Add docket entries without time data but same date
-        add_docket_entries(self.d_cand, self.de_date_data["docket_entries"])
+        async_to_sync(add_docket_entries)(
+            self.d_cand, self.de_date_data["docket_entries"]
+        )
         de_cand.refresh_from_db()
         # Avoid updating date-time if the date doesn't change
         self.assertEqual(de_cand.date_filed, datetime.date(2021, 10, 15))
         self.assertEqual(de_cand.time_filed, datetime.time(19, 46, 51))
 
         # Add docket entries without time data but different date
-        add_docket_entries(
+        async_to_sync(add_docket_entries)(
             self.d_cand, self.de_date_data_changes["docket_entries"]
         )
         de_cand.refresh_from_db()
@@ -2233,7 +2050,9 @@ class DocketEntriesTimezone(TestCase):
         """
 
         # Add docket entries with UTC datetime for CAND
-        add_docket_entries(self.d_cand, self.de_utc_data["docket_entries"])
+        async_to_sync(add_docket_entries)(
+            self.d_cand, self.de_utc_data["docket_entries"]
+        )
 
         de_cand = DocketEntry.objects.get(
             docket__court=self.cand, entry_number=1
@@ -2244,7 +2063,7 @@ class DocketEntriesTimezone(TestCase):
 
         # Add docket entries with UTC datetime for CAND, time changes,
         # date remains the same
-        add_docket_entries(
+        async_to_sync(add_docket_entries)(
             self.d_cand, self.de_utc_changes_time["docket_entries"]
         )
         de_cand.refresh_from_db()
@@ -2253,7 +2072,7 @@ class DocketEntriesTimezone(TestCase):
         self.assertEqual(de_cand.time_filed, datetime.time(19, 50, 11))
 
         # Add docket entries with UTC datetime for CAND, date and time change.
-        add_docket_entries(
+        async_to_sync(add_docket_entries)(
             self.d_cand, self.de_utc_data_not_dst["docket_entries"]
         )
         de_cand.refresh_from_db()
@@ -2268,8 +2087,12 @@ class DocketEntriesTimezone(TestCase):
 
         # Add docket entries for CAND US/Pacific filed in DST, in UTC and a
         # different time offset.
-        add_docket_entries(self.d_cand, self.de_utc_data["docket_entries"])
-        add_docket_entries(self.d_cand, self.de_pdt_data["docket_entries"])
+        async_to_sync(add_docket_entries)(
+            self.d_cand, self.de_utc_data["docket_entries"]
+        )
+        async_to_sync(add_docket_entries)(
+            self.d_cand, self.de_pdt_data["docket_entries"]
+        )
 
         de_cand_utc = DocketEntry.objects.get(
             docket__court=self.cand, entry_number=1
@@ -2297,8 +2120,12 @@ class DocketEntriesTimezone(TestCase):
 
         # Add docket entries for NYED US/Eastern filed in DST, in UTC and a
         # different time offset.
-        add_docket_entries(self.d_nyed, self.de_utc_data["docket_entries"])
-        add_docket_entries(self.d_nyed, self.de_pdt_data["docket_entries"])
+        async_to_sync(add_docket_entries)(
+            self.d_nyed, self.de_utc_data["docket_entries"]
+        )
+        async_to_sync(add_docket_entries)(
+            self.d_nyed, self.de_pdt_data["docket_entries"]
+        )
 
         de_nyed_utc = DocketEntry.objects.get(
             docket__court=self.nyed, entry_number=1
@@ -2329,7 +2156,7 @@ class DocketEntriesTimezone(TestCase):
         """
 
         # Add docket entries for CAND filed in not DST time. US/Pacific
-        add_docket_entries(
+        async_to_sync(add_docket_entries)(
             self.d_cand, self.de_utc_data_not_dst["docket_entries"]
         )
         de_cand_utc = DocketEntry.objects.get(
@@ -2346,7 +2173,7 @@ class DocketEntriesTimezone(TestCase):
         self.assertEqual(de_cand_utc.datetime_filed, target_date_aware)
 
         # Add docket entries for NYED filed in not DST time. US/Eastern
-        add_docket_entries(
+        async_to_sync(add_docket_entries)(
             self.d_nyed, self.de_utc_data_not_dst["docket_entries"]
         )
         de_nyed_utc = DocketEntry.objects.get(

@@ -1,6 +1,5 @@
 from django.urls import path, re_path
 
-from cl.opinion_page.feeds import DocketFeed
 from cl.opinion_page.views import (
     block_item,
     citation_homepage,
@@ -13,6 +12,7 @@ from cl.opinion_page.views import (
     redirect_og_lookup,
     view_authorities,
     view_docket,
+    view_docket_feed,
     view_opinion,
     view_parties,
     view_recap_document,
@@ -45,7 +45,7 @@ urlpatterns = [
     ),
     path(
         "docket/<int:docket_id>/feed/",
-        DocketFeed(),
+        view_docket_feed,
         name="docket_feed",
     ),
     path("opinion/<int:pk>/<blank-slug:_>/", view_opinion, name="view_case"),

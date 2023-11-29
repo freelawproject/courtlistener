@@ -106,8 +106,8 @@
           <p><a href="{% url "court_publish_page" pk="tennworkcompcl" %}"
                 class="btn btn-default">Upload New CWCC Opinion</a></p>
         {% endif %}
-        {% if results_compcl.paginator.count > 0 %}
-          {% include "includes/search_result.html" with results=results_compcl type_override=SEARCH_TYPES.OPINION simple=True %}
+        {% if results_tennworkcompcl.paginator.count > 0 %}
+          {% include "includes/search_result.html" with results=results_tennworkcompcl type_override=SEARCH_TYPES.OPINION simple=True %}
           <p class="right">
             <a href="/?court_tennworkcompcl=on&order_by=dateFiled+desc"
                class="btn btn-default btn-lg v-offset-above-2"
@@ -124,8 +124,8 @@
           <p><a href="{% url "court_publish_page" pk="tennworkcompapp" %}"
                 class="btn btn-default">Upload New Appeals Board Opinion</a></p>
         {% endif %}
-        {% if results_compapp.paginator.count > 0 %}
-          {% include "includes/search_result.html" with results=results_compapp type_override=SEARCH_TYPES.OPINION simple=True %}
+        {% if results_tennworkcompapp.paginator.count > 0 %}
+          {% include "includes/search_result.html" with results=results_tennworkcompapp type_override=SEARCH_TYPES.OPINION simple=True %}
           <p class="right">
             <a href="/?court_tennworkcompapp=on&order_by=dateFiled+desc"
                class="btn btn-default btn-lg v-offset-above-2"
