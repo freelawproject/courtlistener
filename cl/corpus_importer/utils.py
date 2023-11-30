@@ -247,7 +247,9 @@ def similarity_scores(
 def match_opinion_lists(
     file_opinions_list: list[Any], cl_opinions_list: list[Any]
 ) -> dict[int, int]:
-    """Try to match the opinions on two lists and generate a dict with position of
+    """Match opinions on two lists from different sources
+
+    Try to match the opinions on two lists and generate a dict with position of
     matching opinions
 
     Remove non-alphanumeric and non-whitespace characters from lowercased text,

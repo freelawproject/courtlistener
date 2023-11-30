@@ -116,8 +116,7 @@ SIMPLE_TAGS = [
 
 
 def format_case_name(name: str) -> str:
-    """Applies standard harmonization methods after normalizing with
-    lowercase.
+    """Applies standard harmonization methods after normalizing with lowercase
 
     :param name: case name
     :return: title cased name
@@ -281,7 +280,9 @@ def extract_columbia_opinions(
 def merge_opinions(
     opinions: list, content: list, current_order: int
 ) -> tuple[list, int]:
-    """Merge last and previous opinion if are the same type or create a new
+    """Merge last and previous opinion if possible
+
+    We try merge last and previous opinion to if are the same type or create a new
     opinion if merge is not possible
 
     :param opinions: list of opinions that is being updated constantly
@@ -338,7 +339,9 @@ def is_per_curiam_opinion(
 
 
 def process_extracted_opinions(extracted_opinions: list) -> list:
-    """We read the extracted data in extract_opinions function to merge all
+    """Process all extracted opinions from columbia xml
+
+    We read the extracted data in extract_opinions function to merge all
     possible floating opinions (it is not explicitly defined within an opinion
     tag or doesn't have an author)
 
@@ -424,6 +427,7 @@ def fix_reporter_caption(found_tags) -> None:
 
     The reporter_caption may contain the location, and we need to remove it
     to make the name cleaner e.g. Tex.App.-Ft.Worth [2d Dist.] 2002
+
     :param found_tags: a list of found tags
     :return: None
     """
@@ -485,7 +489,9 @@ def fetch_simple_tags(soup: BeautifulSoup, tag_name: str) -> list:
 
 
 def convert_columbia_html(text: str, opinion_index: int) -> str:
-    """Convert xml tags to html tags and process additional data from opinions
+    """Convert opinion data to html
+
+    Convert xml tags to html tags and process additional data from opinions
     like footnotes
 
     :param text: Text to convert to html

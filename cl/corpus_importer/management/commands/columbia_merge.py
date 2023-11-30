@@ -154,8 +154,7 @@ def get_cl_opinion_content(cluster_id: int) -> list[dict[Any, Any]]:
 def update_matching_opinions(
     matches: dict, cl_cleaned_opinions: list, columbia_opinions: list
 ) -> None:
-    """Store matching opinion content in html_columbia field from Opinion
-    object
+    """Store matching opinion content in html_columbia field from Opinion object
 
     :param matches: dict with matching position from cl and columbia opinions
     :param cl_cleaned_opinions: list of cl opinions
