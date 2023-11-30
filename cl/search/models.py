@@ -1520,20 +1520,20 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         court_id = map_cl_to_pacer_id(court.pk)
         if self.pacer_doc_id:
             if self.pacer_doc_id.count("-") > 1:
-                # Redirects users to the ACMS Docket Report page.
-                # Loading the docket report is an essential step to
-                # access the download confirmation page.
+                # It seems like loading the ACMS Download Page using links is not
+                # possible. we've implemented a modal window that explains this
+                # issue and guides users towards using the button to access the
+                # docket report.
                 return self.docket_entry.docket.pacer_docket_url
+            elif court.jurisdiction == Court.FEDERAL_APPELLATE:
+                template = "https://ecf.%s.uscourts.gov/docs1/%s?caseId=%s"
             else:
-                if court.jurisdiction == Court.FEDERAL_APPELLATE:
-                    template = "https://ecf.%s.uscourts.gov/docs1/%s?caseId=%s"
-                else:
-                    template = "https://ecf.%s.uscourts.gov/doc1/%s?caseid=%s"
-                return template % (
-                    court_id,
-                    self.pacer_doc_id,
-                    self.docket_entry.docket.pacer_case_id,
-                )
+                template = "https://ecf.%s.uscourts.gov/doc1/%s?caseid=%s"
+            return template % (
+                court_id,
+                self.pacer_doc_id,
+                self.docket_entry.docket.pacer_case_id,
+            )
         else:
             if court.jurisdiction == Court.FEDERAL_APPELLATE:
                 return ""
