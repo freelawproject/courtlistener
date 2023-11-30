@@ -101,101 +101,6 @@ CERT_DENIED_TAGS = [
     "certiorari denied by supreme court",
     "petition for certiorari denied by supreme court",
 ]
-UNKNOWN_TAGS = [
-    "petition for review allowed",
-    "affirmed",
-    "reversed and remanded",
-    "rehearing overruled",
-    "motion for rehearing overruled",
-    "review granted",
-    "decision released",
-    "transfer denied",
-    "released for publication",
-    "application to transfer denied",
-    "amended",
-    "reversed",
-    "opinion on petition to rehear",
-    "suggestion of error overruled",
-    "cv",
-    "case stored in record room",
-    "met to file petition for review disposed granted",
-    "rehearing granted",
-    "opinion released",
-    "permission to appeal denied by supreme court",
-    "rehearing pending",
-    "on motion for rehearing",
-    "application for transfer denied",
-    "effective date",
-    "modified",
-    "opinion modified",
-    "transfer granted",
-    "discretionary review denied",
-    "discretionary review refused",
-    "application for leave to file second petition for rehearing denied",
-    "final",
-    "date of judgment entry on appeal",
-    "petition for review pending",
-    "writ denied",
-    "rehearing filed",
-    "as extended",
-    "officially released",
-    "appendix filed",
-    "spring sessions",
-    "summer sessions",
-    "fall sessions",
-    "winter sessions",
-    "discretionary review denied by supreme court",
-    "dissenting opinion",
-    "en banc reconsideration denied",
-    "answer returned",
-    "refiled",
-    "revised",
-    "modified upon denial of rehearing",
-    "session mailed",
-    "reversed and remanded with instructions",
-    "writ granted",
-    "date of judgment entry",
-    "preliminary ruling rendered",
-    "amended on",
-    "dissenting opinion filed",
-    "concurring opinion filed",
-    "memorandum dated",
-    "mandamus denied on mandate",
-    "updated",
-    "date of judgment entered",
-    "released and journalized",
-    "submitted on",
-    "case assigned",
-    "opinion circulated for comment",
-    "submitted on rehearing",
-    "united states supreme court dismissed appeal",
-    "answered",
-    "reconsideration granted in part and as amended",
-    "as amended on denial of rehearing",
-    "reassigned",
-    "as amended",
-    "as corrected",
-    "writ allowed",
-    "released",
-    "application for leave to appeal filed",
-    "affirmed on appeal reversed and remanded",
-    "as corrected",
-    "withdrawn substituted and refiled",
-    "answered",
-    "released",
-    "as modified and ordered published",
-    "remanded",
-    "concurring opinion added",
-    "decision and journal entry dated",
-    "memorandum filed",
-    "as modified",
-    "application for permission to appeal denied by supreme court",
-    "rehearing and clarification denied",
-    "reversed and remanded for reconsideration",
-    "opinion granting rehearing in part",
-]
-
-
 SIMPLE_TAGS = [
     "attorneys",
     "caption",
@@ -237,8 +142,7 @@ def is_opinion_published(soup: BeautifulSoup) -> bool:
 
 
 def read_xml_to_soup(filepath: str) -> BeautifulSoup:
-    """This function reads the xml file, fixes the bad tags in columbia xml files and
-    returns a BeautifulSoup object
+    """Read the xml file and return a BeautifulSoup object
 
     :param filepath: path to xml file
     :return: BeautifulSoup object of parsed content
@@ -263,7 +167,9 @@ def read_xml_to_soup(filepath: str) -> BeautifulSoup:
 def add_floating_opinion(
     opinions: list, floating_content: list, opinion_order: int
 ) -> list:
-    """We have found floating opinions in bs object, we keep the opinion content as a
+    """Create a new opinion item
+
+    We have found floating opinions in bs object, we keep the opinion content as a
     new opinion
 
     :param opinions: a list with opinions found
@@ -296,9 +202,11 @@ def add_floating_opinion(
 def extract_columbia_opinions(
     outer_opinion: BeautifulSoup,
 ) -> list[Optional[dict]]:
-    """We extract all possible opinions from BeautifulSoup, with and without author,
-    and we create new opinions if floating content exists(content that is not
-    explicitly defined within an opinion tag or doesn't have an author)
+    """Get the opinions of the soup object
+
+    We extract all possible opinions from BeautifulSoup, with and without
+    author, and we create new opinions if floating content exists(content that
+    is not explicitly defined within an opinion tag or doesn't have an author)
 
     :param outer_opinion: element containing all xml tags
     :return: list of opinion dicts
@@ -327,9 +235,9 @@ def extract_columbia_opinions(
                 "concurrence_text",
             ]:
                 if floating_content:
-                    # We have found an opinion, but there is floating content, we
-                    # create a dict with the opinion using the floating content with
-                    # default type = "opinion"
+                    # We have found an opinion, but there is floating
+                    # content, we create a dict with the opinion using the
+                    # floating content with default type = "opinion"
                     opinions = add_floating_opinion(
                         opinions, floating_content, order
                     )
@@ -357,15 +265,15 @@ def extract_columbia_opinions(
 
             else:
                 if content.name not in SIMPLE_TAGS + ["syllabus"]:
-                    # We store content that is not inside _text tag and is not in
-                    # one of the known non-opinion tags
+                    # We store content that is not inside _text tag and is
+                    # not in one of the known non-opinion tags
                     floating_content.append(str(content))
 
     # Combine the new content into another opinion. great.
     if floating_content:
-        # If we end to go through all the found opinions and if we still have
-        # floating content out there, we create a new opinion with the last type
-        # of opinion
+        # If we end to go through all the found opinions and if we still
+        # have floating content out there, we create a new opinion with the
+        # last type of opinion
         opinions = add_floating_opinion(opinions, floating_content, order)
     return opinions
 
@@ -373,8 +281,8 @@ def extract_columbia_opinions(
 def merge_opinions(
     opinions: list, content: list, current_order: int
 ) -> tuple[list, int]:
-    """Merge last and previous opinion if are the same type or create a new opinion
-    if merge is not possible
+    """Merge last and previous opinion if are the same type or create a new
+    opinion if merge is not possible
 
     :param opinions: list of opinions that is being updated constantly
     :param content: list of opinions without an author
@@ -417,6 +325,7 @@ def is_per_curiam_opinion(
     content: Optional[str], byline: Optional[str]
 ) -> bool:
     """Check if opinion author is per curiam
+
     :param content: opinion content
     :param byline: opinion text author
     :return: True if opinion author is per curiam
@@ -429,9 +338,9 @@ def is_per_curiam_opinion(
 
 
 def process_extracted_opinions(extracted_opinions: list) -> list:
-    """We read the extracted data in extract_opinions function to merge all possible
-    floating opinions (it is not explicitly defined within an opinion tag or doesn't
-    have an author)
+    """We read the extracted data in extract_opinions function to merge all
+    possible floating opinions (it is not explicitly defined within an opinion
+    tag or doesn't have an author)
 
     :param extracted_opinions: list of opinions obtained from xml file
     :return: a list with extracted and processed opinions
@@ -513,7 +422,8 @@ def process_extracted_opinions(extracted_opinions: list) -> list:
 def fix_reporter_caption(found_tags) -> None:
     """Remove unnecessary information from reporter_caption tag
 
-    The reporter_caption may contain the location, and we need to remove it to make the name cleaner e.g. Tex.App.-Ft.Worth [2d Dist.] 2002
+    The reporter_caption may contain the location, and we need to remove it
+    to make the name cleaner e.g. Tex.App.-Ft.Worth [2d Dist.] 2002
     :param found_tags: a list of found tags
     :return: None
     """
@@ -528,7 +438,8 @@ def fix_reporter_caption(found_tags) -> None:
                         # string
                         r.next_sibling.extract()
                 if r.name == "citation":
-                    # Extract and insert citation tag before reporter_caption tag
+                    # Extract and insert citation tag before
+                    # reporter_caption tag
                     citation = r.extract()
                     found_tag.insert_before(citation)
                     continue
@@ -549,8 +460,8 @@ def fetch_simple_tags(soup: BeautifulSoup, tag_name: str) -> list:
         if tag_name == "reporter_caption":
             fix_reporter_caption(found_tags)
 
-        # We use space as a separator to add a space when we have one tag next to
-        # other without a space
+        # We use space as a separator to add a space when we have one tag
+        # next to other without a space
         tag_data = [
             found_tag.get_text(separator=" ").strip()
             for found_tag in found_tags
@@ -674,7 +585,8 @@ def parse_dates(
     """Parses the dates from a list of string.
 
     :param raw_dates: A list of (probably) date-containing strings
-    :return: Returns a list of lists of (string, datetime) tuples if there is a string before the date (or None).
+    :return: Returns a list of lists of (string, datetime) tuples if there is
+    a string before the date (or None).
     """
     months = re.compile(
         "january|february|march|april|may|june|july|august|"
@@ -770,8 +682,8 @@ def find_dates_in_xml(soup: BeautifulSoup) -> dict:
             else:
                 unknown_date = date_info[1]
 
-    # panel_date is used for finding judges, dates are ordered in terms of which type
-    # of dates best reflect them
+    # panel_date is used for finding judges, dates are ordered in terms of
+    # which type of dates best reflect them
     panel_date = (
         date_argued
         or date_reargued
@@ -824,8 +736,8 @@ def map_opinion_types(opinions=None) -> None:
     lead = False
     for op in opinions:
         op_type = op.get("type")
-        # Only first opinion with "opinion" type is a lead opinion, the next opinion
-        # with "opinion" type is an addendum
+        # Only first opinion with "opinion" type is a lead opinion, the next
+        # opinion with "opinion" type is an addendum
         if not lead and op_type and op_type == "opinion":
             lead = True
             op["type"] = "020lead"
