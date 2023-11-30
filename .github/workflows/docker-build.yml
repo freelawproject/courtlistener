@@ -44,13 +44,13 @@ jobs:
       - name: Launch Temporary Pod
         id: tempPod
         run: |
-          kubectl run temp-pod-${{ steps.vars.outputs.sha_short }} --rm -i -n ${{ env.EKS_NAMESPACE }} --image=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod --restart Never --pod-running-timeout=120s --overrides='
+          kubectl run temp-pod-${{ steps.vars.outputs.sha_short }} -n ${{ env.EKS_NAMESPACE }} --image=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod --restart Never --pod-running-timeout=120s --overrides='
           {
               "spec": {
               "containers": [{
                   "name": "temp-pod",
                   "image": "freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod",
-                  "command": ["/bin/sh", "-c", "trap : TERM INT; sleep 3600 & wait"],
+                  "command": ["/bin/sh", "-c", "trap : TERM INT; sleep 259200 & wait"],
                   "envFrom": [{
                   "secretRef": {
                       "name": "cl-env"
@@ -59,7 +59,8 @@ jobs:
               }]
               }
           }'
-
+      - name: Wait for Temporary Pod to Start
+        run: kubectl wait pods -n ${{ env.EKS_NAMESPACE }} --for condition=Ready --timeout=90s temp-pod-${{ steps.vars.outputs.sha_short }}
       - name: Collect Static Assets
         id: collectStatic
         run: |
@@ -80,6 +81,8 @@ jobs:
           echo "Found unapplied migrations. Open shell into pod temp-pod-${{ steps.vars.outputs.sha_short }}"
           echo "Manually run migrations. That pod will delete itself after an hour."
           exit 1
+      - name: Delete Temporary Pod
+        run: kubectl delete pod -n ${{ env.EKS_NAMESPACE }} temp-pod-${{ steps.vars.outputs.sha_short }}
 
       # Rollout new versions one by one (watch "deployments" in k9s)
       - name: Rollout cl-python
