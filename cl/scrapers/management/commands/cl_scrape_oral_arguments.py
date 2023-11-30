@@ -129,6 +129,7 @@ class Command(cl_scrape_opinions.Command):
             msg, r = get_binary_content(
                 item["download_urls"],
                 site.cookies,
+                headers={"User-Agent": "CourtListener"},
                 method=site.method,
             )
             if msg:

@@ -721,6 +721,7 @@ class Docket(AbstractDateTimeModel):
         fields=[
             "docket_number",
             "case_name",
+            "case_name_short",
             "case_name_full",
             "nature_of_suit",
             "cause",
@@ -733,6 +734,7 @@ class Docket(AbstractDateTimeModel):
             "assigned_to_str",
             "referred_to_id",
             "referred_to_str",
+            "slug",
         ]
     )
 
@@ -1323,6 +1325,21 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             "the attachments page."
         ),
         blank=True,
+    )
+
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "docket_entry_id",
+            "document_type",
+            "document_number",
+            "description",
+            "pacer_doc_id",
+            "plain_text",
+            "attachment_number",
+            "is_available",
+            "page_count",
+            "filepath_local",
+        ]
     )
 
     class Meta:
@@ -3388,6 +3405,10 @@ class ParentheticalGroup(models.Model):
     )
     size = models.IntegerField(
         help_text="The number of parentheticals that belong to the group"
+    )
+
+    es_pa_field_tracker = FieldTracker(
+        fields=["opinion_id", "representative_id"]
     )
 
     def __str__(self) -> str:

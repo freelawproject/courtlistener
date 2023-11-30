@@ -700,14 +700,14 @@ def build_es_base_query(
                 ["representative_text"], cd.get("q", "")
             )
         case SEARCH_TYPES.ORAL_ARGUMENT:
-            fields = SEARCH_ORAL_ARGUMENT_QUERY_FIELDS
+            fields = SEARCH_ORAL_ARGUMENT_QUERY_FIELDS.copy()
             fields.extend(add_fields_boosting(cd))
             string_query = build_fulltext_query(
                 fields,
                 cd.get("q", ""),
             )
         case SEARCH_TYPES.PEOPLE:
-            child_fields = SEARCH_PEOPLE_CHILD_QUERY_FIELDS
+            child_fields = SEARCH_PEOPLE_CHILD_QUERY_FIELDS.copy()
             child_fields.extend(
                 add_fields_boosting(
                     cd,
@@ -721,7 +721,7 @@ def build_es_base_query(
             child_query_fields = {
                 "position": child_fields,
             }
-            parent_query_fields = SEARCH_PEOPLE_PARENT_QUERY_FIELDS
+            parent_query_fields = SEARCH_PEOPLE_PARENT_QUERY_FIELDS.copy()
             parent_query_fields.extend(
                 add_fields_boosting(
                     cd,
@@ -736,7 +736,7 @@ def build_es_base_query(
                 cd.get("q", ""),
             )
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
-            child_fields = SEARCH_RECAP_CHILD_QUERY_FIELDS
+            child_fields = SEARCH_RECAP_CHILD_QUERY_FIELDS.copy()
             child_fields.extend(
                 add_fields_boosting(
                     cd,
@@ -749,7 +749,7 @@ def build_es_base_query(
                 )
             )
             child_query_fields = {"recap_document": child_fields}
-            parent_query_fields = SEARCH_RECAP_PARENT_QUERY_FIELDS
+            parent_query_fields = SEARCH_RECAP_PARENT_QUERY_FIELDS.copy()
             parent_query_fields.extend(
                 add_fields_boosting(
                     cd,
