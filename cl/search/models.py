@@ -1449,6 +1449,48 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             ]
         )
 
+    @property
+    def authority_count(self):
+        return self.cited_opinions.count()
+
+    @property
+    def authorities_with_data(self):
+        """Returns a queryset of this document's authorities for
+        eventual injection into a view template.
+
+        The returned queryset is sorted by the depth field.
+        """
+        query = (
+            self.cited_opinions.select_related(
+                "cited_opinion__cluster__docket__court"
+            )
+            .prefetch_related(
+                "cited_opinion__cluster__citations",
+                Prefetch(
+                    "cited_opinion__cluster__sub_opinions",
+                    queryset=Opinion.objects.only("pk", "cluster_id"),
+                ),
+            )
+            .only(
+                "depth",
+                "citing_document_id",
+                "cited_opinion__cluster__slug",
+                "cited_opinion__cluster__case_name",
+                "cited_opinion__cluster__case_name_full",
+                "cited_opinion__cluster__case_name_short",
+                "cited_opinion__cluster__citation_count",
+                "cited_opinion__cluster__docket_id",
+                "cited_opinion__cluster__date_filed",
+                "cited_opinion__cluster__docket__docket_number",
+                "cited_opinion__cluster__docket__court_id",
+                "cited_opinion__cluster__docket__court__citation_string",
+                "cited_opinion__cluster__docket__court__full_name",
+            )
+            .order_by("-depth")
+        )
+
+        return query
+
     def save(
         self,
         update_fields=None,
