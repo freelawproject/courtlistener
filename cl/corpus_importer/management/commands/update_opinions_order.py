@@ -1,12 +1,13 @@
 import os.path
 import re
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 from bs4 import BeautifulSoup, NavigableString, Tag
 from django.core.management import BaseCommand
+from django.db import transaction
 from django.db.models import Count
 
-from cl.corpus_importer.utils import similarity_scores
+from cl.corpus_importer.utils import compare_documents, similarity_scores
 from cl.lib.command_utils import logger
 from cl.lib.string_diff import get_cosine_similarity
 from cl.search.models import SOURCES, Opinion, OpinionCluster
@@ -23,7 +24,6 @@ VALID_HARVARD_SOURCES = [
 
 
 # TODO remove the funcitions below and import them from utils.py and columbia_utils.py when those changes get merged
-
 
 SIMPLE_TAGS = [
     "attorneys",
@@ -347,45 +347,84 @@ def map_opinion_types(opinions=None) -> None:
             op["type"] = "030concurrence"
 
 
-# TODO ------------------------ remove until here -------------------------------
-
-
-def match_text_lists(
-    file_opinions_list: List[Any], cl_opinions_list: List[Any]
+def match_opinion_lists(
+    file_opinions_list: list[Any], cl_opinions_list: list[Any]
 ) -> dict[int, int]:
-    """Generate matching lists above threshold
+    """Try to match the opinions on two lists and generate a dict with position of
+    matching opinions
+
+    Remove non-alphanumeric and non-whitespace characters from lowercased text,
+    this tries to make both texts in equal conditions to prove if both are similar or
+    equal
+
+    get_cosine_similarity works great when both texts are almost the same with very
+    small variations
+
+    Sometimes cosine similarity fails when there are small variations in text,
+    such as parties, attorneys, case name, or court that are included in the content
+    of the opinion, compare_documents() checks the percentage of the file opinion
+    text that it is in courtlistener opinion, having a large percentage means that
+    almost all the file opinion is in courtlistener opinion, but there is a
+    possibility that the courtlistener opinion contains some additional data in que
+    opinion content (such as case name, parties, etc.)
+
+    compare_documents works good when the opinion from the file is a subset of the
+    opinion in CL, the percentage represents how much of the opinion of the file is
+    in the opinion from cl (content in cl opinion can have other data in the body
+    like posture, attorneys, etc. e.g. in cluster id: 7643871 we have the posture and
+    the opinion text but in the xml file we only have the opinion text, cosine_sim:
+    0.1639075094124459 and percent_match: 73)
+
+    Sometimes one algorithm performs better than the other, this is due to some
+    additional text, such as editor's notes, or the author, page number or posture
+    added to the opinion
+
+    Key is opinion position from file, Value is opinion position from cl opinion e.g.
+    matches {0: 1, 1: 2} 0 is file opinion and 1 in cl opinion, 1 is file opinion and
+    2 is cl opinion
 
     :param file_opinions_list: Opinions from file
     :param cl_opinions_list: CL opinions
     :return: Matches if found or empty dict
     """
-    # We import this here to avoid a circular import
-    from cl.corpus_importer.management.commands.harvard_opinions import (
-        compare_documents,
-    )
 
     scores = similarity_scores(file_opinions_list, cl_opinions_list)
 
     matches = {}
     for i, row in enumerate(scores):
         j = row.argmax()  # type: ignore
-        # Lower threshold for small opinions.
-        if (
-            get_cosine_similarity(file_opinions_list[i], cl_opinions_list[j])
-            < 0.60
-        ):
-            continue
-        percent_match = compare_documents(
-            file_opinions_list[i], cl_opinions_list[j]
+        file_opinion = re.sub(
+            r"[^a-zA-Z0-9 ]", "", file_opinions_list[i].lower()
         )
-        if percent_match < 60:
+        cl_opinion = re.sub(r"[^a-zA-Z0-9 ]", "", cl_opinions_list[j].lower())
+
+        cosine_sim = get_cosine_similarity(file_opinion, cl_opinion)
+
+        percent_match = compare_documents(file_opinion, cl_opinion)
+
+        if cosine_sim < 0.60 and percent_match < 60:
             continue
+
         matches[i] = j
 
-    # Key is opinion position from file, Value is opinion position from cl opinion
-    # e.g. matches {0: 1, 1: 2} 0 is file opinion and 1 in cl opinion, 1 is file
-    # opinion and 2 is cl opinion
     return matches
+
+
+def clean_opinion_content(text: str) -> str:
+    """Clean opinion content
+
+    :param text: text to clean
+    :return: cleaned text
+    """
+
+    # Replace line breaks with spaces and get rid of double spaces
+    text = re.sub(" +", " ", " ".join(text.split("\n"))).strip()
+
+    # Remove non-alphanumeric and non-whitespace characters from lowercased text
+    return re.sub(r"[^a-zA-Z0-9 ]", "", text.lower())
+
+
+# TODO ------------------------ remove until here -------------------------------
 
 
 def get_opinions_cleaned_content(
@@ -432,10 +471,7 @@ def get_opinions_cleaned_content(
 
         soup = BeautifulSoup(content, features="html.parser")
         opinion_text = soup.getText(separator=" ", strip=True)
-        prep_text = re.sub(
-            " +", " ", " ".join(opinion_text.split("\n"))
-        ).strip()
-        prep_text = re.sub(r"[^a-zA-Z0-9 ]", "", prep_text.lower())
+        prep_text = clean_opinion_content(opinion_text)
 
         cl_cleaned_opinions.append(
             {
@@ -485,10 +521,7 @@ def get_opinions_columbia_file(xml_filepath: str) -> list:
         opinion_content = op.get("opinion")
         soup = BeautifulSoup(opinion_content, "html.parser")
         opinion_text = soup.getText(separator=" ", strip=True)
-        opinion_text = re.sub(
-            " +", " ", " ".join(opinion_text.split("\n"))
-        ).strip()
-        cleaned_opinion = re.sub(r"[^a-zA-Z0-9 ]", "", opinion_text.lower())
+        cleaned_opinion = clean_opinion_content(opinion_text)
         op["opinion"] = cleaned_opinion
 
     return opinions
@@ -543,6 +576,78 @@ def sort_harvard_opinions(start_id: int, end_id: int) -> None:
             cluster_op.save()
 
         logger.info(msg=f"Opinions reordered for cluster id: {oc.id}")
+
+
+def update_opinions(
+    cluster_id: int,
+    cl_opinions: list,
+    columbia_opinions: list,
+    matches: dict,
+    cluster_has_combined_opinion: bool,
+    start_position: int,
+):
+    """Update opinions with correct order
+
+    :param cluster_id:
+    :param cl_opinions: a list with cleaned opinions from cl
+    :param columbia_opinions: a ordered list with cleaned opinions from xml file
+    :param matches: a dict with the matches of each opinion of both lists
+    :param cluster_has_combined_opinion: True if the cluster has combined opinions
+    :param start_position: the number from where the order should begin for
+    non-combined opinions
+    :return: None
+    """
+    update_failed = False
+
+    with transaction.atomic():
+        for file_pos, cl_pos in matches.items():
+            # file_pos is the correct index to find the opinion id to update
+            file_opinion = columbia_opinions[file_pos]
+            # the order was calculated using the xml file
+            file_order = file_opinion.get("order") + start_position
+            cl_opinion = cl_opinions[cl_pos]
+            opinion_id_to_update = cl_opinion.get("id")
+
+            if opinion_id_to_update:
+                try:
+                    # Update opinion order
+                    op = Opinion.objects.get(id=opinion_id_to_update)
+                    op.order = file_order
+                    op.save()
+                except Opinion.DoesNotExist:
+                    # This should not happen, but it is better to be
+                    # cautious
+                    logger.warning(
+                        f"We can't update opinion, opinion doesn't exist "
+                        f"with id: {opinion_id_to_update}"
+                    )
+                    update_failed = True
+                    break
+
+        if cluster_has_combined_opinion and not update_failed:
+            combined_opinions_cluster = Opinion.objects.filter(
+                cluster_id=cluster_id, type="010combined"
+            ).order_by("id")
+
+            # Show combined opinions at beginning
+            for opinion_order, cluster_op in enumerate(
+                combined_opinions_cluster
+            ):
+                cluster_op.order = opinion_order
+                cluster_op.save()
+
+        if update_failed:
+            # There was an error updating an opinion, rollback all changes for
+            # cluster's opinions
+            logger.warning(
+                f"There was an error updating the order of opinions of the "
+                f"cluster id: {cluster_id}"
+            )
+            transaction.set_rollback(True)
+        else:
+            logger.info(
+                f"The order of opinions was updated, cluster id: {cluster_id}"
+            )
 
 
 def sort_columbia_opinions(start_id: int, end_id: int, xml_dir: str) -> None:
@@ -614,7 +719,7 @@ def sort_columbia_opinions(start_id: int, end_id: int, xml_dir: str) -> None:
                 if op.get("opinion")
             ]
 
-            matches = match_text_lists(
+            matches = match_opinion_lists(
                 columbia_opinions_content,
                 cl_opinions_content,
             )
@@ -638,57 +743,15 @@ def sort_columbia_opinions(start_id: int, end_id: int, xml_dir: str) -> None:
                     # Go to next cluster id
                     continue
 
-                failed = False
-                for file_pos, cl_pos in matches.items():
-                    # file_pos is the correct index to find the opinion id to update
-                    file_opinion = extracted_columbia_opinions[file_pos]
-                    # the order was calculated using the xml file
-                    file_order = file_opinion.get("order") + start_position
-                    cl_opinion = cl_cleaned_opinions[cl_pos]
-                    opinion_id_to_update = cl_opinion.get("id")
-
-                    if opinion_id_to_update:
-                        try:
-                            # Save opinion
-                            op = Opinion.objects.get(id=opinion_id_to_update)
-                            op.order = file_order
-                            op.save()
-                            logger.info(
-                                f"Cluster id processed: {cluster_id} Update opinion id: {opinion_id_to_update} with position: {file_order}"
-                            )
-                        except Opinion.DoesNotExist:
-                            logger.warning(
-                                f"We can't update opinion, opinion doesn't exist with "
-                                f"id: {opinion_id_to_update}"
-                            )
-                            failed = True
-                            break
-                    else:
-                        logger.warning(
-                            f"We can't update opinion, empty opinion id "
-                            f"from cluster: {cluster_id}"
-                        )
-                        failed = True
-                        break
-
-                if cluster_has_combined_opinion and not failed:
-                    combined_opinions_cluster = Opinion.objects.filter(
-                        cluster_id=cluster_id, type="010combined"
-                    ).order_by("id")
-
-                    # Show combined opinions at beginning
-                    for opinion_order, cluster_op in enumerate(
-                        combined_opinions_cluster
-                    ):
-                        cluster_op.order = opinion_order
-                        cluster_op.save()
-
-            else:
-                # No matches found
-                logger.warning(
-                    f"Failed to match opinions from cluster id: {cluster_id}"
+                # Update all opinions order
+                update_opinions(
+                    cluster_id,
+                    cl_cleaned_opinions,
+                    extracted_columbia_opinions,
+                    matches,
+                    cluster_has_combined_opinion,
+                    start_position,
                 )
-                continue
 
 
 class Command(BaseCommand):
