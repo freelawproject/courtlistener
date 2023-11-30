@@ -101,101 +101,6 @@ CERT_DENIED_TAGS = [
     "certiorari denied by supreme court",
     "petition for certiorari denied by supreme court",
 ]
-UNKNOWN_TAGS = [
-    "petition for review allowed",
-    "affirmed",
-    "reversed and remanded",
-    "rehearing overruled",
-    "motion for rehearing overruled",
-    "review granted",
-    "decision released",
-    "transfer denied",
-    "released for publication",
-    "application to transfer denied",
-    "amended",
-    "reversed",
-    "opinion on petition to rehear",
-    "suggestion of error overruled",
-    "cv",
-    "case stored in record room",
-    "met to file petition for review disposed granted",
-    "rehearing granted",
-    "opinion released",
-    "permission to appeal denied by supreme court",
-    "rehearing pending",
-    "on motion for rehearing",
-    "application for transfer denied",
-    "effective date",
-    "modified",
-    "opinion modified",
-    "transfer granted",
-    "discretionary review denied",
-    "discretionary review refused",
-    "application for leave to file second petition for rehearing denied",
-    "final",
-    "date of judgment entry on appeal",
-    "petition for review pending",
-    "writ denied",
-    "rehearing filed",
-    "as extended",
-    "officially released",
-    "appendix filed",
-    "spring sessions",
-    "summer sessions",
-    "fall sessions",
-    "winter sessions",
-    "discretionary review denied by supreme court",
-    "dissenting opinion",
-    "en banc reconsideration denied",
-    "answer returned",
-    "refiled",
-    "revised",
-    "modified upon denial of rehearing",
-    "session mailed",
-    "reversed and remanded with instructions",
-    "writ granted",
-    "date of judgment entry",
-    "preliminary ruling rendered",
-    "amended on",
-    "dissenting opinion filed",
-    "concurring opinion filed",
-    "memorandum dated",
-    "mandamus denied on mandate",
-    "updated",
-    "date of judgment entered",
-    "released and journalized",
-    "submitted on",
-    "case assigned",
-    "opinion circulated for comment",
-    "submitted on rehearing",
-    "united states supreme court dismissed appeal",
-    "answered",
-    "reconsideration granted in part and as amended",
-    "as amended on denial of rehearing",
-    "reassigned",
-    "as amended",
-    "as corrected",
-    "writ allowed",
-    "released",
-    "application for leave to appeal filed",
-    "affirmed on appeal reversed and remanded",
-    "as corrected",
-    "withdrawn substituted and refiled",
-    "answered",
-    "released",
-    "as modified and ordered published",
-    "remanded",
-    "concurring opinion added",
-    "decision and journal entry dated",
-    "memorandum filed",
-    "as modified",
-    "application for permission to appeal denied by supreme court",
-    "rehearing and clarification denied",
-    "reversed and remanded for reconsideration",
-    "opinion granting rehearing in part",
-]
-
-
 SIMPLE_TAGS = [
     "attorneys",
     "caption",
@@ -237,8 +142,7 @@ def is_opinion_published(soup: BeautifulSoup) -> bool:
 
 
 def read_xml_to_soup(filepath: str) -> BeautifulSoup:
-    """This function reads the xml file, fixes the bad tags in columbia xml
-    files and returns a BeautifulSoup object
+    """Read the xml file and return a BeautifulSoup object
 
     :param filepath: path to xml file
     :return: BeautifulSoup object of parsed content
@@ -263,8 +167,10 @@ def read_xml_to_soup(filepath: str) -> BeautifulSoup:
 def add_floating_opinion(
     opinions: list, floating_content: list, opinion_order: int
 ) -> list:
-    """We have found floating opinions in bs object, we keep the opinion
-    content as a new opinion
+    """Create a new opinion item
+
+    We have found floating opinions in bs object, we keep the opinion content as a
+    new opinion
 
     :param opinions: a list with opinions found
     :param floating_content: content that is not in known non-opinion tags
@@ -296,7 +202,9 @@ def add_floating_opinion(
 def extract_columbia_opinions(
     outer_opinion: BeautifulSoup,
 ) -> list[Optional[dict]]:
-    """We extract all possible opinions from BeautifulSoup, with and without
+    """Get the opinions of the soup object
+
+    We extract all possible opinions from BeautifulSoup, with and without
     author, and we create new opinions if floating content exists(content that
     is not explicitly defined within an opinion tag or doesn't have an author)
 
@@ -417,6 +325,7 @@ def is_per_curiam_opinion(
     content: Optional[str], byline: Optional[str]
 ) -> bool:
     """Check if opinion author is per curiam
+
     :param content: opinion content
     :param byline: opinion text author
     :return: True if opinion author is per curiam
