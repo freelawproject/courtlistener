@@ -32,7 +32,6 @@ from reporters_db import (
 from rest_framework.status import HTTP_300_MULTIPLE_CHOICES, HTTP_404_NOT_FOUND
 
 from cl.citations.parenthetical_utils import get_or_create_parenthetical_groups
-from cl.citations.recap_citations import get_recap_citations
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import NoteForm
 from cl.favorites.models import Note
@@ -56,7 +55,7 @@ from cl.opinion_page.forms import (
     CourtUploadForm,
     DocketEntryFilterForm,
 )
-from cl.opinion_page.types import AuthoritiesContext, RECAPDocCitationRecord
+from cl.opinion_page.types import AuthoritiesContext
 from cl.opinion_page.utils import core_docket_data, get_case_title
 from cl.people_db.models import AttorneyOrganization, CriminalCount, Role
 from cl.recap.constants import COURT_TIMEZONES
@@ -469,15 +468,12 @@ def view_recap_document(
     # Override the og:url if we're serving a request to an OG crawler bot
     og_file_path_override = f"/{rd.filepath_local}" if is_og_bot else None
 
-    total_citation_count, citation_records = get_recap_citations(
-        rd.pk, top_k=5
-    )
-    authorities_context: AuthoritiesContext = AuthoritiesContext.construct(
-        citation_record=RECAPDocCitationRecord(
-            cit_records=citation_records,
-            total_citation_count=total_citation_count,
-        ),
-        request_query_string=request.META["QUERY_STRING"],
+    authorities_context: AuthoritiesContext = AuthoritiesContext(
+        citation_record=rd,
+        query_string=request.META["QUERY_STRING"],
+        total_authorities_count=rd.authority_count,
+        view_all_url="",
+        doc_type="document",
     )
 
     return TemplateResponse(
@@ -561,8 +557,15 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     ):
         sponsored = True
 
-    authorities_context: AuthoritiesContext = AuthoritiesContext.construct(
-        cluster, request.META["QUERY_STRING"]
+    view_authorities_url = reverse(
+        "view_authorities", args=[cluster.pk, cluster.slug]
+    )
+    authorities_context: AuthoritiesContext = AuthoritiesContext(
+        citation_record=cluster,
+        query_string=request.META["QUERY_STRING"],
+        total_authorities_count=cluster.authority_count,
+        view_all_url=view_authorities_url,
+        doc_type="opinion",
     )
 
     return TemplateResponse(
