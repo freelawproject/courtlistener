@@ -370,38 +370,38 @@ def merge_case_names(
     :param case_name_full_key: dict key that contains case_name_key value from file
     :return: empty dict or dict with new value for field
     """
-    columbia_case_name = titlecase(harmonize(file_data[case_name_key]))
-    columbia_case_name_full = titlecase(file_data[case_name_full_key])
+    file_case_name = titlecase(harmonize(file_data[case_name_key]))
+    file_case_name_full = titlecase(file_data[case_name_full_key])
     cluster_case_name = titlecase(harmonize(cluster.case_name))
     cluster_case_name_full = titlecase(cluster.case_name_full)
 
     update_dict = {}
     # Case with full case names
-    if not cluster_case_name_full and columbia_case_name_full:
-        update_dict["case_name_full"] = columbia_case_name_full
+    if not cluster_case_name_full and file_case_name_full:
+        update_dict["case_name_full"] = file_case_name_full
         # Change stored value to new
-        cluster_case_name_full = columbia_case_name_full
-    elif cluster_case_name_full and columbia_case_name_full:
-        if len(columbia_case_name_full) > len(cluster_case_name_full):
+        cluster_case_name_full = file_case_name_full
+    elif cluster_case_name_full and file_case_name_full:
+        if len(file_case_name_full) > len(cluster_case_name_full):
             # Select best case name based on string length
-            update_dict["case_name_full"] = columbia_case_name_full
+            update_dict["case_name_full"] = file_case_name_full
             # Change stored value to new
-            cluster_case_name_full = columbia_case_name_full
+            cluster_case_name_full = file_case_name_full
     else:
         # We don't care if data is empty or both are empty
         pass
 
     # Case with abbreviated case names
-    if not cluster_case_name and columbia_case_name:
-        update_dict["case_name"] = columbia_case_name
+    if not cluster_case_name and file_case_name:
+        update_dict["case_name"] = file_case_name
         # Change stored value to new
-        cluster_case_name = columbia_case_name
-    elif cluster_case_name and columbia_case_name:
-        if len(columbia_case_name) > len(cluster_case_name):
+        cluster_case_name = file_case_name
+    elif cluster_case_name and file_case_name:
+        if len(file_case_name) > len(cluster_case_name):
             # Select best case name based on string length
-            update_dict["case_name"] = columbia_case_name
+            update_dict["case_name"] = file_case_name
             # Change stored value to new
-            cluster_case_name = columbia_case_name
+            cluster_case_name = file_case_name
     else:
         # We don't care if data is empty or both are empty
         pass

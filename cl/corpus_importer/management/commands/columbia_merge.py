@@ -101,10 +101,14 @@ def clean_opinion_content(content: str, is_harvard: bool) -> str:
             for extra in op.find_all(["author"]):
                 extra.extract()
 
+    # Replace line breaks with spaces and get rid of double spaces
     prep_text = re.sub(
-        r"[^a-zA-Z0-9 ]", "", soup.getText(separator=" ").lower()
-    )
-    prep_text = re.sub(" +", " ", prep_text)
+        " +", " ", " ".join(soup.getText(separator=" ").split("\n"))
+    ).strip()
+
+    # Remove non-alphanumeric and non-whitespace characters from lowercased text
+    prep_text = re.sub(r"[^a-zA-Z0-9 ]", "", prep_text.lower())
+
     return prep_text
 
 
