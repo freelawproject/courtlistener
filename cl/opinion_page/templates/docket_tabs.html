@@ -499,6 +499,14 @@
           </a>
         </li>
         {% endif %}
+
+        {% if docket.authority_count %}
+        <li class="{% block nav-authorities %}inactive{% endblock %}"
+            role="presentation">
+          <a href="{% url "docket_authorities" docket_id=docket.pk slug=docket.slug %}">Authorities
+          </a>
+        </li>
+        {% endif %}
       </ul>
       {% block tab-content %}{% endblock %}
     </div>
