@@ -400,14 +400,12 @@ def process_cluster(
     cluster_id: int,
     filepath: str,
     skip_judge_merger: bool = False,
-    debug: bool = False,
 ) -> None:
     """Merge specified cluster id
 
     :param cluster_id: Cluster object id to merge
     :param filepath: specified path to xml file
     :param skip_judge_merger: skip judge merger
-    :param debug: True if it should roll back the changes
     :return: None
     """
 
@@ -420,6 +418,7 @@ def process_cluster(
         .first()
     )
     if not cluster:
+        logger.info(f"Cluster id: {cluster_id} already merged")
         return
 
     logger.info(msg=f"Merging {cluster_id} at {filepath}")
@@ -533,8 +532,6 @@ def process_cluster(
             update_docket_source(cluster)
             update_cluster_source(cluster)
             logger.info(msg=f"Finished merging cluster: {cluster_id}")
-            if debug:
-                transaction.set_rollback(True)
 
     except AuthorException:
         logger.warning(msg=f"Author exception for cluster id: {cluster_id}")
@@ -555,7 +552,6 @@ def merge_columbia_into_cl(options) -> None:
     csv_filepath, xml_dir = options["csv_file"], options["xml_dir"]
     skip_until, limit = options["skip_until"], options["limit"]
     skip_judge_merger = options["skip_judge_merger"]
-    debug = options["debug"]
     total_processed = 0
     start = False if skip_until else True
 
@@ -583,7 +579,6 @@ def merge_columbia_into_cl(options) -> None:
             cluster_id=cluster_id,
             filepath=xml_path,
             skip_judge_merger=skip_judge_merger,
-            debug=debug,
         )
 
         total_processed += 1
@@ -620,7 +615,7 @@ class Command(VerboseCommand):
 
         parser.add_argument(
             "--xml-dir",
-            default="/opt/courtlistener/_columbia",
+            default="/tmp/columbia",
             required=False,
             help="The absolute path to the directory with columbia xml files",
         )
@@ -629,13 +624,6 @@ class Command(VerboseCommand):
             "--skip-judge-merger",
             action="store_true",
             help="Set flag to skip judge merger if the judges do not match",
-        )
-
-        parser.add_argument(
-            "--debug",
-            action="store_true",
-            default=False,
-            help="Don't change the data. Only pretend.",
         )
 
     def handle(self, *args, **options) -> None:
