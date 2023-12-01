@@ -1,0 +1,41 @@
+{% extends "docket_tabs.html" %}
+{% load humanize %}
+{% load text_filters %}
+
+{% block title %}Authorities for {{ title }} – CourtListener.com{% endblock %}
+{% block og_title %}Authorities for {{ title }} - CourtListener.com{% endblock %}
+{% block description %}Authorities for {{ title }} — Brought to you by the RECAP Initiative and Free Law Project, a
+non-profit dedicated to creating high quality open legal information.{% endblock %}
+{% block og_description %}Authorities for {{ title }} — Brought to you by the RECAP Initiative and Free Law Project, a
+non-profit dedicated to creating high quality open legal information.{% endblock %}
+
+{% block nav-authorities %}active{% endblock %}
+
+{% block tab-content %}
+<div class="flex flex-column justify-content-center col-xs-12 col-md-10 col-lg-12">
+  <div class="col-xs-12 col-md-10 col-lg-10">
+    <h3>This Docket cites {{docket.authority_count|intcomma}} opinion{{docket.authority_count|pluralize}}.</h3>
+    <hr>
+    {# Westlaw's metadata organization: Checkbox, Treatment, Name + citation + summary, Date, Type, Depth #}
+    <ul>
+      {% for authority in authorities %}
+      <li>
+        {{ authority.depth }} reference{{ authority.depth|pluralize }} to
+        <a href="{{ authority.cited_opinion.cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}" {% if authority.blocked %}rel="nofollow" {% endif %}>
+          {{ authority.cited_opinion.cluster.caption|safe|v_wrapper }}
+        </a>
+        <br />
+        <span class="bullet-tail">{{ authority.cited_opinion.cluster.docket.court }}</span>
+        <span class="bullet-tail">{{ authority.cited_opinion.cluster.date_filed }}</span>
+        {% if authority.cited_opinion.cluster.citation_count > 1 %}
+        Also cited by <a href="/?q=cites%3A({{ authority.cited_opinion.cluster.sub_opinions.all|OR_join }})"
+          rel="nofollow">{{authority.cited_opinion.cluster.citation_count|add:"-1" }} other opinion{{authority.cited_opinion.cluster.citation_count|add:"-1"|pluralize }}</a>
+        {% else %}
+        Cited by 0 other opinions
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endblock %}
