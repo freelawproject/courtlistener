@@ -1,4 +1,6 @@
 from django.db import models
+from django_elasticsearch_dsl import fields
+from elasticsearch_dsl import Join, Percolator
 
 
 class CharNullField(models.CharField):
@@ -43,3 +45,25 @@ class CharNullField(models.CharField):
         else:
             # Otherwise, just pass the value.
             return value
+
+
+class PercolatorField(fields.DEDField, Percolator):
+    """Subclass of DEDField and Percolator field.
+    This subclass transforms the Percolator field into a field compatible with
+    django_elasticsearch_dsl. This enables us to leverage DED Document methods
+    like "prepare," which allows the field to be populated using the prepare
+    method.
+    """
+
+    pass
+
+
+class JoinField(fields.DEDField, Join):
+    """Subclass of DEDField and Join field.
+    This subclass transforms the Join field into a field compatible with
+    django_elasticsearch_dsl. This enables us to leverage DED Document methods
+    like "prepare," which allows the field to be populated using the prepare
+    method.
+    """
+
+    pass

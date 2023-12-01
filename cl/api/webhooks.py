@@ -1,3 +1,5 @@
+import json
+
 import requests
 from django.conf import settings
 from rest_framework.renderers import JSONRenderer
@@ -19,7 +21,7 @@ from cl.lib.string_utils import trunc
 from cl.recap.api_serializers import PacerFetchQueueSerializer
 from cl.recap.models import PROCESSING_STATUS, PacerFetchQueue
 from cl.search.api_serializers import SearchResultSerializer
-from cl.search.api_utils import SolrObject
+from cl.search.api_utils import ResultObject
 
 
 def send_webhook_event(
@@ -47,6 +49,10 @@ def send_webhook_event(
             webhook_event.content,
             accepted_media_type="application/json;",
         )
+
+    json_data = json.loads(json_bytes)
+    if json_data == {}:
+        raise ValueError("Webhook payload is empty.")
     try:
         # To send a POST to an HTTPS target and using webhook-sentry as proxy,
         # you needed to change the protocol to HTTP and set the X-WhSentry-TLS
@@ -55,9 +61,8 @@ def send_webhook_event(
         response = requests.post(
             url,
             proxies=proxy_server,
-            data=json_bytes,
+            json=json_data,
             timeout=(3, 3),
-            stream=True,
             headers=headers,
             allow_redirects=False,
         )
@@ -168,7 +173,7 @@ def send_search_alert_webhook(
         result["snippet"] = "&hellip;".join(result["solr_highlights"]["text"])
         # This transformation is required before serialization so that null
         # fields are shown in the results, as in Search API.
-        solr_results.append(SolrObject(initial=result))
+        solr_results.append(ResultObject(initial=result))
 
     serialized_results = SearchResultSerializer(
         solr_results,

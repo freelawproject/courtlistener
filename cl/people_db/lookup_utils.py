@@ -9,7 +9,9 @@ from dateutil.relativedelta import relativedelta
 from django.db.models import Q, QuerySet
 from django.utils.html import strip_tags
 from nameparser import HumanName
+from unidecode import unidecode
 
+from cl.corpus_importer.utils import wrap_text
 from cl.people_db.models import SUFFIX_LOOKUP, Person
 
 # list of words that aren't judge names
@@ -18,6 +20,7 @@ NOT_JUDGE_WORDS = [
     "absent",
     "acting",
     "active",
+    "administrative",
     "adopted",
     "affirm",
     "after",
@@ -25,11 +28,14 @@ NOT_JUDGE_WORDS = [
     "all",
     "although",
     "and",
+    "amicus",
     "affirmed",
     "appeals",
     "appellate",
+    "appellant",
     "argument",
     "argued",
+    "article",
     "arj",
     "ass",
     "assign",
@@ -37,6 +43,7 @@ NOT_JUDGE_WORDS = [
     "assignment",
     "associate",
     "assistant",
+    "attached",
     "attorney",
     "authorized",
     "available",
@@ -72,10 +79,13 @@ NOT_JUDGE_WORDS = [
     "consisted",
     "consists",
     "constituting",
+    "constitution",
     "consultation",
     "continue",
     "court",
     "curiam",
+    "curiae",
+    "customs",
     "decided",
     "decision",
     "delivered",
@@ -84,6 +94,7 @@ NOT_JUDGE_WORDS = [
     "designation",
     "did",
     "died",
+    "directed",
     "disqualified",
     "dissent",
     "dissented",
@@ -93,6 +104,7 @@ NOT_JUDGE_WORDS = [
     "division",
     "editor",
     "emeritus",
+    "error",
     "even",
     "facts",
     "fellows",
@@ -112,6 +124,7 @@ NOT_JUDGE_WORDS = [
     "indicated",
     "initial",
     "industrial",
+    "introduction",
     "issuance",
     "issuing",
     "italic",
@@ -133,12 +146,14 @@ NOT_JUDGE_WORDS = [
     "may",
     "member",
     "memorandum",
+    "military",
     "not",
     "note",
     "number",
     "october",
     "of",
     "one",
+    "only",
     "opinion",
     "oral",
     "order",
@@ -180,8 +195,11 @@ NOT_JUDGE_WORDS = [
     "reservation",
     "sat",
     "section",
+    "secretary",
     "senior",
     "separate",
+    "should",
+    "signing",
     "sit",
     "sitting",
     "special",
@@ -194,6 +212,7 @@ NOT_JUDGE_WORDS = [
     "surrogate",
     "superior",
     "supernumerary",
+    "supreme",
     "taking",
     "tem",
     "term",
@@ -204,7 +223,9 @@ NOT_JUDGE_WORDS = [
     "though",
     "three",
     "time",
+    "took",
     "transfer",
+    "tried",
     "two",
     "unanimous",
     "unpublished",
@@ -213,6 +234,7 @@ NOT_JUDGE_WORDS = [
     "vacancy",
     "vice",
     "votes",
+    "voting",
     "warden",
     "was",
     "which",
@@ -240,13 +262,115 @@ NAME_CUTOFF = 3
 IS_JUDGE = {"wu", "re", "du", "de"}
 
 
-def extract_judge_last_name(text: str) -> List[str]:
+def find_all_judges(judge_text: str) -> [str]:
+    """Find all judges
+    This method is used to extract out multiple judge names from a text input
+    from the harvard merger/import.
+    :param judge_text: Harvard text input from judges tags
+    :return: List of judges names or empty list
+    """
+    cleaned_text = unidecode(judge_text).replace("\n", " ")
+    cleaned_text = wrap_text(100, cleaned_text).strip()
+    cleaned_text = cleaned_text.replace("By the Court", "")
+    cleaned_text = cleaned_text.replace(" and", ", and").replace(",,", ",")
+
+    if "PER CURIAM" in cleaned_text.upper():
+        return ["PER CURIAM"]
+
+    if len(cleaned_text.split()) == 1:
+        # You have only one name
+        return [cleaned_text]
+
+    query1 = re.findall(
+        r"(((Van|VAN|De|DE|Da|DA)\s)?[A-Z][\w\-']{2,}\b(\s(IV|I|II|III|V|Jr\.|Sr\.))?)\b,?[\s|\b]?",
+        cleaned_text,
+    )
+    query2 = re.findall(
+        r",\sand\s(((Van|VAN|De|DE|Da|DA)\s)?\b[A-Z][\w\-'']{2,}\b(\s(IV|I|II|III|V|Jr\.|Sr\.)[\s|\b])?)",
+        cleaned_text,
+    )
+    query = query1 + query2
+    if query:
+        matches = [
+            name[0] for name in query if name[0].lower() not in NOT_JUDGE_WORDS
+        ]
+        return sorted(list(set(matches)))
+    return []
+
+
+def find_just_name(text: str) -> str:
+    """Extract the first surname appearing in the Harvard text
+
+    This is designed specifically for the Harvard merger and its particular
+    brand of OCR.
+
+    :param text: string to analyze
+    :return: surname or empty string
+    """
+    # Crop the text - on the off chance the text is incorrectly long to avoid
+    # searching the text way down.
+    cleaned_text = unidecode(text).replace("\n", " ")
+    cleaned_text = wrap_text(100, cleaned_text).strip()
+
+    # this is done to handle weird OCR issue
+    cleaned_text = cleaned_text.replace("By the Court", "")
+
+    # First we extract out PER CURIAM
+    if "PER CURIAM" in cleaned_text.upper():
+        return "PER CURIAM"
+
+    # OCR typically fails on the per curiam but this was an easy way to
+    # make sure we recognized it.
+    match_per_curiam = re.search(r"(Pe. C......)", cleaned_text)
+    if match_per_curiam:
+        return "PER CURIAM"
+
+    # Next up is full names followed by a comma
+    match_titles = re.search(
+        "(((Van|VAN|De|DE|Da|DA)\s)?[A-Z][\w\-'']{2,}(\s(IV|I|II|III|V|Jr\.|JR\.|Sr\.|SR\.))?),",
+        cleaned_text,
+    )
+    if match_titles:
+        return match_titles.group(1)
+
+    # Next the style of Justice First Last
+    match_honorifics = re.search(
+        r"(Justice|Judge|Commissioner|Honorable)\s([A-Z\-'']\w+(\s[A-Z\-'']\w+)?)",
+        cleaned_text,
+    )
+    if match_honorifics:
+        return match_honorifics.group(2)
+
+    # Match Lastname, C. J.
+    match_last_first = re.search(r"([A-Z\-'']\w+)\s(C|J|P)\.", cleaned_text)
+    if match_last_first:
+        return match_last_first.group(1)
+
+    # Finally - default to the old style to handle stragglers
+    default = extract_judge_last_name(
+        cleaned_text, keep_letter_case=True, require_capital=True
+    )
+    if default:
+        return " ".join(
+            [name for name in default if name.lower() not in NOT_JUDGE_WORDS]
+        )
+    return ""
+
+
+def extract_judge_last_name(
+    text: str = "", keep_letter_case=False, require_capital=False
+) -> List[str]:
     """Find judge last names in a string of text.
 
     :param text: The text you wish to extract names from.
+    :param keep_letter_case: True if you want to keep letter case from text
+    :param require_capital: True if you want to keep words that start with a capital letter
     :return: last names of judges in `text`.
     """
-    text = text.lower() or ""
+    if require_capital:
+        text = " ".join([x for x in text.split() if x[0].isupper()])
+    if not keep_letter_case:
+        text = text.lower() or ""
     # just use the first nonempty line (there's
     # sometimes a useless second line)
     line = text
@@ -262,7 +386,16 @@ def extract_judge_last_name(text: str) -> List[str]:
     line = html.unescape(line)
 
     # normalize text and get candidate judge names
-    line = "".join([c if c.isalpha() else " " for c in line.lower()])
+    if not keep_letter_case:
+        line = "".join(
+            [
+                c if (c.isalpha() or c == "-" or c == "'") else " "
+                for c in line.lower()
+            ]
+        )
+    else:
+        line = "".join([c if c.isalpha() or c == "-" else " " for c in line])
+
     names = []
     for word in line.split():
         word_too_short = len(word) < NAME_CUTOFF
@@ -290,7 +423,7 @@ def extract_judge_last_name(text: str) -> List[str]:
     return last_names
 
 
-def lookup_judge_by_full_name(
+async def lookup_judge_by_full_name(
     name: Union[HumanName, str],
     court_id: str,
     event_date: Optional[date] = None,
@@ -408,16 +541,17 @@ def lookup_judge_by_full_name(
     for filter_set in filter_sets:
         applied_filters.extend(filter_set)
         candidates = Person.objects.filter(*applied_filters)
-        if len(candidates) == 0:
+        count = await candidates.acount()
+        if count == 0:
             # No luck finding somebody. Abort.
             return None
-        elif len(candidates) == 1:
+        elif count == 1:
             # Got somebody unique!
-            return candidates.first()
+            return await candidates.afirst()
     return None
 
 
-def lookup_judge_by_full_name_and_set_attr(
+async def lookup_judge_by_full_name_and_set_attr(
     item: object,
     target_field: str,
     full_name: Union[HumanName, str],
@@ -427,20 +561,20 @@ def lookup_judge_by_full_name_and_set_attr(
     """Lookup a judge by the attribute of an object
 
     :param item: The object containing the attribute you want to look up
-    :param target_field: The field on the attribute you want to look up.
-    :param full_name: The full name of the judge to look up.
-    :param court_id: The court where the judge did something.
-    :param event_date: The date the judge did something.
+    :param target_field: The field on the attribute you want to look up
+    :param full_name: The full name of the judge to look up
+    :param court_id: The court where the judge did something
+    :param event_date: The date the judge did something
     :return None
     """
     if not full_name:
         return None
-    judge = lookup_judge_by_full_name(full_name, court_id, event_date)
+    judge = await lookup_judge_by_full_name(full_name, court_id, event_date)
     if judge is not None:
         setattr(item, target_field, judge)
 
 
-def lookup_judge_by_last_name(
+async def lookup_judge_by_last_name(
     last_name: str,
     court_id: str,
     event_date: Optional[date] = None,
@@ -449,12 +583,12 @@ def lookup_judge_by_last_name(
     """Look up the judge using their last name, a date and court"""
     hn = HumanName()
     hn.last = last_name
-    return lookup_judge_by_full_name(
+    return await lookup_judge_by_full_name(
         hn, court_id, event_date, require_living_judge
     )
 
 
-def lookup_judges_by_last_name_list(
+async def lookup_judges_by_last_name_list(
     last_names: List[str],
     court_id: str,
     event_date: Optional[date] = None,
@@ -465,7 +599,7 @@ def lookup_judges_by_last_name_list(
     for last_name in last_names:
         hn = HumanName()
         hn.last = last_name
-        person = lookup_judge_by_full_name(
+        person = await lookup_judge_by_full_name(
             hn, court_id, event_date, require_living_judge
         )
         if person is not None:
@@ -473,7 +607,7 @@ def lookup_judges_by_last_name_list(
     return found_people
 
 
-def lookup_judges_by_messy_str(
+async def lookup_judges_by_messy_str(
     s: str,
     court_id: str,
     event_date: Optional[date] = None,
@@ -482,7 +616,9 @@ def lookup_judges_by_messy_str(
     names. (This is the least accurate way to look up judges.)
     """
     last_names = extract_judge_last_name(s)
-    return lookup_judges_by_last_name_list(last_names, court_id, event_date)
+    return await lookup_judges_by_last_name_list(
+        last_names, court_id, event_date
+    )
 
 
 def sort_judge_list(judges: QuerySet, search_terms: Set[str]) -> QuerySet:

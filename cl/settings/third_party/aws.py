@@ -18,6 +18,7 @@ AWS_STORAGE_BUCKET_NAME = env(
 AWS_S3_CUSTOM_DOMAIN = "storage.courtlistener.com"
 AWS_DEFAULT_ACL = "public-read"
 AWS_QUERYSTRING_AUTH = False
+AWS_S3_MAX_MEMORY_SIZE = 16 * 1024 * 1024
 
 if DEVELOPMENT:
     AWS_STORAGE_BUCKET_NAME = "dev-com-courtlistener-storage"

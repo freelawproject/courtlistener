@@ -1,3 +1,6 @@
+import factory
+from django.db.models import signals
+
 from cl.lib.management.commands.make_dev_data import FACTORIES
 from cl.search.factories import DocketWithChildrenFactory
 from cl.search.models import Docket, Opinion, OpinionCluster, Parenthetical
@@ -9,6 +12,7 @@ class TestFactoryCreation(TestCase):
     Tests to make sure that we can use our factories to generate data.
     """
 
+    @factory.django.mute_signals(signals.pre_save, signals.post_save)
     def test_making_docket(self) -> None:
         """Can we make a docket and have all its children get made?"""
         # Make sure things are empty at first
@@ -21,11 +25,16 @@ class TestFactoryCreation(TestCase):
         DocketWithChildrenFactory.create()
 
         # Check for a docket, opinion cluster, opinion, and parenthetical
-        self.assertGreaterEqual(Docket.objects.count(), 1)
+        num_dockets = Docket.objects.count()
+        self.assertGreaterEqual(num_dockets, 1)
         self.assertGreaterEqual(OpinionCluster.objects.count(), 1)
         self.assertGreaterEqual(Opinion.objects.count(), 1)
         self.assertGreaterEqual(Parenthetical.objects.count(), 1)
+        docket = Docket.objects.all()[0]
+        FACTORIES[107].create(parent_id=docket.id)
+        self.assertEqual(Docket.objects.count(), num_dockets)
 
+    @factory.django.mute_signals(signals.pre_save, signals.post_save)
     def test_making_specific_objects(self) -> None:
         """Can each of our basic factories be run properly?"""
         for Factory in FACTORIES.values():

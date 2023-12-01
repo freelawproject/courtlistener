@@ -146,7 +146,7 @@ class OpinionClusterFilter(NoEmptyFilterSet):
     sub_opinions = filters.RelatedFilter(
         OpinionFilter, queryset=Opinion.objects.all()
     )
-    source = filters.MultipleChoiceFilter(choices=SOURCES)
+    source = filters.MultipleChoiceFilter(choices=SOURCES.NAMES)
     citations = filters.RelatedFilter(
         CitationFilter, queryset=Citation.objects.all()
     )
@@ -196,10 +196,11 @@ class DocketEntryFilter(NoEmptyFilterSet):
         model = DocketEntry
         fields = {
             "id": ["exact"],
-            "entry_number": INTEGER_LOOKUPS,
+            "entry_number": INTEGER_LOOKUPS + ["isnull"],
             "date_created": DATETIME_LOOKUPS,
             "date_modified": DATETIME_LOOKUPS,
             "date_filed": DATE_LOOKUPS,
+            "pacer_sequence_number": INTEGER_LOOKUPS + ["isnull"],
         }
 
 

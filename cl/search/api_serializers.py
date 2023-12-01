@@ -6,8 +6,10 @@ from rest_framework.serializers import ModelSerializer
 
 from cl.api.utils import HyperlinkedModelSerializerWithId
 from cl.audio.models import Audio
+from cl.lib.document_serializer import DocumentSerializer
 from cl.people_db.models import PartyType, Person
 from cl.recap.api_serializers import FjcIntegratedDatabaseSerializer
+from cl.search.documents import AudioDocument, PersonDocument
 from cl.search.models import (
     Citation,
     Court,
@@ -140,12 +142,14 @@ class OpinionSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
     absolute_url = serializers.CharField(
         source="get_absolute_url", read_only=True
     )
+    cluster_id = serializers.ReadOnlyField()
     cluster = serializers.HyperlinkedRelatedField(
         many=False,
         view_name="opinioncluster-detail",
         queryset=OpinionCluster.objects.all(),
         style={"base_template": "input.html"},
     )
+    author_id = serializers.ReadOnlyField()
     author = serializers.HyperlinkedRelatedField(
         many=False,
         view_name="person-detail",
@@ -215,6 +219,7 @@ class OpinionClusterSerializer(
         queryset=Person.objects.all(),
         style={"base_template": "input.html"},
     )
+    docket_id = serializers.ReadOnlyField()
     docket = serializers.HyperlinkedRelatedField(
         many=False,
         view_name="docket-detail",
@@ -289,3 +294,60 @@ class SearchResultSerializer(serializers.Serializer):
                 fields.pop(field)
         fields = OrderedDict(sorted(fields.items()))  # Sort by key
         return fields
+
+
+class OAESResultSerializer(DocumentSerializer):
+    """The serializer for Oral argument results."""
+
+    snippet = serializers.CharField(read_only=True)
+    panel_ids = serializers.ListField(read_only=True)
+
+    class Meta:
+        document = AudioDocument
+        exclude = (
+            "text",
+            "docket_slug",
+            "percolator_query",
+            "case_name_full",
+            "dateArgued_text",
+            "dateReargued_text",
+            "dateReargumentDenied_text",
+            "court_id_text",
+        )
+
+
+class PersonESResultSerializer(DocumentSerializer):
+    """The serializer for Person results."""
+
+    class Meta:
+        document = PersonDocument
+        exclude = ("text", "person_child")
+
+
+class ExtendedPersonESSerializer(PersonESResultSerializer):
+    """Extends the Person serializer with all the field we get from the db"""
+
+    snippet = serializers.CharField(read_only=True)
+    appointer = serializers.ListField(read_only=True)
+    court = serializers.ListField(read_only=True)
+    court_exact = serializers.ListField(read_only=True)
+    position_type = serializers.ListField(read_only=True)
+    supervisor = serializers.ListField(read_only=True)
+    predecessor = serializers.ListField(read_only=True)
+    date_nominated = serializers.ListField(read_only=True)
+    date_elected = serializers.ListField(read_only=True)
+    date_recess_appointment = serializers.ListField(read_only=True)
+    date_referred_to_judicial_committee = serializers.ListField(read_only=True)
+    date_judicial_committee_action = serializers.ListField(read_only=True)
+    date_hearing = serializers.ListField(read_only=True)
+    date_confirmation = serializers.ListField(read_only=True)
+    date_start = serializers.ListField(read_only=True)
+    date_granularity_start = serializers.ListField(read_only=True)
+    date_retirement = serializers.ListField(read_only=True)
+    date_termination = serializers.ListField(read_only=True)
+    date_granularity_termination = serializers.ListField(read_only=True)
+    judicial_committee_action = serializers.ListField(read_only=True)
+    nomination_process = serializers.ListField(read_only=True)
+    selection_method = serializers.ListField(read_only=True)
+    selection_method_id = serializers.ListField(read_only=True)
+    termination_reason = serializers.ListField(read_only=True)

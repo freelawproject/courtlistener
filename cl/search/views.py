@@ -1,31 +1,46 @@
 import logging
 import traceback
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from urllib.parse import quote
 
+import waffle
 from cache_memoize import cache_memoize
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
-from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+from django.core.paginator import EmptyPage, Page, PageNotAnInteger, Paginator
 from django.db.models import Count, Sum
 from django.http import HttpRequest, HttpResponse
-from django.shortcuts import HttpResponseRedirect, get_object_or_404
+from django.http.request import QueryDict
+from django.shortcuts import HttpResponseRedirect, get_object_or_404, render
 from django.template.response import TemplateResponse
 from django.urls import reverse
-from django.utils.timezone import make_aware, utc
+from django.utils.timezone import make_aware
 from django.views.decorators.cache import never_cache
-from requests import RequestException
+from django_elasticsearch_dsl.search import Search
+from requests import RequestException, Session
 from scorched.exc import SolrError
+from waffle.decorators import waffle_flag
 
 from cl.alerts.forms import CreateAlertForm
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.bot_detector import is_bot
-from cl.lib.ratelimiter import ratelimit_deny_list
+from cl.lib.elasticsearch_utils import (
+    build_es_main_query,
+    convert_str_date_fields_to_date_objects,
+    es_index_exists,
+    fetch_es_results,
+    limit_inner_hits,
+    merge_courts_from_db,
+    merge_unavailable_fields_on_parent_document,
+    sanitize_unbalanced_parenthesis,
+    set_results_highlights,
+)
+from cl.lib.paginators import ESPaginator
 from cl.lib.redis_utils import make_redis_interface
 from cl.lib.search_utils import (
     add_depth_counts,
@@ -38,7 +53,15 @@ from cl.lib.search_utils import (
     merge_form_with_courts,
     regroup_snippets,
 )
+from cl.lib.types import CleanData
 from cl.search.constants import RELATED_PATTERN
+from cl.search.documents import (
+    AudioDocument,
+    DocketDocument,
+    ParentheticalGroupDocument,
+    PersonDocument,
+)
+from cl.search.exception import UnbalancedQuery
 from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import SEARCH_TYPES, Court, Opinion, OpinionCluster
 from cl.stats.models import Stat
@@ -50,8 +73,8 @@ logger = logging.getLogger(__name__)
 
 def check_pagination_depth(page_number):
     """Check if the pagination is too deep (indicating a crawler)"""
-    max_search_pagination_depth = 100
-    if page_number > max_search_pagination_depth:
+
+    if page_number > settings.MAX_SEARCH_PAGINATION_DEPTH:
         logger.warning(
             "Query depth of %s denied access (probably a crawler)",
             page_number,
@@ -130,59 +153,55 @@ def do_search(
         cd = search_form.cleaned_data
 
         # Do the query, hitting the cache if desired
-        try:
-            si = get_solr_interface(cd)
-        except NotImplementedError:
-            si.conn.http_connection.close()
-            logger.error(
-                "Tried getting solr connection for %s, but it's not "
-                "implemented yet",
-                cd["type"],
-            )
-            raise
-
-        try:
-            # Is this a `related:<pks>` prefix query?
-            related_prefix_match = RELATED_PATTERN.search(cd["q"])
-            if related_prefix_match:
-                # Seed IDs
-                related_cluster_pks = related_prefix_match.group("pks").split(
-                    ","
+        with Session() as session:
+            try:
+                si = get_solr_interface(cd, http_connection=session)
+            except NotImplementedError:
+                logger.error(
+                    "Tried getting solr connection for %s, but it's not "
+                    "implemented yet",
+                    cd["type"],
                 )
-                results = get_mlt_query(
-                    si,
-                    cd.copy(),
-                    facet,
-                    related_cluster_pks,
-                    # Original query
-                    cd["q"].replace(related_prefix_match.group("pfx"), ""),
-                )
-                si.conn.http_connection.close()
-            else:
-                # Regular search queries
-                results = si.query().add_extra(
-                    **build_main_query(cd, facet=facet)
-                )
-                si.conn.http_connection.close()
+                raise
 
-            si.conn.http_connection.close()
+            try:
+                # Is this a `related:<pks>` prefix query?
+                related_prefix_match = RELATED_PATTERN.search(cd["q"])
+                if related_prefix_match:
+                    # Seed IDs
+                    related_cluster_pks = related_prefix_match.group(
+                        "pks"
+                    ).split(",")
+                    results = get_mlt_query(
+                        si,
+                        cd.copy(),
+                        facet,
+                        related_cluster_pks,
+                        # Original query
+                        cd["q"].replace(related_prefix_match.group("pfx"), ""),
+                    )
+                else:
+                    # Regular search queries
+                    results = si.query().add_extra(
+                        **build_main_query(cd, facet=facet)
+                    )
 
-            paged_results = paginate_cached_solr_results(
-                get_params, cd, results, rows, cache_key
-            )
-            cited_cluster = add_depth_counts(
-                # Also returns cited cluster if found
-                search_data=cd,
-                search_results=paged_results,
-            )
-        except (NotImplementedError, RequestException, SolrError) as e:
-            error = True
-            logger.warning(
-                f"Error loading search page with request: {get_params}"
-            )
-            logger.warning(f"Error was: {e}")
-            if settings.DEBUG is True:
-                traceback.print_exc()
+                paged_results = paginate_cached_solr_results(
+                    get_params, cd, results, rows, cache_key
+                )
+                cited_cluster = add_depth_counts(
+                    # Also returns cited cluster if found
+                    search_data=cd,
+                    search_results=paged_results,
+                )
+            except (NotImplementedError, RequestException, SolrError) as e:
+                error = True
+                logger.warning(
+                    f"Error loading search page with request: {get_params}"
+                )
+                logger.warning(f"Error was: {e}")
+                if settings.DEBUG is True:
+                    traceback.print_exc()
 
         # A couple special variables for particular search types
         search_form = _clean_form(get_params, cd, courts)
@@ -242,7 +261,9 @@ def get_homepage_stats():
     dict
     """
     r = make_redis_interface("STATS")
-    ten_days_ago = make_aware(datetime.today() - timedelta(days=10), utc)
+    ten_days_ago = make_aware(
+        datetime.today() - timedelta(days=10), timezone.utc
+    )
     last_ten_days = [
         f"api:v3.d:{(date.today() - timedelta(days=x)).isoformat()}.count"
         for x in range(0, 10)
@@ -292,7 +313,6 @@ def get_homepage_stats():
 
 
 @never_cache
-@ratelimit_deny_list
 def show_results(request: HttpRequest) -> HttpResponse:
     """
     This view can vary significantly, depending on how it is called:
@@ -311,6 +331,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
     All of these paths have tests.
     """
     # Create a search string that does not contain the page numbers
+
     get_string = make_get_string(request)
     get_string_sans_alert = make_get_string(
         request, ["page", "edit_alert", "show_alert_modal"]
@@ -385,20 +406,40 @@ def show_results(request: HttpRequest) -> HttpResponse:
                 )
             )
             # Get the results from the oral arguments as well
-            render_dict.update(
-                {
-                    "results_oa": do_search(
-                        mutable_GET,
-                        rows=5,
-                        override_params={
-                            "order_by": "dateArgued desc",
-                            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-                        },
-                        facet=False,
-                        cache_key="homepage-data-oa",
-                    )["results"]
-                }
-            )
+            # Check if waffle flag is active.
+            if not waffle.flag_is_active(request, "oa-es-active"):
+                render_dict.update(
+                    {
+                        "results_oa": do_search(
+                            mutable_GET,
+                            rows=5,
+                            override_params={
+                                "order_by": "dateArgued desc",
+                                "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                            },
+                            facet=False,
+                            cache_key="homepage-data-oa",
+                        )["results"]
+                    }
+                )
+            else:
+                # Add additional or overridden GET parameters
+                mutable_GET.update(
+                    {
+                        "order_by": "dateArgued desc",
+                        "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                    }
+                )
+                render_dict.update(
+                    {
+                        "results_oa": do_es_search(
+                            mutable_GET,
+                            rows=5,
+                            facet=False,
+                            cache_key="homepage-data-oa-es",
+                        )["results"]
+                    }
+                )
 
             # But give it a fresh form for the advanced search section
             render_dict.update({"search_form": SearchForm(request.GET)})
@@ -443,13 +484,37 @@ def show_results(request: HttpRequest) -> HttpResponse:
                     initial={"query": get_string, "rate": "dly"},
                     user=request.user,
                 )
+            search_type = request.GET.get("type")
+            match search_type:
+                case SEARCH_TYPES.PARENTHETICAL:
+                    render_dict.update(do_es_search(request.GET.copy()))
+                case SEARCH_TYPES.ORAL_ARGUMENT:
+                    # Check if waffle flag is active.
+                    if waffle.flag_is_active(request, "oa-es-active"):
+                        render_dict.update(do_es_search(request.GET.copy()))
+                    else:
+                        render_dict.update(do_search(request.GET.copy()))
+                case SEARCH_TYPES.PEOPLE:
+                    # Check if waffle flag is active.
+                    if waffle.flag_is_active(request, "p-es-active"):
+                        render_dict.update(do_es_search(request.GET.copy()))
+                    else:
+                        render_dict.update(do_search(request.GET.copy()))
+                case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
+                    if waffle.flag_is_active(request, "r-es-active"):
+                        search_results = do_es_search(request.GET.copy())
+                    else:
+                        search_results = do_search(request.GET.copy())
+                    render_dict.update(search_results)
+                case _:
+                    render_dict.update(do_search(request.GET.copy()))
 
-            render_dict.update(do_search(request.GET.copy()))
             # Set the value to the query as a convenience
             alert_form.fields["name"].widget.attrs["value"] = render_dict[
                 "search_summary_str"
             ]
             render_dict.update({"alert_form": alert_form})
+
             return TemplateResponse(request, "search.html", render_dict)
 
 
@@ -497,4 +562,191 @@ def advanced(request: HttpRequest) -> HttpResponse:
                 "court_count": court_count,
             }
         )
-        return TemplateResponse(request, "advanced.html", render_dict)
+        return render(request, "advanced.html", render_dict)
+
+
+@waffle_flag("parenthetical-search")
+def es_search(request: HttpRequest) -> HttpResponse:
+    """Display elasticsearch search page based on type passed as url param
+    :param request: HttpRequest object
+    :return: HttpResponse
+    """
+    render_dict = {"private": False}
+    courts = Court.objects.filter(in_use=True)
+    render_dict.update({"search_type": "parenthetical"})
+    obj_type = SEARCH_TYPES.PARENTHETICAL
+    search_form = SearchForm({"type": obj_type})
+    if search_form.is_valid():
+        search_form = _clean_form(
+            request.GET.copy(),
+            search_form.cleaned_data,
+            courts,
+        )
+    template = "advanced.html"
+
+    courts, court_count_human, court_count = merge_form_with_courts(
+        courts, search_form
+    )
+    render_dict.update(
+        {
+            "search_form": search_form,
+            "courts": courts,
+            "court_count_human": court_count_human,
+            "court_count": court_count,
+        }
+    )
+
+    return render(request, template, render_dict)
+
+
+def do_es_search(
+    get_params: QueryDict,
+    rows: int = settings.SEARCH_PAGE_SIZE,
+    facet: bool = True,
+    cache_key: str = None,
+):
+    """Run Elasticsearch searching and filtering and prepare data to display
+
+    :param get_params: The request.GET params sent by user.
+    :param rows: The number of Elasticsearch results to request
+    :param facet: Whether to complete faceting in the query
+    :param cache_key: A cache key with which to save the results. Note that it
+    does not do anything clever with the actual query, so if you use this, your
+    cache key should *already* have factored in the query. If None, no caching
+    is set or used. Results are saved for six hours.
+    :return: A big dict of variables for use in the search results, homepage, or
+    other location.
+    """
+    paged_results = None
+    courts = Court.objects.filter(in_use=True)
+    query_time = total_query_results = 0
+    top_hits_limit = 5
+    document_type = None
+    error_message = ""
+    suggested_query = ""
+    total_child_results = 0
+
+    search_form = SearchForm(get_params)
+    match get_params.get("type"):
+        case SEARCH_TYPES.PARENTHETICAL:
+            document_type = ParentheticalGroupDocument
+        case SEARCH_TYPES.ORAL_ARGUMENT:
+            document_type = AudioDocument
+        case SEARCH_TYPES.PEOPLE:
+            document_type = PersonDocument
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
+            document_type = DocketDocument
+
+    if search_form.is_valid() and es_index_exists(
+        index_name=document_type._index._name
+    ):
+        cd = search_form.cleaned_data
+        try:
+            # Create necessary filters to execute ES query
+            search_query = document_type.search()
+
+            (
+                s,
+                total_query_results,
+                top_hits_limit,
+                total_child_results,
+            ) = build_es_main_query(search_query, cd)
+            paged_results, query_time, error = fetch_and_paginate_results(
+                get_params, s, rows_per_page=rows, cache_key=cache_key
+            )
+            search_form = _clean_form(
+                get_params,
+                search_form.cleaned_data,
+                courts,
+            )
+        except UnbalancedQuery:
+            error = True
+            error_message = "has incorrect syntax. Did you forget to close one or more parentheses?"
+            suggested_query = sanitize_unbalanced_parenthesis(cd.get("q", ""))
+    else:
+        error = True
+
+    courts, court_count_human, court_count = merge_form_with_courts(
+        courts, search_form
+    )
+    search_summary_str = search_form.as_text(court_count_human)
+    search_summary_dict = search_form.as_display_dict(court_count_human)
+    results_details = [
+        query_time,
+        total_query_results,
+        top_hits_limit,
+        total_child_results,
+    ]
+
+    return {
+        "results": paged_results,
+        "results_details": results_details,
+        "search_form": search_form,
+        "search_summary_str": search_summary_str,
+        "search_summary_dict": search_summary_dict,
+        "error": error,
+        "courts": courts,
+        "court_count_human": court_count_human,
+        "court_count": court_count,
+        "error_message": error_message,
+        "suggested_query": suggested_query,
+    }
+
+
+def fetch_and_paginate_results(
+    get_params: QueryDict,
+    search_query: Search,
+    rows_per_page: int = settings.SEARCH_PAGE_SIZE,
+    cache_key: str = None,
+) -> tuple[Page | list, int, bool]:
+    """Fetch and paginate elasticsearch results.
+
+    :param get_params: The user get params.
+    :param search_query: Elasticsearch DSL Search object
+    :param rows_per_page: Number of records wanted per page
+    :param cache_key: The cache key to use.
+    :return: A three tuple, the paginated results, the ES query time and if
+    there was an error.
+    """
+
+    # Run the query and set up pagination
+    if cache_key is not None:
+        results = cache.get(cache_key)
+        if results is not None:
+            return results, 0, False
+
+    try:
+        page = int(get_params.get("page", 1))
+    except ValueError:
+        page = 1
+
+    # Check pagination depth
+    check_pagination_depth(page)
+
+    # Fetch results from ES
+    hits, query_time, error = fetch_es_results(
+        get_params, search_query, page, rows_per_page
+    )
+
+    if error:
+        return [], query_time, error
+    paginator = ESPaginator(hits, rows_per_page)
+    try:
+        results = paginator.page(page)
+    except PageNotAnInteger:
+        results = paginator.page(1)
+    except EmptyPage:
+        results = paginator.page(paginator.num_pages)
+
+    search_type = get_params.get("type")
+    # Set highlights in results.
+
+    convert_str_date_fields_to_date_objects(results, search_type)
+    merge_courts_from_db(results, search_type)
+    limit_inner_hits(get_params, results, search_type)
+    set_results_highlights(results, search_type)
+    merge_unavailable_fields_on_parent_document(results, search_type)
+
+    if cache_key is not None:
+        cache.set(cache_key, results, settings.QUERY_RESULTS_CACHE)
+    return results, query_time, error

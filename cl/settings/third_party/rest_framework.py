@@ -24,6 +24,10 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {"anon": "100/day", "user": "5000/hour"},
     "OVERRIDE_THROTTLE_RATES": {
         # Throttling down.
+        # Didn't respond to emails, 2023-10-02
+        "Tylersuard": "10/hour",
+        # Didn't respond to emails, 2023-08-04
+        "skalecorn12": "10/hour",
         # Didn't respond to emails; looks unsavory.
         "donier": "10/hour",
         # Doing a background check service, we told them we didn't want to work
@@ -59,7 +63,7 @@ REST_FRAMEWORK = {
         "hdave4": "15000/hour",  # GSU
         "ellliottt": "15000/hour",
         "flooie": "20000/hour",  # Needed for testing
-        "WarrenLex": "10000/hour",  # For big litigation days (wow)
+        "WarrenLex": "20000/hour",  # For big litigation days (wow)
         "quevon24": "500000/hour",  # Perform tests, clone cases in local env
     },
     # Auth

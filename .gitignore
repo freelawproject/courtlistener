@@ -28,6 +28,7 @@ cl/assets/media/recap-data/
 cl/assets/media/recap_processing_queue/
 cl/assets/media/xml/
 cl/assets/static/
+cl/assets/static-global/js/react
 
 # IntelliJ IDEA files
 .idea
@@ -36,7 +37,9 @@ cl/assets/static/
 cl/settings/*private.py
 cl/settings/google_auth.json
 .DS_Store
-
-cl/node_modules
+.dir-locals.el
 /.env.dev
 /.env
+
+.vscode/*
+

@@ -5,11 +5,13 @@ import pghistory
 from django.db import models
 from django.template import loader
 from django.urls import NoReverseMatch, reverse
+from model_utils import FieldTracker
 
 from cl.custom_filters.templatetags.text_filters import best_case_name
-from cl.lib.date_time import midnight_pst
+from cl.lib.date_time import midnight_pt
 from cl.lib.model_helpers import make_upload_path
 from cl.lib.models import AbstractDateTimeModel, s3_warning_note
+from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
 from cl.lib.search_index_utils import (
     InvalidDocumentError,
     normalize_search_dicts,
@@ -21,7 +23,7 @@ from cl.people_db.models import Person
 from cl.search.models import SOURCES, Docket
 
 
-@pghistory.track(pghistory.Snapshot())
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Audio(AbstractDateTimeModel):
     """A class representing oral arguments and their associated metadata"""
 
@@ -44,9 +46,9 @@ class Audio(AbstractDateTimeModel):
     )
     source = models.CharField(
         help_text="the source of the audio file, one of: %s"
-        % ", ".join(["%s (%s)" % (t[0], t[1]) for t in SOURCES]),
+        % ", ".join(["%s (%s)" % (t[0], t[1]) for t in SOURCES.NAMES]),
         max_length=10,
-        choices=SOURCES,
+        choices=SOURCES.NAMES,
         blank=True,
     )
     case_name_short = models.TextField(
@@ -146,6 +148,22 @@ class Audio(AbstractDateTimeModel):
         blank=True,
     )
 
+    es_oa_field_tracker = FieldTracker(
+        fields=[
+            "case_name",
+            "case_name_short",
+            "case_name_full",
+            "duration",
+            "download_url",
+            "local_path_mp3",
+            "judges",
+            "sha1",
+            "source",
+            "stt_google_response",
+            "docket_id",
+        ]
+    )
+
     @property
     def transcript(self) -> str:
         j = json.loads(self.stt_google_response)
@@ -219,11 +237,11 @@ class Audio(AbstractDateTimeModel):
         # Docket
         docket = {"docketNumber": self.docket.docket_number}
         if self.docket.date_argued is not None:
-            docket["dateArgued"] = midnight_pst(self.docket.date_argued)
+            docket["dateArgued"] = midnight_pt(self.docket.date_argued)
         if self.docket.date_reargued is not None:
-            docket["dateReargued"] = midnight_pst(self.docket.date_reargued)
+            docket["dateReargued"] = midnight_pt(self.docket.date_reargued)
         if self.docket.date_reargument_denied is not None:
-            docket["dateReargumentDenied"] = midnight_pst(
+            docket["dateReargumentDenied"] = midnight_pt(
                 self.docket.date_reargument_denied
             )
         out.update(docket)
@@ -265,10 +283,7 @@ class Audio(AbstractDateTimeModel):
         return normalize_search_dicts(out)
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-    obj_field=None,
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
 class AudioPanel(Audio.panel.through):  # type: ignore
     """A model class to track audio panel m2m relation"""
 

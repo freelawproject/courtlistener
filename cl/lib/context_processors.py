@@ -40,7 +40,6 @@ info_tips = (
     % reverse("donate"),
     'Free Law Project is a member of the <a href="http://www.falm.info/">Free Access to Law Movement</a> and relies heavily on <a href="%s?referrer=tip">your donations</a>. <i class="fa fa-heart red"></i>'
     % reverse("donate"),
-    'Using <a href="https://smile.amazon.com/ch/46-3342480">smile.amazon.com</a>, you can donate 0.5% of every purchase you make on Amazon to Free Law Project, the non-profit that sponsors CourtListener. <i class="fa fa-heart red"></i>',
     'Free Law Project, the non-profit behind CourtListener, provides <a href="https://free.law/data-consulting/">data consulting and client services</a> for those that need help with our data.',
     'If you have a Github account, you <a href="https://github.com/sponsors/freelawproject/">can sponsor our work</a> so we can do more of it. <i class="fa fa-heart red"></i>',
     # Recognition

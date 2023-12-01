@@ -3,6 +3,7 @@ from typing import Dict, List, Set, Tuple
 
 from django.db import transaction
 from django.db.models import F
+from django.db.models.query import QuerySet
 from eyecite import get_citations
 from eyecite.models import CitationBase
 
@@ -78,14 +79,29 @@ def identify_parallel_citations(
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
 def find_citations_and_parantheticals_for_recap_documents(
-    self, doc_ids: List[int], index: bool = True
+    self, doc_ids: List[int]
 ):
-    documents: List[RECAPDocument] = RECAPDocument.objects.filter(
+    """Find citations and authored parentheticals for search.RECAPDocument objects.
+
+    :param doc_ids: An iterable of search.RECAPDocument PKs
+
+    :return: None
+    """
+    documents: QuerySet[RECAPDocument] = RECAPDocument.objects.filter(
         pk__in=doc_ids
+    ).filter(
+        ocr_status__in=[
+            RECAPDocument.OCR_UNNECESSARY,
+            RECAPDocument.OCR_COMPLETE,
+        ]
     )
 
     for d in documents:
-        store_recap_citations_and_update_parentheticals(d, index)
+        try:
+            store_recap_citations(d)
+        except ResponseNotReady as e:
+            # Threading problem in httplib, which is used in the Solr query.
+            raise self.retry(exc=e, countdown=2)
 
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
@@ -97,10 +113,10 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
     """Find citations and authored parentheticals for search.Opinion objects.
 
     :param opinion_pks: An iterable of search.Opinion PKs
-    :param index: Whether to add the item to Solr
+    :param index: Whether to add the items to Solr
     :return: None
     """
-    opinions: List[Opinion] = Opinion.objects.filter(pk__in=opinion_pks)
+    opinions: QuerySet[Opinion] = Opinion.objects.filter(pk__in=opinion_pks)
     for opinion in opinions:
         try:
             store_opinion_citations_and_update_parentheticals(opinion, index)
@@ -118,9 +134,9 @@ def store_opinion_citations_and_update_parentheticals(
     opinion: Opinion, index: bool
 ) -> None:
     """
-    Updates counts of citations within court opinions, as well as parenthetical info for cited opinions.
+    Updates counts of citations to other opinions within a given court opinion, as well as parenthetical info for the cited opinions.
 
-    :param opinion_pks: An iterable of search.Opinion PKs
+    :param opinion: A search.Opinion object.
     :param index: Whether to add the item to Solr
     :return: None
     """
@@ -237,7 +253,48 @@ def store_opinion_citations_and_update_parentheticals(
         opinion.save(index=False)
 
 
-def store_recap_citations_and_update_parentheticals(
-    document: RECAPDocument, index: bool
-):
-    pass
+def store_recap_citations(document: RECAPDocument) -> None:
+    """
+    Identify citations from federal filings to opinions.
+
+    :param document: A search.RECAPDocument object.
+
+    :return: None
+    """
+
+    get_and_clean_opinion_text(
+        document
+    )  # even though this function assumes the input is an opinion, it will work for RECAP documents.
+
+    # Extract the citations from the document's text
+    citations: List[CitationBase] = get_citations(document.cleaned_text)
+
+    # If no citations are found, then there is nothing else to do for now.
+    if not citations:
+        return
+
+    # Resolve all those different citation objects to Opinion objects,
+    # using a variety of heuristics.
+    citation_resolutions: Dict[
+        MatchedResourceType, List[SupportedCitationType]
+    ] = do_resolve_citations(citations, document)
+
+    # Delete the unmatched citations
+    citation_resolutions.pop(NO_MATCH_RESOURCE, None)
+
+    with transaction.atomic():
+        # delete existing citation entries
+        OpinionsCitedByRECAPDocument.objects.filter(
+            citing_document=document.pk
+        ).delete()
+
+        objects_to_create = [
+            OpinionsCitedByRECAPDocument(
+                citing_document_id=document.pk,
+                cited_opinion_id=opinion_object.pk,
+                depth=len(cits),
+            )
+            for opinion_object, cits in citation_resolutions.items()
+        ]
+
+        OpinionsCitedByRECAPDocument.objects.bulk_create(objects_to_create)

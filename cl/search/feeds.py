@@ -1,14 +1,18 @@
-import os
-
+import waffle
 from django.conf import settings
 from django.contrib.syndication.views import Feed
 from django.shortcuts import get_object_or_404
 from django.utils.feedgenerator import Atom1Feed
+from django.utils.timezone import is_naive
+from requests import Session
 
 from cl.lib import search_utils
-from cl.lib.date_time import midnight_pst
+from cl.lib.date_time import midnight_pt
+from cl.lib.elasticsearch_utils import do_es_feed_query
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.scorched_utils import ExtraSolrInterface
+from cl.lib.timezone_helpers import localize_naive_datetime_to_court_timezone
+from cl.search.documents import ESRECAPDocument
 from cl.search.forms import SearchForm
 from cl.search.models import SEARCH_TYPES, Court
 
@@ -43,28 +47,55 @@ class SearchFeed(Feed):
         if search_form.is_valid():
             cd = search_form.cleaned_data
             order_by = "dateFiled"
-            if cd["type"] == SEARCH_TYPES.OPINION:
-                solr = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
-            elif cd["type"] == SEARCH_TYPES.RECAP:
-                solr = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode="r")
-            else:
-                return []
-            main_params = search_utils.build_main_query(
-                cd, highlight=False, facet=False
-            )
-            main_params.update(
-                {
-                    "sort": f"{order_by} desc",
-                    "rows": "20",
-                    "start": "0",
-                    "caller": "SearchFeed",
-                }
-            )
-            # Eliminate items that lack the ordering field.
-            main_params["fq"].append(f"{order_by}:[* TO *]")
-            items = solr.query().add_extra(**main_params).execute()
-            solr.conn.http_connection.close()
-            return items
+            es_search_query = None
+            with Session() as session:
+                match cd["type"]:
+                    case SEARCH_TYPES.OPINION:
+                        solr = ExtraSolrInterface(
+                            settings.SOLR_OPINION_URL,
+                            http_connection=session,
+                            mode="r",
+                        )
+                    case SEARCH_TYPES.RECAP if waffle.flag_is_active(
+                        obj, "r-es-active"
+                    ):
+                        es_search_query = ESRECAPDocument.search()
+                    case SEARCH_TYPES.RECAP:
+                        solr = ExtraSolrInterface(
+                            settings.SOLR_RECAP_URL,
+                            http_connection=session,
+                            mode="r",
+                        )
+                    case _:
+                        return []
+
+                if es_search_query:
+                    override_params = {
+                        "order_by": "entry_date_filed_feed desc",
+                    }
+                    cd.update(override_params)
+
+                    items = do_es_feed_query(
+                        es_search_query,
+                        cd,
+                        rows=20,
+                    )
+                else:
+                    main_params = search_utils.build_main_query(
+                        cd, highlight=False, facet=False
+                    )
+                    main_params.update(
+                        {
+                            "sort": f"{order_by} desc",
+                            "rows": "20",
+                            "start": "0",
+                            "caller": "SearchFeed",
+                        }
+                    )
+                    # Eliminate items that lack the ordering field.
+                    main_params["fq"].append(f"{order_by}:[* TO *]")
+                    items = solr.query().add_extra(**main_params).execute()
+                return items
         else:
             return []
 
@@ -75,7 +106,19 @@ class SearchFeed(Feed):
         return get_item(item)["court"]
 
     def item_pubdate(self, item):
-        return midnight_pst(get_item(item)["dateFiled"])
+        try:
+            # Get pub_date for RECAP
+            entry_date = get_item(item)["entry_date_filed"]
+            if not is_naive(entry_date):
+                # Handle non-naive dates
+                return midnight_pt(entry_date)
+            else:
+                return localize_naive_datetime_to_court_timezone(
+                    get_item(item)["court_id"], entry_date
+                )
+        except KeyError:
+            # Get pub_date for Opinions
+            return midnight_pt(get_item(item)["dateFiled"])
 
     def item_title(self, item):
         return get_item(item)["caseName"]
@@ -101,18 +144,20 @@ class JurisdictionFeed(Feed):
 
     def items(self, obj):
         """Do a Solr query here. Return the first 20 results"""
-        solr = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
-        params = {
-            "q": "*",
-            "fq": f"court_exact:{obj.pk}",
-            "sort": "dateFiled desc",
-            "rows": "20",
-            "start": "0",
-            "caller": "JurisdictionFeed",
-        }
-        items = solr.query().add_extra(**params).execute()
-        solr.conn.http_connection.close()
-        return items
+        with Session() as session:
+            solr = ExtraSolrInterface(
+                settings.SOLR_OPINION_URL, http_connection=session, mode="r"
+            )
+            params = {
+                "q": "*",
+                "fq": f"court_exact:{obj.pk}",
+                "sort": "dateFiled desc",
+                "rows": "20",
+                "start": "0",
+                "caller": "JurisdictionFeed",
+            }
+            items = solr.query().add_extra(**params).execute()
+            return items
 
     def item_link(self, item):
         return get_item(item)["absolute_url"]
@@ -121,7 +166,7 @@ class JurisdictionFeed(Feed):
         return get_item(item)["court"]
 
     def item_pubdate(self, item):
-        return midnight_pst(get_item(item)["dateFiled"])
+        return midnight_pt(get_item(item)["dateFiled"])
 
     def item_title(self, item):
         return get_item(item)["caseName"]
@@ -155,14 +200,16 @@ class AllJurisdictionsFeed(JurisdictionFeed):
 
     def items(self, obj):
         """Do a Solr query here. Return the first 20 results"""
-        solr = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
-        params = {
-            "q": "*",
-            "sort": "dateFiled desc",
-            "rows": "20",
-            "start": "0",
-            "caller": "AllJurisdictionsFeed",
-        }
-        items = solr.query().add_extra(**params).execute()
-        solr.conn.http_connection.close()
-        return items
+        with Session() as session:
+            solr = ExtraSolrInterface(
+                settings.SOLR_OPINION_URL, http_connection=session, mode="r"
+            )
+            params = {
+                "q": "*",
+                "sort": "dateFiled desc",
+                "rows": "20",
+                "start": "0",
+                "caller": "AllJurisdictionsFeed",
+            }
+            items = solr.query().add_extra(**params).execute()
+            return items

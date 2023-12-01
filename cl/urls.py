@@ -81,4 +81,11 @@ urlpatterns = [
         "removal/",
         RedirectView.as_view(url="/terms/#removal", permanent=True),
     ),
-] + static("/", document_root=settings.MEDIA_ROOT)
+]
+
+if settings.DEVELOPMENT:
+    urlpatterns.append(
+        path("__debug__/", include("debug_toolbar.urls")),
+    )
+
+urlpatterns += static("/", document_root=settings.MEDIA_ROOT)  # type: ignore

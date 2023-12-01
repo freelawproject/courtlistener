@@ -11,7 +11,6 @@ env = environ.FileAwareEnv()
 
 SECRET_KEY = env("SECRET_KEY", default="THIS-is-a-Secret")
 
-
 ############
 # Database #
 ############
@@ -29,7 +28,7 @@ DATABASES = {
             # See: https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-PROTECTION
             # "prefer" is fine in dev, but poor in prod, where it should be
             # "require" or above.
-            "sslmode": env("DB_SSL_MODE", default="prefer"),
+            "sslmode": env("DB_SSL_MODE", default="require"),
         },
     },
 }
@@ -50,15 +49,14 @@ if env("DB_REPLICA_HOST", default=""):
 MAX_REPLICATION_LAG = env.int("MAX_REPLICATION_LAG", default=1e8)  # 100MB
 API_READ_DATABASES: List[str] = env("API_READ_DATABASES", default="replica")
 
-
 ####################
 # Cache & Sessions #
 ####################
 CACHES = {
     "default": {
-        "BACKEND": "redis_cache.RedisCache",
-        "LOCATION": f"{REDIS_HOST}:{REDIS_PORT}",
-        "OPTIONS": {"DB": REDIS_DATABASES["CACHE"], "MAX_ENTRIES": 1e5},
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}",
+        "OPTIONS": {"db": REDIS_DATABASES["CACHE"]},
     },
     "db_cache": {
         "BACKEND": "django.core.cache.backends.db.DatabaseCache",
@@ -69,7 +67,6 @@ CACHES = {
 # This sets Redis as the session backend. This is often advised against, but we
 # have pretty good persistency in Redis, so it's fairly well backed up.
 SESSION_ENGINE = "django.contrib.sessions.backends.cache"
-
 
 #####################################
 # Directories, Apps, and Middleware #
@@ -82,9 +79,20 @@ MEDIA_ROOT = env("MEDIA_ROOT", default=INSTALL_ROOT / "cl/assets/media/")
 STATIC_URL = env.str("STATIC_URL", default="static/")
 STATIC_ROOT = INSTALL_ROOT / "cl/assets/static/"
 TEMPLATE_ROOT = INSTALL_ROOT / "cl/assets/templates/"
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+}
 
 if not any([TESTING, DEBUG]):
-    STATICFILES_STORAGE = "cl.lib.storage.SubDirectoryS3ManifestStaticStorage"
+    STORAGES["staticfiles"] = {
+        "BACKEND": "cl.lib.storage.SubDirectoryS3ManifestStaticStorage",
+    }
+else:
+    STORAGES["staticfiles"] = {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    }
 
 TEMPLATES = [
     {
@@ -115,6 +123,7 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "corsheaders.middleware.CorsMiddleware",
+    "csp.middleware.CSPMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django_ratelimit.middleware.RatelimitMiddleware",
@@ -128,6 +137,7 @@ MIDDLEWARE = [
 ROOT_URLCONF = "cl.urls"
 
 INSTALLED_APPS = [
+    "daphne",
     "django.contrib.admin",
     "django.contrib.admindocs",
     "django.contrib.contenttypes",
@@ -148,6 +158,7 @@ INSTALLED_APPS = [
     "storages",
     "waffle",
     "admin_cursor_paginator",
+    "django_elasticsearch_dsl",
     "pghistory",
     "pgtrigger",
     # CourtListener Apps
@@ -176,6 +187,9 @@ INSTALLED_APPS = [
 
 if DEVELOPMENT:
     INSTALLED_APPS.append("django_extensions")
+    MIDDLEWARE.append("debug_toolbar.middleware.DebugToolbarMiddleware")
+
+ASGI_APPLICATION = "cl.asgi.application"
 
 
 ################
@@ -202,7 +216,6 @@ MANAGERS = [
         env("MANAGER_EMAIL", default="joe@courtlistener.com"),
     )
 ]
-
 
 LOGIN_URL = "/sign-in/"
 LOGIN_REDIRECT_URL = "/"

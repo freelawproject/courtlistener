@@ -18,7 +18,7 @@
 {% endblock %}
 
 {% block footer-scripts %}
-    <script type="text/javascript">
+    <script type="text/javascript" nonce="{{ request.csp_nonce }}">
         var opinions = {
             {% for viz in results.object_list %}
                 "{{ viz.id }}": {{ viz.json|safe }}{% if not forloop.last %},{% endif %}
@@ -87,7 +87,7 @@
                 <div class="col-sm-3"></div>
             </div>
         {% endif %}
-        {% include "includes/pagination.html" %}
+        {% include "includes/pagination.html" with page_obj=results%}
         {% include "includes/random_tip.html" %}
     </div>
 {% endblock %}

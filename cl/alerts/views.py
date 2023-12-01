@@ -15,9 +15,8 @@ from cl.alerts.forms import DocketAlertConfirmForm
 from cl.alerts.models import Alert, DocketAlert
 from cl.alerts.tasks import send_unsubscription_confirmation
 from cl.lib.http import is_ajax
-from cl.lib.ratelimiter import ratelimit_deny_list
 from cl.lib.types import AuthenticatedHttpRequest
-from cl.opinion_page.views import make_docket_title, user_has_alert
+from cl.opinion_page.utils import make_docket_title, user_has_alert
 from cl.search.models import Docket
 
 
@@ -60,7 +59,6 @@ def delete_alert_confirm(request, pk):
     )
 
 
-@ratelimit_deny_list
 def disable_alert(request, secret_key):
     """Disable an alert based on a secret key."""
     alert = get_object_or_404(Alert, secret_key=secret_key)
@@ -74,7 +72,6 @@ def disable_alert(request, secret_key):
     )
 
 
-@ratelimit_deny_list
 def enable_alert(request, secret_key):
     alert = get_object_or_404(Alert, secret_key=secret_key)
     rate = request.GET.get("rate")
@@ -203,7 +200,6 @@ def set_docket_alert_state(
         send_unsubscription_confirmation.delay(docket_alert.pk)
 
 
-@ratelimit_deny_list
 def toggle_docket_alert_confirmation(
     request: HttpRequest,
     route_prefix: str,

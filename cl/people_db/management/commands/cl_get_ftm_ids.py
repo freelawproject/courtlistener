@@ -120,89 +120,91 @@ def print_stats(match_stats, candidate_eid_lists):
 
 def update_judges_by_solr(candidate_id_map, debug):
     """Update judges by looking up each entity from FTM in Solr."""
-    conn = ExtraSolrInterface(settings.SOLR_PEOPLE_URL, mode="r")
-    match_stats = defaultdict(int)
-    # These IDs are ones that cannot be updated due to being identified as
-    # problematic in FTM's data.
-    denylisted_ips = defaultdict(set)
-    for court_id, candidate_list in candidate_id_map.items():
-        for candidate in candidate_list:
-            # Look up the candidate in Solr.
-            logger.info(f"Doing: {candidate['name']}")
-            name = (
-                " AND ".join(
-                    [
-                        word
-                        for word in candidate["name"].split()
-                        if len(word) > 1
-                    ]
+    with requests.Session() as session:
+        conn = ExtraSolrInterface(
+            settings.SOLR_PEOPLE_URL, http_connection=session, mode="r"
+        )
+        match_stats = defaultdict(int)
+        # These IDs are ones that cannot be updated due to being identified as
+        # problematic in FTM's data.
+        denylisted_ips = defaultdict(set)
+        for court_id, candidate_list in candidate_id_map.items():
+            for candidate in candidate_list:
+                # Look up the candidate in Solr.
+                logger.info(f"Doing: {candidate['name']}")
+                name = (
+                    " AND ".join(
+                        [
+                            word
+                            for word in candidate["name"].split()
+                            if len(word) > 1
+                        ]
+                    )
+                ).replace(",", "")
+                results = (
+                    conn.query()
+                    .add_extra(
+                        **{
+                            "caller": "ftm_update_judges_by_solr",
+                            "fq": [
+                                f"name:({name})",
+                                f"court_exact:{court_id}",
+                                # This filters out Sr/Jr problems by insisting on recent
+                                # positions. 1980 is arbitrary, based on testing.
+                                "date_start:[1980-12-31T23:59:59Z TO *]",
+                            ],
+                            "q": "*",
+                        }
+                    )
+                    .execute()
                 )
-            ).replace(",", "")
-            results = (
-                conn.query()
-                .add_extra(
-                    **{
-                        "caller": "ftm_update_judges_by_solr",
-                        "fq": [
-                            f"name:({name})",
-                            f"court_exact:{court_id}",
-                            # This filters out Sr/Jr problems by insisting on recent
-                            # positions. 1980 is arbitrary, based on testing.
-                            "date_start:[1980-12-31T23:59:59Z TO *]",
-                        ],
-                        "q": "*",
-                    }
-                )
-                .execute()
-            )
 
-            if len(results) == 0:
-                match_stats[len(results)] += 1
-                logger.info("Found no matches.")
+                if len(results) == 0:
+                    match_stats[len(results)] += 1
+                    logger.info("Found no matches.")
 
-            elif len(results) == 1:
-                match_stats[len(results)] += 1
-                logger.info(f"Found one match: {results[0]['name']}")
+                elif len(results) == 1:
+                    match_stats[len(results)] += 1
+                    logger.info(f"Found one match: {results[0]['name']}")
 
-                # Get the person from the DB and update them.
-                pk = results[0]["id"]
-                if pk in denylisted_ips:
-                    continue
-                p = Person.objects.get(pk=pk)
-                if p.ftm_eid:
-                    if p.ftm_eid != candidate["eid"]:
-                        logger.info(
-                            "  Found values in ftm database fields. "
-                            "This indicates a duplicate in FTM."
-                        )
+                    # Get the person from the DB and update them.
+                    pk = results[0]["id"]
+                    if pk in denylisted_ips:
+                        continue
+                    p = Person.objects.get(pk=pk)
+                    if p.ftm_eid:
+                        if p.ftm_eid != candidate["eid"]:
+                            logger.info(
+                                "  Found values in ftm database fields. "
+                                "This indicates a duplicate in FTM."
+                            )
 
-                        denylisted_ips[p.pk].add(candidate["eid"])
-                        denylisted_ips[p.pk].add(p.ftm_eid)
-                        p.ftm_eid = ""
-                        p.ftm_total_received = None
+                            denylisted_ips[p.pk].add(candidate["eid"])
+                            denylisted_ips[p.pk].add(p.ftm_eid)
+                            p.ftm_eid = ""
+                            p.ftm_total_received = None
+                        else:
+                            logger.info(
+                                "Found values with matching EID. Adding "
+                                "amounts, since this indicates multiple "
+                                "jurisdictions that the judge was in."
+                            )
+                            p.ftm_total_received += candidate["total"]
+                        if not debug:
+                            p.save()
                     else:
-                        logger.info(
-                            "Found values with matching EID. Adding "
-                            "amounts, since this indicates multiple "
-                            "jurisdictions that the judge was in."
-                        )
-                        p.ftm_total_received += candidate["total"]
-                    if not debug:
-                        p.save()
-                else:
-                    # No major problems. Proceed.
-                    p.ftm_eid = candidate["eid"]
-                    p.ftm_total_received = candidate["total"]
-                    if not debug:
-                        p.save()
+                        # No major problems. Proceed.
+                        p.ftm_eid = candidate["eid"]
+                        p.ftm_total_received = candidate["total"]
+                        if not debug:
+                            p.save()
 
-            elif len(results) > 1:
-                match_stats[len(results)] += 1
-                logger.info(f"  Found more than one match: {results}")
+                elif len(results) > 1:
+                    match_stats[len(results)] += 1
+                    logger.info(f"  Found more than one match: {results}")
 
-    print_stats(match_stats, candidate_id_map)
-    logger.info(f"Denylisted IDs: {denylisted_ips}")
-    conn.conn.http_connection.close()
+        print_stats(match_stats, candidate_id_map)
+        logger.info(f"Denylisted IDs: {denylisted_ips}")
 
 
 class Command(VerboseCommand):

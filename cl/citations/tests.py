@@ -28,13 +28,12 @@ from cl.citations.filter_parentheticals import (
     is_parenthetical_descriptive,
 )
 from cl.citations.group_parentheticals import (
-    ComputedParentheticalGroup,
     compute_parenthetical_groups,
     get_graph_component,
     get_parenthetical_tokens,
     get_representative_parenthetical,
 )
-from cl.citations.management.commands.cl_add_parallel_citations import (
+from cl.citations.management.commands.add_parallel_citations import (
     identify_parallel_citations,
     make_edge_list,
 )
@@ -48,24 +47,30 @@ from cl.citations.match_citations import (
 )
 from cl.citations.score_parentheticals import parenthetical_score
 from cl.citations.tasks import (
+    find_citations_and_parantheticals_for_recap_documents,
     find_citations_and_parentheticals_for_opinion_by_pks,
+    store_recap_citations,
 )
-from cl.lib.test_helpers import IndexedSolrTestCase
+from cl.lib.test_helpers import IndexedSolrTestCase, TestCase
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
+    DocketEntryWithParentsFactory,
     DocketFactory,
     OpinionClusterFactoryWithChildrenAndParents,
     OpinionClusterWithParentsFactory,
     OpinionWithChildrenFactory,
+    RECAPDocumentFactory,
 )
 from cl.search.models import (
     Citation,
     Opinion,
     OpinionCluster,
     OpinionsCited,
+    OpinionsCitedByRECAPDocument,
     Parenthetical,
     ParentheticalGroup,
+    RECAPDocument,
 )
 from cl.tests.cases import SimpleTestCase, TestCase
 
@@ -157,7 +162,7 @@ class CitationTextTest(SimpleTestCase):
 
             # Id. citation across line break
             ('asdf." Id., at 315.\n       Lorem ipsum dolor sit amet',
-             '<pre class="inline">asdf." </pre><span class="citation '
+             '<pre class="inline">asdf.&quot; </pre><span class="citation '
              'no-link">Id., at 315</span><pre class="inline">.\n       Lorem '
              'ipsum dolor sit amet</pre>'),
 
@@ -172,6 +177,10 @@ class CitationTextTest(SimpleTestCase):
              '<pre class="inline">Lorem ipsum dolor sit amet. U.S. Code </pre>'
              '<span class="citation no-link">§3617.</span><pre class="inline">'
              ' Foo bar.</pre>'),
+
+            # Plaintext with HTML text (see Alexis Hunley v. Instagram, LLC)
+            ('<script async src="//www.instagram.com/embed.js"></script>',
+             '<pre class="inline">&lt;script async src=&quot;//www.instagram.com/embed.js&quot;&gt;&lt;/script&gt;</pre>'),
         ]
 
         # fmt: on
@@ -311,6 +320,73 @@ class CitationTextTest(SimpleTestCase):
                 )
 
 
+class RECAPDocumentObjectTest(IndexedSolrTestCase):
+    # pass
+    @classmethod
+    def setUpTestData(cls):
+        cls.recap_doc = RECAPDocumentFactory.create(
+            plain_text="In Fisher v. SD Protection Inc., 948 F.3d 593 (2d Cir. 2020), the Second Circuit held that in the context of settlement of FLSA and NYLL cases, which must be approved by the trial court in accordance with Cheeks v. Freeport Pancake House, Inc., 796 F.3d 199 (2d Cir. 2015), the district court abused its discretion in limiting the amount of recoverable fees to a percentage of the recovery by the successful plaintiffs. But also: sdjnfdsjnk. Fisher, 948 F.3d at 597.",
+            ocr_status=RECAPDocument.OCR_UNNECESSARY,
+            docket_entry=DocketEntryWithParentsFactory(),
+        )
+        # Courts
+        court_ca2 = CourtFactory(id="ca2")
+
+        # Citation 1
+        cls.citation1 = CitationWithParentsFactory.create(
+            volume="948",
+            reporter="F.3d",
+            page="593",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=court_ca2),
+                case_name="Fisher v. SD Protection Inc.",
+                date_filed=date(2020, 1, 1),
+            ),
+        )
+
+        # Citation 2
+        cls.citation2 = CitationWithParentsFactory.create(
+            volume="796",
+            reporter="F.3d",
+            page="199",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=court_ca2),
+                case_name="Cheeks v. Freeport Pancake House, Inc.",
+                date_filed=date(2015, 1, 1),
+            ),
+        )
+
+        super().setUpTestData()
+
+    def test_opinionscited_recap_creation(self):
+        """
+        Tests that OpinionsCitedByRECAPDocument objects are created in the database,
+        with correct citation counts.
+        """
+        test_recap_document = self.recap_doc
+
+        store_recap_citations(test_recap_document)
+
+        opinion1 = Opinion.objects.get(cluster__pk=self.citation1.cluster_id)
+        opinion2 = Opinion.objects.get(cluster__pk=self.citation2.cluster_id)
+
+        citation_test_pairs = [
+            (opinion1, 2),
+            (opinion2, 1),
+        ]
+
+        for cited_op, depth in citation_test_pairs:
+            with self.subTest(
+                f"Testing OpinionsCitedByRECAPDocument creation for {cited_op}...",
+                cited=cited_op,
+                depth=depth,
+            ):
+                citation_obj = OpinionsCitedByRECAPDocument.objects.get(
+                    citing_document=test_recap_document, cited_opinion=cited_op
+                )
+                self.assertEqual(citation_obj.depth, depth)
+
+
 class CitationObjectTest(IndexedSolrTestCase):
     fixtures: List = []
 
@@ -395,7 +471,6 @@ class CitationObjectTest(IndexedSolrTestCase):
                 ),
             ),
         )
-        super().setUpTestData()
 
     def test_citation_resolution(self) -> None:
         """Tests whether different types of citations (i.e., full, short form,
@@ -748,7 +823,8 @@ class CitationFeedTest(IndexedSolrTestCase):
     def test_basic_cited_by_feed(self) -> None:
         """Can we load the cited-by feed and does it have content?"""
         r = self.client.get(
-            reverse("search_feed", args=["search"]), {"q": "cites:1"}
+            reverse("search_feed", args=["search"]),
+            {"q": f"cites:{self.opinion_1.pk}"},
         )
         self.assertEqual(r.status_code, 200)
 
@@ -762,10 +838,13 @@ class CitationFeedTest(IndexedSolrTestCase):
         new_case_name = (
             "MAC ARTHUR KAMMUELLER, \u2014 v. LOOMIS, FARGO & " "CO., \u2014"
         )
-        OpinionCluster.objects.filter(pk=1).update(case_name=new_case_name)
+        OpinionCluster.objects.filter(pk=self.opinion_cluster_1.pk).update(
+            case_name=new_case_name
+        )
 
         r = self.client.get(
-            reverse("search_feed", args=["search"]), {"q": "cites:1"}
+            reverse("search_feed", args=["search"]),
+            {"q": f"cites:{self.opinion_1.pk}"},
         )
         self.assertEqual(r.status_code, 200)
 
@@ -774,7 +853,7 @@ class CitationFeedTest(IndexedSolrTestCase):
 
 
 class CitationCommandTest(IndexedSolrTestCase):
-    """Test a variety of the ways that cl_find_citations can be called."""
+    """Test a variety of the ways that find_citations can be called."""
 
     fixtures: List = []
 
@@ -822,10 +901,8 @@ class CitationCommandTest(IndexedSolrTestCase):
             cluster__pk=cls.citation3.cluster_id
         ).pk
 
-        super().setUpTestData()
-
     def call_command_and_test_it(self, args):
-        call_command("cl_find_citations", *args)
+        call_command("find_citations", *args)
         cited = Opinion.objects.get(cluster__pk=self.citation1.cluster_id)
         expected_count = 1
         self.assertEqual(
