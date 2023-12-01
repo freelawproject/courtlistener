@@ -348,6 +348,7 @@ class PacerDocIdLookUpSerializer(serializers.HyperlinkedModelSerializer):
         fields = (
             "pacer_doc_id",
             "filepath_local",
+            "acms_document_guid",
             "id",
         )
 
