@@ -340,6 +340,26 @@ def docket_idb_data(
     return TemplateResponse(request, "docket_idb_data.html", context)
 
 
+def docket_authorities(
+    request: HttpRequest,
+    docket_id: int,
+    slug: str,
+) -> HttpResponse:
+    docket, context = core_docket_data(request, docket_id)
+    if not docket.authority_count:
+        raise Http404("No authorities data for this docket at this time")
+
+    context.update(
+        {
+            # Needed to show/hide parties tab.
+            "parties": docket.parties.exists(),
+            "docket_entries": docket.docket_entries.exists(),
+            "authorities": docket.authorities_with_data,
+        }
+    )
+    return TemplateResponse(request, "docket_authorities.html", context)
+
+
 def make_rd_title(rd: RECAPDocument) -> str:
     de = rd.docket_entry
     d = de.docket

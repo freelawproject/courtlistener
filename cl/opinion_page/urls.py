@@ -7,6 +7,7 @@ from cl.opinion_page.views import (
     cluster_visualizations,
     court_homepage,
     court_publish_page,
+    docket_authorities,
     docket_idb_data,
     redirect_docket_recap,
     redirect_og_lookup,
@@ -72,6 +73,11 @@ urlpatterns = [
         "docket/<int:docket_id>/idb/<blank-slug:slug>/",
         docket_idb_data,
         name="docket_idb_data",
+    ),
+    path(
+        "docket/<int:docket_id>/authorities/<blank-slug:slug>/",
+        docket_authorities,
+        name="docket_authorities",
     ),
     path(
         "docket/<int:docket_id>/<str:doc_num>/<blank-slug:slug>/",
