@@ -467,12 +467,30 @@ def view_recap_document(
 
     # Override the og:url if we're serving a request to an OG crawler bot
     og_file_path_override = f"/{rd.filepath_local}" if is_og_bot else None
-
+    if rd.attachment_number:
+        view_authorities_url = reverse(
+            "view_attachment_authorities",
+            args=[
+                rd.docket_entry.docket_id,
+                rd.document_number,
+                rd.attachment_number,
+                rd.docket_entry.docket.slug,
+            ],
+        )
+    else:
+        view_authorities_url = reverse(
+            "view_document_authorities",
+            args=[
+                rd.docket_entry.docket_id,
+                rd.document_number,
+                rd.docket_entry.docket.slug,
+            ],
+        )
     authorities_context: AuthoritiesContext = AuthoritiesContext(
         citation_record=rd,
         query_string=request.META["QUERY_STRING"],
         total_authorities_count=rd.authority_count,
-        view_all_url="",
+        view_all_url=view_authorities_url,
         doc_type="document",
     )
 
@@ -489,6 +507,86 @@ def view_recap_document(
                 rd.docket_entry.docket.court_id, "US/Eastern"
             ),
             "redirect_to_pacer_modal": redirect_to_pacer_modal,
+            "authorities_context": authorities_context,
+        },
+    )
+
+
+def view_recap_authorities(
+    request: HttpRequest,
+    docket_id: int | None = None,
+    doc_num: int | None = None,
+    att_num: int | None = None,
+    slug: str = "",
+    is_og_bot: bool = False,
+) -> HttpResponse:
+    """This view can display authorities of an attachment or a regular
+    document, depending on the URL pattern that is matched.
+    """
+    rd = RECAPDocument.objects.filter(
+        docket_entry__docket__id=docket_id,
+        document_number=doc_num,
+        attachment_number=att_num,
+    ).order_by("pk")[0]
+    title = make_rd_title(rd)
+    rd = make_thumb_if_needed(request, rd)
+
+    try:
+        note = Note.objects.get(recap_doc_id=rd.pk, user=request.user)
+    except (ObjectDoesNotExist, TypeError):
+        # Not saved in notes or anonymous user
+        note_form = NoteForm(
+            initial={
+                "recap_doc_id": rd.pk,
+                "name": trunc(title, 100, ellipsis="..."),
+            }
+        )
+    else:
+        note_form = NoteForm(instance=note)
+
+    if rd.attachment_number:
+        view_authorities_url = reverse(
+            "view_attachment_authorities",
+            args=[
+                rd.docket_entry.docket_id,
+                rd.document_number,
+                rd.attachment_number,
+                rd.docket_entry.docket.slug,
+            ],
+        )
+    else:
+        view_authorities_url = reverse(
+            "view_document_authorities",
+            args=[
+                rd.docket_entry.docket_id,
+                rd.document_number,
+                rd.docket_entry.docket.slug,
+            ],
+        )
+    authorities_context: AuthoritiesContext = AuthoritiesContext(
+        citation_record=rd,
+        query_string=request.META["QUERY_STRING"],
+        total_authorities_count=rd.authority_count,
+        view_all_url=view_authorities_url,
+        doc_type="document",
+        query_all_authorities=True,
+    )
+
+    # Override the og:url if we're serving a request to an OG crawler bot
+    og_file_path_override = f"/{rd.filepath_local}" if is_og_bot else None
+    return TemplateResponse(
+        request,
+        "recap_authorities.html",
+        {
+            "rd": rd,
+            "title": title,
+            "og_file_path": og_file_path_override,
+            "note_form": note_form,
+            "private": True,  # Always True for RECAP docs.
+            "timezone": COURT_TIMEZONES.get(
+                rd.docket_entry.docket.court_id, "US/Eastern"
+            ),
+            "redirect_to_pacer_modal": False,
             "authorities_context": authorities_context,
         },
     )
