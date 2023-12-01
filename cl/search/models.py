@@ -798,6 +798,51 @@ class Docket(AbstractDateTimeModel):
             # Simply add the RECAP value to the other value.
             self.source = self.source + self.RECAP
 
+    @property
+    def authority_count(self):
+        return OpinionsCitedByRECAPDocument.objects.filter(
+            citing_document__docket_entry__docket_id=self.pk
+        ).count()
+
+    @property
+    def authorities_with_data(self):
+        """Returns a queryset of this document's authorities for
+        eventual injection into a view template.
+
+        The returned queryset is sorted by the depth field.
+        """
+        query = (
+            OpinionsCitedByRECAPDocument.objects.filter(
+                citing_document__docket_entry__docket_id=self.pk
+            )
+            .select_related("cited_opinion__cluster__docket__court")
+            .prefetch_related(
+                "cited_opinion__cluster__citations",
+                Prefetch(
+                    "cited_opinion__cluster__sub_opinions",
+                    queryset=Opinion.objects.only("pk", "cluster_id"),
+                ),
+            )
+            .only(
+                "depth",
+                "citing_document_id",
+                "cited_opinion__cluster__slug",
+                "cited_opinion__cluster__case_name",
+                "cited_opinion__cluster__case_name_full",
+                "cited_opinion__cluster__case_name_short",
+                "cited_opinion__cluster__citation_count",
+                "cited_opinion__cluster__docket_id",
+                "cited_opinion__cluster__date_filed",
+                "cited_opinion__cluster__docket__docket_number",
+                "cited_opinion__cluster__docket__court_id",
+                "cited_opinion__cluster__docket__court__citation_string",
+                "cited_opinion__cluster__docket__court__full_name",
+            )
+            .order_by("-depth")
+        )
+
+        return query
+
     def add_idb_source(self):
         if self.source == self.DEFAULT:
             self.source = self.IDB
