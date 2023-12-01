@@ -140,6 +140,28 @@ def is_opinion_published(soup: BeautifulSoup) -> bool:
     return True
 
 
+def fix_xml_tags(file_content: str) -> str:
+    """Fix bad tags in xlm file
+
+    :param file_content: raw content from xml file
+    :return: fixed xml as string
+    """
+
+    # Sometimes opening and ending tag mismatch (e.g. ed7c6b39dcb29c9c.xml)
+    file_content = file_content.replace(
+        "</footnote_body></block_quote>", "</block_quote></footnote_body>"
+    )
+    # Fix opinion with invalid attribute
+    if "<opinion unpublished=true>" in file_content:
+        file_content = file_content.replace(
+            "<opinion unpublished=true>", "<opinion unpublished='true'>"
+        )
+        file_content = file_content.replace("<unpublished>", "").replace(
+            "</unpublished>", ""
+        )
+    return file_content
+
+
 def read_xml_to_soup(filepath: str) -> BeautifulSoup:
     """Read the xml file and return a BeautifulSoup object
 
@@ -148,18 +170,8 @@ def read_xml_to_soup(filepath: str) -> BeautifulSoup:
     """
     with open(filepath, "r", encoding="utf-8") as f:
         file_content = f.read()
-        # Sometimes opening and ending tag mismatch (e.g. ed7c6b39dcb29c9c.xml)
-        file_content = file_content.replace(
-            "</footnote_body></block_quote>", "</block_quote></footnote_body>"
-        )
-        # Fix opinion with invalid attribute
-        if "<opinion unpublished=true>" in file_content:
-            file_content = file_content.replace(
-                "<opinion unpublished=true>", "<opinion unpublished='true'>"
-            )
-            file_content = file_content.replace("<unpublished>", "").replace(
-                "</unpublished>", ""
-            )
+        file_content = fix_xml_tags(file_content)
+
     return BeautifulSoup(file_content, "lxml")
 
 
