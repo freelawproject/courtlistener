@@ -8,9 +8,10 @@ from localflavor.us.models import (
     USStateField,
     USZipCodeField,
 )
+from model_utils import FieldTracker
 
 from cl.custom_filters.templatetags.extras import granular_date
-from cl.lib.date_time import midnight_pst
+from cl.lib.date_time import midnight_pt
 from cl.lib.model_helpers import (
     make_choices_group_lookup,
     validate_all_or_none,
@@ -24,6 +25,7 @@ from cl.lib.model_helpers import (
     validate_supervisor,
 )
 from cl.lib.models import AbstractDateTimeModel
+from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
 from cl.lib.search_index_utils import (
     normalize_search_dicts,
     null_map,
@@ -59,9 +61,7 @@ DATE_GRANULARITIES = (
 )
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Person(AbstractDateTimeModel):
     RELIGIONS = (
         ("ca", "Catholic"),
@@ -208,6 +208,23 @@ class Person(AbstractDateTimeModel):
         "the judge pics project.",
         default=False,
     )
+    es_p_field_tracker = FieldTracker(
+        fields=[
+            "name_full",
+            "name_full_reverse",
+            "religion",
+            "gender",
+            "dob_city",
+            "dob_state",
+            "fjc_id",
+            "date_dob",
+            "date_dod",
+            "date_granularity_dob",
+            "date_granularity_dod",
+            "slug",
+        ]
+    )
+    es_rd_field_tracker = FieldTracker(fields=["name_full"])
 
     def __str__(self) -> str:
         return f"{self.pk}: {self.name_full}"
@@ -218,10 +235,12 @@ class Person(AbstractDateTimeModel):
     def get_absolute_url(self) -> str:
         return reverse("view_person", args=[self.pk, self.slug])
 
-    def save(self, *args, **kwargs):
+    def save(self, update_fields=None, *args, **kwargs):
         self.slug = slugify(trunc(self.name_full, 158))
+        if update_fields is not None:
+            update_fields = {"slug"}.union(update_fields)
         self.full_clean()
-        super(Person, self).save(*args, **kwargs)
+        super(Person, self).save(update_fields=update_fields, *args, **kwargs)
 
     def clean_fields(self, *args, **kwargs):
         validate_partial_date(self, ["dob", "dod"])
@@ -300,9 +319,9 @@ class Person(AbstractDateTimeModel):
 
         # Dates
         if self.date_dob is not None:
-            out["dob"] = midnight_pst(self.date_dob)
+            out["dob"] = midnight_pt(self.date_dob)
         if self.date_dod is not None:
-            out["dod"] = midnight_pst(self.date_dod)
+            out["dod"] = midnight_pt(self.date_dod)
 
         # Joined Values. Brace yourself.
         positions = self.positions.all()
@@ -393,9 +412,7 @@ class Person(AbstractDateTimeModel):
         return normalize_search_dicts(out)
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class School(AbstractDateTimeModel):
     is_alias_of = models.ForeignKey(
         "self",
@@ -415,6 +432,7 @@ class School(AbstractDateTimeModel):
         blank=True,
         db_index=True,
     )
+    es_p_field_tracker = FieldTracker(fields=["name"])
 
     def __str__(self) -> str:
         if self.is_alias_of:
@@ -436,9 +454,7 @@ class School(AbstractDateTimeModel):
         super(School, self).clean_fields(*args, **kwargs)
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Position(AbstractDateTimeModel):
     """A role held by a person, and the details about it."""
 
@@ -954,6 +970,35 @@ class Position(AbstractDateTimeModel):
         default=False,
     )
 
+    es_p_field_tracker = FieldTracker(
+        fields=[
+            "court_id",
+            "organization_name",
+            "job_title",
+            "position_type",
+            "date_nominated",
+            "date_elected",
+            "date_recess_appointment",
+            "date_referred_to_judicial_committee",
+            "date_judicial_committee_action",
+            "date_hearing",
+            "date_confirmation",
+            "date_start",
+            "date_granularity_start",
+            "date_retirement",
+            "date_termination",
+            "date_granularity_termination",
+            "judicial_committee_action",
+            "nomination_process",
+            "how_selected",
+            "termination_reason",
+            "person_id",
+            "appointer_id",
+            "supervisor_id",
+            "predecessor_id",
+        ]
+    )
+
     def __str__(self) -> str:
         return f"{self.pk}: {self.person.name_full} at {self.court_id}"
 
@@ -1067,9 +1112,7 @@ class Position(AbstractDateTimeModel):
         super(Position, self).clean_fields(*args, **kwargs)
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class RetentionEvent(AbstractDateTimeModel):
     RETENTION_TYPES = (
         ("reapp_gov", "Governor Reappointment"),
@@ -1141,9 +1184,7 @@ class RetentionEvent(AbstractDateTimeModel):
         super(RetentionEvent, self).clean_fields(*args, **kwargs)
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Education(AbstractDateTimeModel):
     DEGREE_LEVELS = (
         ("ba", "Bachelor's (e.g. B.A.)"),
@@ -1211,9 +1252,7 @@ class Education(AbstractDateTimeModel):
         super(Education, self).clean_fields(*args, **kwargs)
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Race(models.Model):
     RACES = (
         ("w", "White"),
@@ -1236,10 +1275,7 @@ class Race(models.Model):
         return f"{self.race}"
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-    obj_field=None,
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
 class PersonRace(Person.race.through):
     """A model class to track person race m2m relation"""
 
@@ -1247,9 +1283,7 @@ class PersonRace(Person.race.through):
         proxy = True
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class PoliticalAffiliation(AbstractDateTimeModel):
     POLITICAL_AFFILIATION_SOURCE = (
         ("b", "Ballot"),
@@ -1308,6 +1342,7 @@ class PoliticalAffiliation(AbstractDateTimeModel):
         max_length=15,
         blank=True,
     )
+    es_p_field_tracker = FieldTracker(fields=["political_party"])
 
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -1319,9 +1354,7 @@ class PoliticalAffiliation(AbstractDateTimeModel):
         super(PoliticalAffiliation, self).clean_fields(*args, **kwargs)
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Source(AbstractDateTimeModel):
     person = models.ForeignKey(
         Person,
@@ -1347,9 +1380,7 @@ class Source(AbstractDateTimeModel):
     )
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class ABARating(AbstractDateTimeModel):
     ABA_RATINGS = (
         ("ewq", "Exceptionally Well Qualified"),
@@ -1374,6 +1405,7 @@ class ABARating(AbstractDateTimeModel):
         choices=ABA_RATINGS,
         max_length=5,
     )
+    es_p_field_tracker = FieldTracker(fields=["rating"])
 
     class Meta:
         verbose_name = "American Bar Association Rating"

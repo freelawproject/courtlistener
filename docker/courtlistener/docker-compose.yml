@@ -10,8 +10,6 @@ services:
   cl-redis:
     container_name: cl-redis
     image: redis
-    ports:
-      - "6379:6379"
     networks:
       - cl_net_overlay
 
@@ -20,13 +18,25 @@ services:
   # use, you will have ot migrate it yourself. See DEVELOPING.md
   cl-postgresql:
     container_name: cl-postgres
+    build:
+      context: ../../../courtlistener/docker/postgresql/
+      dockerfile: ../../../courtlistener/docker/postgresql/Dockerfile
+      args:
+        POSTGRES_VERSION: 15.2-alpine
     ports:
       - "5432:5432"
-    image: postgres:11-alpine
     environment:
       POSTGRES_USER: "postgres"
       POSTGRES_PASSWORD: "postgres"
       POSTGRES_DB: "courtlistener"
+    command:
+      - "postgres"
+      - "-c"
+      - "ssl=on"
+      - "-c"
+      - "ssl_cert_file=/etc/ssl/private/cl-postgres.crt"
+      - "-c"
+      - "ssl_key_file=/etc/ssl/private/cl-postgres.key"
     networks:
       - cl_net_overlay
 
@@ -43,10 +53,25 @@ services:
     networks:
       - cl_net_overlay
 
+  cl-webpack:
+    container_name: cl-webpack
+    image: node:16
+    volumes:
+      - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
+    env_file:
+      - ../../.env.dev
+    working_dir: /opt/courtlistener/cl
+    command: sh -c 'npm install && npx webpack --progress --watch --mode=development'
+
   # Task Server
   cl-celery:
     container_name: cl-celery
-    image: ${CELERY_DOCKER_IMAGE:-freelawproject/courtlistener:latest-celery-dev}
+    build:
+      context: "../../"
+      dockerfile: "./docker/django/Dockerfile"
+      args:
+        BUILD_ENV: dev
+    command: celery
     depends_on:
       - cl-postgresql
       - cl-redis
@@ -62,7 +87,12 @@ services:
 
   cl-django:
     container_name: cl-django
-    image: ${DJANGO_DOCKER_IMAGE:-freelawproject/courtlistener:latest-web-dev}
+    build:
+      context: "../../"
+      dockerfile: "./docker/django/Dockerfile"
+      args:
+        BUILD_ENV: dev
+    command: web-dev
     depends_on:
       - cl-postgresql
       - cl-redis
@@ -71,11 +101,14 @@ services:
       - cl-selenium
       - cl-doctor
       - cl-disclosures
+      - cl-es
     ports:
       - "8000:8000"
+    user: root
     volumes:
       - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
       - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
+      - ${CL_BASE_DIR:-../../../courtlistener/.postgresql}:/root/.postgresql
     networks:
       - cl_net_overlay
     env_file:
@@ -83,9 +116,8 @@ services:
 
   cl-selenium:
     container_name: cl-selenium
-    image: seleniarm/standalone-chromium
+    image: seleniarm/standalone-chromium:113.0
     ports:
-      - 4444:4444  # Selenium
       - 5900:5900  # VNC server
     volumes:
       - ${CL_SHM_DIR:-/dev/shm}:/dev/shm
@@ -109,5 +141,39 @@ services:
   cl-webhook-sentry:
     image: juggernaut/webhook-sentry:latest
     container_name: "cl-webhook-sentry"
+    networks:
+      - cl_net_overlay
+
+  cl-es:
+    container_name: cl-es
+    image: elasticsearch:8.8.1
+    environment:
+      - discovery.type=single-node
+      - cluster.name=courtlistener-cluster
+      - cluster.routing.allocation.disk.threshold_enabled=false
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=true
+      - xpack.security.http.ssl.key=certs/cl-es.key
+      - xpack.security.http.ssl.certificate=certs/cl-es.crt
+      - xpack.security.http.ssl.certificate_authorities=certs/ca.crt
+      - xpack.security.transport.ssl.enabled=true
+      - xpack.security.transport.ssl.key=certs/cl-es.key
+      - xpack.security.transport.ssl.certificate=certs/cl-es.crt
+      - xpack.security.transport.ssl.certificate_authorities=certs/ca.crt
+      - xpack.security.transport.ssl.verification_mode=certificate
+      - ELASTIC_PASSWORD=password
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: 500
+        hard: 600
+    volumes:
+      - ${CL_BASE_DIR:-../../../courtlistener/docker/elastic/cl-es.crt}:/usr/share/elasticsearch/config/certs/cl-es.crt
+      - ${CL_BASE_DIR:-../../../courtlistener/docker/elastic/cl-es.key}:/usr/share/elasticsearch/config/certs/cl-es.key
+      - ${CL_BASE_DIR:-../../../courtlistener/docker/elastic/ca.crt}:/usr/share/elasticsearch/config/certs/ca.crt
+      - ${CL_BASE_DIR:-../../../courtlistener/cl/search/elasticsearch_files/synonyms_en.txt}:/usr/share/elasticsearch/config/dictionaries/synonyms_en.txt
+      - ${CL_BASE_DIR:-../../../courtlistener/cl/search/elasticsearch_files/stopwords_en.txt}:/usr/share/elasticsearch/config/dictionaries/stopwords_en.txt
+    ports:
+      - "9200:9200"
     networks:
       - cl_net_overlay

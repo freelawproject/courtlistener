@@ -14,7 +14,7 @@
 {% block content %}
 <div class="col-xs-12">
 <div class="row">
-  <div class="hidden-xs hidden-sm col-md-3">
+  <div id="toc-container" class="hidden-xs hidden-sm col-md-3">
     <div id="toc">
       <h3>Table of Contents</h3>
       <ul>
@@ -32,7 +32,7 @@
         <ul>
           <li><a href="#schedule">Data Generation Schedule</a></li>
           <li><a href="#contributing">Contributions</a></li>
-          <li><a href="#old">Old Formats</a></li>
+          <li><a href="#old">Release Notes</a></li>
           <li><a herf="#copyright">Copyright</a></li>
         </ul>
       </ul>
@@ -50,7 +50,7 @@
 
 
     <h2 id="browsing">Browsing the Data Files</h2>
-    <p>As they are generated, files are streamed to an AWS S3 bucket. Dates are added to the filenames indicating when their generation began (in the UTC timezone).
+    <p>As they are generated, files are streamed to an AWS S3 bucket. Files are named with their generation time (UTC) and object type. Files are snapshots, not deltas.
     </p>
     <p>
       <a href="https://com-courtlistener-storage.s3-us-west-2.amazonaws.com/list.html?prefix=bulk-data/" class="btn btn-primary btn-lg">Browse Bulk Data</a>
@@ -58,8 +58,13 @@
 
 
     <h2 id="formats">Data Format and Field Definitions</h2>
-    <p>Files are generated using the PostgreSQL <a href="https://www.postgresql.org/docs/current/sql-copy.html"><code>COPY TO</code></a> command. This generates CSV files that correspond with the tables in our database. Files are provided using the CSV output format, in the UTF-8 encoding, with a header row on the top. If you are using PostgreSQL, the easiest way to import these files is to use the <code>COPY FROM</code> command. Details about the CSVs we generate can be found in the <a href="https://www.postgresql.org/docs/current/sql-copy.html">COPY documentation</a> or by reading <a href="https://github.com/freelawproject/courtlistener/blob/main/scripts/make_bulk_data.sh">the code we use to generate these files</a>.
+    <p>Files are generated using the PostgreSQL <a href="https://www.postgresql.org/docs/current/sql-copy.html"><code>COPY TO</code></a> command. This generates CSV files that correspond with the tables in our database. Files are provided using the CSV output format, in the UTF-8 encoding, with a header row on the top. If you are using PostgreSQL, the easiest way to import these files is to use the <code>COPY FROM</code> command. Details about the CSVs we generate can be found in the <a href="https://www.postgresql.org/docs/current/sql-copy.html">COPY documentation</a> or by reading <a href="https://github.com/freelawproject/courtlistener/blob/main/scripts/make_bulk_data.sh">the code we use to generate these files</a>. You can import the data using <code>COPY FROM</code> by executing a sql statement like this:
     </p>
+    <blockquote>
+      <code>
+        COPY public.search_opinionscited (id, depth, cited_opinion_id, citing_opinion_id) FROM 'path_to_csv_file.csv' WITH (FORMAT csv, ENCODING utf8, header);
+      </code>
+    </blockquote>
     <p>The SQL commands to generate our database schema (including tables, columns, indexes, and constraints) are dumped whenever we generate the bulk data files. You can import the schema file into your own database with something like:
     </p>
     <blockquote>
@@ -154,7 +159,13 @@
     <p>Like all Free Law Project initiatives, CourtListener is an open source project. If you are a developer and you notice bugs or missing features, we enthusiastically welcome your contributions <a href="https://github.com/freelawproject/courtlistener">on Github</a>.
     </p>
 
-    <h3 id="old">Obsoleted Bulk Data Formats</h3>
+    <h3 id="old">Release Notes</h3>
+	<p>
+      <strong>2023-09-26</strong>: Bulk script refactored to make it easier to maintain. Courthouse table added to bulk script. Court appeals_to through table added to bulk script. Bulk script now automatically generates a shell script to load bulk data and stream the script to S3.
+    </p>
+    <p>
+      <strong>2023-07-07</strong>: We added the <code>FORCE_QUOTE *</code> option to our export script so that null can be distinguished from blank values. In the past, both appeared in the CSVs as commas with nothing between them (<code>,,</code>). With this change, blanks will use quotes: (<code>,"",</code>), while nulls will remain as before. This should make the <code>COPY TO</code> commands work better. In addition, several missing columns are added to the bulk data to align our exports more closely with our database.
+    </p>
     <p>This is the third version of our bulk data system. Previous versions were available by jurisdiction, by day, month, or year, and in JSON format corresponding to our REST API. We also previously provided our CiteGeist data file. Each of these features has been removed in an effort to simply the feature. For more information, see <a href="https://github.com/freelawproject/courtlistener/issues/285">here (removing day/month/year files)</a> and <a href="https://github.com/freelawproject/courtlistener/issues/1983">here (removing the JSON format and switching to PostgreSQL dumps)</a>.
     </p>
 
@@ -162,7 +173,7 @@
     <p>Our bulk data files are free of known copyright restrictions.<br/>
       <a rel="license"
          href="http://creativecommons.org/publicdomain/mark/1.0/">
-        <img src="https://i.creativecommons.org/p/mark/1.0/88x31.png"
+        <img src="{% static "png/cc-pd.png" %}"
              alt="Public Domain Mark" height="31"
              width="88"/>
       </a>

@@ -27,7 +27,7 @@
 
 {% block content %}
     <div class="col-xs-12">
-      {% include "includes/pagination.html" with results=judge_page %}
+      {% include "includes/pagination.html" with page_obj=judge_page %}
       <div class="text-center">
         <h1 class="v-offset-below-1 v-offset-above-3">{{ title }}</h1>
         <p class="h4">
@@ -112,7 +112,7 @@
           </div>
         </div>
       </form>
-      {% include "includes/pagination.html" with results=judge_page %}
+      {% include "includes/pagination.html" with page_obj=judge_page %}
 
       <h3>Tips</h3>
       <ol>

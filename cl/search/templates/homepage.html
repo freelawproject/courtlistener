@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load extras humanize static %}
+{% load extras humanize static %}{% load waffle_tags %}
 
 {% block canonical %}{% get_canonical_element %}{% endblock %}
 {% block title %}Non-Profit Free Legal Search Engine and Alert System – CourtListener.com{% endblock %}
@@ -13,7 +13,7 @@
 {% endblock %}
 
 {% block footer-scripts %}
-    <script type="text/javascript">
+    <script type="text/javascript" nonce="{{ request.csp_nonce }}">
         var opinions = {
             {% for viz in visualizations %}
                 "{{ viz.id }}": {{ viz.json|safe }}{% if not forloop.last %},
@@ -119,7 +119,11 @@
             <p>We download oral arguments from many jurisdictions on an
                 ongoing basis. Here are the most recent ones.
             </p>
-            {% include "includes/search_result.html" with results=results_oa type_override=SEARCH_TYPES.ORAL_ARGUMENT simple=True %}
+            {% flag "oa-es-active" %}
+              {% include "includes/search_result.html" with results=results_oa type_override=SEARCH_TYPES.ORAL_ARGUMENT simple=True %}
+            {% else %}
+              {% include "includes/search_result_solr.html" with results=results_oa type_override=SEARCH_TYPES.ORAL_ARGUMENT simple=True %}
+            {% endflag %}
             <p class="right">
                 <a href="/?order_by=dateArgued+desc&type=oa"
                    rel="nofollow"

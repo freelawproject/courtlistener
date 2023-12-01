@@ -1,11 +1,13 @@
 import json
 import os
+from copy import deepcopy
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 from unittest.mock import ANY
 
 import time_machine
+from asgiref.sync import async_to_sync
 from dateutil.tz import tzutc
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
@@ -58,9 +60,11 @@ from cl.recap.api_serializers import PacerFetchQueueSerializer
 from cl.recap.factories import (
     AppellateAttachmentFactory,
     AppellateAttachmentPageFactory,
+    DocketDataFactory,
     DocketEntriesDataFactory,
     DocketEntryDataFactory,
     FjcIntegratedDatabaseFactory,
+    MinuteDocketEntryDataFactory,
     PacerFetchQueueFactory,
     ProcessingQueueFactory,
     RECAPEmailDocketDataFactory,
@@ -420,7 +424,7 @@ class RecapUploadsTest(TestCase):
             court=self.court_appellate,
             pacer_case_id="104490",
         )
-        add_docket_entries(d, self.de_data["docket_entries"])
+        async_to_sync(add_docket_entries)(d, self.de_data["docket_entries"])
         pq = ProcessingQueue.objects.create(
             court=self.court_appellate,
             uploader=self.user,
@@ -439,7 +443,7 @@ class RecapUploadsTest(TestCase):
             side_effect=lambda x, y: self.att_data,
         ):
             # Process the appellate attachment page containing 2 attachments.
-            process_recap_appellate_attachment(pq.pk)
+            async_to_sync(process_recap_appellate_attachment)(pq.pk)
 
         # After adding attachments, it should only exist 2 RD attachments.
         self.assertEqual(recap_documents.count(), 2)
@@ -465,7 +469,7 @@ class RecapUploadsTest(TestCase):
             "cl.recap.tasks.get_data_from_appellate_att_report",
             side_effect=lambda x, y: self.att_data,
         ):
-            process_recap_appellate_attachment(pq_1.pk)
+            async_to_sync(process_recap_appellate_attachment)(pq_1.pk)
 
         # Process the attachment page again, no new attachments should be added
         self.assertEqual(recap_documents.count(), 2)
@@ -490,7 +494,7 @@ class RecapUploadsTest(TestCase):
             pacer_case_id="104490",
         )
         # Merge docket entries
-        add_docket_entries(d, self.de_data["docket_entries"])
+        async_to_sync(add_docket_entries)(d, self.de_data["docket_entries"])
 
         pq = ProcessingQueue.objects.create(
             court=self.court_appellate,
@@ -509,7 +513,7 @@ class RecapUploadsTest(TestCase):
             "cl.recap.tasks.get_data_from_appellate_att_report",
             side_effect=lambda x, y: self.att_data,
         ):
-            process_recap_appellate_attachment(pq.pk)
+            async_to_sync(process_recap_appellate_attachment)(pq.pk)
 
         # Confirm attachments were added correctly.
         self.assertEqual(recap_documents.count(), 2)
@@ -523,7 +527,7 @@ class RecapUploadsTest(TestCase):
         )
 
         # Merge docket entries data again
-        add_docket_entries(d, self.de_data["docket_entries"])
+        async_to_sync(add_docket_entries)(d, self.de_data["docket_entries"])
 
         # No new main recap document should be created
         self.assertEqual(recap_documents.count(), 2)
@@ -999,7 +1003,7 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.court = CourtFactory(id="txwd", jurisdiction="FB")
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
         with open(
             test_dir / "recap_mail_custom_receipt.json",
@@ -1112,7 +1116,7 @@ class DebugRecapUploadtest(TestCase):
             upload_type=UPLOAD_TYPE.PDF,
             debug=True,
         )
-        process_recap_pdf(pq.pk)
+        async_to_sync(process_recap_pdf)(pq.pk)
         self.assertEqual(RECAPDocument.objects.count(), 0)
         mock_extract.assert_not_called()
 
@@ -1127,7 +1131,7 @@ class DebugRecapUploadtest(TestCase):
             upload_type=UPLOAD_TYPE.DOCKET,
             debug=True,
         )
-        process_recap_docket(pq.pk)
+        async_to_sync(process_recap_docket)(pq.pk)
         self.assertEqual(Docket.objects.count(), 0)
         self.assertEqual(DocketEntry.objects.count(), 0)
         self.assertEqual(RECAPDocument.objects.count(), 0)
@@ -1152,7 +1156,7 @@ class DebugRecapUploadtest(TestCase):
             filepath_local=self.att,
             debug=True,
         )
-        process_recap_attachment(pq.pk)
+        async_to_sync(process_recap_attachment)(pq.pk)
         self.assertEqual(Docket.objects.count(), 1)
         self.assertEqual(DocketEntry.objects.count(), 1)
         self.assertEqual(RECAPDocument.objects.count(), 1)
@@ -1202,7 +1206,7 @@ class RecapPdfTaskTest(TestCase):
         self.pq.delete()
         try:
             self.docket.delete()  # This cascades to self.de and self.rd
-        except (Docket.DoesNotExist, AssertionError):
+        except (Docket.DoesNotExist, AssertionError, ValueError):
             pass
 
     def test_pq_has_default_status(self) -> None:
@@ -1216,7 +1220,7 @@ class RecapPdfTaskTest(TestCase):
         cf = ContentFile(self.file_content)
         self.rd.filepath_local.save(self.filename, cf)
 
-        rd = process_recap_pdf(self.pq.pk)
+        rd = async_to_sync(process_recap_pdf)(self.pq.pk)
 
         # Did we avoid creating new objects?
         self.assertEqual(rd, self.rd)
@@ -1243,22 +1247,20 @@ class RecapPdfTaskTest(TestCase):
         Alas, we fail. In theory, this shouldn't happen.
         """
         self.de.delete()
-        with self.assertRaises(DocketEntry.DoesNotExist):
-            process_recap_pdf(self.pq.pk)
+        rd = async_to_sync(process_recap_pdf)(self.pq.pk)
+        self.assertIsNone(rd)
         self.pq.refresh_from_db()
-        # This doesn't do the celery retries, unfortunately. If we get that
-        # working, the correct status is PROCESSING_STATUS.FAILED.
-        self.assertEqual(self.pq.status, PROCESSING_STATUS.QUEUED_FOR_RETRY)
+        self.assertEqual(self.pq.status, PROCESSING_STATUS.FAILED)
         self.assertIn("Unable to find docket entry", self.pq.error_message)
 
-    @mock.patch("cl.recap.tasks.extract_recap_pdf_base")
+    @mock.patch("cl.recap.tasks.extract_recap_pdf.si")
     def test_docket_and_docket_entry_already_exist(self, mock_extract):
         """What happens if we have everything but the PDF?
 
         This is the good case. We simply create a new item.
         """
         self.rd.delete()
-        rd = process_recap_pdf(self.pq.pk)
+        rd = async_to_sync(process_recap_pdf)(self.pq.pk)
         self.assertTrue(rd.is_available)
         self.assertTrue(rd.sha1)
         self.assertTrue(rd.filepath_local)
@@ -1280,19 +1282,17 @@ class RecapPdfTaskTest(TestCase):
         In practice, this shouldn't happen.
         """
         self.docket.delete()
-        with self.assertRaises(Docket.DoesNotExist):
-            process_recap_pdf(self.pq.pk)
+        rd = async_to_sync(process_recap_pdf)(self.pq.pk)
+        self.assertIsNone(rd)
         self.pq.refresh_from_db()
-        # This doesn't do the celery retries, unfortunately. If we get that
-        # working, the correct status is PROCESSING_STATUS.FAILED.
-        self.assertEqual(self.pq.status, PROCESSING_STATUS.QUEUED_FOR_RETRY)
+        self.assertEqual(self.pq.status, PROCESSING_STATUS.FAILED)
         self.assertIn("Unable to find docket", self.pq.error_message)
 
     def test_ocr_extraction_recap_document(self):
         """Can we extract a recap document via OCR?"""
         cf = ContentFile(self.file_content_ocr)
         self.pq.filepath_local.save(self.filename_ocr, cf)
-        rd = process_recap_pdf(self.pq.pk)
+        rd = async_to_sync(process_recap_pdf)(self.pq.pk)
         recap_document = RECAPDocument.objects.get(pk=rd.pk)
         self.assertEqual(needs_ocr(recap_document.plain_text), False)
         self.assertEqual(recap_document.ocr_status, RECAPDocument.OCR_COMPLETE)
@@ -1349,13 +1349,13 @@ class RecapZipTaskTest(TestCase):
         Docket.objects.all().delete()
         ProcessingQueue.objects.all().delete()
 
-    @mock.patch("cl.recap.tasks.extract_recap_pdf_base")
+    @mock.patch("cl.recap.tasks.extract_recap_pdf.si")
     def test_simple_zip_upload(self, mock_extract):
         """Do we unpack the zip and process it's contents properly?"""
         # The original pq should be marked as complete with a good message.
         pq = ProcessingQueue.objects.get(id=self.pq.id)
         print(pq.__dict__)
-        results = process_recap_zip(pq.pk)
+        results = async_to_sync(process_recap_zip)(pq.pk)
         pq.refresh_from_db()
         self.assertEqual(
             pq.status,
@@ -1744,12 +1744,12 @@ class RecapMinuteEntriesTest(TestCase):
         expected_entry_count = 23
 
         pq = self.make_pq()
-        returned_data = process_recap_docket(pq.pk)
+        returned_data = async_to_sync(process_recap_docket)(pq.pk)
         d1 = Docket.objects.get(pk=returned_data["docket_pk"])
         self.assertEqual(d1.docket_entries.count(), expected_entry_count)
 
         pq = self.make_pq()
-        returned_data = process_recap_docket(pq.pk)
+        returned_data = async_to_sync(process_recap_docket)(pq.pk)
         d2 = Docket.objects.get(pk=returned_data["docket_pk"])
         self.assertEqual(d1.pk, d2.pk)
         self.assertEqual(d2.docket_entries.count(), expected_entry_count)
@@ -1760,12 +1760,12 @@ class RecapMinuteEntriesTest(TestCase):
         """
         expected_entry_count = 25
         pq = self.make_pq("azd_multiple_unnumbered.html")
-        returned_data = process_recap_docket(pq.pk)
+        returned_data = async_to_sync(process_recap_docket)(pq.pk)
         d1 = Docket.objects.get(pk=returned_data["docket_pk"])
         self.assertEqual(d1.docket_entries.count(), expected_entry_count)
 
         pq = self.make_pq("azd_multiple_unnumbered.html")
-        returned_data = process_recap_docket(pq.pk)
+        returned_data = async_to_sync(process_recap_docket)(pq.pk)
         d2 = Docket.objects.get(pk=returned_data["docket_pk"])
         self.assertEqual(d1.pk, d2.pk)
         self.assertEqual(d2.docket_entries.count(), expected_entry_count)
@@ -1774,7 +1774,7 @@ class RecapMinuteEntriesTest(TestCase):
         """Do appellate cases get ordered/handled properly?"""
         expected_entry_count = 16
         pq = self.make_pq("ca1.html", upload_type=UPLOAD_TYPE.APPELLATE_DOCKET)
-        returned_data = process_recap_appellate_docket(pq.pk)
+        returned_data = async_to_sync(process_recap_appellate_docket)(pq.pk)
         d1 = Docket.objects.get(pk=returned_data["docket_pk"])
         self.assertEqual(d1.docket_entries.count(), expected_entry_count)
 
@@ -1787,16 +1787,16 @@ class RecapMinuteEntriesTest(TestCase):
             text = f.read().decode()
         rss_feed._parse_text(text)
         docket = rss_feed.data[0]
-        d = find_docket_object(
+        d = async_to_sync(find_docket_object)(
             court_id, docket["pacer_case_id"], docket["docket_number"]
         )
-        update_docket_metadata(d, docket)
+        async_to_sync(update_docket_metadata)(d, docket)
         d.save()
 
         expected_count = 1
-        add_docket_entries(d, docket["docket_entries"])
+        async_to_sync(add_docket_entries)(d, docket["docket_entries"])
         self.assertEqual(d.docket_entries.count(), expected_count)
-        add_docket_entries(d, docket["docket_entries"])
+        async_to_sync(add_docket_entries)(d, docket["docket_entries"])
         self.assertEqual(d.docket_entries.count(), expected_count)
 
     def test_dhr_merges_separate_docket_entries(self) -> None:
@@ -1834,7 +1834,7 @@ class RecapMinuteEntriesTest(TestCase):
         )
         # Add a docket entry that spans the two above. Same date, same short
         # and long description. This should trigger a merge.
-        add_docket_entries(
+        async_to_sync(add_docket_entries)(
             d,
             [
                 {
@@ -1990,7 +1990,7 @@ class RecapDocketTaskTest(TestCase):
 
     def test_parsing_docket_does_not_exist(self) -> None:
         """Can we parse an HTML docket we have never seen before?"""
-        returned_data = process_recap_docket(self.pq.pk)
+        returned_data = async_to_sync(process_recap_docket)(self.pq.pk)
         d = Docket.objects.get(pk=returned_data["docket_pk"])
         self.assertEqual(d.source, Docket.RECAP)
         self.assertTrue(d.case_name)
@@ -2001,7 +2001,7 @@ class RecapDocketTaskTest(TestCase):
         existing_d = Docket.objects.create(
             source=Docket.DEFAULT, pacer_case_id="asdf", court_id="scotus"
         )
-        returned_data = process_recap_docket(self.pq.pk)
+        returned_data = async_to_sync(process_recap_docket)(self.pq.pk)
         d = Docket.objects.get(pk=returned_data["docket_pk"])
         self.assertEqual(d.source, Docket.RECAP_AND_SCRAPER)
         self.assertTrue(d.case_name)
@@ -2014,7 +2014,7 @@ class RecapDocketTaskTest(TestCase):
         Docket.objects.create(
             source=Docket.HARVARD, pacer_case_id="asdf", court_id="scotus"
         )
-        returned_data = process_recap_docket(self.pq.pk)
+        returned_data = async_to_sync(process_recap_docket)(self.pq.pk)
         d = Docket.objects.get(pk=returned_data["docket_pk"])
         self.assertEqual(d.source, Docket.HARVARD_AND_RECAP)
 
@@ -2026,7 +2026,7 @@ class RecapDocketTaskTest(TestCase):
         existing_de = DocketEntry.objects.create(
             docket=existing_d, entry_number="1", date_filed=date(2008, 1, 1)
         )
-        returned_data = process_recap_docket(self.pq.pk)
+        returned_data = async_to_sync(process_recap_docket)(self.pq.pk)
         d = Docket.objects.get(pk=returned_data["docket_pk"])
         de = d.docket_entries.get(pk=existing_de.pk)
         self.assertNotEqual(
@@ -2063,9 +2063,54 @@ class RecapDocketTaskTest(TestCase):
             upload_type=UPLOAD_TYPE.PDF,
             status=PROCESSING_STATUS.FAILED,
         )
-        process_recap_docket(self.pq.pk)
+        async_to_sync(process_recap_docket)(self.pq.pk)
         pq.refresh_from_db()
         self.assertEqual(pq.status, PROCESSING_STATUS.SUCCESSFUL)
+
+
+@mock.patch("cl.recap.tasks.add_items_to_solr")
+class RecapDocketAttachmentTaskTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        CourtFactory(id="cand", jurisdiction="FD")
+
+    def setUp(self) -> None:
+        self.user = User.objects.get(username="recap")
+        self.filename = "cand_7.html"
+        path = os.path.join(
+            settings.INSTALL_ROOT, "cl", "recap", "test_assets", self.filename
+        )
+        with open(path, "rb") as f:
+            f = SimpleUploadedFile(self.filename, f.read())
+        self.pq = ProcessingQueue.objects.create(
+            court_id="cand",
+            uploader=self.user,
+            pacer_case_id="417880",
+            filepath_local=f,
+            upload_type=UPLOAD_TYPE.DOCKET,
+        )
+
+    def tearDown(self) -> None:
+        self.pq.filepath_local.delete()
+        self.pq.delete()
+        Docket.objects.all().delete()
+        RECAPDocument.objects.filter(
+            document_type=RECAPDocument.ATTACHMENT,
+        ).delete()
+
+    def test_attachments_get_created(self, mock):
+        """Do attachments get created if we have a RECAPDocument to match
+        on?"""
+        async_to_sync(process_recap_docket)(self.pq.pk)
+        num_attachments_to_create = 3
+        self.assertEqual(
+            RECAPDocument.objects.filter(
+                document_type=RECAPDocument.ATTACHMENT
+            ).count(),
+            num_attachments_to_create,
+        )
+        self.pq.refresh_from_db()
+        self.assertEqual(self.pq.status, PROCESSING_STATUS.SUCCESSFUL)
 
 
 class ClaimsRegistryTaskTest(TestCase):
@@ -2098,7 +2143,9 @@ class ClaimsRegistryTaskTest(TestCase):
 
     def test_parsing_docket_does_not_exist(self) -> None:
         """Can we parse the claims registry when the docket doesn't exist?"""
-        returned_data = process_recap_claims_register(self.pq.pk)
+        returned_data = async_to_sync(process_recap_claims_register)(
+            self.pq.pk
+        )
         d = Docket.objects.get(pk=returned_data["docket_pk"])
         self.assertEqual(d.source, Docket.RECAP)
         self.assertTrue(d.case_name)
@@ -2116,7 +2163,9 @@ class ClaimsRegistryTaskTest(TestCase):
         self.pq.filepath_local = f
         self.pq.save()
 
-        returned_data = process_recap_claims_register(self.pq.pk)
+        returned_data = async_to_sync(process_recap_claims_register)(
+            self.pq.pk
+        )
         self.assertIsNone(returned_data)
         self.pq.refresh_from_db()
         self.assertTrue(self.pq.status, PROCESSING_STATUS.INVALID_CONTENT)
@@ -2149,7 +2198,9 @@ class RecapDocketAppellateTaskTest(TestCase):
 
     def test_parsing_appellate_docket(self) -> None:
         """Can we parse an HTML docket we have never seen before?"""
-        returned_data = process_recap_appellate_docket(self.pq.pk)
+        returned_data = async_to_sync(process_recap_appellate_docket)(
+            self.pq.pk
+        )
         d = Docket.objects.get(pk=returned_data["docket_pk"])
         self.assertEqual(d.source, Docket.RECAP)
         self.assertTrue(d.case_name)
@@ -2194,7 +2245,7 @@ class RecapCriminalDataUploadTaskTest(TestCase):
         """Does the criminal data appear in the DB properly when we process
         the docket?
         """
-        process_recap_docket(self.pq.pk)
+        async_to_sync(process_recap_docket)(self.pq.pk)
         expected_criminal_count_count = 1
         self.assertEqual(
             expected_criminal_count_count, CriminalCount.objects.count()
@@ -2243,7 +2294,7 @@ class RecapAttachmentPageTaskTest(TestCase):
     def test_attachments_get_created(self, mock):
         """Do attachments get created if we have a RECAPDocument to match
         on?"""
-        process_recap_attachment(self.pq.pk)
+        async_to_sync(process_recap_attachment)(self.pq.pk)
         num_attachments_to_create = 3
         self.assertEqual(
             RECAPDocument.objects.filter(
@@ -2257,12 +2308,14 @@ class RecapAttachmentPageTaskTest(TestCase):
     def test_no_rd_match(self, mock):
         """If there's no RECAPDocument to match on, do we fail gracefully?"""
         RECAPDocument.objects.all().delete()
-        with self.assertRaises(RECAPDocument.DoesNotExist):
-            process_recap_attachment(self.pq.pk)
+        pq_status, msg, items = async_to_sync(process_recap_attachment)(
+            self.pq.pk
+        )
+        self.assertEqual(
+            msg, "Could not find docket to associate with attachment metadata"
+        )
         self.pq.refresh_from_db()
-        # This doesn't do the celery retries, unfortunately. If we get that
-        # working, the correct status is PROCESSING_STATUS.FAILED.
-        self.assertEqual(self.pq.status, PROCESSING_STATUS.QUEUED_FOR_RETRY)
+        self.assertEqual(self.pq.status, PROCESSING_STATUS.FAILED)
 
 
 class RecapUploadAuthenticationTest(TestCase):
@@ -3413,7 +3466,10 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(len(recap_documents_webhook), 10)
         # Compare content for the main document and the first attachment
         # Main document
-        self.assertEqual(recap_documents_webhook[0]["description"], "")
+        self.assertEqual(
+            recap_documents_webhook[0]["description"],
+            "Case Management Statement",
+        )
         self.assertEqual(
             recap_documents_webhook[0]["pacer_doc_id"], "123019137279"
         )
@@ -4357,7 +4413,7 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
         self.assertEqual(len(rd_needs_extraction_after), 0)
 
     @mock.patch(
-        "cl.lib.microservice_utils.models.fields.files.FieldFile.open",
+        "django.db.models.fields.files.FieldFile.open",
         side_effect=lambda mode: exec("raise FileNotFoundError"),
     )
     def test_clean_up_recap_document_file(self, mock_open):
@@ -6176,7 +6232,7 @@ class CalculateRecapsSequenceNumbersTest(TestCase):
         court timezone when time is available?
         """
 
-        add_docket_entries(
+        async_to_sync(add_docket_entries)(
             self.d_nyed, self.de_datetime_desc["docket_entries"]
         )
         docket_entries_nyed = DocketEntry.objects.filter(
@@ -6191,7 +6247,9 @@ class CalculateRecapsSequenceNumbersTest(TestCase):
             )
             entry_number += 1
 
-        add_docket_entries(self.d_cand, self.de_date_asc["docket_entries"])
+        async_to_sync(add_docket_entries)(
+            self.d_cand, self.de_date_asc["docket_entries"]
+        )
         docket_entries_cand = DocketEntry.objects.filter(
             docket__court=self.cand
         ).order_by("recap_sequence_number")
@@ -6204,7 +6262,7 @@ class CalculateRecapsSequenceNumbersTest(TestCase):
             )
             entry_number += 1
 
-        add_docket_entries(
+        async_to_sync(add_docket_entries)(
             self.d_nysd, self.de_datetime_prev_differs["docket_entries"]
         )
         docket_entries_nysd = DocketEntry.objects.filter(
@@ -6280,10 +6338,10 @@ class LookupDocketsTest(TestCase):
         properly.
         """
 
-        d = find_docket_object(
+        d = async_to_sync(find_docket_object)(
             self.court.pk, "12345", self.docket_data["docket_number"]
         )
-        update_docket_metadata(d, self.docket_data)
+        async_to_sync(update_docket_metadata)(d, self.docket_data)
         d.save()
 
         # Successful lookup, dockets matched
@@ -6295,10 +6353,10 @@ class LookupDocketsTest(TestCase):
     def test_case_id_lookup(self):
         """Confirm if lookup by only pacer_case_id works properly."""
 
-        d = find_docket_object(
+        d = async_to_sync(find_docket_object)(
             self.court.pk, "54321", self.docket_data["docket_number"]
         )
-        update_docket_metadata(d, self.docket_data)
+        async_to_sync(update_docket_metadata)(d, self.docket_data)
         d.save()
 
         # Successful lookup, dockets matched
@@ -6310,12 +6368,12 @@ class LookupDocketsTest(TestCase):
     def test_docket_number_core_lookup(self):
         """Confirm if lookup by only docket_number_core works properly."""
 
-        d = find_docket_object(
+        d = async_to_sync(find_docket_object)(
             self.court.pk,
             self.docket_core_data["docket_entries"][0]["pacer_case_id"],
             self.docket_core_data["docket_number"],
         )
-        update_docket_metadata(d, self.docket_core_data)
+        async_to_sync(update_docket_metadata)(d, self.docket_core_data)
         d.save()
 
         # Successful lookup, dockets matched
@@ -6327,12 +6385,12 @@ class LookupDocketsTest(TestCase):
     def test_docket_number_lookup(self):
         """Confirm if lookup by only docket_number works properly."""
 
-        d = find_docket_object(
+        d = async_to_sync(find_docket_object)(
             self.court.pk,
             self.docket_no_core_data["docket_entries"][0]["pacer_case_id"],
             self.docket_no_core_data["docket_number"],
         )
-        update_docket_metadata(d, self.docket_no_core_data)
+        async_to_sync(update_docket_metadata)(d, self.docket_no_core_data)
         d.save()
 
         # Successful lookup, dockets matched
@@ -6346,13 +6404,13 @@ class LookupDocketsTest(TestCase):
         docket_number_core in the same court, but they are different dockets?
         """
 
-        d = find_docket_object(
+        d = async_to_sync(find_docket_object)(
             self.court.pk,
             self.docket_data["docket_entries"][0]["pacer_case_id"],
             self.docket_data["docket_number"],
         )
 
-        update_docket_metadata(d, self.docket_data)
+        async_to_sync(update_docket_metadata)(d, self.docket_data)
         d.save()
 
         # Docket is not overwritten a new one is created instead.
@@ -6374,13 +6432,13 @@ class LookupDocketsTest(TestCase):
             pacer_case_id=None,
         )
 
-        d = find_docket_object(
+        d = async_to_sync(find_docket_object)(
             self.court.pk,
             self.docket_data["docket_entries"][0]["pacer_case_id"],
             self.docket_data["docket_number"],
         )
 
-        update_docket_metadata(d, self.docket_data)
+        async_to_sync(update_docket_metadata)(d, self.docket_data)
         d.save()
 
         # Docket is not overwritten a new one is created instead.
@@ -6408,12 +6466,12 @@ class LookupDocketsTest(TestCase):
                 RECAPEmailDocketEntryDataFactory(pacer_case_id="1234568")
             ],
         )
-        new_d = find_docket_object(
+        new_d = async_to_sync(find_docket_object)(
             self.court_appellate.pk,
             docket_data_lower_number["docket_entries"][0]["pacer_case_id"],
             docket_data_lower_number["docket_number"],
         )
-        update_docket_metadata(new_d, docket_data_lower_number)
+        async_to_sync(update_docket_metadata)(new_d, docket_data_lower_number)
         new_d.save()
         # The existing docket is matched instead of creating a new one.
         self.assertEqual(new_d.pk, d.pk)
@@ -6567,3 +6625,161 @@ class CleanUpDuplicateAppellateEntries(TestCase):
         )
         docket_entries = DocketEntry.objects.all()
         self.assertEqual(docket_entries.count(), 1)
+
+
+class RemoveDuplicatedMinuteEntries(TestCase):
+    """Test remove duplicated minute entries while avoid deleting those who
+    are not duplicates in the same day.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.cand = CourtFactory(id="cand", jurisdiction="FD")
+        cls.d = DocketFactory(
+            source=Docket.RECAP,
+            court=cls.cand,
+        )
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_avoid_deleting_non_duplicated_minute_entries(
+        self,
+        mock_webhook_post,
+    ):
+        """Confirm non duplicated entries are not deleted when merging the
+        docket history report.
+        """
+        docket_entries = DocketEntry.objects.all()
+        self.assertEqual(docket_entries.count(), 0)
+
+        docket_data = DocketDataFactory(
+            docket_entries=[
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2020, 10, 15),
+                    date_entered=date(2020, 10, 15),
+                    description="The corrected publicly accessible audio line for today's conference is available",
+                    short_description=None,
+                    document_number=210,
+                ),
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2020, 10, 15),
+                    date_entered=date(2020, 10, 15),
+                    description="Set/Reset Deadlines: Expert Discovery due by 6/11/2021. (cf) (Entered: 10/15/2020)",
+                    short_description=None,
+                ),
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2020, 10, 15),
+                    date_entered=date(2020, 10, 15),
+                    description="Set/Reset Deadlines: Fact Discovery due by 2/12/2021. (cf) (Entered: 10/15/2020)",
+                    short_description=None,
+                ),
+            ],
+        )
+
+        # Add initial docket entries with only long descriptions.
+        data = deepcopy(docket_data)
+        async_to_sync(add_docket_entries)(self.d, data["docket_entries"])
+        # 3 entries should be created.
+        self.assertEqual(docket_entries.count(), 3)
+
+        data_history = deepcopy(docket_data)
+        # Add short descriptions to entries, simulating a docket history report.
+        data_history["docket_entries"][0][
+            "short_description"
+        ] = "Order on Motion for Extension of Time to Complete Discovery"
+        data_history["docket_entries"][1][
+            "short_description"
+        ] = "Set/Reset Deadlines"
+        data_history["docket_entries"][2][
+            "short_description"
+        ] = "Set/Reset Deadlines"
+        # Merge docket history report entries.
+        async_to_sync(add_docket_entries)(
+            self.d, data_history["docket_entries"]
+        )
+        # Entries are properly merged without removing non duplicated entries.
+        self.assertEqual(docket_entries.count(), 3)
+        # Confirm entries were properly merged.
+        for entry_db, entry in zip(
+            docket_entries, data_history["docket_entries"]
+        ):
+            self.assertEqual(entry_db.description, entry["description"])
+            self.assertEqual(
+                entry_db.recap_documents.all()[0].description,
+                entry["short_description"],
+            )
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_remove_duplicated_minute_entries(
+        self,
+        mock_webhook_post,
+    ):
+        """Confirm that we can remove minute entries that are in fact
+        duplicated.
+        """
+        docket_entries = DocketEntry.objects.all()
+        self.assertEqual(docket_entries.count(), 0)
+
+        docket_data = DocketDataFactory(
+            docket_entries=[
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2020, 10, 15),
+                    date_entered=date(2020, 10, 15),
+                    description="The corrected publicly accessible audio line for today's conference is available",
+                    short_description=None,
+                    document_number=210,
+                ),
+                MinuteDocketEntryDataFactory(  # Duplicated entry
+                    date_filed=date(2020, 10, 15),
+                    date_entered=date(2020, 10, 15),
+                    short_description="Set/Reset Deadlines",
+                    description=None,
+                ),
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2020, 10, 15),
+                    date_entered=date(2020, 10, 15),
+                    description="Set/Reset Deadlines: Fact Discovery due by 2/12/2021. (cf) (Entered: 10/15/2020)",
+                    short_description=None,
+                ),
+                MinuteDocketEntryDataFactory(
+                    date_filed=date(2020, 10, 15),
+                    date_entered=date(2020, 10, 15),
+                    description="Set/Reset Deadlines: Expert Discovery due by 6/11/2021. (cf) (Entered: 10/15/2020)",
+                    short_description=None,
+                ),
+            ],
+        )
+
+        # Add initial docket entries.
+        data = deepcopy(docket_data)
+        async_to_sync(add_docket_entries)(self.d, data["docket_entries"])
+        # 4 entries should be created.
+        self.assertEqual(docket_entries.count(), 4)
+
+        # Adapt docket entries to simulate docket history report entries
+        # without duplicates.
+        data_history = deepcopy(docket_data)
+        docket_entries_history = data_history["docket_entries"][0:3]
+        docket_entries_history[0][
+            "short_description"
+        ] = "Order on Motion for Extension of Time to Complete Discovery"
+        docket_entries_history[1][
+            "description"
+        ] = "Set/Reset Deadlines: Expert Discovery due by 6/11/2021. (cf) (Entered: 10/15/2020)"
+        docket_entries_history[2]["short_description"] = "Set/Reset Deadlines"
+        # Merge docket history report entries.
+        async_to_sync(add_docket_entries)(self.d, docket_entries_history)
+        # Entries are properly merged removing the duplicated one.
+        self.assertEqual(docket_entries.count(), 3)
+        # Confirm entries were properly merged.
+        for entry_db, entry in zip(docket_entries, docket_entries_history):
+            self.assertEqual(entry_db.description, entry["description"])
+            self.assertEqual(
+                entry_db.recap_documents.all()[0].description,
+                entry["short_description"],
+            )

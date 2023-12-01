@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Tuple, TypeVar
 
 import pghistory
 import pytz
+from asgiref.sync import sync_to_async
 from celery.canvas import chain
 from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
@@ -14,17 +15,21 @@ from django.urls import NoReverseMatch, reverse
 from django.utils.encoding import force_str
 from django.utils.text import slugify
 from eyecite import get_citations
+from localflavor.us.models import USPostalCodeField, USZipCodeField
+from localflavor.us.us_states import OBSOLETE_STATES, USPS_CHOICES
+from model_utils import FieldTracker
 
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
-from cl.lib.date_time import midnight_pst
+from cl.lib.date_time import midnight_pt
 from cl.lib.model_helpers import (
     make_docket_number_core,
     make_recap_path,
     make_upload_path,
 )
 from cl.lib.models import AbstractDateTimeModel, AbstractPDF, s3_warning_note
+from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
 from cl.lib.search_index_utils import (
     InvalidDocumentError,
     normalize_search_dicts,
@@ -55,34 +60,100 @@ class PRECEDENTIAL_STATUS:
     )
 
 
-SOURCES = (
-    ("C", "court website"),
-    ("R", "public.resource.org"),
-    ("CR", "court website merged with resource.org"),
-    ("L", "lawbox"),
-    ("LC", "lawbox merged with court"),
-    ("LR", "lawbox merged with resource.org"),
-    ("LCR", "lawbox merged with court and resource.org"),
-    ("M", "manual input"),
-    ("A", "internet archive"),
-    ("H", "brad heath archive"),
-    ("Z", "columbia archive"),
-    ("ZC", "columbia merged with court"),
-    ("ZLC", "columbia merged with lawbox and court"),
-    ("ZLR", "columbia merged with lawbox and resource.org"),
-    ("ZLCR", "columbia merged with lawbox, court, and resource.org"),
-    ("ZR", "columbia merged with resource.org"),
-    ("ZCR", "columbia merged with court and resource.org"),
-    ("ZL", "columbia merged with lawbox"),
-    ("U", "Harvard, Library Innovation Lab Case Law Access Project"),
-    ("CU", "court website merged with Harvard"),
-    ("D", "direct court input"),
-)
+class SOURCES:
+    COURT_WEBSITE = "C"
+    PUBLIC_RESOURCE = "R"
+    COURT_M_RESOURCE = "CR"
+    LAWBOX = "L"
+    LAWBOX_M_COURT = "LC"
+    LAWBOX_M_RESOURCE = "LR"
+    LAWBOX_M_COURT_RESOURCE = "LCR"
+    MANUAL_INPUT = "M"
+    INTERNET_ARCHIVE = "A"
+    BRAD_HEATH_ARCHIVE = "H"
+    COLUMBIA_ARCHIVE = "Z"
+    COLUMBIA_M_COURT = "ZC"
+    COLUMBIA_M_LAWBOX_COURT = "ZLC"
+    COLUMBIA_M_LAWBOX_RESOURCE = "ZLR"
+    COLUMBIA_M_LAWBOX_COURT_RESOURCE = "ZLCR"
+    COLUMBIA_M_RESOURCE = "ZR"
+    COLUMBIA_M_COURT_RESOURCE = "ZCR"
+    COLUMBIA_M_LAWBOX = "ZL"
+    HARVARD_CASELAW = "U"
+    COURT_M_HARVARD = "CU"
+    DIRECT_COURT_INPUT = "D"
+    ANON_2020 = "Q"
+    ANON_2020_M_HARVARD = "QU"
+    COURT_M_RESOURCE_M_HARVARD = "CRU"
+    DIRECT_COURT_INPUT_M_HARVARD = "DU"
+    LAWBOX_M_HARVARD = "LU"
+    LAWBOX_M_COURT_M_HARVARD = "LCU"
+    LAWBOX_M_RESOURCE_M_HARVARD = "LRU"
+    LAWBOX_M_COURT_RESOURCE_M_HARVARD = "LCRU"
+    MANUAL_INPUT_M_HARVARD = "MU"
+    PUBLIC_RESOURCE_M_HARVARD = "RU"
+    COLUMBIA_ARCHIVE_M_HARVARD = "ZU"
+    NAMES = (
+        (COURT_WEBSITE, "court website"),
+        (PUBLIC_RESOURCE, "public.resource.org"),
+        (COURT_M_RESOURCE, "court website merged with resource.org"),
+        (LAWBOX, "lawbox"),
+        (LAWBOX_M_COURT, "lawbox merged with court"),
+        (LAWBOX_M_RESOURCE, "lawbox merged with resource.org"),
+        (LAWBOX_M_COURT_RESOURCE, "lawbox merged with court and resource.org"),
+        (MANUAL_INPUT, "manual input"),
+        (INTERNET_ARCHIVE, "internet archive"),
+        (BRAD_HEATH_ARCHIVE, "brad heath archive"),
+        (COLUMBIA_ARCHIVE, "columbia archive"),
+        (COLUMBIA_M_COURT, "columbia merged with court"),
+        (COLUMBIA_M_LAWBOX_COURT, "columbia merged with lawbox and court"),
+        (
+            COLUMBIA_M_LAWBOX_RESOURCE,
+            "columbia merged with lawbox and resource.org",
+        ),
+        (
+            COLUMBIA_M_LAWBOX_COURT_RESOURCE,
+            "columbia merged with lawbox, court, and resource.org",
+        ),
+        (COLUMBIA_M_RESOURCE, "columbia merged with resource.org"),
+        (
+            COLUMBIA_M_COURT_RESOURCE,
+            "columbia merged with court and resource.org",
+        ),
+        (COLUMBIA_M_LAWBOX, "columbia merged with lawbox"),
+        (
+            HARVARD_CASELAW,
+            "Harvard, Library Innovation Lab Case Law Access Project",
+        ),
+        (COURT_M_HARVARD, "court website merged with Harvard"),
+        (DIRECT_COURT_INPUT, "direct court input"),
+        (ANON_2020, "2020 anonymous database"),
+        (ANON_2020_M_HARVARD, "2020 anonymous database merged with Harvard"),
+        (COURT_M_HARVARD, "court website merged with Harvard"),
+        (
+            COURT_M_RESOURCE_M_HARVARD,
+            "court website merged with public.resource.org and Harvard",
+        ),
+        (
+            DIRECT_COURT_INPUT_M_HARVARD,
+            "direct court input merged with Harvard",
+        ),
+        (LAWBOX_M_HARVARD, "lawbox merged with Harvard"),
+        (
+            LAWBOX_M_COURT_M_HARVARD,
+            "Lawbox merged with court website and Harvard",
+        ),
+        (
+            LAWBOX_M_RESOURCE_M_HARVARD,
+            "Lawbox merged with public.resource.org and with Harvard",
+        ),
+        (MANUAL_INPUT_M_HARVARD, "Manual input merged with Harvard"),
+        (PUBLIC_RESOURCE_M_HARVARD, "public.resource.org merged with Harvard"),
+        (COLUMBIA_ARCHIVE_M_HARVARD, "columbia archive merged with Harvard"),
+    )
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class OriginatingCourtInformation(AbstractDateTimeModel):
     """Lower court metadata to associate with appellate cases.
 
@@ -185,10 +256,7 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
         verbose_name_plural = "Originating Court Information"
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-    exclude=["view_count"],
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), exclude=["view_count"])
 class Docket(AbstractDateTimeModel):
     """A class to sit above OpinionClusters, Audio files, and Docket Entries,
     and link them together.
@@ -219,7 +287,21 @@ class Docket(AbstractDateTimeModel):
     HARVARD = 16
     HARVARD_AND_RECAP = 17
     SCRAPER_AND_HARVARD = 18
+    RECAP_AND_SCRAPER_AND_HARVARD = 19
+    HARVARD_AND_COLUMBIA = 20
+    COLUMBIA_AND_RECAP_AND_HARVARD = 21
+    COLUMBIA_AND_SCRAPER_AND_HARVARD = 22
+    COLUMBIA_AND_RECAP_AND_SCRAPER_AND_HARVARD = 23
+    IDB_AND_HARVARD = 24
+    RECAP_AND_IDB_AND_HARVARD = 25
+    SCRAPER_AND_IDB_AND_HARVARD = 26
+    RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD = 27
+    COLUMBIA_AND_IDB_AND_HARVARD = 28
+    COLUMBIA_AND_RECAP_AND_IDB_AND_HARVARD = 29
+    COLUMBIA_AND_SCRAPER_AND_IDB_AND_HARVARD = 30
+    COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD = 31
     DIRECT_INPUT = 32
+    DIRECT_INPUT_AND_HARVARD = 48
     ANON_2020 = 64
     ANON_2020_AND_SCRAPER = 66
     ANON_2020_AND_HARVARD = 80
@@ -247,7 +329,36 @@ class Docket(AbstractDateTimeModel):
         (HARVARD, "Harvard"),
         (HARVARD_AND_RECAP, "Harvard and RECAP"),
         (SCRAPER_AND_HARVARD, "Scraper and Harvard"),
+        (RECAP_AND_SCRAPER_AND_HARVARD, "RECAP, Scraper and Harvard"),
+        (HARVARD_AND_COLUMBIA, "Harvard and Columbia"),
+        (COLUMBIA_AND_RECAP_AND_HARVARD, "Columbia, RECAP, and Harvard"),
+        (COLUMBIA_AND_SCRAPER_AND_HARVARD, "Columbia, Scraper, and Harvard"),
+        (
+            COLUMBIA_AND_RECAP_AND_SCRAPER_AND_HARVARD,
+            "Columbia, RECAP, Scraper, and Harvard",
+        ),
+        (IDB_AND_HARVARD, "IDB and Harvard"),
+        (RECAP_AND_IDB_AND_HARVARD, "RECAP, IDB and Harvard"),
+        (SCRAPER_AND_IDB_AND_HARVARD, "Scraper, IDB and Harvard"),
+        (
+            RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
+            "RECAP, Scraper, IDB and Harvard",
+        ),
+        (COLUMBIA_AND_IDB_AND_HARVARD, "Columbia, IDB, and Harvard"),
+        (
+            COLUMBIA_AND_RECAP_AND_IDB_AND_HARVARD,
+            "Columbia, Recap, IDB, and Harvard",
+        ),
+        (
+            COLUMBIA_AND_SCRAPER_AND_IDB_AND_HARVARD,
+            "Columbia, Scraper, IDB, and Harvard",
+        ),
+        (
+            COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
+            "Columbia, Recap, Scraper, IDB, and Harvard",
+        ),
         (DIRECT_INPUT, "Direct court input"),
+        (DIRECT_INPUT_AND_HARVARD, "Direct court input and Harvard"),
         (ANON_2020, "2020 anonymous database"),
         (ANON_2020_AND_SCRAPER, "2020 anonymous database and Scraper"),
         (ANON_2020_AND_HARVARD, "2020 anonymous database and Harvard"),
@@ -596,6 +707,36 @@ class Docket(AbstractDateTimeModel):
         ),
         default=False,
     )
+    es_pa_field_tracker = FieldTracker(fields=["docket_number", "court_id"])
+    es_oa_field_tracker = FieldTracker(
+        fields=[
+            "date_argued",
+            "date_reargued",
+            "date_reargument_denied",
+            "docket_number",
+            "slug",
+        ]
+    )
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "docket_number",
+            "case_name",
+            "case_name_short",
+            "case_name_full",
+            "nature_of_suit",
+            "cause",
+            "jury_demand",
+            "jurisdiction_type",
+            "date_argued",
+            "date_filed",
+            "date_terminated",
+            "assigned_to_id",
+            "assigned_to_str",
+            "referred_to_id",
+            "referred_to_str",
+            "slug",
+        ]
+    )
 
     class Meta:
         unique_together = ("docket_number", "pacer_case_id", "court")
@@ -613,7 +754,7 @@ class Docket(AbstractDateTimeModel):
         else:
             return f"{self.pk}"
 
-    def save(self, *args, **kwargs):
+    def save(self, update_fields=None, *args, **kwargs):
         self.slug = slugify(trunc(best_case_name(self), 75))
         if self.docket_number and not self.docket_number_core:
             self.docket_number_core = make_docket_number_core(
@@ -633,7 +774,10 @@ class Docket(AbstractDateTimeModel):
                         f"'{field}' cannot be Null or empty in RECAP dockets."
                     )
 
-        super(Docket, self).save(*args, **kwargs)
+        if update_fields is not None:
+            update_fields = {"slug", "docket_number_core"}.union(update_fields)
+
+        super(Docket, self).save(update_fields=update_fields, *args, **kwargs)
 
     def get_absolute_url(self) -> str:
         return reverse("view_docket", args=[self.pk, self.slug])
@@ -827,11 +971,11 @@ class Docket(AbstractDateTimeModel):
             "jurisdictionType": self.jurisdiction_type,
         }
         if self.date_argued is not None:
-            out["dateArgued"] = midnight_pst(self.date_argued)
+            out["dateArgued"] = midnight_pt(self.date_argued)
         if self.date_filed is not None:
-            out["dateFiled"] = midnight_pst(self.date_filed)
+            out["dateFiled"] = midnight_pt(self.date_filed)
         if self.date_terminated is not None:
-            out["dateTerminated"] = midnight_pst(self.date_terminated)
+            out["dateTerminated"] = midnight_pt(self.date_terminated)
         try:
             out["docket_absolute_url"] = self.get_absolute_url()
         except NoReverseMatch:
@@ -858,27 +1002,6 @@ class Docket(AbstractDateTimeModel):
             }
         )
 
-        # Parties, attorneys, firms
-        out.update(
-            {
-                "party_id": set(),
-                "party": set(),
-                "attorney_id": set(),
-                "attorney": set(),
-                "firm_id": set(),
-                "firm": set(),
-            }
-        )
-        for p in self.prefetched_parties:
-            out["party_id"].add(p.pk)
-            out["party"].add(p.name)
-            for a in p.attys_in_docket:
-                out["attorney_id"].add(a.pk)
-                out["attorney"].add(a.name)
-                for f in a.firms_in_docket:
-                    out["firm_id"].add(f.pk)
-                    out["firm"].add(f.name)
-
         # Do RECAPDocument and Docket Entries in a nested loop
         for de in self.docket_entries.all().iterator():
             # Docket Entry
@@ -888,7 +1011,7 @@ class Docket(AbstractDateTimeModel):
             if de.entry_number is not None:
                 de_out["entry_number"] = de.entry_number
             if de.date_filed is not None:
-                de_out["entry_date_filed"] = midnight_pst(de.date_filed)
+                de_out["entry_date_filed"] = midnight_pt(de.date_filed)
             rds = de.recap_documents.all()
 
             if len(rds) == 0:
@@ -970,10 +1093,7 @@ class Docket(AbstractDateTimeModel):
             )
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-    obj_field=None,
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
 class DocketTags(Docket.tags.through):
     """A model class to track docket tags m2m relation"""
 
@@ -981,10 +1101,7 @@ class DocketTags(Docket.tags.through):
         proxy = True
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-    obj_field=None,
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
 class DocketPanel(Docket.panel.through):
     """A model class to track docket panel m2m relation"""
 
@@ -992,9 +1109,7 @@ class DocketPanel(Docket.panel.through):
         proxy = True
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class DocketEntry(AbstractDateTimeModel):
     docket = models.ForeignKey(
         Docket,
@@ -1079,10 +1194,19 @@ class DocketEntry(AbstractDateTimeModel):
         ),
         blank=True,
     )
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "description",
+            "entry_number",
+            "date_filed",
+        ]
+    )
 
     class Meta:
         verbose_name_plural = "Docket Entries"
-        index_together = ("recap_sequence_number", "entry_number")
+        indexes = [
+            models.Index(fields=["recap_sequence_number", "entry_number"])
+        ]
         ordering = ("recap_sequence_number", "entry_number")
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
 
@@ -1103,10 +1227,7 @@ class DocketEntry(AbstractDateTimeModel):
         return None
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-    obj_field=None,
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
 class DocketEntryTags(DocketEntry.tags.through):
     """A model class to track docket entry tags m2m relation"""
 
@@ -1168,9 +1289,7 @@ class AbstractPacerDocument(models.Model):
         abstract = True
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
     """The model for Docket Documents and Attachments."""
 
@@ -1208,6 +1327,21 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         blank=True,
     )
 
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "docket_entry_id",
+            "document_type",
+            "document_number",
+            "description",
+            "pacer_doc_id",
+            "plain_text",
+            "attachment_number",
+            "is_available",
+            "page_count",
+            "filepath_local",
+        ]
+    )
+
     class Meta:
         unique_together = (
             "docket_entry",
@@ -1215,10 +1349,14 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             "attachment_number",
         )
         ordering = ("document_type", "document_number", "attachment_number")
-        index_together = [
-            ["document_type", "document_number", "attachment_number"],
-        ]
         indexes = [
+            models.Index(
+                fields=[
+                    "document_type",
+                    "document_number",
+                    "attachment_number",
+                ]
+            ),
             models.Index(
                 fields=["filepath_local"],
                 name="search_recapdocument_filepath_local_7dc6b0e53ccf753_uniq",
@@ -1311,7 +1449,14 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             ]
         )
 
-    def save(self, do_extraction=False, index=False, *args, **kwargs):
+    def save(
+        self,
+        update_fields=None,
+        do_extraction=False,
+        index=False,
+        *args,
+        **kwargs,
+    ):
         if self.document_type == self.ATTACHMENT:
             if self.attachment_number is None:
                 raise ValidationError(
@@ -1361,7 +1506,12 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
                         % (self.pk, other.pk)
                     )
 
-        super(RECAPDocument, self).save(*args, **kwargs)
+        if update_fields is not None:
+            update_fields = {"pacer_doc_id"}.union(update_fields)
+
+        super(RECAPDocument, self).save(
+            update_fields=update_fields, *args, **kwargs
+        )
         tasks = []
         if do_extraction and self.needs_extraction:
             # Context extraction not done and is requested.
@@ -1376,6 +1526,22 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             )
         if len(tasks) > 0:
             chain(*tasks)()
+
+    async def asave(
+        self,
+        update_fields=None,
+        do_extraction=False,
+        index=False,
+        *args,
+        **kwargs,
+    ):
+        return await sync_to_async(self.save)(
+            update_fields=update_fields,
+            do_extraction=do_extraction,
+            index=index,
+            *args,
+            **kwargs,
+        )
 
     def delete(self, *args, **kwargs):
         """
@@ -1411,11 +1577,11 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             }
         )
         if docket.date_argued is not None:
-            out["dateArgued"] = midnight_pst(docket.date_argued)
+            out["dateArgued"] = midnight_pt(docket.date_argued)
         if docket.date_filed is not None:
-            out["dateFiled"] = midnight_pst(docket.date_filed)
+            out["dateFiled"] = midnight_pt(docket.date_filed)
         if docket.date_terminated is not None:
-            out["dateTerminated"] = midnight_pst(docket.date_terminated)
+            out["dateTerminated"] = midnight_pt(docket.date_terminated)
         try:
             out["docket_absolute_url"] = docket.get_absolute_url()
         except NoReverseMatch:
@@ -1441,28 +1607,6 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
                 "court_citation_string": docket.court.citation_string,
             }
         )
-
-        # Parties, Attorneys, Firms
-        out.update(
-            {
-                "party_id": set(),
-                "party": set(),
-                "attorney_id": set(),
-                "attorney": set(),
-                "firm_id": set(),
-                "firm": set(),
-            }
-        )
-        for p in docket.prefetched_parties:
-            out["party_id"].add(p.pk)
-            out["party"].add(p.name)
-            for a in p.attys_in_docket:
-                out["attorney_id"].add(a.pk)
-                out["attorney"].add(a.name)
-                for f in a.firms_in_docket:
-                    out["firm_id"].add(f.pk)
-                    out["firm"].add(f.name)
-
         return out
 
     def as_search_dict(self, docket_metadata=None):
@@ -1509,9 +1653,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         if self.docket_entry.entry_number is not None:
             out["entry_number"] = self.docket_entry.entry_number
         if self.docket_entry.date_filed is not None:
-            out["entry_date_filed"] = midnight_pst(
-                self.docket_entry.date_filed
-            )
+            out["entry_date_filed"] = midnight_pt(self.docket_entry.date_filed)
 
         text_template = loader.get_template("indexes/dockets_text.txt")
         out["text"] = text_template.render({"item": self}).translate(null_map)
@@ -1519,10 +1661,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         return normalize_search_dicts(out)
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-    obj_field=None,
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
 class RECAPDocumentTags(RECAPDocument.tags.through):
     """A model class to track recap document tags m2m relation"""
 
@@ -1530,9 +1669,7 @@ class RECAPDocumentTags(RECAPDocument.tags.through):
         proxy = True
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class BankruptcyInformation(AbstractDateTimeModel):
     docket = models.OneToOneField(
         Docket,
@@ -1567,6 +1704,12 @@ class BankruptcyInformation(AbstractDateTimeModel):
     trustee_str = models.TextField(
         help_text="The name of the trustee handling the case.", blank=True
     )
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "chapter",
+            "trustee_str",
+        ]
+    )
 
     class Meta:
         verbose_name_plural = "Bankruptcy Information"
@@ -1575,9 +1718,7 @@ class BankruptcyInformation(AbstractDateTimeModel):
         return f"Bankruptcy Info for docket {self.docket_id}"
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Claim(AbstractDateTimeModel):
     docket = models.ForeignKey(
         Docket,
@@ -1692,10 +1833,7 @@ class Claim(AbstractDateTimeModel):
         )
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-    obj_field=None,
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
 class ClaimTags(Claim.tags.through):
     """A model class to track claim tags m2m relation"""
 
@@ -1703,9 +1841,7 @@ class ClaimTags(Claim.tags.through):
         proxy = True
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class ClaimHistory(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
     DOCKET_ENTRY = 1
     CLAIM_ENTRY = 2
@@ -1823,10 +1959,11 @@ class FederalCourtsQuerySet(models.QuerySet):
     def territorial_courts(self) -> models.QuerySet:
         return self.filter(jurisdictions__in=Court.TERRITORY_JURISDICTIONS)
 
+    def military_courts(self) -> models.QuerySet:
+        return self.filter(jurisdictions__in=Court.MILITARY_JURISDICTIONS)
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Court(models.Model):
     """A class to represent some information about each court, can be extended
     as needed."""
@@ -1851,6 +1988,8 @@ class Court(models.Model):
     TERRITORY_APPELLATE = "TA"
     TERRITORY_TRIAL = "TT"
     TERRITORY_SPECIAL = "TSP"
+    MILITARY_APPELLATE = "MA"
+    MILITARY_TRIAL = "MT"
     COMMITTEE = "C"
     INTERNATIONAL = "I"
     TESTING_COURT = "T"
@@ -1873,6 +2012,8 @@ class Court(models.Model):
         (TERRITORY_TRIAL, "Territory Trial"),
         (TERRITORY_SPECIAL, "Territory Special"),
         (STATE_ATTORNEY_GENERAL, "State Attorney General"),
+        (MILITARY_APPELLATE, "Military Appellate"),
+        (MILITARY_TRIAL, "Military Trial"),
         (COMMITTEE, "Committee"),
         (INTERNATIONAL, "International"),
         (TESTING_COURT, "Testing"),
@@ -1907,13 +2048,31 @@ class Court(models.Model):
         TERRITORY_TRIAL,
         TERRITORY_SPECIAL,
     ]
+    MILITARY_JURISDICTIONS = [
+        MILITARY_APPELLATE,
+        MILITARY_TRIAL,
+    ]
 
     id = models.CharField(
         help_text="a unique ID for each court as used in URLs",
         max_length=15,  # Changes here will require updates in urls.py
         primary_key=True,
     )
-
+    parent_court = models.ForeignKey(
+        "self",
+        help_text="Parent court for subdivisions",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="child_courts",
+    )
+    appeals_to = models.ManyToManyField(
+        "self",
+        help_text="Appellate courts for this court",
+        blank=True,
+        symmetrical=False,
+        related_name="appeals_from",
+    )
     # Pacer fields
     pacer_court_id = models.PositiveSmallIntegerField(
         help_text=(
@@ -2038,6 +2197,75 @@ class Court(models.Model):
         ordering = ["position"]
 
 
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
+class CourtAppealsTo(Court.appeals_to.through):
+    """A model class to track court appeals_to m2m relation"""
+
+    class Meta:
+        proxy = True
+
+
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
+class Courthouse(models.Model):
+    """A class to represent the physical location of a court."""
+
+    COUNTRY_CHOICES = (("GB", "United Kingdom"), ("US", "United States"))
+
+    court = models.ForeignKey(
+        Court,
+        help_text="The court object associated with this courthouse.",
+        related_name="courthouses",
+        on_delete=models.CASCADE,
+    )
+    court_seat = models.BooleanField(
+        help_text="Is this the seat of the Court?",
+        default=False,
+        null=True,
+    )
+    building_name = models.TextField(
+        help_text="Ex. John Adams Courthouse.",
+        blank=True,
+    )
+    address1 = models.TextField(
+        help_text="The normalized address1 of the courthouse.",
+        blank=True,
+    )
+    address2 = models.TextField(
+        help_text="The normalized address2 of the courthouse.",
+        blank=True,
+    )
+    city = models.TextField(
+        help_text="The normalized city of the courthouse.",
+        blank=True,
+    )
+    county = models.TextField(
+        help_text="The county, if any, where the courthouse resides.",
+        blank=True,
+    )
+    state = USPostalCodeField(
+        help_text="The two-letter USPS postal abbreviation for the "
+        "organization w/ obsolete state options.",
+        choices=USPS_CHOICES + OBSOLETE_STATES,
+        blank=True,
+    )
+    zip_code = USZipCodeField(
+        help_text="The zip code for the organization, XXXXX or XXXXX-XXXX "
+        "work.",
+        blank=True,
+    )
+    country_code = models.TextField(
+        help_text="The two letter country code.",
+        choices=COUNTRY_CHOICES,
+        default="US",
+    )
+
+    def __str__(self):
+        return f"{self.court.short_name} Courthouse"
+
+    class Meta:
+        verbose_name_plural = "Courthouses"
+
+
 class ClusterCitationQuerySet(models.query.QuerySet):
     """Add filtering on citation strings.
 
@@ -2079,9 +2307,7 @@ class ClusterCitationQuerySet(models.query.QuerySet):
         return clone
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class OpinionCluster(AbstractDateTimeModel):
     """A class representing a cluster of court opinions."""
 
@@ -2182,9 +2408,9 @@ class OpinionCluster(AbstractDateTimeModel):
     )
     source = models.CharField(
         help_text="the source of the cluster, one of: %s"
-        % ", ".join(["%s (%s)" % (t[0], t[1]) for t in SOURCES]),
+        % ", ".join(["%s (%s)" % (t[0], t[1]) for t in SOURCES.NAMES]),
         max_length=10,
-        choices=SOURCES,
+        choices=SOURCES.NAMES,
         blank=True,
     )
     procedural_history = models.TextField(
@@ -2328,8 +2554,32 @@ class OpinionCluster(AbstractDateTimeModel):
         blank=True,
         db_index=True,
     )
+    arguments = models.TextField(
+        help_text="The attorney(s) and legal arguments presented as HTML text. "
+        "This is primarily seen in older opinions and can contain "
+        "case law cited and arguments presented to the judges.",
+        blank=True,
+    )
+    headmatter = models.TextField(
+        help_text="Headmatter is the content before an opinion in the Harvard "
+        "CaseLaw import. This consists of summaries, headnotes, "
+        "attorneys etc for the opinion.",
+        blank=True,
+    )
 
     objects = ClusterCitationQuerySet.as_manager()
+    es_pa_field_tracker = FieldTracker(
+        fields=[
+            "case_name",
+            "citation_count",
+            "date_filed",
+            "slug",
+            "docket_id",
+            "judges",
+            "nature_of_suit",
+            "precedential_status",
+        ]
+    )
 
     @property
     def caption(self):
@@ -2465,9 +2715,20 @@ class OpinionCluster(AbstractDateTimeModel):
     def get_absolute_url(self) -> str:
         return reverse("view_case", args=[self.pk, self.slug])
 
-    def save(self, index=True, force_commit=False, *args, **kwargs):
+    def save(
+        self,
+        update_fields=None,
+        index=True,
+        force_commit=False,
+        *args,
+        **kwargs,
+    ):
         self.slug = slugify(trunc(best_case_name(self), 75))
-        super(OpinionCluster, self).save(*args, **kwargs)
+        if update_fields is not None:
+            update_fields = {"slug"}.union(update_fields)
+        super(OpinionCluster, self).save(
+            update_fields=update_fields, *args, **kwargs
+        )
         if index:
             from cl.search.tasks import add_items_to_solr
 
@@ -2505,11 +2766,11 @@ class OpinionCluster(AbstractDateTimeModel):
             "docketNumber": self.docket.docket_number,
         }
         if self.docket.date_argued is not None:
-            docket["dateArgued"] = midnight_pst(self.docket.date_argued)
+            docket["dateArgued"] = midnight_pt(self.docket.date_argued)
         if self.docket.date_reargued is not None:
-            docket["dateReargued"] = midnight_pst(self.docket.date_reargued)
+            docket["dateReargued"] = midnight_pt(self.docket.date_reargued)
         if self.docket.date_reargument_denied is not None:
-            docket["dateReargumentDenied"] = midnight_pst(
+            docket["dateReargumentDenied"] = midnight_pt(
                 self.docket.date_reargument_denied
             )
         out.update(docket)
@@ -2552,7 +2813,7 @@ class OpinionCluster(AbstractDateTimeModel):
             pass
 
         if self.date_filed is not None:
-            out["dateFiled"] = midnight_pst(self.date_filed)
+            out["dateFiled"] = midnight_pt(self.date_filed)
         try:
             out["absolute_url"] = self.get_absolute_url()
         except NoReverseMatch:
@@ -2593,10 +2854,7 @@ class OpinionCluster(AbstractDateTimeModel):
         return search_list
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-    obj_field=None,
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
 class OpinionClusterPanel(OpinionCluster.panel.through):
     """A model class to track opinion cluster panel m2m relation"""
 
@@ -2604,10 +2862,7 @@ class OpinionClusterPanel(OpinionCluster.panel.through):
         proxy = True
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-    obj_field=None,
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
 class OpinionClusterNonParticipatingJudges(
     OpinionCluster.non_participating_judges.through
 ):
@@ -2618,9 +2873,7 @@ class OpinionClusterNonParticipatingJudges(
         proxy = True
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Citation(models.Model):
     """A simple class to hold citations."""
 
@@ -2688,12 +2941,12 @@ class Citation(models.Model):
         return self.cluster.get_absolute_url()
 
     class Meta:
-        index_together = (
+        indexes = [
             # To look up individual citations
-            ("volume", "reporter", "page"),
+            models.Index(fields=["volume", "reporter", "page"]),
             # To generate reporter volume lists
-            ("volume", "reporter"),
-        )
+            models.Index(fields=["volume", "reporter"]),
+        ]
         unique_together = (("cluster", "volume", "reporter", "page"),)
 
 
@@ -2741,9 +2994,7 @@ def sort_cites(c):
         return 8
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Opinion(AbstractDateTimeModel):
     COMBINED = "010combined"
     UNANIMOUS = "015unamimous"
@@ -2894,6 +3145,9 @@ class Opinion(AbstractDateTimeModel):
         default=False,
         db_index=True,
     )
+    es_pa_field_tracker = FieldTracker(
+        fields=["extracted_by_ocr", "cluster_id", "author_id"]
+    )
 
     @property
     def siblings(self) -> QuerySet:
@@ -2988,7 +3242,7 @@ class Opinion(AbstractDateTimeModel):
             pass
 
         if self.cluster.date_filed is not None:
-            out["dateFiled"] = midnight_pst(self.cluster.date_filed)
+            out["dateFiled"] = midnight_pt(self.cluster.date_filed)
         try:
             out["absolute_url"] = self.cluster.get_absolute_url()
         except NoReverseMatch:
@@ -3001,15 +3255,13 @@ class Opinion(AbstractDateTimeModel):
         # Docket
         docket = {"docketNumber": self.cluster.docket.docket_number}
         if self.cluster.docket.date_argued is not None:
-            docket["dateArgued"] = midnight_pst(
-                self.cluster.docket.date_argued
-            )
+            docket["dateArgued"] = midnight_pt(self.cluster.docket.date_argued)
         if self.cluster.docket.date_reargued is not None:
-            docket["dateReargued"] = midnight_pst(
+            docket["dateReargued"] = midnight_pt(
                 self.cluster.docket.date_reargued
             )
         if self.cluster.docket.date_reargument_denied is not None:
-            docket["dateReargumentDenied"] = midnight_pst(
+            docket["dateReargumentDenied"] = midnight_pt(
                 self.cluster.docket.date_reargument_denied
             )
         out.update(docket)
@@ -3030,10 +3282,7 @@ class Opinion(AbstractDateTimeModel):
         return normalize_search_dicts(out)
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-    obj_field=None,
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
 class OpinionJoinedBy(Opinion.joined_by.through):
     """A model class to track opinion joined_by m2m relation"""
 
@@ -3119,6 +3368,7 @@ class Parenthetical(models.Model):
         help_text="A score between 0 and 1 representing how descriptive the "
         "parenthetical is",
     )
+    es_pa_field_tracker = FieldTracker(fields=["score", "text"])
 
     def __str__(self) -> str:
         return (
@@ -3157,6 +3407,10 @@ class ParentheticalGroup(models.Model):
         help_text="The number of parentheticals that belong to the group"
     )
 
+    es_pa_field_tracker = FieldTracker(
+        fields=["opinion_id", "representative_id"]
+    )
+
     def __str__(self) -> str:
         return (
             f"Parenthetical group for opinion {self.opinion_id} "
@@ -3174,9 +3428,7 @@ class ParentheticalGroup(models.Model):
 TaggableType = TypeVar("TaggableType", Docket, DocketEntry, RECAPDocument)
 
 
-@pghistory.track(
-    pghistory.Snapshot(),
-)
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Tag(AbstractDateTimeModel):
     name = models.CharField(
         help_text="The name of the tag.",
@@ -3271,11 +3523,13 @@ class SEARCH_TYPES:
     DOCKETS = "d"
     ORAL_ARGUMENT = "oa"
     PEOPLE = "p"
+    PARENTHETICAL = "pa"
     NAMES = (
         (OPINION, "Opinions"),
         (RECAP, "RECAP"),
         (DOCKETS, "RECAP Dockets"),
         (ORAL_ARGUMENT, "Oral Arguments"),
         (PEOPLE, "People"),
+        (PARENTHETICAL, "Parenthetical"),
     )
     ALL_TYPES = [OPINION, RECAP, ORAL_ARGUMENT, PEOPLE]

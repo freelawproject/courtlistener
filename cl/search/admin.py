@@ -14,6 +14,7 @@ from cl.search.models import (
     Claim,
     ClaimHistory,
     Court,
+    Courthouse,
     Docket,
     DocketEntry,
     Opinion,
@@ -119,6 +120,21 @@ class CourtAdmin(admin.ModelAdmin):
     readonly_fields = ("date_modified",)
 
 
+@admin.register(Courthouse)
+class CourthouseAdmin(admin.ModelAdmin):
+    list_display = (
+        "court",
+        "building_name",
+        "state",
+        "country_code",
+    )
+    search_fields = ("court", "state", "country_code")
+    list_filter = (
+        "state",
+        "country_code",
+    )
+
+
 class ClaimHistoryInline(admin.StackedInline):
     model = ClaimHistory
     extra = 1
@@ -166,10 +182,11 @@ class RECAPDocumentAdmin(CursorPaginatorAdmin):
                 rd.filepath_local.delete()
 
             # Internet Archive
-            url = rd.filepath_ia
-            r = delete_from_ia(url)
-            if not r.ok:
-                ia_failures.append(url)
+            if rd.filepath_ia:
+                url = rd.filepath_ia
+                r = delete_from_ia(url)
+                if not r.ok:
+                    ia_failures.append(url)
 
         queryset.update(
             date_upload=None,

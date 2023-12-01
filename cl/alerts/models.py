@@ -1,13 +1,18 @@
+from datetime import datetime
+
 import pghistory
 from django.contrib.auth.models import User
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
+from django.http import QueryDict
 from django.utils.crypto import get_random_string
 
 from cl.lib.models import AbstractDateTimeModel
+from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
 from cl.search.models import SEARCH_TYPES, Docket
 
 
-@pghistory.track(pghistory.Snapshot())
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Alert(AbstractDateTimeModel):
     REAL_TIME = "rt"
     DAILY = "dly"
@@ -40,6 +45,13 @@ class Alert(AbstractDateTimeModel):
         choices=FREQUENCY,
         max_length=10,
     )
+    alert_type = models.CharField(
+        help_text="The type of search alert this is, one of: %s"
+        % ", ".join(["%s (%s)" % (t[0], t[1]) for t in SEARCH_TYPES.NAMES]),
+        max_length=3,
+        choices=SEARCH_TYPES.NAMES,
+        default=SEARCH_TYPES.OPINION,
+    )
     secret_key = models.CharField(
         verbose_name="A key to be used in links to access the alert without "
         "having to log in. Can be used for a variety of "
@@ -57,6 +69,10 @@ class Alert(AbstractDateTimeModel):
         """Ensure we get a token when we save the first time."""
         if self.pk is None:
             self.secret_key = get_random_string(length=40)
+
+        # Set the search type based on the provided query.
+        qd = QueryDict(self.query.encode(), mutable=True)
+        self.alert_type = qd.get("type", SEARCH_TYPES.OPINION)
         super(Alert, self).save(*args, **kwargs)
 
 
@@ -65,7 +81,7 @@ class DocketAlertManager(models.Manager):
         return self.filter(alert_type=DocketAlert.SUBSCRIPTION)
 
 
-@pghistory.track(pghistory.Snapshot())
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
 class DocketAlert(AbstractDateTimeModel):
     UNSUBSCRIPTION = 0
     SUBSCRIPTION = 1
@@ -140,3 +156,49 @@ class RealTimeQueue(models.Model):
         db_index=True,
     )
     item_pk = models.IntegerField(help_text="the pk of the item")
+
+
+class DateJSONEncoder(DjangoJSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
+
+
+class SCHEDULED_ALERT_HIT_STATUS(object):
+    """ScheduledAlertHit Status Types"""
+
+    SCHEDULED = 0
+    SENT = 1
+    STATUS = (
+        (SCHEDULED, "Alert Hit Scheduled"),
+        (SENT, "Alert Hit Sent"),
+    )
+
+
+class ScheduledAlertHit(AbstractDateTimeModel):
+    """Store alert hits triggered by a percolated document in Elasticsearch,to
+    be sent later according to the user-defined rate.
+    """
+
+    alert = models.ForeignKey(
+        Alert,
+        help_text="The related Alert object.",
+        related_name="scheduled_alert_hits",
+        on_delete=models.CASCADE,
+    )
+    user = models.ForeignKey(
+        User,
+        help_text="The related User object.",
+        related_name="scheduled_alert_hits",
+        on_delete=models.CASCADE,
+    )
+    document_content = models.JSONField(  # type: ignore
+        encoder=DateJSONEncoder,
+        help_text="The content of the document at the moment it was added.",
+    )
+    hit_status = models.SmallIntegerField(
+        help_text="The Scheduled Alert hit status.",
+        default=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
+        choices=SCHEDULED_ALERT_HIT_STATUS.STATUS,
+    )

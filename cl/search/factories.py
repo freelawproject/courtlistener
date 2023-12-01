@@ -1,7 +1,10 @@
+import logging
 import string
 
+from django.db.utils import IntegrityError
 from factory import (
     Faker,
+    Iterator,
     LazyAttribute,
     RelatedFactory,
     SelfAttribute,
@@ -16,16 +19,21 @@ from cl.people_db.factories import PersonFactory
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SOURCES,
+    BankruptcyInformation,
     Citation,
     Court,
     Docket,
     DocketEntry,
     Opinion,
     OpinionCluster,
+    OpinionsCited,
     Parenthetical,
+    ParentheticalGroup,
     RECAPDocument,
 )
 from cl.tests.providers import LegalProvider
+
+logger = logging.getLogger(__name__)
 
 Faker.add_provider(LegalProvider)
 
@@ -45,6 +53,23 @@ class CourtFactory(DjangoModelFactory):
     jurisdiction = FuzzyChoice(Court.JURISDICTIONS, getter=lambda c: c[0])
     in_use = True
 
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        count = 1
+        while True:
+            try:
+                obj = model_class(*args, **kwargs)
+                obj.save()
+                return obj
+            except IntegrityError as exp:
+                logger.info(f"Unexpected {exp=}, {type(exp)=}")
+                kwargs["position"] = Faker(
+                    "pyfloat", positive=True, right_digits=4, left_digits=3
+                ).evaluate(None, None, {"locale": None})
+                count = count + 1
+                if count > 3:
+                    raise (exp)
+
 
 class ParentheticalFactory(DjangoModelFactory):
     class Meta:
@@ -53,6 +78,14 @@ class ParentheticalFactory(DjangoModelFactory):
     describing_opinion = SelfAttribute("described_opinion")
     text = Faker("sentence")
     score = Faker("pyfloat", min_value=0, max_value=1, right_digits=4)
+
+
+class ParentheticalGroupFactory(DjangoModelFactory):
+    class Meta:
+        model = ParentheticalGroup
+
+    score = Faker("pyfloat", min_value=0, max_value=1, right_digits=4)
+    size = Faker("random_int", min=1, max=100)
 
 
 class ParentheticalWithParentsFactory(ParentheticalFactory):
@@ -112,7 +145,7 @@ class OpinionClusterFactory(DjangoModelFactory):
     case_name_full = Faker("case_name", full=True)
     date_filed = Faker("date")
     slug = Faker("slug")
-    source = FuzzyChoice(SOURCES, getter=lambda c: c[0])
+    source = FuzzyChoice(SOURCES.NAMES, getter=lambda c: c[0])
     precedential_status = FuzzyChoice(
         PRECEDENTIAL_STATUS.NAMES, getter=lambda c: c[0]
     )
@@ -134,7 +167,7 @@ class DocketParentMixin(DjangoModelFactory):
             lambda self: getattr(
                 self.factory_parent,
                 "case_name",
-                str(Faker("case_name")),
+                Faker("case_name").evaluate(None, None, {"locale": None}),
             )
         ),
         case_name_short=LazyAttribute(
@@ -148,7 +181,9 @@ class DocketParentMixin(DjangoModelFactory):
             lambda self: getattr(
                 self.factory_parent,
                 "case_name_full",
-                str(Faker("case_name", full=True)),
+                Faker("case_name", full=True).evaluate(
+                    None, None, {"locale": None}
+                ),
             )
         ),
     )
@@ -173,9 +208,39 @@ class OpinionClusterWithParentsFactory(
     pass
 
 
+class RECAPDocumentFactory(DjangoModelFactory):
+    class Meta:
+        model = RECAPDocument
+
+    description = Faker("text", max_nb_chars=750)
+    document_type = RECAPDocument.PACER_DOCUMENT
+    pacer_doc_id = Faker("pyint", min_value=100_000, max_value=400_000)
+
+
 class DocketEntryFactory(DjangoModelFactory):
     class Meta:
         model = DocketEntry
+
+    description = Faker("text", max_nb_chars=750)
+
+
+class DocketReuseParentMixin(DjangoModelFactory):
+    docket = Iterator(Docket.objects.all())
+
+
+class DocketEntryForDocketFactory(DjangoModelFactory):
+    class Meta:
+        model = DocketEntry
+
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        """Override default docket"""
+        docket_id = kwargs.pop("parent_id", None)
+        if not docket_id:
+            return None
+        kwargs["docket_id"] = docket_id
+        manager = cls._get_manager(model_class)
+        return manager.create(*args, **kwargs)
 
     description = Faker("text", max_nb_chars=750)
 
@@ -189,13 +254,13 @@ class DocketEntryWithParentsFactory(
     pass
 
 
-class RECAPDocumentFactory(DjangoModelFactory):
-    class Meta:
-        model = RECAPDocument
+class DocketEntryReuseParentsFactory(
+    DocketEntryFactory,
+    DocketReuseParentMixin,
+):
+    """Make a DocketEntry using existing Dockets as parents"""
 
-    description = Faker("text", max_nb_chars=750)
-    document_type = RECAPDocument.PACER_DOCUMENT
-    pacer_doc_id = Faker("pyint", min_value=100_000, max_value=400_000)
+    pass
 
 
 class DocketFactory(DjangoModelFactory):
@@ -239,3 +304,25 @@ class OpinionClusterFactoryMultipleOpinions(
         size=3,  # by default create 3 opinions
     )
     precedential_status = ("Published", "Precedential")
+
+
+class OpinionsCitedWithParentsFactory(DjangoModelFactory):
+    """Make a OpinionCited with Opinion parents"""
+
+    class Meta:
+        model = OpinionsCited
+
+    citing_opinion = SubFactory(
+        "cl.search.factories.OpinionFactory",
+    )
+    cited_opinion = SubFactory(
+        "cl.search.factories.OpinionFactory",
+    )
+
+
+class BankruptcyInformationFactory(DjangoModelFactory):
+    class Meta:
+        model = BankruptcyInformation
+
+    chapter = Faker("random_id_string")
+    trustee_str = Faker("name_female")

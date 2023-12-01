@@ -85,20 +85,6 @@ def remove_duplicate_dicts(l):
     return [dict(t) for t in set([tuple(d.items()) for d in l])]
 
 
-def alphanumeric_sort(query: QuerySet, sort_key: str) -> List[Any]:
-    """Sort a django queryset by a particular field value
-
-    :param query: The django queryset
-    :param sort_key: The field to sort naturally
-    :return:
-    """
-    convert = lambda text: int(text) if text.isdigit() else text
-    alphanum_key = lambda key: [
-        convert(c) for c in re.split("([0-9]+)", getattr(key, sort_key))
-    ]
-    return sorted(query, key=alphanum_key)
-
-
 def human_sort(
     unordered_list: IterableType[str | Tuple[str, Any]],
     key: Optional[str] = None,

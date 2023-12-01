@@ -2,6 +2,7 @@ import random
 from datetime import date
 from typing import Any, Dict, Tuple, Union
 
+from asgiref.sync import async_to_sync
 from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils.encoding import force_bytes
@@ -23,7 +24,7 @@ from cl.scrapers.utils import (
     get_extension,
     update_or_create_docket,
 )
-from cl.search.models import SEARCH_TYPES, Court, Docket
+from cl.search.models import SEARCH_TYPES, SOURCES, Court, Docket
 
 cnt = CaseNameTweaker()
 
@@ -41,7 +42,7 @@ def save_everything(
     candidate_judges = []
     if af.docket.court_id != "scotus":
         if af.judges:
-            candidate_judges = lookup_judges_by_messy_str(
+            candidate_judges = async_to_sync(lookup_judges_by_messy_str)(
                 af.judges, docket.court.pk, af.docket.date_argued
             )
     else:
@@ -85,7 +86,7 @@ def make_objects(
 
     audio_file = Audio(
         judges=item.get("judges", ""),
-        source=item.get("cluster_source") or "C",
+        source=item.get("cluster_source") or SOURCES.COURT_WEBSITE,
         case_name=item["case_names"],
         case_name_short=case_name_short,
         sha1=sha1_hash,
@@ -128,6 +129,7 @@ class Command(cl_scrape_opinions.Command):
             msg, r = get_binary_content(
                 item["download_urls"],
                 site.cookies,
+                headers={"User-Agent": "CourtListener"},
                 method=site.method,
             )
             if msg:
@@ -172,9 +174,7 @@ class Command(cl_scrape_opinions.Command):
                     index=False,
                     backscrape=backscrape,
                 )
-                process_audio_file.apply_async(
-                    (audio_file.pk,), countdown=random.randint(0, 3600)
-                )
+                process_audio_file.delay(audio_file.pk)
 
                 logger.info(
                     "Successfully added audio file {pk}: {name}".format(

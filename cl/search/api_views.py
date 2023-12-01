@@ -1,4 +1,6 @@
+import waffle
 from rest_framework import pagination, permissions, response, status, viewsets
+from rest_framework.pagination import PageNumberPagination
 
 from cl.api.utils import CacheListMixin, LoggingMixin, RECAPUsersReadOnly
 from cl.search import api_utils
@@ -6,6 +8,8 @@ from cl.search.api_serializers import (
     CourtSerializer,
     DocketEntrySerializer,
     DocketSerializer,
+    ExtendedPersonESSerializer,
+    OAESResultSerializer,
     OpinionClusterSerializer,
     OpinionsCitedSerializer,
     OpinionSerializer,
@@ -25,6 +29,7 @@ from cl.search.filters import (
 )
 from cl.search.forms import SearchForm
 from cl.search.models import (
+    SEARCH_TYPES,
     Court,
     Docket,
     DocketEntry,
@@ -115,6 +120,10 @@ class CourtViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Court.objects.exclude(
         jurisdiction=Court.TESTING_COURT
     ).order_by("position")
+    # Our default pagination blocks deep pagination by overriding
+    # PageNumberPagination. Allow deep pagination, by overriding our default
+    # with this base class.
+    pagination_class = PageNumberPagination
 
 
 class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -169,18 +178,27 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
         search_form = SearchForm(request.GET)
         if search_form.is_valid():
             cd = search_form.cleaned_data
-            if cd["q"] == "":
-                cd["q"] = "*"  # Get everything
 
+            search_type = cd["type"]
             paginator = pagination.PageNumberPagination()
             sl = api_utils.get_object_list(request, cd=cd, paginator=paginator)
-
             result_page = paginator.paginate_queryset(sl, request)
-            serializer = SearchResultSerializer(
-                result_page, many=True, context={"schema": sl.conn.schema}
-            )
+            if (
+                search_type == SEARCH_TYPES.ORAL_ARGUMENT
+                and waffle.flag_is_active(request, "oa-es-active")
+            ):
+                serializer = OAESResultSerializer(result_page, many=True)
+            elif search_type == SEARCH_TYPES.PEOPLE and waffle.flag_is_active(
+                request, "p-es-active"
+            ):
+                serializer = ExtendedPersonESSerializer(result_page, many=True)
+            else:
+                if cd["q"] == "":
+                    cd["q"] = "*"  # Get everything
+                serializer = SearchResultSerializer(
+                    result_page, many=True, context={"schema": sl.conn.schema}
+                )
             return paginator.get_paginated_response(serializer.data)
-
         # Invalid search.
         return response.Response(
             search_form.errors, status=status.HTTP_400_BAD_REQUEST

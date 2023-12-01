@@ -695,9 +695,6 @@
                 If you are interested, we have a variety of <a href="https://free.law/press-assets/">"Powered
                 By" logos</a> available for your website or application. We appreciate a reference, but it's not required.
             </p>
-            <a href="https://free.law/press-assets/">
-                <img src="{% static "png/logo-long-w350.png" %}" width="350" height="81">
-            </a>
         </div>
 
         <div class="sidebar-section">
@@ -727,14 +724,12 @@
             </p>
         </div>
 
-        {% include "includes/deprecated_sidebar_section.html" %}
-
         <div class="sidebar-section">
             <h3 id="copyright"><span>Copyright</span></h3>
             <p>
                 Our data is free of known copyright restrictions.<br />
                 <a rel="license" href="http://creativecommons.org/publicdomain/mark/1.0/">
-                    <img src="https://i.creativecommons.org/p/mark/1.0/88x31.png" alt="Public Domain Mark" height="31" width="88"/>
+                    <img src="{% static "png/cc-pd.png" %}" alt="Public Domain Mark" height="31" width="88"/>
                 </a>
             </p>
         </div>

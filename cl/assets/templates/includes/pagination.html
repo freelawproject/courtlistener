@@ -1,61 +1,46 @@
 {% load humanize %}
-
-{% if results.has_previous or results.has_next %}
-<div class="well v-offset-above-3 hidden-print">
-  <div class="row">
-    <div class="col-xs-2 col-sm-3">
-      {% if results.has_previous %}
-        <div class="text-left">
-          {% if webhooks %}
-            <button id="webhooks-paginator"
-               hx-get="{% url 'webhook_events-list' format="html" %}?debug={{debug}}&page={{ results.previous_page_number }}&webhook__event_type={{ type_filter }}&event_status={{ status_filter }}"
-               hx-target="#webhook_table_body"
-               rel="prev"
-               class="btn btn-default">
-              <i class="fa fa-caret-left no-underline"></i>
-              <span class="hidden-xs hidden-sm">Previous</span>
-              <span class="hidden-xs hidden-md hidden-lg">Prev.</span>
-            </button>
-          {% else %}
-            <a href="?{{ get_string }}page={{ results.previous_page_number }}"
-               rel="prev"
-               class="btn btn-default">
-              <i class="fa fa-caret-left no-underline"></i>
-              <span class="hidden-xs hidden-sm">Previous</span>
-              <span class="hidden-xs hidden-md hidden-lg">Prev.</span>
+{% if page_obj.has_other_pages %}
+  <div class="well v-offset-above-3 hidden-print">
+    <div class="row">
+	    <div class="col-xs-3">
+        {% if page_obj.has_previous %}
+          {% if not hide_first %}
+            <a href="?{{ get_string }}page=1"
+               rel="first" class="hidden-xs btn btn-default" >
+              <i class="fa fa-caret-left no-underline" ></i>
+              <i class="fa fa-caret-left no-underline" ></i>
+			        <span class="">First</span>
             </a>
           {% endif %}
-        </div>
-      {% endif %}
-    </div>
-    <div class="col-xs-8 col-sm-6">
-      <div class="text-center large">
-        <span class="hidden-xs">Page </span>{{ results.number|intcomma }} of {{ results.paginator.num_pages|intcomma }}
+          <a href="?{{ get_string }}page={{ page_obj.previous_page_number }}"
+             rel="prev"
+             class="btn btn-default" >
+            <i class="fa fa-caret-left no-underline" ></i>
+			      <span class="hidden-xs">Prev.</span>
+          </a>
+        {% endif %}
+      </div>
+      <div class="col-xs-6 text-center large">
+        <span class="hidden-xs" >Page</span> {{ page_obj.number|intcomma }} of {{ page_obj.paginator.num_pages|intcomma }}
+      </div>
+      <div class="col-xs-3 text-right" >
+        {% if page_obj.has_next %}
+          <a href="?{{ get_string }}page={{ page_obj.next_page_number }}"
+             rel="next"
+             class="btn btn-default" >
+			      <span class="hidden-xs">Next</span>
+            <i class="fa fa-caret-right no-underline" ></i>
+          </a>
+          {% if not hide_last %}
+            <a href="?{{ get_string }}page={{ page_obj.paginator.num_pages }}"
+               rel="last" class="hidden-xs btn btn-default" >
+			        <span class="">Last</span>
+              <i class="fa fa-caret-right no-underline" ></i>
+              <i class="fa fa-caret-right no-underline" ></i>
+            </a>
+          {% endif %}
+        {% endif %}
       </div>
     </div>
-    <div class="col-xs-2 col-sm-3">
-      {% if results.has_next %}
-        <div class="text-right">
-          {% if webhooks %}
-            <button id="webhooks-paginator"
-               hx-get="{% url 'webhook_events-list' format="html" %}?debug={{debug}}&page={{ results.next_page_number }}&webhook__event_type={{ type_filter }}&event_status={{ status_filter }}"
-               hx-target="#webhook_table_body"
-               rel="next"
-               class="btn btn-default">
-              <span class="hidden-xs">Next</span>
-              <i class="fa fa-caret-right no-underline"></i>
-            </button>
-          {% else %}
-            <a href="?{{ get_string }}page={{ results.next_page_number }}"
-               rel="next"
-               class="btn btn-default">
-              <span class="hidden-xs">Next</span>
-              <i class="fa fa-caret-right no-underline"></i>
-            </a>
-          {% endif %}
-        </div>
-      {% endif %}
-    </div>
   </div>
-</div>
 {% endif %}

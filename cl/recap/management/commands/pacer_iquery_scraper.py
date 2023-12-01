@@ -6,6 +6,7 @@ from typing import Set
 import pytz
 import requests
 from django.conf import settings
+from django.db.models import Q
 from requests import RequestException
 from simplejson import JSONDecodeError
 
@@ -103,9 +104,18 @@ def get_docket_ids() -> Set[int]:
                     docket_ids.add(match.group(1))
 
     # Add in docket IDs that have docket alerts, tags, or notes
-    docket_ids.update(DocketAlert.objects.values_list("docket", flat=True))
+    docket_ids.update(
+        DocketAlert.objects.values_list("docket", flat=True)
+        .filter(alert_type=DocketAlert.SUBSCRIPTION)
+        .distinct("docket")
+    )
+    one_year_ago = datetime.today() - timedelta(days=365)
     docket_ids.update(
         Note.objects.exclude(docket_id=None)
+        .filter(
+            Q(date_created__gt=one_year_ago)
+            | Q(date_modified__gt=one_year_ago)
+        )
         .distinct("docket_id")
         .values_list("docket_id", flat=True)
     )
@@ -114,9 +124,12 @@ def get_docket_ids() -> Set[int]:
             "docket_id", flat=True
         )
     )
+    one_week_ago = datetime.today() - timedelta(days=7)
     docket_ids.update(
         Docket.objects.filter(
-            case_name__isnull=True,
+            Q(date_created__gt=one_week_ago)
+            | Q(date_modified__gt=one_week_ago),
+            case_name="",
             source__in=Docket.RECAP_SOURCES,
             court__jurisdiction__in=[
                 Court.FEDERAL_DISTRICT,

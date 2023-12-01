@@ -2,7 +2,7 @@
 # See https://pre-commit.com/hooks.html for more hooks
 exclude: migrations
 default_language_version:
-  python: "python3.10"
+  python: "python3.11"
 ci:
   autoupdate_schedule: quarterly
 repos:
@@ -18,20 +18,22 @@ repos:
      - id: check-yaml
      - id: debug-statements
      - id: detect-private-key
+       exclude: '^docker/postgresql/cl-postgres.key$|^docker/elastic/cl-es.key$'
      - id: fix-byte-order-marker
      - id: fix-encoding-pragma
        args: [--remove]
      - id: trailing-whitespace
        args: [--markdown-linebreak-ext=md]
+       exclude: '^cl/recap/test_assets/.*\.html$'
 
   - repo: https://github.com/ikamensh/flynt/
-    rev: '0.78'
+    rev: '1.0.1'
     hooks:
      - id: flynt
        args: [--line-length=79, --transform-concats]
 
   - repo: https://github.com/psf/black
-    rev: 23.3.0
+    rev: 23.9.1
     hooks:
      - id: black
 

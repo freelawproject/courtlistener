@@ -60,3 +60,15 @@ RELATED_MLT_MAXDF = 1000
 RELATED_MLT_MINWL = 3
 RELATED_MLT_MAXWL = 0
 RELATED_FILTER_BY_STATUS = "Precedential"
+QUERY_RESULTS_CACHE = 60 * 60 * 6
+
+#####################
+# Search pagination #
+#####################
+MAX_SEARCH_PAGINATION_DEPTH = 100
+SEARCH_PAGE_SIZE = 20
+CHILD_HITS_PER_RESULT = 5
+VIEW_MORE_CHILD_HITS = 99
+# The amount of text to return from the beginning of the field if there are no
+# matching fragments to highlight.
+NO_MATCH_HL_SIZE = 500

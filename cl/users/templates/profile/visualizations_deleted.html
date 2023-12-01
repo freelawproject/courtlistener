@@ -71,6 +71,6 @@
         <div class="hidden-xs col-sm-1 col-md-3"></div>
       </div>
     {% endif %}
-    {% include "includes/pagination.html" %}
+    {% include "includes/pagination.html" with page_obj=results %}
   </div>
 {% endblock %}

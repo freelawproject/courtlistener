@@ -4,13 +4,14 @@ import string
 from collections import OrderedDict
 from datetime import date
 
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from eyecite.find import get_citations
 from eyecite.utils import clean_text
 
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.solr_core_admin import get_term_frequency
-from cl.search.models import Docket, Opinion, OpinionCluster
+from cl.search.models import SOURCES, Docket, Opinion, OpinionCluster
 
 from ...people_db.lookup_utils import (
     lookup_judge_by_last_name,
@@ -387,11 +388,11 @@ def make_and_save(
         case_name_short=item["case_name_short"] or "",
         case_name=item["case_name"] or "",
         case_name_full=item["case_name_full"] or "",
-        source="Z",
+        source=SOURCES.COLUMBIA_ARCHIVE,
         attorneys=item["attorneys"] or "",
         posture=item["posture"] or "",
     )
-    panel = lookup_judges_by_last_name_list(
+    panel = async_to_sync(lookup_judges_by_last_name_list)(
         item["panel"], item["court_id"], panel_date
     )
 
@@ -400,7 +401,7 @@ def make_and_save(
         if opinion_info["author"] is None:
             author = None
         else:
-            author = lookup_judge_by_last_name(
+            author = async_to_sync(lookup_judge_by_last_name)(
                 opinion_info["author"], item["court_id"], panel_date
             )
 
@@ -420,7 +421,7 @@ def make_and_save(
             # reading this, you'll need to update this code.
             local_path=opinion_info["local_path"],
         )
-        joined_by = lookup_judges_by_last_name_list(
+        joined_by = async_to_sync(lookup_judges_by_last_name_list)(
             item["joining"], item["court_id"], panel_date
         )
         opinions.append((opinion, joined_by))

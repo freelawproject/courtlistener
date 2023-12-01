@@ -33,13 +33,20 @@ from cl.donate.utils import get_donation_totals_by_email
 from cl.lib.ratelimiter import ratelimiter_unsafe_3_per_m
 from cl.people_db.models import Person
 from cl.search.forms import SearchForm
-from cl.search.models import Court, Docket, OpinionCluster, RECAPDocument
+from cl.search.models import (
+    SOURCES,
+    Court,
+    Docket,
+    OpinionCluster,
+    RECAPDocument,
+)
+from cl.simple_pages.coverage_utils import fetch_data, fetch_federal_data
 from cl.simple_pages.forms import ContactForm
 
 logger = logging.getLogger(__name__)
 
 
-def about(request: HttpRequest) -> HttpResponse:
+async def about(request: HttpRequest) -> HttpResponse:
     """Loads the about page"""
     return TemplateResponse(request, "about.html", {"private": False})
 
@@ -74,7 +81,7 @@ def faq(request: HttpRequest) -> HttpResponse:
     )
 
 
-def help_home(request: HttpRequest) -> HttpResponse:
+async def help_home(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "help/index.html", {"private": False})
 
 
@@ -113,35 +120,35 @@ def alert_help(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "help/alert_help.html", context)
 
 
-def donation_help(request: HttpRequest) -> HttpResponse:
+async def donation_help(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(
         request, "help/donation_help.html", {"private": False}
     )
 
 
-def delete_help(request: HttpRequest) -> HttpResponse:
+async def delete_help(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(
         request, "help/delete_account_help.html", {"private": False}
     )
 
 
-def markdown_help(request: HttpRequest) -> HttpResponse:
+async def markdown_help(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(
         request, "help/markdown_help.html", {"private": False}
     )
 
 
-def tag_notes_help(request: HttpRequest) -> HttpResponse:
+async def tag_notes_help(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "help/tags_help.html", {"private": False})
 
 
-def recap_email_help(request: HttpRequest) -> HttpResponse:
+async def recap_email_help(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(
         request, "help/recap_email_help.html", {"private": False}
     )
 
 
-def broken_email_help(request: HttpRequest) -> HttpResponse:
+async def broken_email_help(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(
         request,
         "help/broken_email_help.html",
@@ -228,11 +235,11 @@ def get_coverage_data_o(request: HttpRequest) -> dict[str, Any]:
         count_lawbox = 0
         count_scraper = 0
         for d in counts:
-            if "R" in d["source"]:
+            if SOURCES.PUBLIC_RESOURCE in d["source"]:
                 count_pro += d["source__count"]
-            if "C" in d["source"]:
+            if SOURCES.COURT_WEBSITE in d["source"]:
                 count_scraper += d["source__count"]
-            if "L" in d["source"]:
+            if SOURCES.LAWBOX in d["source"]:
                 count_lawbox += d["source__count"]
 
         opinion_courts = Court.objects.filter(
@@ -273,6 +280,42 @@ def coverage_graph(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "help/coverage.html", coverage_data_o)
 
 
+def coverage_opinions(request: HttpRequest) -> HttpResponse:
+    """Generate Coverage Opinion Page
+
+    :param request: A django request
+    :return: The page requested
+    """
+    coverage_data_op = cache.get("coverage_data_op")
+    if coverage_data_op is None:
+        coverage_data_op = {
+            "private": False,
+            "federal": fetch_federal_data(),
+            "sections": {
+                "state": fetch_data(Court.STATE_JURISDICTIONS),
+                "territory": fetch_data(Court.TERRITORY_JURISDICTIONS),
+                "international": fetch_data(
+                    Court.INTERNATIONAL, group_by_state=False
+                ),
+                "tribal": fetch_data(
+                    Court.TRIBAL_JURISDICTIONS, group_by_state=False
+                ),
+                "special": fetch_data(
+                    [Court.FEDERAL_SPECIAL], group_by_state=False
+                ),
+                "military": fetch_data(
+                    Court.MILITARY_JURISDICTIONS, group_by_state=False
+                ),
+            },
+        }
+        one_day = 60 * 60 * 24
+        cache.set("coverage_data_op", coverage_data_op, one_day)
+
+    return TemplateResponse(
+        request, "help/coverage_opinions.html", coverage_data_op
+    )
+
+
 def feeds(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(
         request,
@@ -300,7 +343,7 @@ def podcasts(request: HttpRequest) -> HttpResponse:
     )
 
 
-def contribute(request: HttpRequest) -> HttpResponse:
+async def contribute(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "contribute.html", {"private": False})
 
 
@@ -367,17 +410,23 @@ def contact(
     return TemplateResponse(request, template_path, template_data)
 
 
-def contact_thanks(request: HttpRequest) -> HttpResponse:
+async def contact_thanks(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "contact_thanks.html", {"private": True})
 
 
-def advanced_search(request: HttpRequest) -> HttpResponse:
+async def advanced_search(request: HttpRequest) -> HttpResponse:
+    types = ["opinions", "parentheticals", "recap_archive", "oral_arguments"]
+    json_template = loader.get_template("includes/available_fields.json")
+    json_content = json_template.render()
+    data = json.loads(json_content)
     return TemplateResponse(
-        request, "help/advanced_search.html", {"private": False}
+        request,
+        "help/advanced_search.html",
+        {"private": False, "data": data, "types": types},
     )
 
 
-def old_terms(request: HttpRequest, v: str) -> HttpResponse:
+async def old_terms(request: HttpRequest, v: str) -> HttpResponse:
     return TemplateResponse(
         request,
         f"terms/{v}.html",
@@ -389,7 +438,7 @@ def old_terms(request: HttpRequest, v: str) -> HttpResponse:
     )
 
 
-def latest_terms(request: HttpRequest) -> HttpResponse:
+async def latest_terms(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(
         request,
         "terms/latest.html",
@@ -409,11 +458,13 @@ def robots(request: HttpRequest) -> HttpResponse:
     return response
 
 
-def validate_for_wot(request: HttpRequest) -> HttpResponse:
+async def validate_for_wot(request: HttpRequest) -> HttpResponse:
     return HttpResponse("bcb982d1e23b7091d5cf4e46826c8fc0")
 
 
-def ratelimited(request: HttpRequest, exception: Exception) -> HttpResponse:
+async def ratelimited(
+    request: HttpRequest, exception: Exception
+) -> HttpResponse:
     return TemplateResponse(
         request,
         "429.html",
