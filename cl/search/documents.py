@@ -1116,34 +1116,6 @@ class OpinionBaseDocument(Document):
     dateArgued = fields.DateField()
     dateReargued = fields.DateField()
     dateReargumentDenied = fields.DateField()
-    dateFiled_text = fields.TextField(
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(analyzer="english_exact"),
-        },
-        search_analyzer="search_analyzer",
-    )
-    dateArgued_text = fields.TextField(
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(analyzer="english_exact"),
-        },
-        search_analyzer="search_analyzer",
-    )
-    dateReargued_text = fields.TextField(
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(analyzer="english_exact"),
-        },
-        search_analyzer="search_analyzer",
-    )
-    dateReargumentDenied_text = fields.TextField(
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(analyzer="english_exact"),
-        },
-        search_analyzer="search_analyzer",
-    )
     court_id = fields.TextField(
         analyzer="text_en_splitting_cl",
         search_analyzer="search_analyzer",
@@ -1259,29 +1231,6 @@ class OpinionBaseDocument(Document):
 
     def prepare_caseNameFull(self, instance):
         return instance.case_name_full
-
-    def prepare_dateFiled_text(self, instance):
-        if not instance.date_filed:
-            return
-
-        if isinstance(instance.date_filed, str):
-            return datetime.strptime(instance.date_filed, "%Y-%m-%d").strftime(
-                "%-d %B %Y"
-            )
-
-        return instance.date_filed.strftime("%-d %B %Y")
-
-    def prepare_dateArgued_text(self, instance):
-        if instance.docket.date_argued:
-            return instance.docket.date_argued.strftime("%-d %B %Y")
-
-    def prepare_dateReargued_text(self, instance):
-        if instance.docket.date_reargued:
-            return instance.docket.date_reargued.strftime("%-d %B %Y")
-
-    def prepare_dateReargumentDenied_text(self, instance):
-        if instance.docket.date_reargument_denied:
-            return instance.docket.date_reargument_denied.strftime("%-d %B %Y")
 
     def prepare_court_id(self, instance):
         return instance.docket.court.pk
@@ -1557,31 +1506,6 @@ class OpinionDocument(OpinionBaseDocument):
 
     def prepare_caseNameFull(self, instance):
         return instance.cluster.case_name_full
-
-    def prepare_dateFiled_text(self, instance):
-        if not instance.cluster.date_filed:
-            return
-
-        if isinstance(instance.cluster.date_filed, str):
-            return datetime.strptime(
-                instance.cluster.date_filed, "%Y-%m-%d"
-            ).strftime("%-d %B %Y")
-
-        return instance.cluster.date_filed.strftime("%-d %B %Y")
-
-    def prepare_dateArgued_text(self, instance):
-        if instance.cluster.docket.date_argued:
-            return instance.cluster.docket.date_argued.strftime("%-d %B %Y")
-
-    def prepare_dateReargued_text(self, instance):
-        if instance.cluster.docket.date_reargued:
-            return instance.cluster.docket.date_reargued.strftime("%-d %B %Y")
-
-    def prepare_dateReargumentDenied_text(self, instance):
-        if instance.cluster.docket.date_reargument_denied:
-            return instance.cluster.docket.date_reargument_denied.strftime(
-                "%-d %B %Y"
-            )
 
     def prepare_court_id(self, instance):
         return instance.cluster.docket.court.pk

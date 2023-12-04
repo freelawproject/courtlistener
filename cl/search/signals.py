@@ -297,9 +297,9 @@ o_field_mapping = {
         Docket: {
             "docket": {
                 "docket_number": ["docketNumber"],
-                "date_argued": ["dateArgued_text"],
-                "date_reargued": ["dateReargued_text"],
-                "date_reargument_denied": ["dateReargumentDenied_text"],
+                "date_argued": ["dateArgued"],
+                "date_reargued": ["dateReargued"],
+                "date_reargument_denied": ["dateReargumentDenied"],
             }
         },
         OpinionCluster: {
@@ -307,7 +307,7 @@ o_field_mapping = {
                 "case_name": ["caseName"],
                 "case_name_full": ["caseName", "caseNameFull"],
                 "case_name_short": ["caseName"],
-                "date_filed": ["dateFiled_text"],
+                "date_filed": ["dateFiled"],
                 "judges": ["judge"],
                 "attorneys": ["attorney"],
                 "nature_of_suit": ["suitNature"],
@@ -344,9 +344,9 @@ o_cluster_field_mapping = {
             "docket": {
                 "court_id": ["court_exact"],
                 "docket_number": ["docketNumber"],
-                "date_argued": ["dateArgued_text"],
-                "date_reargued": ["dateReargued_text"],
-                "date_reargument_denied": ["dateReargumentDenied_text"],
+                "date_argued": ["dateArgued"],
+                "date_reargued": ["dateReargued"],
+                "date_reargument_denied": ["dateReargumentDenied"],
             }
         },
         Opinion: {"sub_opinions": {"cluster_id": ["sibling_ids"]}},

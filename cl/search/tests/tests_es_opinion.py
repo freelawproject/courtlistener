@@ -1562,50 +1562,6 @@ class EsOpinionsIndexingTest(ESIndexTestCase, TransactionTestCase):
         self.assertEqual(cluster_doc.caseName, "Franklin50")
         self.assertEqual(opinion_doc.caseName, "Franklin50")
 
-        # update the date_field field in the cluster record
-        opinion_cluster.date_filed = now().date()
-        opinion_cluster.save()
-
-        date_text = opinion_cluster.date_filed.strftime("%-d %B %Y")
-
-        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        self.assertEqual(cluster_doc.dateFiled_text, date_text)
-        self.assertEqual(opinion_doc.dateFiled_text, date_text)
-
-        # update the date_argued field in the docket record
-        docket.date_argued = now().date()
-        docket.save()
-
-        date_text = docket.date_argued.strftime("%-d %B %Y")
-
-        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        self.assertEqual(cluster_doc.dateArgued_text, date_text)
-        self.assertEqual(opinion_doc.dateArgued_text, date_text)
-
-        # update the date_reargued field in the docket record
-        docket.date_reargued = now().date()
-        docket.save()
-
-        date_text = docket.date_reargued.strftime("%-d %B %Y")
-
-        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        self.assertEqual(cluster_doc.dateReargued_text, date_text)
-        self.assertEqual(opinion_doc.dateReargued_text, date_text)
-
-        # update the date_reargument_denied field in the docket record
-        docket.date_reargument_denied = now().date()
-        docket.save()
-
-        date_text = docket.date_reargument_denied.strftime("%-d %B %Y")
-
-        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        self.assertEqual(cluster_doc.dateReargumentDenied_text, date_text)
-        self.assertEqual(opinion_doc.dateReargumentDenied_text, date_text)
-
         # update the attorneys field in the cluster record
         opinion_cluster.judges = "first judge, second judge"
         opinion_cluster.save()
