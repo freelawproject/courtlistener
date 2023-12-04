@@ -920,9 +920,8 @@ def replace_highlight(
     """
 
     term = match.group(0)
-    for marked_string in unique_hl_strings:
-        if term == marked_string:
-            return f"<{tag}>{marked_string}</{tag}>"
+    if term in unique_hl_strings:
+        return f"<{tag}>{term}</{tag}>"
     return term
 
 
@@ -975,7 +974,7 @@ def merge_highlights_into_result(
                     set(marked_strings + marked_strings_exact)
                 )
                 original_string = highlight_list[0]
-                all_terms_pattern = rf"<{tag}>|</{tag}>|\s+|[^\s<]+"
+                all_terms_pattern = rf"<{tag}>|</{tag}>|\w+"
                 combined_highlights = re.sub(
                     all_terms_pattern,
                     lambda match: replace_highlight(

@@ -1304,7 +1304,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 docket_entry=self.de,
                 document_number="11",
                 is_available=False,
-                plain_text="Lorem this was finished, this unwieldy process has led ipsum",
+                plain_text="Lorem this was finished, this unwieldy process has led ipsum,",
             )
 
         # This phrase shouldn't return results since it doesn't match the
@@ -1318,6 +1318,24 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         # This phrase should match a result.
         search_phrase = '"this was finished, this unwieldy process"'
+        params = {"type": SEARCH_TYPES.RECAP, "q": search_phrase}
+        # Frontend
+        r = async_to_sync(self._test_article_count)(
+            params, 1, "phrase_search_duplicated_terms"
+        )
+        # Count child documents under docket.
+        self._count_child_documents(
+            0, r.content.decode(), 1, "phrase_search_duplicated_terms"
+        )
+
+        # Confirm phrase search are properly highlighted.
+        terms_list = search_phrase.replace('"', "").split(" ")
+        for term in terms_list:
+            self.assertIn(f"<mark>{term}</mark>", r.content.decode())
+
+        # Confirm we're able to HL terms combined with chars like ",", "." or
+        # or any other symbols.
+        search_phrase = '"this was finished, this unwieldy process" ipsum'
         params = {"type": SEARCH_TYPES.RECAP, "q": search_phrase}
         # Frontend
         r = async_to_sync(self._test_article_count)(
