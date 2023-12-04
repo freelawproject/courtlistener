@@ -943,6 +943,47 @@ def build_child_docs_query(
     return Q(query_dict)
 
 
+def get_only_status_facets(
+    search_query: Search, search_form: SearchForm
+) -> list[str]:
+    """Create a useful facet variable to use in a template
+
+    This method creates an Elasticsearch query with the status aggregations
+    and sets the size to 0 to ensure that no documents are returned.
+    :param search_query: The Elasticsearch search query object.
+    :param search_form: The form displayed in the user interface
+    """
+    search_query = search_query.extra(size=0)
+    search_query = search_query.query(
+        Q("bool", must_not=Q("match", cluster_child="opinion_cluster"))
+    )
+    search_query.aggs.bucket("status", A("terms", field="status.raw"))
+    response = search_query.execute()
+
+    facet_fields = []
+    try:
+        buckets = response.aggregations.status.buckets
+        facet_values = {group["key"]: group["doc_count"] for group in buckets}
+    except (KeyError, AttributeError):
+        facet_values = {}
+
+    for field in search_form:
+        if not field.html_name.startswith("stat_"):
+            continue
+
+        try:
+            count = facet_values[field.html_name.replace("stat_", "")]
+        except KeyError:
+            # Happens when a field is iterated on that doesn't exist in the
+            # facets variable
+            count = None
+
+        field.count = count
+        facet_fields.append(field)
+
+    return facet_fields
+
+
 def build_es_main_query(
     search_query: Search, cd: CleanData
 ) -> tuple[Search, int | None, int, int | None]:

@@ -34,6 +34,7 @@ from cl.lib.elasticsearch_utils import (
     convert_str_date_fields_to_date_objects,
     es_index_exists,
     fetch_es_results,
+    get_only_status_facets,
     limit_inner_hits,
     make_es_stats_variable,
     merge_courts_from_db,
@@ -550,17 +551,23 @@ def advanced(request: HttpRequest) -> HttpResponse:
     # I'm not thrilled about how this is repeating URLs in a view.
     if request.path == reverse("advanced_o"):
         obj_type = SEARCH_TYPES.OPINION
-        # Needed b/c of facet values.
-
-        o_results = do_search(
-            request.GET.copy(),
-            rows=1,
-            override_params={"type": obj_type},
-            facet=True,
-            cache_key="opinion-homepage-results",
-        )
-        render_dict.update(o_results)
         render_dict["search_form"] = SearchForm({"type": obj_type})
+        # Needed b/c of facet values.
+        if waffle.flag_is_active(request, "o-es-active"):
+            search_query = OpinionClusterDocument.search()
+            facet_results = get_only_status_facets(
+                search_query, render_dict["search_form"]
+            )
+            render_dict.update({"facet_fields": facet_results})
+        else:
+            o_results = do_search(
+                request.GET.copy(),
+                rows=1,
+                override_params={"type": obj_type},
+                facet=True,
+                cache_key="opinion-homepage-results",
+            )
+            render_dict.update(o_results)
         return TemplateResponse(request, "advanced.html", render_dict)
     else:
         courts = Court.objects.filter(in_use=True)
