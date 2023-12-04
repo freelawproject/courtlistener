@@ -298,6 +298,12 @@
                       {% else %}
                          <span class="small gray top">{{ results.object_list.QTime|intcomma }}ms</span>
                       {% endflag %}
+                    {% elif type == SEARCH_TYPES.OPINION %}
+                      {% flag "o-es-active" %}
+                        <span class="small gray top">{{ results_details.0|intcomma }}ms</span>
+                      {% else %}
+                        <span class="small gray top">{{ results.object_list.QTime|intcomma }}ms</span>
+                      {% endflag %}
                     {% else %}
                       <span class="small gray top">{{ results.object_list.QTime|intcomma }}ms</span>
                     {% endif %}
