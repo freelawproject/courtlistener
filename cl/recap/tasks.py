@@ -392,15 +392,16 @@ async def process_recap_pdf(pk):
             ).apply_async
         )()
 
-    de = await DocketEntry.objects.aget(recap_documents=rd)
-    await mark_pq_successful(
-        pq,
-        d_id=de.docket_id,
-        de_id=rd.docket_entry_id,
-        rd_id=rd.pk,
-    )
-    docket = await Docket.objects.aget(id=de.docket_id)
-    await mark_ia_upload_needed(docket, save_docket=True)
+    if not pq.debug:
+        de = await DocketEntry.objects.aget(recap_documents=rd)
+        await mark_pq_successful(
+            pq,
+            d_id=de.docket_id,
+            de_id=rd.docket_entry_id,
+            rd_id=rd.pk,
+        )
+        docket = await Docket.objects.aget(id=de.docket_id)
+        await mark_ia_upload_needed(docket, save_docket=True)
     return rd
 
 
