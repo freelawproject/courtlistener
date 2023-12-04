@@ -863,7 +863,6 @@ def build_es_base_query(
             related_match = RELATED_PATTERN.search(str_query)
             mlt_query = None
             if related_match:
-                str_query = RELATED_PATTERN.sub(str_query, "").strip()
                 cluster_pks = related_match.group("pks").split(",")
                 mlt_query = build_more_like_this_query(cluster_pks)
             opinion_search_fields = SEARCH_OPINION_QUERY_FIELDS

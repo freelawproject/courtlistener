@@ -11,7 +11,6 @@ from cl.search.api_serializers import (
     ExtendedPersonESSerializer,
     OAESResultSerializer,
     OpinionClusterSerializer,
-    OpinionESResultSerializer,
     OpinionsCitedSerializer,
     OpinionSerializer,
     OriginalCourtInformationSerializer,
