@@ -1,6 +1,3 @@
-# !/usr/bin/python
-# -*- coding: utf-8 -*-
-
 import difflib
 import itertools
 import json
@@ -9,43 +6,37 @@ import os
 import re
 from datetime import date, datetime, timedelta
 from glob import glob
-from typing import Any, Dict, List, Optional, Set, Tuple, TypedDict
+from typing import Any, Optional, TypedDict
 
 import requests
 from bs4 import BeautifulSoup
 from courts_db import find_court
 from django.conf import settings
 from django.db import transaction
-from django.db.models import QuerySet
-from django.db.utils import IntegrityError, OperationalError
+from django.db.utils import OperationalError
 from eyecite.find import get_citations
 from eyecite.models import FullCaseCitation
 from juriscraper.lib.diff_tools import normalize_phrase
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize, titlecase
 
-from cl.citations.utils import map_reporter_db_cite_type
-from cl.corpus_importer.utils import compare_documents
+from cl.corpus_importer.utils import (
+    add_citations_to_cluster,
+    clean_body_content,
+    match_based_text,
+)
 from cl.lib.argparse_types import _argparse_volumes
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.string_diff import get_cosine_similarity
 from cl.lib.string_utils import trunc
 from cl.lib.utils import human_sort
 from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.scrapers.utils import update_or_create_docket
-from cl.search.models import (
-    SOURCES,
-    Citation,
-    Court,
-    Docket,
-    Opinion,
-    OpinionCluster,
-)
+from cl.search.models import SOURCES, Court, Docket, Opinion, OpinionCluster
 from cl.search.tasks import add_items_to_solr
 
 cnt = CaseNameTweaker()
 
 
-def validate_dt(date_str: str) -> Tuple[Optional[date], bool]:
+def validate_dt(date_str: str) -> tuple[Optional[date], bool]:
     """
     Check if the date string is only year-month or year.
     If partial date string, make date string the first of the month
@@ -81,7 +72,7 @@ def _make_glob_from_args(
     reporter: Optional[str],
     volumes: Optional[range],
     page: Optional[str],
-) -> List[str]:
+) -> list[str]:
     """Make list of glob paths
 
     :param reporter: The reporter to filter if any
@@ -126,7 +117,7 @@ def filepath_list(
     reporter: str,
     volumes: Optional[range],
     page: Optional[str],
-) -> List[str]:
+) -> list[str]:
     """Given a reporter and volume, return a sorted list of files to process
 
     Make a list of file paths accordingly:
@@ -139,6 +130,7 @@ def filepath_list(
 
     :param reporter: The reporter to filter to (optional)
     :param volumes: The volumes of the reporter to filter to (optional)
+    :param page: The page of the reporter's volume to filter to (optional)
     :return: A sorted list of file paths
     """
 
@@ -150,12 +142,13 @@ def filepath_list(
     return files  # type: ignore
 
 
-def check_for_match(new_case: str, possibilities: List[str]) -> bool:
+def check_for_match(new_case: str, possibilities: list[str]) -> bool:
     """Check for matches based on case names
 
     This code is a variation of get_closest_match_index used in juriscraper.
     It checks if the case name we are trying to add matches any duplicate
     citation cases already in the system.
+
     :param new_case: The importing case name
     :param possibilities: The array of cases already in the
     system with the same citation
@@ -194,12 +187,11 @@ def map_opinion_type(harvard_opinion_type: str) -> str:
     return type_map.get(harvard_opinion_type, Opinion.COMBINED)
 
 
-def parse_extra_fields(soup, fields, long_field=False):
-    """
-    Parse the remaining extra fields into long or short strings
+def parse_extra_fields(soup, fields, long_field=False) -> dict:
+    """Parse the remaining extra fields into long or short strings
     returned as dict
 
-    :param soup: The bs4 representaion of the case data xml
+    :param soup: The bs4 representation of the case data xml
     :param fields: An array of strings names for fields to parse
     :param long_field: A boolean decides to parse the field into <p> or simple
     text.
@@ -238,7 +230,7 @@ class OptionsType(TypedDict):
     bankruptcy: bool
 
 
-def get_fix_list() -> List[str]:
+def get_fix_list() -> list[str]:
     """Download the fix list for harvard data.
 
     :return:List of files to fix
@@ -250,12 +242,12 @@ def get_fix_list() -> List[str]:
     return data["files"]
 
 
-def merge_fixes(data: Dict[str, Any], identifier: str) -> Dict[str, Any]:
+def merge_fixes(data: dict[str, Any], identifier: str) -> dict[str, Any]:
     """Merge fixes into the data
 
     :param data: The Harvard data
     :param identifier: The filepath of the data to fix.
-    :return:
+    :return: a dict with updated data
     """
     fix = requests.get(
         f"https://raw.githubusercontent.com/freelawproject/opinionated/main/data/harvard/{identifier}",
@@ -270,7 +262,7 @@ def read_json(file_path: str, ia_download_url: str) -> Optional[Any]:
 
     :param file_path: Filepath to JSON
     :param ia_download_url: URL of file
-    :return: JSON object if avaialble
+    :return: JSON object if available
     """
     try:
         with open(file_path) as f:
@@ -381,7 +373,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
             )
             continue
         case_body = data["casebody"]["data"]
-        harvard_characters = clean_body_content(case_body, harvard=True)
+        harvard_characters = clean_body_content(case_body, harvard_file=True)
 
         if not harvard_characters:
             # Unfortunately, some harvard cases have no opinions.
@@ -402,8 +394,9 @@ def parse_harvard_opinions(options: OptionsType) -> None:
             # upgrade this to do a full merge.
 
             with transaction.atomic():
-                add_citations(
-                    data["citations"], cluster_id=previously_imported_case.id
+                add_citations_to_cluster(
+                    [c.get("cite") for c in data.get("citations", [])],
+                    cluster_id=previously_imported_case.id,
                 )
                 logger.info(
                     f"Adding citations for case at https://www.courtlistener.com/opinion/{previously_imported_case.id}/{previously_imported_case.slug}"
@@ -430,14 +423,14 @@ def parse_harvard_opinions(options: OptionsType) -> None:
 
 
 def add_new_case(
-    data: Dict[str, Any],
+    data: dict[str, Any],
     case_body: str,
     case_name: str,
     case_name_full: str,
     case_name_short: str,
     date_filed: Optional[date],
     is_approximate: bool,
-    citation: Citation,
+    citation: FullCaseCitation,
     court_id: Optional[str],
     file_path: str,
     make_searchable: bool,
@@ -550,7 +543,9 @@ def add_new_case(
         logger.info("Saving cluster for: %s", cluster.id)
 
         logger.info("Adding citation for: %s", citation.corrected_citation())
-        add_citations(data["citations"], cluster.id)
+        add_citations_to_cluster(
+            [c.get("cite") for c in data.get("citations", [])], cluster.id
+        )
         new_op_pks = add_opinions(soup, cluster.id, citation)
 
     if make_searchable:
@@ -562,66 +557,9 @@ def add_new_case(
     )
 
 
-class CitationType(TypedDict):
-    cite: str
-    type: str
-
-
-def add_citations(cites: List[CitationType], cluster_id: int) -> None:
-    """Add citations to OpinionClusters
-
-    :param cites: Harvard Citation data
-    :param cluster_id: Cluster of found opinion in DB
-    :return: None
-    """
-    for cite in cites:
-        # Cleanup citations with extra spaces
-        clean_cite = re.sub(r"\s+", " ", cite["cite"])
-        citation = get_citations(clean_cite)
-        if (
-            not citation
-            or not isinstance(citation[0], FullCaseCitation)
-            or not citation[0].groups.get("volume", False)
-        ):
-            logger.warning(f"Citation parsing failed for {clean_cite}")
-            continue
-
-        # Because of non-canonical reporters this code breaks for states like
-        # Washington, where there are reporter abbreviations like "wash", that
-        # refer to more than one reporter series. The fix here is to eventually
-        # look up the abbreviation in reporters DB and see if the cite_type
-        # varies across the reporter series it refers to. If so, we have a hard
-        # problem -- maybe unsolveable -- if not, we can just use the value we
-        # get. In the case of Wash., it refers to two reporter series, both of
-        # which are of type "state", so it's easy.
-
-        # We now have an example of non-canonical reporters that do not have
-        # the same type, in Arkansas and Ark App. - We can resolve these by
-        # defining the regex pattern much more narrowly.  The neutral cite
-        # follows a four digit year volume while the state reporter does not.
-        if not citation[0].corrected_reporter():
-            reporter_type = Citation.STATE
-        else:
-            cite_type_str = citation[0].all_editions[0].reporter.cite_type
-            reporter_type = map_reporter_db_cite_type(cite_type_str)
-
-        try:
-            Citation.objects.get_or_create(
-                volume=citation[0].groups["volume"],
-                reporter=citation[0].corrected_reporter(),
-                page=citation[0].groups["page"],
-                type=reporter_type,
-                cluster_id=cluster_id,
-            )
-        except IntegrityError:
-            logger.warning(
-                f"Reporter mismatch for cluster: {cluster_id} on cite: {cite['cite']}"
-            )
-
-
 def add_opinions(
-    soup: BeautifulSoup, cluster_id: int, citation: Citation
-) -> List[int]:
+    soup: BeautifulSoup, cluster_id: int, citation: FullCaseCitation
+) -> list[int]:
     """Add opinions to Cluster
 
     :param soup: The bs4 representation of the case data xml
@@ -673,271 +611,16 @@ def add_opinions(
     return new_op_pks
 
 
-def get_opinion_content(cluster):
-    """Get the opinions content for a cluster object
-
-    :param cluster: Cluster ID for a set of opinions
-    :return: Combined opinion text
-    """
-    opinions = []
-    for op in Opinion.objects.filter(cluster_id=cluster.id):
-        if len(op.html_with_citations) > 1:
-            opinions.append(op.html_with_citations)
-        elif len(op.html_columbia) > 1:
-            opinions.append(op.html_columbia)
-        elif len(op.html_lawbox) > 1:
-            opinions.append(op.html_lawbox)
-        elif len(op.plain_text) > 1:
-            opinions.append(op.plain_text)
-        elif len(op.html) > 1:
-            opinions.append(op.html)
-        elif len(op.xml_harvard) > 1:
-            opinions.append(op.xml_harvard)
-    op = " ".join(opinions)
-    soup = BeautifulSoup(op, features="html.parser")
-    return soup.text
-
-
-def clean_docket_number(docket_number: str) -> str:
-    """Strip non-numeric content from docket numbers
-
-    :param docket_number: Case docket number
-    :return: A stripped down docket number.
-    """
-
-    docket_number = re.sub("Department.*", "", docket_number)
-    docket_number = re.sub("Nos?. ", "", docket_number)
-    return docket_number
-
-
-def clean_body_content(case_body: str, harvard: bool = False) -> str:
-    """Strip all non-alphanumeric characters
-
-    :param case_body: Opinion text
-    :param harvard: Are we harvard xml data
-    :return:Opinion text with only alphanumeric characters
-    """
-    soup = BeautifulSoup(case_body, "lxml")
-    if not harvard:
-        opinion_text = soup.text
-    else:
-        opinions = []
-        for op in soup.find_all(
-            lambda tag: (
-                tag.name == "opinion" and tag.get("data-type") is None
-            )
-            or tag.get("data-type") == "opinion"
-        ):
-            opinions.append(op.text)
-        opinion_text = "".join(
-            [
-                op.text
-                for op in soup.find_all(
-                    lambda tag: (
-                        tag.name == "opinion" and tag.get("data-type") is None
-                    )
-                    or tag.get("data-type") == "opinion"
-                )
-            ]
-        )
-
-    return re.sub(r"[^a-zA-Z0-9 ]", "", opinion_text.lower())
-
-
-def length_too_different(
-    case: OpinionCluster, harvard_characters: str, cl_characters: str
-) -> bool:
-    """Check if length is too different between texts
-
-    :param case: The opinion cluster for the case
-    :param harvard_characters: The Harvard opinion content characters
-    :param cl_characters: The CL opinion content characters
-    :return: Whether the content is too different in length
-    """
-    if len(cl_characters) == 0:
-        logger.info(f"Empty Courtlistener opinion cluster: {case.id}")
-        return True
-
-    diff = len(harvard_characters) / len(cl_characters)
-    if not (0.3 < diff < 3):
-        # Content too dissimilar in length to compare
-        return True
-    return False
-
-
-def content_too_different(
-    case: OpinionCluster,
-    harvard_characters: str,
-    cl_characters: str,
-    docket: str,
-) -> bool:
-    """Is the content too different
-
-    Check the percentage overlap of two blocks of text
-
-    Florida uses some pretty rote language in the ~650 character
-    length that requires a bump in the length for stricter checking.
-
-    This also means the matching threshold has to go for small cases
-    completely so a 98% match in washington is not the
-    same as a 99% match in Florida
-
-    Require a very close match - with name overlap and
-    docket number for very small cases.
-
-    :param case: Opinion cluster for case
-    :param harvard_characters: The Harvard opinion content characters
-    :param cl_characters: The CL opinion content characters
-    :param docket: The Harvard docket number
-    :return: Whether the opinion content is too dissimilar
-    """
-
-    if len(harvard_characters) > 10000:
-        cosine_sim = get_cosine_similarity(harvard_characters, cl_characters)
-        if cosine_sim > 0.97:
-            return False
-        else:
-            return True
-
-    percent_match = compare_documents(harvard_characters, cl_characters)
-    if percent_match < 60:
-        return True
-
-    if len(harvard_characters) > 1000:
-        return False
-
-    if percent_match < 90:
-        return True
-
-    # If a docket number exists: check against it.
-    if case.docket.docket_number is not None:
-        clean_docket = clean_docket_number(docket)
-        if clean_docket not in case.docket.docket_number:
-            return True
-    return False
-
-
-def case_names_dont_overlap(
-    case: OpinionCluster, case_name_full: str, case_name_abbreviation: str
-) -> bool:
-    """Case names not overlap
-
-    Check if the case names have quality overlapping case name words.
-    Excludes 'bad words' and other common words.
-
-    :param case: The case opinion cluster
-    :param case_name_full: The case name full from Harvard
-    :param case_name_abbreviation: The case name abbreviation from Harvard
-    :return: Do the case names share quality overlapping words
-    """
-
-    harvard_case = f"{case_name_full} {case_name_abbreviation}"
-    overlap = winnow_case_name(case.case_name) & winnow_case_name(harvard_case)
-
-    if not overlap:
-        return True
-    return False
-
-
-def cosine_similarity_too_different(
-    case: OpinionCluster, case_name_full: str, case_name_abbreviation: str
-) -> bool:
-    """Cosine similarity comparison between case names
-
-    Checks the cosine similarity between a case in CL and Harvard
-
-    :param case: The case opinion cluster
-    :param case_name_full: The case name full from Harvard
-    :param case_name_abbreviation: The case name abbreviation from Harvard
-    :return: Is the cosine similarity too different
-    """
-
-    similarities = []
-    for title in [case_name_full, case_name_abbreviation]:
-        similarity = get_cosine_similarity(title, case.case_name)
-        similarities.append(similarity)
-    max_similarity = max(similarities)
-
-    if max_similarity < 0.3:
-        return True
-    return False
-
-
-def has_too_similar_citation(case: OpinionCluster, citation: Citation) -> bool:
-    """Has a citation associated with cluster in same volume
-
-    If you make it this far - we should check if this small case has
-    an identical volume reporter citation attached to it already.
-    I think this may help us with the wilder v. state issue of having
-    four identical opinions only differentiated by page number
-
-    :param case: The case opinion cluster
-    :param citation: The citation of a potential matching
-    :return: Whether the citation matches to the reporter and volume.
-    """
-
-    return (
-        Citation.objects.filter(
-            cluster_id=case.id,
-            reporter=citation.corrected_reporter(),
-        )
-        .exclude(
-            page=citation.groups["page"], volume=citation.groups["volume"]
-        )
-        .exists()
-    )
-
-
-def match_based_text(
-    harvard_characters: str,
-    docket_number: str,
-    case_name_full: str,
-    possible_cases: QuerySet,
-    case_name_abbreviation: str,
-    citation: Citation,
-) -> Optional[OpinionCluster]:
-    """Compare CL text to Harvard content to establish duplicates
-
-    :param harvard_characters: Harvard stripped characters to compare
-    :param possible_cases: List of opinions to check against
-    :param docket_number: The docket number
-    :param case_name_full: The full case name
-    :return: OpinionCluster or None
-    """
-    for case in possible_cases:
-        cl_case_body = get_opinion_content(case)
-        cl_characters = clean_body_content(cl_case_body)
-
-        if len(cl_characters) == 0:
-            logger.warning(
-                f"Empty opinion at https://www.courtlistener.com/opinion/{case.id}/{case.slug}"
-            )
-            continue
-
-        case_and_texts = [case, harvard_characters, cl_characters]
-        case_and_texts_and_docket = case_and_texts + [docket_number]
-        case_and_titles = [case, case_name_full, case_name_abbreviation]
-        if (
-            length_too_different(*case_and_texts)
-            or has_too_similar_citation(case, citation)
-            or case_names_dont_overlap(*case_and_titles)
-            or cosine_similarity_too_different(*case_and_titles)
-            or content_too_different(*case_and_texts_and_docket)
-        ):
-            continue
-        return case
-    return None
-
-
 def find_previously_imported_cases(
-    data: Dict[str, Any],
+    data: dict[str, Any],
     court_id: Optional[str],
     date_filed: date,
     harvard_characters: str,
     case_name_full: str,
-    citation: Citation,
+    citation: FullCaseCitation,
 ) -> Optional[OpinionCluster]:
     """Check if opinion is in Courtlistener
+
     :param data: The harvard data
     :param court_id: Court ID
     :param date_filed: The date filed
@@ -1009,84 +692,6 @@ def find_previously_imported_cases(
             citation,
         )
     return match
-
-
-def winnow_case_name(case_name: str) -> Set:
-    """Reduce each case title to a set of words worth comparing
-
-    :param case_name: The name of a case or combination of case names
-    :return: A set of words worth comparing
-    """
-    false_positive_set = {
-        "and",
-        "personal",
-        "restraint",
-        "matter",
-        "washington",
-        "florida",
-        "county",
-        "city",
-        "of",
-        "the",
-        "state",
-        "estate",
-        "in",
-        "inc",
-        "st",
-        "ex",
-        "rel",
-    }
-
-    # strings where order matters
-    false_positive_strings = ["united states"]
-
-    false_positive_strings_regex = re.compile(
-        "|".join(map(re.escape, false_positive_strings))
-    )
-
-    # Fix case name to be cleaner
-    case_name = harmonize(case_name)
-
-    # Join abbreviations/acronyms. e.g. "D.L.M. v. T.J.S." -> "DLM v. TJS"
-    case_name = re.sub(
-        r"\b[a-zA-Z][a-zA-Z\.]*[A-Za-z]\b\.?",
-        lambda m: m.group().replace(".", ""),
-        case_name,
-    )
-
-    # Remove all non-alphanumeric characters
-    case_title = re.sub(r"[^a-z0-9 ]", " ", case_name.lower())
-
-    # Remove strings that can cause an unnecessary overlap
-    case_title = false_positive_strings_regex.sub("", case_title)
-
-    # Remove one-letter words, initials etc.
-    case_title = re.sub(r"\b[^ ]\b", "", case_title)
-
-    if not case_title:
-        # Log case name if the process reduce it to blank
-        logger.warning(f"Case name: {case_name} reduced to blank.")
-
-    # Convert case name to set of words
-    cleaned_set = set(case_title.split())
-
-    # Lastly remove our ever-growing set of false positive words
-    # This is different from bad words, but may have some overlap.
-    return cleaned_set - (cleaned_set & false_positive_set)
-
-
-class MissingDocumentError(Exception):
-    """The document could not be opened or was empty"""
-
-    def __init__(self, message):
-        Exception.__init__(self, message)
-
-
-class ParsingError(Exception):
-    """The document could not be opened or was empty"""
-
-    def __init__(self, message):
-        Exception.__init__(self, message)
 
 
 class Command(VerboseCommand):
