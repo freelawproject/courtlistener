@@ -1385,16 +1385,7 @@ class OpinionDocument(OpinionBaseDocument):
 
     def prepare_local_path(self, instance):
         if instance.local_path:
-            if not instance.local_path.storage.exists(
-                instance.local_path.name
-            ):
-                logger.warning(
-                    f"The file {instance.local_path.name} associated with "
-                    f"Opinion ID {instance.pk} not found in S3. "
-                )
-                return None
-
-            return deepgetattr(self, "local_path.name", None)
+            return instance.local_path.name
 
     def prepare_cites(self, instance):
         return [opinion.pk for opinion in instance.opinions_cited.all()]
