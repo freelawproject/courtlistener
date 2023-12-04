@@ -11,7 +11,6 @@ from cl.custom_filters.templatetags.text_filters import (
     html_decode,
 )
 from cl.lib.command_utils import logger
-from cl.lib.date_time import midnight_pt
 from cl.lib.elasticsearch_utils import build_es_base_query
 from cl.lib.fields import JoinField, PercolatorField
 from cl.lib.utils import deepgetattr
@@ -1282,9 +1281,9 @@ class OpinionBaseDocument(Document):
             datetime_object = datetime.strptime(
                 instance.date_filed, "%Y-%m-%d"
             )
-            return midnight_pt(datetime_object)
+            return datetime_object
 
-        return midnight_pt(instance.date_filed)
+        return instance.date_filed
 
     def prepare_dateArgued(self, instance):
         if instance.docket.date_argued is None:
@@ -1294,9 +1293,9 @@ class OpinionBaseDocument(Document):
             datetime_object = datetime.strptime(
                 instance.docket.date_argued, "%Y-%m-%d"
             )
-            return midnight_pt(datetime_object)
+            return datetime_object
 
-        return midnight_pt(instance.docket.date_argued)
+        return instance.docket.date_argued
 
     def prepare_dateReargued(self, instance):
         if instance.docket.date_reargued is None:
@@ -1306,9 +1305,9 @@ class OpinionBaseDocument(Document):
             datetime_object = datetime.strptime(
                 instance.docket.date_reargued, "%Y-%m-%d"
             )
-            return midnight_pt(datetime_object)
+            return datetime_object
 
-        return midnight_pt(instance.docket.date_reargued)
+        return instance.docket.date_reargued
 
     def prepare_dateReargumentDenied(self, instance):
         if instance.docket.date_reargument_denied is None:
@@ -1318,9 +1317,9 @@ class OpinionBaseDocument(Document):
             datetime_object = datetime.strptime(
                 instance.docket.date_reargument_denied, "%Y-%m-%d"
             )
-            return midnight_pt(datetime_object)
+            return datetime_object
 
-        return midnight_pt(instance.docket.date_reargument_denied)
+        return instance.docket.date_reargument_denied
 
     def prepare_neutralCite(self, instance):
         neutral_citations = instance.citations.filter(type=Citation.NEUTRAL)
@@ -1430,9 +1429,9 @@ class OpinionDocument(OpinionBaseDocument):
             datetime_object = datetime.strptime(
                 instance.cluster.date_filed, "%Y-%m-%d"
             )
-            return midnight_pt(datetime_object)
+            return datetime_object
 
-        return midnight_pt(instance.cluster.date_filed)
+        return instance.cluster.date_filed
 
     def prepare_dateArgued(self, instance):
         if instance.cluster.docket.date_argued is None:
@@ -1442,9 +1441,9 @@ class OpinionDocument(OpinionBaseDocument):
             datetime_object = datetime.strptime(
                 instance.cluster.docket.date_argued, "%Y-%m-%d"
             )
-            return midnight_pt(datetime_object)
+            return datetime_object
 
-        return midnight_pt(instance.cluster.docket.date_argued)
+        return instance.cluster.docket.date_argued
 
     def prepare_dateReargued(self, instance):
         if instance.cluster.docket.date_reargued is None:
@@ -1454,9 +1453,9 @@ class OpinionDocument(OpinionBaseDocument):
             datetime_object = datetime.strptime(
                 instance.cluster.docket.date_reargued, "%Y-%m-%d"
             )
-            return midnight_pt(datetime_object)
+            return datetime_object
 
-        return midnight_pt(instance.cluster.docket.date_reargued)
+        return instance.cluster.docket.date_reargued
 
     def prepare_dateReargumentDenied(self, instance):
         if instance.cluster.docket.date_reargument_denied is None:
@@ -1466,9 +1465,9 @@ class OpinionDocument(OpinionBaseDocument):
             datetime_object = datetime.strptime(
                 instance.cluster.docket.date_reargument_denied, "%Y-%m-%d"
             )
-            return midnight_pt(datetime_object)
+            return datetime_object
 
-        return midnight_pt(instance.cluster.docket.date_reargument_denied)
+        return instance.cluster.docket.date_reargument_denied
 
     def prepare_neutralCite(self, instance):
         neutral_citations = instance.cluster.citations.filter(
