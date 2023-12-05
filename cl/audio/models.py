@@ -63,7 +63,7 @@ class Audio(AbstractDateTimeModel):
     case_name_full = models.TextField(
         help_text="The full name of the case", blank=True
     )
-    panel = models.ManyToManyField(
+    panel = models.ManyToManyField(  # type: ignore[var-annotated]
         Person,
         help_text="The judges that heard the oral arguments",
         related_name="oral_argument_panel_members",
