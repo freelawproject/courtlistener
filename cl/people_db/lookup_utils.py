@@ -11,7 +11,7 @@ from django.utils.html import strip_tags
 from nameparser import HumanName
 from unidecode import unidecode
 
-from cl.corpus_importer.utils import wrap_text
+from cl.lib.utils import wrap_text
 from cl.people_db.models import SUFFIX_LOOKUP, Person
 
 # list of words that aren't judge names

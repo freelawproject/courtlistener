@@ -44,7 +44,6 @@ from requests.exceptions import (
     ReadTimeout,
     RequestException,
 )
-from requests.packages.urllib3.exceptions import ReadTimeoutError
 from rest_framework.renderers import JSONRenderer
 from rest_framework.status import (
     HTTP_400_BAD_REQUEST,
@@ -52,6 +51,7 @@ from rest_framework.status import (
     HTTP_500_INTERNAL_SERVER_ERROR,
     HTTP_504_GATEWAY_TIMEOUT,
 )
+from urllib3.exceptions import ReadTimeoutError
 
 from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
 from cl.audio.models import Audio
@@ -597,7 +597,7 @@ def get_and_process_free_pdf(
             rd.pk, result.pacer_case_id, result.pacer_doc_id, cookies
         )
     except HTTPError as exc:
-        if exc.response.status_code in [
+        if exc.response and exc.response.status_code in [
             HTTP_500_INTERNAL_SERVER_ERROR,
             HTTP_504_GATEWAY_TIMEOUT,
         ]:
@@ -611,10 +611,18 @@ def get_and_process_free_pdf(
                 return None
             logger.info(f"{msg} Retrying.")
             raise self.retry(exc=exc)
-        else:
+        elif exc.response:
             msg = (
                 f"Ran into unknown HTTPError while getting PDF: "
                 f"{exc.response.status_code}. Aborting."
+            )
+            logger.error(msg)
+            self.request.chain = None
+            return None
+        else:
+            msg = (
+                f"Ran into unknown HTTPError while getting PDF: "
+                f"{str(exc)}. Aborting."
             )
             logger.error(msg)
             self.request.chain = None
@@ -806,7 +814,7 @@ def upload_to_ia(
             return None
         raise self.retry(exc=exc)
     except HTTPError as exc:
-        if exc.response.status_code in [
+        if exc.response and exc.response.status_code in [
             HTTP_403_FORBIDDEN,  # Can't access bucket, typically.
             HTTP_400_BAD_REQUEST,  # Corrupt PDF, typically.
         ]:
@@ -1447,7 +1455,7 @@ def get_attachment_page_by_rd(
     try:
         att_report = get_att_report_by_rd(rd, cookies)
     except HTTPError as exc:
-        if exc.response.status_code in [
+        if exc.response and exc.response.status_code in [
             HTTP_500_INTERNAL_SERVER_ERROR,
             HTTP_504_GATEWAY_TIMEOUT,
         ]:
@@ -1455,9 +1463,14 @@ def get_attachment_page_by_rd(
                 "Ran into HTTPError: %s. Retrying.", exc.response.status_code
             )
             raise self.retry(exc)
-        else:
+        elif exc.response:
             msg = "Ran into unknown HTTPError. %s. Aborting."
             logger.error(msg, exc.response.status_code)
+            self.request.chain = None
+            return None
+        else:
+            msg = "Ran into unknown HTTPError. %s. Aborting."
+            logger.error(msg, str(exc))
             self.request.chain = None
             return None
     except requests.RequestException as exc:
@@ -2040,11 +2053,11 @@ def get_pacer_doc_id_with_show_case_doc_url(
         logger.info(f"{msg} Retrying.", rd)
         raise self.retry(exc=exc)
     except HTTPError as exc:
-        status_code = exc.response.status_code
-        if status_code in [
+        if exc.response and exc.response.status_code in [
             HTTP_500_INTERNAL_SERVER_ERROR,
             HTTP_504_GATEWAY_TIMEOUT,
         ]:
+            status_code = exc.response.status_code
             msg = "Got HTTPError with status code %s."
             if last_try:
                 logger.error(f"{msg} Aborting.", status_code)
@@ -2052,9 +2065,14 @@ def get_pacer_doc_id_with_show_case_doc_url(
 
             logger.info(f"{msg} Retrying", status_code)
             raise self.retry(exc)
-        else:
+        elif exc.response:
+            status_code = exc.response.status_code
             msg = "Ran into unknown HTTPError. %s. Aborting."
             logger.error(msg, status_code)
+            return
+        else:
+            msg = "Ran into unknown HTTPError. %s. Aborting."
+            logger.error(msg, str(exc))
             return
     try:
         pacer_doc_id = report.data
