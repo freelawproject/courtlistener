@@ -219,6 +219,9 @@ class Person(AbstractDateTimeModel):
             "fjc_id",
             "date_dob",
             "date_dod",
+            "date_granularity_dob",
+            "date_granularity_dod",
+            "slug",
         ]
     )
     es_rd_field_tracker = FieldTracker(fields=["name_full"])
@@ -965,6 +968,35 @@ class Position(AbstractDateTimeModel):
         "from a data source instead of manually added. See sources "
         "field for more details.",
         default=False,
+    )
+
+    es_p_field_tracker = FieldTracker(
+        fields=[
+            "court_id",
+            "organization_name",
+            "job_title",
+            "position_type",
+            "date_nominated",
+            "date_elected",
+            "date_recess_appointment",
+            "date_referred_to_judicial_committee",
+            "date_judicial_committee_action",
+            "date_hearing",
+            "date_confirmation",
+            "date_start",
+            "date_granularity_start",
+            "date_retirement",
+            "date_termination",
+            "date_granularity_termination",
+            "judicial_committee_action",
+            "nomination_process",
+            "how_selected",
+            "termination_reason",
+            "person_id",
+            "appointer_id",
+            "supervisor_id",
+            "predecessor_id",
+        ]
     )
 
     def __str__(self) -> str:

@@ -3,9 +3,7 @@ from collections.abc import Iterable
 from itertools import chain, islice, tee
 from typing import Any
 from typing import Iterable as IterableType
-from typing import List, Optional, Tuple
-
-from django.db.models import QuerySet
+from typing import Optional, Tuple
 
 
 class _UNSPECIFIED(object):
@@ -104,3 +102,23 @@ def human_sort(
         sorter = lambda item: [convert(c) for c in re.split("([0-9]+)", item)]
 
     return sorted(unordered_list, key=sorter)
+
+
+def wrap_text(length: int, text: str) -> str:
+    """Wrap text to specified length without cutting words
+
+    :param length: max length to wrap
+    :param text: text to wrap
+    :return: text wrapped
+    """
+    words = text.split(" ")
+    if words:
+        lines = [words[0]]
+        for word in words[1:]:
+            if len(lines[-1]) + len(word) < length:
+                lines[-1] += f" {word}"
+            else:
+                lines.append(word)
+                break
+        return " ".join(lines)
+    return ""

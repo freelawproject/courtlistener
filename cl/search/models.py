@@ -72,13 +72,6 @@ class SOURCES:
     INTERNET_ARCHIVE = "A"
     BRAD_HEATH_ARCHIVE = "H"
     COLUMBIA_ARCHIVE = "Z"
-    COLUMBIA_M_COURT = "ZC"
-    COLUMBIA_M_LAWBOX_COURT = "ZLC"
-    COLUMBIA_M_LAWBOX_RESOURCE = "ZLR"
-    COLUMBIA_M_LAWBOX_COURT_RESOURCE = "ZLCR"
-    COLUMBIA_M_RESOURCE = "ZR"
-    COLUMBIA_M_COURT_RESOURCE = "ZCR"
-    COLUMBIA_M_LAWBOX = "ZL"
     HARVARD_CASELAW = "U"
     COURT_M_HARVARD = "CU"
     DIRECT_COURT_INPUT = "D"
@@ -92,7 +85,27 @@ class SOURCES:
     LAWBOX_M_COURT_RESOURCE_M_HARVARD = "LCRU"
     MANUAL_INPUT_M_HARVARD = "MU"
     PUBLIC_RESOURCE_M_HARVARD = "RU"
+    COLUMBIA_M_INTERNET_ARCHIVE = "ZA"
+    COLUMBIA_M_DIRECT_COURT_INPUT = "ZD"
+    COLUMBIA_M_COURT = "ZC"
+    COLUMBIA_M_BRAD_HEATH_ARCHIVE = "ZH"
+    COLUMBIA_M_LAWBOX_COURT = "ZLC"
+    COLUMBIA_M_LAWBOX_RESOURCE = "ZLR"
+    COLUMBIA_M_LAWBOX_COURT_RESOURCE = "ZLCR"
+    COLUMBIA_M_RESOURCE = "ZR"
+    COLUMBIA_M_COURT_RESOURCE = "ZCR"
+    COLUMBIA_M_LAWBOX = "ZL"
+    COLUMBIA_M_MANUAL = "ZM"
+    COLUMBIA_M_ANON_2020 = "ZQ"
     COLUMBIA_ARCHIVE_M_HARVARD = "ZU"
+    COLUMBIA_M_LAWBOX_M_HARVARD = "ZLU"
+    COLUMBIA_M_DIRECT_COURT_INPUT_M_HARVARD = "ZDU"
+    COLUMBIA_M_LAWBOX_M_RESOURCE_M_HARVARD = "ZLRU"
+    COLUMBIA_M_LAWBOX_M_COURT_RESOURCE_M_HARVARD = "ZLCRU"
+    COLUMBIA_M_COURT_M_HARVARD = "ZCU"
+    COLUMBIA_M_MANUAL_INPUT_M_HARVARD = "ZMU"
+    COLUMBIA_M_PUBLIC_RESOURCE_M_HARVARD = "ZRU"
+    COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD = "ZLCU"
     NAMES = (
         (COURT_WEBSITE, "court website"),
         (PUBLIC_RESOURCE, "public.resource.org"),
@@ -105,7 +118,16 @@ class SOURCES:
         (INTERNET_ARCHIVE, "internet archive"),
         (BRAD_HEATH_ARCHIVE, "brad heath archive"),
         (COLUMBIA_ARCHIVE, "columbia archive"),
+        (COLUMBIA_M_INTERNET_ARCHIVE, "columbia merged with internet archive"),
+        (
+            COLUMBIA_M_DIRECT_COURT_INPUT,
+            "columbia merged with direct court input",
+        ),
         (COLUMBIA_M_COURT, "columbia merged with court"),
+        (
+            COLUMBIA_M_BRAD_HEATH_ARCHIVE,
+            "columbia merged with brad heath archive",
+        ),
         (COLUMBIA_M_LAWBOX_COURT, "columbia merged with lawbox and court"),
         (
             COLUMBIA_M_LAWBOX_RESOURCE,
@@ -121,6 +143,8 @@ class SOURCES:
             "columbia merged with court and resource.org",
         ),
         (COLUMBIA_M_LAWBOX, "columbia merged with lawbox"),
+        (COLUMBIA_M_MANUAL, "columbia merged with manual input"),
+        (COLUMBIA_M_ANON_2020, "columbia merged with 2020 anonymous database"),
         (
             HARVARD_CASELAW,
             "Harvard, Library Innovation Lab Case Law Access Project",
@@ -150,6 +174,38 @@ class SOURCES:
         (MANUAL_INPUT_M_HARVARD, "Manual input merged with Harvard"),
         (PUBLIC_RESOURCE_M_HARVARD, "public.resource.org merged with Harvard"),
         (COLUMBIA_ARCHIVE_M_HARVARD, "columbia archive merged with Harvard"),
+        (
+            COLUMBIA_M_LAWBOX_M_HARVARD,
+            "columbia archive merged with Lawbox and Harvard",
+        ),
+        (
+            COLUMBIA_M_DIRECT_COURT_INPUT_M_HARVARD,
+            "columbia archive merged with direct court input and Harvard",
+        ),
+        (
+            COLUMBIA_M_LAWBOX_M_RESOURCE_M_HARVARD,
+            "columbia archive merged with lawbox, public.resource.org and Harvard",
+        ),
+        (
+            COLUMBIA_M_LAWBOX_M_COURT_RESOURCE_M_HARVARD,
+            "columbia archive merged with lawbox, court website, public.resource.org and Harvard",
+        ),
+        (
+            COLUMBIA_M_COURT_M_HARVARD,
+            "columbia archive merged with court website and Harvard",
+        ),
+        (
+            COLUMBIA_M_MANUAL_INPUT_M_HARVARD,
+            "columbia archive merged with manual input and Harvard",
+        ),
+        (
+            COLUMBIA_M_PUBLIC_RESOURCE_M_HARVARD,
+            "columbia archive merged with public.resource.org and Harvard",
+        ),
+        (
+            COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
+            "columbia archive merged with lawbox, court website and Harvard",
+        ),
     )
 
 
@@ -721,6 +777,7 @@ class Docket(AbstractDateTimeModel):
         fields=[
             "docket_number",
             "case_name",
+            "case_name_short",
             "case_name_full",
             "nature_of_suit",
             "cause",
@@ -733,6 +790,7 @@ class Docket(AbstractDateTimeModel):
             "assigned_to_str",
             "referred_to_id",
             "referred_to_str",
+            "slug",
         ]
     )
 
@@ -1323,6 +1381,21 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             "the attachments page."
         ),
         blank=True,
+    )
+
+    es_rd_field_tracker = FieldTracker(
+        fields=[
+            "docket_entry_id",
+            "document_type",
+            "document_number",
+            "description",
+            "pacer_doc_id",
+            "plain_text",
+            "attachment_number",
+            "is_available",
+            "page_count",
+            "filepath_local",
+        ]
     )
 
     class Meta:
@@ -3476,6 +3549,10 @@ class ParentheticalGroup(models.Model):
     )
     size = models.IntegerField(
         help_text="The number of parentheticals that belong to the group"
+    )
+
+    es_pa_field_tracker = FieldTracker(
+        fields=["opinion_id", "representative_id"]
     )
 
     def __str__(self) -> str:

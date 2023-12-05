@@ -1,5 +1,4 @@
 from functools import partial
-from typing import Any
 
 from celery.canvas import chain
 from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist
@@ -17,10 +16,10 @@ from cl.people_db.models import (
     Education,
     Person,
     PoliticalAffiliation,
+    Position,
     School,
 )
 from cl.search.documents import (
-    ES_CHILD_ID,
     AudioDocument,
     DocketDocument,
     ESRECAPDocument,
@@ -28,7 +27,12 @@ from cl.search.documents import (
     PersonDocument,
     PositionDocument,
 )
-from cl.search.models import BankruptcyInformation, Docket
+from cl.search.models import (
+    BankruptcyInformation,
+    Docket,
+    ParentheticalGroup,
+    RECAPDocument,
+)
 from cl.search.tasks import (
     es_save_document,
     remove_document_from_es_index,
@@ -63,7 +67,7 @@ def updated_fields(
         tracked_set = getattr(instance, "es_pa_field_tracker", None)
     elif es_document is ESRECAPDocument or es_document is DocketDocument:
         tracked_set = getattr(instance, "es_rd_field_tracker", None)
-    elif es_document is PositionDocument:
+    elif es_document is PositionDocument or es_document is PersonDocument:
         tracked_set = getattr(instance, "es_p_field_tracker", None)
 
     # Check the set before trying to get the fields
@@ -141,12 +145,35 @@ def update_es_documents(
 
     for query, fields_map in mapping_fields.items():
         fields_to_update = get_fields_to_update(changed_fields, fields_map)
+        if not fields_to_update:
+            # No fields from the current mapping need updating. Omit it.
+            continue
         match instance:
+            case RECAPDocument() | Docket() | ParentheticalGroup() | Audio() | Person() | Position() if mapping_fields.get("self", None):  # type: ignore
+                # Update main document in ES, including fields to be
+                # extracted from a related instance.
+                transaction.on_commit(
+                    partial(
+                        update_es_document.delay,
+                        es_document.__name__,
+                        fields_to_update,
+                        (
+                            compose_app_label(instance),
+                            instance.pk,
+                        ),
+                        (compose_app_label(instance), instance.pk),
+                        fields_map,
+                    )
+                )
             case Person() if es_document is PositionDocument and query == "person":  # type: ignore
                 """
                 This case handles the update of one or more fields that belongs to
                 the parent model(The person model).
                 """
+                # Avoid calling update_children_docs_by_query if the Person
+                # doesn't have any positions or is not a Judge.
+                if not instance.positions.exists() or not instance.is_judge:
+                    continue
                 transaction.on_commit(
                     partial(
                         update_children_docs_by_query.delay,
@@ -156,7 +183,7 @@ def update_es_documents(
                         fields_map,
                     )
                 )
-            case ABARating() | PoliticalAffiliation() | School() if es_document is PositionDocument:  # type: ignore
+            case School() if es_document is PositionDocument:  # type: ignore
                 """
                 This code handles the update of fields that belongs to records associated with
                 the parent document using ForeignKeys.
@@ -166,6 +193,10 @@ def update_es_documents(
                 """
                 related_record = Person.objects.filter(**{query: instance})
                 for person in related_record:
+                    # Avoid calling update_children_docs_by_query if the Person
+                    # doesn't have any positions or is not a Judge.
+                    if not person.positions.exists() or not person.is_judge:
+                        continue
                     transaction.on_commit(
                         partial(
                             update_children_docs_by_query.delay,
@@ -176,6 +207,10 @@ def update_es_documents(
                         )
                     )
             case Docket() if es_document is ESRECAPDocument:  # type: ignore
+                # Avoid calling update_children_docs_by_query if the Docket
+                # doesn't have any docket entries.
+                if not instance.docket_entries.exists():
+                    continue
                 transaction.on_commit(
                     partial(
                         update_children_docs_by_query.delay,
@@ -188,6 +223,10 @@ def update_es_documents(
             case Person() if es_document is ESRECAPDocument:  # type: ignore
                 related_dockets = Docket.objects.filter(**{query: instance})
                 for rel_docket in related_dockets:
+                    # Avoid calling update_children_docs_by_query if the Docket
+                    # doesn't have any docket entries.
+                    if not rel_docket.docket_entries.exists():
+                        continue
                     transaction.on_commit(
                         partial(
                             update_children_docs_by_query.delay,
@@ -296,6 +335,9 @@ def update_reverse_related_documents(
     # Update parent instance
     main_objects = main_model.objects.filter(**{query_string: instance})
     for main_object in main_objects:
+        # Avoid calling update_es_document if the Person is not a Judge.
+        if isinstance(main_object, Person) and not main_object.is_judge:
+            continue
         transaction.on_commit(
             partial(
                 update_es_document.delay,
@@ -312,6 +354,11 @@ def update_reverse_related_documents(
             # bulk update position documents when a reverse related record is created/updated.
             related_record = Person.objects.filter(**{query_string: instance})
             for person in related_record:
+                # Avoid calling update_children_docs_by_query if the Person
+                # doesn't have any positions or is not a Judge.
+                if not person.positions.exists() or not person.is_judge:
+                    continue
+
                 transaction.on_commit(
                     partial(
                         update_children_docs_by_query.delay,
@@ -322,6 +369,10 @@ def update_reverse_related_documents(
                 )
         case BankruptcyInformation() if es_document is DocketDocument:  # type: ignore
             # bulk update RECAP documents when a reverse related record is created/updated.
+            # Avoid calling update_children_docs_by_query if the Docket
+            # doesn't have any entries.
+            if not instance.docket.docket_entries.exists():
+                return
             transaction.on_commit(
                 partial(
                     update_children_docs_by_query.delay,
@@ -365,6 +416,10 @@ def delete_reverse_related_documents(
                     None,
                 )
             )
+            # Avoid calling update_children_docs_by_query if the Person
+            # doesn't have any positions or is not a Judge.
+            if not instance.positions.exists() or not instance.is_judge:
+                return
             # Then update all their child documents (Positions)
             transaction.on_commit(
                 partial(
@@ -388,6 +443,10 @@ def delete_reverse_related_documents(
                     None,
                 )
             )
+            # Avoid calling update_children_docs_by_query if the Docket
+            # doesn't have any entries.
+            if not instance.docket_entries.exists():
+                return
             # Then update all their child documents (RECAPDocuments)
             transaction.on_commit(
                 partial(
@@ -415,9 +474,8 @@ def delete_reverse_related_documents(
                 )
 
 
-def avoid_es_audio_indexing(
+def allow_es_audio_indexing(
     instance: ESModelType,
-    es_document: ESDocumentClassType,
     update_fields: list[str] | None,
 ):
     """Check conditions to abort Elasticsearch indexing for Audio instances.
@@ -425,23 +483,49 @@ def avoid_es_audio_indexing(
     processed yet by process_audio_file.
 
     :param instance: The Audio instance to evaluate for Elasticsearch indexing.
-    :param es_document: The Elasticsearch document class.
     :param update_fields: List of fields being updated, or None.
     :return: True if indexing should be avoided, False otherwise.
     """
 
-    if (
-        type(instance) == Audio
-        and not es_document.exists(instance.pk)
-        and (
-            not update_fields
-            or (update_fields and "processing_complete" not in update_fields)
-        )
+    if type(instance) == Audio and (
+        update_fields and "processing_complete" in update_fields
     ):
-        # Avoid indexing Audio instances that haven't been previously indexed
-        # in ES and for which 'processing_complete' is not present in update_fields.
+        # Allow indexing Audio instances for which 'processing_complete' is
+        # present in update_fields.
         return True
     return False
+
+
+def remove_non_judge_person_and_positions_from_index(
+    instance: Position,
+) -> None:
+    """Remove non-judge person and associated positions from ES index if a
+     Judiciary position is removed.
+
+    :param instance: The Position instance being removed.
+    :return: None
+    """
+    try:
+        if instance.person.is_judge:
+            # The Person is still a Judge, return.
+            return
+
+        person_positions = Position.objects.filter(person_id=instance.person)
+        # Remove all the remaining positions from the index.
+        for position in person_positions:
+            remove_document_from_es_index.delay(
+                PositionDocument.__name__, position.pk
+            )
+
+        # Remove the Person from the index.
+        remove_document_from_es_index.delay(
+            PersonDocument.__name__, instance.person.pk
+        )
+
+    except (Person.DoesNotExist, ValueError):
+        # The Person was removed before the Positions.
+        # Do nothing all the Positions were removed from the index.
+        pass
 
 
 class ESSignalProcessor(object):
@@ -535,23 +619,17 @@ class ESSignalProcessor(object):
             return None
 
         mapping_fields = self.documents_model_mapping["save"][sender]
-        if not created:
-            update_es_documents(
-                self.main_model,
-                self.es_document,
-                instance,
-                created,
-                mapping_fields,
-            )
-        if not mapping_fields:
-            if avoid_es_audio_indexing(
-                instance, self.es_document, update_fields
-            ):
-                # This check is required to avoid indexing and triggering
-                # search alerts for Audio instances whose MP3 files have not
-                # yet been processed by process_audio_file.
-                return None
-
+        if (
+            created
+            and mapping_fields.get("self", None)
+            and type(instance) != Audio
+        ) or (
+            allow_es_audio_indexing(instance, update_fields)
+            and mapping_fields.get("self", None)
+        ):
+            if isinstance(instance, Person) and not instance.is_judge:
+                # Avoid calling es_save_document if the Person is not a Judge.
+                return
             transaction.on_commit(
                 lambda: chain(
                     es_save_document.si(
@@ -563,12 +641,29 @@ class ESSignalProcessor(object):
                     process_percolator_response.s(),
                 ).apply_async()
             )
+            return
+
+        update_es_documents(
+            self.main_model,
+            self.es_document,
+            instance,
+            created,
+            mapping_fields,
+        )
 
     @elasticsearch_enabled
     def handle_delete(self, sender, instance, **kwargs):
         """Receiver function that gets called after an object instance is deleted"""
         remove_document_from_es_index.delay(
             self.es_document.__name__, instance.pk
+        )
+
+        # If a Position is removed and the Person is not a Judge anymore,
+        # remove it from the index with all the other positions.
+        if not isinstance(instance, Position):
+            return
+        transaction.on_commit(
+            partial(remove_non_judge_person_and_positions_from_index, instance)
         )
 
     @elasticsearch_enabled

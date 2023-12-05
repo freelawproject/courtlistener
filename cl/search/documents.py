@@ -117,11 +117,14 @@ class ParentheticalGroupDocument(Document):
 
 
 class AudioDocumentBase(Document):
-    absolute_url = fields.KeywordField(attr="get_absolute_url", index=False)
+    absolute_url = fields.KeywordField(index=False)
     caseName = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            )
         },
         search_analyzer="search_analyzer",
     )
@@ -130,7 +133,9 @@ class AudioDocumentBase(Document):
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(
-                attr="case_name_full", analyzer="english_exact"
+                attr="case_name_full",
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -140,7 +145,9 @@ class AudioDocumentBase(Document):
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(
-                attr="docket.court.full_name", analyzer="english_exact"
+                attr="docket.court.full_name",
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -166,21 +173,30 @@ class AudioDocumentBase(Document):
     dateArgued_text = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
     dateReargued_text = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
     dateReargumentDenied_text = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -189,7 +205,9 @@ class AudioDocumentBase(Document):
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(
-                attr="docket.docket_number", analyzer="english_exact"
+                attr="docket.docket_number",
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -203,7 +221,11 @@ class AudioDocumentBase(Document):
         attr="judges",
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(attr="judges", analyzer="english_exact"),
+            "exact": fields.TextField(
+                attr="judges",
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -217,7 +239,10 @@ class AudioDocumentBase(Document):
     text = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -229,6 +254,9 @@ class AudioDocument(AudioDocumentBase):
     class Django:
         model = Audio
         ignore_signals = True
+
+    def prepare_absolute_url(self, instance):
+        return instance.get_absolute_url()
 
     def prepare_caseName(self, instance):
         return best_case_name(instance)
@@ -339,7 +367,10 @@ class PersonBaseDocument(Document):
     name = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -349,7 +380,10 @@ class PersonBaseDocument(Document):
         fields.TextField(
             analyzer="text_en_splitting_cl",
             fields={
-                "exact": fields.TextField(analyzer="english_exact"),
+                "exact": fields.TextField(
+                    analyzer="english_exact",
+                    search_analyzer="search_analyzer_exact",
+                ),
             },
             search_analyzer="search_analyzer",
             multi=True,
@@ -361,7 +395,8 @@ class PersonBaseDocument(Document):
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(
-                attr="person.dob_city", analyzer="english_exact"
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -369,7 +404,10 @@ class PersonBaseDocument(Document):
     dob_state = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -378,7 +416,10 @@ class PersonBaseDocument(Document):
         fields.TextField(
             analyzer="text_en_splitting_cl",
             fields={
-                "exact": fields.TextField(analyzer="english_exact"),
+                "exact": fields.TextField(
+                    analyzer="english_exact",
+                    search_analyzer="search_analyzer_exact",
+                ),
             },
             search_analyzer="search_analyzer",
             multi=True,
@@ -388,7 +429,10 @@ class PersonBaseDocument(Document):
         fields.TextField(
             analyzer="text_en_splitting_cl",
             fields={
-                "exact": fields.TextField(analyzer="english_exact"),
+                "exact": fields.TextField(
+                    analyzer="english_exact",
+                    search_analyzer="search_analyzer_exact",
+                ),
             },
             search_analyzer="search_analyzer",
             multi=True,
@@ -398,7 +442,10 @@ class PersonBaseDocument(Document):
         fields.TextField(
             analyzer="text_en_splitting_cl",
             fields={
-                "exact": fields.TextField(analyzer="english_exact"),
+                "exact": fields.TextField(
+                    analyzer="english_exact",
+                    search_analyzer="search_analyzer_exact",
+                ),
             },
             search_analyzer="search_analyzer",
             multi=True,
@@ -471,7 +518,9 @@ class PositionDocument(PersonBaseDocument):
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(
-                attr="court.short_name", analyzer="english_exact"
+                attr="court.short_name",
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -481,7 +530,9 @@ class PositionDocument(PersonBaseDocument):
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(
-                attr="court.full_name", analyzer="english_exact"
+                attr="court.full_name",
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -515,6 +566,7 @@ class PositionDocument(PersonBaseDocument):
             "exact": fields.TextField(
                 attr="appointer.person.name_full_reverse",
                 analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -524,7 +576,9 @@ class PositionDocument(PersonBaseDocument):
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(
-                attr="supervisor.name_full_reverse", analyzer="english_exact"
+                attr="supervisor.name_full_reverse",
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -534,7 +588,9 @@ class PositionDocument(PersonBaseDocument):
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(
-                attr="predecessor.name_full_reverse", analyzer="english_exact"
+                attr="predecessor.name_full_reverse",
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -679,10 +735,13 @@ class PersonDocument(PersonBaseDocument):
     )
     date_granularity_dob = fields.KeywordField(attr="date_granularity_dob")
     date_granularity_dod = fields.KeywordField(attr="date_granularity_dod")
-    absolute_url = fields.KeywordField(attr="get_absolute_url")
+    absolute_url = fields.KeywordField()
 
     def prepare_person_child(self, instance):
         return "person"
+
+    def prepare_absolute_url(self, instance):
+        return instance.get_absolute_url()
 
 
 # RECAP
@@ -695,7 +754,10 @@ class DocketBaseDocument(Document):
     caseName = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -706,6 +768,7 @@ class DocketBaseDocument(Document):
             "exact": fields.TextField(
                 attr="case_name_full",
                 analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -717,6 +780,7 @@ class DocketBaseDocument(Document):
             "exact": fields.TextField(
                 attr="docket_number",
                 analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -728,6 +792,7 @@ class DocketBaseDocument(Document):
             "exact": fields.TextField(
                 attr="nature_of_suit",
                 analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -736,7 +801,11 @@ class DocketBaseDocument(Document):
         attr="cause",
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(attr="cause", analyzer="english_exact"),
+            "exact": fields.TextField(
+                attr="cause",
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -747,6 +816,7 @@ class DocketBaseDocument(Document):
             "exact": fields.TextField(
                 attr="jury_demand",
                 analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -758,6 +828,7 @@ class DocketBaseDocument(Document):
             "exact": fields.TextField(
                 attr="jurisdiction_type",
                 analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -768,7 +839,10 @@ class DocketBaseDocument(Document):
     assignedTo = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -776,7 +850,10 @@ class DocketBaseDocument(Document):
     referredTo = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -788,6 +865,7 @@ class DocketBaseDocument(Document):
             "exact": fields.TextField(
                 attr="court.full_name",
                 analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -812,6 +890,7 @@ class DocketBaseDocument(Document):
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -834,7 +913,9 @@ class ESRECAPDocument(DocketBaseDocument):
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(
-                attr="docket_entry.description", analyzer="english_exact"
+                attr="docket_entry.description",
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -846,7 +927,9 @@ class ESRECAPDocument(DocketBaseDocument):
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(
-                attr="description", analyzer="english_exact"
+                attr="description",
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -854,7 +937,10 @@ class ESRECAPDocument(DocketBaseDocument):
     document_type = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -863,7 +949,10 @@ class ESRECAPDocument(DocketBaseDocument):
     plain_text = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -982,7 +1071,10 @@ class DocketDocument(DocketBaseDocument):
         fields.TextField(
             analyzer="text_en_splitting_cl",
             fields={
-                "exact": fields.TextField(analyzer="english_exact"),
+                "exact": fields.TextField(
+                    analyzer="english_exact",
+                    search_analyzer="search_analyzer_exact",
+                ),
             },
             search_analyzer="search_analyzer",
             multi=True,
@@ -993,7 +1085,10 @@ class DocketDocument(DocketBaseDocument):
         fields.TextField(
             analyzer="text_en_splitting_cl",
             fields={
-                "exact": fields.TextField(analyzer="english_exact"),
+                "exact": fields.TextField(
+                    analyzer="english_exact",
+                    search_analyzer="search_analyzer_exact",
+                ),
             },
             search_analyzer="search_analyzer",
             multi=True,
@@ -1004,7 +1099,10 @@ class DocketDocument(DocketBaseDocument):
         fields.TextField(
             analyzer="text_en_splitting_cl",
             fields={
-                "exact": fields.TextField(analyzer="english_exact"),
+                "exact": fields.TextField(
+                    analyzer="english_exact",
+                    search_analyzer="search_analyzer_exact",
+                ),
             },
             search_analyzer="search_analyzer",
             multi=True,
