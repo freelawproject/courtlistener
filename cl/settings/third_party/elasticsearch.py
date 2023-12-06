@@ -28,7 +28,7 @@ else:
 ELASTICSEARCH_DSL_HOST = env(
     "ELASTICSEARCH_DSL_HOST",
     default=[
-        "cl-es:9200",
+        "https://cl-es:9200",
     ],
 )
 ELASTICSEARCH_USER = env(
@@ -48,7 +48,6 @@ ELASTICSEARCH_DSL = {
     "default": {
         "hosts": ELASTICSEARCH_DSL_HOST,
         "http_auth": (ELASTICSEARCH_USER, ELASTICSEARCH_PASSWORD),
-        "use_ssl": True,
         "verify_certs": False,
         "ca_certs": ELASTICSEARCH_CA_CERT,
         "timeout": ELASTICSEARCH_TIMEOUT,
