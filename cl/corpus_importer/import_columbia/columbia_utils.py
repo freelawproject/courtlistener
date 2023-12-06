@@ -5,9 +5,13 @@ from typing import Any, Optional
 
 import dateutil.parser as dparser
 from bs4 import BeautifulSoup, NavigableString, Tag
+from eyecite import get_citations
+from eyecite.models import FullCaseCitation
 from juriscraper.lib.string_utils import clean_string, harmonize, titlecase
 
+from cl.lib.command_utils import logger
 from cl.people_db.lookup_utils import extract_judge_last_name
+from cl.search.models import Citation
 
 FILED_TAGS = [
     "filed",
@@ -766,3 +770,40 @@ def map_opinion_types(opinions=None) -> None:
             op["type"] = "040dissent"
         elif op_type and op_type == "concurrence":
             op["type"] = "030concurrence"
+
+
+def validate_citations(cites: list[str], cluster_id: int) -> list:
+    """Get valid citations
+
+    :param cites: citation list
+    :param cluster_id: cluster id related to citations
+    :return: list with valid citations
+    """
+
+    valid_citations = []
+
+    for cite in cites:
+        clean_cite = re.sub(r"\s+", " ", cite)
+        citation = get_citations(clean_cite)
+        if (
+            not citation
+            or not isinstance(citation[0], FullCaseCitation)
+            or not citation[0].groups.get("volume", False)
+        ):
+            logger.warning(f"Citation parsing failed for {clean_cite}")
+            continue
+
+        if Citation.objects.filter(
+            cluster_id=cluster_id, reporter=citation[0].corrected_reporter()
+        ).exists():
+            # Avoid adding a citation if we already have a citation from the
+            # citation's reporter
+            logger.info(
+                f"Cluster id: {cluster_id} - Reporter's citation already exist in "
+                f"cluster: {cite}"
+            )
+            continue
+
+        valid_citations.append(cite)
+
+    return valid_citations

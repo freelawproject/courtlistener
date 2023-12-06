@@ -39,6 +39,7 @@ from cl.corpus_importer.import_columbia.columbia_utils import (
     map_opinion_types,
     process_extracted_opinions,
     read_xml_to_soup,
+    validate_citations,
 )
 from cl.corpus_importer.utils import (
     AuthorException,
@@ -479,6 +480,10 @@ def process_cluster(
             "date_reargument_denied",
         ]
     }
+
+    columbia_data["citations"] = validate_citations(
+        columbia_data["citations"], cluster_id
+    )
 
     try:
         with transaction.atomic():
