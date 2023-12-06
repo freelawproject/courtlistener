@@ -85,7 +85,7 @@ def process_lexis_data(data: DataFrame | TextFileReader, debug: bool) -> None:
                     )
                 else:
                     # +1 to indicate row considering the header
-                    logger.info(f"Invalid data in row: {index + 1}")
+                    logger.info(f"Insufficient data in row: {index + 1}")
 
         else:
             if (
@@ -105,7 +105,7 @@ def process_lexis_data(data: DataFrame | TextFileReader, debug: bool) -> None:
                 )
             else:
                 # +1 to indicate row considering the header
-                logger.info(f"Invalid data in row: {index + 1}")
+                logger.info(f"Insufficient data in row: {index + 1}")
 
 
 class Command(BaseCommand):
@@ -124,7 +124,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--csv",
             required=True,
-            help="Absolute path to the CSV containing the citations to add.",
+            help="Absolute path to a single CSV file containing the citations to add.",
         )
         parser.add_argument(
             "--csv-dir",

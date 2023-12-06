@@ -44,8 +44,15 @@ def prepare_citation(citation: str) -> Union[List[FullCaseCitation], list]:
     """
     clean_cite = re.sub(r"\s+", " ", citation)
     citations = get_citations(clean_cite)
+
+    # There are some unsupported volume numbers in citations like "90-1 U.S.Tax Cas.
+    # (CCH) P60,005". Volume field is defined as SmallIntegerField.
     citations = [
-        cite for cite in citations if isinstance(cite, FullCaseCitation)
+        cite
+        for cite in citations
+        if isinstance(cite, FullCaseCitation)
+        and cite.groups["volume"]
+        and cite.groups["volume"].isdigit()
     ]
     return citations
 
@@ -193,7 +200,11 @@ def add_stub_case(
         found_court = find_court(court_name, bankruptcy=True)
 
     if len(found_court) >= 1:
-        court = Court.objects.get(pk=found_court[0])
+        try:
+            court = Court.objects.get(pk=found_court[0])
+        except Court.DoesNotExist:
+            logger.info(f"Court doesn't exist in database: {found_court[0]}")
+            return
     else:
         logger.info(f"Couldn't find court: {court_name}")
         return
@@ -209,6 +220,8 @@ def add_stub_case(
                 case_name = harmonize(case_name)
                 case_name_short = cnt.make_case_name_short(case_name)
 
+                # TODO change with cluster stub model
+                # TODO point citations to cluster stub object
                 docket = Docket.objects.create(
                     source=0,
                     court=court,
@@ -229,7 +242,6 @@ def add_stub_case(
                     precedential_status="Unknown",
                 )
 
-                # By default, add to solr to make it searchable
                 Opinion.objects.create(
                     cluster=cluster,
                     type="Lead Opinion",
