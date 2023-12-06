@@ -43,7 +43,7 @@ ELASTICSEARCH_CA_CERT = env(
     "ELASTICSEARCH_CA_CERT",
     default="/opt/courtlistener/docker/elastic/ca.crt",
 )
-ELASTICSEARCH_TIMEOUT = env("ELASTICSEARCH_TIMEOUT", default=30)
+ELASTICSEARCH_TIMEOUT = env("ELASTICSEARCH_TIMEOUT", default=120)
 ELASTICSEARCH_DSL = {
     "default": {
         "hosts": ELASTICSEARCH_DSL_HOST,
