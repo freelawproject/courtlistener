@@ -91,7 +91,11 @@ def process_westlaw_data(
             # Add stub case if possible
             if case_name and valid_citations and court and date_filed:
                 add_stub_case(
-                    valid_citations, court, case_name, date_filed, debug
+                    valid_citations=valid_citations,
+                    court_str=court,
+                    case_name=case_name,
+                    date_filed=date_filed,
+                    debug=debug,
                 )
             else:
                 # +1 to indicate row considering the header
