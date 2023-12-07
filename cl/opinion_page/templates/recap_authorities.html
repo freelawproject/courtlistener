@@ -1,6 +1,5 @@
 {% extends "recap_document.html" %}
 {% load humanize %}
-{% load text_filters %}
 
 {% block nav-pdf %}{% endblock %}
 {% block content-pdf %}{% endblock %}
@@ -9,29 +8,10 @@
 {% block tab-content %}
   <div role="tabpanel" class="tab-pane active" id="text">
     <div id="authorities">
-      <h3>This {{authorities_context.doc_type}} cites {{ authorities_context.total_authorities_count|intcomma }} opinion{{ authorities_context.total_authorities_count|pluralize }}.</h3>
+      <h3>This {{authorities_context.doc_type}} cites {{ authorities_context.total_authorities_count|intcomma }} opinion{{ authorities_context.total_authorities_count|pluralize }}</h3>
       <hr>
       {# Westlaw's metadata organization: Checkbox, Treatment, Name + citation + summary, Date, Type, Depth #}
-      <ul>
-          {% for authority in authorities_context.full_list_authorities %}
-              <li>
-                  {{ authority.depth }} reference{{ authority.depth|pluralize }} to
-                  <a href="{{ authority.cited_opinion.cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}"
-                      {% if authority.blocked %}rel="nofollow"{% endif %}>
-                      {{ authority.cited_opinion.cluster.caption|safe|v_wrapper }}
-                  </a>
-                  <br/>
-                  <span class="bullet-tail">{{ authority.cited_opinion.cluster.docket.court }}</span>
-                  <span class="bullet-tail">{{ authority.cited_opinion.cluster.date_filed }}</span>
-                  {% if authority.cited_opinion.cluster.citation_count > 1 %}
-                      Also cited by <a href="/?q=cites%3A({{ authority.cited_opinion.cluster.sub_opinions.all|OR_join }})"
-                                        rel="nofollow">{{ authority.cited_opinion.cluster.citation_count|add:"-1" }} other opinion{{ authority.cited_opinion.cluster.citation_count|add:"-1"|pluralize }}</a>
-                  {% else %}
-                      Cited by 0 other opinions
-                  {% endif %}
-              </li>
-          {% endfor %}
-      </ul>
+      {% include 'includes/authorities_list.html' with authorities=authorities_context.full_list_authorities %}
     </div>
   </div>
 
