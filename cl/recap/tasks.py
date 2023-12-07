@@ -1115,7 +1115,6 @@ async def process_recap_acms_docket(pk):
         return None
 
     if process.current_process().daemon:
-        # yyy
         data = parse_acms_json(map_cl_to_pacer_id(pq.court_id), text)
     else:
         with concurrent.futures.ProcessPoolExecutor() as pool:
@@ -1153,8 +1152,6 @@ async def process_recap_acms_docket(pk):
         d.originating_court_information = og_info
     await d.asave()
 
-    # Add the JSON to the docket in case we need it someday.
-    # xxx PacerHtmlFiles is ok for JSON?
     pacer_file = await PacerHtmlFiles.objects.acreate(
         content_object=d, upload_type=UPLOAD_TYPE.APPELLATE_DOCKET
     )
