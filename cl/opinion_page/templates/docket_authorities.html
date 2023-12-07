@@ -27,12 +27,6 @@ non-profit dedicated to creating high quality open legal information.{% endblock
         <br />
         <span class="bullet-tail">{{ authority.cited_opinion.cluster.docket.court }}</span>
         <span class="bullet-tail">{{ authority.cited_opinion.cluster.date_filed }}</span>
-        {% if authority.cited_opinion.cluster.citation_count > 1 %}
-        Also cited by <a href="/?q=cites%3A({{ authority.cited_opinion.cluster.sub_opinions.all|OR_join }})"
-          rel="nofollow">{{authority.cited_opinion.cluster.citation_count|add:"-1" }} other opinion{{authority.cited_opinion.cluster.citation_count|add:"-1"|pluralize }}</a>
-        {% else %}
-        Cited by 0 other opinions
-        {% endif %}
       </li>
       {% endfor %}
     </ul>
