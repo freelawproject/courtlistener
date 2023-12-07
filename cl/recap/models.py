@@ -228,9 +228,6 @@ class ProcessingQueue(AbstractDateTimeModel):
         permissions = (
             ("has_recap_upload_access", "Can upload documents to RECAP."),
         )
-        indexes = [
-            models.Index(fields=["acms_document_guid"]),
-        ]
 
     @property
     def file_contents(self) -> str:
