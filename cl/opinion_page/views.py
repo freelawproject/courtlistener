@@ -487,32 +487,6 @@ def view_recap_document(
 
     # Override the og:url if we're serving a request to an OG crawler bot
     og_file_path_override = f"/{rd.filepath_local}" if is_og_bot else None
-    if rd.attachment_number:
-        view_authorities_url = reverse(
-            "view_attachment_authorities",
-            args=[
-                rd.docket_entry.docket_id,
-                rd.document_number,
-                rd.attachment_number,
-                rd.docket_entry.docket.slug,
-            ],
-        )
-    else:
-        view_authorities_url = reverse(
-            "view_document_authorities",
-            args=[
-                rd.docket_entry.docket_id,
-                rd.document_number,
-                rd.docket_entry.docket.slug,
-            ],
-        )
-    authorities_context: AuthoritiesContext = AuthoritiesContext(
-        citation_record=rd,
-        query_string=request.META["QUERY_STRING"],
-        total_authorities_count=rd.authority_count,
-        view_all_url=view_authorities_url,
-        doc_type="document",
-    )
 
     return TemplateResponse(
         request,
@@ -527,7 +501,7 @@ def view_recap_document(
                 rd.docket_entry.docket.court_id, "US/Eastern"
             ),
             "redirect_to_pacer_modal": redirect_to_pacer_modal,
-            "authorities_context": authorities_context,
+            "authorities": rd.cited_opinions.exists(),
         },
     )
 

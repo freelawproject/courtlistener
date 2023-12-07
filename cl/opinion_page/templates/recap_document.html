@@ -100,9 +100,9 @@
                  aria-controls="profile"
                  role="tab"
                  data-toggle="tab">Text</a></li>
-          {% if authorities_context.total_authorities_count %}
+          {% if authorities %}
             <li class="{% block nav-authorities %}inactive{% endblock %}" role="presentation">
-              <a href="{{ authorities_context.view_all_url }}">
+              <a href="{{ rd.get_authorities_url }}">
                 Authorities
               </a>
             </li>
