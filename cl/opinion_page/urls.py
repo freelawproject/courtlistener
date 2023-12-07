@@ -85,7 +85,7 @@ urlpatterns = [
         name="view_recap_document",
     ),
     path(
-        "docket/<int:docket_id>/<str:doc_num>/<blank-slug:slug>//authorities/",
+        "docket/<int:docket_id>/<str:doc_num>/<blank-slug:slug>/authorities/",
         view_recap_authorities,
         name="view_document_authorities",
     ),
