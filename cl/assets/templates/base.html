@@ -210,8 +210,13 @@
                            tabindex="206"><i class="fa fa-money gray fa-fw"></i>&nbsp;Donations</a></li>
                     <li><a href="{% url "view_settings" %}"
                            tabindex="207"><i class="fa fa-user gray fa-fw"></i>&nbsp;Account</a></li>
-                    <li><a href="/sign-out/"
-                           tabindex="208"><i class="fa fa-sign-out gray fa-fw"></i>&nbsp;Sign out</a></li>
+                    <li>
+                      <form id="logout-form" method="post" action="/sign-out/">
+                        {% csrf_token %}
+                        <i class="fa fa-sign-out gray fa-fw"></i>
+                        <button type="submit" class="btn btn-link" tabindex="208">&nbsp;Sign out</button>
+                      </form>
+                    </li>
                   </ul>
                 </li>
               </ul>
