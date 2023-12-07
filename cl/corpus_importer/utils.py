@@ -633,6 +633,13 @@ def add_citations_to_cluster(cites: list[str], cluster_id: int) -> None:
             cite_type_str = citation[0].all_editions[0].reporter.cite_type
             reporter_type = map_reporter_db_cite_type(cite_type_str)
 
+        if Citation.objects.filter(
+            cluster_id=cluster_id, reporter=citation[0].corrected_reporter()
+        ).exists():
+            # Avoid adding a citation if we already have a citation from the
+            # citation's reporter
+            continue
+
         try:
             o, created = Citation.objects.get_or_create(
                 volume=citation[0].groups["volume"],
