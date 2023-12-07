@@ -94,7 +94,7 @@ numpy = "^1.26.2"
 datasketch = "^1.6.0"
 PyStemmer = "^2.2.0.1"
 factory-boy = "^3.3.0"
-django-elasticsearch-dsl = "^7.4"
+django-elasticsearch-dsl = "^8.0"
 django-override-storage = "^0.3.2"
 django-ses = {extras = ["events"], version = "^3.5.2"}
 django-environ = "^0.11.2"
