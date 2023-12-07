@@ -1355,7 +1355,6 @@ class AbstractPacerDocument(models.Model):
         help_text="The ID of the document in PACER.",
         max_length=64,  # Increased to support storing docketEntryId from ACMS.
         blank=True,
-        db_index=True,
     )
     is_available = models.BooleanField(
         help_text="True if the item is available in RECAP",
@@ -1454,7 +1453,6 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
                 fields=["filepath_local"],
                 name="search_recapdocument_filepath_local_7dc6b0e53ccf753_uniq",
             ),
-            models.Index(fields=["acms_document_guid"]),
         ]
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
 
