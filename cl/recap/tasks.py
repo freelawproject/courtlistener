@@ -1153,10 +1153,10 @@ async def process_recap_acms_docket(pk):
     await d.asave()
 
     pacer_file = await PacerHtmlFiles.objects.acreate(
-        content_object=d, upload_type=UPLOAD_TYPE.APPELLATE_DOCKET
+        content_object=d, upload_type=UPLOAD_TYPE.ACMS_DOCKET_JSON
     )
     await sync_to_async(pacer_file.filepath.save)(
-        "docket.html",  # We only care about the ext w/S3PrivateUUIDStorageTest
+        "docket.json",  # We only care about the ext w/S3PrivateUUIDStorageTest
         ContentFile(text.encode()),
     )
 
