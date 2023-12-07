@@ -1441,6 +1441,28 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
                 },
             )
 
+    def get_authorities_url(self) -> str:
+        if self.document_type == self.ATTACHMENT:
+            return reverse(
+                "view_attachment_authorities",
+                kwargs={
+                    "docket_id": self.docket_entry.docket.pk,
+                    "doc_num": self.document_number,
+                    "att_num": self.attachment_number,
+                    "slug": self.docket_entry.docket.slug,
+                },
+            )
+        else:
+            return reverse(
+                "view_document_authorities",
+                kwargs={
+                    "docket_id": self.docket_entry.docket.pk,
+                    "doc_num": self.document_number,
+                    "att_num": self.attachment_number,
+                    "slug": self.docket_entry.docket.slug,
+                },
+            )
+
     @property
     def pacer_url(self) -> str | None:
         """Construct a doc1 URL for any item, if we can. Else, return None."""
