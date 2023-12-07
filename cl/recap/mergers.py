@@ -602,12 +602,30 @@ async def merge_unnumbered_docket_entries(
 def add_create_docket_entry_transaction(d, docket_entry):
     with transaction.atomic():
         Docket.objects.select_for_update().get(pk=d.pk)
+        pacer_seq_no = docket_entry.get("pacer_seq_no")
+        params = {
+            "docket": d,
+            "entry_number": docket_entry["document_number"],
+        }
+        if pacer_seq_no is not None:
+            params["pacer_sequence_number"] = pacer_seq_no
+        null_de_queryset = DocketEntry.objects.filter(
+            docket=d,
+            entry_number=docket_entry["document_number"],
+            pacer_sequence_number__isnull=True,
+        )
         try:
-            de, de_created = DocketEntry.objects.get_or_create(
-                docket=d, entry_number=docket_entry["document_number"]
-            )
+            de = DocketEntry.objects.get(**params)
+            de_created = False
+        except DocketEntry.DoesNotExist:
+            if pacer_seq_no is not None and null_de_queryset.exists():
+                de = null_de_queryset.latest("date_created")
+                null_de_queryset.exclude(pk=de.pk).delete()
+                de_created = False
+            else:
+                de = DocketEntry.objects.create(**params)
+                de_created = True
         except DocketEntry.MultipleObjectsReturned:
-            pacer_seq_no = docket_entry.get("pacer_seq_no")
             if pacer_seq_no is None:
                 logger.error(
                     "Multiple docket entries found for document "
@@ -617,11 +635,6 @@ def add_create_docket_entry_transaction(d, docket_entry):
                 )
                 return None
 
-            null_de_queryset = DocketEntry.objects.filter(
-                docket=d,
-                entry_number=docket_entry["document_number"],
-                pacer_sequence_number__isnull=True,
-            )
             try:
                 de = DocketEntry.objects.get(
                     docket=d,
