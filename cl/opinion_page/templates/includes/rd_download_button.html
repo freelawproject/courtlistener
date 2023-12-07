@@ -51,7 +51,7 @@
         <a href="{{ rd.pacer_url }}"
           {% if '-' in rd.pacer_doc_id %}
             data-toggle="modal" data-target="#modal-buy-acms"
-            class="disabled open_buy_acms_modal btn btn-primary"
+            class="disabled open_buy_acms_modal cursor btn btn-primary"
             style="pointer-events: all;"
           {% elif not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
             data-toggle="modal" data-target="#modal-buy-pacer"
