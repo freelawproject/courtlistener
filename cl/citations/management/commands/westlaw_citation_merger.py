@@ -1,5 +1,6 @@
 import os.path
 from glob import glob
+from typing import Optional
 
 from django.core.management import BaseCommand
 from juriscraper.lib.string_utils import CaseNameTweaker
@@ -36,16 +37,35 @@ def extract_valid_citations(citations) -> list:
 
 
 def process_westlaw_data(
-    data: DataFrame | TextFileReader, debug: bool
+    data: DataFrame | TextFileReader,
+    debug: bool,
+    limit: int,
+    start_row: Optional[int] = None,
+    end_row: Optional[int] = None,
 ) -> None:
     """
     Process citations from csv file
 
     :param data: rows from csv file
     :param debug: if true don't save changes
+    :param limit: limit number of rows to process
+    :param start_row: start row
+    :param end_row: end row
     :return: None
     """
+    start = False if start_row else True
+    end = False
+    total_processed = 0
+
     for index, row in data.iterrows():
+        if not start and start_row == index:
+            start = True
+        if not start:
+            continue
+
+        if end_row is not None and (end_row == index):
+            end = True
+
         case_name = row.get("Title")
         citation = row.get("Citation")
         parallel_citation = row.get("Parallel Cite")
@@ -85,7 +105,7 @@ def process_westlaw_data(
                     )
                 else:
                     # +1 to indicate row considering the header
-                    logger.info(f"Invalid data in row: {index + 1}")
+                    logger.info(f"Invalid data in row: {index}")
 
         else:
             # Add stub case if possible
@@ -99,7 +119,15 @@ def process_westlaw_data(
                 )
             else:
                 # +1 to indicate row considering the header
-                logger.info(f"Invalid data in row: {index + 1}")
+                logger.info(f"Invalid data in row: {index}")
+
+        total_processed += 1
+        if limit and total_processed >= limit:
+            logger.info(f"Finished {limit} rows")
+            return
+
+        if end:
+            return
 
 
 class Command(BaseCommand):
@@ -125,7 +153,24 @@ class Command(BaseCommand):
             type=str,
             help="The base path where to find the CSV files to process. It can be a "
             "mounted directory.",
-            default="/opt/courtlistener/cl/assets/media/westlaw",
+        )
+        parser.add_argument(
+            "--start-row",
+            type=int,
+            help="Start row (inclusive). It only applies when you pass a single csv "
+            "file.",
+        )
+        parser.add_argument(
+            "--end-row",
+            type=int,
+            help="End row (inclusive). It only applies when you pass single csv file.",
+        )
+        parser.add_argument(
+            "--limit",
+            default=10000,
+            type=int,
+            help="Limit number of rows to process.",
+            required=False,
         )
 
     def handle(self, *args, **options):
@@ -133,12 +178,28 @@ class Command(BaseCommand):
         if options["csv_dir"]:
             files.extend(glob(os.path.join(options["csv_dir"], "*.csv")))
             files = human_sort(files, key=None)
-            print(f"Files found: {len(files)}")
-
-        if options["csv"]:
-            files.append(options["csv"])
+            print(f"Files found in --csv-dir: {len(files)}")
 
         for file in files:
             data = load_citations_file(file)
             if not data.empty:
-                process_westlaw_data(data, options["debug"])
+                process_westlaw_data(data, options["debug"], options["limit"])
+
+        if options["csv"]:
+            if (
+                options["start_row"] is not None
+                and options["end_row"] is not None
+            ):
+                if options["start_row"] > options["end_row"]:
+                    print("--start-row can't be greater than --end-row")
+                    return
+
+            data = load_citations_file(options["csv"])
+            if not data.empty:
+                process_westlaw_data(
+                    data,
+                    options["debug"],
+                    options["limit"],
+                    options["start_row"],
+                    options["end_row"],
+                )

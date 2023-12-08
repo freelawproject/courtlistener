@@ -1683,7 +1683,7 @@ class WestlawCitationMergerTest(TestCase):
         )
 
         # Call process to add citations using test data
-        process_westlaw_data(df, False)
+        process_westlaw_data(df, False, limit=10000)
 
         # Check that target cluster now have two citations
         self.assertEqual(
@@ -1778,7 +1778,7 @@ class WestlawCitationMergerTest(TestCase):
         )
 
         # Call process to add citations using test data
-        process_westlaw_data(df, False)
+        process_westlaw_data(df, False, limit=1000)
 
         # Check that target cluster now have two citations
         self.assertEqual(

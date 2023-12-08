@@ -51,8 +51,8 @@ def prepare_citation(citation: str) -> Union[List[FullCaseCitation], list]:
         cite
         for cite in citations
         if isinstance(cite, FullCaseCitation)
-        and cite.groups["volume"]
-        and cite.groups["volume"].isdigit()
+        and cite.groups.get("volume")
+        and cite.groups.get("volume").isdigit()
     ]
     return citations
 
