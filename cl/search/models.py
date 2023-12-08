@@ -1495,7 +1495,6 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
                 kwargs={
                     "docket_id": self.docket_entry.docket.pk,
                     "doc_num": self.document_number,
-                    "att_num": self.attachment_number,
                     "slug": self.docket_entry.docket.slug,
                 },
             )
