@@ -320,7 +320,7 @@ async def update_docket_metadata(
         d.court_id,
         docket_data.get("date_filed"),
     )
-    d.assigned_to_str = docket_data.get("assigned_to_str") or ""
+    d.assigned_to_str = docket_data.get("assigned_to_str") or d.assigned_to_str
     await lookup_judge_by_full_name_and_set_attr(
         d,
         "referred_to",
@@ -328,7 +328,7 @@ async def update_docket_metadata(
         d.court_id,
         docket_data.get("date_filed"),
     )
-    d.referred_to_str = docket_data.get("referred_to_str") or ""
+    d.referred_to_str = docket_data.get("referred_to_str") or d.referred_to_str
     d.blocked, d.date_blocked = await get_blocked_status(d)
 
     return d
