@@ -69,13 +69,12 @@ class BaseSeleniumTest(
         )
 
         if settings.DOCKER_SELENIUM_HOST:
-            capabilities = options.to_capabilities()
             return webdriver.Remote(
                 settings.DOCKER_SELENIUM_HOST,
-                desired_capabilities=capabilities,
+                options=options,
                 keep_alive=True,
             )
-        return webdriver.Chrome(chrome_options=options, keep_alive=True)
+        return webdriver.Chrome(options=options, keep_alive=True)
 
     @classmethod
     def setUpClass(cls) -> None:
