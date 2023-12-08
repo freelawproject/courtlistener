@@ -8,11 +8,12 @@
 {% block tab-content %}
   <div role="tabpanel" class="tab-pane active" id="text">
     <div id="authorities">
-      <h3>This {{authorities_context.doc_type}} cites {{ authorities_context.total_authorities_count|intcomma }} opinion{{ authorities_context.total_authorities_count|pluralize }}</h3>
+      {% with authorities_count=rd.authority_count %}
+        <h3>This document cites {{ authorities_count|intcomma }} opinion{{ authorities_count|pluralize }}</h3>
+      {% endwith %}
       <hr>
       {# Westlaw's metadata organization: Checkbox, Treatment, Name + citation + summary, Date, Type, Depth #}
-      {% include 'includes/authorities_list.html' with authorities=authorities_context.full_list_authorities %}
+      {% include 'includes/authorities_list.html' with authorities=authorities %}
     </div>
   </div>
-
 {% endblock %}
