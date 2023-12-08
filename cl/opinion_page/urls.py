@@ -7,6 +7,7 @@ from cl.opinion_page.views import (
     cluster_visualizations,
     court_homepage,
     court_publish_page,
+    docket_authorities,
     docket_idb_data,
     redirect_docket_recap,
     redirect_og_lookup,
@@ -15,6 +16,7 @@ from cl.opinion_page.views import (
     view_docket_feed,
     view_opinion,
     view_parties,
+    view_recap_authorities,
     view_recap_document,
     view_summaries,
 )
@@ -73,14 +75,29 @@ urlpatterns = [
         name="docket_idb_data",
     ),
     path(
+        "docket/<int:docket_id>/authorities/<blank-slug:slug>/",
+        docket_authorities,
+        name="docket_authorities",
+    ),
+    path(
         "docket/<int:docket_id>/<str:doc_num>/<blank-slug:slug>/",
         view_recap_document,
         name="view_recap_document",
     ),
     path(
+        "docket/<int:docket_id>/<str:doc_num>/<blank-slug:slug>/authorities/",
+        view_recap_authorities,
+        name="view_document_authorities",
+    ),
+    path(
         "docket/<int:docket_id>/<str:doc_num>/<int:att_num>/<blank-slug:slug>/",
         view_recap_document,
         name="view_recap_attachment",
+    ),
+    path(
+        "docket/<int:docket_id>/<str:doc_num>/<int:att_num>/<blank-slug:slug>/authorities/",
+        view_recap_authorities,
+        name="view_attachment_authorities",
     ),
     # Citation look up pages
     path(
