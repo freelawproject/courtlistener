@@ -1920,6 +1920,36 @@ class RecapMinuteEntriesTest(TestCase):
         self.assertEqual(docket.pacer_case_id, "")
         self.assertEqual(docket.docket_number, "22-2127")
 
+    @mock.patch("cl.recap_rss.tasks.enqueue_docket_alert")
+    def test_retain_existing_values_in_absent_rss_fields(
+        self, mock_enqueue_de
+    ) -> None:
+        """Confirm that when 'assigned_to_str' and 'referred_to_str' fields
+        are not present in an RSS Feed, pre-existing values in these fields are
+        retained and not cleared.
+        """
+        court_ca10 = CourtFactory(id="ca10", jurisdiction="F")
+        docket = DocketFactory(
+            case_name="Navarette v. Horton, et al",
+            docket_number="22-2127",
+            court=court_ca10,
+            source=Docket.RECAP,
+            pacer_case_id=None,
+            assigned_to_str="John Marshall",
+            referred_to_str="Sophia Clinton",
+        )
+
+        self.assertEqual(docket.docket_entries.count(), 0)
+        rss_feed = PacerRssFeed(court_ca10.pk)
+        with open(self.make_path("rss_ca10.xml"), "rb") as f:
+            text = f.read().decode()
+        rss_feed._parse_text(text)
+        merge_rss_feed_contents(rss_feed.data, court_ca10.pk)
+        docket.refresh_from_db()
+        self.assertEqual(docket.docket_entries.count(), 1)
+        self.assertEqual(docket.assigned_to_str, "John Marshall")
+        self.assertEqual(docket.referred_to_str, "Sophia Clinton")
+
 
 class DescriptionCleanupTest(SimpleTestCase):
     def test_cleanup(self) -> None:
