@@ -51,8 +51,8 @@ def prepare_citation(citation: str) -> Union[List[FullCaseCitation], list]:
         cite
         for cite in citations
         if isinstance(cite, FullCaseCitation)
-        and cite.groups["volume"]
-        and cite.groups["volume"].isdigit()
+        and cite.groups.get("volume")
+        and cite.groups.get("volume").isdigit()
     ]
     return citations
 
@@ -81,13 +81,14 @@ def case_names_overlap(case: OpinionCluster, case_name: str) -> bool:
 
 
 def prepare_date(date_str: Optional[str] = None) -> Optional[date]:
-    """Convert dates like 'February 28, 2011' or '2011-02-28' to date object
+    """Convert dates like 'February 28, 2011', '2011-02-28' or '13-Jun-01' to date
+    object
 
     :param date_str: date string
     :return: date object or None
     """
     if date_str:
-        valid_formats = ["%B %d, %Y", "%Y-%m-%d"]
+        valid_formats = ["%B %d, %Y", "%Y-%m-%d", "%d-%b-%y"]
         for date_format in valid_formats:
             try:
                 date_obj = datetime.strptime(date_str, date_format)
@@ -110,6 +111,17 @@ def add_citations(
     """
 
     for citation in citations:
+        if Citation.objects.filter(
+            cluster_id=cluster_id, reporter=citation.corrected_reporter()
+        ).exists():
+            # Avoid adding a citation if we already have a citation from the
+            # citation's reporter
+            logger.info(
+                f"Cluster id: {cluster_id} - Reporter's citation already exist in "
+                f"cluster: {citation.corrected_citation()}"
+            )
+            continue
+
         # Get correct reporter type before trying to add the citation
         if not citation.corrected_reporter():
             reporter_type = Citation.STATE
@@ -236,9 +248,7 @@ def add_stub_case(
                     case_name_short=case_name_short,
                     case_name_full=case_name,
                     docket=docket,
-                    date_filed=prep_date_filed
-                    if prep_date_filed
-                    else prep_date_decided,
+                    date_filed=prep_date_filed or prep_date_decided,
                     precedential_status="Unknown",
                 )
 
@@ -259,7 +269,7 @@ def add_stub_case(
             logger.info(f"Added stub case correctly")
 
 
-def dict_all_combinations(d: dict, dates_filed: Optional[list]) -> list:
+def dict_all_combinations(d: dict, dates_filed: Optional[list] = None) -> list:
     """Generate all possible combinations of a dict
 
     :param d: dict with filters

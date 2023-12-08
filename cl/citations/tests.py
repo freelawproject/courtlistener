@@ -1704,7 +1704,7 @@ class LexisCitationMergerTest(TestCase):
         )
 
         # Call process to add citations using test data
-        process_lexis_data(df, False)
+        process_lexis_data(df, False, limit=10000)
 
         # Check that target cluster now have five citations
         self.assertEqual(

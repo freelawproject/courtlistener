@@ -1,6 +1,7 @@
 import os
 import re
 from glob import glob
+from typing import Optional
 
 from django.core.management import BaseCommand
 from pandas import DataFrame
@@ -17,7 +18,7 @@ from cl.lib.command_utils import logger
 from cl.lib.utils import human_sort
 
 
-def extract_valid_citations(citations: str) -> list:
+def extract_valid_citations(citations: Optional[str]) -> list:
     """Extract citations from string
 
     :param citations: string with multiple citations
@@ -25,27 +26,48 @@ def extract_valid_citations(citations: str) -> list:
     """
     valid_citations = []
 
-    pattern = r'"([^"]*)"'
-    new_citations = re.findall(pattern, citations)
-    if new_citations:
-        for citation in new_citations:
-            validated_citation = prepare_citation(citation)
-            if validated_citation:
-                valid_citations.extend(validated_citation)
-            else:
-                logger.warning(f'Invalid citation found: "{citation}"')
+    if citations:
+        pattern = r'"([^"]*)"'
+        new_citations = re.findall(pattern, citations)
+        if new_citations:
+            for citation in new_citations:
+                validated_citation = prepare_citation(citation)
+                if validated_citation:
+                    valid_citations.extend(validated_citation)
+                else:
+                    logger.warning(f'Invalid citation found: "{citation}"')
 
     return valid_citations
 
 
-def process_lexis_data(data: DataFrame | TextFileReader, debug: bool) -> None:
+def process_lexis_data(
+    data: DataFrame | TextFileReader,
+    debug: bool,
+    limit: int,
+    start_row: Optional[int] = None,
+    end_row: Optional[int] = None,
+) -> None:
     """Process citations from csv file
 
     :param data: rows from csv file
     :param debug: if true don't save changes
+    :param limit: limit number of rows to process
+    :param start_row: start row
+    :param end_row: end row
     :return: None
     """
+    start = False if start_row else True
+    end = False
+    total_processed = 0
+
     for index, row in data.iterrows():
+        if not start and start_row == index:
+            start = True
+        if not start:
+            continue
+        if end_row is not None and (end_row == index):
+            end = True
+
         case_name = row.get("full_name")
         citations = row.get("lexis_ids_normalized")
         court = row.get("court")
@@ -76,36 +98,42 @@ def process_lexis_data(data: DataFrame | TextFileReader, debug: bool) -> None:
                     and (date_filed or date_decided)
                 ):
                     add_stub_case(
-                        valid_citations,
-                        court,
-                        case_name,
-                        date_filed,
-                        date_decided,
-                        debug,
+                        valid_citations=valid_citations,
+                        court_str=court,
+                        case_name=case_name,
+                        date_filed=date_filed,
+                        date_decided=date_decided,
+                        debug=debug,
                     )
                 else:
-                    # +1 to indicate row considering the header
-                    logger.info(f"Insufficient data in row: {index + 1}")
+                    logger.info(f"Insufficient data in row: {index}")
 
         else:
+            # Add stub case if possible
             if (
                 case_name
                 and valid_citations
                 and court
                 and (date_filed or date_decided)
             ):
-                # Add stub case
                 add_stub_case(
-                    valid_citations,
-                    court,
-                    case_name,
-                    date_filed,
-                    date_decided,
-                    debug,
+                    valid_citations=valid_citations,
+                    court_str=court,
+                    case_name=case_name,
+                    date_filed=date_filed,
+                    date_decided=date_decided,
+                    debug=debug,
                 )
             else:
-                # +1 to indicate row considering the header
-                logger.info(f"Insufficient data in row: {index + 1}")
+                logger.info(f"Insufficient data in row: {index}")
+
+        total_processed += 1
+        if limit and total_processed >= limit:
+            logger.info(f"Finished {limit} rows")
+            return
+
+        if end:
+            return
 
 
 class Command(BaseCommand):
@@ -133,6 +161,24 @@ class Command(BaseCommand):
             "mounted directory.",
             default="/opt/courtlistener/cl/assets/media/lexis",
         )
+        parser.add_argument(
+            "--start-row",
+            type=int,
+            help="Start row (inclusive). It only applies when you pass a single csv "
+            "file.",
+        )
+        parser.add_argument(
+            "--end-row",
+            type=int,
+            help="End row (inclusive). It only applies when you pass single csv file.",
+        )
+        parser.add_argument(
+            "--limit",
+            default=10000,
+            type=int,
+            help="Limit number of rows to process.",
+            required=False,
+        )
 
     def handle(self, *args, **options):
         files = []
@@ -140,12 +186,29 @@ class Command(BaseCommand):
         if options["csv_dir"]:
             files.extend(glob(os.path.join(options["csv_dir"], "*.csv")))
             files = human_sort(files, key=None)
-            print(f"Files found: {len(files)}")
-
-        if options["csv"]:
-            files.append(options["csv"])
+            print(f"CSV files found in {options['csv_dir']}: {len(files)}")
 
         for file in files:
             data = load_citations_file(file)
             if not data.empty:
                 process_lexis_data(data, options["debug"])
+
+        if options["csv"]:
+            if (
+                options["start_row"] is not None
+                and options["end_row"] is not None
+            ):
+                if options["start_row"] > options["end_row"]:
+                    print("--start-row can't be greater than --end-row")
+                    return
+
+            # Handle single csv file
+            data = load_citations_file(options["csv"])
+            if not data.empty:
+                process_lexis_data(
+                    data,
+                    options["debug"],
+                    options["limit"],
+                    options["start_row"],
+                    options["end_row"],
+                )
