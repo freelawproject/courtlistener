@@ -799,10 +799,21 @@ class Docket(AbstractDateTimeModel):
             self.source = self.source + self.RECAP
 
     @property
-    def authority_count(self):
+    def authorities(self):
+        """Returns a queryset that can be used for querying and caching
+        authorities.
+        """
         return OpinionsCitedByRECAPDocument.objects.filter(
             citing_document__docket_entry__docket_id=self.pk
-        ).count()
+        )
+
+    @property
+    def has_authorities(self):
+        return self.authorities.exists()
+
+    @property
+    def authority_count(self):
+        return self.authorities.count()
 
     @property
     def authorities_with_data(self):
