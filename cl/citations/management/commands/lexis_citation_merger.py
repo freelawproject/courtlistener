@@ -147,11 +147,10 @@ class Command(BaseCommand):
             "--debug",
             action="store_true",
             default=False,
-            help="If debug is true,then  don't save new citations.",
+            help="If debug is true,then don't save new citations.",
         )
         parser.add_argument(
             "--csv",
-            required=True,
             help="Absolute path to a single CSV file containing the citations to add.",
         )
         parser.add_argument(
@@ -191,7 +190,7 @@ class Command(BaseCommand):
         for file in files:
             data = load_citations_file(file)
             if not data.empty:
-                process_lexis_data(data, options["debug"])
+                process_lexis_data(data, options["debug"], options["limit"])
 
         if options["csv"]:
             if (
