@@ -267,10 +267,6 @@ class DocketFactory(DjangoModelFactory):
     class Meta:
         model = Docket
 
-    idb_data = RelatedFactory(
-        "cl.recap.factories.FjcIntegratedDatabaseFactory",
-        factory_related_name="docket",
-    )
     source = FuzzyChoice(Docket.SOURCE_CHOICES, getter=lambda c: c[0])
     court = SubFactory(CourtFactory)
     appeal_from = SubFactory(CourtFactory)
