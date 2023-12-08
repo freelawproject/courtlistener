@@ -550,6 +550,9 @@ def view_recap_authorities(
             "og_file_path": og_file_path_override,
             "note_form": note_form,
             "private": True,  # Always True for RECAP docs.
+            "timezone": COURT_TIMEZONES.get(
+                rd.docket_entry.docket.court_id, "US/Eastern"
+            ),
             "authorities": rd.authorities_with_data,
         },
     )
