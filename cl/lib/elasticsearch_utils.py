@@ -276,7 +276,7 @@ def build_fulltext_query(
     """
     if value:
         if check_unbalanced_parenthesis(value):
-            raise UnbalancedQuery()
+            raise UnbalancedQuery("The query contains unbalanced parentheses.")
         # In Elasticsearch, the colon (:) character is used to separate the
         # field name and the field value in a query.
         # To avoid parsing errors escape any colon characters in the value
