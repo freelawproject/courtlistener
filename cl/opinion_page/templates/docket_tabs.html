@@ -500,7 +500,7 @@
         </li>
         {% endif %}
 
-        {% if docket.authority_count %}
+        {% if authorities %}
         <li class="{% block nav-authorities %}inactive{% endblock %}"
             role="presentation">
           <a href="{% url "docket_authorities" docket_id=docket.pk slug=docket.slug %}">Authorities

@@ -234,6 +234,7 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
         {
             "parties": docket.parties.exists(),
             # Needed to show/hide parties tab.
+            "authorities": docket.has_authorities,
             "docket_entries": docket_entries,
             "sort_order_asc": sort_order_asc,
             "form": form,
@@ -346,7 +347,7 @@ def docket_authorities(
     slug: str,
 ) -> HttpResponse:
     docket, context = core_docket_data(request, docket_id)
-    if not docket.authority_count:
+    if not docket.has_authorities:
         raise Http404("No authorities data for this docket at this time")
 
     context.update(
