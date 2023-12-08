@@ -822,37 +822,7 @@ class Docket(AbstractDateTimeModel):
 
         The returned queryset is sorted by the depth field.
         """
-        query = (
-            OpinionsCitedByRECAPDocument.objects.filter(
-                citing_document__docket_entry__docket_id=self.pk
-            )
-            .select_related("cited_opinion__cluster__docket__court")
-            .prefetch_related(
-                "cited_opinion__cluster__citations",
-                Prefetch(
-                    "cited_opinion__cluster__sub_opinions",
-                    queryset=Opinion.objects.only("pk", "cluster_id"),
-                ),
-            )
-            .only(
-                "depth",
-                "citing_document_id",
-                "cited_opinion__cluster__slug",
-                "cited_opinion__cluster__case_name",
-                "cited_opinion__cluster__case_name_full",
-                "cited_opinion__cluster__case_name_short",
-                "cited_opinion__cluster__citation_count",
-                "cited_opinion__cluster__docket_id",
-                "cited_opinion__cluster__date_filed",
-                "cited_opinion__cluster__docket__docket_number",
-                "cited_opinion__cluster__docket__court_id",
-                "cited_opinion__cluster__docket__court__citation_string",
-                "cited_opinion__cluster__docket__court__full_name",
-            )
-            .order_by("-depth")
-        )
-
-        return query
+        return build_authorities_query(self.authorities)
 
     def add_idb_source(self):
         if self.source == self.DEFAULT:
@@ -1538,36 +1508,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
 
         The returned queryset is sorted by the depth field.
         """
-        query = (
-            self.cited_opinions.select_related(
-                "cited_opinion__cluster__docket__court"
-            )
-            .prefetch_related(
-                "cited_opinion__cluster__citations",
-                Prefetch(
-                    "cited_opinion__cluster__sub_opinions",
-                    queryset=Opinion.objects.only("pk", "cluster_id"),
-                ),
-            )
-            .only(
-                "depth",
-                "citing_document_id",
-                "cited_opinion__cluster__slug",
-                "cited_opinion__cluster__case_name",
-                "cited_opinion__cluster__case_name_full",
-                "cited_opinion__cluster__case_name_short",
-                "cited_opinion__cluster__citation_count",
-                "cited_opinion__cluster__docket_id",
-                "cited_opinion__cluster__date_filed",
-                "cited_opinion__cluster__docket__docket_number",
-                "cited_opinion__cluster__docket__court_id",
-                "cited_opinion__cluster__docket__court__citation_string",
-                "cited_opinion__cluster__docket__court__full_name",
-            )
-            .order_by("-depth")
-        )
-
-        return query
+        return build_authorities_query(self.cited_opinions)
 
     def save(
         self,
@@ -3460,6 +3401,40 @@ class OpinionsCitedByRECAPDocument(models.Model):
         verbose_name_plural = "Opinions cited by RECAP document"
         unique_together = ("citing_document", "cited_opinion")
         indexes = [models.Index(fields=["depth"])]
+
+
+def build_authorities_query(
+    base_queryset: QuerySet[OpinionsCitedByRECAPDocument],
+) -> QuerySet[OpinionsCitedByRECAPDocument]:
+    """
+    Optimizes the authorities query by applying select_related, prefetch_related,
+    and selecting only the relevant fields to display the list of citations
+
+    Args:
+        base_queryset (QuerySet[OpinionsCitedByRECAPDocument]): The queryset to optimize
+    """
+    return (
+        base_queryset.select_related("cited_opinion__cluster__docket__court")
+        .prefetch_related(
+            "cited_opinion__cluster__citations",
+        )
+        .only(
+            "depth",
+            "citing_document_id",
+            "cited_opinion__cluster__slug",
+            "cited_opinion__cluster__case_name",
+            "cited_opinion__cluster__case_name_full",
+            "cited_opinion__cluster__case_name_short",
+            "cited_opinion__cluster__citation_count",
+            "cited_opinion__cluster__docket_id",
+            "cited_opinion__cluster__date_filed",
+            "cited_opinion__cluster__docket__docket_number",
+            "cited_opinion__cluster__docket__court_id",
+            "cited_opinion__cluster__docket__court__citation_string",
+            "cited_opinion__cluster__docket__court__full_name",
+        )
+        .order_by("-depth")
+    )
 
 
 class Parenthetical(models.Model):
