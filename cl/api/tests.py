@@ -3,7 +3,7 @@ from datetime import date, timedelta
 from typing import Any, Dict
 from unittest import mock
 
-from asgiref.sync import async_to_sync, sync_to_async
+from asgiref.sync import async_to_sync
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Permission
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
@@ -388,7 +388,7 @@ class DRFJudgeApiFilterTests(
     @async_to_sync
     async def setUp(self) -> None:
         self.assertTrue(
-            await sync_to_async(self.async_client.login)(
+            await self.async_client.alogin(
                 username="pandora", password="password"
             )
         )
@@ -592,7 +592,7 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
     @async_to_sync
     async def setUp(self) -> None:
         self.assertTrue(
-            await sync_to_async(self.async_client.login)(
+            await self.async_client.alogin(
                 username="recap-user", password="password"
             )
         )
@@ -748,7 +748,7 @@ class DRFSearchAppAndAudioAppApiFilterTest(
     @async_to_sync
     async def setUp(self) -> None:
         self.assertTrue(
-            await sync_to_async(self.async_client.login)(
+            await self.async_client.alogin(
                 username="recap-user", password="password"
             )
         )
@@ -903,7 +903,7 @@ class DRFFieldSelectionTest(SimpleUserDataMixin, TestCase):
         fields_to_return = ["educations", "date_modified", "slug"]
         q = {"fields": ",".join(fields_to_return)}
         self.assertTrue(
-            await sync_to_async(self.async_client.login)(
+            await self.async_client.alogin(
                 username="pandora", password="password"
             )
         )
@@ -980,7 +980,7 @@ class DRFRecapPermissionTest(TestCase):
     async def test_has_access(self) -> None:
         """Does the RECAP user have access to all of the RECAP endpoints?"""
         self.assertTrue(
-            await sync_to_async(self.async_client.login)(
+            await self.async_client.alogin(
                 username="recap-user", password="password"
             )
         )
@@ -993,7 +993,7 @@ class DRFRecapPermissionTest(TestCase):
     async def test_lacks_access(self) -> None:
         """Does a normal user lack access to the RECPAP endpoints?"""
         self.assertTrue(
-            await sync_to_async(self.async_client.login)(
+            await self.async_client.alogin(
                 username="pandora", password="password"
             )
         )
