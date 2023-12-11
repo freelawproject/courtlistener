@@ -20,7 +20,7 @@ from cl.lib.utils import human_sort
 cnt = CaseNameTweaker()
 
 
-def extract_valid_citations(citations) -> list:
+def extract_valid_citations(citations: list) -> list:
     """Extract citations from list of strings
 
     :param citations: list with string citations
@@ -58,6 +58,7 @@ def process_westlaw_data(
     total_processed = 0
 
     for index, row in data.iterrows():
+        logger.info(f"Processing row: {index}")
         if not start and start_row == index:
             start = True
         if not start:
@@ -145,7 +146,6 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--csv",
-            required=True,
             help="Absolute path to a single CSV file containing the citations to add.",
         )
         parser.add_argument(
@@ -169,7 +169,8 @@ class Command(BaseCommand):
             "--limit",
             default=10000,
             type=int,
-            help="Limit number of rows to process.",
+            help="Limit number of rows to process. It will apply to each csv file "
+            "found.",
             required=False,
         )
 
