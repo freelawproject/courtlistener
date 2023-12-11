@@ -138,7 +138,7 @@ class DocumentPageRedirection(TestCase):
                 "slug": self.docket.slug,
             },
         )
-        r = await sync_to_async(self.client.get)(path, follow=True)
+        r = await self.async_client.get(path, follow=True)
         self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
         self.assertEqual(r.status_code, HTTP_200_OK)
 
@@ -163,12 +163,12 @@ class CitationRedirectorTest(TestCase):
     async def test_with_a_citation(self) -> None:
         """Make sure that the url paths are working properly."""
         # Are we redirected to the correct place when we use GET or POST?
-        r = await sync_to_async(self.client.get)(
+        r = await self.async_client.get(
             reverse("citation_redirector", kwargs=self.citation), follow=True
         )
         self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
 
-        r = await sync_to_async(self.client.post)(
+        r = await self.async_client.post(
             reverse("citation_redirector"), self.citation, follow=True
         )
         self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
@@ -398,7 +398,7 @@ class CitationRedirectorTest(TestCase):
         """Do we get redirected to the correct URL when we pass in a full
         citation?"""
 
-        r = await sync_to_async(self.client.get)(
+        r = await self.async_client.get(
             reverse(
                 "citation_redirector",
                 kwargs={
@@ -476,7 +476,7 @@ class ViewRecapDocketTest(TestCase):
         """Can we redirect to a regular docket URL from a recap/uscourts.*
         URL?
         """
-        r = await sync_to_async(self.client.get)(
+        r = await self.async_client.get(
             reverse(
                 "redirect_docket_recap",
                 kwargs={
@@ -558,9 +558,12 @@ class NewDocketAlertTest(SimpleUserDataMixin, TestCase):
         "test_court.json",
     ]
 
-    def setUp(self) -> None:
+    @async_to_sync
+    async def setUp(self) -> None:
         self.assertTrue(
-            self.async_client.login(username="pandora", password="password")
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
         )
 
     async def test_bad_parameters(self) -> None:
@@ -770,9 +773,7 @@ class UploadPublication(TestCase):
 
     async def test_access_upload_page(self, mock) -> None:
         """Can we successfully access upload page with access?"""
-        await sync_to_async(self.async_client.login)(
-            username="learned", password="password"
-        )
+        await self.async_client.alogin(username="learned", password="password")
         response = await self.async_client.get(
             reverse("court_publish_page", args=["tennworkcompcl"])
         )
@@ -780,7 +781,7 @@ class UploadPublication(TestCase):
 
     async def test_redirect_without_access(self, mock) -> None:
         """Can we successfully redirect individuals without proper access?"""
-        await sync_to_async(self.async_client.login)(
+        await self.async_client.alogin(
             username="test_user", password="password"
         )
         response = await self.async_client.get(

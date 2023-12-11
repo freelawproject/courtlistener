@@ -2,7 +2,7 @@ import time
 
 from asgiref.sync import sync_to_async
 from django.contrib.auth.hashers import make_password
-from django.test.client import Client
+from django.test.client import AsyncClient
 from django.urls import reverse
 from rest_framework.status import (
     HTTP_200_OK,
@@ -31,7 +31,7 @@ class NoteTest(SimpleUserDataMixin, TestCase, AudioTestCase):
 
     def setUp(self) -> None:
         # Set up some handy variables
-        self.client = Client()
+        self.async_client = AsyncClient()
         self.note_cluster_params = {
             "cluster_id": 1,
             "name": "foo",
@@ -46,31 +46,31 @@ class NoteTest(SimpleUserDataMixin, TestCase, AudioTestCase):
     async def test_create_note(self) -> None:
         """Can we create a note by sending a post?"""
         self.assertTrue(
-            await sync_to_async(self.client.login)(
+            await self.async_client.alogin(
                 username="pandora", password="password"
             )
         )
         for params in [self.note_cluster_params, self.note_audio_params]:
-            r = await sync_to_async(self.client.post)(
+            r = await self.async_client.post(
                 reverse("save_or_update_note"),
                 params,
                 follow=True,
-                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+                X_REQUESTED_WITH="XMLHttpRequest",
             )
             self.assertEqual(r.status_code, 200)
             self.assertIn("It worked", r.content.decode())
 
         # And can we delete them?
         for params in [self.note_cluster_params, self.note_audio_params]:
-            r = await sync_to_async(self.client.post)(
+            r = await self.async_client.post(
                 reverse("delete_note"),
                 params,
                 follow=True,
-                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+                X_REQUESTED_WITH="XMLHttpRequest",
             )
         self.assertEqual(r.status_code, 200)
         self.assertIn("It worked", r.content.decode())
-        await sync_to_async(self.client.logout)()
+        await self.async_client.alogout()
 
 
 class UserNotesTest(BaseSeleniumTest):
