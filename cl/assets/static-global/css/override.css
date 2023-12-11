@@ -1456,6 +1456,10 @@ emphasis {
   justify-content: flex-end;
 }
 
+.justify-content-center{
+  justify-content: center;
+}
+
 .mr-1 {
   margin-right: 0.25em;
 }

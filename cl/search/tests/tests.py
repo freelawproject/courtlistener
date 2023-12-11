@@ -1657,7 +1657,9 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
         self.assertIsNone(dropdown_menu.get_attribute("display"))
         profile_dropdown.click()
 
-        sign_out = get_with_wait(wait, (By.LINK_TEXT, "Sign out"))
+        sign_out = get_with_wait(
+            wait, (By.XPATH, ".//button[contains(text(), 'Sign out')]")
+        )
         sign_out.click()
 
         # She receives a sign out confirmation with links back to the homepage,

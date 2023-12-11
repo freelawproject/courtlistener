@@ -22,8 +22,6 @@ DATABASES = {
         "PASSWORD": env("DB_PASSWORD", default="postgres"),
         "CONN_MAX_AGE": env("DB_CONN_MAX_AGE", default=0),
         "HOST": env("DB_HOST", default="cl-postgres"),
-        # Disable DB serialization during tests for small speed boost
-        "TEST": {"SERIALIZE": False},
         "OPTIONS": {
             # See: https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-PROTECTION
             # "prefer" is fine in dev, but poor in prod, where it should be
