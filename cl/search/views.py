@@ -652,7 +652,11 @@ def do_es_search(
                 total_child_results,
             ) = build_es_main_query(search_query, cd)
             paged_results, query_time, error = fetch_and_paginate_results(
-                get_params, s, rows_per_page=rows, cache_key=cache_key
+                get_params,
+                s,
+                total_query_results,
+                rows_per_page=rows,
+                cache_key=cache_key,
             )
             search_form = _clean_form(
                 get_params,
@@ -696,6 +700,7 @@ def do_es_search(
 def fetch_and_paginate_results(
     get_params: QueryDict,
     search_query: Search,
+    total_query_results: int,
     rows_per_page: int = settings.SEARCH_PAGE_SIZE,
     cache_key: str = None,
 ) -> tuple[Page | list, int, bool]:
@@ -703,6 +708,7 @@ def fetch_and_paginate_results(
 
     :param get_params: The user get params.
     :param search_query: Elasticsearch DSL Search object
+    :param total_query_results: The total number of results for the query.
     :param rows_per_page: Number of records wanted per page
     :param cache_key: The cache key to use.
     :return: A three tuple, the paginated results, the ES query time and if
@@ -730,7 +736,7 @@ def fetch_and_paginate_results(
 
     if error:
         return [], query_time, error
-    paginator = ESPaginator(hits, rows_per_page)
+    paginator = ESPaginator(total_query_results, hits, rows_per_page)
     try:
         results = paginator.page(page)
     except PageNotAnInteger:
