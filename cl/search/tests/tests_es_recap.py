@@ -3201,3 +3201,73 @@ class RECAPIndexingTest(
         self.assertEqual(r_doc.docket_child["parent"], docket_2.pk)
 
         docket_2.delete()
+
+    def test_search_pagination_results_limit(self) -> None:
+        """Confirm that the last page in the pagination is properly computed
+        based on the number of results returned by Elasticsearch.
+        """
+        d_created = []
+        for i in range(21):
+            d = DocketFactory(
+                court=self.court,
+            )
+            d_created.append(d)
+
+        # Test pagination requests.
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+        }
+
+        # 100 results, 5 pages.
+        with mock.patch(
+            "cl.search.views.build_es_main_query",
+            side_effect=lambda x, y: (
+                DocketDocument.search().query("match_all"),
+                100,
+                5,
+                1000,
+            ),
+        ):
+            r = self.client.get(
+                reverse("show_results"),
+                search_params,
+            )
+        self.assertIn("100 Results", r.content.decode())
+        self.assertIn("1 of 5", r.content.decode())
+
+        # 101 results, 6 pages.
+        with mock.patch(
+            "cl.search.views.build_es_main_query",
+            side_effect=lambda x, y: (
+                DocketDocument.search().query("match_all"),
+                101,
+                5,
+                1000,
+            ),
+        ):
+            r = self.client.get(
+                reverse("show_results"),
+                search_params,
+            )
+        self.assertIn("101 Results", r.content.decode())
+        self.assertIn("1 of 6", r.content.decode())
+
+        # 20,000 results, 1,000 pages.
+        with mock.patch(
+            "cl.search.views.build_es_main_query",
+            side_effect=lambda x, y: (
+                DocketDocument.search().query("match_all"),
+                20_000,
+                5,
+                1000,
+            ),
+        ):
+            r = self.client.get(
+                reverse("show_results"),
+                search_params,
+            )
+        self.assertIn("20,000 Results", r.content.decode())
+        self.assertIn("1 of 1,000", r.content.decode())
+
+        for d in d_created:
+            d.delete()
