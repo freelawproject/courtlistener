@@ -44,14 +44,20 @@ ELASTICSEARCH_CA_CERT = env(
     default="/opt/courtlistener/docker/elastic/ca.crt",
 )
 ELASTICSEARCH_TIMEOUT = env("ELASTICSEARCH_TIMEOUT", default=200)
+
+base_connection_params = {
+    "hosts": ELASTICSEARCH_DSL_HOST,
+    "http_auth": (ELASTICSEARCH_USER, ELASTICSEARCH_PASSWORD),
+    "verify_certs": False,
+    "ca_certs": ELASTICSEARCH_CA_CERT,
+    "timeout": ELASTICSEARCH_TIMEOUT,
+}
+no_retry_conn = base_connection_params.copy()
+no_retry_conn["max_retries"] = 0
+
 ELASTICSEARCH_DSL = {
-    "default": {
-        "hosts": ELASTICSEARCH_DSL_HOST,
-        "http_auth": (ELASTICSEARCH_USER, ELASTICSEARCH_PASSWORD),
-        "verify_certs": False,
-        "ca_certs": ELASTICSEARCH_CA_CERT,
-        "timeout": ELASTICSEARCH_TIMEOUT,
-    },
+    "default": base_connection_params,
+    "no_retry_connection": no_retry_conn,
     "analysis": {
         "analyzer": {
             "text_en_splitting_cl": {

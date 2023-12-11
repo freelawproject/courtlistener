@@ -605,7 +605,7 @@ def update_children_docs_by_query(
         # document in ES.
         return
 
-    client = connections.get_connection()
+    client = connections.get_connection(alias="no_retry_connection")
     ubq = (
         UpdateByQuery(using=client, index=es_document._index._name)
         .query(s.to_dict()["query"])
