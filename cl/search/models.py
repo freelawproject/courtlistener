@@ -2707,6 +2707,7 @@ class OpinionCluster(AbstractDateTimeModel):
     )
     es_o_field_tracker = FieldTracker(
         fields=[
+            "docket_id",
             "case_name",
             "case_name_short",
             "case_name_full",
@@ -2721,6 +2722,8 @@ class OpinionCluster(AbstractDateTimeModel):
             "syllabus",
             "scdb_id",
             "citation_count",
+            "slug",
+            "source",
         ]
     )
 
@@ -3291,7 +3294,23 @@ class Opinion(AbstractDateTimeModel):
     es_pa_field_tracker = FieldTracker(
         fields=["extracted_by_ocr", "cluster_id", "author_id"]
     )
-    es_o_field_tracker = FieldTracker(fields=["cluster_id"])
+    es_o_field_tracker = FieldTracker(
+        fields=[
+            "cluster_id",
+            "author_id",
+            "type",
+            "per_curiam",
+            "download_url",
+            "local_path",
+            "html_columbia",
+            "html_lawbox",
+            "xml_harvard",
+            "html_anon_2020",
+            "html",
+            "plain_text",
+            "sha1",
+        ]
+    )
 
     @property
     def siblings(self) -> QuerySet:

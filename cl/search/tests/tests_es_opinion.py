@@ -1727,5 +1727,30 @@ class EsOpinionsIndexingTest(ESIndexTestCase, TransactionTestCase):
         self.assertEqual(cluster_doc.citeCount, 8)
         self.assertEqual(opinion_doc.citeCount, 8)
 
+        # Confirm a Opinion is indexed if it doesn't exist in the
+        # index on a tracked field update.
+        # Clean the OpinionsCluster index.
+        self.delete_index("search.OpinionCluster")
+        self.create_index("search.OpinionCluster")
+
+        # Index OpinionCluster
+        opinion_cluster.citation_count = 5
+        opinion_cluster.save()
+
+        self.assertFalse(
+            OpinionClusterDocument.exists(id=ES_CHILD_ID(opinion.pk).OPINION)
+        )
+        # Opinion Document creation on update.
+        opinion.plain_text = "Lorem ipsum dolor."
+        opinion.save()
+
+        opinion_doc = OpinionClusterDocument.get(
+            id=ES_CHILD_ID(opinion.pk).OPINION
+        )
+        self.assertEqual(opinion_doc.text, "Lorem ipsum dolor.")
+        self.assertEqual(
+            opinion_doc.cluster_child["parent"], opinion_cluster.pk
+        )
+
         docket.delete()
         opinion_cluster.delete()

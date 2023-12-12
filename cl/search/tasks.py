@@ -557,6 +557,8 @@ def get_doc_from_es(
         es_args["_routing"] = parent_id
     elif es_document is OpinionDocument:
         instance_id = ES_CHILD_ID(instance_id).OPINION
+        parent_id = getattr(instance.cluster, "pk", None)
+        es_args["_routing"] = parent_id
 
     try:
         main_doc = es_document.get(id=instance_id)

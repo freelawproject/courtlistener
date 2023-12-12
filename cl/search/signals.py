@@ -407,7 +407,22 @@ o_field_mapping = {
                 "citation_count": ["citeCount"],
             }
         },
-        Opinion: {},
+        Opinion: {
+            "self": {
+                "author_id": ["author_id"],
+                "type": ["type", "type_text"],
+                "per_curiam": ["per_curiam"],
+                "download_url": ["download_url"],
+                "local_path": ["local_path"],
+                "html_columbia": ["text"],
+                "html_lawbox": ["text"],
+                "xml_harvard": ["text"],
+                "html_anon_2020": ["text"],
+                "html": ["text"],
+                "plain_text": ["text"],
+                "sha1": ["sha1"],
+            },
+        },
     },
     "delete": {Opinion: {}},
     "m2m": {
@@ -438,7 +453,26 @@ o_cluster_field_mapping = {
             }
         },
         Opinion: {"sub_opinions": {"cluster_id": ["sibling_ids"]}},
-        OpinionCluster: {},
+        OpinionCluster: {
+            "self": {
+                "docket_id": ["prepare"],
+                "case_name": ["caseName"],
+                "case_name_short": ["caseName", "caseNameShort"],
+                "case_name_full": ["caseNameFull", "caseName"],
+                "date_filed": ["dateFiled"],
+                "judges": ["judge"],
+                "attorneys": ["attorney"],
+                "nature_of_suit": ["suitNature"],
+                "precedential_status": ["status"],
+                "procedural_history": ["proceduralHistory"],
+                "posture": ["posture"],
+                "syllabus": ["syllabus"],
+                "scdb_id": ["scdb_id"],
+                "citation_count": ["citeCount"],
+                "slug": ["absolute_url"],
+                "source": ["source"],
+            },
+        },
     },
     "delete": {OpinionCluster: {}},
     "m2m": {

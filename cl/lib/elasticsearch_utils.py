@@ -2032,7 +2032,9 @@ def get_related_clusters_with_cache_and_es(
 
         query_dict = QueryDict("", mutable=True)
         query_dict.update(url_search_params)
-        search_query, *_ = build_es_main_query(search, url_search_params)
+        search_query, total_query_results, *_ = build_es_main_query(
+            search, url_search_params
+        )
         hits, _, error = fetch_es_results(
             query_dict, search_query, 1, settings.RELATED_COUNT
         )
@@ -2040,7 +2042,9 @@ def get_related_clusters_with_cache_and_es(
         if error:
             return [], [], url_search_params
 
-        paginator = ESPaginator(hits, settings.RELATED_COUNT)
+        paginator = ESPaginator(
+            total_query_results, hits, settings.RELATED_COUNT
+        )
         try:
             related_clusters = paginator.page(1)
         except EmptyPage:

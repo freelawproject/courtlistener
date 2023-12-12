@@ -158,7 +158,7 @@ def update_es_documents(
             # No fields from the current mapping need updating. Omit it.
             continue
         match instance:
-            case RECAPDocument() | Docket() | ParentheticalGroup() | Audio() | Person() | Position() if mapping_fields.get("self", None):  # type: ignore
+            case RECAPDocument() | Docket() | ParentheticalGroup() | Audio() | Person() | Position() | OpinionCluster() | Opinion() if mapping_fields.get("self", None):  # type: ignore
                 # Update main document in ES, including fields to be
                 # extracted from a related instance.
                 transaction.on_commit(
