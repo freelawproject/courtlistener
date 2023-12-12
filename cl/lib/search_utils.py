@@ -1004,7 +1004,7 @@ def build_court_count_query(group: bool = False) -> SearchParam:
     return params
 
 
-def add_depth_counts(
+async def add_depth_counts(
     search_data: Dict[str, Any],
     search_results: SolrResponse,
 ) -> Optional[OpinionCluster]:
@@ -1021,14 +1021,16 @@ def add_depth_counts(
     cites_query_matches = re.findall(r"cites:\((\d+)\)", search_data["q"])
     if len(cites_query_matches) == 1:
         try:
-            cited_cluster = OpinionCluster.objects.get(
+            cited_cluster = await OpinionCluster.objects.aget(
                 sub_opinions__pk=cites_query_matches[0]
             )
         except OpinionCluster.DoesNotExist:
             return None
         else:
             for result in search_results.object_list:
-                result["citation_depth"] = get_citation_depth_between_clusters(
+                result[
+                    "citation_depth"
+                ] = await get_citation_depth_between_clusters(
                     citing_cluster_pk=result["cluster_id"],
                     cited_cluster_pk=cited_cluster.pk,
                 )
@@ -1037,7 +1039,7 @@ def add_depth_counts(
         return None
 
 
-def get_citing_clusters_with_cache(
+async def get_citing_clusters_with_cache(
     cluster: OpinionCluster,
 ) -> Tuple[list, int]:
     """Use Solr to get clusters citing the one we're looking at
@@ -1048,13 +1050,13 @@ def get_citing_clusters_with_cache(
     """
     cache_key = f"citing:{cluster.pk}"
     cache = caches["db_cache"]
-    cached_results = cache.get(cache_key)
+    cached_results = await cache.aget(cache_key)
     if cached_results is not None:
         return cached_results
 
     # Cache miss. Get the citing results from Solr
     sub_opinion_pks = cluster.sub_opinions.values_list("pk", flat=True)
-    ids_str = " OR ".join([str(pk) for pk in sub_opinion_pks])
+    ids_str = " OR ".join([str(pk) async for pk in sub_opinion_pks])
     q = {
         "q": f"cites:({ids_str})",
         "rows": 5,
@@ -1069,12 +1071,14 @@ def get_citing_clusters_with_cache(
     citing_clusters = list(results)
     citing_cluster_count = results.result.numFound
     a_week = 60 * 60 * 24 * 7
-    cache.set(cache_key, (citing_clusters, citing_cluster_count), a_week)
+    await cache.aset(
+        cache_key, (citing_clusters, citing_cluster_count), a_week
+    )
 
     return citing_clusters, citing_cluster_count
 
 
-def get_related_clusters_with_cache(
+async def get_related_clusters_with_cache(
     cluster: OpinionCluster,
     request: HttpRequest,
 ) -> Tuple[List[OpinionCluster], List[int], Dict[str, str]]:
@@ -1093,7 +1097,7 @@ def get_related_clusters_with_cache(
     # Opinions that belong to the targeted cluster
     sub_opinion_ids = cluster.sub_opinions.values_list("pk", flat=True)
 
-    if is_bot(request) or not sub_opinion_ids:
+    if is_bot(request) or not await sub_opinion_ids.aexists():
         # If it is a bot or lacks sub-opinion IDs, return empty results
         return [], [], url_search_params
 
@@ -1102,7 +1106,7 @@ def get_related_clusters_with_cache(
     # Use cache if enabled
     mlt_cache_key = f"mlt-cluster:{cluster.pk}"
     related_clusters = (
-        caches["db_cache"].get(mlt_cache_key)
+        await caches["db_cache"].aget(mlt_cache_key)
         if settings.RELATED_USE_CACHE
         else None
     )
@@ -1111,7 +1115,9 @@ def get_related_clusters_with_cache(
         # Cache is empty
 
         # Turn list of opinion IDs into list of Q objects
-        sub_opinion_queries = [si.Q(id=sub_id) for sub_id in sub_opinion_ids]
+        sub_opinion_queries = [
+            si.Q(id=sub_id) async for sub_id in sub_opinion_ids
+        ]
 
         # Take one Q object from the list
         sub_opinion_query = sub_opinion_queries.pop()
@@ -1178,7 +1184,7 @@ def get_related_clusters_with_cache(
             # No MLT results are available (this should not happen)
             related_clusters = []
 
-        cache.set(
+        await cache.aset(
             mlt_cache_key, related_clusters, settings.RELATED_CACHE_TIMEOUT
         )
     si.conn.http_connection.close()

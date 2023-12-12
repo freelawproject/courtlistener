@@ -7,7 +7,7 @@ from cl.lib.microservice_utils import microservice
 from cl.lib.models import THUMBNAIL_STATUSES
 
 
-def make_png_thumbnail_for_instance(
+async def make_png_thumbnail_for_instance(
     pk: int,
     klass: Any,
     max_dimension: int,
@@ -21,17 +21,17 @@ def make_png_thumbnail_for_instance(
     :param klass: The class of the instance
     :param max_dimension: The longest you want any edge to be
     """
-    item = klass.objects.get(pk=pk)
-    response = async_to_sync(microservice)(
+    item = await klass.objects.aget(pk=pk)
+    response = await microservice(
         service="generate-thumbnail",
         item=item,
         params={"max_dimension": max_dimension},
     )
     if not response.is_success:
         item.thumbnail_status = THUMBNAIL_STATUSES.FAILED
-        item.save()
+        await item.asave()
     else:
         item.thumbnail_status = THUMBNAIL_STATUSES.COMPLETE
         filename = f"{pk}.thumb.{max_dimension}.png"
-        item.thumbnail.save(filename, ContentFile(response.content))
+        await item.thumbnail.asave(filename, ContentFile(response.content))
     return item.pk
