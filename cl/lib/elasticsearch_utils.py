@@ -7,7 +7,7 @@ from copy import deepcopy
 from dataclasses import fields
 from datetime import date, datetime
 from functools import reduce, wraps
-from typing import Any, Callable, Dict, List, Literal, Tuple
+from typing import Any, Callable, Dict, List, Literal, Match, Tuple
 
 from django.conf import settings
 from django.core.cache import cache, caches
@@ -347,7 +347,7 @@ def build_fulltext_query(
     """
     if value:
         if check_unbalanced_parenthesis(value):
-            raise UnbalancedQuery()
+            raise UnbalancedQuery("The query contains unbalanced parentheses.")
         # In Elasticsearch, the colon (:) character is used to separate the
         # field name and the field value in a query.
         # To avoid parsing errors escape any colon characters in the value
@@ -796,14 +796,14 @@ def build_es_base_query(
                 ["representative_text"], cd.get("q", "")
             )
         case SEARCH_TYPES.ORAL_ARGUMENT:
-            fields = SEARCH_ORAL_ARGUMENT_QUERY_FIELDS
+            fields = SEARCH_ORAL_ARGUMENT_QUERY_FIELDS.copy()
             fields.extend(add_fields_boosting(cd))
             string_query = build_fulltext_query(
                 fields,
                 cd.get("q", ""),
             )
         case SEARCH_TYPES.PEOPLE:
-            child_fields = SEARCH_PEOPLE_CHILD_QUERY_FIELDS
+            child_fields = SEARCH_PEOPLE_CHILD_QUERY_FIELDS.copy()
             child_fields.extend(
                 add_fields_boosting(
                     cd,
@@ -817,7 +817,7 @@ def build_es_base_query(
             child_query_fields = {
                 "position": child_fields,
             }
-            parent_query_fields = SEARCH_PEOPLE_PARENT_QUERY_FIELDS
+            parent_query_fields = SEARCH_PEOPLE_PARENT_QUERY_FIELDS.copy()
             parent_query_fields.extend(
                 add_fields_boosting(
                     cd,
@@ -832,7 +832,7 @@ def build_es_base_query(
                 cd.get("q", ""),
             )
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
-            child_fields = SEARCH_RECAP_CHILD_QUERY_FIELDS
+            child_fields = SEARCH_RECAP_CHILD_QUERY_FIELDS.copy()
             child_fields.extend(
                 add_fields_boosting(
                     cd,
@@ -845,7 +845,7 @@ def build_es_base_query(
                 )
             )
             child_query_fields = {"recap_document": child_fields}
-            parent_query_fields = SEARCH_RECAP_PARENT_QUERY_FIELDS
+            parent_query_fields = SEARCH_RECAP_PARENT_QUERY_FIELDS.copy()
             parent_query_fields.extend(
                 add_fields_boosting(
                     cd,
@@ -1083,6 +1083,25 @@ def add_es_highlighting(
     return search_query
 
 
+def replace_highlight(
+    match: Match[str], unique_hl_strings: List[str], tag: str
+) -> str:
+    """Replaces the matched term with a marked version if it exists in the
+    unique highlighted strings list.
+
+    :param match: A regex match object containing the term to be replaced.
+    :param unique_hl_strings: A list of strings to be highlighted.
+    :param tag: The HTML tag to use for marking the term.
+    :return: The highlighted term if it's in the unique_hl_strings, otherwise
+    the original term.
+    """
+
+    term = match.group(0)
+    if term in unique_hl_strings:
+        return f"<{tag}>{term}</{tag}>"
+    return term
+
+
 def merge_highlights_into_result(
     highlights: dict[str, Any], result: AttrDict | dict[str, Any], tag: str
 ) -> None:
@@ -1113,13 +1132,14 @@ def merge_highlights_into_result(
             marked_strings_exact = []
             # Extract all unique marked strings from "field.exact"
             marked_strings = re.findall(
-                rf"<{tag}>.*?</{tag}>", highlight_list[0]
+                rf"<{tag}>(.*?)</{tag}>", highlight_list[0]
             )
+
             if field in highlights:
                 # Extract all unique marked strings from "field" if
                 # available
                 marked_strings_exact = re.findall(
-                    rf"<{tag}>.*?</{tag}>",
+                    rf"<{tag}>(.*?)</{tag}>",
                     highlights[field][0],
                 )
 
@@ -1130,17 +1150,15 @@ def merge_highlights_into_result(
                 unique_marked_strings = list(
                     set(marked_strings + marked_strings_exact)
                 )
-                combined_highlights = highlight_list[0]
-                for marked_string in unique_marked_strings:
-                    # Replace unique highlighted terms in a single
-                    # field.
-                    unmarked_string = marked_string.replace(
-                        f"<{tag}>", ""
-                    ).replace(f"</{tag}>", "")
-                    combined_highlights = combined_highlights.replace(
-                        unmarked_string, marked_string
-                    )
-
+                original_string = highlight_list[0]
+                all_terms_pattern = rf"<{tag}>|</{tag}>|\w+"
+                combined_highlights = re.sub(
+                    all_terms_pattern,
+                    lambda match: replace_highlight(
+                        match, unique_marked_strings, tag
+                    ),
+                    original_string,
+                )
                 # Remove nested <mark> tags after replace.
                 combined_highlights = re.sub(
                     rf"<{tag}><{tag}>(.*?)</{tag}></{tag}>",

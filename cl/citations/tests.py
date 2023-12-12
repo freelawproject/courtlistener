@@ -815,9 +815,9 @@ class CitationFeedTest(IndexedSolrTestCase):
         )
         self.assertEqual(count, expected_count)
 
-    def test_basic_cited_by_feed(self) -> None:
+    async def test_basic_cited_by_feed(self) -> None:
         """Can we load the cited-by feed and does it have content?"""
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("search_feed", args=["search"]),
             {"q": f"cites:{self.opinion_1.pk}"},
         )
@@ -826,18 +826,18 @@ class CitationFeedTest(IndexedSolrTestCase):
         expected_count = 1
         self._tree_has_content(r.content, expected_count)
 
-    def test_unicode_content(self) -> None:
+    async def test_unicode_content(self) -> None:
         """Does the citation feed continue working even when we have a unicode
         case name?
         """
         new_case_name = (
             "MAC ARTHUR KAMMUELLER, \u2014 v. LOOMIS, FARGO & " "CO., \u2014"
         )
-        OpinionCluster.objects.filter(pk=self.opinion_cluster_1.pk).update(
-            case_name=new_case_name
-        )
+        await OpinionCluster.objects.filter(
+            pk=self.opinion_cluster_1.pk
+        ).aupdate(case_name=new_case_name)
 
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("search_feed", args=["search"]),
             {"q": f"cites:{self.opinion_1.pk}"},
         )

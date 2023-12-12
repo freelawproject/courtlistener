@@ -15,7 +15,7 @@ else:
     )
     ELASTICSEARCH_RECAP_DOCS_SIGNALS_DISABLED = env(
         "ELASTICSEARCH_RECAP_DOCS_SIGNALS_DISABLED",
-        default=True,
+        default=False,
     )
     ELASTICSEARCH_DOCKETS_SIGNALS_DISABLED = env(
         "ELASTICSEARCH_DOCKETS_SIGNALS_DISABLED",
@@ -28,7 +28,7 @@ else:
 ELASTICSEARCH_DSL_HOST = env(
     "ELASTICSEARCH_DSL_HOST",
     default=[
-        "cl-es:9200",
+        "https://cl-es:9200",
     ],
 )
 ELASTICSEARCH_USER = env(
@@ -43,16 +43,21 @@ ELASTICSEARCH_CA_CERT = env(
     "ELASTICSEARCH_CA_CERT",
     default="/opt/courtlistener/docker/elastic/ca.crt",
 )
-ELASTICSEARCH_TIMEOUT = env("ELASTICSEARCH_TIMEOUT", default=30)
+ELASTICSEARCH_TIMEOUT = env("ELASTICSEARCH_TIMEOUT", default=200)
+
+base_connection_params = {
+    "hosts": ELASTICSEARCH_DSL_HOST,
+    "http_auth": (ELASTICSEARCH_USER, ELASTICSEARCH_PASSWORD),
+    "verify_certs": False,
+    "ca_certs": ELASTICSEARCH_CA_CERT,
+    "timeout": ELASTICSEARCH_TIMEOUT,
+}
+no_retry_conn = base_connection_params.copy()
+no_retry_conn["max_retries"] = 0
+
 ELASTICSEARCH_DSL = {
-    "default": {
-        "hosts": ELASTICSEARCH_DSL_HOST,
-        "http_auth": (ELASTICSEARCH_USER, ELASTICSEARCH_PASSWORD),
-        "use_ssl": True,
-        "verify_certs": False,
-        "ca_certs": ELASTICSEARCH_CA_CERT,
-        "timeout": ELASTICSEARCH_TIMEOUT,
-    },
+    "default": base_connection_params,
+    "no_retry_connection": no_retry_conn,
     "analysis": {
         "analyzer": {
             "text_en_splitting_cl": {
@@ -80,6 +85,17 @@ ELASTICSEARCH_DSL = {
                     "remove_duplicates",
                 ],
             },
+            "search_analyzer_exact": {
+                "type": "custom",
+                "tokenizer": "whitespace",
+                "filter": [
+                    "lowercase",
+                    "synonym_filter",
+                    "custom_word_delimiter_filter",
+                    "remove_leading_zeros",
+                    "english_stop",
+                ],
+            },
             "english_exact": {
                 "type": "custom",
                 "tokenizer": "whitespace",
@@ -88,7 +104,6 @@ ELASTICSEARCH_DSL = {
                     "custom_word_delimiter_filter",
                     "remove_leading_zeros",
                     "english_stop",
-                    "remove_duplicates",
                 ],
             },
         },

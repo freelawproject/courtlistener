@@ -1,7 +1,8 @@
 import datetime
 from collections import OrderedDict, defaultdict
+from dataclasses import dataclass
 from itertools import groupby
-from typing import Dict, Union
+from typing import Dict, List, Tuple, Union
 from urllib.parse import urlencode
 
 import eyecite
@@ -56,6 +57,7 @@ from cl.opinion_page.forms import (
     CourtUploadForm,
     DocketEntryFilterForm,
 )
+from cl.opinion_page.types import AuthoritiesContext
 from cl.opinion_page.utils import core_docket_data, get_case_title
 from cl.people_db.models import AttorneyOrganization, CriminalCount, Role
 from cl.recap.constants import COURT_TIMEZONES
@@ -235,6 +237,7 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
         {
             "parties": docket.parties.exists(),
             # Needed to show/hide parties tab.
+            "authorities": docket.has_authorities,
             "docket_entries": docket_entries,
             "sort_order_asc": sort_order_asc,
             "form": form,
@@ -339,6 +342,26 @@ def docket_idb_data(
         }
     )
     return TemplateResponse(request, "docket_idb_data.html", context)
+
+
+def docket_authorities(
+    request: HttpRequest,
+    docket_id: int,
+    slug: str,
+) -> HttpResponse:
+    docket, context = core_docket_data(request, docket_id)
+    if not docket.has_authorities:
+        raise Http404("No authorities data for this docket at this time")
+
+    context.update(
+        {
+            # Needed to show/hide parties tab.
+            "parties": docket.parties.exists(),
+            "docket_entries": docket.docket_entries.exists(),
+            "authorities": docket.authorities_with_data,
+        }
+    )
+    return TemplateResponse(request, "docket_authorities.html", context)
 
 
 def make_rd_title(rd: RECAPDocument) -> str:
@@ -482,6 +505,58 @@ def view_recap_document(
                 rd.docket_entry.docket.court_id, "US/Eastern"
             ),
             "redirect_to_pacer_modal": redirect_to_pacer_modal,
+            "authorities": rd.cited_opinions.exists(),
+        },
+    )
+
+
+def view_recap_authorities(
+    request: HttpRequest,
+    docket_id: int | None = None,
+    doc_num: int | None = None,
+    att_num: int | None = None,
+    slug: str = "",
+    is_og_bot: bool = False,
+) -> HttpResponse:
+    """This view can display authorities of an attachment or a regular
+    document, depending on the URL pattern that is matched.
+    """
+    rd = RECAPDocument.objects.filter(
+        docket_entry__docket__id=docket_id,
+        document_number=doc_num,
+        attachment_number=att_num,
+    ).order_by("pk")[0]
+    title = make_rd_title(rd)
+    rd = make_thumb_if_needed(request, rd)
+
+    try:
+        note = Note.objects.get(recap_doc_id=rd.pk, user=request.user)
+    except (ObjectDoesNotExist, TypeError):
+        # Not saved in notes or anonymous user
+        note_form = NoteForm(
+            initial={
+                "recap_doc_id": rd.pk,
+                "name": trunc(title, 100, ellipsis="..."),
+            }
+        )
+    else:
+        note_form = NoteForm(instance=note)
+
+    # Override the og:url if we're serving a request to an OG crawler bot
+    og_file_path_override = f"/{rd.filepath_local}" if is_og_bot else None
+    return TemplateResponse(
+        request,
+        "recap_authorities.html",
+        {
+            "rd": rd,
+            "title": title,
+            "og_file_path": og_file_path_override,
+            "note_form": note_form,
+            "private": True,  # Always True for RECAP docs.
+            "timezone": COURT_TIMEZONES.get(
+                rd.docket_entry.docket.court_id, "US/Eastern"
+            ),
+            "authorities": rd.authorities_with_data,
         },
     )
 
@@ -557,6 +632,17 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     ):
         sponsored = True
 
+    view_authorities_url = reverse(
+        "view_authorities", args=[cluster.pk, cluster.slug]
+    )
+    authorities_context: AuthoritiesContext = AuthoritiesContext(
+        citation_record=cluster,
+        query_string=request.META["QUERY_STRING"],
+        total_authorities_count=cluster.authority_count,
+        view_all_url=view_authorities_url,
+        doc_type="opinion",
+    )
+
     return TemplateResponse(
         request,
         "opinion.html",
@@ -569,8 +655,7 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
             "private": cluster.blocked,
             "citing_clusters": citing_clusters,
             "citing_cluster_count": citing_cluster_count,
-            "top_authorities": cluster.authorities_with_data[:5],
-            "authorities_count": len(cluster.authorities_with_data),
+            "authorities_context": authorities_context,
             "top_parenthetical_groups": parenthetical_groups,
             "summaries_count": cluster.parentheticals.count(),
             "sub_opinion_ids": sub_opinion_ids,
@@ -613,7 +698,9 @@ def view_summaries(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     )
 
 
-def view_authorities(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
+def view_authorities(
+    request: HttpRequest, pk: int, slug: str, doc_type=0
+) -> HttpResponse:
     cluster = get_object_or_404(OpinionCluster, pk=pk)
 
     return TemplateResponse(

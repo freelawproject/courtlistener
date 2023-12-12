@@ -5,12 +5,13 @@ from unittest import mock
 from urllib.parse import parse_qs, urlparse
 
 import time_machine
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.core import mail
 from django.core.management import call_command
-from django.test import Client, override_settings
+from django.test import AsyncClient, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.timezone import now
@@ -96,49 +97,55 @@ class AlertTest(SimpleUserDataMixin, TestCase):
     def tearDown(self) -> None:
         Alert.objects.all().delete()
 
-    def test_create_alert(self) -> None:
+    async def test_create_alert(self) -> None:
         """Can we create an alert by sending a post?"""
         self.assertTrue(
-            self.client.login(username="pandora", password="password")
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
         )
-        r = self.client.post(
+        r = await self.async_client.post(
             reverse("show_results"), self.alert_params, follow=True
         )
         self.assertEqual(r.redirect_chain[0][1], 302)
         self.assertIn("successfully", r.content.decode())
-        self.client.logout()
+        await self.async_client.alogout()
 
-    def test_fail_gracefully(self) -> None:
+    async def test_fail_gracefully(self) -> None:
         """Do we fail gracefully when an invalid alert form is sent?"""
         # Use a copy to shield other tests from changes.
         bad_alert_params = self.alert_params.copy()
         # Break the form
         bad_alert_params.pop("query", None)
         self.assertTrue(
-            self.client.login(username="pandora", password="password")
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
         )
-        r = self.client.post("/", bad_alert_params, follow=True)
+        r = await self.async_client.post("/", bad_alert_params, follow=True)
         self.assertEqual(r.status_code, 200)
         self.assertIn("error creating your alert", r.content.decode())
-        self.client.logout()
+        await self.async_client.alogout()
 
     def test_new_alert_gets_secret_key(self) -> None:
         """When you create a new alert, does it get a secret key?"""
         self.assertTrue(self.alert.secret_key)
 
-    def test_are_alerts_disabled_when_the_link_is_visited(self) -> None:
+    async def test_are_alerts_disabled_when_the_link_is_visited(self) -> None:
         self.assertEqual(self.alert.rate, self.alert_params["rate"])
-        self.client.get(reverse("disable_alert", args=[self.alert.secret_key]))
-        self.alert.refresh_from_db()
+        await self.async_client.get(
+            reverse("disable_alert", args=[self.alert.secret_key])
+        )
+        await self.alert.arefresh_from_db()
         self.assertEqual(self.alert.rate, "off")
 
-    def test_are_alerts_enabled_when_the_link_is_visited(self) -> None:
+    async def test_are_alerts_enabled_when_the_link_is_visited(self) -> None:
         self.assertEqual(self.alert.rate, self.alert_params["rate"])
         self.alert.rate = "off"
         new_rate = "wly"
         path = reverse("enable_alert", args=[self.alert.secret_key])
-        self.client.get(f"{path}?rate={new_rate}")
-        self.alert.refresh_from_db()
+        await self.async_client.get(f"{path}?rate={new_rate}")
+        await self.alert.arefresh_from_db()
         self.assertEqual(self.alert.rate, new_rate)
 
 
@@ -326,7 +333,7 @@ class AlertSeleniumTest(BaseSeleniumTest):
 
     def setUp(self) -> None:
         # Set up some handy variables
-        self.client = Client()
+        self.async_client = AsyncClient()
         self.alert_params = {
             "query": "q=asdf",
             "name": "dummy alert",
@@ -599,8 +606,8 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
                 "cl.scrapers.tasks.microservice",
                 side_effect=lambda *args, **kwargs: MockResponse(200, b"10"),
             ), mock.patch(
-                "cl.lib.es_signal_processor.avoid_es_audio_indexing",
-                side_effect=lambda x, y, z: False,
+                "cl.lib.es_signal_processor.allow_es_audio_indexing",
+                side_effect=lambda x, y: True,
             ):
                 cls.dly_oral_argument = AudioWithParentsFactory.create(
                     case_name="Dly Test OA",
@@ -1185,13 +1192,13 @@ class OldDocketAlertsReportToggleTest(TestCase):
         self.assertEqual(len(report.disabled_alerts), 1)
         self.assertEqual(active_docket_alerts.count(), 0)
 
-    def test_toggle_docket_alert_date_update(self):
+    async def test_toggle_docket_alert_date_update(self):
         """Does the docket alert toggle view properly update docket alerts
         date_modified when toggling the alert_type?
         """
 
         # A docket alert is created today for a case terminated on 2020-01-01
-        da = DocketAlertWithParentsFactory(
+        da = await sync_to_async(DocketAlertWithParentsFactory)(
             docket__source=Docket.RECAP,
             docket__date_terminated="2020-01-01",
             docket__date_last_filing=None,
@@ -1201,24 +1208,24 @@ class OldDocketAlertsReportToggleTest(TestCase):
         )
 
         self.assertTrue(
-            self.client.login(
+            await self.async_client.alogin(
                 username=self.user_profile.user.username, password="password"
             )
         )
         post_data = {"id": da.docket.pk}
-        header = {"HTTP_X_REQUESTED_WITH": "XMLHttpRequest"}
+        header = {"X_REQUESTED_WITH": "XMLHttpRequest"}
 
         # Send an AJAX request to toggle_docket_alert view and confirm the
         # is disabled and the date_modified updated.
         sixty_days_ahead = now() + timedelta(days=60)
         with time_machine.travel(sixty_days_ahead, tick=False):
-            self.client.post(
+            await self.async_client.post(
                 reverse("toggle_docket_alert"),
                 data=post_data,
                 follow=True,
                 **header,
             )
-        da.refresh_from_db()
+        await da.arefresh_from_db()
         self.assertEqual(da.alert_type, DocketAlert.UNSUBSCRIPTION)
         self.assertEqual(da.date_modified, sixty_days_ahead)
 
@@ -1226,13 +1233,13 @@ class OldDocketAlertsReportToggleTest(TestCase):
         # is enabled and the date_modified updated.
         eighty_five_days_ahead = now() + timedelta(days=85)
         with time_machine.travel(eighty_five_days_ahead, tick=False):
-            self.client.post(
+            await self.async_client.post(
                 reverse("toggle_docket_alert"),
                 data=post_data,
                 follow=True,
                 **header,
             )
-        da.refresh_from_db()
+        await da.arefresh_from_db()
         self.assertEqual(da.alert_type, DocketAlert.SUBSCRIPTION)
         self.assertEqual(da.date_modified, eighty_five_days_ahead)
 
@@ -1532,8 +1539,8 @@ class DocketAlertGetNotesTagsTests(TestCase):
 
 @override_switch("oa-es-alerts-active", active=True)
 @mock.patch(
-    "cl.lib.es_signal_processor.avoid_es_audio_indexing",
-    side_effect=lambda x, y, z: False,
+    "cl.lib.es_signal_processor.allow_es_audio_indexing",
+    side_effect=lambda x, y: True,
 )
 class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
     """Test ES Search Alerts"""

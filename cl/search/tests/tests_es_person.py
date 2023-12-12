@@ -2,6 +2,7 @@ import datetime
 import operator
 from collections import Counter
 from functools import reduce
+from unittest import mock
 
 from django.core.management import call_command
 from django.urls import reverse
@@ -28,7 +29,13 @@ from cl.people_db.models import Race
 from cl.search.documents import ES_CHILD_ID, PersonDocument, PositionDocument
 from cl.search.factories import CourtFactory
 from cl.search.models import SEARCH_TYPES
-from cl.tests.cases import ESIndexTestCase, TestCase, TransactionTestCase
+from cl.search.tasks import es_save_document, update_es_document
+from cl.tests.cases import (
+    CountESTasksTestCase,
+    ESIndexTestCase,
+    TestCase,
+    TransactionTestCase,
+)
 
 
 class PeopleSearchTestElasticSearch(
@@ -1208,13 +1215,16 @@ class IndexJudgesPositionsCommandTest(
         self.assertEqual(s.count(), 1)
 
 
-class PeopleIndexingTest(ESIndexTestCase, TransactionTestCase):
+class PeopleIndexingTest(
+    CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
+):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         cls.rebuild_index("people_db.Person")
 
     def setUp(self):
+        super().setUp()
         self.court_1 = CourtFactory(
             id="ca1",
             full_name="First Circuit",
@@ -1318,6 +1328,7 @@ class PeopleIndexingTest(ESIndexTestCase, TransactionTestCase):
             date_granularity_dob="%Y-%m-%d",
             date_granularity_dod="%Y-%m-%d",
         )
+        person_id = person.pk
         no_jud_position = PositionFactory.create(
             date_granularity_start="%Y-%m-%d",
             date_start=datetime.date(2015, 12, 14),
@@ -1329,7 +1340,7 @@ class PeopleIndexingTest(ESIndexTestCase, TransactionTestCase):
 
         # At this point there is no judiciary position for person, so the
         # person and no_jud_position are not indexed yet.
-        self.assertFalse(PersonDocument.exists(id=person.pk))
+        self.assertFalse(PersonDocument.exists(id=person_id))
         self.assertFalse(
             PersonDocument.exists(id=ES_CHILD_ID(no_jud_position.pk).POSITION)
         )
@@ -1346,12 +1357,13 @@ class PeopleIndexingTest(ESIndexTestCase, TransactionTestCase):
             nomination_process="fed_senate",
             date_elected=datetime.date(2015, 11, 12),
         )
+        jud_position_id = jud_position.pk
 
         # Confirm now the Person is indexed in ES.
-        self.assertTrue(PersonDocument.exists(id=person.pk))
+        self.assertTrue(PersonDocument.exists(id=person_id))
         # Also the judiciary position is indexed.
         self.assertTrue(
-            PositionDocument.exists(id=ES_CHILD_ID(jud_position.pk).POSITION)
+            PositionDocument.exists(id=ES_CHILD_ID(jud_position_id).POSITION)
         )
         # Previous no judiciary positions should also been indexed now.
         self.assertTrue(
@@ -1369,9 +1381,10 @@ class PeopleIndexingTest(ESIndexTestCase, TransactionTestCase):
             position_type=None,
             person=person,
         )
+        no_jud_position_2_id = no_jud_position_2.pk
         self.assertTrue(
             PositionDocument.exists(
-                id=ES_CHILD_ID(no_jud_position_2.pk).POSITION
+                id=ES_CHILD_ID(no_jud_position_2_id).POSITION
             )
         )
 
@@ -1386,9 +1399,44 @@ class PeopleIndexingTest(ESIndexTestCase, TransactionTestCase):
             nomination_process="fed_senate",
             date_elected=datetime.date(2015, 11, 12),
         )
+        jud_position_2_id = jud_position_2.pk
         self.assertTrue(
-            PositionDocument.exists(id=ES_CHILD_ID(jud_position_2.pk).POSITION)
+            PositionDocument.exists(id=ES_CHILD_ID(jud_position_2_id).POSITION)
         )
+
+        # If Judge Positions are removed and the Person is not a Judge anymore,
+        # remove it from the index with all the other positions.
+
+        jud_position.delete()
+        jud_position_2.delete()
+        self.assertFalse(
+            PositionDocument.exists(id=ES_CHILD_ID(jud_position_id).POSITION)
+        )
+        self.assertFalse(
+            PositionDocument.exists(id=ES_CHILD_ID(jud_position_2_id).POSITION)
+        )
+
+        # Non-judiciary positions and the Person should be also removed from
+        # the index
+        self.assertFalse(
+            PositionDocument.exists(
+                id=ES_CHILD_ID(no_jud_position_2_id).POSITION
+            )
+        )
+        self.assertFalse(PersonDocument.exists(id=person_id))
+
+        # Avoid indexing Person if a reverse related for a non-judge Person
+        # is added or updated.
+        aba_rating = ABARatingFactory(
+            rating="nq",
+            person=person,
+            year_rated="2015",
+        )
+        self.assertFalse(PersonDocument.exists(id=person_id))
+        aba_rating.year_rated = "2023"
+        aba_rating.save()
+        self.assertFalse(PersonDocument.exists(id=person_id))
+
         person.delete()
 
     def test_remove_parent_child_objects_from_index(self) -> None:
@@ -1407,7 +1455,6 @@ class PeopleIndexingTest(ESIndexTestCase, TransactionTestCase):
             nomination_process="fed_senate",
         )
         PoliticalAffiliationFactory.create(person=person)
-        school = SchoolFactory.create(name="Harvard University")
 
         person_pk = person.pk
         pos_1_pk = pos_1.pk
@@ -1455,6 +1502,12 @@ class PeopleIndexingTest(ESIndexTestCase, TransactionTestCase):
             date_start=datetime.date(1993, 1, 20),
             date_retirement=datetime.date(2001, 1, 20),
             termination_reason="retire_mand",
+            position_type="c-jud",
+            how_selected="e_part",
+            nomination_process="fed_senate",
+        )
+        PositionFactory.create(
+            person=person,
             position_type="c-jud",
             how_selected="e_part",
             nomination_process="fed_senate",
@@ -1771,3 +1824,149 @@ class PeopleIndexingTest(ESIndexTestCase, TransactionTestCase):
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         self.assertEqual(None, person_3_doc.aba_rating)
         self.assertEqual(None, pos_doc.aba_rating)
+
+    def test_person_indexing_and_tasks_count(self) -> None:
+        """Confirm a Person is properly indexed in ES with the right number of
+        indexing tasks.
+        """
+
+        with mock.patch(
+            "cl.lib.es_signal_processor.es_save_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                es_save_document, *args, **kwargs
+            ),
+        ):
+            person = PersonFactory.create(
+                name_first="Bill Clinton",
+                date_granularity_dob="%Y-%m-%d",
+                date_granularity_dod="%Y-%m-%d",
+                religion="ca",
+                date_dob=datetime.date(1941, 10, 21),
+                date_dod=datetime.date(2022, 11, 25),
+            )
+        # 0 es_save_document task calls for Person creation since it's not a
+        # Judge.
+        self.reset_and_assert_task_count(expected=0)
+        # The person is not indexed since it's not a Judge.
+        self.assertFalse(PersonDocument.exists(id=person.pk))
+
+        # Add a judiciaryPosition to person.
+        with mock.patch(
+            "cl.lib.es_signal_processor.es_save_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                es_save_document, *args, **kwargs
+            ),
+        ):
+            position = PositionFactory.create(
+                date_granularity_start="%Y-%m-%d",
+                court=self.court_2,
+                date_start=datetime.date(2020, 12, 14),
+                predecessor=self.person_3,
+                appointer=self.position_1,
+                judicial_committee_action="no_rep",
+                termination_reason="retire_mand",
+                position_type="c-jud",
+                person=person,
+                how_selected="a_legis",
+                nomination_process="fed_senate",
+            )
+        # 1 es_save_document task calls for Position creation.
+        self.reset_and_assert_task_count(expected=1)
+        # The Person and the Position are now indexed.
+        self.assertTrue(PersonDocument.exists(id=person.pk))
+        self.assertTrue(
+            PersonDocument.exists(id=ES_CHILD_ID(position.pk).POSITION)
+        )
+
+        # Update a Person without changes.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            person.save()
+        # update_es_document task shouldn't be called on save() without changes
+        self.reset_and_assert_task_count(expected=0)
+
+        # Update a Position without changes.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            position.save()
+        # update_es_document task shouldn't be called on save() without changes
+        self.reset_and_assert_task_count(expected=0)
+
+        # Update a Person tracked field.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            person.name_first = "Barack"
+            person.save()
+        # update_es_document task should be called 1 on tracked fields updates
+        self.reset_and_assert_task_count(expected=1)
+        p_doc = PersonDocument.get(id=person.pk)
+        self.assertIn("Barack", p_doc.name)
+
+        # Confirm a Person is indexed if it doesn't exist in the index on a
+        # tracked field update.
+        self.delete_index("people_db.Person")
+        self.create_index("people_db.Person")
+
+        self.assertFalse(PersonDocument.exists(id=person.pk))
+        self.assertFalse(
+            PersonDocument.exists(id=ES_CHILD_ID(position.pk).POSITION)
+        )
+
+        # Person creation on update.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            person.religion = "pr"
+            person.save()
+
+        # update_es_document task should be called 1 on tracked fields update
+        self.reset_and_assert_task_count(expected=1)
+        p_doc = PersonDocument.get(id=person.pk)
+        self.assertEqual(p_doc.religion, "pr")
+
+        # Position creation on update.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            position.nomination_process = "state_senate"
+            position.save()
+
+        # update_es_document task should be called 1 on tracked fields update
+        self.reset_and_assert_task_count(expected=1)
+        po_doc = PersonDocument.get(id=ES_CHILD_ID(position.pk).POSITION)
+        self.assertEqual(po_doc.nomination_process, "State Senate")
+
+        # Position ForeignKey field update.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            position.predecessor = self.person_2
+            position.save()
+
+        # update_es_document task should be called 1 on tracked fields update
+        self.reset_and_assert_task_count(expected=1)
+        po_doc = PersonDocument.get(id=ES_CHILD_ID(position.pk).POSITION)
+        self.assertEqual(po_doc.predecessor, self.person_2.name_full_reverse)
+
+        person.delete()

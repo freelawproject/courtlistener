@@ -238,9 +238,16 @@ class Command(VerboseCommand):
         logger.debug(f"#{len(site)} opinions found.")
         added = 0
         for i, item in enumerate(site):
+            # Minnesota currently rejects Courtlistener and Juriscraper as a User Agent
+            if court_str in ["minn", "minnctapp"]:
+                headers = site.headers
+            else:
+                headers = {"User-Agent": "CourtListener"}
+
             msg, r = get_binary_content(
                 item["download_urls"],
                 site.cookies,
+                headers,
                 method=site.method,
             )
             if msg:

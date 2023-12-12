@@ -155,31 +155,8 @@
         </div>
 
 
-        {# Show cases this case cites #}
-        {% if authorities_count > 0  %}
-            <div id="authorities" class="sidebar-section">
-                <h3><span>Authorities ({{ authorities_count|intcomma }})</span></h3>
-                <p class="bottom">This opinion cites:</p>
-                <ul>
-                    {% for authority in top_authorities %}
-                        <li>
-                            <a href="{{ authority.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
-                                {{ authority.caption|safe|truncatewords:10|v_wrapper }}
-                            </a>
-                            {% if authority.citation_depth %}
-                              <span class="small gray">({{ authority.citation_depth }}&nbsp;time{{ authority.citation_depth|pluralize }})</span>
-                            {% endif %}
-                        </li>
-                    {% endfor %}
-                </ul>
-                <h4>
-                    <a href="{% url "view_authorities" pk=cluster.pk slug=cluster.slug %}?{{ request.META.QUERY_STRING }}"
-                       class="btn btn-default">
-                        View All Authorities
-                    </a>
-                </h4>
-            </div>
-        {% endif %}
+        {% include "includes/authorities_section.html" with authorities_context=authorities_context%}
+
 
         {# Related opinions #}
         {% if related_clusters %}
@@ -496,7 +473,7 @@
                                 {% if sub_opinion.html_with_citations %}
                                   {% if cluster.source == "C" %}
                                     {# It's a PDF with no HTML enrichment #}
-                                    <div class="plaintext">{{ sub_opinion.html_with_citations|safe }}</div>
+                                    <div class="plaintext">{{ sub_opinion.html_with_citations|safe|linebreaksbr }}</div>
                                   {% else %}
                                     <div class="serif-text">{{ sub_opinion.html_with_citations|safe }}</div>
                                   {% endif %}

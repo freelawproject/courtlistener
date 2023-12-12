@@ -320,7 +320,7 @@ async def update_docket_metadata(
         d.court_id,
         docket_data.get("date_filed"),
     )
-    d.assigned_to_str = docket_data.get("assigned_to_str") or ""
+    d.assigned_to_str = docket_data.get("assigned_to_str") or d.assigned_to_str
     await lookup_judge_by_full_name_and_set_attr(
         d,
         "referred_to",
@@ -328,7 +328,7 @@ async def update_docket_metadata(
         d.court_id,
         docket_data.get("date_filed"),
     )
-    d.referred_to_str = docket_data.get("referred_to_str") or ""
+    d.referred_to_str = docket_data.get("referred_to_str") or d.referred_to_str
     d.blocked, d.date_blocked = await get_blocked_status(d)
 
     return d
@@ -602,12 +602,30 @@ async def merge_unnumbered_docket_entries(
 def add_create_docket_entry_transaction(d, docket_entry):
     with transaction.atomic():
         Docket.objects.select_for_update().get(pk=d.pk)
+        pacer_seq_no = docket_entry.get("pacer_seq_no")
+        params = {
+            "docket": d,
+            "entry_number": docket_entry["document_number"],
+        }
+        if pacer_seq_no is not None:
+            params["pacer_sequence_number"] = pacer_seq_no
+        null_de_queryset = DocketEntry.objects.filter(
+            docket=d,
+            entry_number=docket_entry["document_number"],
+            pacer_sequence_number__isnull=True,
+        )
         try:
-            de, de_created = DocketEntry.objects.get_or_create(
-                docket=d, entry_number=docket_entry["document_number"]
-            )
+            de = DocketEntry.objects.get(**params)
+            de_created = False
+        except DocketEntry.DoesNotExist:
+            if pacer_seq_no is not None and null_de_queryset.exists():
+                de = null_de_queryset.latest("date_created")
+                null_de_queryset.exclude(pk=de.pk).delete()
+                de_created = False
+            else:
+                de = DocketEntry.objects.create(**params)
+                de_created = True
         except DocketEntry.MultipleObjectsReturned:
-            pacer_seq_no = docket_entry.get("pacer_seq_no")
             if pacer_seq_no is None:
                 logger.error(
                     "Multiple docket entries found for document "
@@ -617,11 +635,6 @@ def add_create_docket_entry_transaction(d, docket_entry):
                 )
                 return None
 
-            null_de_queryset = DocketEntry.objects.filter(
-                docket=d,
-                entry_number=docket_entry["document_number"],
-                pacer_sequence_number__isnull=True,
-            )
             try:
                 de = DocketEntry.objects.get(
                     docket=d,
@@ -776,13 +789,7 @@ async def add_docket_entries(
         # Then make the RECAPDocument object. Try to find it. If we do, update
         # the pacer_doc_id field if it's blank. If we can't find it, create it
         # or throw an error.
-        params = {
-            "docket_entry": de,
-            # Normalize to "" here. Unsure why, but RECAPDocuments have a
-            # char field for this field while DocketEntries have a integer
-            # field.
-            "document_number": docket_entry["document_number"] or "",
-        }
+        params = {"docket_entry": de}
         if not docket_entry["document_number"] and docket_entry.get(
             "short_description"
         ):
@@ -816,11 +823,13 @@ async def add_docket_entries(
             ).aexists()
             if appellate_rd_att_exists:
                 params["document_type"] = RECAPDocument.ATTACHMENT
+                params["pacer_doc_id"] = docket_entry["pacer_doc_id"]
         try:
             rd = await RECAPDocument.objects.aget(**params)
         except RECAPDocument.DoesNotExist:
             try:
                 rd = await RECAPDocument.objects.acreate(
+                    document_number=docket_entry["document_number"] or "",
                     pacer_doc_id=docket_entry["pacer_doc_id"],
                     is_available=False,
                     **params,
@@ -834,12 +843,23 @@ async def add_docket_entries(
                 "Multiple recap documents found for document entry number'%s' "
                 "while processing '%s'" % (docket_entry["document_number"], d)
             )
-            continue
+            if params["document_type"] == RECAPDocument.ATTACHMENT:
+                continue
+            duplicate_rd_queryset = RECAPDocument.objects.filter(**params)
+            rd_with_pdf_queryset = duplicate_rd_queryset.filter(
+                is_available=True
+            ).exclude(filepath_local="")
+            if await rd_with_pdf_queryset.aexists():
+                rd = await rd_with_pdf_queryset.alatest("date_created")
+            else:
+                rd = await duplicate_rd_queryset.alatest("date_created")
+            await duplicate_rd_queryset.exclude(pk=rd.pk).adelete()
 
         rd.pacer_doc_id = rd.pacer_doc_id or docket_entry["pacer_doc_id"]
         rd.description = (
             docket_entry.get("short_description") or rd.description
         )
+        rd.document_number = docket_entry["document_number"] or ""
         try:
             await rd.asave()
         except ValidationError:
@@ -1417,22 +1437,20 @@ def merge_pacer_docket_into_cl_docket(
 
 async def clean_duplicate_attachment_entries(
     de: DocketEntry,
-    document_number: int,
     attachment_dicts: List[Dict[str, Union[int, str]]],
 ):
     """Remove attachment page entries with duplicate pacer_doc_id's that
     have incorrect attachment numbers. This is needed because older attachment
     pages were incorrectly parsed. See: freelawproject/juriscraper#721
 
+    Also generically remove attachments with duplicate pacer_doc_id's which
+    may have been duplicated due to issues with document_number parsing.
+
     :param de: A DocketEntry object
-    :param document_number: The docket entry number
     :param attachment_dicts: A list of Juriscraper-parsed dicts for each
     attachment.
     """
-    rds = RECAPDocument.objects.filter(
-        docket_entry=de,
-        document_number=document_number,
-    )
+    rds = RECAPDocument.objects.filter(docket_entry=de)
 
     dupe_doc_ids = (
         rds.values("pacer_doc_id")
@@ -1455,6 +1473,23 @@ async def clean_duplicate_attachment_entries(
             if dupe.pacer_doc_id == pacer_doc_id:
                 if dupe.attachment_number != attachment_number:
                     await dupe.adelete()
+    if not await dupe_doc_ids.aexists():
+        return
+    dupes = rds.filter(
+        pacer_doc_id__in=[
+            i["pacer_doc_id"] async for i in dupe_doc_ids.aiterator()
+        ]
+    )
+    async for dupe in dupes.aiterator():
+        duplicate_rd_queryset = rds.filter(pacer_doc_id=dupe.pacer_doc_id)
+        rd_with_pdf_queryset = duplicate_rd_queryset.filter(
+            is_available=True
+        ).exclude(filepath_local="")
+        if await rd_with_pdf_queryset.aexists():
+            keep_rd = await rd_with_pdf_queryset.alatest("date_created")
+        else:
+            keep_rd = await duplicate_rd_queryset.alatest("date_created")
+        await duplicate_rd_queryset.exclude(pk=keep_rd.pk).adelete()
 
 
 async def merge_attachment_page_data(
@@ -1480,20 +1515,34 @@ async def merge_attachment_page_data(
     and the DocketEntry object associated with the RECAPDocuments
     :raises: RECAPDocument.MultipleObjectsReturned, RECAPDocument.DoesNotExist
     """
+    params = {
+        "pacer_doc_id": pacer_doc_id,
+        "docket_entry__docket__court": court,
+    }
+    if pacer_case_id:
+        params["docket_entry__docket__pacer_case_id"] = pacer_case_id
     try:
-        params = {
-            "pacer_doc_id": pacer_doc_id,
-            "docket_entry__docket__court": court,
-        }
-        if pacer_case_id:
-            params["docket_entry__docket__pacer_case_id"] = pacer_case_id
         main_rd = await RECAPDocument.objects.select_related(
             "docket_entry", "docket_entry__docket"
         ).aget(**params)
     except RECAPDocument.MultipleObjectsReturned as exc:
-        # Unclear how to proceed and we don't want to associate this data with
-        # the wrong case. We must punt.
-        raise exc
+        if pacer_case_id:
+            duplicate_rd_queryset = RECAPDocument.objects.filter(**params)
+            rd_with_pdf_queryset = duplicate_rd_queryset.filter(
+                is_available=True
+            ).exclude(filepath_local="")
+            if await rd_with_pdf_queryset.aexists():
+                keep_rd = await rd_with_pdf_queryset.alatest("date_created")
+            else:
+                keep_rd = await duplicate_rd_queryset.alatest("date_created")
+            await duplicate_rd_queryset.exclude(pk=keep_rd.pk).adelete()
+            main_rd = await RECAPDocument.objects.select_related(
+                "docket_entry", "docket_entry__docket"
+            ).aget(**params)
+        else:
+            # Unclear how to proceed and we don't want to associate this data
+            # with the wrong case. We must punt.
+            raise exc
     except RECAPDocument.DoesNotExist as exc:
         # Can't find the docket to associate with the attachment metadata
         # It may be possible to go look for orphaned documents at this stage
@@ -1552,19 +1601,24 @@ async def merge_attachment_page_data(
             main_rd.document_type = RECAPDocument.ATTACHMENT
             main_rd.attachment_number = attachment["attachment_number"]
             rd = main_rd
-            created = False
         else:
-            rd, created = await RECAPDocument.objects.aupdate_or_create(
-                docket_entry=de,
-                document_number=document_number,
-                attachment_number=attachment["attachment_number"],
-                document_type=RECAPDocument.ATTACHMENT,
-            )
+            try:
+                rd = await RECAPDocument.objects.aget(
+                    docket_entry=de,
+                    document_number=document_number,
+                    attachment_number=attachment["attachment_number"],
+                    document_type=RECAPDocument.ATTACHMENT,
+                )
+            except RECAPDocument.DoesNotExist:
+                rd = RECAPDocument(
+                    docket_entry=de,
+                    document_number=document_number,
+                    attachment_number=attachment["attachment_number"],
+                    document_type=RECAPDocument.ATTACHMENT,
+                )
+                rds_created.append(rd)
 
-        if created:
-            rds_created.append(rd)
         rds_affected.append(rd)
-
         for field in ["description", "pacer_doc_id"]:
             if attachment[field]:
                 setattr(rd, field, attachment[field])
@@ -1589,9 +1643,7 @@ async def merge_attachment_page_data(
         # Do *not* do this async — that can cause race conditions.
         await sync_to_async(add_items_to_solr)([rd.pk], "search.RECAPDocument")
 
-    await clean_duplicate_attachment_entries(
-        de, document_number, attachment_dicts
-    )
+    await clean_duplicate_attachment_entries(de, attachment_dicts)
     await mark_ia_upload_needed(de.docket, save_docket=True)
     await process_orphan_documents(
         rds_created, court.pk, main_rd.docket_entry.docket.date_filed

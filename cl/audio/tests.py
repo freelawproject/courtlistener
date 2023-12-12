@@ -28,8 +28,8 @@ class PodcastTest(ESIndexTestCase, TestCase):
             citation_string="Appeals. CA8.",
         )
         with mock.patch(
-            "cl.lib.es_signal_processor.avoid_es_audio_indexing",
-            side_effect=lambda x, y, z: False,
+            "cl.lib.es_signal_processor.allow_es_audio_indexing",
+            side_effect=lambda x, y: True,
         ), cls.captureOnCommitCallbacks(execute=True):
             cls.audio = AudioWithParentsFactory.create(
                 docket=DocketFactory(
@@ -54,11 +54,11 @@ class PodcastTest(ESIndexTestCase, TestCase):
                 duration=5,
             )
 
-    def test_do_jurisdiction_podcasts_have_good_content(self) -> None:
+    async def test_do_jurisdiction_podcasts_have_good_content(self) -> None:
         """Can we simply load a jurisdiction podcast page?"""
 
         # Test jurisdiction_podcast for a court.
-        response = self.client.get(
+        response = await self.async_client.get(
             reverse(
                 "jurisdiction_podcast",
                 kwargs={"court": self.court_1.id},
@@ -108,7 +108,7 @@ class PodcastTest(ESIndexTestCase, TestCase):
         )
 
         # Test all_jurisdictions_podcast
-        response = self.client.get(
+        response = await self.async_client.get(
             reverse(
                 "all_jurisdictions_podcast",
             )
