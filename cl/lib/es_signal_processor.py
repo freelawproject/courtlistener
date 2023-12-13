@@ -36,6 +36,7 @@ from cl.search.models import (
     Docket,
     Opinion,
     OpinionCluster,
+    OpinionsCited,
     OpinionsCitedByRECAPDocument,
     ParentheticalGroup,
     RECAPDocument,
@@ -822,6 +823,8 @@ class ESSignalProcessor(object):
                     # the required mapping changes are landed in production.
                     return
                 main_object = instances[0].citing_document
+            case OpinionsCited() if self.es_document is OpinionDocument:  # type: ignore
+                main_object = instances[0].citing_opinion
             case _:
                 return
 

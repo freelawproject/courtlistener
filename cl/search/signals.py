@@ -435,19 +435,19 @@ o_field_mapping = {
     },
     "delete": {Opinion: {}},
     "m2m": {
-        OpinionsCited: {
-            "opinion": {
-                "cites": "cites",
-            },
-        },
         Opinion.joined_by.through: {
             "opinion": {
                 "joined_by_ids": "joined_by_ids",
             },
         },
     },
-    "reverse": {},
+    "reverse": {
+        OpinionsCited: {"cited_opinions": {"all": ["cites"]}},
+    },  # For handling OpinionsCited.save() in add_manual_citations command
     "reverse-delete": {},
+    "bulk-create": {
+        OpinionsCited: {"cited_opinions": {"all": ["cites"]}},
+    },  # For handling OpinionsCited bulk_create used in store_opinion_citations_and_update_parentheticals
 }
 
 o_cluster_field_mapping = {
@@ -508,6 +508,7 @@ o_cluster_field_mapping = {
             "cluster": {"all": ["citation", "neutralCite", "lexisCite"]}
         },
     },
+    "bulk-create": {},
 }
 
 

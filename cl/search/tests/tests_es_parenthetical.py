@@ -761,10 +761,11 @@ class ParentheticalESSignalProcessorTest(
             p5.group = pg_test
             p5.save()
 
-        # 1 es_save_document task calls for ParentheticalGroup creation.
+        # 5 es_save_document task calls for ParentheticalGroup creation.
+        # 2 Clusters, 2 Opinions and 1 ParentheticalGroup
         # Persons created by OpinionWithParentsFactory shouldn't call tasks
         # since they are not Judges.
-        self.reset_and_assert_task_count(expected=1)
+        self.reset_and_assert_task_count(expected=5)
         self.assertTrue(ParentheticalGroupDocument.exists(id=pg_test.pk))
 
         # Update a ParentheticalGroup without changes.

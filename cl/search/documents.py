@@ -1380,10 +1380,10 @@ class OpinionBaseDocument(Document):
         return instance.syllabus
 
     def prepare_sibling_ids(self, instance):
-        return [opinion.pk for opinion in instance.sub_opinions.all()]
+        return list(instance.sub_opinions.all().values_list("id", flat=True))
 
     def prepare_panel_ids(self, instance):
-        return [judge.pk for judge in instance.panel.all()]
+        return list(instance.panel.all().values_list("id", flat=True))
 
     def prepare_dateFiled(self, instance):
         if instance.date_filed is None:
@@ -1499,10 +1499,14 @@ class OpinionDocument(OpinionBaseDocument):
             return instance.local_path.name
 
     def prepare_cites(self, instance):
-        return [opinion.pk for opinion in instance.opinions_cited.all()]
+        return list(
+            instance.cited_opinions.all().values_list(
+                "cited_opinion_id", flat=True
+            )
+        )
 
     def prepare_joined_by_ids(self, instance):
-        return [judge.pk for judge in instance.joined_by.all()]
+        return list(instance.joined_by.all().values_list("id", flat=True))
 
     def prepare_text(self, instance):
         if instance.html_columbia:
@@ -1528,10 +1532,12 @@ class OpinionDocument(OpinionBaseDocument):
         return instance.cluster.scdb_id
 
     def prepare_sibling_ids(self, instance):
-        return [opinion.pk for opinion in instance.cluster.sub_opinions.all()]
+        return list(
+            instance.cluster.sub_opinions.all().values_list("id", flat=True)
+        )
 
     def prepare_panel_ids(self, instance):
-        return [judge.pk for judge in instance.cluster.panel.all()]
+        return list(instance.cluster.panel.all().values_list("id", flat=True))
 
     def prepare_dateFiled(self, instance):
         if instance.cluster.date_filed is None:
@@ -1678,7 +1684,11 @@ class OpinionClusterDocument(OpinionBaseDocument):
         return instance.get_absolute_url()
 
     def prepare_non_participating_judge_ids(self, instance):
-        return [judge.pk for judge in instance.non_participating_judges.all()]
+        return list(
+            instance.non_participating_judges.all().values_list(
+                "id", flat=True
+            )
+        )
 
     def prepare_cluster_child(self, instance):
         return "opinion_cluster"

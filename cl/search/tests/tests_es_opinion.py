@@ -6,7 +6,6 @@ from django.contrib.auth.hashers import make_password
 from django.core.management import call_command
 from django.test import AsyncRequestFactory, override_settings
 from django.urls import reverse
-from django.utils.timezone import now
 from elasticsearch_dsl import Q
 from factory import RelatedFactory
 from lxml import html
@@ -38,7 +37,7 @@ from cl.search.factories import (
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
     compose_redis_key,
 )
-from cl.search.models import PRECEDENTIAL_STATUS, SEARCH_TYPES
+from cl.search.models import PRECEDENTIAL_STATUS, SEARCH_TYPES, OpinionsCited
 from cl.search.views import do_search
 from cl.tests.cases import ESIndexTestCase, TestCase, TransactionTestCase
 from cl.users.factories import UserProfileWithParentsFactory
@@ -1399,7 +1398,28 @@ class EsOpinionsIndexingTest(ESIndexTestCase, TransactionTestCase):
             per_curiam=False,
             type="010combined",
         )
-        opinion.opinions_cited.add(opinion_2)
+        opinion_3 = OpinionFactory.create(
+            extracted_by_ocr=False,
+            author=person_2,
+            plain_text="my plain text secret word for queries",
+            cluster=opinion_cluster,
+            local_path="test/search/opinion_wpd.wpd",
+            per_curiam=False,
+            type="010combined",
+        )
+        # Add OpinionsCited used save() as in add_manual_citations command
+        cite = OpinionsCited(
+            citing_opinion_id=opinion.pk,
+            cited_opinion_id=opinion_2.pk,
+        )
+        cite.save()
+
+        # Add OpinionsCited used bulk_create as in store_opinion_citations_and_update_parentheticals
+        cite_2 = OpinionsCited(
+            citing_opinion_id=opinion.pk,
+            cited_opinion_id=opinion_3.pk,
+        )
+        OpinionsCited.objects.bulk_create_with_signal([cite_2])
 
         es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
         for cite in opinion.opinions_cited.all():

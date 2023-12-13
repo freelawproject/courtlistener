@@ -3457,6 +3457,15 @@ class OpinionJoinedBy(Opinion.joined_by.through):
         proxy = True
 
 
+class BulkCreateManager(models.Manager):
+    """Custom manager that will trigger a signal on bulk_create."""
+
+    def bulk_create_with_signal(self, objs, *args, **kwargs):
+        created_objs = super().bulk_create(objs, *args, **kwargs)
+        bulk_create_signal.send(sender=self.model, instances=created_objs)
+        return created_objs
+
+
 class OpinionsCited(models.Model):
     citing_opinion = models.ForeignKey(
         Opinion, related_name="cited_opinions", on_delete=models.CASCADE
@@ -3479,21 +3488,14 @@ class OpinionsCited(models.Model):
     # treatment: positive, negative, etc.
     #
 
+    objects = BulkCreateManager()
+
     def __str__(self) -> str:
         return f"{self.citing_opinion.id} ⤜--cites⟶  {self.cited_opinion.id}"
 
     class Meta:
         verbose_name_plural = "Opinions cited"
         unique_together = ("citing_opinion", "cited_opinion")
-
-
-class BulkCreateManager(models.Manager):
-    """Custom manager that will trigger a signal on bulk_create."""
-
-    def bulk_create_with_signal(self, objs, *args, **kwargs):
-        created_objs = super().bulk_create(objs, *args, **kwargs)
-        bulk_create_signal.send(sender=self.model, instances=created_objs)
-        return created_objs
 
 
 class OpinionsCitedByRECAPDocument(models.Model):

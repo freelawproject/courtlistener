@@ -231,7 +231,7 @@ def store_opinion_citations_and_update_parentheticals(
         Parenthetical.objects.filter(describing_opinion_id=opinion.pk).delete()
 
         # Create the new ones.
-        OpinionsCited.objects.bulk_create(
+        OpinionsCited.objects.bulk_create_with_signal(
             [
                 OpinionsCited(
                     citing_opinion_id=opinion.pk,
