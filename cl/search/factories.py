@@ -27,6 +27,7 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     OpinionsCited,
+    OpinionsCitedByRECAPDocument,
     Parenthetical,
     ParentheticalGroup,
     RECAPDocument,
@@ -322,3 +323,17 @@ class BankruptcyInformationFactory(DjangoModelFactory):
 
     chapter = Faker("random_id_string")
     trustee_str = Faker("name_female")
+
+
+class OpinionsCitedByRECAPDocumentFactory(DjangoModelFactory):
+    """Make a OpinionsCitedByRECAPDocument with parents"""
+
+    class Meta:
+        model = OpinionsCitedByRECAPDocument
+
+    citing_document = SubFactory(
+        "cl.search.factories.RECAPDocumentFactory",
+    )
+    cited_opinion = SubFactory(
+        "cl.search.factories.OpinionFactory",
+    )

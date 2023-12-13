@@ -961,6 +961,9 @@ class ESRECAPDocument(DocketBaseDocument):
     page_count = fields.IntegerField(attr="page_count")
     filepath_local = fields.KeywordField(index=False)
     absolute_url = fields.KeywordField(index=False)
+    cites = fields.ListField(
+        fields.IntegerField(multi=True),
+    )
 
     class Django:
         model = RECAPDocument
@@ -1057,6 +1060,12 @@ class ESRECAPDocument(DocketBaseDocument):
 
     def prepare_plain_text(self, instance):
         return escape(instance.plain_text)
+
+    def prepare_cites(self, instance):
+        return [
+            opinion.cited_opinion.pk
+            for opinion in instance.cited_opinions.all()
+        ]
 
 
 @recap_index.document

@@ -31,6 +31,7 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     OpinionsCited,
+    OpinionsCitedByRECAPDocument,
     Parenthetical,
     ParentheticalGroup,
     RECAPDocument,
@@ -374,7 +375,9 @@ recap_document_field_mapping = {
     },
     "delete": {RECAPDocument: {}},
     "m2m": {},
-    "reverse": {},
+    "reverse": {
+        OpinionsCitedByRECAPDocument: {"cited_opinions": {"all": ["cites"]}},
+    },
     "reverse-delete": {},
 }
 

@@ -29,6 +29,8 @@ from cl.search.factories import (
     CourtFactory,
     DocketEntryWithParentsFactory,
     DocketFactory,
+    OpinionsCitedByRECAPDocumentFactory,
+    OpinionWithParentsFactory,
     RECAPDocumentFactory,
 )
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
@@ -3199,6 +3201,24 @@ class RECAPIndexingTest(
         r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
         self.assertEqual(r_doc.pacer_doc_id, "99999999")
         self.assertEqual(r_doc.docket_child["parent"], docket_2.pk)
+
+        # Add cites to RECAPDocument.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            opinion = OpinionWithParentsFactory()
+            OpinionsCitedByRECAPDocumentFactory(
+                citing_document=rd_1,
+                cited_opinion=opinion,
+                depth=1,
+            )
+
+        self.reset_and_assert_task_count(expected=1)
+        r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
+        self.assertIn(opinion.pk, r_doc.cites)
 
         docket_2.delete()
 
