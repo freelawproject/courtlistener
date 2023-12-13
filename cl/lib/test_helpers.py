@@ -35,7 +35,12 @@ from cl.search.factories import (
     OpinionsCitedWithParentsFactory,
     RECAPDocumentFactory,
 )
-from cl.search.models import Court, Opinion, RECAPDocument
+from cl.search.models import (
+    Court,
+    Opinion,
+    OpinionsCitedByRECAPDocument,
+    RECAPDocument,
+)
 from cl.search.tasks import add_items_to_solr
 from cl.tests.cases import SimpleTestCase, TestCase
 from cl.users.factories import UserProfileWithParentsFactory
@@ -463,6 +468,18 @@ class RECAPSearchTestCase(SimpleTestCase):
             pacer_doc_id="018036652435",
         )
 
+        cls.opinion = OpinionFactory(
+            cluster=OpinionClusterFactory(docket=cls.de.docket)
+        )
+        OpinionsCitedByRECAPDocument.objects.bulk_create_with_signal(
+            [
+                OpinionsCitedByRECAPDocument(
+                    citing_document=cls.rd,
+                    cited_opinion=cls.opinion,
+                    depth=1,
+                )
+            ]
+        )
         cls.rd_att = RECAPDocumentFactory(
             docket_entry=cls.de,
             description="Document attachment",

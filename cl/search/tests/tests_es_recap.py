@@ -38,7 +38,11 @@ from cl.search.management.commands.cl_index_parent_and_child_docs import (
     get_last_parent_document_id_processed,
     log_last_document_indexed,
 )
-from cl.search.models import SEARCH_TYPES, RECAPDocument
+from cl.search.models import (
+    SEARCH_TYPES,
+    OpinionsCitedByRECAPDocument,
+    RECAPDocument,
+)
 from cl.search.tasks import (
     add_docket_to_solr_by_rds,
     es_save_document,
@@ -1048,7 +1052,44 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # Frontend
         r = await self._test_article_count(params, 1, '"pacer_doc_id"')
         # Count child documents under docket.
+        self._count_child_documents(0, r.content.decode(), 2, '"entry_number"')
+
+    def test_advanced_query_cites(self) -> None:
+        """Confirm cites advance query works properly"""
+
+        # Advanced query string, cites
+        # Frontend
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": f"cites:({self.opinion.pk})",
+        }
+
+        r = async_to_sync(self._test_article_count)(params, 1, "cites")
+        # Count child documents under docket.
+        self._count_child_documents(0, r.content.decode(), 1, '"pacer_doc_id"')
+
+        # Add a new OpinionsCitedByRECAPDocument
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_2 = OpinionWithParentsFactory()
+            OpinionsCitedByRECAPDocument.objects.bulk_create_with_signal(
+                [
+                    OpinionsCitedByRECAPDocument(
+                        citing_document=self.rd_att,
+                        cited_opinion=opinion_2,
+                        depth=1,
+                    )
+                ]
+            )
+        # Frontend
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": f"cites:({opinion_2.pk} OR {self.opinion.pk})",
+        }
+        r = async_to_sync(self._test_article_count)(params, 1, "cites")
+        # Count child documents under docket.
         self._count_child_documents(0, r.content.decode(), 2, '"pacer_doc_id"')
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_2.cluster.docket.delete()
 
     async def test_text_queries(self) -> None:
         """Confirm text queries works properly"""
@@ -3210,15 +3251,62 @@ class RECAPIndexingTest(
             ),
         ):
             opinion = OpinionWithParentsFactory()
-            OpinionsCitedByRECAPDocumentFactory(
-                citing_document=rd_1,
-                cited_opinion=opinion,
-                depth=1,
+            OpinionsCitedByRECAPDocument.objects.bulk_create_with_signal(
+                [
+                    OpinionsCitedByRECAPDocument(
+                        citing_document=rd_1,
+                        cited_opinion=opinion,
+                        depth=1,
+                    )
+                ]
             )
 
         self.reset_and_assert_task_count(expected=1)
         r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
         self.assertIn(opinion.pk, r_doc.cites)
+
+        # Confirm OpinionsCitedByRECAPDocument delete doesn't trigger a update.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            OpinionsCitedByRECAPDocument.objects.filter(
+                citing_document=rd_1.pk
+            ).delete()
+
+        self.reset_and_assert_task_count(expected=0)
+        r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
+        self.assertIn(opinion.pk, r_doc.cites)
+
+        # Update cites to RECAPDocument.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            opinion = OpinionWithParentsFactory()
+            opinion_2 = OpinionWithParentsFactory()
+            o_cited = OpinionsCitedByRECAPDocument(
+                citing_document=rd_1,
+                cited_opinion=opinion,
+                depth=1,
+            )
+            o_cited_2 = OpinionsCitedByRECAPDocument(
+                citing_document=rd_1,
+                cited_opinion=opinion_2,
+                depth=1,
+            )
+            OpinionsCitedByRECAPDocument.objects.bulk_create_with_signal(
+                [o_cited, o_cited_2]
+            )
+
+        self.reset_and_assert_task_count(expected=1)
+        r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
+        self.assertIn(opinion.pk, r_doc.cites)
+        self.assertIn(opinion_2.pk, r_doc.cites)
 
         docket_2.delete()
 

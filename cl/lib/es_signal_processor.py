@@ -1,6 +1,7 @@
 from functools import partial
 
 from celery.canvas import chain
+from django.conf import settings
 from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist
 from django.db import transaction
 from django.db.models.signals import m2m_changed, post_delete, post_save
@@ -30,8 +31,10 @@ from cl.search.documents import (
 from cl.search.models import (
     BankruptcyInformation,
     Docket,
+    OpinionsCitedByRECAPDocument,
     ParentheticalGroup,
     RECAPDocument,
+    bulk_create_signal,
 )
 from cl.search.tasks import (
     es_save_document,
@@ -551,6 +554,9 @@ class ESSignalProcessor(object):
         models_reverse_foreign_key_delete = list(
             self.documents_model_mapping["reverse-delete"].keys()
         )
+        models_bulk_create = list(
+            self.documents_model_mapping["bulk-create"].keys()
+        )
         main_model = self.main_model.__name__.lower()
 
         # Connect signals for save
@@ -585,6 +591,14 @@ class ESSignalProcessor(object):
             self.handle_reverse_actions_delete,
             {
                 post_delete: f"update_reverse_related_{main_model}_on_delete",
+            },
+        )
+        # Connect signals for bulk-create keys
+        self.connect_signals(
+            models_bulk_create,
+            self.handle_bulk_create,
+            {
+                bulk_create_signal: f"update_bulk_create_{main_model}",
             },
         )
 
@@ -713,6 +727,39 @@ class ESSignalProcessor(object):
                 getattr(instance, instance_field, instance),
                 query_string,
                 affected_fields,
+            )
+
+    @elasticsearch_enabled
+    def handle_bulk_create(self, sender, instances=None, **kwargs):
+        """Receiver function that gets called after a bulk_create_with_signal
+        action.
+        """
+
+        if not instances:
+            return
+        instance = instances[0]
+        match instance:
+            case OpinionsCitedByRECAPDocument() if self.es_document is ESRECAPDocument:  # type: ignore
+                if settings.ELASTICSEARCH_RECAP_CITES_DISABLED:
+                    # Disable indexing the ESRECAPDocument cites field until
+                    # the required mapping changes are landed in production.
+                    return
+                main_object = instances[0].citing_document
+            case _:
+                return
+
+        mapping_fields = self.documents_model_mapping["bulk-create"][sender]
+        for query_string, fields_map in mapping_fields.items():
+            affected_fields = fields_map["all"]
+            transaction.on_commit(
+                partial(
+                    update_es_document.delay,
+                    self.es_document.__name__,
+                    affected_fields,
+                    (compose_app_label(main_object), main_object.pk),
+                    None,
+                    None,
+                )
             )
 
     @elasticsearch_enabled
