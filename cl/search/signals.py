@@ -34,6 +34,7 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     OpinionsCited,
+    OpinionsCitedByRECAPDocument,
     Parenthetical,
     ParentheticalGroup,
     RECAPDocument,
@@ -134,6 +135,7 @@ pa_field_mapping = {
             },
         }
     },
+    "bulk-create": {},
 }
 
 oa_field_mapping = {
@@ -170,6 +172,7 @@ oa_field_mapping = {
     "m2m": {Audio.panel.through: {"audio": {"panel_ids": "panel_ids"}}},
     "reverse": {},
     "reverse-delete": {},
+    "bulk-create": {},
 }
 
 p_field_mapping = {
@@ -211,6 +214,7 @@ p_field_mapping = {
             }
         },
     },
+    "bulk-create": {},
 }
 
 position_field_mapping = {
@@ -276,6 +280,7 @@ position_field_mapping = {
     "m2m": {Person.race.through: {"person": {"races": "races"}}},
     "reverse": {},
     "reverse-delete": {},
+    "bulk-create": {},
 }
 
 docket_field_mapping = {
@@ -322,6 +327,7 @@ docket_field_mapping = {
     "reverse-delete": {
         BankruptcyInformation: {"docket": {"all": ["chapter", "trustee_str"]}},
     },
+    "bulk-create": {},
 }
 
 recap_document_field_mapping = {
@@ -378,6 +384,9 @@ recap_document_field_mapping = {
     "m2m": {},
     "reverse": {},
     "reverse-delete": {},
+    "bulk-create": {
+        OpinionsCitedByRECAPDocument: {"cited_opinions": {"all": ["cites"]}},
+    },
 }
 
 o_field_mapping = {
