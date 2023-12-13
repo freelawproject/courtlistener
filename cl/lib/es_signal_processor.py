@@ -740,7 +740,7 @@ class ESSignalProcessor(object):
         instance = instances[0]
         match instance:
             case OpinionsCitedByRECAPDocument() if self.es_document is ESRECAPDocument:  # type: ignore
-                if settings.ELASTICSEARCH_RECAP_CITES_DISABLED:
+                if not settings.ELASTICSEARCH_RECAP_CITES_ENABLED:
                     # Disable indexing the ESRECAPDocument cites field until
                     # the required mapping changes are landed in production.
                     return

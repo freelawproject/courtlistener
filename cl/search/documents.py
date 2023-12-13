@@ -87,7 +87,9 @@ class ParentheticalGroupDocument(Document):
         return [str(cite) for cite in instance.opinion.cluster.citations.all()]
 
     def prepare_cites(self, instance):
-        return [o.pk for o in instance.opinion.opinions_cited.all()]
+        return list(
+            instance.opinion.opinions_cited.all().values_list("id", flat=True)
+        )
 
     def prepare_lexisCite(self, instance):
         try:
@@ -110,7 +112,9 @@ class ParentheticalGroupDocument(Document):
             pass
 
     def prepare_panel_ids(self, instance):
-        return [judge.pk for judge in instance.opinion.cluster.panel.all()]
+        return list(
+            instance.opinion.cluster.panel.all().values_list("id", flat=True)
+        )
 
     def prepare_status(self, instance):
         return instance.opinion.cluster.get_precedential_status_display()
@@ -262,7 +266,7 @@ class AudioDocument(AudioDocumentBase):
         return best_case_name(instance)
 
     def prepare_panel_ids(self, instance):
-        return [judge.pk for judge in instance.panel.all()]
+        return list(instance.panel.all().values_list("id", flat=True))
 
     def prepare_file_size_mp3(self, instance):
         if instance.local_path_mp3:
@@ -1062,10 +1066,11 @@ class ESRECAPDocument(DocketBaseDocument):
         return escape(instance.plain_text)
 
     def prepare_cites(self, instance):
-        return [
-            opinion.cited_opinion.pk
-            for opinion in instance.cited_opinions.all()
-        ]
+        return list(
+            instance.cited_opinions.all().values_list(
+                "cited_opinion_id", flat=True
+            )
+        )
 
 
 @recap_index.document
