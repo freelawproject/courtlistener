@@ -98,6 +98,7 @@ services:
       - cl-redis
       - cl-celery
       - cl-solr
+      - cl-selenium
       - cl-doctor
       - cl-disclosures
       - cl-es
@@ -112,6 +113,18 @@ services:
       - cl_net_overlay
     env_file:
       - ../../.env.dev
+
+  cl-selenium:
+    container_name: cl-selenium
+    image: seleniarm/standalone-chromium:113.0
+    ports:
+      - 5900:5900  # VNC server
+    volumes:
+      - ${CL_SHM_DIR:-/dev/shm}:/dev/shm
+    networks:
+      - cl_net_overlay
+    environment:
+      - JAVA_OPTS=-Dwebdriver.chrome.whitelistedIps=
 
   cl-doctor:
     image: freelawproject/doctor:latest
