@@ -108,6 +108,48 @@ class MembershipWebhookViewSet(
 
         return user
 
+    def _get_membership_data(
+        self, webhook_data: dict[str, str]
+    ) -> dict[str, str]:
+        """
+        Extracts relevant membership information from a Neon webhook payload.
+
+        Args:
+            webhook_data (dict[str, str]): The payload received from a Neon
+            webhook.
+
+        Returns:
+            dict[str, str]: A dictionary containing the extracted membership
+            data, with the following keys:
+            - membershipId: Unique identifier for the membership.
+            - accountId: Identifier for the user account associated with the
+            membership.
+            - termEndDate: The date the membership is scheduled to terminate
+            - membershipName: The name of the membership level the user is
+            enrolled in.
+        """
+        if "membership" in webhook_data["data"]:
+            data = webhook_data["data"]["membership"]
+            membership = {
+                "membershipId": data["membershipId"],
+                "membershipName": data["membershipName"],
+            }
+        else:
+            data = webhook_data["data"]
+            membership = {
+                "membershipId": data["id"],
+                "membershipName": data["membershipLevel"]["name"],
+            }
+
+        membership.update(
+            {
+                "accountId": data["accountId"],
+                "termEndDate": data["termEndDate"],
+            }
+        )
+
+        return membership
+
     def _store_webhook_payload(self, webhook_data, trigger_type: int) -> None:
         membership_data = webhook_data["data"]["membership"]
         NeonWebhookEvents.objects.create(
