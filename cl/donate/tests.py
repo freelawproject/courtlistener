@@ -8,12 +8,14 @@ import stripe
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core import mail
-from django.test.client import AsyncClient
+from django.test import override_settings
+from django.test.client import AsyncClient, Client
 from django.urls import reverse
 from django.utils.timezone import now
 from rest_framework.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_302_FOUND
 
-from cl.donate.factories import DonationFactory
+from cl.donate.api_views import MembershipWebhookViewSet
+from cl.donate.factories import DonationFactory, NeonWebhookEventFactory
 from cl.donate.management.commands.cl_send_donation_reminders import (
     Command as DonationReminderCommand,
 )
@@ -511,17 +513,38 @@ class MembershipWebhookTest(TestCase):
             },
         }
 
-    async def test_store_webhook_data(self) -> None:
+    @override_settings(NEON_MAX_WEBHOOK_NUMBER=10)
+    def test_store_and_truncate_webhook_data(self) -> None:
         self.data["eventTrigger"] = "createMembership"
-        r = await self.async_client.post(
+        client = Client()
+        r = client.post(
             reverse("membership-webhooks-list", kwargs={"version": "v3"}),
             data=self.data,
             content_type="application/json",
         )
         self.assertEqual(r.status_code, HTTP_201_CREATED)
-        self.assertEqual(await NeonWebhookEvents.objects.all().acount(), 1)
+        self.assertEqual(NeonWebhookEvents.objects.all().count(), 1)
 
-    async def test_create_new_membership(self) -> None:
+        NeonWebhookEventFactory.create_batch(18)
+
+        # Update the trigger type and Adds a new webhook to the log. After
+        # adding this new record the post_save signal should truncate the
+        # events table and keep the latest NEON_MAX_WEBHOOK_NUMBER records
+        self.data["eventTrigger"] = "editMembership"
+        client = Client()
+        r = client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+            data=self.data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(NeonWebhookEvents.objects.all().count(), 10)
+
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    async def test_create_new_membership(self, mock_store_webhook) -> None:
         self.data["eventTrigger"] = "createMembership"
         r = await self.async_client.post(
             reverse("membership-webhooks-list", kwargs={"version": "v3"}),
@@ -538,7 +561,16 @@ class MembershipWebhookTest(TestCase):
         self.assertEqual(membership.user_id, self.user_profile.user.pk)
         self.assertEqual(membership.level, NeonMembership.TIER_1)
 
-    async def test_update_membership(self) -> None:
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    async def test_update_membership(self, mock_store_webhook) -> None:
+        await NeonMembership.objects.acreate(
+            user=self.user_profile.user,
+            neon_id="12345",
+            level=NeonMembership.TIER_1,
+        )
+
         # Update the membership level and the trigger type
         self.data["eventTrigger"] = "editMembership"
         self.data["data"]["membership"][
@@ -557,7 +589,10 @@ class MembershipWebhookTest(TestCase):
         self.assertEqual(membership.neon_id, "12345")
         self.assertEqual(membership.level, NeonMembership.TIER_4)
 
-    async def test_delete_membership(self) -> None:
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    async def test_delete_membership(self, mock_store_webhook) -> None:
         await NeonMembership.objects.acreate(
             user=self.user_profile.user, neon_id="9876"
         )
