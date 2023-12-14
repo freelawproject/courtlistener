@@ -858,7 +858,7 @@ class DRFSearchAppAndAudioAppApiFilterTest(
         self.assertCountInResults(1)
 
         # Multiple choice filter
-        
+
         sources = [SOURCES.COURT_WEBSITE]
         self.q = {"source": sources}
         self.assertCountInResults(2)
