@@ -45,26 +45,17 @@ class MembershipWebhookViewSet(
         serializer.is_valid(raise_exception=True)
 
         webhook_data = serializer.validated_data
+        self._store_webhook_payload(webhook_data)
         match webhook_data["eventTrigger"]:
-            case "createMembership":
-                self._store_webhook_payload(
-                    webhook_data, NeonWebhookEvents.MEMBERSHIP_CREATION
-                )
-                self._handle_membership_creation(webhook_data)
-            case "editMembership":
-                self._store_webhook_payload(
-                    webhook_data, NeonWebhookEvents.MEMBERSHIP_UPDATE
-                )
-                self._handle_membership_update(webhook_data)
+            case "createMembership" | "editMembership":
+                self._handle_membership_creation_or_update(webhook_data)
             case "deleteMembership":
-                self._store_webhook_payload(
-                    webhook_data, NeonWebhookEvents.MEMBERSHIP_DELETE
-                )
                 self._handle_membership_deletion(webhook_data)
             case "updateMembership":
                 pass
             case _:
-                raise NotImplementedError("Unknown event trigger")
+                trigger = webhook_data["eventTrigger"]
+                raise NotImplementedError(f"Unknown event trigger-{trigger}")
 
         return Response(status=HTTPStatus.CREATED)
 
