@@ -1,6 +1,5 @@
 import logging
 import socket
-from collections import deque
 from datetime import timedelta
 from importlib import import_module
 from random import randint
@@ -548,7 +547,7 @@ def get_doc_from_es(
             )
         except (ConflictError, RequestError) as exc:
             logger.error(
-                f"Error indexing the {es_document.Django.model.__name__.capitalize()} with ID: {main_instance_id}. "
+                f"Error indexing the {es_document.Django.model.__name__.capitalize()} with ID: {instance_id}. "
                 f"Exception was: {type(exc).__name__}"
             )
 

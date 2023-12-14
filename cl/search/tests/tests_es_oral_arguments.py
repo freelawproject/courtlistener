@@ -944,7 +944,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         # Frontend
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": f'docketNumber:"19 5734"',
+            "q": 'docketNumber:"19 5734"',
         }
         r = self.client.get(
             reverse("show_results"),
@@ -1225,7 +1225,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         # Frontend
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": f"Freedom of Info",
+            "q": "Freedom of Info",
         }
         r = self.client.get(
             reverse("show_results"),
@@ -1338,7 +1338,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         # Frontend
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": f"judge:Wallace and Friedland",
+            "q": "judge:Wallace and Friedland",
         }
         r = self.client.get(
             reverse("show_results"),
@@ -1351,7 +1351,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": f"judge:Wallace to Friedland",
+            "q": "judge:Wallace to Friedland",
         }
         r = self.client.get(
             reverse("show_results"),
@@ -1365,7 +1365,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         # Special stopwords are not found.
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": f"xx-xxxx",
+            "q": "xx-xxxx",
         }
         r = self.client.get(
             reverse("show_results"),
@@ -1380,7 +1380,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         # Frontend
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": f'caseName:"Freedom of Inform"',
+            "q": 'caseName:"Freedom of Inform"',
         }
         r = self.client.get(
             reverse("show_results"),
@@ -1570,7 +1570,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         # and 1:21-cv-1234-ABC
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "docket_number": f"21-1234",
+            "docket_number": "21-1234",
         }
         # Frontend
         r = self.client.get(
@@ -1726,7 +1726,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         # 'learning rd'.
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": f"learn road",
+            "q": "learn road",
         }
         r = self.client.get(
             reverse("show_results"),
@@ -1741,7 +1741,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
         # Search for '"learning" road' should return only a result for
         # 'Learning rd'
-        search_params["q"] = f'"learning" road'
+        search_params["q"] = '"learning" road'
         r = self.client.get(
             reverse("show_results"),
             search_params,
@@ -1755,7 +1755,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         # A phrase search for '"learn road"' should execute an exact and phrase
         # search simultaneously. It shouldn't return any results,
         # given that the indexed string is 'Learn of rd'.
-        search_params["q"] = f'"learn road"'
+        search_params["q"] = '"learn road"'
         r = self.client.get(
             reverse("show_results"),
             search_params,
@@ -1801,7 +1801,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
         cd = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "docket_number": f"1:21-bk-1234",
+            "docket_number": "1:21-bk-1234",
             "q": "",
             "order_by": "score desc",
         }
@@ -1816,8 +1816,8 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
         cd = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "docket_number": f"1:21-cv-1234-ABC",
-            "court": f"cabc",
+            "docket_number": "1:21-cv-1234-ABC",
+            "court": "cabc",
             "q": "",
             "order_by": "score desc",
         }
@@ -1833,8 +1833,8 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
         cd = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "docket_number": f"1:21-bk-1234",
-            "court": f"cabc",
+            "docket_number": "1:21-bk-1234",
+            "court": "cabc",
             "argued_after": datetime.date(2015, 8, 16),
             "q": "",
             "order_by": "score desc",
@@ -1851,8 +1851,8 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
         cd = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "docket_number": f"19-5734",
-            "court": f"cabc",
+            "docket_number": "19-5734",
+            "court": "cabc",
             "argued_after": datetime.date(2015, 8, 15),
             "q": "Loretta NOT (Hong Liu)",
             "order_by": "score desc",
@@ -1868,9 +1868,9 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
         cd = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "court": f"nyed",
+            "court": "nyed",
             "argued_after": datetime.date(2015, 8, 14),
-            "q": f"caseName:Loretta AND docketNumber:(ASBCA No. 59126)",
+            "q": "caseName:Loretta AND docketNumber:(ASBCA No. 59126)",
             "order_by": "score desc",
         }
 

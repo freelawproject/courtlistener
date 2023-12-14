@@ -775,8 +775,7 @@ class DRFSearchAppAndAudioAppApiFilterTest(
         self.assertCountInResults(1)
 
         # Integer lookups
-        self.q = dict()
-        self.q["scdb_votes_majority__gt"] = 10
+        self.q = {"scdb_votes_majority__gt": 10}
         self.assertCountInResults(0)
         self.q["scdb_votes_majority__gt"] = 1
         self.assertCountInResults(1)
@@ -801,21 +800,18 @@ class DRFSearchAppAndAudioAppApiFilterTest(
         self.q["cluster__panel"] = 2
         self.assertCountInResults(4)
 
-        self.q = dict()
-        self.q["author__name_first__istartswith"] = "Nope"
+        self.q = {"author__name_first__istartswith": "Nope"}
         self.assertCountInResults(0)
         self.q["author__name_first__istartswith"] = "jud"
         self.assertCountInResults(6)
 
-        self.q = dict()
-        self.q["joined_by__name_first__istartswith"] = "Nope"
+        self.q = {"joined_by__name_first__istartswith": "Nope"}
         self.assertCountInResults(0)
         self.q["joined_by__name_first__istartswith"] = "jud"
         self.assertCountInResults(1)
 
-        self.q = dict()
         types = [Opinion.COMBINED]
-        self.q["type"] = types
+        self.q = {"type": types}
         self.assertCountInResults(5)
         types.append(Opinion.LEAD)
         self.assertCountInResults(6)
@@ -862,9 +858,9 @@ class DRFSearchAppAndAudioAppApiFilterTest(
         self.assertCountInResults(1)
 
         # Multiple choice filter
-        self.q = dict()
+        
         sources = [SOURCES.COURT_WEBSITE]
-        self.q["source"] = sources
+        self.q = {"source": sources}
         self.assertCountInResults(2)
         sources.append(SOURCES.COURT_M_RESOURCE)
         self.assertCountInResults(3)
@@ -1165,7 +1161,7 @@ class WebhooksMilestoneEventsTest(TestCase):
         self.assertEqual(total_events[0].description, user_description)
 
         # Send 4 more new webhook events for user_1:
-        for i in range(4):
+        for _ in range(4):
             webhook_event = WebhookEventFactory(
                 webhook=self.webhook_user_1,
                 content="{'message': 'ok_1'}",
@@ -1194,7 +1190,7 @@ class WebhooksMilestoneEventsTest(TestCase):
         self.assertEqual(total_events[1].description, global_description)
 
         # Send 5 new webhook events for user_2
-        for i in range(5):
+        for _ in range(5):
             webhook_event_2 = WebhookEventFactory(
                 webhook=self.webhook_user_2,
                 content="{'message': 'ok_2'}",

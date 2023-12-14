@@ -120,11 +120,7 @@ def make_es_boost_list(fields: Dict[str, float]) -> list[str]:
     the corresponding boost values.
     :return: A list of Elasticsearch fields with boost values formatted as 'field_name^boost_value'.
     """
-    boosted_fields = []
-    for k, v in fields.items():
-        boosted_fields.append(f"{k}^{v}")
-    return boosted_fields
-
+    return [f"{k}^{v}" for k, v in fields.items()]
 
 def add_fields_boosting(
     cd: CleanData, fields: list[str] | None = None
