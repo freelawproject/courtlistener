@@ -150,13 +150,43 @@ class MembershipWebhookViewSet(
 
         return membership
 
-    def _store_webhook_payload(self, webhook_data, trigger_type: int) -> None:
-        membership_data = webhook_data["data"]["membership"]
+    def _map_trigger_value(self, trigger_event: str) -> int:
+        """
+        Maps a string trigger event received from a Neon webhook to the
+        corresponding integer value representing the trigger event type in
+        the NeonWebhookEvents model.
+
+        Args:
+            trigger_event (str): The string representing the trigger event
+            type received in the Neon webhook payload.
+
+        Returns:
+            int: The integer value of the trigger event type according to
+            the NeonWebhookEvents model
+        """
+        match trigger_event:
+            case "createMembership":
+                trigger = NeonWebhookEvents.MEMBERSHIP_CREATION
+            case "updateMembership":
+                trigger = NeonWebhookEvents.MEMBERSHIP_UPDATE
+            case "editMembership":
+                trigger = NeonWebhookEvents.MEMBERSHIP_EDIT
+            case "deleteMembership":
+                trigger = NeonWebhookEvents.MEMBERSHIP_DELETE
+
+        return trigger
+
+    def _store_webhook_payload(self, webhook_data) -> None:
+        trigger = self._map_trigger_value(webhook_data["eventTrigger"])
+        if trigger != NeonWebhookEvents.MEMBERSHIP_DELETE:
+            membership_data = self._get_membership_data(webhook_data)
+        else:
+            membership_data = webhook_data["data"]["membership"]
         NeonWebhookEvents.objects.create(
             content=json.dumps(webhook_data, default=str),
-            trigger=trigger_type,
+            account_id=membership_data.get("accountId", ""),
             membership_id=membership_data["membershipId"],
-            account_id=membership_data["accountId"],
+            trigger=trigger,
         )
 
     def _handle_membership_creation(self, webhook_data) -> None:
