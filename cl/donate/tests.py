@@ -11,17 +11,27 @@ from django.core import mail
 from django.test.client import AsyncClient
 from django.urls import reverse
 from django.utils.timezone import now
-from rest_framework.status import HTTP_200_OK, HTTP_302_FOUND
+from rest_framework.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_302_FOUND
 
 from cl.donate.factories import DonationFactory
 from cl.donate.management.commands.cl_send_donation_reminders import (
     Command as DonationReminderCommand,
 )
-from cl.donate.models import FREQUENCIES, PROVIDERS, Donation, MonthlyDonation
+from cl.donate.models import (
+    FREQUENCIES,
+    PROVIDERS,
+    Donation,
+    MonthlyDonation,
+    NeonMembership,
+    NeonWebhookEvents,
+)
 
 # From: https://stripe.com/docs/testing#cards
 from cl.donate.utils import emails
-from cl.lib.test_helpers import SimpleUserDataMixin
+from cl.lib.test_helpers import (
+    SimpleUserDataMixin,
+    UserProfileWithParentsFactory,
+)
 from cl.tests.cases import TestCase
 
 stripe_test_numbers = {
@@ -480,3 +490,88 @@ class DonationIntegrationTest(SimpleUserDataMixin, TestCase):
         )
         await self.do_stripe_callback()
         self.assertEmailSubject(emails["payment_thanks"]["subject"])
+
+
+class MembershipWebhookTest(TestCase):
+    def setUp(self) -> None:
+        self.async_client = AsyncClient()
+        self.user_profile = UserProfileWithParentsFactory()
+        self.user_profile.neon_account_id = "1234"
+        self.user_profile.save()
+
+        self.data = {
+            "eventTimestamp": "2017-05-04T03:42:59.000-06:00",
+            "data": {
+                "membership": {
+                    "membershipId": "12345",
+                    "accountId": "1234",
+                    "membershipName": "CL Membership - Tier 1",
+                    "termEndDate": "2024-01-01-05:00",
+                }
+            },
+        }
+
+    async def test_store_webhook_data(self) -> None:
+        self.data["eventTrigger"] = "createMembership"
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+            data=self.data,
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(await NeonWebhookEvents.objects.all().acount(), 1)
+
+    async def test_create_new_membership(self) -> None:
+        self.data["eventTrigger"] = "createMembership"
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+            data=self.data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+
+        query = NeonMembership.objects.filter(neon_id="12345")
+        self.assertEqual(await query.acount(), 1)
+
+        membership = await query.afirst()
+        self.assertEqual(membership.user_id, self.user_profile.user.pk)
+        self.assertEqual(membership.level, NeonMembership.TIER_1)
+
+    async def test_update_membership(self) -> None:
+        # Update the membership level and the trigger type
+        self.data["eventTrigger"] = "editMembership"
+        self.data["data"]["membership"][
+            "membershipName"
+        ] = "CL Membership - Tier 4"
+
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+            data=self.data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        membership = await NeonMembership.objects.aget(neon_id="12345")
+
+        self.assertEqual(membership.neon_id, "12345")
+        self.assertEqual(membership.level, NeonMembership.TIER_4)
+
+    async def test_delete_membership(self) -> None:
+        await NeonMembership.objects.acreate(
+            user=self.user_profile.user, neon_id="9876"
+        )
+
+        # Update trigger type and membership id
+        self.data["eventTrigger"] = "deleteMembership"
+        self.data["data"]["membership"]["membershipId"] = "9876"
+
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+            data=self.data,
+            content_type="application/json",
+        )
+
+        query = NeonMembership.objects.filter(neon_id="9876")
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(await query.acount(), 0)
