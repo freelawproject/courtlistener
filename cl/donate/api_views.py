@@ -189,21 +189,12 @@ class MembershipWebhookViewSet(
             trigger=trigger,
         )
 
-    def _handle_membership_creation(self, webhook_data) -> None:
-        membership_data = webhook_data["data"]["membership"]
-        user = self._get_member_record(membership_data["accountId"])
-        NeonMembership.objects.create(
-            user=user,
-            neon_id=membership_data["membershipId"],
-            level=NeonMembership.INVERTED[membership_data["membershipName"]],
-            termination_date=membership_data["termEndDate"],
-        )
-
-    def _handle_membership_update(self, webhook_data) -> None:
-        membership_data = webhook_data["data"]["membership"]
+    def _handle_membership_creation_or_update(self, webhook_data) -> None:
+        membership_data = self._get_membership_data(webhook_data)
         user = self._get_member_record(membership_data["accountId"])
         try:
             neon_membership = user.membership
+            neon_membership.neon_id = membership_data["membershipId"]
             neon_membership.level = NeonMembership.INVERTED[
                 membership_data["membershipName"]
             ]
