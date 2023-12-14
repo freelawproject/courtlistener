@@ -61,6 +61,8 @@ class MembershipWebhookViewSet(
                     webhook_data, NeonWebhookEvents.MEMBERSHIP_DELETE
                 )
                 self._handle_membership_deletion(webhook_data)
+            case "updateMembership":
+                pass
             case _:
                 raise NotImplementedError("Unknown event trigger")
 
