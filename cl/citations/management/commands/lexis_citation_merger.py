@@ -10,7 +10,7 @@ from pandas.io.parsers import TextFileReader
 from cl.citations.management.commands.citation_merger_utils import (
     add_citations,
     add_stub_case,
-    find_cases_with_citations,
+    find_cases_with_metadata,
     load_citations_file,
     prepare_citation,
 )
@@ -68,6 +68,7 @@ def process_lexis_data(
         if end_row is not None and (end_row == index):
             end = True
 
+        logger.info(f"Processing row: {index}")
         case_name = row.get("full_name")
         citations = row.get("lexis_ids_normalized")
         court = row.get("court")
@@ -79,14 +80,14 @@ def process_lexis_data(
         valid_citations = extract_valid_citations(citations)
 
         if len(valid_citations) > 0:
-            search_results = find_cases_with_citations(
+            search_results = find_cases_with_metadata(
                 valid_citations, court, date_filed, date_decided, case_name
             )
             if search_results:
-                for search_result in search_results:
+                if search_results.count() == 1:
                     add_citations(
                         valid_citations,
-                        search_result.pk,
+                        search_results.first(),
                         debug,
                     )
             else:
@@ -173,9 +174,10 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--limit",
-            default=10000,
+            default=0,
             type=int,
-            help="Limit number of rows to process.",
+            help="Limit number of rows to process. It will apply to each csv file "
+            "found.",
             required=False,
         )
 

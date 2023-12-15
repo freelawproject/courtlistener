@@ -116,10 +116,6 @@ def add_citations(
         ).exists():
             # Avoid adding a citation if we already have a citation from the
             # citation's reporter
-            logger.info(
-                f"Cluster id: {cluster_id} - Reporter's citation already exist in "
-                f"cluster: {citation.corrected_citation()}"
-            )
             continue
 
         # Get correct reporter type before trying to add the citation
@@ -230,6 +226,16 @@ def add_stub_case(
             with transaction.atomic():
                 # Prepare case name
                 case_name = harmonize(case_name)
+
+                if case_name == "v.":
+                    # Case name reduced to blank: "Plaintiff v. Defendant",
+                    # this happened in row 2417 of file
+                    # 20190510_minimal_metadata_bankruptcy.csv
+                    logger.info(
+                        f"Case name reduced to blank, can't add stub case."
+                    )
+                    return
+
                 case_name_short = cnt.make_case_name_short(case_name)
 
                 # TODO change with cluster stub model
@@ -262,7 +268,7 @@ def add_stub_case(
                 add_citations(valid_citations, cluster.pk, debug)
 
                 logger.info(
-                    f"Added stub case correctly, cluster id: {cluster.pk}"
+                    f"Added stub case correctly: {case_name}, cluster id: {cluster.pk}"
                 )
 
         else:
@@ -328,7 +334,7 @@ def get_date_filter(
     return dates_filed
 
 
-def find_cases_with_citations(
+def find_cases_with_metadata(
     valid_citations: list,
     court: Optional[str] = None,
     date_filed: Optional[str] = None,
@@ -447,8 +453,8 @@ def find_cases_with_citations(
     results_ids = list(set(results_ids))
 
     if len(results_ids) > 1:
-        # Possible duplicate cases, we still add citations to cases that
-        # match the search criteria
+        # Possible duplicate cases, we return all objects, but we will skip that row
+        # because the citations could be added to the wrong case
         logger.warning(
             f"Possible duplicated cases with ids: {','.join(map(str, results_ids))}"
         )
