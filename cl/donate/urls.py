@@ -2,12 +2,10 @@ from django.urls import path
 
 from cl.donate.paypal import donate_paypal_cancel, process_paypal_callback
 from cl.donate.stripe_helpers import process_stripe_callback
-from cl.donate.views import donate, payment_complete, toggle_monthly_donation
+from cl.donate.views import payment_complete, toggle_monthly_donation
 from cl.users.views import view_donations
 
 urlpatterns = [
-    # Donations & payments
-    path("donate/", donate, name="donate"),
     path(
         "donate/complete/",
         payment_complete,
