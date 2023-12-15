@@ -371,6 +371,7 @@ def update_reverse_related_documents(
     instance: ESModelType,
     query_string: str,
     affected_fields: list[str],
+    fields_map: dict[str, str],
 ) -> None:
     """Update reverse related documents in Elasticsearch.
     :param main_model: The main model to fetch objects from.
@@ -380,8 +381,15 @@ def update_reverse_related_documents(
     :param query_string: The query string to filter the main model objects.
     :param affected_fields: The list of field names that are reverse related to
     the instance.
+    :param fields_map: A dict containing field names that can be updated.
     :return: None
     """
+
+    # Set related instance if fields_map is provided.
+    related_instance = (compose_app_label(instance), instance.pk)
+    if fields_map.get("all", None):
+        related_instance = None
+        fields_map = None
 
     # Update parent instance
     main_objects = main_model.objects.filter(**{query_string: instance})
@@ -395,8 +403,8 @@ def update_reverse_related_documents(
                 es_document.__name__,
                 affected_fields,
                 (compose_app_label(main_object), main_object.pk),
-                None,
-                None,
+                related_instance,
+                fields_map,
             )
         )
 
@@ -425,6 +433,7 @@ def update_reverse_related_documents(
                     OpinionDocument.__name__,
                     instance.cluster.pk,
                     affected_fields,
+                    fields_map,
                 )
             )
         case BankruptcyInformation() if es_document is DocketDocument:  # type: ignore
@@ -792,6 +801,13 @@ class ESSignalProcessor(object):
                     )
                     if not affected_fields:
                         return None
+                case Opinion() if self.es_document is OpinionClusterDocument:  # type: ignore
+                    changed_fields = updated_fields(instance, self.es_document)
+                    affected_fields = get_fields_to_update(
+                        changed_fields, fields_map
+                    )
+                    if not affected_fields:
+                        return None
                 case _:
                     try:
                         affected_fields = fields_map[instance.type]
@@ -805,6 +821,7 @@ class ESSignalProcessor(object):
                 getattr(instance, instance_field, instance),
                 query_string,
                 affected_fields,
+                fields_map,
             )
 
     @elasticsearch_enabled

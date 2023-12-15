@@ -445,9 +445,7 @@ o_field_mapping = {
         OpinionsCited: {"cited_opinions": {"all": ["cites"]}},
     },  # For handling OpinionsCited.save() in add_manual_citations command
     "reverse-delete": {},
-    "bulk-create": {
-        OpinionsCited: {"cited_opinions": {"all": ["cites"]}},
-    },  # For handling OpinionsCited bulk_create used in store_opinion_citations_and_update_parentheticals
+    "bulk-create": {},
 }
 
 o_cluster_field_mapping = {
@@ -461,7 +459,6 @@ o_cluster_field_mapping = {
                 "date_reargument_denied": ["dateReargumentDenied"],
             }
         },
-        Opinion: {"sub_opinions": {"cluster_id": ["sibling_ids"]}},
         OpinionCluster: {
             "self": {
                 "docket_id": ["prepare"],
@@ -497,7 +494,7 @@ o_cluster_field_mapping = {
         },
     },
     "reverse": {
-        Opinion: {"sub_opinions": {"all": ["sibling_ids"]}},
+        Opinion: {"sub_opinions": {"cluster_id": ["sibling_ids"]}},
         Citation: {
             "citations": {"all": ["citation", "neutralCite", "lexisCite"]}
         },

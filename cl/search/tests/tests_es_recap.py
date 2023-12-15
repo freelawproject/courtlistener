@@ -29,7 +29,6 @@ from cl.search.factories import (
     CourtFactory,
     DocketEntryWithParentsFactory,
     DocketFactory,
-    OpinionsCitedByRECAPDocumentFactory,
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
 )
@@ -3246,13 +3245,13 @@ class RECAPIndexingTest(
         self.assertEqual(r_doc.docket_child["parent"], docket_2.pk)
 
         # Add cites to RECAPDocument.
+        opinion = OpinionWithParentsFactory()
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.delay",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
                 update_es_document, *args, **kwargs
             ),
         ):
-            opinion = OpinionWithParentsFactory()
             OpinionsCitedByRECAPDocument.objects.bulk_create_with_signal(
                 [
                     OpinionsCitedByRECAPDocument(
@@ -3263,6 +3262,7 @@ class RECAPIndexingTest(
                 ]
             )
 
+        # update_es_document task should be called 1 on tracked fields update
         self.reset_and_assert_task_count(expected=1)
         r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
         self.assertIn(opinion.pk, r_doc.cites)
@@ -3305,7 +3305,7 @@ class RECAPIndexingTest(
                 [o_cited, o_cited_2]
             )
 
-        self.reset_and_assert_task_count(expected=1)
+        self.reset_and_assert_task_count(expected=3)
         r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
         self.assertIn(opinion.pk, r_doc.cites)
         self.assertIn(opinion_2.pk, r_doc.cites)

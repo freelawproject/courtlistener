@@ -1,6 +1,5 @@
 import logging
 import socket
-from collections import deque
 from datetime import timedelta
 from importlib import import_module
 from random import randint
@@ -12,7 +11,7 @@ from celery import Task
 from django.apps import apps
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import QuerySet
+from django.db.models import Prefetch, QuerySet
 from django.utils.timezone import now
 from elasticsearch.exceptions import (
     ConflictError,
@@ -20,7 +19,7 @@ from elasticsearch.exceptions import (
     NotFoundError,
     RequestError,
 )
-from elasticsearch.helpers import parallel_bulk, streaming_bulk
+from elasticsearch.helpers import bulk, parallel_bulk, streaming_bulk
 from elasticsearch_dsl import Document, UpdateByQuery, connections
 from requests import Session
 from scorched.exc import SolrError
@@ -45,6 +44,7 @@ from cl.search.models import (
     Docket,
     Opinion,
     OpinionCluster,
+    OpinionsCited,
     RECAPDocument,
 )
 from cl.search.types import (
@@ -651,6 +651,7 @@ def update_children_docs_by_query(
         .params(timeout=f"{settings.ELASTICSEARCH_TIMEOUT}s")
     )
 
+    # Build the UpdateByQuery script and execute it
     script_lines = []
     params = {}
     for field_to_update in fields_to_update:
@@ -669,7 +670,7 @@ def update_children_docs_by_query(
             else:
                 params[field_name] = getattr(parent_instance, field_to_update)
     script_source = "\n".join(script_lines)
-    # Build the UpdateByQuery script and execute it
+
     ubq = ubq.script(source=script_source, params=params)
     try:
         ubq.execute()
@@ -975,3 +976,118 @@ def index_dockets_in_bulk(
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
         DocketDocument._index.refresh()
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(ConnectionError, ConflictError, NotFoundError),
+    max_retries=6,
+    retry_backoff=2 * 60,
+    retry_backoff_max=20 * 60,
+    retry_jitter=True,
+    queue=settings.CELERY_ETL_TASK_QUEUE,
+    ignore_result=True,
+)
+def index_related_cites_fields(
+    self: Task,
+    model_name: str,
+    child_id: int,
+    cluster_ids_to_update: list[int] | None = None,
+) -> None:
+    """Index 'cites' and 'citeCount' fields in ES documents in a one request.
+    :param self: The Celery task instance.
+    :param model_name: The model name that originated the request.
+    :param child_id: The child document ID to update with the cites.
+    :param cluster_ids_to_update: Optional; the cluster IDs where 'citeCount'
+    should be updated.
+    :return: None.
+    """
+
+    documents_to_update = []
+    match model_name:
+        case OpinionsCited.__name__ if cluster_ids_to_update:
+            # Query all clusters to update and retrieve only their sub_opinions
+            # with the necessary fields.
+            prefetch = Prefetch(
+                "sub_opinions", queryset=Opinion.objects.only("pk")
+            )
+            clusters_with_sub_opinions = (
+                OpinionCluster.objects.filter(pk__in=cluster_ids_to_update)
+                .only("pk", "citation_count")
+                .prefetch_related(prefetch)
+            )
+
+            base_doc = {
+                "_op_type": "update",
+                "_index": OpinionClusterDocument._index._name,
+            }
+            for cluster in clusters_with_sub_opinions:
+                if not OpinionClusterDocument.exists(id=cluster.pk):
+                    # If the OpinionClusterDocument does not exist, it might
+                    # not be indexed yet. Raise a NotFoundError to retry the
+                    # task; hopefully, it will be indexed soon.
+                    raise NotFoundError(
+                        f"The OpinionCluster {cluster.pk} is not indexed.",
+                        "",
+                        {"id": cluster.pk},
+                    )
+
+                # Build the OpinionCluster dicts for updating the citeCount.
+                doc_to_update = {
+                    "_id": cluster.pk,
+                    "doc": {"citeCount": cluster.citation_count},
+                }
+                doc_to_update.update(base_doc)
+                documents_to_update.append(doc_to_update)
+
+                for opinion in cluster.sub_opinions.all():
+                    if not OpinionClusterDocument.exists(
+                        id=ES_CHILD_ID(opinion.pk).OPINION
+                    ):
+                        # If the OpinionDocument does not exist, it might
+                        # not be indexed yet. Raise a NotFoundError to retry the
+                        # task; hopefully, it will be indexed soon.
+                        raise NotFoundError(
+                            f"The Opinion {opinion.pk} is not indexed.",
+                            "",
+                            {"id": opinion.pk},
+                        )
+
+                    # Build the Opinion dicts for updating the citeCount.
+                    doc_to_update = {
+                        "_id": ES_CHILD_ID(opinion.pk).OPINION,
+                        "doc": {"citeCount": cluster.citation_count},
+                    }
+                    doc_to_update.update(base_doc)
+                    documents_to_update.append(doc_to_update)
+
+            # Finally build the Opinion dict for updating the cites.
+            opinion_instance = get_instance_from_db(child_id, Opinion)
+            if not opinion_instance:
+                return
+            cites_prepared = OpinionDocument().prepare_cites(opinion_instance)
+            doc_id = ES_CHILD_ID(opinion_instance.pk).OPINION
+            if not OpinionClusterDocument.exists(id=doc_id):
+                # If the OpinionDocument does not exist, it might
+                # not be indexed yet. Raise a NotFoundError to retry the
+                # task; hopefully, it will be indexed soon.
+                raise NotFoundError(
+                    f"The Opinion {opinion_instance.pk} is not indexed.",
+                    "",
+                    {"id": opinion_instance.pk},
+                )
+
+            doc_to_update = {"_id": doc_id, "doc": {"cites": cites_prepared}}
+            doc_to_update.update(base_doc)
+            documents_to_update.append(doc_to_update)
+
+    if not documents_to_update:
+        return
+
+    client = connections.get_connection(alias="no_retry_connection")
+    # Execute the bulk update
+    bulk(client, documents_to_update)
+
+    if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
+        # Set auto-refresh, used for testing.
+        OpinionClusterDocument._index.refresh()

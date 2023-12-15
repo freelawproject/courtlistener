@@ -28,11 +28,10 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     OpinionsCited,
-    OpinionsCitedByRECAPDocument,
     Parenthetical,
     RECAPDocument,
 )
-from cl.search.tasks import add_items_to_solr
+from cl.search.tasks import add_items_to_solr, index_related_cites_fields
 
 # This is the distance two reporter abbreviations can be from each other if
 # they are considered parallel reporters. For example,
@@ -231,7 +230,7 @@ def store_opinion_citations_and_update_parentheticals(
         Parenthetical.objects.filter(describing_opinion_id=opinion.pk).delete()
 
         # Create the new ones.
-        OpinionsCited.objects.bulk_create_with_signal(
+        OpinionsCited.objects.bulk_create(
             [
                 OpinionsCited(
                     citing_opinion_id=opinion.pk,
@@ -252,3 +251,11 @@ def store_opinion_citations_and_update_parentheticals(
 
         # Save all the changes to the citing opinion (send to solr later)
         opinion.save(index=False)
+
+    # Update changes in ES.
+    cluster_ids_to_update = list(
+        opinion_clusters_to_update.values_list("id", flat=True)
+    )
+    index_related_cites_fields.delay(
+        OpinionsCited.__name__, opinion.pk, cluster_ids_to_update
+    )

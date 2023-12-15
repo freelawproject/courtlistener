@@ -1025,8 +1025,12 @@ def add_depth_counts(
     :param search_results: Solr results from paginate_cached_solr_results()
     :return The OpinionCluster if the lookup was successful
     """
+
     cites_query_matches = re.findall(r"cites:\((\d+)\)", search_data["q"])
-    if len(cites_query_matches) == 1:
+    if (
+        len(cites_query_matches) == 1
+        and search_data["type"] == SEARCH_TYPES.OPINION
+    ):
         try:
             cited_cluster = OpinionCluster.objects.get(
                 sub_opinions__pk=cites_query_matches[0]

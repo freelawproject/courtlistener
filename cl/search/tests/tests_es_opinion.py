@@ -1,9 +1,11 @@
 import datetime
+from unittest import mock
 
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.core.management import call_command
+from django.db.models import F
 from django.test import AsyncRequestFactory, override_settings
 from django.urls import reverse
 from elasticsearch_dsl import Q
@@ -37,9 +39,25 @@ from cl.search.factories import (
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
     compose_redis_key,
 )
-from cl.search.models import PRECEDENTIAL_STATUS, SEARCH_TYPES, OpinionsCited
+from cl.search.models import (
+    PRECEDENTIAL_STATUS,
+    SEARCH_TYPES,
+    OpinionCluster,
+    OpinionsCited,
+)
+from cl.search.tasks import (
+    es_save_document,
+    index_related_cites_fields,
+    update_children_docs_by_query,
+    update_es_document,
+)
 from cl.search.views import do_search
-from cl.tests.cases import ESIndexTestCase, TestCase, TransactionTestCase
+from cl.tests.cases import (
+    CountESTasksTestCase,
+    ESIndexTestCase,
+    TestCase,
+    TransactionTestCase,
+)
 from cl.users.factories import UserProfileWithParentsFactory
 
 
@@ -1184,7 +1202,9 @@ class IndexOpinionDocumentsCommandTest(
             self.assertTrue(OpinionDocument.exists(id=ES_CHILD_ID(pk).OPINION))
 
 
-class EsOpinionsIndexingTest(ESIndexTestCase, TransactionTestCase):
+class EsOpinionsIndexingTest(
+    CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
+):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -1230,6 +1250,8 @@ class EsOpinionsIndexingTest(ESIndexTestCase, TransactionTestCase):
             dob_city="Brookyln",
             dob_state="NY",
         )
+        self.person_2 = PersonFactory.create()
+        super().setUp()
 
     def test_remove_parent_child_objects_from_index(self) -> None:
         """Confirm join child objects are removed from the index when the
@@ -1324,35 +1346,68 @@ class EsOpinionsIndexingTest(ESIndexTestCase, TransactionTestCase):
 
     def test_child_document_update_properly(self) -> None:
         """Confirm that child fields are properly update when changing DB records"""
-        opinion_cluster = OpinionClusterFactory.create(
-            case_name_full="Paul Debbas v. Franklin",
-            case_name_short="Debbas",
-            syllabus="some rando syllabus",
-            date_filed=datetime.date(2015, 8, 14),
-            procedural_history="some rando history",
-            source="C",
-            case_name="Debbas v. Franklin",
-            attorneys="a bunch of crooks!",
-            slug="case-name-cluster",
-            precedential_status="Errata",
-            citation_count=4,
-            docket=self.docket,
-        )
-        opinion = OpinionFactory.create(
-            extracted_by_ocr=False,
-            author=self.person,
-            plain_text="my plain text secret word for queries",
-            cluster=opinion_cluster,
-            local_path="test/search/opinion_doc.doc",
-            per_curiam=False,
-            type="020lead",
-        )
-        # Update the author field in the opinion record.
-        opinion.author = self.person
-        opinion.save()
+
+        with mock.patch(
+            "cl.lib.es_signal_processor.es_save_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                es_save_document, *args, **kwargs
+            ),
+        ):
+            opinion_cluster = OpinionClusterFactory.create(
+                case_name_full="Paul Debbas v. Franklin",
+                case_name_short="Debbas",
+                syllabus="some rando syllabus",
+                date_filed=datetime.date(2015, 8, 14),
+                procedural_history="some rando history",
+                source="C",
+                case_name="Debbas v. Franklin",
+                attorneys="a bunch of crooks!",
+                slug="case-name-cluster",
+                precedential_status="Errata",
+                citation_count=4,
+                docket=self.docket,
+            )
+            opinion = OpinionFactory.create(
+                extracted_by_ocr=False,
+                author=self.person,
+                plain_text="my plain text secret word for queries",
+                cluster=opinion_cluster,
+                local_path="test/search/opinion_doc.doc",
+                per_curiam=False,
+                type="020lead",
+            )
+
+        # Two es_save_document task should be called on creation, one for
+        # opinion and one for opinion_cluster
+        self.reset_and_assert_task_count(expected=2)
+
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            # Update the author field in the opinion record.
+            opinion.author = self.person_2
+            opinion.save()
+        # One update_es_document task should be called on tracked field update.
+        self.reset_and_assert_task_count(expected=1)
+
+        # Update an opinion untracked field.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            opinion.joined_by_str = "Joined Lorem"
+            opinion.save()
+        # update_es_document task shouldn't be called on save() for untracked
+        # fields
+        self.reset_and_assert_task_count(expected=0)
 
         es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        self.assertEqual(es_doc.author_id, self.person.pk)
+        self.assertEqual(es_doc.author_id, self.person_2.pk)
 
         # Update the type field in the opinion record.
         opinion.type = "010combined"
@@ -1398,32 +1453,87 @@ class EsOpinionsIndexingTest(ESIndexTestCase, TransactionTestCase):
             per_curiam=False,
             type="010combined",
         )
+        opinion_cluster_2 = OpinionClusterFactory.create(
+            precedential_status="Errata",
+            citation_count=5,
+            docket=self.docket,
+        )
+
         opinion_3 = OpinionFactory.create(
             extracted_by_ocr=False,
             author=person_2,
             plain_text="my plain text secret word for queries",
-            cluster=opinion_cluster,
+            cluster=opinion_cluster_2,
             local_path="test/search/opinion_wpd.wpd",
             per_curiam=False,
             type="010combined",
         )
-        # Add OpinionsCited used save() as in add_manual_citations command
-        cite = OpinionsCited(
-            citing_opinion_id=opinion.pk,
-            cited_opinion_id=opinion_2.pk,
-        )
-        cite.save()
 
-        # Add OpinionsCited used bulk_create as in store_opinion_citations_and_update_parentheticals
-        cite_2 = OpinionsCited(
-            citing_opinion_id=opinion.pk,
-            cited_opinion_id=opinion_3.pk,
-        )
-        OpinionsCited.objects.bulk_create_with_signal([cite_2])
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            # Add OpinionsCited using save() as in add_manual_citations command
+            cite = OpinionsCited(
+                citing_opinion_id=opinion.pk,
+                cited_opinion_id=opinion_2.pk,
+            )
+            cite.save()
+        # One update_es_document task should be called tracked field update.
+        self.reset_and_assert_task_count(expected=1)
+        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(es_doc.cites, [opinion_2.pk])
 
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            # Add OpinionsCited using bulk_create as in store_opinion_citations_and_update_parentheticals
+            cite_2 = OpinionsCited(
+                citing_opinion_id=opinion.pk,
+                cited_opinion_id=opinion_3.pk,
+            )
+            OpinionsCited.objects.bulk_create([cite_2])
+
+            # Increase the citation_count for multiple cluster using update()
+            opinion_clusters_to_update = OpinionCluster.objects.filter(
+                pk__in=[opinion_cluster.pk, opinion_cluster_2.pk]
+            )
+            opinion_clusters_to_update.update(
+                citation_count=F("citation_count") + 1
+            )
+            cluster_ids_to_update = list(
+                opinion_clusters_to_update.values_list("id", flat=True)
+            )
+
+        # No update_es_document task should be called on bulk creation or update
+        self.reset_and_assert_task_count(expected=0)
+
+        # Update changes in ES using index_related_cites_fields
+        index_related_cites_fields.delay(
+            OpinionsCited.__name__, opinion.pk, cluster_ids_to_update
+        )
+
+        # Confirm the cites and citeCount fields were properly updated in the
+        # different documents.
         es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
         for cite in opinion.opinions_cited.all():
             self.assertIn(cite.pk, es_doc.cites)
+        self.assertEqual(es_doc.citeCount, 5)
+
+        es_doc_2 = OpinionDocument.get(ES_CHILD_ID(opinion_2.pk).OPINION)
+        self.assertEqual(es_doc_2.citeCount, 5)
+        es_doc_3 = OpinionDocument.get(ES_CHILD_ID(opinion_3.pk).OPINION)
+        self.assertEqual(es_doc_3.citeCount, 6)
+
+        cluster_1 = OpinionClusterDocument.get(opinion_cluster.pk)
+        self.assertEqual(cluster_1.citeCount, 5)
+        cluster_2 = OpinionClusterDocument.get(opinion_cluster_2.pk)
+        self.assertEqual(cluster_2.citeCount, 6)
 
         # Update joined_by field in the opinion record.
         person_3 = PersonFactory.create(
@@ -1464,12 +1574,33 @@ class EsOpinionsIndexingTest(ESIndexTestCase, TransactionTestCase):
             docket=docket,
         )
 
-        # Update the court field in the docket record.
-        docket.court = self.court_1
-        docket.save()
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            # Update the court field in the docket record.
+            docket.court = self.court_1
+            docket.save()
+        # update_es_document task should be called 1 on tracked fields update
+        self.reset_and_assert_task_count(expected=1)
 
         es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         self.assertEqual(es_doc.court_exact, "ca1")
+
+        # Update a opinion_cluster untracked field.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            opinion_cluster.other_dates = "January 12"
+            opinion_cluster.save()
+        # update_es_document task shouldn't be called on save() for untracked
+        # fields
+        self.reset_and_assert_task_count(expected=0)
 
         # Update the absolute_url field in the cluster record.
         opinion_cluster.case_name = "Debbas v. test"
@@ -1543,14 +1674,41 @@ class EsOpinionsIndexingTest(ESIndexTestCase, TransactionTestCase):
             type="020lead",
         )
 
-        # update docket number in parent document
-        docket.docket_number = "005"
-        docket.save()
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            # update docket number in parent document
+            docket.docket_number = "005"
+            docket.save()
 
+        # 2 update_es_document task should be called on tracked field update, one
+        # for DocketDocument and one for OpinionClusterDocument.
+        self.reset_and_assert_task_count(expected=2)
         cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
         self.assertEqual(cluster_doc.docketNumber, "005")
         self.assertEqual(opinion_doc.docketNumber, "005")
+
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_children_docs_by_query.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_children_docs_by_query, *args, **kwargs
+            ),
+        ):
+            # update docket number in parent document
+            docket.docket_number = "006"
+            docket.save()
+
+        # 1 update_children_docs_by_query task should be called on tracked
+        # field update.
+        self.reset_and_assert_task_count(expected=1)
+        cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
+        opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(cluster_doc.docketNumber, "006")
+        self.assertEqual(opinion_doc.docketNumber, "006")
 
         # update the case name in the opinion cluster record
         opinion_cluster.case_name = "Debbas v. Franklin2"
@@ -1678,6 +1836,10 @@ class EsOpinionsIndexingTest(ESIndexTestCase, TransactionTestCase):
         opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
         self.assertIn(opinion_1.pk, cluster_doc.sibling_ids)
         self.assertIn(opinion_1.pk, opinion_doc.sibling_ids)
+        self.assertIn(opinion.pk, opinion_doc.sibling_ids)
+        opinion_1_doc = OpinionDocument.get(ES_CHILD_ID(opinion_1.pk).OPINION)
+        self.assertIn(opinion_1.pk, opinion_1_doc.sibling_ids)
+        self.assertIn(opinion.pk, opinion_1_doc.sibling_ids)
 
         opinion_2 = OpinionFactory.create(
             extracted_by_ocr=False,
@@ -1739,13 +1901,23 @@ class EsOpinionsIndexingTest(ESIndexTestCase, TransactionTestCase):
         self.assertNotEqual(opinion_doc.neutralCite, neutral_citation_str)
 
         # Update the cite_count field in the cluster record.
-        opinion_cluster.citation_count = 8
-        opinion_cluster.save()
+        opinion_clusters_to_update = OpinionCluster.objects.filter(
+            pk=opinion_cluster.pk
+        )
+        opinion_clusters_to_update.update(
+            citation_count=F("citation_count") + 1
+        )
+        cluster_ids_to_update = list(
+            opinion_clusters_to_update.values_list("id", flat=True)
+        )
 
+        index_related_cites_fields.delay(
+            OpinionsCited.__name__, opinion.pk, cluster_ids_to_update
+        )
         cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        self.assertEqual(cluster_doc.citeCount, 8)
-        self.assertEqual(opinion_doc.citeCount, 8)
+        self.assertEqual(cluster_doc.citeCount, 5)
+        self.assertEqual(opinion_doc.citeCount, 5)
 
         # Confirm a Opinion is indexed if it doesn't exist in the
         # index on a tracked field update.

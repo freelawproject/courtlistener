@@ -11,7 +11,7 @@ from typing import Any, Callable, Dict, List, Literal, Match, Tuple
 
 from django.conf import settings
 from django.core.cache import cache, caches
-from django.core.paginator import EmptyPage, Page, PageNotAnInteger
+from django.core.paginator import EmptyPage, Page
 from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.http.request import QueryDict

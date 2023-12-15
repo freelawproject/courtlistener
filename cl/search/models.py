@@ -3488,8 +3488,6 @@ class OpinionsCited(models.Model):
     # treatment: positive, negative, etc.
     #
 
-    objects = BulkCreateManager()
-
     def __str__(self) -> str:
         return f"{self.citing_opinion.id} ⤜--cites⟶  {self.cited_opinion.id}"
 
