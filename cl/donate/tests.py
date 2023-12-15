@@ -5,11 +5,10 @@ from unittest import skipIf
 from unittest.mock import MagicMock, patch
 
 import stripe
-from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core import mail
-from django.test.client import AsyncClient, Client
+from django.test.client import AsyncClient
 from django.urls import reverse
 from django.utils.timezone import now
 from rest_framework.status import HTTP_200_OK, HTTP_302_FOUND
@@ -57,7 +56,7 @@ class EmailCommandTest(TestCase):
 @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
 class DonationFormSubmissionTest(TestCase):
     def setUp(self) -> None:
-        self.client = Client()
+        self.async_client = AsyncClient()
         self.params = {
             "address1": "123 Sesame St.",
             "city": "New York",
@@ -77,7 +76,7 @@ class DonationFormSubmissionTest(TestCase):
     ) -> None:
         """Can a paypal donation go through using the "Other" field?"""
         self.params.update({"amount": "other", "amount_other": "5"})
-        r = await sync_to_async(self.client.post)(
+        r = await self.async_client.post(
             reverse("donate"), self.params, follow=True
         )
         self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
@@ -87,7 +86,7 @@ class DonationFormSubmissionTest(TestCase):
     ) -> None:
         """Can a stripe donation go through using the "Other" field?"""
         self.params.update({"amount": "25"})
-        r = await sync_to_async(self.client.post)(
+        r = await self.async_client.post(
             reverse("donate"), self.params, follow=True
         )
         self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
@@ -272,7 +271,6 @@ class DonationIntegrationTest(SimpleUserDataMixin, TestCase):
     }
 
     def setUp(self) -> None:
-        self.client = Client()
         self.async_client = AsyncClient()
 
         self.params = {
@@ -305,9 +303,7 @@ class DonationIntegrationTest(SimpleUserDataMixin, TestCase):
         url: str,
         target: Optional[str] = None,
     ) -> None:
-        r = await sync_to_async(self.client.post)(
-            url, data=self.params, follow=True
-        )
+        r = await self.async_client.post(url, data=self.params, follow=True)
         self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
         if target is not None:
             self.assertRedirects(r, target)
@@ -352,15 +348,13 @@ class DonationIntegrationTest(SimpleUserDataMixin, TestCase):
     async def test_one_time_paypal_logged_in_donation(
         self, mock: MagicMock
     ) -> None:
-        self.assertTrue(
-            await sync_to_async(self.client.login)(**self.credentials)
-        )
+        self.assertTrue(await self.async_client.alogin(**self.credentials))
         await self.do_post_and_assert(reverse("donate"))
 
     async def test_one_time_paypal_logged_out_donation_existing_account(
         self, mock: MagicMock
     ) -> None:
-        await sync_to_async(self.client.logout)()
+        await self.async_client.alogout()
         await self.do_post_and_assert(reverse("donate"))
 
     async def test_one_time_paypal_logged_out_donation_new_stub(
@@ -377,23 +371,21 @@ class DonationIntegrationTest(SimpleUserDataMixin, TestCase):
         self, mock: MagicMock
     ) -> None:
         self.set_stripe_params()
-        self.assertTrue(
-            await sync_to_async(self.client.login)(**self.credentials)
-        )
+        self.assertTrue(await self.async_client.alogin(**self.credentials))
         await self.do_post_and_assert(reverse("donate"))
 
     async def test_one_time_stripe_logged_out_donation_existing_account(
         self, mock: MagicMock
     ) -> None:
         self.set_stripe_params()
-        await sync_to_async(self.client.logout)()
+        await self.async_client.alogout()
         await self.do_post_and_assert(reverse("donate"))
 
     async def test_one_time_stripe_logged_out_donation_new_stub(
         self, mock: MagicMock
     ) -> None:
         self.set_stripe_params()
-        await sync_to_async(self.client.logout)()
+        await self.async_client.alogout()
         self.set_new_stub_params()
         await self.do_post_and_assert(reverse("donate"))
 
@@ -402,9 +394,7 @@ class DonationIntegrationTest(SimpleUserDataMixin, TestCase):
     ) -> None:
         self.set_monthly_params()
         self.set_stripe_params()
-        self.assertTrue(
-            await sync_to_async(self.client.login)(**self.credentials)
-        )
+        self.assertTrue(await self.async_client.alogin(**self.credentials))
         await self.do_post_and_assert(reverse("donate"))
         await self.check_monthly_donation_created()
 
@@ -413,7 +403,7 @@ class DonationIntegrationTest(SimpleUserDataMixin, TestCase):
     ) -> None:
         self.set_monthly_params()
         self.set_stripe_params()
-        await sync_to_async(self.client.logout)()
+        await self.async_client.alogout()
         await self.do_post_and_assert(reverse("donate"))
         await self.check_monthly_donation_created()
 
@@ -422,7 +412,7 @@ class DonationIntegrationTest(SimpleUserDataMixin, TestCase):
     ) -> None:
         self.set_monthly_params()
         self.set_stripe_params()
-        await sync_to_async(self.client.logout)()
+        await self.async_client.alogout()
         self.set_new_stub_params()
         await self.do_post_and_assert(reverse("donate"))
         await self.check_monthly_donation_created()
@@ -431,23 +421,21 @@ class DonationIntegrationTest(SimpleUserDataMixin, TestCase):
         self, mock: MagicMock
     ) -> None:
         self.set_stripe_params()
-        self.assertTrue(
-            await sync_to_async(self.client.login)(**self.credentials)
-        )
+        self.assertTrue(await self.async_client.alogin(**self.credentials))
         await self.do_post_and_assert(reverse("cc_payment"))
 
     async def test_one_time_stripe_logged_out_payment_existing_account(
         self, mock: MagicMock
     ) -> None:
         self.set_stripe_params()
-        await sync_to_async(self.client.logout)()
+        await self.async_client.alogout()
         await self.do_post_and_assert(reverse("cc_payment"))
 
     async def test_one_time_stripe_logged_out_payment_new_stub(
         self, mock: MagicMock
     ) -> None:
         self.set_stripe_params()
-        await sync_to_async(self.client.logout)()
+        await self.async_client.alogout()
         self.set_new_stub_params()
         await self.do_post_and_assert(reverse("cc_payment"))
 
@@ -462,7 +450,7 @@ class DonationIntegrationTest(SimpleUserDataMixin, TestCase):
         self, mock: MagicMock
     ) -> None:
         self.set_stripe_params()
-        await sync_to_async(self.client.logout)()
+        await self.async_client.alogout()
         await self.do_post_and_assert(
             reverse("donate"), target=reverse("donate_complete")
         )
@@ -472,7 +460,7 @@ class DonationIntegrationTest(SimpleUserDataMixin, TestCase):
     async def test_email_and_redirection_monthly_donation(
         self, mock: MagicMock
     ) -> None:
-        await sync_to_async(self.client.logout)()
+        await self.async_client.alogout()
         self.set_stripe_params()
         self.set_monthly_params()
         await self.do_post_and_assert(
@@ -485,7 +473,7 @@ class DonationIntegrationTest(SimpleUserDataMixin, TestCase):
     async def test_email_and_redirection_one_time_payment(
         self, mock: MagicMock
     ) -> None:
-        await sync_to_async(self.client.logout)()
+        await self.async_client.alogout()
         self.set_stripe_params()
         await self.do_post_and_assert(
             reverse("cc_payment"), target=reverse("payment_complete")

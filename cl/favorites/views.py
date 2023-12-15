@@ -1,3 +1,4 @@
+from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
@@ -19,30 +20,31 @@ from cl.lib.http import is_ajax
 from cl.lib.view_utils import increment_view_count
 
 
-def get_note(request: HttpRequest) -> HttpResponse:
+async def get_note(request: HttpRequest) -> HttpResponse:
     audio_pk = request.POST.get("audio_id")
     cluster_pk = request.POST.get("cluster_id")
     docket_pk = request.POST.get("docket_id")
     recap_doc_pk = request.POST.get("recap_doc_id")
+    user = await request.auser()
     if audio_pk and audio_pk != "undefined":
         try:
-            note = Note.objects.get(audio_id=audio_pk, user=request.user)
+            note = await Note.objects.aget(audio_id=audio_pk, user=user)
         except ObjectDoesNotExist:
             note = Note()
     elif cluster_pk and cluster_pk != "undefined":
         try:
-            note = Note.objects.get(cluster_id=cluster_pk, user=request.user)
+            note = await Note.objects.aget(cluster_id=cluster_pk, user=user)
         except ObjectDoesNotExist:
             note = Note()
     elif docket_pk and docket_pk != "undefined":
         try:
-            note = Note.objects.get(docket_id=docket_pk, user=request.user)
+            note = await Note.objects.aget(docket_id=docket_pk, user=user)
         except ObjectDoesNotExist:
             note = Note()
     elif recap_doc_pk and recap_doc_pk != "undefined":
         try:
-            note = Note.objects.get(
-                recap_doc_id=recap_doc_pk, user=request.user
+            note = await Note.objects.aget(
+                recap_doc_id=recap_doc_pk, user=user
             )
         except ObjectDoesNotExist:
             note = Note()
@@ -51,8 +53,10 @@ def get_note(request: HttpRequest) -> HttpResponse:
     return note
 
 
+@sync_to_async
 @login_required
-def save_or_update_note(request: HttpRequest) -> HttpResponse:
+@async_to_sync
+async def save_or_update_note(request: HttpRequest) -> HttpResponse:
     """Uses ajax to save or update a note.
 
     Receives a request as an argument, and then uses that plus POST data to
@@ -61,18 +65,18 @@ def save_or_update_note(request: HttpRequest) -> HttpResponse:
     new information. If not, it creates a new note.
     """
     if is_ajax(request):
-        note = get_note(request)
+        note = await get_note(request)
         if note is None:
             return HttpResponseServerError(
                 "Unknown document, audio, docket or recap document id."
             )
 
         f = NoteForm(request.POST, instance=note)
-        if f.is_valid():
-            new_note = f.save(commit=False)
-            new_note.user = request.user
+        if await sync_to_async(f.is_valid)():
+            new_note = await sync_to_async(f.save)(commit=False)
+            new_note.user = await request.auser()
             try:
-                new_note.save()
+                await sync_to_async(new_note.save)()
             except IntegrityError:
                 # User already has this note.
                 return HttpResponse("It worked")
@@ -87,19 +91,21 @@ def save_or_update_note(request: HttpRequest) -> HttpResponse:
         )
 
 
+@sync_to_async
 @login_required
-def delete_note(request: HttpRequest) -> HttpResponse:
+@async_to_sync
+async def delete_note(request: HttpRequest) -> HttpResponse:
     """Delete a user's note
 
     Deletes a note for a user using an ajax call and post data.
     """
     if is_ajax(request):
-        note = get_note(request)
+        note = await get_note(request)
         if note is None:
             return HttpResponseServerError(
                 "Unknown document, audio, docket, or recap document id."
             )
-        note.delete()
+        await note.adelete()
 
         try:
             if request.POST["message"] == "True":

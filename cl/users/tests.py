@@ -18,7 +18,7 @@ from django.core.mail import (
     get_connection,
     send_mail,
 )
-from django.test import Client
+from django.test import AsyncClient
 from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils.http import urlsafe_base64_encode
@@ -127,7 +127,7 @@ class UserTest(LiveServerTestCase):
             "skip_me_if_alive": "",
             "consent": True,
         }
-        response = await sync_to_async(self.client.post)(
+        response = await self.async_client.post(
             f"{self.live_server_url}{reverse('register')}",
             params,
             follow=True,
@@ -194,7 +194,7 @@ class UserDataTest(LiveServerTestCase):
             user__username=params["username"],
             user__password=make_password(params["password"]),
         )
-        r = await sync_to_async(self.client.post)(
+        r = await self.async_client.post(
             reverse("sign-in"), params, follow=True
         )
         self.assertRedirects(r, "/")
@@ -282,7 +282,7 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
 
         # Log in, get the API again, and then load the profile page
         self.assertTrue(
-            await sync_to_async(self.async_client.login)(
+            await self.async_client.alogin(
                 username="pandora", password="password"
             )
         )
@@ -297,11 +297,11 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
     async def test_deleting_your_account(self) -> None:
         """Can we delete an account properly?"""
         self.assertTrue(
-            await sync_to_async(self.client.login)(
+            await self.async_client.alogin(
                 username="pandora", password="password"
             )
         )
-        response = await sync_to_async(self.client.post)(
+        response = await self.async_client.post(
             reverse("delete_account"),
             {"password": "password"},
             follow=True,
@@ -363,11 +363,11 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
 
         # Delete user account.
         self.assertTrue(
-            await sync_to_async(self.client.login)(
+            await self.async_client.alogin(
                 username=user_1.user.username, password="password"
             )
         )
-        await sync_to_async(self.client.post)(
+        await self.async_client.post(
             reverse("delete_account"),
             {"password": "password"},
             follow=True,
@@ -419,11 +419,11 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
 
         # Delete user account.
         self.assertTrue(
-            await sync_to_async(self.client.login)(
+            await self.async_client.alogin(
                 username=user_1.user.username, password="password"
             )
         )
-        await sync_to_async(self.client.post)(
+        await self.async_client.post(
             reverse("delete_account"),
             {"password": "password"},
             follow=True,
@@ -453,7 +453,7 @@ class DisposableEmailTest(SimpleUserDataMixin, TestCase):
     bad_email = f"{user}@{bad_domain}"
 
     def setUp(self) -> None:
-        self.client = Client()
+        self.client = AsyncClient()
 
     async def test_can_i_create_account_with_bad_email_address(self) -> None:
         """Is an error thrown if we try to use a banned email address?"""
@@ -477,11 +477,9 @@ class DisposableEmailTest(SimpleUserDataMixin, TestCase):
     async def test_can_i_change_to_bad_email_address(self) -> None:
         """Is an error thrown if we try to change to a bad email address?"""
         self.assertTrue(
-            await sync_to_async(self.client.login)(
-                username="pandora", password="password"
-            )
+            await self.client.alogin(username="pandora", password="password")
         )
-        r = await sync_to_async(self.client.post)(
+        r = await self.client.post(
             reverse("view_settings"),
             {"email": self.bad_email},
             follow=True,
