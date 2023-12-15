@@ -3,7 +3,6 @@ from django.urls import path
 from cl.donate.paypal import donate_paypal_cancel, process_paypal_callback
 from cl.donate.stripe_helpers import process_stripe_callback
 from cl.donate.views import (
-    badge_signup,
     donate,
     make_check_donation,
     payment_complete,
@@ -14,18 +13,11 @@ from cl.users.views import view_donations
 urlpatterns = [
     # Donations & payments
     path("donate/", donate, name="donate"),
-    path("badges/sign-up/", badge_signup, name="badge_signup"),
     path(
         "donate/complete/",
         payment_complete,
         {"template_name": "donate_complete.html"},
         name="donate_complete",
-    ),
-    path(
-        "badges/complete/",
-        payment_complete,
-        {"template_name": "badge_signup_complete.html"},
-        name="badge_signup_complete",
     ),
     # Paypal
     path("donate/paypal/cancel/", donate_paypal_cancel, name="paypal_cancel"),
