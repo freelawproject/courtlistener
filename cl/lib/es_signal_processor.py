@@ -386,10 +386,14 @@ def update_reverse_related_documents(
     """
 
     # Set related instance if fields_map is provided.
-    related_instance = (compose_app_label(instance), instance.pk)
+    related_instance: tuple[str, int] | None = (
+        compose_app_label(instance),
+        instance.pk,
+    )
+    fields_map_to_pass: dict[str, str] | None = fields_map.copy()
     if fields_map.get("all", None):
         related_instance = None
-        fields_map = None
+        fields_map_to_pass = None
 
     # Update parent instance
     main_objects = main_model.objects.filter(**{query_string: instance})
@@ -404,7 +408,7 @@ def update_reverse_related_documents(
                 affected_fields,
                 (compose_app_label(main_object), main_object.pk),
                 related_instance,
-                fields_map,
+                fields_map_to_pass,
             )
         )
 
@@ -433,7 +437,7 @@ def update_reverse_related_documents(
                     OpinionDocument.__name__,
                     instance.cluster.pk,
                     affected_fields,
-                    fields_map,
+                    fields_map_to_pass,
                 )
             )
         case BankruptcyInformation() if es_document is DocketDocument:  # type: ignore

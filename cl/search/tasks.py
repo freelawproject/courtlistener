@@ -1005,7 +1005,7 @@ def index_related_cites_fields(
 
     documents_to_update = []
     match model_name:
-        case OpinionsCited.__name__ if cluster_ids_to_update:
+        case OpinionsCited.__name__:
             # Query all clusters to update and retrieve only their sub_opinions
             # with the necessary fields.
             prefetch = Prefetch(
