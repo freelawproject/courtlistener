@@ -87,7 +87,7 @@ def process_lexis_data(
                 if search_results.count() == 1:
                     add_citations(
                         valid_citations,
-                        search_results.first(),
+                        search_results[0].pk,
                         debug,
                     )
             else:
