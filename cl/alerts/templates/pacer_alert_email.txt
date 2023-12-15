@@ -13,6 +13,6 @@ The PG&E bankruptcy appears to be available on PACER:
 This alert brought to you by the 501(c)(3) non-profit Free Law Project
  - Blog: https://free.law
  - Twitter: http://twitter.com/freelawproject
- - Donate: https://www.courtlistener.com{% url "donate" %}?referrer=pacer-alert-service
+ - Donate: https://donate.free.law/forms/supportflp
 
 Thank you for supporting our work.

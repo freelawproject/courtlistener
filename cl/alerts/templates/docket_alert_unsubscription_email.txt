@@ -12,6 +12,6 @@ This alert brought to you by the 501(c)(3) non-profit Free Law Project
 
  - Blog: https://free.law
  - Twitter: http://twitter.com/freelawproject
- - Donate: https://www.courtlistener.com{% url "donate" %}?referrer=pt-email
+ - Donate: https://donate.free.law/forms/supportflp
 
 Please donate to support our work.

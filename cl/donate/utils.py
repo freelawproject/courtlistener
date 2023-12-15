@@ -3,7 +3,6 @@ from typing import Dict, Optional, TypedDict
 
 from django.conf import settings
 from django.core.mail import send_mail
-from django.urls import reverse
 
 from cl.donate.models import PAYMENT_TYPES, Donation, MonthlyDonation
 from cl.lib.types import EmailType
@@ -247,7 +246,7 @@ def send_failed_subscription_email(m_donation: MonthlyDonation) -> None:
     body = email["body"] % (
         m_donation.donor.first_name,
         m_donation.monthly_donation_amount,
-        reverse("donate"),
+        "https://donate.free.law/forms/supportflp",
         m_donation.monthly_donation_amount,
     )
     send_mail(
