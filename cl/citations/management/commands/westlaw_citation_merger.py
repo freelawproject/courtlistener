@@ -10,7 +10,7 @@ from pandas.io.parsers import TextFileReader
 from cl.citations.management.commands.citation_merger_utils import (
     add_citations,
     add_stub_case,
-    find_cases_with_citations,
+    find_cases_with_metadata,
     load_citations_file,
     prepare_citation,
 )
@@ -58,7 +58,6 @@ def process_westlaw_data(
     total_processed = 0
 
     for index, row in data.iterrows():
-        logger.info(f"Processing row: {index}")
         if not start and start_row == index:
             start = True
         if not start:
@@ -67,6 +66,7 @@ def process_westlaw_data(
         if end_row is not None and (end_row == index):
             end = True
 
+        logger.info(f"Processing row: {index}")
         case_name = row.get("Title")
         citation = row.get("Citation")
         parallel_citation = row.get("Parallel Cite")
@@ -83,7 +83,7 @@ def process_westlaw_data(
         valid_citations = extract_valid_citations(citations)
 
         if valid_citations:
-            search_results = find_cases_with_citations(
+            search_results = find_cases_with_metadata(
                 valid_citations=valid_citations,
                 court=court,
                 date_filed=date_filed,
@@ -92,8 +92,12 @@ def process_westlaw_data(
             )
 
             if search_results:
-                for search_result in search_results:
-                    add_citations(valid_citations, search_result.pk, debug)
+                if search_results.count() == 1:
+                    add_citations(
+                        valid_citations,
+                        search_results[0].pk,
+                        debug,
+                    )
             else:
                 # We couldn't get any search result to add the citations
                 if case_name and valid_citations and court and date_filed:
@@ -167,7 +171,7 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--limit",
-            default=10000,
+            default=0,
             type=int,
             help="Limit number of rows to process. It will apply to each csv file "
             "found.",
