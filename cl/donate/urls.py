@@ -4,7 +4,6 @@ from cl.donate.paypal import donate_paypal_cancel, process_paypal_callback
 from cl.donate.stripe_helpers import process_stripe_callback
 from cl.donate.views import (
     badge_signup,
-    cc_payment,
     donate,
     make_check_donation,
     payment_complete,
@@ -15,19 +14,12 @@ from cl.users.views import view_donations
 urlpatterns = [
     # Donations & payments
     path("donate/", donate, name="donate"),
-    path("pay/", cc_payment, name="cc_payment"),
     path("badges/sign-up/", badge_signup, name="badge_signup"),
     path(
         "donate/complete/",
         payment_complete,
         {"template_name": "donate_complete.html"},
         name="donate_complete",
-    ),
-    path(
-        "pay/complete/",
-        payment_complete,
-        {"template_name": "payment_complete.html"},
-        name="payment_complete",
     ),
     path(
         "badges/complete/",

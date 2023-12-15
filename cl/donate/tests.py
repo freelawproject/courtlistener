@@ -417,28 +417,6 @@ class DonationIntegrationTest(SimpleUserDataMixin, TestCase):
         await self.do_post_and_assert(reverse("donate"))
         await self.check_monthly_donation_created()
 
-    async def test_one_time_stripe_logged_in_payment(
-        self, mock: MagicMock
-    ) -> None:
-        self.set_stripe_params()
-        self.assertTrue(await self.async_client.alogin(**self.credentials))
-        await self.do_post_and_assert(reverse("cc_payment"))
-
-    async def test_one_time_stripe_logged_out_payment_existing_account(
-        self, mock: MagicMock
-    ) -> None:
-        self.set_stripe_params()
-        await self.async_client.alogout()
-        await self.do_post_and_assert(reverse("cc_payment"))
-
-    async def test_one_time_stripe_logged_out_payment_new_stub(
-        self, mock: MagicMock
-    ) -> None:
-        self.set_stripe_params()
-        await self.async_client.alogout()
-        self.set_new_stub_params()
-        await self.do_post_and_assert(reverse("cc_payment"))
-
     #
     # Test redirection and emails
     #
@@ -469,14 +447,3 @@ class DonationIntegrationTest(SimpleUserDataMixin, TestCase):
         await self.check_monthly_donation_created()
         await self.do_stripe_callback()
         self.assertEmailSubject(emails["donation_thanks_recurring"]["subject"])
-
-    async def test_email_and_redirection_one_time_payment(
-        self, mock: MagicMock
-    ) -> None:
-        await self.async_client.alogout()
-        self.set_stripe_params()
-        await self.do_post_and_assert(
-            reverse("cc_payment"), target=reverse("payment_complete")
-        )
-        await self.do_stripe_callback()
-        self.assertEmailSubject(emails["payment_thanks"]["subject"])

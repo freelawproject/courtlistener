@@ -305,21 +305,6 @@ def donate(request: HttpRequest) -> Union[HttpResponseRedirect, HttpResponse]:
 
 
 @ratelimiter_unsafe_10_per_m
-def cc_payment(
-    request: HttpRequest,
-) -> Union[HttpResponseRedirect, HttpResponse]:
-    context = make_payment_page_context(request)
-    context["private"] = True
-    return process_donation_forms(
-        request,
-        template_name="cc_payment.html",
-        stripe_redirect_url=reverse("payment_complete"),
-        context=context,
-        payment_type=PAYMENT_TYPES.PAYMENT,
-    )
-
-
-@ratelimiter_unsafe_10_per_m
 def badge_signup(
     request: HttpRequest,
 ) -> Union[HttpResponseRedirect, HttpResponse]:
