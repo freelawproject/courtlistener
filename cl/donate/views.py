@@ -2,7 +2,6 @@ import logging
 from typing import Dict, Tuple, Union
 
 from django.conf import settings
-from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.models import User
 from django.http import (
     HttpRequest,
@@ -34,7 +33,7 @@ from cl.donate.stripe_helpers import (
     create_stripe_customer,
     process_stripe_payment,
 )
-from cl.donate.utils import PaymentFailureException, send_thank_you_email
+from cl.donate.utils import PaymentFailureException
 from cl.lib.http import is_ajax
 from cl.lib.ratelimiter import ratelimiter_unsafe_10_per_m
 from cl.users.utils import create_stub_account
@@ -348,66 +347,3 @@ def toggle_monthly_donation(request: HttpRequest) -> HttpResponse:
         return HttpResponseNotAllowed(
             permitted_methods={"POST"}, content="Not an Ajax POST request."
         )
-
-
-@staff_member_required
-def make_check_donation(request: HttpRequest) -> HttpResponse:
-    """A page for admins to use to input check donations manually."""
-    if request.method == "POST":
-        data = request.POST.copy()
-        data.update({"payment_provider": PROVIDERS.CHECK, "amount": "other"})
-        donation_form = DonationForm(data)
-        # Get the user, if we can. Else, set up the form to create a new user.
-        try:
-            email = request.POST.get("email").strip()
-            user = User.objects.get(email__iexact=email)
-        except User.DoesNotExist:
-            user = None
-            user_form = UserForm(request.POST)
-            profile_form = ProfileForm(request.POST)
-        else:
-            user_form = UserForm(request.POST, instance=user)
-            profile_form = ProfileForm(request.POST, instance=user.profile)
-
-        if all(
-            [
-                donation_form.is_valid(),
-                user_form.is_valid(),
-                profile_form.is_valid(),
-            ]
-        ):
-            cd_user_form = user_form.cleaned_data
-            cd_profile_form = profile_form.cleaned_data
-            if user is not None:
-                user = user_form.save()
-                profile_form.save()
-            else:
-                user, profile = create_stub_account(
-                    cd_user_form, cd_profile_form
-                )
-                user.save()
-                profile.save()
-
-            d = donation_form.save(commit=False)
-            d.status = Donation.PROCESSED
-            d.donor = user
-            d.save()
-            if user.email:
-                send_thank_you_email(d, PAYMENT_TYPES.DONATION)
-
-            return HttpResponseRedirect(reverse("donate_complete"))
-    else:
-        donation_form = DonationForm()
-        user_form = UserForm()
-        profile_form = ProfileForm()
-
-    return render(
-        request,
-        "check_donation.html",
-        {
-            "donation_form": donation_form,
-            "profile_form": profile_form,
-            "user_form": user_form,
-            "private": True,
-        },
-    )
