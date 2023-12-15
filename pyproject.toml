@@ -34,7 +34,7 @@ celery = "^5.3.6"
 certifi = "^2023.11.17"
 courts-db = "^0.10.17"
 disposable-email-domains = "*"
-Django = "^4.2.7"
+Django = "^5.0"
 django-cache-memoize = "==0.*"
 django-cors-headers = "^4.3.1"
 django-csp = "^3.7.0"
@@ -94,7 +94,7 @@ numpy = "^1.26.2"
 datasketch = "^1.6.0"
 PyStemmer = "^2.2.0.1"
 factory-boy = "^3.3.0"
-django-elasticsearch-dsl = "^7.4"
+django-elasticsearch-dsl = "^8.0"
 django-override-storage = "^0.3.2"
 django-ses = {extras = ["events"], version = "^3.5.2"}
 django-environ = "^0.11.2"
@@ -109,10 +109,10 @@ types-dateparser = "^1.1.4.10"
 uvicorn = {extras = ["standard"], version = "^0.24.0.post1"}
 daphne = "^4.0.0"
 psycopg = {extras = ["binary"], version = "^3.1.14"}
-juriscraper = "^2.5.70"
 httpx = {extras = ["http2"], version = "^0.25.2"}
 django-model-utils = "^4.3.1"
 inflection = "^0.5.1"  # necessary for DRF schema generation - remove after drf-spectacular
+juriscraper = "^2.5.74"
 
 
 [tool.poetry.group.dev.dependencies]

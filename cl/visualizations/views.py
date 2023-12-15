@@ -1,5 +1,6 @@
 import datetime
 
+from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
@@ -183,12 +184,16 @@ def edit_visualization(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @ensure_csrf_cookie
+@sync_to_async
 @login_required
-def delete_visualization(request: HttpRequest) -> HttpResponse:
+@async_to_sync
+async def delete_visualization(request: HttpRequest) -> HttpResponse:
     if is_ajax(request):
-        v = SCOTUSMap.objects.get(pk=request.POST.get("pk"), user=request.user)
+        v = await SCOTUSMap.objects.aget(
+            pk=request.POST.get("pk"), user=request.user
+        )
         v.deleted = True
-        v.save()
+        await v.asave()
         return HttpResponse("It worked.")
     else:
         return HttpResponseNotAllowed(
@@ -197,13 +202,17 @@ def delete_visualization(request: HttpRequest) -> HttpResponse:
 
 
 @ensure_csrf_cookie
+@sync_to_async
 @login_required
-def restore_visualization(request: HttpRequest) -> HttpResponse:
+@async_to_sync
+async def restore_visualization(request: HttpRequest) -> HttpResponse:
     if is_ajax(request):
-        v = SCOTUSMap.objects.get(pk=request.POST.get("pk"), user=request.user)
+        v = await SCOTUSMap.objects.aget(
+            pk=request.POST.get("pk"), user=request.user
+        )
         v.deleted = False
         v.date_deleted = None
-        v.save()
+        await v.asave()
         return HttpResponse("It worked")
     else:
         return HttpResponseNotAllowed(
@@ -212,12 +221,16 @@ def restore_visualization(request: HttpRequest) -> HttpResponse:
 
 
 @ensure_csrf_cookie
+@sync_to_async
 @login_required
-def share_visualization(request: HttpRequest) -> HttpResponse:
+@async_to_sync
+async def share_visualization(request: HttpRequest) -> HttpResponse:
     if is_ajax(request):
-        v = SCOTUSMap.objects.get(pk=request.POST.get("pk"), user=request.user)
+        v = await SCOTUSMap.objects.aget(
+            pk=request.POST.get("pk"), user=request.user
+        )
         v.published = True
-        v.save()
+        await v.asave()
         return HttpResponse("It worked")
     else:
         return HttpResponseNotAllowed(
@@ -226,12 +239,16 @@ def share_visualization(request: HttpRequest) -> HttpResponse:
 
 
 @ensure_csrf_cookie
+@sync_to_async
 @login_required
-def privatize_visualization(request: HttpRequest) -> HttpResponse:
+@async_to_sync
+async def privatize_visualization(request: HttpRequest) -> HttpResponse:
     if is_ajax(request):
-        v = SCOTUSMap.objects.get(pk=request.POST.get("pk"), user=request.user)
+        v = await SCOTUSMap.objects.aget(
+            pk=request.POST.get("pk"), user=request.user
+        )
         v.published = False
-        v.save()
+        await v.asave()
         return HttpResponse("It worked")
     else:
         return HttpResponseNotAllowed(

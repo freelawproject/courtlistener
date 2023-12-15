@@ -10,6 +10,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Prefetch, Q, QuerySet
+from django.dispatch import Signal
 from django.template import loader
 from django.urls import NoReverseMatch, reverse
 from django.utils.encoding import force_str
@@ -38,6 +39,9 @@ from cl.lib.search_index_utils import (
 from cl.lib.storage import IncrementingAWSMediaStorage
 from cl.lib.string_utils import trunc
 from cl.lib.utils import deepgetattr
+
+# Custom signal for use with bulk_create.
+bulk_create_signal = Signal()
 
 
 class PRECEDENTIAL_STATUS:
@@ -854,6 +858,32 @@ class Docket(AbstractDateTimeModel):
             # Simply add the RECAP value to the other value.
             self.source = self.source + self.RECAP
 
+    @property
+    def authorities(self):
+        """Returns a queryset that can be used for querying and caching
+        authorities.
+        """
+        return OpinionsCitedByRECAPDocument.objects.filter(
+            citing_document__docket_entry__docket_id=self.pk
+        )
+
+    @property
+    def has_authorities(self):
+        return self.authorities.exists()
+
+    @property
+    def authority_count(self):
+        return self.authorities.count()
+
+    @property
+    def authorities_with_data(self):
+        """Returns a queryset of this document's authorities for
+        eventual injection into a view template.
+
+        The returned queryset is sorted by the depth field.
+        """
+        return build_authorities_query(self.authorities)
+
     def add_idb_source(self):
         if self.source == self.DEFAULT:
             self.source = self.IDB
@@ -1452,6 +1482,27 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
                 },
             )
 
+    def get_authorities_url(self) -> str:
+        if self.document_type == self.ATTACHMENT:
+            return reverse(
+                "view_attachment_authorities",
+                kwargs={
+                    "docket_id": self.docket_entry.docket.pk,
+                    "doc_num": self.document_number,
+                    "att_num": self.attachment_number,
+                    "slug": self.docket_entry.docket.slug,
+                },
+            )
+        else:
+            return reverse(
+                "view_document_authorities",
+                kwargs={
+                    "docket_id": self.docket_entry.docket.pk,
+                    "doc_num": self.document_number,
+                    "slug": self.docket_entry.docket.slug,
+                },
+            )
+
     @property
     def pacer_url(self) -> str | None:
         """Construct a doc1 URL for any item, if we can. Else, return None."""
@@ -1504,6 +1555,19 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
                 self.has_valid_pdf,
             ]
         )
+
+    @property
+    def authority_count(self):
+        return self.cited_opinions.count()
+
+    @property
+    def authorities_with_data(self):
+        """Returns a queryset of this document's authorities for
+        eventual injection into a view template.
+
+        The returned queryset is sorted by the depth field.
+        """
+        return build_authorities_query(self.cited_opinions)
 
     def save(
         self,
@@ -3376,6 +3440,15 @@ class OpinionsCited(models.Model):
         unique_together = ("citing_opinion", "cited_opinion")
 
 
+class BulkCreateManager(models.Manager):
+    """Custom manager that will trigger a signal on bulk_create."""
+
+    def bulk_create_with_signal(self, objs, *args, **kwargs):
+        created_objs = super().bulk_create(objs, *args, **kwargs)
+        bulk_create_signal.send(sender=self.model, instances=created_objs)
+        return created_objs
+
+
 class OpinionsCitedByRECAPDocument(models.Model):
     citing_document = models.ForeignKey(
         RECAPDocument, related_name="cited_opinions", on_delete=models.CASCADE
@@ -3389,6 +3462,8 @@ class OpinionsCitedByRECAPDocument(models.Model):
         default=1,
     )
 
+    objects = BulkCreateManager()
+
     def __str__(self) -> str:
         return f"{self.citing_document.id} ⤜--cites⟶  {self.cited_opinion.id}"
 
@@ -3396,6 +3471,40 @@ class OpinionsCitedByRECAPDocument(models.Model):
         verbose_name_plural = "Opinions cited by RECAP document"
         unique_together = ("citing_document", "cited_opinion")
         indexes = [models.Index(fields=["depth"])]
+
+
+def build_authorities_query(
+    base_queryset: QuerySet[OpinionsCitedByRECAPDocument],
+) -> QuerySet[OpinionsCitedByRECAPDocument]:
+    """
+    Optimizes the authorities query by applying select_related, prefetch_related,
+    and selecting only the relevant fields to display the list of citations
+
+    Args:
+        base_queryset (QuerySet[OpinionsCitedByRECAPDocument]): The queryset to optimize
+    """
+    return (
+        base_queryset.select_related("cited_opinion__cluster__docket__court")
+        .prefetch_related(
+            "cited_opinion__cluster__citations",
+        )
+        .only(
+            "depth",
+            "citing_document_id",
+            "cited_opinion__cluster__slug",
+            "cited_opinion__cluster__case_name",
+            "cited_opinion__cluster__case_name_full",
+            "cited_opinion__cluster__case_name_short",
+            "cited_opinion__cluster__citation_count",
+            "cited_opinion__cluster__docket_id",
+            "cited_opinion__cluster__date_filed",
+            "cited_opinion__cluster__docket__docket_number",
+            "cited_opinion__cluster__docket__court_id",
+            "cited_opinion__cluster__docket__court__citation_string",
+            "cited_opinion__cluster__docket__court__full_name",
+        )
+        .order_by("-depth")
+    )
 
 
 class Parenthetical(models.Model):
