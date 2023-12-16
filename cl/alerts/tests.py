@@ -2116,7 +2116,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             call_command("cl_send_scheduled_alerts", rate="dly")
 
         # One OA search alert email should be sent.
-        mock_logger.info.assert_called_with(f"Sent 1 dly email alerts.")
+        mock_logger.info.assert_called_with("Sent 1 dly email alerts.")
         self.assertEqual(len(mail.outbox), 1)
         text_content = mail.outbox[0].body
 
@@ -2183,7 +2183,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 user=user_profile.user,
                 rate=Alert.REAL_TIME,
                 name=f"Test Alert RT {i}",
-                query=f"q=RT+Test+OA&type=oa",
+                query="q=RT+Test+OA&type=oa",
             )
             alerts_created.append(alert)
 
@@ -2206,10 +2206,10 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             ),
         ), self.captureOnCommitCallbacks(execute=True):
             rt_oral_argument = AudioWithParentsFactory.create(
-                case_name=f"RT Test OA",
+                case_name="RT Test OA",
                 docket__court=self.court_1,
                 docket__date_argued=now().date(),
-                docket__docket_number=f"19-5735",
+                docket__docket_number="19-5735",
             )
 
         # 11 OA search alert emails should be sent, one for each user that
@@ -2347,10 +2347,10 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             ),
         ), self.captureOnCommitCallbacks(execute=True):
             rt_oral_argument = AudioWithParentsFactory.create(
-                case_name=f"Lorem Ipsum",
+                case_name="Lorem Ipsum",
                 docket__court=self.court_1,
                 docket__date_argued=now().date(),
-                docket__docket_number=f"20-5739",
+                docket__docket_number="20-5739",
             )
 
         # Percolate the document. First batch.

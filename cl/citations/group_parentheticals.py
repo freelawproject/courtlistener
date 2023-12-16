@@ -32,7 +32,7 @@ https://github.com/freelawproject/courtlistener/pull/1941
 import re
 from copy import deepcopy
 from dataclasses import dataclass
-from math import ceil, log10
+from math import ceil
 from typing import Dict, List, Set
 
 from datasketch import MinHash, MinHashLSH

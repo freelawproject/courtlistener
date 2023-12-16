@@ -77,7 +77,7 @@ class DisabledHTMLFilterBackend(RestFrameworkFilterBackend):
     one query at a time. It's insanity, so it's gotta be disabled globally.
     """
 
-    def to_html(self, request, queryset, view):
+    def to_html(self, request, queryset, view) -> str:
         return ""
 
 
@@ -90,8 +90,7 @@ class NoEmptyFilterSet(FilterSet):
         # Remove any empty query parameters from the QueryDict. Fixes #2066
         if data:
             # Make a mutable copy so we can tweak it.
-            data = data.copy()
-            [data.pop(k) for k, v in list(data.items()) if not v]
+            data = {k: v for k, v in data.items() if not v}
         super().__init__(
             data=data, queryset=queryset, relationship=relationship, **kwargs
         )
@@ -316,7 +315,7 @@ class CacheListMixin(object):
 
 
 class ExceptionalUserRateThrottle(UserRateThrottle):
-    def allow_request(self, request, view):
+    def allow_request(self, request, view) -> bool:
         """
         Give special access to a few special accounts.
 
