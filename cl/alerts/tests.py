@@ -2259,7 +2259,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 user=user_profile.user,
                 rate=Alert.DAILY,
                 name=f"Test Alert OA {i}",
-                query=f"q=OA&+19-5735&type=oa",
+                query="q=OA&+19-5735&type=oa",
             )
             alerts_created.append(alert)
             # Create a new document that triggers each existing alert created
@@ -2271,10 +2271,10 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 ),
             ), self.captureOnCommitCallbacks(execute=True):
                 audio = AudioWithParentsFactory.create(
-                    case_name=f"Test OA",
+                    case_name="Test OA",
                     docket__court=self.court_1,
                     docket__date_argued=now().date(),
-                    docket__docket_number=f"19-5735",
+                    docket__docket_number="19-5735",
                 )
                 audios_created.append(audio)
 
@@ -2335,7 +2335,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 user=user_profile.user,
                 rate=Alert.REAL_TIME,
                 name=f"Test Alert RT {i}",
-                query=f"q=Lorem+Ipsum+20-5739&type=oa",
+                query="q=Lorem+Ipsum+20-5739&type=oa",
             )
             alerts_created.append(alert)
 
@@ -2359,9 +2359,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             str(rt_oral_argument.pk), document_index
         )
 
-        ids_in_results = []
-        for result in percolator_response.hits:
-            ids_in_results.append(result.id)
+        ids_in_results = [result.id for result in percolator_response.hits]
 
         # Update the first in the previous batch.
         alert_to_modify = alerts_created[0]
@@ -2627,7 +2625,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         )
         # No "+" if hits do not reach the SCHEDULED_ALERT_HITS_LIMIT.
         self.assertIn(
-            f"had 2 hits",
+            "had 2 hits",
             mail.outbox[1].body,
         )
 
