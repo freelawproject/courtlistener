@@ -280,9 +280,9 @@ class Command(VerboseCommand):
                 c for c in cluster.case_name if c not in exclude
             )
             case_name_words = case_name.lower().split()
-            cluster_words = set(
-                [word for word in case_name_words if word not in bad_words]
-            )
+            cluster_words = {
+                word for word in case_name_words if word not in bad_words
+            }
             if scdb_words.issuperset(cluster_words):
                 good_cluster_ids.append(cluster.pk)
 
