@@ -1201,8 +1201,10 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             0, r.content.decode(), 2, "highlights docketNumber"
         )
 
-        self.assertIn("<mark>1:21", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>1:21</mark>"), 1)
+        self.assertIn("<mark>1:21-bk-1234", r.content.decode())
+        self.assertEqual(
+            r.content.decode().count("<mark>1:21-bk-1234</mark>"), 1
+        )
 
         # Highlight description.
         params = {"type": SEARCH_TYPES.RECAP, "q": "Discharging Debtor"}
@@ -1229,7 +1231,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIn("<mark>Lorem</mark>", r.content.decode())
         self.assertEqual(r.content.decode().count("<mark>Lorem</mark>"), 2)
 
-        # Highlight plain_text snippet.
+        # Highlight plain_text exact snippet.
         params = {"type": SEARCH_TYPES.RECAP, "q": 'Maecenas nunc "justo"'}
 
         r = await self._test_article_count(params, 1, "highlights plain_text")
@@ -1240,6 +1242,30 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(r.content.decode().count("<mark>Maecenas</mark>"), 1)
         self.assertEqual(r.content.decode().count("<mark>nunc</mark>"), 1)
         self.assertEqual(r.content.decode().count("<mark>justo</mark>"), 1)
+
+        # Highlight plain_text snippet.
+        params = {"type": SEARCH_TYPES.RECAP, "q": "Mauris leo"}
+
+        r = await self._test_article_count(params, 1, "highlights plain_text")
+        # Count child documents under docket.
+        self._count_child_documents(
+            0, r.content.decode(), 1, "highlights plain_text"
+        )
+        self.assertEqual(r.content.decode().count("<mark>Mauris</mark>"), 1)
+        self.assertEqual(r.content.decode().count("<mark>leo</mark>"), 1)
+
+        # Highlight short_description.
+        params = {"type": SEARCH_TYPES.RECAP, "q": '"Document attachment"'}
+
+        r = await self._test_article_count(params, 1, "short_description")
+        # Count child documents under docket.
+        self._count_child_documents(
+            0, r.content.decode(), 1, "highlights plain_text"
+        )
+        self.assertEqual(r.content.decode().count("<mark>Document</mark>"), 1)
+        self.assertEqual(
+            r.content.decode().count("<mark>attachment</mark>"), 1
+        )
 
         # Highlight filter: caseName
         params = {
@@ -1269,8 +1295,10 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = await self._test_article_count(
             params, 1, "highlights docket number"
         )
-        self.assertIn("<mark>1:21", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>1:21</mark>"), 1)
+        self.assertIn("<mark>1:21-bk-1234", r.content.decode())
+        self.assertEqual(
+            r.content.decode().count("<mark>1:21-bk-1234</mark>"), 1
+        )
 
         # Highlight filter: Nature of Suit
         params = {

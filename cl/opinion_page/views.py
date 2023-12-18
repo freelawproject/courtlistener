@@ -662,7 +662,10 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
             "related_algorithm": "mlt",
             "related_clusters": related_clusters,
             "related_cluster_ids": [
-                item["cluster_id"] for item in related_clusters
+                item["cluster_id"]
+                if waffle.flag_is_active(request, "o-es-active")
+                else item["id"]
+                for item in related_clusters
             ],
             "related_search_params": f"&{urlencode(related_search_params)}",
             "sponsored": sponsored,

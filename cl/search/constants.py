@@ -94,6 +94,7 @@ SEARCH_OPINION_QUERY_FIELDS = [
     "caseNameFull",
     "caseNameShort",
     "status",
+    "suitNature",
 ]
 
 # ES fields that are used for highlighting
@@ -145,6 +146,19 @@ SEARCH_RECAP_HL_FIELDS = [
     "text",
 ]
 
+SEARCH_OPINION_HL_FIELDS = [
+    "caseName",
+    "caseName.exact",
+    "citation",
+    "citation.exact",
+    "court_citation_string",
+    "docketNumber",
+    "docketNumber.exact",
+    "suitNature",
+    "suitNature.exact",
+]
+
+
 # In RECAP Search, it is necessary to display 'plain_text' as a truncated snippet,
 # where the snippet length is determined by 'fragment_size'.
 # For all other fields, the complete content should be returned.
@@ -157,8 +171,6 @@ SEARCH_RECAP_CHILD_HL_FIELDS = {
     "description.exact": 0,
     "document_type": 0,
     "document_type.exact": 0,
-    "document_number": 0,
-    "attachment_number": 0,
     "plain_text": 100,
     "plain_text.exact": 100,
 }

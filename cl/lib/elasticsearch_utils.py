@@ -9,6 +9,7 @@ from datetime import date, datetime
 from functools import reduce, wraps
 from typing import Any, Callable, Dict, List, Literal, Match, Tuple
 
+import regex
 from django.conf import settings
 from django.core.cache import cache, caches
 from django.core.paginator import EmptyPage, Page
@@ -44,6 +45,7 @@ from cl.search.constants import (
     SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS,
     SEARCH_HL_TAG,
     SEARCH_OPINION_CHILD_HL_FIELDS,
+    SEARCH_OPINION_HL_FIELDS,
     SEARCH_OPINION_QUERY_FIELDS,
     SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS,
     SEARCH_ORAL_ARGUMENT_QUERY_FIELDS,
@@ -53,7 +55,6 @@ from cl.search.constants import (
     SEARCH_RECAP_CHILD_QUERY_FIELDS,
     SEARCH_RECAP_HL_FIELDS,
     SEARCH_RECAP_PARENT_QUERY_FIELDS,
-    SOLR_OPINION_HL_FIELDS,
     SOLR_PEOPLE_ES_HL_FIELDS,
 )
 from cl.search.exception import UnbalancedQuery
@@ -1069,12 +1070,13 @@ def add_es_highlighting(
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             highlighting_fields = SEARCH_RECAP_HL_FIELDS
         case SEARCH_TYPES.OPINION:
-            highlighting_fields = SOLR_OPINION_HL_FIELDS
+            highlighting_fields = SEARCH_OPINION_HL_FIELDS
 
     search_query = search_query.source(excludes=fields_to_exclude)
     for field in highlighting_fields:
         search_query = search_query.highlight(
             field,
+            type="plain",
             number_of_fragments=0,
             pre_tags=[f"<{hl_tag}>"],
             post_tags=[f"</{hl_tag}>"],
@@ -1084,22 +1086,54 @@ def add_es_highlighting(
 
 
 def replace_highlight(
-    match: Match[str], unique_hl_strings: List[str], tag: str
+    cleaned_str: str, unique_hl_strings: List[str], tag: str
 ) -> str:
-    """Replaces the matched term with a marked version if it exists in the
-    unique highlighted strings list.
+    """Replaces each term that needs to be highlighted by the marked term into
+     the clean string.
 
-    :param match: A regex match object containing the term to be replaced.
+    :param cleaned_str: The original string without html tags.
     :param unique_hl_strings: A list of strings to be highlighted.
     :param tag: The HTML tag to use for marking the term.
-    :return: The highlighted term if it's in the unique_hl_strings, otherwise
-    the original term.
+    :return: The highlighted string.
     """
 
-    term = match.group(0)
-    if term in unique_hl_strings:
-        return f"<{tag}>{term}</{tag}>"
-    return term
+    for word in unique_hl_strings:
+        # Create a pattern to match the word as a whole word.
+        pattern = rf"(?<!\w){regex.escape(word)}(?!\w)"
+
+        # Replace with the specified tag
+        replacement = f"<{tag}>{word}</{tag}>"
+        cleaned_str = regex.sub(pattern, replacement, cleaned_str)
+
+    return cleaned_str
+
+
+def select_unique_hl(
+    cleaned_unique_strings: list[str], cleaned_str: str
+) -> list[str]:
+    """Select the longest string to be highlighted. This is required when the
+    field contains HL for the "normal" and the "exact" version.
+
+    :param cleaned_unique_strings: The list holding the unique highlighted str
+    :param cleaned_str: The incoming string to potentially add to the list.
+    :return: The updated cleaned_unique_strings
+    """
+
+    # Check if cleaned_str is contained in any element of the list
+    for item in cleaned_unique_strings:
+        if cleaned_str in item:
+            # cleaned_str is contained in an element of the list, do not add it
+            return cleaned_unique_strings
+
+    # Now do the inverse process, checks if any element of the list is
+    # contained in cleaned_str.
+    cleaned_unique_strings = [
+        item for item in cleaned_unique_strings if not item in cleaned_str
+    ]
+
+    # Adds cleaned_unique_strings to the list
+    cleaned_unique_strings.append(cleaned_str)
+    return cleaned_unique_strings
 
 
 def merge_highlights_into_result(
@@ -1127,37 +1161,54 @@ def merge_highlights_into_result(
         # version can differ, so the best thing to do is combine
         # highlighted terms from each version and set it.
 
+        marked_strings_exact = []
+        marked_strings = []
+        cleaned_unique_strings = []
+
+        # Abort HL merging if the field has already been completed.
+        if field in exact_hl_fields:
+            continue
+
         if "exact" in field:
             field = field.split(".exact")[0]
-            marked_strings_exact = []
-            # Extract all unique marked strings from "field.exact"
-            marked_strings = re.findall(
-                rf"<{tag}>(.*?)</{tag}>", highlight_list[0]
+
+        # Extract all unique marked strings from "field.exact"
+        if f"{field}.exact" in highlights:
+            for hl in highlight_list:
+                cleaned_hl = re.sub(r"</?mark>", "", hl)
+                cleaned_unique_strings = select_unique_hl(
+                    cleaned_unique_strings, cleaned_hl
+                )
+                marked_strings.extend(re.findall(rf"<{tag}>(.*?)</{tag}>", hl))
+
+        if field in highlights:
+            # Extract all unique marked strings from "field" if
+            # available
+
+            for hl in highlights[field]:
+                cleaned_hl = re.sub(r"</?mark>", "", hl)
+                cleaned_unique_strings = select_unique_hl(
+                    cleaned_unique_strings, cleaned_hl
+                )
+                marked_strings_exact.extend(
+                    re.findall(
+                        rf"<{tag}>(.*?)</{tag}>",
+                        hl,
+                    )
+                )
+
+        # Merge highlights if there were HL terms in "field" or "field.exact".
+        # This avoids merging highlights when there are no matching terms,
+        # yet highlights are returned due to the NO_MATCH_HL_SIZE setting.
+        if marked_strings or marked_strings_exact:
+            unique_marked_strings = list(
+                set(marked_strings + marked_strings_exact)
             )
-
-            if field in highlights:
-                # Extract all unique marked strings from "field" if
-                # available
-                marked_strings_exact = re.findall(
-                    rf"<{tag}>(.*?)</{tag}>",
-                    highlights[field][0],
-                )
-
-            # Merge highlights only if the exact.field contains highlight tags.
-            # This avoids merging highlights when there are no matching terms,
-            # yet highlights are returned due to the NO_MATCH_HL_SIZE setting.
-            if marked_strings:
-                unique_marked_strings = list(
-                    set(marked_strings + marked_strings_exact)
-                )
-                original_string = highlight_list[0]
-                all_terms_pattern = rf"<{tag}>|</{tag}>|\w+"
-                combined_highlights = re.sub(
-                    all_terms_pattern,
-                    lambda match: replace_highlight(
-                        match, unique_marked_strings, tag
-                    ),
-                    original_string,
+            merged_hl = []
+            for original_string in cleaned_unique_strings:
+                # Create a regex pattern to match each unique term
+                combined_highlights = replace_highlight(
+                    original_string, unique_marked_strings, tag
                 )
                 # Remove nested <mark> tags after replace.
                 combined_highlights = re.sub(
@@ -1165,13 +1216,15 @@ def merge_highlights_into_result(
                     rf"<{tag}>\1</{tag}>",
                     combined_highlights,
                 )
-                result[field] = combined_highlights
-                exact_hl_fields.append(field)
+                merged_hl.append(combined_highlights)
+
+            result[field] = merged_hl
+            exact_hl_fields.append(field)
 
         if field not in exact_hl_fields:
             # If the "field.exact" version has not been set, set
             # the "field" version.
-            result[field] = highlight_list[0]
+            result[field] = highlight_list
 
 
 def set_results_highlights(results: Page, search_type: str) -> None:

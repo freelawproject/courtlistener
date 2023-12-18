@@ -1205,21 +1205,30 @@ class OpinionBaseDocument(Document):
     docketNumber = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
     caseName = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
     caseNameFull = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -1231,14 +1240,20 @@ class OpinionBaseDocument(Document):
         analyzer="text_en_splitting_cl",
         search_analyzer="search_analyzer",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
             "raw": fields.KeywordField(),
         },
     )
     court = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -1250,7 +1265,10 @@ class OpinionBaseDocument(Document):
     judge = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -1264,50 +1282,75 @@ class OpinionBaseDocument(Document):
     attorney = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
     suitNature = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
     citation = fields.ListField(
         fields.TextField(
             analyzer="text_en_splitting_cl",
+            fields={
+                "exact": fields.TextField(
+                    analyzer="english_exact",
+                    search_analyzer="search_analyzer_exact",
+                    multi=True,
+                ),
+            },
             search_analyzer="search_analyzer",
             multi=True,
-        ),
+        )
     )
     status = fields.TextField(
         analyzer="text_en_splitting_cl",
         search_analyzer="search_analyzer",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
             "raw": fields.KeywordField(),
         },
     )
     proceduralHistory = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
     posture = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
     syllabus = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -1463,7 +1506,10 @@ class OpinionDocument(OpinionBaseDocument):
     type_text = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -1472,7 +1518,10 @@ class OpinionDocument(OpinionBaseDocument):
     text = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -1664,7 +1713,10 @@ class OpinionClusterDocument(OpinionBaseDocument):
         attr="case_name_short",
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -1675,7 +1727,10 @@ class OpinionClusterDocument(OpinionBaseDocument):
         attr="source",
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
