@@ -161,20 +161,18 @@ class Command(VerboseCommand):
 
         # For result_sets with more than 0 results, do all the citations have
         # the same ID?
-        unique_results = set(
-            [
-                results[0]["cluster_id"]
-                for node, results in result_sets
-                if len(results) > 0
-            ]
-        )
+        unique_results = {
+            results[0]["cluster_id"]
+            for node, results in result_sets
+            if len(results) > 0
+        }
         if len(unique_results) > 1:
             logger.info("  Got multiple IDs for the citations. Pass.\n")
             return
 
         # Are the number of unique reporters equal to the number of results?
         if len(
-            set([node.edition_guess.reporter for node, results in result_sets])
+            {node.edition_guess.reporter for node, results in result_sets}
         ) != len(result_sets):
             logger.info("  Got duplicated reporter in citations. Pass.\n")
             return
