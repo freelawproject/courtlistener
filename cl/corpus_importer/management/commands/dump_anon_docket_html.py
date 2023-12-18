@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Dict, Iterator
+from typing import Dict
 
 from juriscraper.pacer import DocketReport
 from tqdm import tqdm
