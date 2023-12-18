@@ -37,11 +37,7 @@ from timeout_decorator import timeout_decorator
 from cl.alerts.factories import DocketAlertFactory
 from cl.alerts.models import DocketAlert, DocketAlertEvent
 from cl.api.factories import WebhookEventFactory, WebhookFactory
-from cl.api.models import (
-    Webhook,
-    WebhookEvent,
-    WebhookEventType,
-)
+from cl.api.models import Webhook, WebhookEvent, WebhookEventType
 from cl.favorites.factories import UserTagFactory
 from cl.favorites.models import (
     DocketTag,
