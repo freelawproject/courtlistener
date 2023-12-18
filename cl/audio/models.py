@@ -91,7 +91,7 @@ class Audio(AbstractDateTimeModel):
         blank=True,
     )
     local_path_mp3 = models.FileField(
-        help_text=f"The location in AWS S3 where our enhanced copy of the "
+        help_text="The location in AWS S3 where our enhanced copy of the "
         f"original audio file is stored. {s3_warning_note}",
         upload_to=make_upload_path,
         storage=IncrementingAWSMediaStorage(),
@@ -99,7 +99,7 @@ class Audio(AbstractDateTimeModel):
         db_index=True,
     )
     local_path_original_file = models.FileField(
-        help_text=f"The location in AWS S3 where the original audio file "
+        help_text="The location in AWS S3 where the original audio file "
         f"downloaded from the court is stored. {s3_warning_note}",
         upload_to=make_upload_path,
         storage=IncrementingAWSMediaStorage(),
