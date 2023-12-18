@@ -1023,6 +1023,7 @@ class TestElasticsearchUtils(SimpleTestCase):
         highlighted terms, ensuring it can handle Unicode characters, such as
         emojis.
         """
+
         tests = [
             {
                 "cleaned_str": "MOTION for Leave to File Amicus Curiae Lorem",
@@ -1057,10 +1058,10 @@ class TestElasticsearchUtils(SimpleTestCase):
         ]
 
         for test in tests:
-            ouput_str = replace_highlight(
-                test["cleaned_str"], test["unique_hl_strings"], "mark"
+            output_str = replace_highlight(
+                test["cleaned_str"], test["unique_hl_strings"], "mark"  # type: ignore
             )
-            self.assertEqual(ouput_str, test["output"])
+            self.assertEqual(output_str, test["output"])
 
     def test_select_unique_hl(self) -> None:
         """Confirm that select_unique_hl correctly identifies and returns the
@@ -1094,8 +1095,8 @@ class TestElasticsearchUtils(SimpleTestCase):
         ]
 
         for test in tests:
-            ouput_str = select_unique_hl(
-                test["current_list"],
-                test["input_str"],
+            output_str = select_unique_hl(
+                test["current_list"],  # type: ignore
+                test["input_str"],  # type: ignore
             )
-            self.assertEqual(ouput_str, test["output"])
+            self.assertEqual(output_str, test["output"])

@@ -1086,7 +1086,7 @@ def add_es_highlighting(
 
 
 def replace_highlight(
-    cleaned_str: str, unique_hl_strings: List[str], tag: str
+    cleaned_str: str, unique_hl_strings: list[str], tag: str
 ) -> str:
     """Replaces each term that needs to be highlighted by the marked term into
      the clean string.
@@ -1161,9 +1161,9 @@ def merge_highlights_into_result(
         # version can differ, so the best thing to do is combine
         # highlighted terms from each version and set it.
 
-        marked_strings_exact = []
-        marked_strings = []
-        cleaned_unique_strings = []
+        marked_strings_exact: list[str] = []
+        marked_strings: list[str] = []
+        cleaned_unique_strings: list[str] = []
 
         # Abort HL merging if the field has already been completed.
         if field in exact_hl_fields:
