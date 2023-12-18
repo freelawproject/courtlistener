@@ -195,7 +195,7 @@ def update_matching_opinions(
                         # columbia names are better
                         op.author_str = author_str
                     else:
-                        raise AuthorException(f"Authors don't match")
+                        raise AuthorException("Authors don't match")
                 elif any(s.isupper() for s in op.author_str.split(",")):
                     # Some names are uppercase, update with processed names
                     op.author_str = author_str

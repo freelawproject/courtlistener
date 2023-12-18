@@ -102,7 +102,7 @@ class DisclosureIngestionTest(TestCase):
         self.assertEqual(
             investment_count,
             84,
-            f"Should have 84 ingested investments",
+            "Should have 84 ingested investments",
         )
 
 
