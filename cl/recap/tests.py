@@ -19,7 +19,7 @@ from django.test import RequestFactory
 from django.urls import reverse
 from django.utils.timezone import now
 from juriscraper.pacer import PacerRssFeed
-from requests import ConnectionError, HTTPError
+from requests import ConnectionError
 from rest_framework.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
@@ -6308,7 +6308,7 @@ class CalculateRecapsSequenceNumbersTest(TestCase):
                     de.recap_sequence_number, f"2021-10-15.00{entry_number}"
                 )
             else:
-                self.assertEqual(de.recap_sequence_number, f"2021-10-16.001")
+                self.assertEqual(de.recap_sequence_number, "2021-10-16.001")
             self.assertEqual(de.entry_number, entry_number)
             entry_number += 1
             prev_de = de
@@ -6614,11 +6614,9 @@ class CleanUpDuplicateAppellateEntries(TestCase):
         self.assertEqual(recap_documents.count(), 4)
 
         # Confirm the right entries are preserved.
-        pass_test = True
-        for de in docket_entries:
-            if not de.entry_number in [105, 506585238, 1, 2]:
-                pass_test = False
-        self.assertEqual(pass_test, True)
+        assert all(
+            de.entry_number in [105, 506585238, 1, 2] for de in docket_entries
+        )
 
     @mock.patch(
         "cl.recap.management.commands.remove_appellate_entries_with_long_numbers.logger"
