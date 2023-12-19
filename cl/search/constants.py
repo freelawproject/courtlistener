@@ -89,6 +89,7 @@ SEARCH_RECAP_PARENT_QUERY_FIELDS = [
 ]
 SEARCH_OPINION_QUERY_FIELDS = [
     "court",
+    "court_id",
     "citation",
     "judge",
     "caseNameFull",

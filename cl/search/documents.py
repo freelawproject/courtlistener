@@ -1506,18 +1506,9 @@ class OpinionDocument(OpinionBaseDocument):
     )
     opinion_url = fields.KeywordField(index=False)
     author_id = fields.IntegerField()
-    type = fields.KeywordField(attr="type")
+    type = fields.KeywordField(attr="type", index=False)
     per_curiam = fields.BooleanField(attr="per_curiam")
-    type_text = fields.TextField(
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(
-                analyzer="english_exact",
-                search_analyzer="search_analyzer_exact",
-            ),
-        },
-        search_analyzer="search_analyzer",
-    )
+    type_text = fields.TextField(index=False)
     download_url = fields.KeywordField(attr="download_url", index=False)
     local_path = fields.KeywordField(index=False)
     text = fields.TextField(
@@ -1530,7 +1521,7 @@ class OpinionDocument(OpinionBaseDocument):
         },
         search_analyzer="search_analyzer",
     )
-    sha1 = fields.TextField(attr="sha1")
+    sha1 = fields.TextField(attr="sha1", index=False)
     cites = fields.ListField(
         fields.IntegerField(multi=True),
     )

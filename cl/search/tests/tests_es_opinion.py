@@ -500,6 +500,41 @@ class OpinionsESSearchTest(
         self.assertIn("Honda", r.content.decode())
         self.assertIn("1 Opinion", r.content.decode())
 
+        # Search by court_id
+        search_params = {"q": "ca1"}
+        r = await self._test_article_count(search_params, 1, "text_query")
+        self.assertIn("case name cluster 3", r.content.decode())
+
+        # Search by court name
+        search_params = {"q": "First Circuit"}
+        r = await self._test_article_count(search_params, 1, "text_query")
+        self.assertIn("case name cluster 3", r.content.decode())
+
+        # Search by Citation
+        search_params = {"q": '"33 state"'}
+        r = await self._test_article_count(search_params, 1, "text_query")
+        self.assertIn("docket number 2", r.content.decode())
+
+        # Search by Judge
+        search_params = {"q": "David"}
+        r = await self._test_article_count(search_params, 1, "text_query")
+        self.assertIn("docket number 2", r.content.decode())
+
+        # Search by caseName
+        search_params = {"q": '""Howard v. Honda""'}
+        r = await self._test_article_count(search_params, 1, "text_query")
+        self.assertIn("docket number 2", r.content.decode())
+
+        # Search by caseNameFull
+        search_params = {"q": "Antonin"}
+        r = await self._test_article_count(search_params, 1, "text_query")
+        self.assertIn("docket number 2", r.content.decode())
+
+        # Search by suitNature
+        search_params = {"q": "copyright"}
+        r = await self._test_article_count(search_params, 1, "text_query")
+        self.assertIn("docket number 2", r.content.decode())
+
     async def test_homepage(self) -> None:
         """Is the homepage loaded when no GET parameters are provided?"""
         response = await self.async_client.get(reverse("show_results"))
