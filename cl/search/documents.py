@@ -1196,7 +1196,7 @@ class DocketDocument(DocketBaseDocument):
 
 # Opinions
 class OpinionBaseDocument(Document):
-    absolute_url = fields.KeywordField()
+    absolute_url = fields.KeywordField(index=False)
     cluster_id = fields.IntegerField(
         attr="pk", fields={"raw": fields.KeywordField(attr="pk")}
     )
@@ -1504,6 +1504,7 @@ class OpinionDocument(OpinionBaseDocument):
             "raw": fields.KeywordField(attr="pk"),
         },
     )
+    opinion_url = fields.KeywordField(index=False)
     author_id = fields.IntegerField()
     type = fields.KeywordField(attr="type")
     per_curiam = fields.BooleanField(attr="per_curiam")
