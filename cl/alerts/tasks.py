@@ -11,12 +11,7 @@ from django.core.mail import EmailMultiAlternatives, get_connection, send_mail
 from django.db import transaction
 from django.template import loader
 from django.utils.timezone import now
-from elasticsearch.exceptions import (
-    ConnectionError,
-    NotFoundError,
-    RequestError,
-    TransportError,
-)
+from elasticsearch.exceptions import ConnectionError
 
 from cl.alerts.models import Alert, DocketAlert, ScheduledAlertHit
 from cl.alerts.utils import (
@@ -39,16 +34,8 @@ from cl.lib.redis_utils import create_redis_semaphore, delete_redis_semaphore
 from cl.lib.string_utils import trunc
 from cl.recap.constants import COURT_TIMEZONES
 from cl.search.constants import ALERTS_HL_TAG
-from cl.search.documents import (
-    ES_CHILD_ID,
-    AudioPercolator,
-    ESRECAPDocument,
-    PositionDocument,
-)
 from cl.search.models import Docket, DocketEntry
 from cl.search.types import (
-    AudioPercolator,
-    ESDocumentClassType,
     PercolatorResponseType,
     SaveDocumentResponseType,
     SearchAlertHitType,
@@ -247,7 +234,7 @@ def make_alert_messages(
             body=txt_template.render(email_context),
             from_email=settings.DEFAULT_ALERTS_EMAIL,
             to=[recipient.email_address],
-            headers={f"X-Entity-Ref-ID": f"docket.alert:{d.pk}"},
+            headers={"X-Entity-Ref-ID": f"docket.alert:{d.pk}"},
         )
         html = html_template.render(email_context)
         msg.attach_alternative(html, "text/html")
@@ -419,7 +406,7 @@ def send_unsubscription_confirmation(
         body=txt_template.render(email_context),
         from_email=settings.DEFAULT_ALERTS_EMAIL,
         to=[email_address],
-        headers={f"X-Entity-Ref-ID": f"docket.alert:{docket.pk}"},
+        headers={"X-Entity-Ref-ID": f"docket.alert:{docket.pk}"},
     )
     html = html_template.render(email_context)
     msg.attach_alternative(html, "text/html")
@@ -437,7 +424,7 @@ def send_recap_email_user_not_found(recap_email_recipients: list[str]) -> None:
 
     template = loader.get_template("recap_email_user_not_found.txt")
     send_mail(
-        subject=f"@recap.email user not found",
+        subject="@recap.email user not found",
         message=template.render(
             {"recap_email_recipients": recap_email_recipients}
         ),
@@ -714,5 +701,5 @@ def es_save_alert_document(
     doc_indexed = es_document(meta={"id": alert.pk}, **doc).save(
         skip_empty=True, refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH
     )
-    if not doc_indexed in ["created", "updated"]:
+    if doc_indexed not in ["created", "updated"]:
         logger.warning(f"Error indexing Alert ID: {alert.pk}")

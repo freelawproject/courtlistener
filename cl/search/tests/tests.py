@@ -210,7 +210,7 @@ class ModelTest(TestCase):
             self.o.file_with_date = date(1899, 1, 1)
             self.o.local_path.save("file_name.pdf", cf, save=False)
             self.o.save(index=False)
-        except ValueError as e:
+        except ValueError:
             raise ValueError(
                 "Unable to save a case older than 1900. Did you "
                 "try to use `strftime`...again?"

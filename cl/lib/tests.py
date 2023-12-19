@@ -977,7 +977,7 @@ class TestElasticsearchUtils(SimpleTestCase):
             {"input": "a b", "output": "a AND b"},
             {"input": "a b (c d)", "output": "a AND b AND (c d)"},
             {
-                "input": f"caseName:Loretta AND docketNumber:(ASBCA No. 59126)",
+                "input": "caseName:Loretta AND docketNumber:(ASBCA No. 59126)",
                 "output": "caseName:Loretta AND docketNumber:(ASBCA No. 59126)",
             },
             {

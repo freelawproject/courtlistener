@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 from django.db import transaction
 from eyecite import get_citations

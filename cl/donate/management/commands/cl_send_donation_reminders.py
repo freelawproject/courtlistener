@@ -8,7 +8,7 @@ from django.template import loader
 from django.utils.timezone import now
 
 from cl.donate.models import Donation
-from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.command_utils import VerboseCommand
 from cl.search.models import Court, Opinion
 from cl.stats.models import Stat
 

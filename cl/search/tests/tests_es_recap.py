@@ -2072,7 +2072,7 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         # Text query case.
         params = {
-            "q": f"Leave to File",
+            "q": "Leave to File",
             "type": SEARCH_TYPES.RECAP,
         }
         response = self.client.get(

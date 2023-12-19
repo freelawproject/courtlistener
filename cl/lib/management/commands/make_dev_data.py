@@ -46,7 +46,7 @@ FACTORIES = {
     # API
     700: WebhookEventWithParentsFactory,
 }
-factories_str = "\n".join([f"{k}: {v}" for k, v in FACTORIES.items()])
+factories_str = "\n".join(f"{k}: {v}" for k, v in FACTORIES.items())
 
 
 class Command(VerboseCommand):
@@ -57,15 +57,15 @@ class Command(VerboseCommand):
             "--count",
             type=int,
             default=10,
-            help=f"How many items to create",
+            help="How many items to create",
         )
         parser.add_argument(
             "--make-objects",
             type=int,
             nargs="+",
             required=False,
-            help=f"Which type of objects do you want. Select by number from "
-            f"(multiple numbers allowed, separated by spaces): "
+            help="Which type of objects do you want. Select by number from "
+            "(multiple numbers allowed, separated by spaces): "
             f"\n{factories_str}",
         )
         parser.add_argument(
@@ -78,7 +78,7 @@ class Command(VerboseCommand):
             "--parent-id",
             type=int,
             required=False,
-            help=f"The parent of the object(s) being made",
+            help="The parent of the object(s) being made",
         )
 
     def handle(self, *args, **options) -> None:
@@ -92,7 +92,7 @@ class Command(VerboseCommand):
         count = options["count"]
         logger.info(
             f"Creating dummy data. Making at least {count} "
-            f"objects of each type."
+            "objects of each type."
         )
         parent_id = options["parent_id"] if options["parent_id"] else None
 
