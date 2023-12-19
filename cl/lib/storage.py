@@ -3,8 +3,7 @@ import os
 import uuid
 from typing import Dict, Optional
 
-from django.conf import settings
-from django.core.files.storage import FileSystemStorage, Storage
+from django.core.files.storage import Storage
 from storages.backends.s3 import S3ManifestStaticStorage, S3Storage
 
 
