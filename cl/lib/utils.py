@@ -70,17 +70,15 @@ def previous_and_next(some_iterable):
 
 def is_iter(item: Any) -> bool:
     # See: http://stackoverflow.com/a/1952655/64911
-    if isinstance(item, Iterable):
-        return True
-    return False
+    return isinstance(item, Iterable)
 
 
-def remove_duplicate_dicts(l):
+def remove_duplicate_dicts(l: list[dict]) -> list[dict]:
     """Given a list of dicts, remove any that are the same.
 
     See: http://stackoverflow.com/a/9427216/64911
     """
-    return [dict(t) for t in set([tuple(d.items()) for d in l])]
+    return [dict(t) for t in {tuple(d.items()) for d in l}]
 
 
 def human_sort(
