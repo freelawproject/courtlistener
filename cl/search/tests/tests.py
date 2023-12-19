@@ -215,7 +215,7 @@ class ModelTest(TestCase):
             self.o.file_with_date = date(1899, 1, 1)
             self.o.local_path.save("file_name.pdf", cf, save=False)
             self.o.save(index=False)
-        except ValueError as e:
+        except ValueError:
             raise ValueError(
                 "Unable to save a case older than 1900. Did you "
                 "try to use `strftime`...again?"
@@ -887,7 +887,7 @@ class SearchTest(ESIndexTestCase, IndexedSolrTestCase):
         # docket_number box filter: 21-1234, return results for 1:21-bk-1234
         search_params = {
             "type": SEARCH_TYPES.OPINION,
-            "docket_number": f"21-1234",
+            "docket_number": "21-1234",
         }
         # Frontend
         r = await self.async_client.get(
@@ -906,7 +906,7 @@ class SearchTest(ESIndexTestCase, IndexedSolrTestCase):
         # Frontend
         search_params = {
             "type": SEARCH_TYPES.OPINION,
-            "q": f"1:21-cv-1234-ABC",
+            "q": "1:21-cv-1234-ABC",
         }
         r = await self.async_client.get(reverse("show_results"), search_params)
         actual = self.get_article_count(r)

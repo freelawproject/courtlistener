@@ -130,7 +130,7 @@ def get_and_store_starting_case_ids(options: OptionsType, r: Redis) -> None:
             r.hdel("iquery_status", court_id)
             continue
         r.hset("iquery_status", court_id, latest_pacer_case_id)
-    logger.info(f"Finished setting starting pacer_case_ids.")
+    logger.info("Finished setting starting pacer_case_ids.")
 
 
 def query_results_in_es(options):
@@ -173,7 +173,7 @@ def query_results_in_es(options):
     json_file = os.path.join(
         settings.MEDIA_ROOT,
         "ready_mix_cases",
-        f"extracted_ready_mix_cases.json",
+        "extracted_ready_mix_cases.json",
     )
     with open(json_file, "w", encoding="utf-8") as file:
         json.dump(
@@ -182,7 +182,7 @@ def query_results_in_es(options):
             indent=2,
             sort_keys=True,
         )
-    logger.info(f"Finished querying results in ES.")
+    logger.info("Finished querying results in ES.")
 
 
 def add_bank_cases_to_cl(options: OptionsType, r) -> None:

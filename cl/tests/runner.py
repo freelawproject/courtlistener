@@ -1,5 +1,4 @@
 import logging
-import os
 import sys
 import warnings
 from unittest import TestLoader
