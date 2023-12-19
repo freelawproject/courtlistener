@@ -2,7 +2,6 @@ import datetime
 from unittest import mock
 
 from django.core.cache import cache
-from django.db import transaction
 from django.urls import reverse
 from elasticsearch_dsl import connections
 from lxml import html
@@ -1121,7 +1120,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         created_audios = []
         audios_to_create = 20
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
-            for i in range(audios_to_create):
+            for _ in range(audios_to_create):
                 audio = AudioFactory.create(
                     docket_id=self.audio_3.docket.pk,
                 )
