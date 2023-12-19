@@ -143,7 +143,6 @@ class UserProfile(models.Model):
     )
     neon_account_id = models.CharField(
         help_text="Unique identifier assigned by Neon CRM to a customer record",
-        default="",
         blank=True,
     )
 
