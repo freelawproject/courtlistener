@@ -4,7 +4,6 @@ from typing import Tuple, TypedDict, cast
 from asgiref.sync import async_to_sync
 from django.contrib.auth.hashers import make_password
 from django.core.files.base import ContentFile
-from django.db.models import F
 from django.test import override_settings
 from django.urls import reverse
 from rest_framework.status import HTTP_200_OK, HTTP_503_SERVICE_UNAVAILABLE
@@ -376,9 +375,9 @@ class TestMaintenanceMiddleware(TestCase):
         admin.user.is_staff = True
         admin.user.save()
 
-    def test_middleware_works_when_enabled(self) -> None:
+    async def test_middleware_works_when_enabled(self) -> None:
         """Does the middleware block users when enabled?"""
-        r = self.client.get(reverse("show_results"))
+        r = await self.async_client.get(reverse("show_results"))
         self.assertEqual(
             r.status_code,
             HTTP_503_SERVICE_UNAVAILABLE,
@@ -386,12 +385,14 @@ class TestMaintenanceMiddleware(TestCase):
             % (r.status_code, HTTP_503_SERVICE_UNAVAILABLE),
         )
 
-    def test_staff_can_get_through(self) -> None:
+    async def test_staff_can_get_through(self) -> None:
         """Can staff get through when the middleware is enabled?"""
         self.assertTrue(
-            self.client.login(username="admin", password="password")
+            await self.async_client.alogin(
+                username="admin", password="password"
+            )
         )
-        r = self.client.get(reverse("show_results"))
+        r = await self.async_client.get(reverse("show_results"))
         self.assertEqual(
             r.status_code,
             HTTP_200_OK,
@@ -972,7 +973,7 @@ class TestAppendQueryConjunctions(SimpleTestCase):
             {"input": "a b", "output": "a AND b"},
             {"input": "a b (c d)", "output": "a AND b AND (c d)"},
             {
-                "input": f"caseName:Loretta AND docketNumber:(ASBCA No. 59126)",
+                "input": "caseName:Loretta AND docketNumber:(ASBCA No. 59126)",
                 "output": "caseName:Loretta AND docketNumber:(ASBCA No. 59126)",
             },
             {

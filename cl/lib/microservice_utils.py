@@ -78,7 +78,7 @@ async def microservice(
     if file and file_type:
         files = {"file": (f"dummy.{file_type}", file)}
     elif file:
-        files = {"file": (f"filename", file)}
+        files = {"file": ("filename", file)}
 
     async with AsyncClient(follow_redirects=True, http2=True) as client:
         req = client.build_request(

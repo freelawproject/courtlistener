@@ -135,7 +135,7 @@ def fetch_non_harvard_data(harvard_data: Dict[str, Any]) -> Dict[str, Any]:
     author_list = list(map(titlecase, author_list))
 
     # Flatten and dedupe list of judges
-    judges = ", ".join(sorted(list(set(judge_list + author_list))))
+    judges = ", ".join(sorted(set(judge_list + author_list)))
 
     all_data = {"judges": judges}
     short_fields = ["attorneys", "disposition", "otherdate", "seealso"]
@@ -600,7 +600,7 @@ def update_matching_opinions(
                     find_just_name(op.author_str).lower()
                     != find_just_name(author_str).lower()
                 ):
-                    raise AuthorException(f"Authors don't match")
+                    raise AuthorException("Authors don't match")
                 elif any(s.isupper() for s in op.author_str.split(",")):
                     # Some names are uppercase, update with processed names
                     op.author_str = author_str

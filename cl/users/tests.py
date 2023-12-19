@@ -18,7 +18,7 @@ from django.core.mail import (
     get_connection,
     send_mail,
 )
-from django.test import Client
+from django.test import AsyncClient
 from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils.http import urlsafe_base64_encode
@@ -37,12 +37,7 @@ from timeout_decorator import timeout_decorator
 from cl.alerts.factories import DocketAlertFactory
 from cl.alerts.models import DocketAlert, DocketAlertEvent
 from cl.api.factories import WebhookEventFactory, WebhookFactory
-from cl.api.models import (
-    Webhook,
-    WebhookEvent,
-    WebhookEventType,
-    WebhookHistoryEvent,
-)
+from cl.api.models import Webhook, WebhookEvent, WebhookEventType
 from cl.favorites.factories import UserTagFactory
 from cl.favorites.models import (
     DocketTag,
@@ -127,7 +122,7 @@ class UserTest(LiveServerTestCase):
             "skip_me_if_alive": "",
             "consent": True,
         }
-        response = await sync_to_async(self.client.post)(
+        response = await self.async_client.post(
             f"{self.live_server_url}{reverse('register')}",
             params,
             follow=True,
@@ -194,7 +189,7 @@ class UserDataTest(LiveServerTestCase):
             user__username=params["username"],
             user__password=make_password(params["password"]),
         )
-        r = await sync_to_async(self.client.post)(
+        r = await self.async_client.post(
             reverse("sign-in"), params, follow=True
         )
         self.assertRedirects(r, "/")
@@ -282,7 +277,7 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
 
         # Log in, get the API again, and then load the profile page
         self.assertTrue(
-            await sync_to_async(self.async_client.login)(
+            await self.async_client.alogin(
                 username="pandora", password="password"
             )
         )
@@ -297,11 +292,11 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
     async def test_deleting_your_account(self) -> None:
         """Can we delete an account properly?"""
         self.assertTrue(
-            await sync_to_async(self.client.login)(
+            await self.async_client.alogin(
                 username="pandora", password="password"
             )
         )
-        response = await sync_to_async(self.client.post)(
+        response = await self.async_client.post(
             reverse("delete_account"),
             {"password": "password"},
             follow=True,
@@ -363,11 +358,11 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
 
         # Delete user account.
         self.assertTrue(
-            await sync_to_async(self.client.login)(
+            await self.async_client.alogin(
                 username=user_1.user.username, password="password"
             )
         )
-        await sync_to_async(self.client.post)(
+        await self.async_client.post(
             reverse("delete_account"),
             {"password": "password"},
             follow=True,
@@ -419,11 +414,11 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
 
         # Delete user account.
         self.assertTrue(
-            await sync_to_async(self.client.login)(
+            await self.async_client.alogin(
                 username=user_1.user.username, password="password"
             )
         )
-        await sync_to_async(self.client.post)(
+        await self.async_client.post(
             reverse("delete_account"),
             {"password": "password"},
             follow=True,
@@ -453,7 +448,7 @@ class DisposableEmailTest(SimpleUserDataMixin, TestCase):
     bad_email = f"{user}@{bad_domain}"
 
     def setUp(self) -> None:
-        self.client = Client()
+        self.client = AsyncClient()
 
     async def test_can_i_create_account_with_bad_email_address(self) -> None:
         """Is an error thrown if we try to use a banned email address?"""
@@ -477,11 +472,9 @@ class DisposableEmailTest(SimpleUserDataMixin, TestCase):
     async def test_can_i_change_to_bad_email_address(self) -> None:
         """Is an error thrown if we try to change to a bad email address?"""
         self.assertTrue(
-            await sync_to_async(self.client.login)(
-                username="pandora", password="password"
-            )
+            await self.client.alogin(username="pandora", password="password")
         )
-        r = await sync_to_async(self.client.post)(
+        r = await self.client.post(
             reverse("view_settings"),
             {"email": self.bad_email},
             follow=True,
@@ -1345,7 +1338,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
             to=["success@simulator.amazonses.com"],
             bcc=["bcc_success@simulator.amazonses.com"],
             cc=["cc_success@simulator.amazonses.com"],
-            headers={f"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+            headers={"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
         )
         html = "<p>Body goes here</p>"
         msg.attach_alternative(html, "text/html")
@@ -1397,7 +1390,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
             to=["success@simulator.amazonses.com"],
             bcc=["bcc_success@simulator.amazonses.com"],
             cc=["cc_success@simulator.amazonses.com"],
-            headers={f"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+            headers={"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
         )
         msg.send()
 
@@ -1437,7 +1430,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
             to=["success@simulator.amazonses.com"],
             bcc=["bcc_success@simulator.amazonses.com"],
             cc=["cc_success@simulator.amazonses.com"],
-            headers={f"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+            headers={"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
         )
         msg.content_subtype = "html"
         msg.send()
@@ -1591,7 +1584,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
             bcc=["bcc_success@simulator.amazonses.com"],
             cc=["cc_success@simulator.amazonses.com"],
             reply_to=["reply_success@simulator.amazonses.com"],
-            headers={f"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+            headers={"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
         )
         html = "<p>Body goes here</p>"
         msg.attach_alternative(html, "text/html")
@@ -1957,7 +1950,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         returned True.
         """
         total = 0
-        for i in range(50):
+        for _ in range(50):
             val = self.call_bcc_random(message, bcc_rate, iterations)
             total = total + val
         average = total / 50
@@ -2156,7 +2149,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
 
         # Send an additional email that exceeds the quota.
         email = EmailMessage(
-            f"This is the subject 6",
+            "This is the subject 6",
             "Body goes here",
             "testing@courtlistener.com",
             ["bounce@simulator.amazonses.com"],
@@ -2196,7 +2189,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
 
         # Send an additional email that exceeds the quota.
         email = EmailMessage(
-            f"This is the subject 6",
+            "This is the subject 6",
             "Body goes here",
             "testing@courtlistener.com",
             ["bounce@simulator.amazonses.com"],
@@ -2302,7 +2295,7 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
 
         # Check if warning is logged
         mock_logging.warning.assert_called_with(
-            f"The message: 5e9b3e8e-93c8-497f-abd4-00f6ddd566f0 can't be "
+            "The message: 5e9b3e8e-93c8-497f-abd4-00f6ddd566f0 can't be "
             "enqueued because it doesn't exist anymore."
         )
 
@@ -2323,7 +2316,7 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
             bcc=["bcc_success@simulator.amazonses.com"],
             cc=["cc_success@simulator.amazonses.com"],
             reply_to=["reply_success@simulator.amazonses.com"],
-            headers={f"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+            headers={"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
         )
         html = "<p>Body goes here</p>"
         msg.attach_alternative(html, "text/html")

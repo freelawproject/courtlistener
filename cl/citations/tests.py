@@ -43,11 +43,10 @@ from cl.citations.match_citations import (
 )
 from cl.citations.score_parentheticals import parenthetical_score
 from cl.citations.tasks import (
-    find_citations_and_parantheticals_for_recap_documents,
     find_citations_and_parentheticals_for_opinion_by_pks,
     store_recap_citations,
 )
-from cl.lib.test_helpers import IndexedSolrTestCase, TestCase
+from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -58,7 +57,6 @@ from cl.search.factories import (
     RECAPDocumentFactory,
 )
 from cl.search.models import (
-    Citation,
     Opinion,
     OpinionCluster,
     OpinionsCited,
@@ -230,8 +228,7 @@ class CitationTextTest(SimpleTestCase):
              'like</p></div>',
              '<div><p>possess any peculiar knowledge of the mere policy of '
              'public measures." <i><span class="citation no-link">Ibid.'
-             '</span></i> Gerry of Massachusetts like</p></div>'
-            ),
+             '</span></i> Gerry of Massachusetts like</p></div>'),
         ]
 
         # fmt: on
@@ -815,9 +812,9 @@ class CitationFeedTest(IndexedSolrTestCase):
         )
         self.assertEqual(count, expected_count)
 
-    def test_basic_cited_by_feed(self) -> None:
+    async def test_basic_cited_by_feed(self) -> None:
         """Can we load the cited-by feed and does it have content?"""
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("search_feed", args=["search"]),
             {"q": f"cites:{self.opinion_1.pk}"},
         )
@@ -826,18 +823,18 @@ class CitationFeedTest(IndexedSolrTestCase):
         expected_count = 1
         self._tree_has_content(r.content, expected_count)
 
-    def test_unicode_content(self) -> None:
+    async def test_unicode_content(self) -> None:
         """Does the citation feed continue working even when we have a unicode
         case name?
         """
         new_case_name = (
             "MAC ARTHUR KAMMUELLER, \u2014 v. LOOMIS, FARGO & " "CO., \u2014"
         )
-        OpinionCluster.objects.filter(pk=self.opinion_cluster_1.pk).update(
-            case_name=new_case_name
-        )
+        await OpinionCluster.objects.filter(
+            pk=self.opinion_cluster_1.pk
+        ).aupdate(case_name=new_case_name)
 
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("search_feed", args=["search"]),
             {"q": f"cites:{self.opinion_1.pk}"},
         )
@@ -1491,7 +1488,7 @@ class GroupParentheticalsTest(SimpleTestCase):
             representative,
         ) in enumerate(test_pairs):
             with self.subTest(
-                f"Testing that representative connected parenthetical is selected correctly.",
+                "Testing that representative connected parenthetical is selected correctly.",
                 i=i,
             ):
                 self.assertEquals(

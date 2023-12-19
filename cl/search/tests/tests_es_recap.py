@@ -29,6 +29,7 @@ from cl.search.factories import (
     CourtFactory,
     DocketEntryWithParentsFactory,
     DocketFactory,
+    OpinionWithParentsFactory,
     RECAPDocumentFactory,
 )
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
@@ -36,7 +37,11 @@ from cl.search.management.commands.cl_index_parent_and_child_docs import (
     get_last_parent_document_id_processed,
     log_last_document_indexed,
 )
-from cl.search.models import SEARCH_TYPES, RECAPDocument
+from cl.search.models import (
+    SEARCH_TYPES,
+    OpinionsCitedByRECAPDocument,
+    RECAPDocument,
+)
 from cl.search.tasks import (
     add_docket_to_solr_by_rds,
     es_save_document,
@@ -1046,7 +1051,44 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # Frontend
         r = await self._test_article_count(params, 1, '"pacer_doc_id"')
         # Count child documents under docket.
+        self._count_child_documents(0, r.content.decode(), 2, '"entry_number"')
+
+    def test_advanced_query_cites(self) -> None:
+        """Confirm cites advance query works properly"""
+
+        # Advanced query string, cites
+        # Frontend
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": f"cites:({self.opinion.pk})",
+        }
+
+        r = async_to_sync(self._test_article_count)(params, 1, "cites")
+        # Count child documents under docket.
+        self._count_child_documents(0, r.content.decode(), 1, '"pacer_doc_id"')
+
+        # Add a new OpinionsCitedByRECAPDocument
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_2 = OpinionWithParentsFactory()
+            OpinionsCitedByRECAPDocument.objects.bulk_create_with_signal(
+                [
+                    OpinionsCitedByRECAPDocument(
+                        citing_document=self.rd_att,
+                        cited_opinion=opinion_2,
+                        depth=1,
+                    )
+                ]
+            )
+        # Frontend
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": f"cites:({opinion_2.pk} OR {self.opinion.pk})",
+        }
+        r = async_to_sync(self._test_article_count)(params, 1, "cites")
+        # Count child documents under docket.
         self._count_child_documents(0, r.content.decode(), 2, '"pacer_doc_id"')
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_2.cluster.docket.delete()
 
     async def test_text_queries(self) -> None:
         """Confirm text queries works properly"""
@@ -2000,7 +2042,7 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         # Text query case.
         params = {
-            "q": f"Leave to File",
+            "q": "Leave to File",
             "type": SEARCH_TYPES.RECAP,
         }
         response = self.client.get(
@@ -3200,4 +3242,139 @@ class RECAPIndexingTest(
         self.assertEqual(r_doc.pacer_doc_id, "99999999")
         self.assertEqual(r_doc.docket_child["parent"], docket_2.pk)
 
+        # Add cites to RECAPDocument.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            opinion = OpinionWithParentsFactory()
+            OpinionsCitedByRECAPDocument.objects.bulk_create_with_signal(
+                [
+                    OpinionsCitedByRECAPDocument(
+                        citing_document=rd_1,
+                        cited_opinion=opinion,
+                        depth=1,
+                    )
+                ]
+            )
+
+        self.reset_and_assert_task_count(expected=1)
+        r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
+        self.assertIn(opinion.pk, r_doc.cites)
+
+        # Confirm OpinionsCitedByRECAPDocument delete doesn't trigger a update.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            OpinionsCitedByRECAPDocument.objects.filter(
+                citing_document=rd_1.pk
+            ).delete()
+
+        self.reset_and_assert_task_count(expected=0)
+        r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
+        self.assertIn(opinion.pk, r_doc.cites)
+
+        # Update cites to RECAPDocument.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            opinion = OpinionWithParentsFactory()
+            opinion_2 = OpinionWithParentsFactory()
+            o_cited = OpinionsCitedByRECAPDocument(
+                citing_document=rd_1,
+                cited_opinion=opinion,
+                depth=1,
+            )
+            o_cited_2 = OpinionsCitedByRECAPDocument(
+                citing_document=rd_1,
+                cited_opinion=opinion_2,
+                depth=1,
+            )
+            OpinionsCitedByRECAPDocument.objects.bulk_create_with_signal(
+                [o_cited, o_cited_2]
+            )
+
+        self.reset_and_assert_task_count(expected=1)
+        r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
+        self.assertIn(opinion.pk, r_doc.cites)
+        self.assertIn(opinion_2.pk, r_doc.cites)
+
         docket_2.delete()
+
+    def test_search_pagination_results_limit(self) -> None:
+        """Confirm that the last page in the pagination is properly computed
+        based on the number of results returned by Elasticsearch.
+        """
+        d_created = []
+        for i in range(21):
+            d = DocketFactory(
+                court=self.court,
+            )
+            d_created.append(d)
+
+        # Test pagination requests.
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+        }
+
+        # 100 results, 5 pages.
+        with mock.patch(
+            "cl.search.views.build_es_main_query",
+            side_effect=lambda x, y: (
+                DocketDocument.search().query("match_all"),
+                100,
+                5,
+                1000,
+            ),
+        ):
+            r = self.client.get(
+                reverse("show_results"),
+                search_params,
+            )
+        self.assertIn("100 Results", r.content.decode())
+        self.assertIn("1 of 5", r.content.decode())
+
+        # 101 results, 6 pages.
+        with mock.patch(
+            "cl.search.views.build_es_main_query",
+            side_effect=lambda x, y: (
+                DocketDocument.search().query("match_all"),
+                101,
+                5,
+                1000,
+            ),
+        ):
+            r = self.client.get(
+                reverse("show_results"),
+                search_params,
+            )
+        self.assertIn("101 Results", r.content.decode())
+        self.assertIn("1 of 6", r.content.decode())
+
+        # 20,000 results, 1,000 pages.
+        with mock.patch(
+            "cl.search.views.build_es_main_query",
+            side_effect=lambda x, y: (
+                DocketDocument.search().query("match_all"),
+                20_000,
+                5,
+                1000,
+            ),
+        ):
+            r = self.client.get(
+                reverse("show_results"),
+                search_params,
+            )
+        self.assertIn("20,000 Results", r.content.decode())
+        self.assertIn("1 of 1,000", r.content.decode())
+
+        for d in d_created:
+            d.delete()

@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 from django.db import transaction
 from eyecite import get_citations
@@ -57,4 +57,6 @@ def store_recap_citations(document: RECAPDocument) -> None:
             for opinion_object, cits in citation_resolutions.items()
         ]
 
-        OpinionsCitedByRECAPDocument.objects.bulk_create(objects_to_create)
+        OpinionsCitedByRECAPDocument.objects.bulk_create_with_signal(
+            objects_to_create
+        )

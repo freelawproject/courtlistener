@@ -5,12 +5,13 @@ from unittest import mock
 from urllib.parse import parse_qs, urlparse
 
 import time_machine
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.core import mail
 from django.core.management import call_command
-from django.test import Client, override_settings
+from django.test import AsyncClient, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.timezone import now
@@ -96,49 +97,55 @@ class AlertTest(SimpleUserDataMixin, TestCase):
     def tearDown(self) -> None:
         Alert.objects.all().delete()
 
-    def test_create_alert(self) -> None:
+    async def test_create_alert(self) -> None:
         """Can we create an alert by sending a post?"""
         self.assertTrue(
-            self.client.login(username="pandora", password="password")
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
         )
-        r = self.client.post(
+        r = await self.async_client.post(
             reverse("show_results"), self.alert_params, follow=True
         )
         self.assertEqual(r.redirect_chain[0][1], 302)
         self.assertIn("successfully", r.content.decode())
-        self.client.logout()
+        await self.async_client.alogout()
 
-    def test_fail_gracefully(self) -> None:
+    async def test_fail_gracefully(self) -> None:
         """Do we fail gracefully when an invalid alert form is sent?"""
         # Use a copy to shield other tests from changes.
         bad_alert_params = self.alert_params.copy()
         # Break the form
         bad_alert_params.pop("query", None)
         self.assertTrue(
-            self.client.login(username="pandora", password="password")
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
         )
-        r = self.client.post("/", bad_alert_params, follow=True)
+        r = await self.async_client.post("/", bad_alert_params, follow=True)
         self.assertEqual(r.status_code, 200)
         self.assertIn("error creating your alert", r.content.decode())
-        self.client.logout()
+        await self.async_client.alogout()
 
     def test_new_alert_gets_secret_key(self) -> None:
         """When you create a new alert, does it get a secret key?"""
         self.assertTrue(self.alert.secret_key)
 
-    def test_are_alerts_disabled_when_the_link_is_visited(self) -> None:
+    async def test_are_alerts_disabled_when_the_link_is_visited(self) -> None:
         self.assertEqual(self.alert.rate, self.alert_params["rate"])
-        self.client.get(reverse("disable_alert", args=[self.alert.secret_key]))
-        self.alert.refresh_from_db()
+        await self.async_client.get(
+            reverse("disable_alert", args=[self.alert.secret_key])
+        )
+        await self.alert.arefresh_from_db()
         self.assertEqual(self.alert.rate, "off")
 
-    def test_are_alerts_enabled_when_the_link_is_visited(self) -> None:
+    async def test_are_alerts_enabled_when_the_link_is_visited(self) -> None:
         self.assertEqual(self.alert.rate, self.alert_params["rate"])
         self.alert.rate = "off"
         new_rate = "wly"
         path = reverse("enable_alert", args=[self.alert.secret_key])
-        self.client.get(f"{path}?rate={new_rate}")
-        self.alert.refresh_from_db()
+        await self.async_client.get(f"{path}?rate={new_rate}")
+        await self.alert.arefresh_from_db()
         self.assertEqual(self.alert.rate, new_rate)
 
 
@@ -326,7 +333,7 @@ class AlertSeleniumTest(BaseSeleniumTest):
 
     def setUp(self) -> None:
         # Set up some handy variables
-        self.client = Client()
+        self.async_client = AsyncClient()
         self.alert_params = {
             "query": "q=asdf",
             "name": "dummy alert",
@@ -1185,13 +1192,13 @@ class OldDocketAlertsReportToggleTest(TestCase):
         self.assertEqual(len(report.disabled_alerts), 1)
         self.assertEqual(active_docket_alerts.count(), 0)
 
-    def test_toggle_docket_alert_date_update(self):
+    async def test_toggle_docket_alert_date_update(self):
         """Does the docket alert toggle view properly update docket alerts
         date_modified when toggling the alert_type?
         """
 
         # A docket alert is created today for a case terminated on 2020-01-01
-        da = DocketAlertWithParentsFactory(
+        da = await sync_to_async(DocketAlertWithParentsFactory)(
             docket__source=Docket.RECAP,
             docket__date_terminated="2020-01-01",
             docket__date_last_filing=None,
@@ -1201,24 +1208,24 @@ class OldDocketAlertsReportToggleTest(TestCase):
         )
 
         self.assertTrue(
-            self.client.login(
+            await self.async_client.alogin(
                 username=self.user_profile.user.username, password="password"
             )
         )
         post_data = {"id": da.docket.pk}
-        header = {"HTTP_X_REQUESTED_WITH": "XMLHttpRequest"}
+        header = {"X_REQUESTED_WITH": "XMLHttpRequest"}
 
         # Send an AJAX request to toggle_docket_alert view and confirm the
         # is disabled and the date_modified updated.
         sixty_days_ahead = now() + timedelta(days=60)
         with time_machine.travel(sixty_days_ahead, tick=False):
-            self.client.post(
+            await self.async_client.post(
                 reverse("toggle_docket_alert"),
                 data=post_data,
                 follow=True,
                 **header,
             )
-        da.refresh_from_db()
+        await da.arefresh_from_db()
         self.assertEqual(da.alert_type, DocketAlert.UNSUBSCRIPTION)
         self.assertEqual(da.date_modified, sixty_days_ahead)
 
@@ -1226,13 +1233,13 @@ class OldDocketAlertsReportToggleTest(TestCase):
         # is enabled and the date_modified updated.
         eighty_five_days_ahead = now() + timedelta(days=85)
         with time_machine.travel(eighty_five_days_ahead, tick=False):
-            self.client.post(
+            await self.async_client.post(
                 reverse("toggle_docket_alert"),
                 data=post_data,
                 follow=True,
                 **header,
             )
-        da.refresh_from_db()
+        await da.arefresh_from_db()
         self.assertEqual(da.alert_type, DocketAlert.SUBSCRIPTION)
         self.assertEqual(da.date_modified, eighty_five_days_ahead)
 
@@ -2109,7 +2116,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             call_command("cl_send_scheduled_alerts", rate="dly")
 
         # One OA search alert email should be sent.
-        mock_logger.info.assert_called_with(f"Sent 1 dly email alerts.")
+        mock_logger.info.assert_called_with("Sent 1 dly email alerts.")
         self.assertEqual(len(mail.outbox), 1)
         text_content = mail.outbox[0].body
 
@@ -2176,7 +2183,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 user=user_profile.user,
                 rate=Alert.REAL_TIME,
                 name=f"Test Alert RT {i}",
-                query=f"q=RT+Test+OA&type=oa",
+                query="q=RT+Test+OA&type=oa",
             )
             alerts_created.append(alert)
 
@@ -2199,10 +2206,10 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             ),
         ), self.captureOnCommitCallbacks(execute=True):
             rt_oral_argument = AudioWithParentsFactory.create(
-                case_name=f"RT Test OA",
+                case_name="RT Test OA",
                 docket__court=self.court_1,
                 docket__date_argued=now().date(),
-                docket__docket_number=f"19-5735",
+                docket__docket_number="19-5735",
             )
 
         # 11 OA search alert emails should be sent, one for each user that
@@ -2252,7 +2259,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 user=user_profile.user,
                 rate=Alert.DAILY,
                 name=f"Test Alert OA {i}",
-                query=f"q=OA&+19-5735&type=oa",
+                query="q=OA&+19-5735&type=oa",
             )
             alerts_created.append(alert)
             # Create a new document that triggers each existing alert created
@@ -2264,10 +2271,10 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 ),
             ), self.captureOnCommitCallbacks(execute=True):
                 audio = AudioWithParentsFactory.create(
-                    case_name=f"Test OA",
+                    case_name="Test OA",
                     docket__court=self.court_1,
                     docket__date_argued=now().date(),
-                    docket__docket_number=f"19-5735",
+                    docket__docket_number="19-5735",
                 )
                 audios_created.append(audio)
 
@@ -2328,7 +2335,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 user=user_profile.user,
                 rate=Alert.REAL_TIME,
                 name=f"Test Alert RT {i}",
-                query=f"q=Lorem+Ipsum+20-5739&type=oa",
+                query="q=Lorem+Ipsum+20-5739&type=oa",
             )
             alerts_created.append(alert)
 
@@ -2340,10 +2347,10 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             ),
         ), self.captureOnCommitCallbacks(execute=True):
             rt_oral_argument = AudioWithParentsFactory.create(
-                case_name=f"Lorem Ipsum",
+                case_name="Lorem Ipsum",
                 docket__court=self.court_1,
                 docket__date_argued=now().date(),
-                docket__docket_number=f"20-5739",
+                docket__docket_number="20-5739",
             )
 
         # Percolate the document. First batch.
@@ -2352,9 +2359,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             str(rt_oral_argument.pk), document_index
         )
 
-        ids_in_results = []
-        for result in percolator_response.hits:
-            ids_in_results.append(result.id)
+        ids_in_results = [result.id for result in percolator_response.hits]
 
         # Update the first in the previous batch.
         alert_to_modify = alerts_created[0]
@@ -2620,7 +2625,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         )
         # No "+" if hits do not reach the SCHEDULED_ALERT_HITS_LIMIT.
         self.assertIn(
-            f"had 2 hits",
+            "had 2 hits",
             mail.outbox[1].body,
         )
 
