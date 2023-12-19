@@ -1,5 +1,4 @@
 import datetime
-import os
 from unittest import mock
 
 from asgiref.sync import sync_to_async
