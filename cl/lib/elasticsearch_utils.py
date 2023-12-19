@@ -896,43 +896,56 @@ def build_es_base_query(
 
 
 def build_child_docs_query(
-    join_query: QueryString | None, exclude_docs_for_empty_field: str = ""
+    join_query: QueryString | None,
+    cd: CleanData,
+    exclude_docs_for_empty_field: str = "",
 ) -> QueryString:
     """Build a query for counting child documents in Elasticsearch, using the
     has_child query filters and queries. And append a match filter to only
     retrieve RECAPDocuments.
 
     :param join_query: Existing Elasticsearch QueryString object or None
+    :param cd: The user input CleanedData
     :param exclude_docs_for_empty_field: Field that should not be empty for a
     document to be included
     :return: An Elasticsearch QueryString object
     """
 
+    child_query_opinion = Q("match", cluster_child="opinion")
+    child_query_recap = Q("match", docket_child="recap_document")
     if not join_query:
-        # Match all case.
+        # Match all query case.
         if not exclude_docs_for_empty_field:
-            return Q("match", docket_child="recap_document")
+            if cd["type"] == SEARCH_TYPES.OPINION:
+                return child_query_opinion
+            else:
+                return child_query_recap
         else:
             filters = [
-                Q("match", docket_child="recap_document"),
                 Q("exists", field=exclude_docs_for_empty_field),
             ]
-
+            if cd["type"] == SEARCH_TYPES.OPINION:
+                filters.append(child_query_opinion)
+            else:
+                filters.append(child_query_recap)
             return Q("bool", filter=filters)
 
     query_dict = join_query.to_dict()
     if "filter" in query_dict["bool"]:
         existing_filter = query_dict["bool"]["filter"]
-        existing_filter.append(Q("match", docket_child="recap_document"))
+        if cd["type"] == SEARCH_TYPES.OPINION:
+            existing_filter.append(child_query_opinion)
+        else:
+            existing_filter.append(child_query_recap)
         if exclude_docs_for_empty_field:
             existing_filter.append(
                 Q("exists", field=exclude_docs_for_empty_field)
             )
-
     else:
-        query_dict["bool"]["filter"] = [
-            Q("match", docket_child="recap_document")
-        ]
+        if cd["type"] == SEARCH_TYPES.OPINION:
+            query_dict["bool"]["filter"] = [child_query_opinion]
+        else:
+            query_dict["bool"]["filter"] = [child_query_recap]
         if exclude_docs_for_empty_field:
             query_dict["bool"]["filter"].append(
                 Q("exists", field=exclude_docs_for_empty_field)
@@ -1016,7 +1029,7 @@ def build_es_main_query(
                 total_child_results,
             )
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
-            child_docs_count_query = build_child_docs_query(join_query)
+            child_docs_count_query = build_child_docs_query(join_query, cd)
             if child_docs_count_query:
                 # Get the total RECAP Documents count.
                 search_query_base = search_query_base.query(
@@ -1224,16 +1237,20 @@ def merge_highlights_into_result(
             result[field] = highlight_list
 
 
-def set_results_highlights(results: Page, search_type: str) -> None:
+def set_results_highlights(results: Page | Response, search_type: str) -> None:
     """Sets the highlights for each search result in a Page object by updating
     related fields in _source dict.
 
-    :param results: The Page object containing search results.
+    :param results: The Page or Response object containing search results.
     :param search_type: The search type to perform.
     :return: None, the function updates the results in place.
     """
 
-    for result in results.object_list:
+    results_list = results
+    if isinstance(results, Page):
+        results_list = results.object_list
+
+    for result in results_list:
         if search_type == SEARCH_TYPES.PARENTHETICAL:
             top_hits = result.grouped_by_opinion_cluster_id.hits.hits
             for hit in top_hits:
@@ -1715,6 +1732,10 @@ def build_join_es_filters(cd: CleanData) -> List:
 
         queries_list.extend(
             [
+                *build_term_query(
+                    "court_id.raw",
+                    cd.get("court", "").split(),
+                ),
                 *build_text_filter("caseName", cd.get("case_name", "")),
                 *build_daterange_query(
                     "dateFiled",
@@ -1748,12 +1769,18 @@ def do_es_feed_query(
     search_query: Search,
     cd: CleanData,
     rows: int = 20,
+    jurisdiction: bool = False,
+    exclude_docs_for_empty_field: str = "",
 ) -> Response:
     """Execute an Elasticsearch query for podcasts.
 
     :param search_query: Elasticsearch DSL Search object
     :param cd: The query CleanedData
     :param rows: Number of rows (items) to be retrieved in the response
+    :param jurisdiction: Whether to perform a jurisdiction query with all the
+    child opinions.
+    :param exclude_docs_for_empty_field: Field that should not be empty for a
+    document to be included
     :return: The Elasticsearch DSL response.
     """
     match cd["type"]:
@@ -1761,13 +1788,31 @@ def do_es_feed_query(
             _, join_query = build_es_base_query(search_query, cd)
             # Eliminate items that lack the ordering field.
             s = build_child_docs_query(
-                join_query, exclude_docs_for_empty_field="entry_date_filed"
+                join_query,
+                cd,
+                exclude_docs_for_empty_field=exclude_docs_for_empty_field,
             )
             s = search_query.query(s)
         case _:
             s, _ = build_es_base_query(search_query, cd)
+            if jurisdiction:
+                _, join_query = build_es_base_query(search_query, cd)
+                # Eliminate items that lack the ordering field.
+                s = build_child_docs_query(
+                    join_query,
+                    cd=cd,
+                    exclude_docs_for_empty_field=exclude_docs_for_empty_field,
+                )
+                s = search_query.query(s)
+
     s = s.sort(build_sort_results(cd))
     response = s.extra(from_=0, size=rows).execute()
+
+    if cd["type"] == SEARCH_TYPES.OPINION:
+        # Merge the text field for Opinions.
+        if not jurisdiction:
+            limit_inner_hits(cd, response, cd["type"])
+        set_results_highlights(response, cd["type"])
     return response
 
 
@@ -1934,12 +1979,14 @@ def build_full_join_es_queries(
 
 
 def limit_inner_hits(
-    get_params: QueryDict, results: Page, search_type: str
+    get_params: QueryDict | CleanData,
+    results: Page | Response,
+    search_type: str,
 ) -> None:
     """Limit inner hits of has_child query results.
 
     :param get_params: The user search params.
-    :param results: The Page object containing search results.
+    :param results: The Page or Response object containing search results.
     :param search_type: The search type to perform.
     :return: None, the function updates the results in place.
     """

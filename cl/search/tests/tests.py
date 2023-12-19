@@ -6,20 +6,17 @@ from pathlib import Path
 from unittest import mock
 
 import pytz
-from asgiref.sync import async_to_sync, sync_to_async
+from asgiref.sync import async_to_sync
 from dateutil.tz import tzoffset, tzutc
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
-from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db import IntegrityError, transaction
-from django.http import HttpRequest
-from django.test import AsyncRequestFactory, override_settings
 from django.urls import reverse
 from factory import RelatedFactory
-from lxml import etree, html
+from lxml import html
 from rest_framework.status import HTTP_200_OK
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
@@ -46,7 +43,6 @@ from cl.search.factories import (
     OpinionWithChildrenFactory,
     RECAPDocumentFactory,
 )
-from cl.search.feeds import JurisdictionFeed
 from cl.search.management.commands.cl_calculate_pagerank import Command
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
@@ -61,7 +57,6 @@ from cl.search.models import (
     sort_cites,
 )
 from cl.search.tasks import add_docket_to_solr_by_rds
-from cl.search.views import do_search
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.utils import get_with_wait
@@ -515,119 +510,6 @@ class SearchTest(ESIndexTestCase, IndexedSolrTestCase):
             {"type": SEARCH_TYPES.RECAP, "attachment_number": "1"},
         )
         self.assertEqual(r.status_code, HTTP_200_OK)
-
-
-class FeedTest(IndexedSolrTestCase):
-    async def test_jurisdiction_feed(self) -> None:
-        """Can we simply load the jurisdiction feed?"""
-        response = await self.async_client.get(
-            reverse("jurisdiction_feed", kwargs={"court": "test"})
-        )
-        self.assertEqual(
-            200,
-            response.status_code,
-            msg="Did not get 200 OK status code for jurisdiction feed",
-        )
-        xml_tree = etree.fromstring(response.content)
-        node_tests = (
-            ("//a:feed/a:entry", 5),
-            ("//a:feed/a:entry/a:title", 5),
-        )
-        for test, expected_count in node_tests:
-            actual_count = len(
-                xml_tree.xpath(
-                    test, namespaces={"a": "http://www.w3.org/2005/Atom"}
-                )
-            )
-            self.assertEqual(
-                actual_count,
-                expected_count,
-                msg="Did not find %s node(s) with XPath query: %s. "
-                "Instead found: %s" % (expected_count, test, actual_count),
-            )
-
-
-@override_settings(
-    MEDIA_ROOT=os.path.join(settings.INSTALL_ROOT, "cl/assets/media/test/")
-)
-class JurisdictionFeedTest(TestCase):
-    def setUp(self) -> None:
-        self.good_item = {
-            "title": "Opinion Title",
-            "court": "SCOTUS",
-            "absolute_url": "http://absolute_url",
-            "caseName": "Case Name",
-            "status": "Precedential",
-            "dateFiled": date(2015, 12, 25),
-            "local_path": "txt/2015/12/28/opinion_text.txt",
-        }
-        self.zero_item = self.good_item.copy()
-        self.zero_item.update(
-            {"local_path": "txt/2015/12/28/opinion_text_bad.junk"}
-        )
-        self.bad_item = self.good_item.copy()
-        self.bad_item.update(
-            {"local_path": "asdfasdfasdfasdfasdfasdfasdfasdfasdjkfasdf"}
-        )
-        self.pdf_item = self.good_item.copy()
-        self.pdf_item.update(
-            {
-                "local_path": "pdf/2013/06/12/"
-                + "in_re_motion_for_consent_to_disclosure_of_court_records.pdf"
-            }
-        )
-        self.null_item = self.good_item.copy()
-        self.null_item.update({"local_path": None})
-        self.feed = JurisdictionFeed()
-        super(JurisdictionFeedTest, self).setUp()
-
-    def test_item_enclosure_mime_type(self) -> None:
-        """Does the mime type detection work correctly?"""
-        self.assertEqual(
-            self.feed.item_enclosure_mime_type(self.good_item), "text/plain"
-        )
-
-    def test_item_enclosure_mime_type_handles_bogus_files(self) -> None:
-        """
-        Does the mime type detection safely return a good default value when
-        given a file it can't detect the mime type for?
-        """
-        self.assertEqual(
-            self.feed.item_enclosure_mime_type(self.zero_item),
-            "application/octet-stream",
-        )
-        self.assertEqual(
-            self.feed.item_enclosure_mime_type(self.bad_item),
-            "application/octet-stream",
-        )
-
-    def test_feed_renders_with_item_without_file_path(self) -> None:
-        """
-        For Opinions without local_path attributes (that is they don't have a
-        corresponding original PDF/txt/doc file) can we render the feed without
-        the enclosures
-        """
-        fake_results = [self.null_item]
-
-        class FakeFeed(JurisdictionFeed):
-            link = "http://localhost"
-
-            def items(self, obj):
-                return fake_results
-
-        court = Court.objects.get(pk="test")
-        request = HttpRequest()
-        request.user = AnonymousUser()
-        request.path = "/feed"
-        try:
-            feed = FakeFeed().get_feed(court, request)
-            xml = feed.writeString("utf-8")
-            self.assertIn(
-                'feed xml:lang="en-us" xmlns="http://www.w3.org/2005/Atom',
-                xml,
-            )
-        except Exception as e:
-            self.fail(f"Could not call get_feed(): {e}")
 
 
 class PagerankTest(TestCase):

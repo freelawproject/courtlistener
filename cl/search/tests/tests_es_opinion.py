@@ -1,16 +1,19 @@
 import datetime
+import os
 from unittest import mock
 
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
+from django.contrib.auth.models import AnonymousUser
 from django.core.management import call_command
 from django.db.models import F
+from django.http import HttpRequest
 from django.test import AsyncRequestFactory, override_settings
 from django.urls import reverse
 from elasticsearch_dsl import Q
 from factory import RelatedFactory
-from lxml import html
+from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
 
 from cl.lib.redis_utils import make_redis_interface
@@ -36,6 +39,7 @@ from cl.search.factories import (
     OpinionFactory,
     OpinionWithChildrenFactory,
 )
+from cl.search.feeds import JurisdictionFeed
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
     compose_redis_key,
 )
@@ -533,6 +537,13 @@ class OpinionsESSearchTest(
         search_params = {"q": "*", "case_name": "honda"}
         r = await self._test_article_count(search_params, 1, "case_name")
         self.assertIn("Honda", r.content.decode())
+
+    async def test_can_filter_using_court(self) -> None:
+        # Frontend
+        search_params = {"court": self.court_1.pk}
+
+        r = await self._test_article_count(search_params, 1, "court")
+        self.assertIn("case name cluster 3", r.content.decode())
 
     async def test_can_query_with_an_old_date(self) -> None:
         """Do we have any recurrent issues with old dates and strftime (issue
@@ -1985,3 +1996,312 @@ class EsOpinionsIndexingTest(
 
         docket.delete()
         opinion_cluster.delete()
+
+
+class OpinionFeedTest(
+    ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
+):
+    """Tests for Opinion Search Feed"""
+
+    def setUp(self) -> None:
+        self.good_item = {
+            "title": "Opinion Title",
+            "court": "SCOTUS",
+            "absolute_url": "http://absolute_url",
+            "caseName": "Case Name",
+            "status": "Precedential",
+            "dateFiled": datetime.date(2015, 12, 25),
+            "local_path": "txt/2015/12/28/opinion_text.txt",
+        }
+        self.zero_item = self.good_item.copy()
+        self.zero_item.update(
+            {"local_path": "txt/2015/12/28/opinion_text_bad.junk"}
+        )
+        self.bad_item = self.good_item.copy()
+        self.bad_item.update(
+            {"local_path": "asdfasdfasdfasdfasdfasdfasdfasdfasdjkfasdf"}
+        )
+        self.pdf_item = self.good_item.copy()
+        self.pdf_item.update(
+            {
+                "local_path": "pdf/2013/06/12/"
+                + "in_re_motion_for_consent_to_disclosure_of_court_records.pdf"
+            }
+        )
+        self.null_item = self.good_item.copy()
+        self.null_item.update({"local_path": None})
+        self.feed = JurisdictionFeed()
+        super(OpinionFeedTest, self).setUp()
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.rebuild_index("search.OpinionCluster")
+        super().setUpTestData()
+        court = CourtFactory(
+            id="canb",
+            jurisdiction="FB",
+            full_name="court of the Medical Worries",
+        )
+        OpinionClusterFactoryWithChildrenAndParents(
+            date_filed=datetime.date(2020, 8, 15),
+            docket=DocketFactory(court=court, docket_number="123456"),
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            syllabus="some rando syllabus",
+            procedural_history="some rando history",
+            source="C",
+            judges="",
+            attorneys="a bunch of crooks!",
+            citation_count=1,
+            scdb_votes_minority=3,
+            scdb_votes_majority=6,
+        )
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
+
+    def test_do_opinion_search_feed_have_content(self) -> None:
+        """Can we make an Opinion Search Feed?"""
+
+        # Text query case.
+        params = {
+            "q": f"docket number",
+            "type": SEARCH_TYPES.OPINION,
+        }
+        response = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(
+            200, response.status_code, msg="Did not get a 200 OK status code."
+        )
+        xml_tree = etree.fromstring(response.content)
+        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
+        node_tests = (
+            ("//atom:feed/atom:title", 1),
+            ("//atom:feed/atom:link", 2),
+            ("//atom:entry", 2),
+            ("//atom:entry/atom:title", 2),
+            ("//atom:entry/atom:link", 2),
+            ("//atom:entry/atom:published", 2),
+            ("//atom:entry/atom:author/atom:name", 2),
+            ("//atom:entry/atom:id", 2),
+            ("//atom:entry/atom:summary", 2),
+        )
+        for test, count in node_tests:
+            node_count = len(xml_tree.xpath(test, namespaces=namespaces))  # type: ignore
+            self.assertEqual(
+                node_count,
+                count,
+                msg="Did not find %s node(s) with XPath query: %s. "
+                "Instead found: %s" % (count, test, node_count),
+            )
+
+        # Confirm items are ordered by date_filed desc
+        published_format = "%Y-%m-%dT%H:%M:%S%z"
+        first_item_published_str = str(
+            xml_tree.xpath(
+                "//atom:entry[1]/atom:published", namespaces=namespaces
+            )[0].text
+            # type: ignore
+        )
+        second_item_published_str = str(
+            xml_tree.xpath(
+                "//atom:entry[2]/atom:published", namespaces=namespaces
+            )[0].text
+            # type: ignore
+        )
+        first_item_published_dt = datetime.datetime.strptime(
+            first_item_published_str, published_format
+        )
+        second_item_published_dt = datetime.datetime.strptime(
+            second_item_published_str, published_format
+        )
+        self.assertGreater(
+            first_item_published_dt,
+            second_item_published_dt,
+            msg="The first item should be newer than the second item.",
+        )
+        # Filter case.
+        params = {
+            "court": self.court_1.pk,
+            "type": SEARCH_TYPES.OPINION,
+        }
+        response = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(
+            200, response.status_code, msg="Did not get a 200 OK status code."
+        )
+        xml_tree = etree.fromstring(response.content)
+        node_tests = (
+            ("//atom:feed/atom:title", 1),
+            ("//atom:feed/atom:link", 2),
+            ("//atom:entry", 1),
+            ("//atom:entry/atom:title", 1),
+            ("//atom:entry/atom:link", 1),
+            ("//atom:entry/atom:published", 1),
+            ("//atom:entry/atom:author/atom:name", 1),
+            ("//atom:entry/atom:id", 1),
+            ("//atom:entry/atom:summary", 1),
+        )
+
+        for test, count in node_tests:
+            node_count = len(xml_tree.xpath(test, namespaces=namespaces))  # type: ignore
+            self.assertEqual(
+                node_count,
+                count,
+                msg="Did not find %s node(s) with XPath query: %s. "
+                "Instead found: %s" % (count, test, node_count),
+            )
+
+        # Match all case.
+        params = {
+            "type": SEARCH_TYPES.OPINION,
+        }
+        response = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(
+            200, response.status_code, msg="Did not get a 200 OK status code."
+        )
+        xml_tree = etree.fromstring(response.content)
+        node_tests = (
+            ("//atom:feed/atom:title", 1),
+            ("//atom:feed/atom:link", 2),
+            ("//atom:entry", 3),
+            ("//atom:entry/atom:title", 3),
+            ("//atom:entry/atom:link", 3),
+            ("//atom:entry/atom:published", 3),
+            ("//atom:entry/atom:author/atom:name", 3),
+            ("//atom:entry/atom:id", 3),
+            ("//atom:entry/atom:summary", 3),
+        )
+        for test, count in node_tests:
+            node_count = len(
+                xml_tree.xpath(test, namespaces=namespaces)
+            )  # type: ignore
+            self.assertEqual(
+                node_count,
+                count,
+                msg="Did not find %s node(s) with XPath query: %s. "
+                "Instead found: %s" % (count, test, node_count),
+            )
+
+    async def test_jurisdiction_feed(self) -> None:
+        """Can we simply load the jurisdiction feed?"""
+        response = await self.async_client.get(
+            reverse("jurisdiction_feed", kwargs={"court": "test"})
+        )
+        self.assertEqual(
+            200,
+            response.status_code,
+            msg="Did not get 200 OK status code for jurisdiction feed",
+        )
+        xml_tree = etree.fromstring(response.content)
+        node_tests = (
+            ("//atom:feed/atom:entry", 5),
+            ("//atom:feed/atom:entry/atom:title", 5),
+            ("//atom:entry/atom:link", 10),
+            ("//atom:entry/atom:published", 5),
+            ("//atom:entry/atom:author/atom:name", 5),
+            ("//atom:entry/atom:id", 5),
+            ("//atom:entry/atom:summary", 5),
+        )
+        for test, expected_count in node_tests:
+            actual_count = len(
+                xml_tree.xpath(
+                    test, namespaces={"atom": "http://www.w3.org/2005/Atom"}
+                )
+            )
+            self.assertEqual(
+                actual_count,
+                expected_count,
+                msg="Did not find %s node(s) with XPath query: %s. "
+                "Instead found: %s" % (expected_count, test, actual_count),
+            )
+
+    async def test_all_jurisdiction_feed(self) -> None:
+        """Can we simply load the jurisdiction feed?"""
+        response = await self.async_client.get(
+            reverse("all_jurisdictions_feed")
+        )
+        self.assertEqual(
+            200,
+            response.status_code,
+            msg="Did not get 200 OK status code for jurisdiction feed",
+        )
+        xml_tree = etree.fromstring(response.content)
+        node_tests = (
+            ("//atom:feed/atom:entry", 7),
+            ("//atom:feed/atom:entry/atom:title", 7),
+            ("//atom:entry/atom:link", 14),
+            ("//atom:entry/atom:published", 7),
+            ("//atom:entry/atom:author/atom:name", 7),
+            ("//atom:entry/atom:id", 7),
+            ("//atom:entry/atom:summary", 7),
+        )
+        for test, expected_count in node_tests:
+            actual_count = len(
+                xml_tree.xpath(
+                    test, namespaces={"atom": "http://www.w3.org/2005/Atom"}
+                )
+            )
+            self.assertEqual(
+                actual_count,
+                expected_count,
+                msg="Did not find %s node(s) with XPath query: %s. "
+                "Instead found: %s" % (expected_count, test, actual_count),
+            )
+
+    def test_item_enclosure_mime_type(self) -> None:
+        """Does the mime type detection work correctly?"""
+        self.assertEqual(
+            self.feed.item_enclosure_mime_type(self.good_item), "text/plain"
+        )
+
+    def test_item_enclosure_mime_type_handles_bogus_files(self) -> None:
+        """
+        Does the mime type detection safely return a good default value when
+        given a file it can't detect the mime type for?
+        """
+        self.assertEqual(
+            self.feed.item_enclosure_mime_type(self.zero_item),
+            "application/octet-stream",
+        )
+        self.assertEqual(
+            self.feed.item_enclosure_mime_type(self.bad_item),
+            "application/octet-stream",
+        )
+
+    def test_feed_renders_with_item_without_file_path(self) -> None:
+        """
+        For Opinions without local_path attributes (that is they don't have a
+        corresponding original PDF/txt/doc file) can we render the feed without
+        the enclosures
+        """
+        fake_results = [self.null_item]
+
+        class FakeFeed(JurisdictionFeed):
+            link = "http://localhost"
+
+            def items(self, obj):
+                return fake_results
+
+        request = HttpRequest()
+        request.user = AnonymousUser()
+        request.path = "/feed"
+        try:
+            feed = FakeFeed().get_feed(self.court_2, request)
+            xml = feed.writeString("utf-8")
+            self.assertIn(
+                'feed xml:lang="en-us" xmlns="http://www.w3.org/2005/Atom',
+                xml,
+            )
+        except Exception as e:
+            self.fail(f"Could not call get_feed(): {e}")

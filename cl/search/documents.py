@@ -1196,6 +1196,7 @@ class DocketDocument(DocketBaseDocument):
 
 # Opinions
 class OpinionBaseDocument(Document):
+    absolute_url = fields.KeywordField()
     cluster_id = fields.IntegerField(
         attr="pk", fields={"raw": fields.KeywordField(attr="pk")}
     )
@@ -1377,6 +1378,9 @@ class OpinionBaseDocument(Document):
         model = OpinionCluster
         ignore_signals = True
 
+    def prepare_absolute_url(self, instance):
+        return instance.get_absolute_url()
+
     def prepare_docketNumber(self, instance):
         return instance.docket.docket_number
 
@@ -1536,6 +1540,9 @@ class OpinionDocument(OpinionBaseDocument):
     class Django:
         model = Opinion
         ignore_signals = True
+
+    def prepare_absolute_url(self, instance):
+        return instance.cluster.get_absolute_url()
 
     def prepare_author_id(self, instance):
         return getattr(instance.author, "pk", None)
@@ -1708,7 +1715,6 @@ class OpinionDocument(OpinionBaseDocument):
 @opinion_index.document
 class OpinionClusterDocument(OpinionBaseDocument):
     court_exact = fields.KeywordField(attr="docket.court_id")
-    absolute_url = fields.KeywordField()
     caseNameShort = fields.TextField(
         attr="case_name_short",
         analyzer="text_en_splitting_cl",
@@ -1734,9 +1740,6 @@ class OpinionClusterDocument(OpinionBaseDocument):
         },
         search_analyzer="search_analyzer",
     )
-
-    def prepare_absolute_url(self, instance):
-        return instance.get_absolute_url()
 
     def prepare_non_participating_judge_ids(self, instance):
         return list(
