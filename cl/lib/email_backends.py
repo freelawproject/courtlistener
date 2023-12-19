@@ -161,7 +161,6 @@ class EmailBackend(BaseEmailBackend):
         r = make_redis_interface("CACHE")
         msg_count = 0
         for email_message in email_messages:
-            message = email_message.message()
             original_recipients = normalize_addresses(email_message.to)
             recipient_list = []
 

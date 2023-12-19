@@ -47,11 +47,10 @@ from cl.citations.match_citations import (
 )
 from cl.citations.score_parentheticals import parenthetical_score
 from cl.citations.tasks import (
-    find_citations_and_parantheticals_for_recap_documents,
     find_citations_and_parentheticals_for_opinion_by_pks,
     store_recap_citations,
 )
-from cl.lib.test_helpers import IndexedSolrTestCase, TestCase
+from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -63,7 +62,6 @@ from cl.search.factories import (
     RECAPDocumentFactory,
 )
 from cl.search.models import (
-    Citation,
     Opinion,
     OpinionCluster,
     OpinionsCited,
@@ -235,8 +233,7 @@ class CitationTextTest(SimpleTestCase):
              'like</p></div>',
              '<div><p>possess any peculiar knowledge of the mere policy of '
              'public measures." <i><span class="citation no-link">Ibid.'
-             '</span></i> Gerry of Massachusetts like</p></div>'
-            ),
+             '</span></i> Gerry of Massachusetts like</p></div>'),
         ]
 
         # fmt: on
@@ -1496,7 +1493,7 @@ class GroupParentheticalsTest(SimpleTestCase):
             representative,
         ) in enumerate(test_pairs):
             with self.subTest(
-                f"Testing that representative connected parenthetical is selected correctly.",
+                "Testing that representative connected parenthetical is selected correctly.",
                 i=i,
             ):
                 self.assertEquals(
