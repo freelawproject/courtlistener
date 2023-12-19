@@ -1437,7 +1437,7 @@ class GroupParentheticalsTest(SimpleTestCase):
                     [frozenset(pg.parentheticals) for pg in output_groups]
                 )
                 input_sets = frozenset([frozenset(g) for g in groups])
-                self.assertEquals(
+                self.assertEqual(
                     input_sets,
                     output_sets,
                     f"Got incorrect result from get_parenthetical_groups for: {groups}",
@@ -1491,7 +1491,7 @@ class GroupParentheticalsTest(SimpleTestCase):
                 "Testing that representative connected parenthetical is selected correctly.",
                 i=i,
             ):
-                self.assertEquals(
+                self.assertEqual(
                     get_representative_parenthetical(
                         parentheticals_to_test, simgraph_to_test
                     ),
@@ -1542,7 +1542,7 @@ class GroupParentheticalsTest(SimpleTestCase):
             with self.subTest(
                 f"Testing {parenthetical_text} is tokenized correctly.", i=i
             ):
-                self.assertEquals(
+                self.assertEqual(
                     get_parenthetical_tokens(parenthetical_text),
                     tokens,
                     f"Got incorrect result from get_parnethetical_tokens for text (expected {tokens}): {parenthetical_text}",
@@ -1604,7 +1604,7 @@ class GroupParentheticalsTest(SimpleTestCase):
             with self.subTest(
                 f"Testing {inputs} connections are recognized correctly.", i=i
             ):
-                self.assertEquals(
+                self.assertEqual(
                     sorted(get_graph_component(*inputs)),
                     sorted(output),
                     f"Got incorrect result from get_graph_component for inputs (expected {output}): {inputs}",
