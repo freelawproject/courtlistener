@@ -594,7 +594,9 @@ class MembershipWebhookTest(TestCase):
     )
     async def test_delete_membership(self, mock_store_webhook) -> None:
         await NeonMembership.objects.acreate(
-            user=self.user_profile.user, neon_id="9876"
+            user=self.user_profile.user,
+            neon_id="9876",
+            level=NeonMembership.BASIC,
         )
 
         # Update trigger type and membership id
