@@ -186,7 +186,7 @@ class MembershipWebhookViewSet(
         try:
             neon_membership = user.membership
             neon_membership.neon_id = membership_data["membershipId"]
-            neon_membership.level = NeonMembership.INVERTED[
+            neon_membership.level = NeonMembership.TYPES_INVERTED[
                 membership_data["membershipName"]
             ]
             neon_membership.termination_date = membership_data["termEndDate"]
@@ -195,7 +195,7 @@ class MembershipWebhookViewSet(
             NeonMembership.objects.create(
                 user=user,
                 neon_id=membership_data["membershipId"],
-                level=NeonMembership.INVERTED[
+                level=NeonMembership.TYPES_INVERTED[
                     membership_data["membershipName"]
                 ],
                 termination_date=membership_data["termEndDate"],
