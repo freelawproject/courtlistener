@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from cl.donate.api_permissions import AllowNeonWebhook
 from cl.donate.models import NeonMembership, NeonWebhookEvent
 from cl.lib.neon_utils import NeonClient
+from cl.users.utils import create_stub_account
 
 
 class NeonMembershipWebhookSerializer(serializers.Serializer):
@@ -70,7 +71,8 @@ class MembershipWebhookViewSet(
         2. If no matching user is found in the database, it fetches the
         account email address from the Neon API using the `account_id`.
         It then tries to find a user whose email address matches the
-        retrieved Neon account email.
+        retrieved Neon account email. If this attempt fails, this helper
+        will create a stub profile using the available data.
 
         Args:
             account_id (str): Unique identifier assigned by Neon to an account
@@ -83,15 +85,35 @@ class MembershipWebhookViewSet(
         except User.DoesNotExist:
             client = NeonClient()
             neon_account = client.get_acount_by_id(account_id)
-            users = User.objects.filter(
-                email=neon_account["primaryContact"]["email1"]
-            ).order_by("-last_login")
+            contact_data = neon_account["primaryContact"]
+            users = User.objects.filter(email=contact_data["email1"]).order_by(
+                "-last_login"
+            )
             if not users.exists():
-                return HttpResponse(
-                    "Error processing webhook, User not found",
-                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                user, _ = create_stub_account(
+                    {
+                        "email": contact_data["email1"],
+                        "first_name": contact_data["firstName"],
+                        "last_name": contact_data["lastName"],
+                    },
+                    {
+                        # Neon API returns an array of addresses.
+                        "address1": contact_data["addresses"][0][
+                            "addressLine1"
+                        ],
+                        "address2": contact_data["addresses"][0][
+                            "addressLine2"
+                        ],
+                        "city": contact_data["addresses"][0]["city"],
+                        "state": contact_data["addresses"][0]["stateProvince"][
+                            "code"
+                        ],
+                        "zip_code": contact_data["addresses"][0]["zipCode"],
+                        "wants_newsletter": False,
+                    },
                 )
-            user = users.first()
+            else:
+                user = users.first()
 
             profile = user.profile
             profile.neon_account_id = neon_account["accountId"]
