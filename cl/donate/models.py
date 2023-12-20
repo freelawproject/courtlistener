@@ -182,22 +182,17 @@ class NeonWebhookEvents(models.Model):
     trigger = models.PositiveSmallIntegerField(
         help_text="Specifies the action that initiated this webhook event",
         choices=TYPES,
-        null=True,
     )
     account_id = models.CharField(
         help_text="Unique identifier assigned by Neon CRM to a customer record",
-        default="",
         blank=True,
     )
     membership_id = models.CharField(
         help_text="Unique identifier assigned by Neon CRM to a membership record",
-        default="",
         blank=True,
     )
     content = models.JSONField(  # type: ignore
         help_text="The content of the payload of the POST request.",
-        blank=True,
-        null=True,
     )
 
 
