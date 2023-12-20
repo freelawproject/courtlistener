@@ -1,3 +1,4 @@
+import factory
 from factory import Faker, SubFactory
 from factory.django import DjangoModelFactory
 from factory.fuzzy import FuzzyChoice
@@ -29,3 +30,10 @@ class NeonWebhookEventFactory(DjangoModelFactory):
         model = NeonWebhookEvent
 
     trigger = FuzzyChoice(NeonWebhookEvent.TYPES, getter=lambda c: c[0])
+    content = factory.Dict(
+        {
+            "eventTrigger": FuzzyChoice(
+                NeonWebhookEvent.TYPES, getter=lambda c: c[0]
+            ),
+        }
+    )
