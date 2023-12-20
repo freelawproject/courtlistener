@@ -1,6 +1,7 @@
 import pghistory
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.serializers.json import DjangoJSONEncoder
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils import timezone
@@ -192,6 +193,7 @@ class NeonWebhookEvent(AbstractDateTimeModel):
         blank=True,
     )
     content = models.JSONField(  # type: ignore
+        encoder=DjangoJSONEncoder,
         help_text="The content of the payload of the POST request.",
     )
 
