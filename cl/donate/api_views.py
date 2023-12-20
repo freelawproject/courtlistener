@@ -85,8 +85,8 @@ class MembershipWebhookViewSet(
             neon_account = client.get_acount_by_id(account_id)
             users = User.objects.filter(
                 email=neon_account["primaryContact"]["email1"]
-            )
-            if not users:
+            ).order_by("-last_login")
+            if not users.exists():
                 return HttpResponse(
                     "Error processing webhook, User not found",
                     status=HTTPStatus.INTERNAL_SERVER_ERROR,
