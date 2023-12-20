@@ -270,7 +270,8 @@ def get_task_wait(
     wait until the next open window for processing. If not throttled, returns
     zero (i.e., don't wait).
     """
-    task_sub_key = f"{task.name}{':' + str(key) if key else ''}"
+    task_sub_key_suffix = f":{str(key)}" if key else ""
+    task_sub_key = f"{task.name}{task_sub_key_suffix}"
     throttle_key = f"celery_throttle:{task_sub_key}"
 
     r = make_redis_interface("CACHE")
