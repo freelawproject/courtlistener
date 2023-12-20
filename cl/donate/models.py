@@ -226,13 +226,11 @@ class NeonMembership(AbstractDateTimeModel):
     )
     neon_id = models.CharField(
         help_text="Unique identifier assigned by Neon CRM to a membership record",
-        default="",
         blank=True,
     )
     level = models.PositiveSmallIntegerField(
         help_text="The current membership tier of a user within Neon CRM",
         choices=TYPES,
-        null=True,
     )
     termination_date = models.DateTimeField(
         help_text="The date a user's Neon membership will be terminated",
