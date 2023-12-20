@@ -185,12 +185,6 @@ class MembershipWebhookViewSet(
         user = self._get_member_record(membership_data["accountId"])
         try:
             neon_membership = user.membership
-            neon_membership.neon_id = membership_data["membershipId"]
-            neon_membership.level = NeonMembership.TYPES_INVERTED[
-                membership_data["membershipName"]
-            ]
-            neon_membership.termination_date = membership_data["termEndDate"]
-            neon_membership.save()
         except ObjectDoesNotExist:
             NeonMembership.objects.create(
                 user=user,
@@ -200,6 +194,13 @@ class MembershipWebhookViewSet(
                 ],
                 termination_date=membership_data["termEndDate"],
             )
+        else:
+            neon_membership.neon_id = membership_data["membershipId"]
+            neon_membership.level = NeonMembership.TYPES_INVERTED[
+                membership_data["membershipName"]
+            ]
+            neon_membership.termination_date = membership_data["termEndDate"]
+            neon_membership.save()
 
     def _handle_membership_deletion(self, webhook_data) -> None:
         membership_data = webhook_data["data"]["membership"]
