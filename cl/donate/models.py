@@ -168,7 +168,7 @@ class MonthlyDonation(AbstractDateTimeModel):
         )
 
 
-class NeonWebhookEvents(models.Model):
+class NeonWebhookEvents(AbstractDateTimeModel):
     MEMBERSHIP_CREATION = 1
     MEMBERSHIP_EDIT = 2
     MEMBERSHIP_DELETE = 3
@@ -197,7 +197,7 @@ class NeonWebhookEvents(models.Model):
 
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot())
-class NeonMembership(models.Model):
+class NeonMembership(AbstractDateTimeModel):
     BASIC = 1
     LEGACY = 2
     TIER_1 = 3
