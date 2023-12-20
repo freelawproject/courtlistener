@@ -9,7 +9,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from cl.donate.api_permissions import AllowNeonWebhook
-from cl.donate.models import NeonMembership, NeonWebhookEvents
+from cl.donate.models import NeonMembership, NeonWebhookEvent
 from cl.lib.neon_utils import NeonClient
 
 
@@ -145,7 +145,7 @@ class MembershipWebhookViewSet(
         """
         Maps a string trigger event received from a Neon webhook to the
         corresponding integer value representing the trigger event type in
-        the NeonWebhookEvents model.
+        the NeonWebhookEvent model.
 
         Args:
             trigger_event (str): The string representing the trigger event
@@ -153,27 +153,27 @@ class MembershipWebhookViewSet(
 
         Returns:
             int: The integer value of the trigger event type according to
-            the NeonWebhookEvents model
+            the NeonWebhookEvent model
         """
         match trigger_event:
             case "createMembership":
-                trigger = NeonWebhookEvents.MEMBERSHIP_CREATION
+                trigger = NeonWebhookEvent.MEMBERSHIP_CREATION
             case "updateMembership":
-                trigger = NeonWebhookEvents.MEMBERSHIP_UPDATE
+                trigger = NeonWebhookEvent.MEMBERSHIP_UPDATE
             case "editMembership":
-                trigger = NeonWebhookEvents.MEMBERSHIP_EDIT
+                trigger = NeonWebhookEvent.MEMBERSHIP_EDIT
             case "deleteMembership":
-                trigger = NeonWebhookEvents.MEMBERSHIP_DELETE
+                trigger = NeonWebhookEvent.MEMBERSHIP_DELETE
 
         return trigger
 
     def _store_webhook_payload(self, webhook_data) -> None:
         trigger = self._map_trigger_value(webhook_data["eventTrigger"])
-        if trigger != NeonWebhookEvents.MEMBERSHIP_DELETE:
+        if trigger != NeonWebhookEvent.MEMBERSHIP_DELETE:
             membership_data = self._get_membership_data(webhook_data)
         else:
             membership_data = webhook_data["data"]["membership"]
-        NeonWebhookEvents.objects.create(
+        NeonWebhookEvent.objects.create(
             content=json.dumps(webhook_data, default=str),
             account_id=membership_data.get("accountId", ""),
             membership_id=membership_data["membershipId"],

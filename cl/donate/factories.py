@@ -2,7 +2,7 @@ from factory import Faker, SubFactory
 from factory.django import DjangoModelFactory
 from factory.fuzzy import FuzzyChoice
 
-from cl.donate.models import PROVIDERS, Donation, NeonWebhookEvents
+from cl.donate.models import PROVIDERS, Donation, NeonWebhookEvent
 from cl.users.factories import UserWithChildProfileFactory
 
 
@@ -26,6 +26,6 @@ class DonationFactory(DjangoModelFactory):
 
 class NeonWebhookEventFactory(DjangoModelFactory):
     class Meta:
-        model = NeonWebhookEvents
+        model = NeonWebhookEvent
 
-    trigger = FuzzyChoice(NeonWebhookEvents.TYPES, getter=lambda c: c[0])
+    trigger = FuzzyChoice(NeonWebhookEvent.TYPES, getter=lambda c: c[0])

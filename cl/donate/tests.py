@@ -25,7 +25,7 @@ from cl.donate.models import (
     Donation,
     MonthlyDonation,
     NeonMembership,
-    NeonWebhookEvents,
+    NeonWebhookEvent,
 )
 
 # From: https://stripe.com/docs/testing#cards
@@ -523,7 +523,7 @@ class MembershipWebhookTest(TestCase):
             content_type="application/json",
         )
         self.assertEqual(r.status_code, HTTP_201_CREATED)
-        self.assertEqual(NeonWebhookEvents.objects.all().count(), 1)
+        self.assertEqual(NeonWebhookEvent.objects.all().count(), 1)
 
         NeonWebhookEventFactory.create_batch(18)
 
@@ -539,7 +539,7 @@ class MembershipWebhookTest(TestCase):
         )
 
         self.assertEqual(r.status_code, HTTP_201_CREATED)
-        self.assertEqual(NeonWebhookEvents.objects.all().count(), 10)
+        self.assertEqual(NeonWebhookEvent.objects.all().count(), 10)
 
     @patch.object(
         MembershipWebhookViewSet, "_store_webhook_payload", return_value=None

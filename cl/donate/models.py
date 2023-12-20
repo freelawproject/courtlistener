@@ -168,7 +168,7 @@ class MonthlyDonation(AbstractDateTimeModel):
         )
 
 
-class NeonWebhookEvents(AbstractDateTimeModel):
+class NeonWebhookEvent(AbstractDateTimeModel):
     MEMBERSHIP_CREATION = 1
     MEMBERSHIP_EDIT = 2
     MEMBERSHIP_DELETE = 3

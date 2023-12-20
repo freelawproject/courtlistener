@@ -4,7 +4,7 @@ from cl.donate.models import (
     Donation,
     MonthlyDonation,
     NeonMembership,
-    NeonWebhookEvents,
+    NeonWebhookEvent,
 )
 
 
@@ -67,8 +67,8 @@ class NeonMembershipInline(admin.StackedInline):
     extra = 0
 
 
-@admin.register(NeonWebhookEvents)
-class NeonWebhookEventsAdmin(admin.ModelAdmin):
+@admin.register(NeonWebhookEvent)
+class NeonWebhookEventAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "get_trigger",
