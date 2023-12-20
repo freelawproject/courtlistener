@@ -180,7 +180,7 @@ class NeonWebhookEvents(models.Model):
         (MEMBERSHIP_UPDATE, "updateMembership"),
     )
     trigger = models.PositiveSmallIntegerField(
-        help_text="The current membership tier of a user within Neon CRM",
+        help_text="Specifies the action that initiated this webhook event",
         choices=TYPES,
         null=True,
     )
