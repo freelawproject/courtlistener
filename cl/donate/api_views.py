@@ -1,4 +1,3 @@
-import json
 from http import HTTPStatus
 
 from django.contrib.auth.models import User
@@ -196,7 +195,7 @@ class MembershipWebhookViewSet(
         else:
             membership_data = webhook_data["data"]["membership"]
         NeonWebhookEvent.objects.create(
-            content=json.dumps(webhook_data, default=str),
+            content=webhook_data,
             account_id=membership_data.get("accountId", ""),
             membership_id=membership_data["membershipId"],
             trigger=trigger,
