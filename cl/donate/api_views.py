@@ -140,6 +140,10 @@ class MembershipWebhookViewSet(
             - membershipName: The name of the membership level the user is
             enrolled in.
         """
+        # checks whether the webhook payloads match the expected schema defined
+        # in the documentation
+        #
+        # see: https://github.com/freelawproject/courtlistener/pull/3468#discussion_r1433374045
         if "membership" in webhook_data["data"]:
             data = webhook_data["data"]["membership"]
             membership = {
