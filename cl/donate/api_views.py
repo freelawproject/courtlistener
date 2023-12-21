@@ -2,6 +2,7 @@ from http import HTTPStatus
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import transaction
 from django.http import HttpResponse
 from rest_framework import mixins, serializers, viewsets
 from rest_framework.request import Request
@@ -26,6 +27,7 @@ class MembershipWebhookViewSet(
     serializer_class = NeonMembershipWebhookSerializer
     queryset = NeonMembership.objects.all()
 
+    @transaction.atomic
     def create(self, request: Request, *args, **kwargs):
         """
         Processes membership webhooks received from Neon CRM.
@@ -80,7 +82,9 @@ class MembershipWebhookViewSet(
             User: User object associated with the Neon account
         """
         try:
-            user = User.objects.get(profile__neon_account_id=account_id)
+            user = User.objects.select_for_update().get(
+                profile__neon_account_id=account_id
+            )
         except User.DoesNotExist:
             client = NeonClient()
             neon_account = client.get_acount_by_id(account_id)
