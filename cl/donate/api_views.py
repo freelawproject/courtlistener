@@ -157,6 +157,7 @@ class MembershipWebhookViewSet(
             {
                 "accountId": data["accountId"],
                 "termEndDate": data["termEndDate"],
+                "status": data["status"].lower(),
             }
         )
 
@@ -203,6 +204,8 @@ class MembershipWebhookViewSet(
 
     def _handle_membership_creation_or_update(self, webhook_data) -> None:
         membership_data = self._get_membership_data(webhook_data)
+        if membership_data["status"] not in ["succeeded", "succeed"]:
+            return None
         user = self._get_member_record(membership_data["accountId"])
         try:
             neon_membership = user.membership

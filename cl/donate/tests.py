@@ -509,6 +509,7 @@ class MembershipWebhookTest(TestCase):
                     "accountId": "1234",
                     "membershipName": "CL Membership - Tier 1",
                     "termEndDate": "2024-01-01-05:00",
+                    "status": "SUCCEEDED",
                 }
             },
         }
@@ -560,6 +561,25 @@ class MembershipWebhookTest(TestCase):
         membership = await query.afirst()
         self.assertEqual(membership.user_id, self.user_profile.user.pk)
         self.assertEqual(membership.level, NeonMembership.TIER_1)
+
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    async def test_avoid_creating_membership_for_failed_transaction(
+        self, mock_store_webhook
+    ) -> None:
+        self.data["eventTrigger"] = "createMembership"
+        self.data["data"]["membership"]["status"] = "FAILED"
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+            data=self.data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+
+        query = NeonMembership.objects.filter(neon_id="12345")
+        self.assertEqual(await query.acount(), 0)
 
     @patch.object(
         MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
