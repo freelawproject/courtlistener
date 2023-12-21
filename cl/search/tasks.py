@@ -579,12 +579,10 @@ def handle_ubq_retries(
         estimated_time_ms = num_documents * 15  # 15ms per document
         # Convert ms to seconds
         estimated_delay_sec = round(estimated_time_ms / 1000)
-        # Apply exponential backoff adding a small random component.
+        # Apply exponential backoff with jitter
         min_delay_sec = max(estimated_delay_sec, 10)
-        rand_component_sec = randint(10, 30)
-        countdown_sec = (
-            (retry_count + 1) * min_delay_sec
-        ) + rand_component_sec
+        jitter_sec = randint(10, 30)
+        countdown_sec = ((retry_count + 1) * min_delay_sec) + jitter_sec
     else:
         # Default case for ConflictError
         min_delay_sec = 10  # 10 seconds
