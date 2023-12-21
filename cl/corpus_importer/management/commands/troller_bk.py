@@ -343,10 +343,10 @@ async def merge_rss_data(
             try:
                 await d.asave(update_fields=["source"])
                 await sync_to_async(add_bankruptcy_data_to_docket)(d, docket)
-            except (DataError, IntegrityError) as exc:
+            except (DataError, IntegrityError):
                 # Trouble. Log and move on
                 logger.warn(
-                    f"Got DataError or IntegrityError while saving docket."
+                    "Got DataError or IntegrityError while saving docket."
                 )
 
     rds_created_pks, dockets_created = await sync_to_async(do_bulk_additions)(
