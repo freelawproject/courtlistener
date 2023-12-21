@@ -1315,10 +1315,11 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 docket_entry=self.de,
                 document_number="10",
                 is_available=False,
-                plain_text="Lorem Dr. Israel also demonstrated a misunderstanding and misapplication of antitrust concepts Ipsum",
+                plain_text="Lorem Dr. Israel also demonstrated a misunderstanding and misapplication of antitrust academy concepts Ipsum",
             )
 
-        search_phrase = '"Dr. Israel also demonstrated a misunderstanding and misapplication of antitrust concepts"'
+        # Match the exact phrase
+        search_phrase = '"Dr. Israel also demonstrated a misunderstanding and misapplication of antitrust academy concepts"'
         params = {"type": SEARCH_TYPES.RECAP, "q": search_phrase}
         # Frontend
         r = async_to_sync(self._test_article_count)(
@@ -1332,6 +1333,26 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # Confirm phrase search are properly highlighted.
         terms_list = search_phrase.replace('"', "").split(" ")
         for term in terms_list:
+            self.assertIn(f"<mark>{term}</mark>", r.content.decode())
+
+        # Also match the phrase including a synonym (acad)
+        search_phrase = '"Dr. Israel also demonstrated a misunderstanding and misapplication of antitrust acad concepts"'
+        params = {"type": SEARCH_TYPES.RECAP, "q": search_phrase}
+        # Frontend
+        r = async_to_sync(self._test_article_count)(
+            params, 1, "phrase_search_stemming"
+        )
+        # Count child documents under docket.
+        self._count_child_documents(
+            0, r.content.decode(), 1, "phrase_search_stemming"
+        )
+
+        # Confirm phrase search are properly highlighted.
+        terms_list = search_phrase.replace('"', "").split(" ")
+        for term in terms_list:
+            if term == "acad":
+                # Synonym is also HL
+                term = "academy"
             self.assertIn(f"<mark>{term}</mark>", r.content.decode())
 
         with self.captureOnCommitCallbacks(execute=True):
