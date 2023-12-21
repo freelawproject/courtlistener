@@ -49,12 +49,10 @@ class MembershipWebhookViewSet(
         webhook_data = serializer.validated_data
         self._store_webhook_payload(webhook_data)
         match webhook_data["eventTrigger"]:
-            case "createMembership" | "editMembership":
+            case "createMembership" | "editMembership" | "updateMembership":
                 self._handle_membership_creation_or_update(webhook_data)
             case "deleteMembership":
                 self._handle_membership_deletion(webhook_data)
-            case "updateMembership":
-                pass
             case _:
                 trigger = webhook_data["eventTrigger"]
                 raise NotImplementedError(f"Unknown event trigger-{trigger}")
@@ -227,7 +225,23 @@ class MembershipWebhookViewSet(
                 termination_date=membership_data["termEndDate"],
             )
         else:
-            neon_membership.neon_id = membership_data["membershipId"]
+            if webhook_data["eventTrigger"] != "updateMembership":
+                neon_membership.neon_id = membership_data["membershipId"]
+            elif neon_membership.neon_id != membership_data["membershipId"]:
+                # The membership record was previously updated and we should
+                # ignore this webhook notification.
+                #
+                # The updateMembership is triggered when a membership upgrade
+                # occurs. Its payload contains the details of the previous
+                # membership record, but with an updated 'termEndDate' field.
+                #
+                # During the upgrade process, a createMembership webhook is also
+                # triggered, and both requests are sent almost simultaneously.
+                # However, we are skipping this webhooks to avoid data integrity
+                # issues.
+                #
+                # See: https://github.com/freelawproject/courtlistener/pull/3468#discussion_r1433398175
+                return None
             neon_membership.level = NeonMembership.TYPES_INVERTED[
                 membership_data["membershipName"]
             ]

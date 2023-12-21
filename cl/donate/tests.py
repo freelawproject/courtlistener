@@ -584,6 +584,42 @@ class MembershipWebhookTest(TestCase):
     @patch.object(
         MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
     )
+    async def test_skip_update_membership_webhook_with_old_data(
+        self, mock_store_webhook
+    ) -> None:
+        self.data["eventTrigger"] = "createMembership"
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+            data=self.data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+
+        self.data["eventTrigger"] = "updateMembership"
+        self.data["data"]["membership"]["membershipId"] = "12344"
+        self.data["data"]["membership"][
+            "membershipName"
+        ] = "CL Membership - Tier 4"
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+            data=self.data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+
+        # checks the neon_id was not updated
+        query = NeonMembership.objects.filter(neon_id="12345")
+        self.assertEqual(await query.acount(), 1)
+
+        # checks the level was not updated
+        membership = await query.afirst()
+        self.assertEqual(membership.level, NeonMembership.TIER_1)
+
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
     async def test_update_membership(self, mock_store_webhook) -> None:
         await NeonMembership.objects.acreate(
             user=self.user_profile.user,
