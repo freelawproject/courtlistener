@@ -578,20 +578,22 @@ def handle_ubq_retries(
         num_documents = count_query.count()
         estimated_time_ms = num_documents * 15  # 15ms per document
         # Convert ms to seconds
-        estimated_delay = round(estimated_time_ms / 1000)
+        estimated_delay_sec = round(estimated_time_ms / 1000)
         # Apply exponential backoff adding a small random component.
-        min_delay = max(estimated_delay, 10)
-        rand_component = randint(10, 30)
-        countdown = ((retry_count + 1) * min_delay) + rand_component
+        min_delay_sec = max(estimated_delay_sec, 10)
+        rand_component_sec = randint(10, 30)
+        countdown_sec = (
+            (retry_count + 1) * min_delay_sec
+        ) + rand_component_sec
     else:
         # Default case for ConflictError
-        min_delay = 10  # 10 seconds
-        max_delay = 15  # 15 seconds
-        countdown = ((retry_count + 1) * min_delay) + randint(
-            min_delay, max_delay
+        min_delay_sec = 10  # 10 seconds
+        max_delay_sec = 15  # 15 seconds
+        countdown_sec = ((retry_count + 1) * min_delay_sec) + randint(
+            min_delay_sec, max_delay_sec
         )
 
-    raise self.retry(exc=exc, countdown=countdown)
+    raise self.retry(exc=exc, countdown=countdown_sec)
 
 
 @app.task(
