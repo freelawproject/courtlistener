@@ -207,8 +207,9 @@
                     <li>
                       <form id="logout-form" method="post" action="/sign-out/">
                         {% csrf_token %}
-                        <i class="fa fa-sign-out gray fa-fw"></i>
-                        <button type="submit" class="btn btn-link" tabindex="208">&nbsp;Sign out</button>
+                        <button type="submit" class="btn btn-link" tabindex="208">
+                          <i class="fa fa-sign-out gray fa-fw"></i>&nbsp;Sign out
+                        </button>
                       </form>
                     </li>
                   </ul>
