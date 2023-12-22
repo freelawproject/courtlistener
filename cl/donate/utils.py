@@ -15,28 +15,6 @@ class PaymentFailureException(Exception):
 
 
 emails: Dict[str, EmailType] = {
-    "donation_thanks": {
-        "subject": "Thanks for your donation to Free Law Project!",
-        "body": (
-            "Hello %s,\n\n"
-            "Thank you for your donation of $%0.2f to Free "
-            "Law Project. We are currently using donations like yours "
-            "for a variety of important projects that would never exist "
-            "without your help.\n\n"
-            "We are a federally-recognized 501(c)(3) public charity "
-            "and a California non-profit public benefit corporation. "
-            "Our EIN is %s. This letter may serve as a record of your "
-            "donation. No goods or services were provided, in whole or "
-            "in part, for this contribution.\n\n"
-            "If you have any questions about your donation, please "
-            "don't hesitate to get in touch.\n\n"
-            "Thanks again,\n\n"
-            "Michael Lissner and Brian Carver\n"
-            "Founders of Free Law Project\n"
-            "https://free.law/contact/"
-        ),
-        "from_email": settings.DEFAULT_FROM_EMAIL,
-    },
     "donation_thanks_recurring": {
         "subject": "We have received your recurring contribution to Free Law "
         "Project",
@@ -63,50 +41,6 @@ emails: Dict[str, EmailType] = {
         ),
         "from_email": settings.DEFAULT_FROM_EMAIL,
     },
-    "payment_thanks": {
-        "subject": "Receipt for your payment to Free Law Project",
-        "body": (
-            "Dear %s,\n\n"
-            "Your payment of $%0.2f was successfully charged with "
-            "charge ID %s.\n\n"
-            "If you have any questions about this payment or need any "
-            "help, please contact us at info@free.law. Thank you for "
-            "supporting our work!\n\n"
-            "Michael Lissner and Brian Carver\n"
-            "Founders of Free Law Project\n"
-            "https://free.law/contact/"
-        ),
-        "from_email": settings.DEFAULT_FROM_EMAIL,
-    },
-    "badge_thanks": {
-        "subject": "Thanks for becoming a Free Law Project supporter!",
-        "body": (
-            "Dear %s,\n\n"
-            "Your decision to support Free Law Project is one you won't "
-            "regret. We are a small non-profit that is working hard to "
-            "make the legal ecosystem more fair, open, and competitive. "
-            "Your ongoing support of Free Law Project allows us to "
-            "continue making high quality legal data and tools widely "
-            "available.\n\n"
-            "Simply put, we would not be able to do our work without "
-            "your help and that of others like you.\n\n"
-            "As a thank you, over the next few business days, we will "
-            "work with Justia to upgrade your profile with the Free Law "
-            "Project supporter badge. Watch for it soon!\n\n"
-            "We are a federally-recognized 501(c)(3) public charity "
-            "and a California non-profit public benefit corporation. "
-            "Our EIN is %s. This letter may serve as a record of your "
-            "donation. No goods or services were provided, in whole or "
-            "in part, for this contribution.\n\n"
-            "If you have any questions about your donation or need any "
-            "help, please contact us at info@free.law. Thank you for "
-            "supporting our work!\n\n"
-            "Michael Lissner and Brian Carver\n"
-            "Founders of Free Law Project\n"
-            "https://free.law/contact/"
-        ),
-        "from_email": settings.DEFAULT_FROM_EMAIL,
-    },
     "user_bad_subscription": {
         "subject": "Your monthly donation to Free Law Project has failed",
         "body": "Dear %s,\n\n"
@@ -126,62 +60,7 @@ emails: Dict[str, EmailType] = {
         "https://free.law/contact/",
         "from_email": settings.DEFAULT_FROM_EMAIL,
     },
-    "admin_donation_report": {
-        "subject": "$%s were donated by monthly donors today",
-        "body": "The following monthly donors contributed a total of $%s:\n\n "
-        "%s\n\n"
-        "(Note that some of these charges still can fail to go "
-        "through.)",
-        "from_email": settings.DEFAULT_FROM_EMAIL,
-        "to": [a[1] for a in settings.MANAGERS],
-    },
-    "admin_big_donation_fyi": {
-        "body": "Just got a donation of $%0.2f from %s %s, with email %s.",
-        "from_email": settings.DEFAULT_FROM_EMAIL,
-        "to": [a[1] for a in settings.MANAGERS],
-    },
 }
-
-
-def send_big_donation_email(
-    donation: Donation,
-    payment_type: str,
-    recurring: bool = False,
-) -> None:
-    """Send an email if it's a big donation
-
-    :param donation: The donation object to process
-    :param payment_type: A payment type in the PAYMENT_TYPES object
-    :param recurring: Whether it's a recurring payment
-    :return: None
-    """
-    user = donation.donor
-    amount = donation.amount
-
-    if payment_type != PAYMENT_TYPES.DONATION:
-        return
-
-    big_recurring = recurring and amount > 100
-    big_one_time = not recurring and amount > 500
-    if big_recurring or big_one_time:
-        if recurring:
-            subject = f"Got big recurring donation of ${amount:0.2f}"
-        else:
-            subject = f"Got big non-recurring donation of ${amount:0.2f}"
-
-        email = emails["admin_big_donation_fyi"]
-        send_mail(
-            subject,
-            email["body"]
-            % (
-                amount,
-                user.first_name,
-                user.last_name,
-                user.email,
-            ),
-            email["from_email"],
-            email["to"],
-        )
 
 
 def send_thank_you_email(

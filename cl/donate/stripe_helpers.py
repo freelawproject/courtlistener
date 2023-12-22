@@ -15,11 +15,7 @@ from stripe.stripe_object import StripeObject
 
 from cl.donate.models import PROVIDERS, Donation
 from cl.donate.types import StripeChargeObject, StripeEventObject
-from cl.donate.utils import (
-    PaymentFailureException,
-    send_big_donation_email,
-    send_thank_you_email,
-)
+from cl.donate.utils import PaymentFailureException, send_thank_you_email
 from cl.users.utils import create_stub_account
 
 logger = logging.getLogger(__name__)
@@ -154,7 +150,6 @@ def send_thank_you_if_needed(d: Donation, charge: StripeChargeObject) -> None:
     payment_type = charge["metadata"]["type"]
     recurring = charge["metadata"].get("recurring", False)
     send_thank_you_email(d, payment_type, recurring=recurring)
-    send_big_donation_email(d, payment_type, recurring=recurring)
 
 
 def update_donation_for_event(
