@@ -242,4 +242,7 @@ class NeonMembership(AbstractDateTimeModel):
 
     @property
     def is_active(self) -> bool:
+        if not self.termination_date:
+            return True
+
         return self.termination_date > timezone.now()
