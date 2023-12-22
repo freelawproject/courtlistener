@@ -1657,7 +1657,7 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
         profile_dropdown.click()
 
         sign_out = get_with_wait(
-            wait, (By.XPATH, ".//button[contains(text(), 'Sign out')]")
+            wait, (By.XPATH, ".//button[contains(., 'Sign out')]")
         )
         sign_out.click()
 

@@ -45,6 +45,11 @@ header {
   color: #555555;
 }
 
+.navbar-default .navbar-nav > li form button{
+  padding: 13px 20px 10px;
+  color: #555555;
+}
+
 .navbar-default .navbar-nav > li.active a {
   background-color: transparent;
   border-bottom-color: #AE0B0B;
@@ -187,6 +192,11 @@ a.button:active {
 }
 
 @media (max-width: 767px) {
+  .navbar-default .navbar-nav > li form button{
+    padding: 5px 15px 5px 25px;
+    color: #777777;
+  }
+
   #homepage #main-query-box {
     margin-bottom: 2em;
   }
