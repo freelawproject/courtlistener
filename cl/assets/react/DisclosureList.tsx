@@ -44,7 +44,7 @@ const DisclosureFooter = () => {
           consider making a donation
         </p>
         <p>
-          <a href="/donate/?referrer=fds-homepage" className="btn btn-danger btn-lg">
+          <a href="https://donate.free.law/forms/supportflp" className="btn btn-danger btn-lg">
             Donate Now
           </a>
         </p>
