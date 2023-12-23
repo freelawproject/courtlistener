@@ -160,11 +160,7 @@ def build_court_dicts(courts: QuerySet) -> list[dict[str, str]]:
     dictionaries"""
     court_dicts = [{"pk": "all", "short_name": "All Courts"}]
     court_dicts.extend(
-        [
-            {"pk": court.pk, "short_name": court.full_name}
-            #'notes': court.notes}
-            for court in courts
-        ]
+        {"pk": court.pk, "short_name": court.full_name} for court in courts
     )
     return court_dicts
 
@@ -195,8 +191,8 @@ def get_coverage_data_fds() -> dict[str, int]:
             coverage_data[k] = model.objects.all().count()
 
         coverage_data["private"] = False
-        one_week = 60 * 60 * 24 * 7
-        cache.set(coverage_key, coverage_data, one_week)
+        one_week_minutes = 60 * 60 * 24 * 7
+        cache.set(coverage_key, coverage_data, one_week_minutes)
 
     return coverage_data
 
