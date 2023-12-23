@@ -654,11 +654,11 @@ class ParentheticalESSignalProcessorTest(
         self.assertEqual(0.70, doc.representative_score)
 
         # Confirm related object fields using display value are properly indexed.
-        self.assertEqual("Non-Precedential", doc.status)
+        self.assertEqual("Unpublished", doc.status)
         self.cluster_1.precedential_status = PRECEDENTIAL_STATUS.PUBLISHED
         self.cluster_1.save()
         doc = ParentheticalGroupDocument.get(id=self.pg_test.pk)
-        self.assertEqual("Precedential", doc.status)
+        self.assertEqual("Published", doc.status)
         self.pg_test.delete()
 
     def test_keep_in_sync_related_pa_objects_on_m2m_change(self) -> None:

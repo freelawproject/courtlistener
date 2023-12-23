@@ -2,7 +2,7 @@
 import re
 from typing import Dict
 
-from cl.search.models import SEARCH_TYPES
+from cl.search.models import SEARCH_TYPES, Opinion
 
 SOLR_OPINION_HL_FIELDS = [
     "caseName",
@@ -93,9 +93,13 @@ SEARCH_OPINION_QUERY_FIELDS = [
     "citation",
     "judge",
     "caseNameFull",
-    "caseNameShort",
+    "caseName",
     "status",
     "suitNature",
+    "attorney",
+    "procedural_history",
+    "posture",
+    "syllabus",
 ]
 
 # ES fields that are used for highlighting
@@ -251,4 +255,20 @@ BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
             # None here. Phrases don't make much sense for people.
         },
     },
+}
+
+
+o_type_index_map = {
+    Opinion.COMBINED: "combined-opinion",
+    Opinion.UNANIMOUS: "unanimous-opinion",
+    Opinion.LEAD: "lead-opinion",
+    Opinion.PLURALITY: "plurality-opinion",
+    Opinion.CONCURRENCE: "concurrence-opinion",
+    Opinion.CONCUR_IN_PART: "in-part-opinion",
+    Opinion.DISSENT: "dissent",
+    Opinion.ADDENDUM: "addendum",
+    Opinion.REMITTUR: "remittitur",
+    Opinion.REHEARING: "rehearing",
+    Opinion.ON_THE_MERITS: "on-the-merits",
+    Opinion.ON_MOTION_TO_STRIKE: "on-motion-to-strike",
 }

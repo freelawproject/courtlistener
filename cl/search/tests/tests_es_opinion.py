@@ -24,6 +24,7 @@ from cl.lib.test_helpers import (
     SearchTestCase,
 )
 from cl.people_db.factories import PersonFactory
+from cl.search.constants import o_type_index_map
 from cl.search.documents import (
     ES_CHILD_ID,
     OpinionClusterDocument,
@@ -45,6 +46,7 @@ from cl.search.management.commands.cl_index_parent_and_child_docs import (
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
+    Opinion,
     OpinionCluster,
     OpinionsCited,
 )
@@ -422,6 +424,7 @@ class OpinionsESSearchTest(
                 OpinionWithChildrenFactory,
                 factory_related_name="cluster",
                 html_columbia="<p>Code, &#167; 1-815</p>",
+                type=Opinion.REMITTUR,
             ),
             date_filed=datetime.date(2020, 8, 15),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
@@ -441,11 +444,12 @@ class OpinionsESSearchTest(
             date_filed=datetime.date(2020, 8, 15),
             docket=DocketFactory(court=court, docket_number="123456"),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
-            syllabus="some rando syllabus",
-            procedural_history="some rando history",
+            syllabus="This is a opinion syllabus",
+            posture="This is a opinion posture",
+            procedural_history="This is a opinion procedural history",
             source="C",
             judges="",
-            attorneys="a bunch of crooks!",
+            attorneys="B. B. Giles, Lindley W. Barnes, and John A. Boyhin",
             slug="case-name-cluster",
             citation_count=1,
             scdb_votes_minority=3,
@@ -534,6 +538,26 @@ class OpinionsESSearchTest(
         search_params = {"q": "copyright"}
         r = await self._test_article_count(search_params, 1, "text_query")
         self.assertIn("docket number 2", r.content.decode())
+
+        # Search by attorney
+        search_params = {"q": "Lindley W. Barnes"}
+        r = await self._test_article_count(search_params, 1, "text_query")
+        self.assertIn("123456", r.content.decode())
+
+        # Search by procedural_history
+        search_params = {"q": '"This is a opinion procedural"'}
+        r = await self._test_article_count(search_params, 1, "text_query")
+        self.assertIn("123456", r.content.decode())
+
+        # Search by posture
+        search_params = {"q": '"This is a opinion posture"'}
+        r = await self._test_article_count(search_params, 1, "text_query")
+        self.assertIn("123456", r.content.decode())
+
+        # Search by syllabus
+        search_params = {"q": '"This is a opinion  syllabus"'}
+        r = await self._test_article_count(search_params, 1, "text_query")
+        self.assertIn("123456", r.content.decode())
 
     async def test_homepage(self) -> None:
         """Is the homepage loaded when no GET parameters are provided?"""
@@ -882,11 +906,21 @@ class OpinionsESSearchTest(
 
     async def test_query_fielded(self) -> None:
         """Does fielded queries work"""
-        search_params = {"q": "status:precedential"}
+        search_params = {"q": f'status:"published"'}
         r = await self._test_article_count(search_params, 4, "status")
         self.assertIn("docket number 2", r.content.decode())
         self.assertIn("docket number 3", r.content.decode())
         self.assertIn("4 Opinions", r.content.decode())
+
+        search_params = {"q": f'status:"errata"', "stat_Errata": "on"}
+        r = await self._test_article_count(search_params, 1, "status")
+        self.assertIn("docket number 1 005", r.content.decode())
+
+    async def test_query_by_type(self) -> None:
+        """Does fielded queries work"""
+        search_params = {"q": f"type:{o_type_index_map.get(Opinion.REMITTUR)}"}
+        r = await self._test_article_count(search_params, 1, "type")
+        self.assertIn("1:21-cv-1234", r.content.decode())
 
     async def test_a_wildcard_query(self) -> None:
         """Does a wildcard query work"""
@@ -1039,9 +1073,9 @@ class RelatedSearchTest(
             "q": "related:%i" % seed_pk,
         }
 
-        # disable all status filters (otherwise results do not match detail page)
+        # enable all status filters (otherwise results do not match detail page)
         params.update(
-            {f"stat_{v}": "on" for s, v in PRECEDENTIAL_STATUS.NAMES}
+            {f"stat_{s}": "on" for s, v in PRECEDENTIAL_STATUS.NAMES}
         )
 
         r = self.client.get(reverse("show_results"), params)
@@ -1195,7 +1229,7 @@ class GroupedSearchTest(EmptySolrTestCase):
             cluster=grouped_cluster,
             local_path="doc/2005/05/04/state_of_indiana_v._charles_barker.doc",
             per_curiam=False,
-            type="010combined",
+            type=Opinion.COMBINED,
         )
         super().setUpTestData()
 
@@ -1362,7 +1396,7 @@ class EsOpinionsIndexingTest(
             cluster=cluster,
             local_path="test/search/opinion_doc1.doc",
             per_curiam=False,
-            type="010combined",
+            type=Opinion.COMBINED,
         )
 
         cluster_pk = cluster.pk
@@ -1410,7 +1444,7 @@ class EsOpinionsIndexingTest(
             cluster=cluster,
             local_path="test/search/opinion_doc1.doc",
             per_curiam=False,
-            type="010combined",
+            type=Opinion.COMBINED,
         )
 
         cluster_pk = cluster.pk
@@ -1494,11 +1528,11 @@ class EsOpinionsIndexingTest(
         self.assertEqual(es_doc.author_id, self.person_2.pk)
 
         # Update the type field in the opinion record.
-        opinion.type = "010combined"
+        opinion.type = Opinion.COMBINED
         opinion.save()
 
         es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        self.assertEqual(es_doc.type, "010combined")
+        self.assertEqual(es_doc.type, o_type_index_map.get(Opinion.COMBINED))
         self.assertEqual(es_doc.type_text, "Combined Opinion")
 
         # Update the per_curiam field in the opinion record.
@@ -1535,7 +1569,7 @@ class EsOpinionsIndexingTest(
             cluster=opinion_cluster,
             local_path="test/search/opinion_wpd.wpd",
             per_curiam=False,
-            type="010combined",
+            type=Opinion.COMBINED,
         )
         opinion_cluster_2 = OpinionClusterFactory.create(
             precedential_status="Errata",
@@ -1550,7 +1584,7 @@ class EsOpinionsIndexingTest(
             cluster=opinion_cluster_2,
             local_path="test/search/opinion_wpd.wpd",
             per_curiam=False,
-            type="010combined",
+            type=Opinion.COMBINED,
         )
 
         with mock.patch(
@@ -1695,13 +1729,6 @@ class EsOpinionsIndexingTest(
             es_doc.absolute_url,
             f"/opinion/{opinion_cluster.pk}/debbas-v-test/",
         )
-
-        # Update the case_name_short field in the cluster record.
-        opinion_cluster.case_name_short = "Franklin"
-        opinion_cluster.save()
-
-        es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
-        self.assertEqual(es_doc.caseNameShort, "Franklin")
 
         # Add a new non participating judge to the cluster record.
         person_3 = PersonFactory.create(
@@ -1861,8 +1888,8 @@ class EsOpinionsIndexingTest(
 
         cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        self.assertEqual(cluster_doc.status, "Separate Opinion")
-        self.assertEqual(opinion_doc.status, "Separate Opinion")
+        self.assertEqual(cluster_doc.status, "Separate")
+        self.assertEqual(opinion_doc.status, "Separate")
 
         # update the procedural_history field in the cluster record
         opinion_cluster.procedural_history = "random history"
@@ -1870,8 +1897,8 @@ class EsOpinionsIndexingTest(
 
         cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
-        self.assertEqual(cluster_doc.proceduralHistory, "random history")
-        self.assertEqual(opinion_doc.proceduralHistory, "random history")
+        self.assertEqual(cluster_doc.procedural_history, "random history")
+        self.assertEqual(opinion_doc.procedural_history, "random history")
 
         # update the posture in the opinion cluster record
         opinion_cluster.posture = "random procedural posture"
@@ -1929,7 +1956,7 @@ class EsOpinionsIndexingTest(
             extracted_by_ocr=False,
             plain_text="my plain text secret word for queries",
             cluster=opinion_cluster,
-            type="010combined",
+            type=Opinion.COMBINED,
         )
         opinion_2.save()
 

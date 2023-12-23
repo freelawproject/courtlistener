@@ -161,7 +161,7 @@ class SearchPodcast(JurisdictionPodcast):
         return request
 
     def items(self, obj):
-        search_form = SearchForm(obj.GET)
+        search_form = SearchForm(obj.GET, request=obj)
         if search_form.is_valid():
             cd = search_form.cleaned_data
             if not waffle.flag_is_active(obj, "oa-es-active"):

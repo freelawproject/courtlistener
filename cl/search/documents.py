@@ -15,6 +15,7 @@ from cl.lib.elasticsearch_utils import build_es_base_query
 from cl.lib.fields import JoinField, PercolatorField
 from cl.lib.utils import deepgetattr
 from cl.people_db.models import Person, Position
+from cl.search.constants import o_type_index_map
 from cl.search.es_indices import (
     opinion_index,
     oral_arguments_index,
@@ -123,7 +124,7 @@ class ParentheticalGroupDocument(Document):
         )
 
     def prepare_status(self, instance):
-        return instance.opinion.cluster.get_precedential_status_display()
+        return instance.opinion.cluster.precedential_status
 
 
 class AudioDocumentBase(Document):
@@ -1325,7 +1326,7 @@ class OpinionBaseDocument(Document):
             "raw": fields.KeywordField(),
         },
     )
-    proceduralHistory = fields.TextField(
+    procedural_history = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(
@@ -1415,9 +1416,9 @@ class OpinionBaseDocument(Document):
         return instance.nature_of_suit
 
     def prepare_status(self, instance):
-        return instance.get_precedential_status_display()
+        return instance.precedential_status
 
-    def prepare_proceduralHistory(self, instance):
+    def prepare_procedural_history(self, instance):
         return instance.procedural_history
 
     def prepare_posture(self, instance):
@@ -1504,9 +1505,8 @@ class OpinionDocument(OpinionBaseDocument):
             "raw": fields.KeywordField(attr="pk"),
         },
     )
-    opinion_url = fields.KeywordField(index=False)
     author_id = fields.IntegerField()
-    type = fields.KeywordField(attr="type", index=False)
+    type = fields.KeywordField()
     per_curiam = fields.BooleanField(attr="per_curiam")
     type_text = fields.TextField(index=False)
     download_url = fields.KeywordField(attr="download_url", index=False)
@@ -1541,6 +1541,9 @@ class OpinionDocument(OpinionBaseDocument):
 
     def prepare_type_text(self, instance):
         return instance.get_type_display()
+
+    def prepare_type(self, instance):
+        return o_type_index_map.get(instance.type)
 
     def prepare_local_path(self, instance):
         if instance.local_path:
@@ -1688,9 +1691,9 @@ class OpinionDocument(OpinionBaseDocument):
         return instance.cluster.nature_of_suit
 
     def prepare_status(self, instance):
-        return instance.cluster.get_precedential_status_display()
+        return instance.cluster.precedential_status
 
-    def prepare_proceduralHistory(self, instance):
+    def prepare_procedural_history(self, instance):
         return instance.cluster.procedural_history
 
     def prepare_posture(self, instance):
@@ -1707,17 +1710,6 @@ class OpinionDocument(OpinionBaseDocument):
 @opinion_index.document
 class OpinionClusterDocument(OpinionBaseDocument):
     court_exact = fields.KeywordField(attr="docket.court_id")
-    caseNameShort = fields.TextField(
-        attr="case_name_short",
-        analyzer="text_en_splitting_cl",
-        fields={
-            "exact": fields.TextField(
-                analyzer="english_exact",
-                search_analyzer="search_analyzer_exact",
-            ),
-        },
-        search_analyzer="search_analyzer",
-    )
     non_participating_judge_ids = fields.ListField(
         fields.IntegerField(multi=True),
     )

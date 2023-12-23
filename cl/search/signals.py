@@ -84,10 +84,7 @@ pa_field_mapping = {
                 "docket_id": ["docket_id"],
                 "judges": ["judge"],
                 "nature_of_suit": ["suitNature"],
-                "get_precedential_status_display": [
-                    "status"
-                ],  # On fields where
-                # indexed values needs to be the display() value, use get_{field_name}_display as key.
+                "precedential_status": ["status"],
             },
         },
         Parenthetical: {
@@ -409,7 +406,7 @@ o_field_mapping = {
                 "attorneys": ["attorney"],
                 "nature_of_suit": ["suitNature"],
                 "precedential_status": ["status"],
-                "procedural_history": ["proceduralHistory"],
+                "procedural_history": ["procedural_history"],
                 "posture": ["posture"],
                 "syllabus": ["syllabus"],
                 "scdb_id": ["scdb_id"],
@@ -463,14 +460,14 @@ o_cluster_field_mapping = {
             "self": {
                 "docket_id": ["prepare"],
                 "case_name": ["caseName"],
-                "case_name_short": ["caseName", "caseNameShort"],
+                "case_name_short": ["caseName"],
                 "case_name_full": ["caseNameFull", "caseName"],
                 "date_filed": ["dateFiled"],
                 "judges": ["judge"],
                 "attorneys": ["attorney"],
                 "nature_of_suit": ["suitNature"],
                 "precedential_status": ["status"],
-                "procedural_history": ["proceduralHistory"],
+                "procedural_history": ["procedural_history"],
                 "posture": ["posture"],
                 "syllabus": ["syllabus"],
                 "scdb_id": ["scdb_id"],

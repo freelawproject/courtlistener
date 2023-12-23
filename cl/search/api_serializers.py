@@ -386,6 +386,6 @@ class OpinionESResultSerializer(DocumentSerializer):
             "dateReargumentDenied_text",
             "posture",
             "syllabus",
-            "proceduralHistory",
+            "procedural_history",
             "panel_names",
         )

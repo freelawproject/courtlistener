@@ -149,6 +149,7 @@ def do_search(
     # Add additional or overridden GET parameters
     if override_params:
         get_params.update(override_params)
+
     search_form = SearchForm(get_params)
 
     if search_form.is_valid():
@@ -465,7 +466,9 @@ def show_results(request: HttpRequest) -> HttpResponse:
                 )
 
             # But give it a fresh form for the advanced search section
-            render_dict.update({"search_form": SearchForm(request.GET)})
+            render_dict.update(
+                {"search_form": SearchForm(request.GET)}, request=request
+            )
 
             # Get a bunch of stats.
             stats = get_homepage_stats()
@@ -551,7 +554,9 @@ def advanced(request: HttpRequest) -> HttpResponse:
     # I'm not thrilled about how this is repeating URLs in a view.
     if request.path == reverse("advanced_o"):
         obj_type = SEARCH_TYPES.OPINION
-        render_dict["search_form"] = SearchForm({"type": obj_type})
+        render_dict["search_form"] = SearchForm(
+            {"type": obj_type}, request=request
+        )
         # Needed b/c of facet values.
         if waffle.flag_is_active(request, "o-es-active"):
             search_query = OpinionClusterDocument.search()
@@ -583,7 +588,7 @@ def advanced(request: HttpRequest) -> HttpResponse:
         else:
             raise NotImplementedError(f"Unknown path: {request.path}")
 
-        search_form = SearchForm({"type": obj_type})
+        search_form = SearchForm({"type": obj_type}, request=request)
         courts, court_count_human, court_count = merge_form_with_courts(
             courts, search_form
         )
@@ -608,12 +613,13 @@ def es_search(request: HttpRequest) -> HttpResponse:
     courts = Court.objects.filter(in_use=True)
     render_dict.update({"search_type": "parenthetical"})
     obj_type = SEARCH_TYPES.PARENTHETICAL
-    search_form = SearchForm({"type": obj_type})
+    search_form = SearchForm({"type": obj_type}, request=request)
     if search_form.is_valid():
         search_form = _clean_form(
             request.GET.copy(),
             search_form.cleaned_data,
             courts,
+            is_es_form=True,
         )
     template = "advanced.html"
 
@@ -662,7 +668,7 @@ def do_es_search(
     cited_cluster = None
     query_citation = None
 
-    search_form = SearchForm(get_params)
+    search_form = SearchForm(get_params, is_es_form=True)
     match get_params.get("type", SEARCH_TYPES.OPINION):
         case SEARCH_TYPES.PARENTHETICAL:
             document_type = ParentheticalGroupDocument
@@ -696,10 +702,9 @@ def do_es_search(
                 rows_per_page=rows,
                 cache_key=cache_key,
             )
+
             search_form = _clean_form(
-                get_params,
-                search_form.cleaned_data,
-                courts,
+                get_params, search_form.cleaned_data, courts, is_es_form=True
             )
             cited_cluster = add_depth_counts(
                 # Also returns cited cluster if found
