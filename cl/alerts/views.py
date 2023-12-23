@@ -162,7 +162,7 @@ def new_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
             },
             status=HTTP_404_NOT_FOUND,
         )
-    except Docket.MultipleObjectsReturned as exc:
+    except Docket.MultipleObjectsReturned:
         docket = Docket.objects.filter(
             pacer_case_id=pacer_case_id, court_id=court_id
         ).earliest("date_created")

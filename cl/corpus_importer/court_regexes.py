@@ -1,9 +1,4 @@
-import os
-import pickle
 import re
-from math import ceil
-
-from django.conf import settings
 
 conn_counties = ")|(".join(
     [
@@ -251,7 +246,7 @@ fd_pairs = (
     (re.compile(r'District of Wisconsin', re.I), 'wisd'),
 )
 
-ca_pairs = (
+ca_pairs: tuple[tuple[re.Pattern, str]] = (
     (re.compile(r'Supreme Court of the United States', re.I), 'scotus'),
 
     (re.compile(r'(^|\s)((U\. ?S\.)|(United States)) ((Circuit Courts?)|(Court of Appeals)) for the First Circuit', re.I), 'ca1'),
@@ -270,7 +265,7 @@ ca_pairs = (
 )
 
 # noinspection PyPep8
-fb_pairs = (
+fb_pairs: tuple[tuple[re.Pattern, str]] = (
     (re.compile(r'(^|\s)D(\.|(istrict)) of Columbia', re.I), 'dcb'),
     (re.compile(r'(^|\s)M(\.|(iddle))? ?D(\.|(istrict))? (of )?Alabama', re.I), 'almb'),
     (re.compile(r'(^|\s)N\.? ?D(\.|(istrict))? (of )?Alabama', re.I), 'alnb'),
@@ -415,7 +410,7 @@ state_pairs = (
 
     (re.compile(r'Supreme Court of California', re.I), 'cal'),
     (re.compile(r'California Court of Appeals', re.I), 'calctapp'),
-        (re.compile(r'Court of Appeal of the State of California',re.I), 'calctapp'),
+        (re.compile(r'Court of Appeal of the State of California', re.I), 'calctapp'),
         (re.compile(r'Court of Appeals? of California', re.I), 'calctapp'),
     (re.compile(r'Appellate Division, Superior Court', re.I), 'calappdeptsuperct'),
         (re.compile(r'Appellate Division of the Superior Court of the State of California', re.I), 'calappdeptsuperct'),
@@ -677,7 +672,7 @@ state_pairs = (
     (re.compile(r'Arkansas Workers\' Compensation Commission', re.I), 'arkworkcompcom'),
 )
 
-state_ag_pairs = (
+state_ag_pairs: tuple[tuple[re.Pattern, str]]  = (
     (re.compile(r'Attorney General of Arkansas', re.I), 'arkag'),
     (re.compile(r'Attorney General of California', re.I), 'calag'),
     (re.compile(r'Attorney General of Colorado', re.I), 'coloag'),
@@ -694,21 +689,21 @@ state_ag_pairs = (
     (re.compile(r'Attorney General of Wisconsin', re.I), 'wisag'),
 )
 
-international_pairs = (
+international_pairs: tuple[tuple[re.Pattern, str]] = (
     (re.compile("Court of King's Bench", re.I), 'kingsbench'),
 )
 # fmt: on
 
 
 def match_court_string(
-    court_str,
-    federal_appeals=False,
-    federal_district=False,
-    bankruptcy=False,
-    state=False,
-    state_ag=False,
-    international=False,
-):
+    court_str: str,
+    federal_appeals: bool = False,
+    federal_district: bool = False,
+    bankruptcy: bool = False,
+    state: bool = False,
+    state_ag: bool = False,
+    international: bool = False,
+) -> str:
     """Look up a court string and return a CourtListener ID.
 
     Note you cannot use bankruptcy and federal_district together due to

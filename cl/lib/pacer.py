@@ -121,7 +121,7 @@ def lookup_and_save(new, debug=False):
     return d
 
 
-def get_first_missing_de_date(d):
+def get_first_missing_de_date(d: Docket):
     """When buying dockets use this function to figure out which docket entries
     we already have, starting at the first item. Since PACER only allows you to
     do a range of docket entries, this allows us to figure out a later starting
@@ -564,7 +564,7 @@ def check_pacer_court_connectivity(court_id: str) -> ConnectionType:
         status_code = r.status_code
         r.raise_for_status()
         connection_ok = True
-    except requests.exceptions.RequestException as e:
+    except requests.exceptions.RequestException:
         connection_ok = False
 
     blocked_dict: ConnectionType = {
