@@ -240,7 +240,6 @@ def process_stripe_payment(
     amount: int,
     email: str,
     kwargs: Dict[str, Union[str, bool, Dict[str, str]]],
-    stripe_redirect_url: str,
 ) -> Dict[str, Union[str, int]]:
     """Process a stripe payment.
 
@@ -274,7 +273,6 @@ def process_stripe_payment(
         response = {
             "status": Donation.AWAITING_PAYMENT,
             "payment_id": charge.id,
-            "redirect": stripe_redirect_url,
         }
     except (stripe.error.CardError, stripe.error.InvalidRequestError) as e:
         logger.info(f"Stripe was unable to process the payment: {e}")
