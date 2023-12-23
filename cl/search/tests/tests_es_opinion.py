@@ -525,7 +525,7 @@ class OpinionsESSearchTest(
         self.assertIn("docket number 2", r.content.decode())
 
         # Search by caseName
-        search_params = {"q": '""Howard v. Honda""'}
+        search_params = {"q": '"Howard v. Honda"'}
         r = await self._test_article_count(search_params, 1, "text_query")
         self.assertIn("docket number 2", r.content.decode())
 

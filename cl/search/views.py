@@ -149,7 +149,6 @@ def do_search(
     # Add additional or overridden GET parameters
     if override_params:
         get_params.update(override_params)
-
     search_form = SearchForm(get_params)
 
     if search_form.is_valid():
@@ -702,7 +701,6 @@ def do_es_search(
                 rows_per_page=rows,
                 cache_key=cache_key,
             )
-
             search_form = _clean_form(
                 get_params, search_form.cleaned_data, courts, is_es_form=True
             )
