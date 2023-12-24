@@ -246,7 +246,7 @@ fd_pairs = (
     (re.compile(r'District of Wisconsin', re.I), 'wisd'),
 )
 
-ca_pairs: tuple[tuple[re.Pattern, str]] = (
+ca_pairs = (
     (re.compile(r'Supreme Court of the United States', re.I), 'scotus'),
 
     (re.compile(r'(^|\s)((U\. ?S\.)|(United States)) ((Circuit Courts?)|(Court of Appeals)) for the First Circuit', re.I), 'ca1'),
@@ -265,7 +265,7 @@ ca_pairs: tuple[tuple[re.Pattern, str]] = (
 )
 
 # noinspection PyPep8
-fb_pairs: tuple[tuple[re.Pattern, str]] = (
+fb_pairs = (
     (re.compile(r'(^|\s)D(\.|(istrict)) of Columbia', re.I), 'dcb'),
     (re.compile(r'(^|\s)M(\.|(iddle))? ?D(\.|(istrict))? (of )?Alabama', re.I), 'almb'),
     (re.compile(r'(^|\s)N\.? ?D(\.|(istrict))? (of )?Alabama', re.I), 'alnb'),
@@ -672,7 +672,7 @@ state_pairs = (
     (re.compile(r'Arkansas Workers\' Compensation Commission', re.I), 'arkworkcompcom'),
 )
 
-state_ag_pairs: tuple[tuple[re.Pattern, str]]  = (
+state_ag_pairs = (
     (re.compile(r'Attorney General of Arkansas', re.I), 'arkag'),
     (re.compile(r'Attorney General of California', re.I), 'calag'),
     (re.compile(r'Attorney General of Colorado', re.I), 'coloag'),
@@ -689,7 +689,7 @@ state_ag_pairs: tuple[tuple[re.Pattern, str]]  = (
     (re.compile(r'Attorney General of Wisconsin', re.I), 'wisag'),
 )
 
-international_pairs: tuple[tuple[re.Pattern, str]] = (
+international_pairs = (
     (re.compile("Court of King's Bench", re.I), 'kingsbench'),
 )
 # fmt: on
@@ -703,7 +703,7 @@ def match_court_string(
     state: bool = False,
     state_ag: bool = False,
     international: bool = False,
-) -> str:
+) -> str | None:
     """Look up a court string and return a CourtListener ID.
 
     Note you cannot use bankruptcy and federal_district together due to
