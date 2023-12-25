@@ -117,8 +117,8 @@
         <h3 class="gray caps">🎉 Your account has unlimited docket alerts</h3>
       {% elif user.profile.email_grants_unlimited_docket_alerts %}
         <h3 class="gray caps">🎉 Your email address provides you unlimited docket alerts</h3>
-     {% elif user.profile.is_monthly_donor %}
-        <h3 class="gray caps">🎉 Being a monthly donor provides you unlimited docket alerts</h3>
+     {% elif user.profile.is_member %}
+        <h3 class="gray caps">🎉 Being a member provides you unlimited docket alerts</h3>
       {% endif %}
 
       <div class="table-responsive">

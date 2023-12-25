@@ -308,10 +308,6 @@ class UnlimitedAlertsTest(TestCase):
             msg="Grantlist allowed even though email should not be on list.",
         )
         self.assertFalse(
-            up.is_monthly_donor,
-            msg="User is marked as monthly donor, but isn't.",
-        )
-        self.assertFalse(
             up.can_make_another_alert,
             msg="Was able to make alerts even though the max free "
             "alerts was overridden to zero.",

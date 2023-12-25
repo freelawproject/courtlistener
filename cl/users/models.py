@@ -168,14 +168,6 @@ class UserProfile(models.Model):
         return total
 
     @property
-    def is_monthly_donor(self) -> bool:
-        """Does the profile have any monthly donations set up and running?
-
-        :return bool: True if so, False if not.
-        """
-        return bool(self.user.monthly_donations.filter(enabled=True).count())
-
-    @property
     def is_member(self) -> bool:
         """Does the user have an active membership?
 
@@ -205,7 +197,7 @@ class UserProfile(models.Model):
 
         The answer is yes, if any of the following is true:
          - They get unlimited ones
-         - They are a monthly donor
+         - They are a member
          - They are under the threshold
          - Their email domain is unlimited
 
@@ -216,7 +208,7 @@ class UserProfile(models.Model):
                 # Place performant checks first
                 self.unlimited_docket_alerts,
                 self.email_grants_unlimited_docket_alerts,
-                self.is_monthly_donor,
+                self.is_member,
                 self.user.docket_alerts.subscriptions().count()
                 < settings.MAX_FREE_DOCKET_ALERTS,
             ]
