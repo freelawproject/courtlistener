@@ -198,7 +198,7 @@ def update_donation_for_event(
         logger.info(f"A dispute on charge {charge['id']} has been updated.")
     elif event["type"].endswith("dispute.funds_withdrawn"):
         logger.info(
-            f"Funds for the stripe dispute on charge "
+            "Funds for the stripe dispute on charge "
             f"{charge['charge']} have been withdrawn"
         )
     elif event["type"].endswith("dispute.closed"):
