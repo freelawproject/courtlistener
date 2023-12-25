@@ -331,7 +331,7 @@ class AudioPercolator(AudioDocumentBase):
         if not search_form.is_valid():
             logger.warning(
                 f"The query {qd} associated with Alert ID {instance.pk} is "
-                f"invalid and was not indexed."
+                "invalid and was not indexed."
             )
             return None
 

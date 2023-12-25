@@ -89,7 +89,7 @@ def lookup_and_save(new, debug=False):
             def is_different(x):
                 return x.pacer_case_id and x.pacer_case_id != new.pacer_case_id
 
-            if all([is_different(d) for d in ds]):
+            if all(is_different(d) for d in ds):
                 # All the dockets found match on docket number, but have
                 # different pacer_case_ids. This means that the docket has
                 # multiple pacer_case_ids in PACER, and we should mirror that
