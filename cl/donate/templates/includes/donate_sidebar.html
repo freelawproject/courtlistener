@@ -1,27 +1,21 @@
 {% load humanize %}
 
 <div class="sidebar-section hidden-xs">
-  {% if user.profile.total_donated_last_year > 0 %}
+  {% if user.profile.is_member %}
     <h3><span>Thank You! <i class="fa fa-heart-o red"></i></span></h3>
-    <p>During the last year you donated <strong>${{ user.profile.total_donated_last_year|intcomma }}</strong>. This support allows us to begin new initiatives and support users like
-      you. Thank you!
-    </p>
-    <p>
-      <a href="https://donate.free.law/forms/supportflp"
-         class="btn btn-danger btn-lg">Donate Again</a>
+    <p>You're a {{user.membership.get_level_display}} level supporter of the Free Law Project. Thank you for your support!
     </p>
   {% else %}
     <h3><span>Support FLP <i class="fa fa-heart-o red"></i></span></h3>
     <p class="v-offset-above-1">
       CourtListener is a project of <a
         href="https://free.law" target="_blank">Free
-      Law Project</a>, a federally-recognized 501(c)(3) non-profit. We
-      rely on donations for our financial security.
+      Law Project</a>, a federally-recognized 501(c)(3) non-profit. Members help support our work and get special access to features.
     </p>
-    <p>Please support our work with a donation.</p>
+    <p>Please become a member today.</p>
     <p>
-      <a href="https://donate.free.law/forms/supportflp"
-         class="btn btn-danger btn-lg btn-block">Donate Now</a>
+      <a href="https://donate.free.law/forms/membership"
+         class="btn btn-danger btn-lg btn-block">Join Free.law Now</a>
     </p>
   {% endif %}
 </div>

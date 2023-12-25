@@ -57,7 +57,7 @@ from cl.api.models import (
 from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
 from cl.donate.factories import DonationFactory
-from cl.donate.models import Donation
+from cl.donate.models import Donation, NeonMembership
 from cl.favorites.factories import NoteFactory, UserTagFactory
 from cl.lib.test_helpers import EmptySolrTestCase, SimpleUserDataMixin
 from cl.search.documents import AudioDocument, AudioPercolator
@@ -522,11 +522,8 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
         cls.rebuild_index("alerts.Alert")
         cls.user_profile = UserProfileWithParentsFactory()
         cls.user_profile_1 = UserProfileWithParentsFactory()
-        cls.donation = DonationFactory(
-            donor=cls.user_profile.user,
-            amount=20,
-            status=Donation.PROCESSED,
-            send_annual_reminder=True,
+        NeonMembership.objects.create(
+            level=NeonMembership.LEGACY, user=cls.user_profile.user
         )
         cls.webhook_enabled = WebhookFactory(
             user=cls.user_profile.user,
@@ -1552,18 +1549,12 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             citation_string="Bankr. C.D. Cal.",
         )
         cls.user_profile = UserProfileWithParentsFactory()
-        cls.donation = DonationFactory(
-            donor=cls.user_profile.user,
-            amount=20,
-            status=Donation.PROCESSED,
-            send_annual_reminder=True,
+        NeonMembership.objects.create(
+            level=NeonMembership.LEGACY, user=cls.user_profile.user
         )
         cls.user_profile_2 = UserProfileWithParentsFactory()
-        cls.donation = DonationFactory(
-            donor=cls.user_profile_2.user,
-            amount=20,
-            status=Donation.PROCESSED,
-            send_annual_reminder=True,
+        NeonMembership.objects.create(
+            level=NeonMembership.LEGACY, user=cls.user_profile_2.user
         )
         cls.webhook_enabled = WebhookFactory(
             user=cls.user_profile.user,
@@ -2148,9 +2139,8 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         contains more than PERCOLATOR_PAGE_SIZE results. So additional
         requests are performed in order to retrieve all the available results.
         """
-
-        donations = Donation.objects.all()
-        self.assertEqual(donations.count(), 2)
+        memberships = NeonMembership.objects.all()
+        self.assertEqual(memberships.count(), 2)
         self.assertEqual(len(mail.outbox), 0)
         webhook_events = WebhookEvent.objects.all()
         self.assertEqual(len(webhook_events), 0)
@@ -2161,13 +2151,10 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             user_profile = UserProfileWithParentsFactory.create()
 
             if i != 1:
-                # Avoid creating a donation for one User in order to test this
+                # Avoid creating a membership for one User in order to test this
                 # RT Alert is not sent.
-                DonationFactory.create(
-                    amount=20,
-                    donor=user_profile.user,
-                    status=Donation.PROCESSED,
-                    send_annual_reminder=True,
+                NeonMembership.objects.create(
+                    user=user_profile.user, level=NeonMembership.LEGACY
                 )
             WebhookFactory(
                 user=user_profile.user,
@@ -2185,8 +2172,8 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
 
         webhooks = Webhook.objects.all()
         self.assertEqual(len(webhooks), 11)
-        donations = Donation.objects.all()
-        self.assertEqual(len(donations), 11)
+        memberships = NeonMembership.objects.all()
+        self.assertEqual(len(memberships), 11)
         total_rt_alerts = Alert.objects.filter(rate=Alert.REAL_TIME)
         # 2 created in setUpTestData + 10
         self.assertEqual(total_rt_alerts.count(), 12)

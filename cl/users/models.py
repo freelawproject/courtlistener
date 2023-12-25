@@ -147,27 +147,6 @@ class UserProfile(models.Model):
     )
 
     @property
-    def total_donated_last_year(self) -> Decimal:
-        one_year_ago = now() - timedelta(days=365)
-        total = (
-            self.user.donations.filter(date_created__gte=one_year_ago)
-            .exclude(status__in=donation_exclusion_codes)
-            .aggregate(Sum("amount"))["amount__sum"]
-        )
-        if total is None:
-            total = Decimal(0.0)
-        return total
-
-    @property
-    def total_donated(self) -> Decimal:
-        total = self.user.donations.exclude(
-            status__in=donation_exclusion_codes
-        ).aggregate(Sum("amount"))["amount__sum"]
-        if total is None:
-            total = Decimal(0.0)
-        return total
-
-    @property
     def is_member(self) -> bool:
         """Does the user have an active membership?
 

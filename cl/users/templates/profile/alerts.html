@@ -86,7 +86,7 @@
                     <i class="fa fa-podcast"></i>&nbsp;Podcast
                   </a>
                 {% endif %}
-                {% if user.profile.total_donated_last_year < MIN_DONATION.rt_alerts and alert.rate == 'rt' %}
+                {% if user.profile.is_member and alert.rate == 'rt' %}
                   <p class="bottom inline"
                      title="Donate at least $10 each year for Real Time alerts">
                     <a class="btn btn-primary btn-xs disabled">
