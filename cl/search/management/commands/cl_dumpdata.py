@@ -9,7 +9,7 @@ import traceback
 from django.core import serializers
 from django.db.models.query_utils import Q
 
-from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.command_utils import VerboseCommand
 from cl.search.models import Docket, Opinion, OpinionCluster, OpinionsCited
 
 SUPPORTED_MODELS = (Docket, OpinionCluster, Opinion, OpinionsCited)
@@ -96,7 +96,7 @@ class Command(VerboseCommand):
             format -- supported Django serizliation format ('json', 'xml'...)
             filter -- Django QuerySet filter
         """
-        if not model in SUPPORTED_MODELS:
+        if model not in SUPPORTED_MODELS:
             raise ModelTypeError(model)
 
         modelname = model.__name__

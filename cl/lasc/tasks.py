@@ -2,7 +2,6 @@ import json
 import logging
 import os
 import pickle
-from datetime import datetime
 
 from django.apps import apps
 from django.conf import settings
@@ -77,7 +76,7 @@ def establish_good_login(self):
     login_to_court()
 
 
-def make_lasc_search():
+def make_lasc_search() -> LASCSearch:
     """Create a logged-in LASCSearch object with cookies pulled from cache
 
     :return: LASCSearch object

@@ -739,7 +739,7 @@ def find_judges(opinions=None) -> str:
 
     judge_list = list(itertools.chain.from_iterable(judges))
     judge_list = list(map(titlecase, judge_list))
-    return ", ".join(sorted(list(set(judge_list))))
+    return ", ".join(sorted(set(judge_list)))
 
 
 def map_opinion_types(opinions=None) -> None:

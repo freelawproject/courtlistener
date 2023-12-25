@@ -52,7 +52,7 @@ def make_citation(
     citation_objs = get_citations(cite_str)
     if not citation_objs:
         logger.error(
-            f"Could not parse citation",
+            "Could not parse citation",
             extra=dict(cite=cite_str, cluster=cluster),
         )
         return None
@@ -230,7 +230,7 @@ class Command(VerboseCommand):
 
         dup_checker = DupChecker(court, full_crawl=full_crawl)
         if dup_checker.abort_by_url_hash(site.url, site.hash):
-            logger.debug(f"Aborting by url hash.")
+            logger.debug("Aborting by url hash.")
             return
 
         if site.cookies:

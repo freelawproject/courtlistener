@@ -470,9 +470,7 @@ def add_new_case(
     ]
     # Flatten and dedupe list of judges
     judges = ", ".join(
-        sorted(
-            list(set(itertools.chain.from_iterable(judge_list + author_list)))
-        )
+        sorted(set(itertools.chain.from_iterable(judge_list + author_list)))
     )
     judges = titlecase(judges)
     docket_string = data["docket_number"].strip()

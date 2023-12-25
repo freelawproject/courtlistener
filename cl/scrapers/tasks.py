@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple, Union
 
 import httpx
 import requests
-from asgiref.sync import async_to_sync, sync_to_async
+from asgiref.sync import async_to_sync
 from django.apps import apps
 from django.conf import settings
 from django.core.files.base import ContentFile
