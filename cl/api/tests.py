@@ -356,7 +356,7 @@ class DRFOrderingTests(TestCase):
         )
 
 
-class FilteringCountTestCase(object):
+class FilteringCountTestCase:
     """Mixin for adding an additional test assertion."""
 
     # noinspection PyPep8Naming

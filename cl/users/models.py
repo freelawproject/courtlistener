@@ -237,7 +237,7 @@ class UserProfileBarMembership(UserProfile.barmembership.through):
         proxy = True
 
 
-class EMAIL_NOTIFICATIONS(object):
+class EMAIL_NOTIFICATIONS:
     """SES Email Notifications Subtypes"""
 
     UNDETERMINED = 0
@@ -268,7 +268,7 @@ class EMAIL_NOTIFICATIONS(object):
     INVERTED = invert_choices_group_lookup(TYPES)
 
 
-class FLAG_TYPES(object):
+class FLAG_TYPES:
     """EmailFlag Flag Types"""
 
     BAN = 0
@@ -447,7 +447,7 @@ class EmailSent(AbstractDateTimeModel):
         return f"Email: {self.message_id}"
 
 
-class STATUS_TYPES(object):
+class STATUS_TYPES:
     """FailedEmail Status Types"""
 
     WAITING = 0

@@ -276,7 +276,7 @@ class CustomPasswordResetForm(PasswordResetForm):
     """
 
     def __init__(self, *args, **kwargs):
-        super(CustomPasswordResetForm, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         self.fields["email"].widget.attrs.update(
             {
@@ -299,7 +299,7 @@ class CustomPasswordResetForm(PasswordResetForm):
                 email["subject"], body, email["from_email"], [recipient_addr]
             )
         else:
-            super(CustomPasswordResetForm, self).save(*args, **kwargs)
+            super().save(*args, **kwargs)
 
 
 class CustomSetPasswordForm(SetPasswordForm):
@@ -308,7 +308,7 @@ class CustomSetPasswordForm(SetPasswordForm):
     """
 
     def __init__(self, user, *args, **kwargs):
-        super(CustomSetPasswordForm, self).__init__(user, *args, **kwargs)
+        super().__init__(user, *args, **kwargs)
 
         self.fields["new_password1"].widget.attrs.update(
             {
