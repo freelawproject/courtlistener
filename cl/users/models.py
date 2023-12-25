@@ -141,6 +141,10 @@ class UserProfile(models.Model):
         help_text="Sort dockets in descending order by default",
         default=False,
     )
+    neon_account_id = models.CharField(
+        help_text="Unique identifier assigned by Neon CRM to a customer record",
+        blank=True,
+    )
 
     @property
     def total_donated_last_year(self) -> Decimal:

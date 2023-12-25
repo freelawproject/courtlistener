@@ -14,6 +14,7 @@ from .third_party.elasticsearch import *
 from .third_party.hcaptcha import *
 from .third_party.markdown import *
 from .third_party.moosend import *
+from .third_party.neon import *
 from .third_party.redis import *
 from .third_party.rest_framework import *
 from .third_party.sentry import *

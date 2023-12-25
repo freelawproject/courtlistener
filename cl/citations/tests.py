@@ -43,11 +43,10 @@ from cl.citations.match_citations import (
 )
 from cl.citations.score_parentheticals import parenthetical_score
 from cl.citations.tasks import (
-    find_citations_and_parantheticals_for_recap_documents,
     find_citations_and_parentheticals_for_opinion_by_pks,
     store_recap_citations,
 )
-from cl.lib.test_helpers import IndexedSolrTestCase, TestCase
+from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -58,7 +57,6 @@ from cl.search.factories import (
     RECAPDocumentFactory,
 )
 from cl.search.models import (
-    Citation,
     Opinion,
     OpinionCluster,
     OpinionsCited,
@@ -230,8 +228,7 @@ class CitationTextTest(SimpleTestCase):
              'like</p></div>',
              '<div><p>possess any peculiar knowledge of the mere policy of '
              'public measures." <i><span class="citation no-link">Ibid.'
-             '</span></i> Gerry of Massachusetts like</p></div>'
-            ),
+             '</span></i> Gerry of Massachusetts like</p></div>'),
         ]
 
         # fmt: on
@@ -1440,7 +1437,7 @@ class GroupParentheticalsTest(SimpleTestCase):
                     [frozenset(pg.parentheticals) for pg in output_groups]
                 )
                 input_sets = frozenset([frozenset(g) for g in groups])
-                self.assertEquals(
+                self.assertEqual(
                     input_sets,
                     output_sets,
                     f"Got incorrect result from get_parenthetical_groups for: {groups}",
@@ -1491,10 +1488,10 @@ class GroupParentheticalsTest(SimpleTestCase):
             representative,
         ) in enumerate(test_pairs):
             with self.subTest(
-                f"Testing that representative connected parenthetical is selected correctly.",
+                "Testing that representative connected parenthetical is selected correctly.",
                 i=i,
             ):
-                self.assertEquals(
+                self.assertEqual(
                     get_representative_parenthetical(
                         parentheticals_to_test, simgraph_to_test
                     ),
@@ -1545,7 +1542,7 @@ class GroupParentheticalsTest(SimpleTestCase):
             with self.subTest(
                 f"Testing {parenthetical_text} is tokenized correctly.", i=i
             ):
-                self.assertEquals(
+                self.assertEqual(
                     get_parenthetical_tokens(parenthetical_text),
                     tokens,
                     f"Got incorrect result from get_parnethetical_tokens for text (expected {tokens}): {parenthetical_text}",
@@ -1607,7 +1604,7 @@ class GroupParentheticalsTest(SimpleTestCase):
             with self.subTest(
                 f"Testing {inputs} connections are recognized correctly.", i=i
             ):
-                self.assertEquals(
+                self.assertEqual(
                     sorted(get_graph_component(*inputs)),
                     sorted(output),
                     f"Got incorrect result from get_graph_component for inputs (expected {output}): {inputs}",

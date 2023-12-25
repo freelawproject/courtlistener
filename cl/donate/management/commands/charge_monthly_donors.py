@@ -56,7 +56,7 @@ class Command(VerboseCommand):
                         },
                     },
                 )
-            except PaymentFailureException as e:
+            except PaymentFailureException:
                 m_donation.failure_count += 1
                 m_donation.enabled = False
                 m_donation.save()

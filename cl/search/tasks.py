@@ -1,6 +1,5 @@
 import logging
 import socket
-from collections import deque
 from datetime import timedelta
 from importlib import import_module
 from random import randint
@@ -548,12 +547,51 @@ def get_doc_from_es(
             )
         except (ConflictError, RequestError) as exc:
             logger.error(
-                f"Error indexing the {es_document.Django.model.__name__.capitalize()} with ID: {main_instance_id}. "
+                f"Error indexing the {es_document.Django.model.__name__.capitalize()} with ID: {instance_id}. "
                 f"Exception was: {type(exc).__name__}"
             )
 
         return None
     return main_doc
+
+
+def handle_ubq_retries(
+    self: Task,
+    exc: ConnectionError | ConflictError,
+    count_query=QuerySet | None,
+) -> None:
+    """Handles the retry logic for update_children_docs_by_query task based on
+    the exception received and number of documents to update.
+
+    :param self: The celery task
+    :param exc: The exception that triggered the retry.
+    :param count_query: Optional a Queryset to retrieve the number of docs to
+    update.
+    :return: None
+    """
+
+    retry_count = self.request.retries
+    if retry_count >= self.max_retries:
+        raise exc
+
+    if isinstance(exc, ConnectionError) and count_query:
+        num_documents = count_query.count()
+        estimated_time_ms = num_documents * 15  # 15ms per document
+        # Convert ms to seconds
+        estimated_delay_sec = round(estimated_time_ms / 1000)
+        # Apply exponential backoff with jitter
+        min_delay_sec = max(estimated_delay_sec, 10)
+        jitter_sec = randint(10, 30)
+        countdown_sec = ((retry_count + 1) * min_delay_sec) + jitter_sec
+    else:
+        # Default case for ConflictError
+        min_delay_sec = 10  # 10 seconds
+        max_delay_sec = 15  # 15 seconds
+        countdown_sec = ((retry_count + 1) * min_delay_sec) + randint(
+            min_delay_sec, max_delay_sec
+        )
+
+    raise self.retry(exc=exc, countdown=countdown_sec)
 
 
 @app.task(
@@ -585,6 +623,7 @@ def update_children_docs_by_query(
     main_doc = None
     parent_instance = None
     parent_doc_class = None
+    count_query = None
     if es_document is PositionDocument:
         s = s.query("parent_id", type="position", id=parent_instance_id)
         parent_doc_class = PersonDocument
@@ -592,6 +631,8 @@ def update_children_docs_by_query(
         parent_instance = get_instance_from_db(parent_instance_id, Person)
         if not parent_instance:
             return
+        count_query = Position.objects.filter(person_id=parent_instance_id)
+
     elif es_document is ESRECAPDocument:
         s = s.query("parent_id", type="recap_document", id=parent_instance_id)
         parent_doc_class = DocketDocument
@@ -599,6 +640,10 @@ def update_children_docs_by_query(
         parent_instance = get_instance_from_db(parent_instance_id, Docket)
         if not parent_instance:
             return
+
+        count_query = RECAPDocument.objects.filter(
+            docket_entry__docket_id=parent_instance_id
+        )
 
     if not main_doc:
         # Abort bulk update for a not supported document or non-existing parent
@@ -635,15 +680,7 @@ def update_children_docs_by_query(
     try:
         ubq.execute()
     except (ConnectionError, ConflictError) as exc:
-        retry_count = self.request.retries
-        if retry_count >= self.max_retries:
-            raise exc
-        min_delay = 10  # 10 seconds
-        max_delay = 15  # 15 seconds
-        countdown = ((retry_count + 1) * min_delay) + randint(
-            min_delay, max_delay
-        )
-        raise self.retry(exc=exc, countdown=countdown)
+        handle_ubq_retries(self, exc, count_query=count_query)
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.

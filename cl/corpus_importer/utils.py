@@ -487,19 +487,17 @@ def merge_judges(
 
     file_data, cl_data = overlapping_data
     # We check if any word in the string is uppercase
-    cl_data_upper = (
-        True if [s for s in cl_data.split(",") if s.isupper()] else False
-    )
+    cl_data_upper = any(s.isupper() for s in cl_data.split(","))
 
     # Get last names keeping case and cleaning the string (We could have
     # the judge names in capital letters)
     cl_clean = set(find_all_judges(cl_data))
     # Lowercase courtlistener judge names for set operations
-    temp_cl_clean = set([c.lower() for c in cl_clean])
+    temp_cl_clean = {c.lower() for c in cl_clean}
     # Get last names in lowercase and cleaned
     file_data_cleaned = set(find_all_judges(file_data))
     # Lowercase file judge names for set operations
-    temp_file_data_clean = set([h.lower() for h in file_data_cleaned])
+    temp_file_data_clean = {h.lower() for h in file_data_cleaned}
     # Prepare judges string
     judges = titlecase(", ".join(find_all_judges(file_data)))
     if (
@@ -538,7 +536,7 @@ def merge_judges(
             # At least one success that matches the names, we can create a new judges
             # list
             new_judges_list = sorted(
-                list(set(cl_data_clean_list + file_data_clean_list))
+                set(cl_data_clean_list + file_data_clean_list)
             )
             return {"judges": titlecase(", ".join(new_judges_list))}
         else:

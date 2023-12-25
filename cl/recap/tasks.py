@@ -247,7 +247,7 @@ async def process_recap_pdf(pk):
                 d = await Docket.objects.aget(
                     pacer_case_id=pq.pacer_case_id, court_id=pq.court_id
                 )
-            except Docket.DoesNotExist as exc:
+            except Docket.DoesNotExist:
                 # No Docket and no RECAPDocument. Do a retry. Hopefully
                 # the docket will be in place soon (it could be in a
                 # different upload task that hasn't yet been processed).
@@ -282,7 +282,7 @@ async def process_recap_pdf(pk):
                 de = await DocketEntry.objects.aget(
                     docket=d, entry_number=pq.document_number
                 )
-            except DocketEntry.DoesNotExist as exc:
+            except DocketEntry.DoesNotExist:
                 logger.warning(
                     f"Unable to find docket entry for processing queue '{pq}'."
                 )
@@ -732,7 +732,7 @@ async def process_recap_claims_register(pk):
     while True:
         try:
             await d.asave()
-        except IntegrityError as exc:
+        except IntegrityError:
             logger.warning(
                 "Race condition experienced while attempting docket save."
             )
@@ -825,7 +825,7 @@ async def process_recap_docket_history_report(pk):
     while True:
         try:
             await d.asave()
-        except IntegrityError as exc:
+        except IntegrityError:
             logger.warning(
                 "Race condition experienced while attempting docket save."
             )
@@ -935,7 +935,7 @@ async def process_case_query_page(pk):
         try:
             await d.asave()
             await sync_to_async(add_bankruptcy_data_to_docket)(d, data)
-        except IntegrityError as exc:
+        except IntegrityError:
             logger.warning(
                 "Race condition experienced while attempting docket save."
             )
@@ -992,7 +992,6 @@ async def process_recap_appellate_docket(pk):
         }
 
     This value is a dict so that it can be ingested in a Celery chain.
-
     """
     start_time = now()
     pq = await ProcessingQueue.objects.aget(pk=pk)
@@ -1134,7 +1133,7 @@ async def process_recap_appellate_attachment(
             pq, msg, PROCESSING_STATUS.FAILED
         )
         return pq_status, msg, []
-    except RECAPDocument.DoesNotExist as exc:
+    except RECAPDocument.DoesNotExist:
         msg = "Could not find docket to associate with attachment metadata"
         pq_status, msg = await mark_pq_status(
             pq, msg, PROCESSING_STATUS.FAILED
