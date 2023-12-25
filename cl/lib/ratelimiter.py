@@ -136,8 +136,7 @@ def get_ip_from_host(host: str) -> str:
 def host_is_approved(host: str) -> bool:
     """Check whether the domain is in our approved allowlist."""
     return any(
-        host.endswith(approved_domain)
-        for approved_domain in APPROVED_DOMAINS
+        host.endswith(approved_domain) for approved_domain in APPROVED_DOMAINS
     )
 
 
