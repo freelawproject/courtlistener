@@ -89,7 +89,7 @@ class SCOTUSMap(AbstractDateTimeModel):
     __original_deleted = None
 
     def __init__(self, *args, **kwargs):
-        super(SCOTUSMap, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.__original_deleted = self.deleted
 
     @property
