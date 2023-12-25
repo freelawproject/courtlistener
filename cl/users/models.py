@@ -8,7 +8,7 @@ import pghistory
 from django.conf import settings
 from django.contrib.auth.models import Group, Permission, User
 from django.contrib.postgres.fields import ArrayField
-from django.core.exceptions import FieldError
+from django.core.exceptions import FieldError, ObjectDoesNotExist
 from django.core.mail import EmailMessage, EmailMultiAlternatives
 from django.db import models
 from django.db.models import Q, Sum, UniqueConstraint
@@ -174,6 +174,18 @@ class UserProfile(models.Model):
         :return bool: True if so, False if not.
         """
         return bool(self.user.monthly_donations.filter(enabled=True).count())
+
+    @property
+    def is_member(self) -> bool:
+        """Does the user have an active membership?
+
+        :return bool: True if so, False if not.
+        """
+        try:
+            membership = self.user.membership
+            return membership.is_active
+        except ObjectDoesNotExist:
+            return False
 
     @property
     def email_grants_unlimited_docket_alerts(self) -> bool:
