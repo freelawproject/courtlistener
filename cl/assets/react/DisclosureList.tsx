@@ -41,11 +41,11 @@ const DisclosureFooter = () => {
         <p>All of the information you find here is available via our APIs or by browsing our database of judges.</p>
         <p>
           Creating this database was an expensive project for our organization. If you find this work valuable, please
-          consider making a donation
+          consider becoming a member.
         </p>
         <p>
           <a href="https://donate.free.law/forms/supportflp" className="btn btn-danger btn-lg">
-            Donate Now
+            Join Now
           </a>
         </p>
       </div>

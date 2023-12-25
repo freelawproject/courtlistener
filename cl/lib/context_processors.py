@@ -35,7 +35,7 @@ info_tips = (
     # Non-profit and fundraising
     'Free Law Project is a 501(c)(3) non-profit that relies on your support to operate. Please <a href="%s?referrer=tip">donate</a> to support this site</a>. <i class="fa fa-heart red"></i>'
     % DONATE_URL,
-    'CourtListener gets more than two million visits per year, but has a lean staff of only a few developers. Please <a href="%s?referrer=tip">donate</a> to support this site. <i class="fa fa-heart red"></i>'
+    'CourtListener serves more than 200 million requests per year, but has a lean staff of only a handful of developers. Please <a href="%s?referrer=tip">donate</a> to support our work making the judiciary more equitable. <i class="fa fa-heart red"></i>'
     % DONATE_URL,
     'CourtListener is supported by <a href="%s?referrer=tip">user donations</a> and small grants. More donations result in less time spent seeking grants and more time adding features. <i class="fa fa-heart red"></i>'
     % DONATE_URL,
