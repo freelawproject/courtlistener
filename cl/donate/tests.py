@@ -54,32 +54,10 @@ class EmailCommandTest(TestCase):
     def test_sending_an_email(self) -> None:
         """Do we send emails correctly?"""
         DonationReminderCommand().handle()
+
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("you donated $", mail.outbox[0].body)
         self.assertIn("you donated $", mail.outbox[0].alternatives[0][0])
-
-
-@skipIf(
-    settings.PAYPAL_SECRET_KEY is None or settings.PAYPAL_SECRET_KEY == "",
-    "Only run PayPal tests if we have an API key available.",
-)
-@patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
-class DonationFormSubmissionTest(TestCase):
-    def setUp(self) -> None:
-        self.async_client = AsyncClient()
-        self.params = {
-            "address1": "123 Sesame St.",
-            "city": "New York",
-            "state": "NY",
-            "zip_code": "12345",
-            "wants_newsletter": True,
-            "first_name": "Elmo",
-            "last_name": "Muppet",
-            "email": "pandora@courtlistener.com",
-            "send_annual_reminder": True,
-            "payment_provider": "paypal",
-            "frequency": "once",
-        }
 
 
 def get_stripe_event(fingerprint):
@@ -98,6 +76,7 @@ def get_stripe_event(fingerprint):
             # parallel, we can get different types of events here than the ones
             # we're expecting. Instead of crashing, just try the next event.
             pass
+
     return event
 
 
@@ -116,11 +95,13 @@ class StripeTest(TestCase):
             event,
             msg=f"Unable to find correct event for token: {token.card.fingerprint}",
         )
+
         r = await self.async_client.post(
             reverse("stripe_callback"),
             data=json.dumps(event),
             content_type="application/json",
         )
+
         # Does it return properly?
         self.assertEqual(r.status_code, HTTP_200_OK)
 
@@ -129,12 +110,14 @@ class StripeTest(TestCase):
     ) -> None:
         """These two tests must live together because they need to be done
         sequentially.
+
         First, we place a donation using the client. Then we send a mock
         callback to our webhook, to make sure it accepts it properly.
         """
         token, r = self.make_a_donation(
             stripe_test_numbers["good"]["visa"], amount="25"
         )
+
         self.assertEqual(
             r.status_code, HTTP_302_FOUND
         )  # redirect after a post
@@ -206,6 +189,7 @@ class StripeTest(TestCase):
 @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
 class DonationIntegrationTest(SimpleUserDataMixin, TestCase):
     """Attempt to handle all types/rates/providers/etc of payments
+
     See discussion in: https://github.com/freelawproject/courtlistener/issues/928
     """
 
@@ -216,6 +200,7 @@ class DonationIntegrationTest(SimpleUserDataMixin, TestCase):
 
     def setUp(self) -> None:
         self.async_client = AsyncClient()
+
         self.params = {
             # Donation info
             "frequency": FREQUENCIES.ONCE,
@@ -233,6 +218,7 @@ class DonationIntegrationTest(SimpleUserDataMixin, TestCase):
             "wants_newsletter": True,
             "send_annual_reminder": True,
         }
+
         self.new_email = "some-user@free.law"
 
     async def tearDown(self) -> None:
