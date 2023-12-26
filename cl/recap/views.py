@@ -131,9 +131,7 @@ class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):
         if not [p.startswith("pacer_doc_id") for p in request.GET.keys()]:
             # Not having this parameter causes bad performance. Abort.
             raise ValidationError("pacer_doc_id is a required filter.")
-        return super().list(
-            request, *args, **kwargs
-        )
+        return super().list(request, *args, **kwargs)
 
 
 class FjcIntegratedDatabaseViewSet(LoggingMixin, ModelViewSet):
