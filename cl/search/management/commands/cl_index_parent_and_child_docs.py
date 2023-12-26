@@ -63,7 +63,7 @@ class Command(VerboseCommand):
     help = "Index existing Parent and Children docs into Elasticsearch."
 
     def __init__(self, *args, **kwargs):
-        super(Command, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.options = {}
 
     def add_arguments(self, parser):
@@ -105,7 +105,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         self.options = options
         search_type = options["search_type"]
         auto_resume = options.get("auto_resume", False)

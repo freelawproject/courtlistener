@@ -949,7 +949,7 @@ class RelatedSearchTest(IndexedSolrTestCase):
         admin.user.is_staff = True
         admin.user.save()
 
-        super(RelatedSearchTest, self).setUp()
+        super().setUp()
 
     async def test_more_like_this_opinion(self) -> None:
         """Does the MoreLikeThis query return the correct number and order of
@@ -1094,7 +1094,7 @@ class GroupedSearchTest(EmptySolrTestCase):
 
     def setUp(self) -> None:
         # Set up some handy variables
-        super(GroupedSearchTest, self).setUp()
+        super().setUp()
         args = [
             "--type",
             "search.Opinion",
@@ -1186,7 +1186,7 @@ class JurisdictionFeedTest(TestCase):
         self.null_item = self.good_item.copy()
         self.null_item.update({"local_path": None})
         self.feed = JurisdictionFeed()
-        super(JurisdictionFeedTest, self).setUp()
+        super().setUp()
 
     def test_item_enclosure_mime_type(self) -> None:
         """Does the mime type detection work correctly?"""

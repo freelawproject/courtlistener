@@ -343,7 +343,7 @@ class AlertSeleniumTest(BaseSeleniumTest):
             user__username="pandora",
             user__password=make_password("password"),
         )
-        super(AlertSeleniumTest, self).setUp()
+        super().setUp()
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_edit_alert(self) -> None:
