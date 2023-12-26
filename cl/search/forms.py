@@ -447,11 +447,13 @@ class SearchForm(forms.Form):
         fields dict.
         """
 
+        # Default values for Solr version.
         default_status = "Precedential"
         status_index = 1
         if request and waffle.flag_is_active(request, "o-es-active"):
             self.is_es_form = True
         if self.is_es_form:
+            # Default values for ES version.
             default_status = "Published"
             status_index = 0
 

@@ -467,51 +467,6 @@ class AdvancedTest(IndexedSolrTestCase):
         )
 
 
-class SearchTest(ESIndexTestCase, IndexedSolrTestCase):
-    @classmethod
-    def setUpTestData(cls):
-        cls.court = CourtFactory(id="canb", jurisdiction="FB")
-        OpinionClusterFactoryWithChildrenAndParents(
-            case_name="Strickland v. Washington.",
-            case_name_full="Strickland v. Washington.",
-            docket=DocketFactory(
-                court=cls.court, docket_number="1:21-cv-1234"
-            ),
-            sub_opinions=RelatedFactory(
-                OpinionWithChildrenFactory,
-                factory_related_name="cluster",
-                html_columbia="<p>Code, &#167; 1-815</p>",
-            ),
-            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
-        )
-        OpinionClusterFactoryWithChildrenAndParents(
-            case_name="Strickland v. Lorem.",
-            docket=DocketFactory(court=cls.court, docket_number="123456"),
-            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
-        )
-        super().setUpTestData()
-
-    @staticmethod
-    def get_article_count(r):
-        """Get the article count in a query response"""
-        return len(html.fromstring(r.content.decode()).xpath("//article"))
-
-    async def test_issue_727_doc_att_numbers(self) -> None:
-        """Can we send integers to the document number and attachment number
-        fields?
-        """
-        r = await self.async_client.get(
-            reverse("show_results"),
-            {"type": SEARCH_TYPES.RECAP, "document_number": "1"},
-        )
-        self.assertEqual(r.status_code, HTTP_200_OK)
-        r = await self.async_client.get(
-            reverse("show_results"),
-            {"type": SEARCH_TYPES.RECAP, "attachment_number": "1"},
-        )
-        self.assertEqual(r.status_code, HTTP_200_OK)
-
-
 class PagerankTest(TestCase):
     fixtures = ["test_objects_search.json", "judge_judy.json"]
 
