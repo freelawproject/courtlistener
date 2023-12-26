@@ -397,12 +397,12 @@
     {% for doc in result.child_docs %}
       {% with doc=doc|get_attrdict:"_source" %}
         <div class="col-md-offset-half">
-          {% if result.child_docs|length > 1 or doc.type != '010combined' %}
+          {% if result.child_docs|length > 1 or doc.type != 'combined-opinion' %}
             <h4>
               <p>{{ doc.type_text }}</p>
             </h4>
           {% endif %}
-          <p {% if result.child_docs|length == 1 and doc.type == '010combined' %} class="representation" {% endif %}>
+          <p {% if result.child_docs|length == 1 and doc.type == 'combined-opinion' %} class="representation" {% endif %}>
             {% contains_highlights doc.text.0 as highlighted %}
             {% if highlighted %}&hellip;{% endif %}{{ doc.text|render_string_or_list|safe }} &hellip;
           </p>
