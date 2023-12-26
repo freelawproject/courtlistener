@@ -57,7 +57,7 @@ class Webhook(AbstractDateTimeModel):
         return f"<Webhook: {self.pk} for event type '{self.get_event_type_display()}'>"
 
 
-class WEBHOOK_EVENT_STATUS(object):
+class WEBHOOK_EVENT_STATUS:
     """WebhookEvent Status Types"""
 
     IN_PROGRESS = 0

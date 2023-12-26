@@ -1346,12 +1346,12 @@ class PoliticalAffiliation(AbstractDateTimeModel):
 
     def save(self, *args, **kwargs):
         self.full_clean()
-        super(PoliticalAffiliation, self).save(*args, **kwargs)
+        super().save(*args, **kwargs)
 
     def clean_fields(self, *args, **kwargs):
         validate_partial_date(self, ["start", "end"])
         validate_is_not_alias(self, ["person"])
-        super(PoliticalAffiliation, self).clean_fields(*args, **kwargs)
+        super().clean_fields(*args, **kwargs)
 
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot())
@@ -1413,11 +1413,11 @@ class ABARating(AbstractDateTimeModel):
 
     def save(self, *args, **kwargs):
         self.full_clean()
-        super(ABARating, self).save(*args, **kwargs)
+        super().save(*args, **kwargs)
 
     def clean_fields(self, *args, **kwargs):
         validate_is_not_alias(self, ["person"])
-        super(ABARating, self).clean_fields(*args, **kwargs)
+        super().clean_fields(*args, **kwargs)
 
 
 class PartyType(models.Model):
@@ -1510,7 +1510,7 @@ class CriminalCount(models.Model):
     )
 
     @staticmethod
-    def normalize_status(status_str):
+    def normalize_status(status_str: str):
         """Convert a status string into one of COUNT_STATUSES"""
         if status_str == "pending":
             return CriminalCount.PENDING

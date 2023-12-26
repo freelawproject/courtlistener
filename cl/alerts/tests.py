@@ -624,7 +624,7 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
             )
 
     def setUp(self) -> None:
-        super(SearchAlertsWebhooksTest, self).setUp()
+        super().setUp()
         obj_types = {
             "audio.Audio": Audio,
             "search.Opinion": Opinion,
