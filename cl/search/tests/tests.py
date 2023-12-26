@@ -794,15 +794,15 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
         first_count = self.extract_result_count_from_serp()
 
         # She notices only Precedential results are being displayed
-        prec = self.browser.find_element(By.ID, "id_stat_Precedential")
-        non_prec = self.browser.find_element(By.ID, "id_stat_Non-Precedential")
+        prec = self.browser.find_element(By.ID, "id_stat_Published")
+        non_prec = self.browser.find_element(By.ID, "id_stat_Unpublished")
         self.assertEqual(prec.get_attribute("checked"), "true")
         self.assertIsNone(non_prec.get_attribute("checked"))
         prec_count = self.browser.find_element(
-            By.CSS_SELECTOR, 'label[for="id_stat_Precedential"]'
+            By.CSS_SELECTOR, 'label[for="id_stat_Published"]'
         )
         non_prec_count = self.browser.find_element(
-            By.CSS_SELECTOR, 'label[for="id_stat_Non-Precedential"]'
+            By.CSS_SELECTOR, 'label[for="id_stat_Unpublished"]'
         )
         self.assertNotIn("(0)", prec_count.text)
         self.assertNotIn("(0)", non_prec_count.text)
