@@ -7,9 +7,14 @@ class ESPaginator(Paginator):
     Paginator for Elasticsearch hits(results).
     """
 
-    def __init__(self, total_query_results: int, *args, **kwargs):
+    def __init__(self, total_query_results: int | None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._count = total_query_results
+        if total_query_results:
+            self._count = total_query_results
+        elif hasattr(self.object_list, "hits"):
+            self._count = self.object_list.hits.total.value
+        else:
+            self._count = len(self.object_list)
         self._aggregations = (
             self.object_list.aggregations
             if hasattr(self.object_list, "aggregations")
