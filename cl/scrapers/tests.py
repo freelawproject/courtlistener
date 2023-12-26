@@ -291,7 +291,7 @@ class ReportScrapeStatusTest(TestCase):
     ]
 
     def setUp(self) -> None:
-        super(ReportScrapeStatusTest, self).setUp()
+        super().setUp()
         self.court = Court.objects.get(pk="test")
         # Make some errors that we can tally
         ErrorLog(
@@ -431,7 +431,7 @@ class DupcheckerWithFixturesTest(TestCase):
     ]
 
     def setUp(self) -> None:
-        super(DupcheckerWithFixturesTest, self).setUp()
+        super().setUp()
         self.court = Court.objects.get(pk="test")
 
         # Set the dup_threshold to zero for these tests

@@ -606,7 +606,7 @@ class SolrTestCase(
 
     def setUp(self) -> None:
         # Set up some handy variables
-        super(SolrTestCase, self).setUp()
+        super().setUp()
 
         self.court = Court.objects.get(pk="test")
         self.expected_num_results_opinion = 6
@@ -617,7 +617,7 @@ class IndexedSolrTestCase(SolrTestCase):
     """Similar to the SolrTestCase, but the data is indexed in Solr"""
 
     def setUp(self) -> None:
-        super(IndexedSolrTestCase, self).setUp()
+        super().setUp()
         obj_types = {
             "audio.Audio": Audio,
             "search.Opinion": Opinion,
