@@ -73,7 +73,7 @@ class Alert(AbstractDateTimeModel):
         # Set the search type based on the provided query.
         qd = QueryDict(self.query.encode(), mutable=True)
         self.alert_type = qd.get("type", SEARCH_TYPES.OPINION)
-        super(Alert, self).save(*args, **kwargs)
+        super().save(*args, **kwargs)
 
 
 class DocketAlertManager(models.Manager):
@@ -128,7 +128,7 @@ class DocketAlert(AbstractDateTimeModel):
         """Ensure we get a token when we save the first time."""
         if self.pk is None:
             self.secret_key = get_random_string(length=40)
-        super(DocketAlert, self).save(*args, **kwargs)
+        super().save(*args, **kwargs)
 
 
 class RealTimeQueue(models.Model):
@@ -165,7 +165,7 @@ class DateJSONEncoder(DjangoJSONEncoder):
         return super().default(obj)
 
 
-class SCHEDULED_ALERT_HIT_STATUS(object):
+class SCHEDULED_ALERT_HIT_STATUS:
     """ScheduledAlertHit Status Types"""
 
     SCHEDULED = 0

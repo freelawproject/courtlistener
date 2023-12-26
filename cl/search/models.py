@@ -704,8 +704,8 @@ class Docket(AbstractDateTimeModel):
         blank=True,
     )
     filepath_local = models.FileField(
-        help_text=f"Path to RECAP's Docket XML page as provided by the "
-        f"original RECAP architecture. These fields are for backup purposes "
+        help_text="Path to RECAP's Docket XML page as provided by the "
+        "original RECAP architecture. These fields are for backup purposes "
         f"only. {s3_warning_note}",
         upload_to=make_recap_path,
         storage=IncrementingAWSMediaStorage(),
@@ -942,20 +942,20 @@ class Docket(AbstractDateTimeModel):
         return (
             f"https://ecf.{self.pacer_court_id}.uscourts.gov"
             f"{path}"
-            f"servlet=CaseSummary.jsp&"
+            "servlet=CaseSummary.jsp&"
             f"caseId={self.pacer_case_id}&"
-            f"incOrigDkt=Y&"
-            f"incDktEntries=Y"
+            "incOrigDkt=Y&"
+            "incDktEntries=Y"
         )
 
     def pacer_appellate_url_with_caseNum(self, path):
         return (
             f"https://ecf.{self.pacer_court_id}.uscourts.gov"
             f"{path}"
-            f"servlet=CaseSummary.jsp&"
+            "servlet=CaseSummary.jsp&"
             f"caseNum={self.docket_number}&"
-            f"incOrigDkt=Y&"
-            f"incDktEntries=Y"
+            "incOrigDkt=Y&"
+            "incDktEntries=Y"
         )
 
     @property
@@ -1143,8 +1143,8 @@ class Docket(AbstractDateTimeModel):
                     rd_out["absolute_url"] = rd.get_absolute_url()
                 except NoReverseMatch:
                     raise InvalidDocumentError(
-                        "Unable to save to index due to missing absolute_url: "
-                        "%s" % self.pk
+                        "Unable to save to index due to missing "
+                        f"absolute_url: {self.pk}"
                     )
 
                 text_template = loader.get_template("indexes/dockets_text.txt")
@@ -3251,7 +3251,7 @@ class Opinion(AbstractDateTimeModel):
     )
     local_path = models.FileField(
         help_text=(
-            f"The location in AWS S3 where the original opinion file is "
+            "The location in AWS S3 where the original opinion file is "
             f"stored. {s3_warning_note}"
         ),
         upload_to=make_upload_path,

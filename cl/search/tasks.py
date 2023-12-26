@@ -265,7 +265,7 @@ def get_instance_from_db(
     except ObjectDoesNotExist:
         logger.warning(
             f"The {model.__name__} with ID {instance_id} doesn't exists and it"
-            f"cannot be updated in ES."
+            "cannot be updated in ES."
         )
         return None
 
@@ -965,7 +965,7 @@ def remove_document_from_es_index(
         model_label = es_document.Django.model.__name__.capitalize()
         logger.error(
             f"The {model_label} with ID:{instance_id} can't be deleted from "
-            f"the ES index, it doesn't exists."
+            "the ES index, it doesn't exists."
         )
 
 

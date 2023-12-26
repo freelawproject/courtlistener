@@ -82,7 +82,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options) -> None:
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
 
         if options["list_objects"]:
             for number, obj in FACTORIES.items():

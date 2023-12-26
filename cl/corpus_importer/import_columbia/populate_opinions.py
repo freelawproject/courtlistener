@@ -576,7 +576,7 @@ def get_good_words(word_list, stop_words_size=500):
     return list(OrderedDict.fromkeys(good_words))
 
 
-class StopWords(object):
+class StopWords:
     """A very simple object that can hold stopwords, but that is only
     initialized once.
     """

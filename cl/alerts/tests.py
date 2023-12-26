@@ -343,7 +343,7 @@ class AlertSeleniumTest(BaseSeleniumTest):
             user__username="pandora",
             user__password=make_password("password"),
         )
-        super(AlertSeleniumTest, self).setUp()
+        super().setUp()
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_edit_alert(self) -> None:
@@ -624,7 +624,7 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
             )
 
     def setUp(self) -> None:
-        super(SearchAlertsWebhooksTest, self).setUp()
+        super().setUp()
         obj_types = {
             "audio.Audio": Audio,
             "search.Opinion": Opinion,

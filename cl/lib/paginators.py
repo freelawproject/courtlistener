@@ -7,8 +7,8 @@ class ESPaginator(Paginator):
     Paginator for Elasticsearch hits(results).
     """
 
-    def __init__(self, total_query_results, *args, **kwargs):
-        super(ESPaginator, self).__init__(*args, **kwargs)
+    def __init__(self, total_query_results: int, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self._count = total_query_results
         self._aggregations = (
             self.object_list.aggregations
@@ -17,8 +17,8 @@ class ESPaginator(Paginator):
         )
 
     @cached_property
-    def count(self):
-        """Set the global number of objects, across all pages."""
+    def count(self) -> int:
+        """Get the global number of objects, across all pages."""
         return self._count
 
     @cached_property

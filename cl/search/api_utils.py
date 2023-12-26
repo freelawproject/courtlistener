@@ -81,7 +81,7 @@ def get_object_list(request, cd, paginator):
     return sl
 
 
-class ESList(object):
+class ESList:
     """This class implements a yielding list object that fetches items from ES
     as they are queried.
     """
@@ -159,7 +159,7 @@ class ESList(object):
         self._item_cache.append(p_object)
 
 
-class SolrList(object):
+class SolrList:
     """This implements a yielding list object that fetches items as they are
     queried.
     """
@@ -238,7 +238,7 @@ class SolrList(object):
         self._item_cache.append(p_object)
 
 
-class ResultObject(object):
+class ResultObject:
     def __init__(self, initial=None):
         self.__dict__["_data"] = initial or {}
 

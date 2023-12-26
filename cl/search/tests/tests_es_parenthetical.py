@@ -168,7 +168,7 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
 
     @classmethod
     def setUpClass(cls):
-        super(ParentheticalESTest, cls).setUpClass()
+        super().setUpClass()
         cls.rebuild_index("search.ParentheticalGroup")
 
     def test_filter_search(self) -> None:

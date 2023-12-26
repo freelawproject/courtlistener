@@ -21,7 +21,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
 
         ops = Opinion.objects.exclude(
             Q(html="") | Q(html=None),
