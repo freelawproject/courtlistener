@@ -560,6 +560,8 @@ async def view_recap_authorities(
 
     # Override the og:url if we're serving a request to an OG crawler bot
     og_file_path_override = f"/{rd.filepath_local}" if is_og_bot else None
+    de = await DocketEntry.objects.aget(id=rd.docket_entry_id)
+    d = await Docket.objects.aget(id=de.docket_id)
     return TemplateResponse(
         request,
         "recap_authorities.html",
@@ -569,9 +571,7 @@ async def view_recap_authorities(
             "og_file_path": og_file_path_override,
             "note_form": note_form,
             "private": True,  # Always True for RECAP docs.
-            "timezone": COURT_TIMEZONES.get(
-                rd.docket_entry.docket.court_id, "US/Eastern"
-            ),
+            "timezone": COURT_TIMEZONES.get(d.court_id, "US/Eastern"),
             "authorities": rd.authorities_with_data,
         },
     )
