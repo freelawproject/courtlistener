@@ -698,8 +698,8 @@ async def view_summaries(
     cluster = await aget_object_or_404(OpinionCluster, pk=pk)
     parenthetical_groups_qs = await get_or_create_parenthetical_groups(cluster)
     parenthetical_groups = [
-        parenthetical_group async for parenthetical_group in
-        parenthetical_groups_qs.prefetch_related(
+        parenthetical_group
+        async for parenthetical_group in parenthetical_groups_qs.prefetch_related(
             Prefetch(
                 "parentheticals",
                 queryset=Parenthetical.objects.order_by("-score"),
