@@ -697,8 +697,9 @@ async def view_summaries(
 ) -> HttpResponse:
     cluster = await aget_object_or_404(OpinionCluster, pk=pk)
     parenthetical_groups_qs = await get_or_create_parenthetical_groups(cluster)
-    parenthetical_groups = list(
-        parenthetical_groups_qs.prefetch_related(
+    parenthetical_groups = [
+        parenthetical_group
+        async for parenthetical_group in parenthetical_groups_qs.prefetch_related(
             Prefetch(
                 "parentheticals",
                 queryset=Parenthetical.objects.order_by("-score"),
@@ -708,7 +709,7 @@ async def view_summaries(
             "representative__describing_opinion__cluster__citations",
             "representative__describing_opinion__cluster__docket__court",
         )
-    )
+    ]
 
     return TemplateResponse(
         request,
