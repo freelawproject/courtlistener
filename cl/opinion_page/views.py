@@ -328,9 +328,7 @@ async def docket_idb_data(
             "parties": await docket.parties.aexists(),
             "docket_entries": await docket.docket_entries.aexists(),
             "origin_csv": choices_to_csv(idb_data, "origin"),
-            "jurisdiction_csv": choices_to_csv(
-                idb_data, "jurisdiction"
-            ),
+            "jurisdiction_csv": choices_to_csv(idb_data, "jurisdiction"),
             "arbitration_csv": choices_to_csv(
                 idb_data, "arbitration_at_filing"
             ),
