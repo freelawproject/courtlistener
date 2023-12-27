@@ -367,9 +367,10 @@ async def docket_authorities(
     return TemplateResponse(request, "docket_authorities.html", context)
 
 
-def make_rd_title(rd: RECAPDocument) -> str:
-    de = rd.docket_entry
-    d = de.docket
+async def make_rd_title(rd: RECAPDocument) -> str:
+    de = await DocketEntry.objects.aget(id=rd.docket_entry_id)
+    d = await Docket.objects.aget(id=de.docket_id)
+    court = await Court.objects.aget(id=d.court_id)
     return "{desc}#{doc_num}{att_num} in {case_name} ({court}{docket_number})".format(
         desc=f"{rd.description} &ndash; " if rd.description else "",
         doc_num=rd.document_number,
@@ -377,7 +378,7 @@ def make_rd_title(rd: RECAPDocument) -> str:
         if rd.document_type == RECAPDocument.ATTACHMENT
         else "",
         case_name=best_case_name(d),
-        court=d.court.citation_string,
+        court=court.citation_string,
         docket_number=f", {d.docket_number}" if d.docket_number else "",
     )
 
@@ -481,7 +482,7 @@ async def view_recap_document(
             if rd.pacer_url and redirect_or_modal:
                 redirect_to_pacer_modal = True
 
-    title = make_rd_title(rd)
+    title = await make_rd_title(rd)
     rd = await make_thumb_if_needed(request, rd)
     try:
         note = await Note.objects.aget(
@@ -539,7 +540,7 @@ async def view_recap_authorities(
         .order_by("pk")
         .afirst()
     )
-    title = make_rd_title(rd)
+    title = await make_rd_title(rd)
     rd = await make_thumb_if_needed(request, rd)
 
     try:
