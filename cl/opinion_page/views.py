@@ -256,7 +256,7 @@ async def view_docket(
 async def view_docket_feed(
     request: HttpRequest, docket_id: int
 ) -> HttpResponse:
-    return DocketFeed()(request, docket_id=docket_id)
+    return await sync_to_async(DocketFeed())(request, docket_id=docket_id)
 
 
 async def view_parties(
@@ -299,7 +299,9 @@ async def view_parties(
     )
 
     parties = []
-    for party_type_name, party_types in groupby(party_types, lambda x: x.name):
+    async for party_type_name, party_types in groupby(
+        party_types, lambda x: x.name
+    ):
         party_types = list(party_types)
         parties.append(
             {
@@ -309,7 +311,10 @@ async def view_parties(
         )
 
     context.update(
-        {"parties": parties, "docket_entries": docket.docket_entries.exists()}
+        {
+            "parties": parties,
+            "docket_entries": await docket.docket_entries.aexists(),
+        }
     )
     return TemplateResponse(request, "docket_parties.html", context)
 
@@ -325,8 +330,8 @@ async def docket_idb_data(
     context.update(
         {
             # Needed to show/hide parties tab.
-            "parties": docket.parties.exists(),
-            "docket_entries": docket.docket_entries.exists(),
+            "parties": await docket.parties.aexists(),
+            "docket_entries": await docket.docket_entries.aexists(),
             "origin_csv": choices_to_csv(docket.idb_data, "origin"),
             "jurisdiction_csv": choices_to_csv(
                 docket.idb_data, "jurisdiction"
@@ -363,8 +368,8 @@ async def docket_authorities(
     context.update(
         {
             # Needed to show/hide parties tab.
-            "parties": docket.parties.exists(),
-            "docket_entries": docket.docket_entries.exists(),
+            "parties": await docket.parties.aexists(),
+            "docket_entries": await docket.docket_entries.aexists(),
             "authorities": docket.authorities_with_data,
         }
     )
