@@ -6,7 +6,7 @@ from unittest import mock
 from asgiref.sync import async_to_sync, sync_to_async
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
-from django.test import RequestFactory, override_settings
+from django.test import AsyncClient, override_settings
 from django.urls import reverse
 from elasticsearch_dsl import Q
 from lxml import etree, html
@@ -1512,13 +1512,13 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             de_4.delete()
 
     @mock.patch("cl.lib.es_signal_processor.chain")
-    def test_avoid_updating_docket_in_es_on_view_count_increment(
+    async def test_avoid_updating_docket_in_es_on_view_count_increment(
         self, mock_es_save_chain
     ) -> None:
         """Confirm a docket is not updated in ES on a view_count increment."""
 
         with self.captureOnCommitCallbacks(execute=True):
-            docket = DocketFactory(
+            docket = await sync_to_async(DocketFactory)(
                 court=self.court,
                 case_name="Lorem Ipsum",
                 case_name_full="Jackson & Sons Holdings vs. Bank",
@@ -1533,16 +1533,16 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         mock_es_save_chain.reset_mock()
         self.assertEqual(mock_es_save_chain.call_count, 0)
 
-        request_factory = RequestFactory()
-        request = request_factory.get("/docket/")
+        request_factory = AsyncClient()
+        request = await request_factory.get("/docket/")
         with mock.patch("cl.lib.view_utils.is_bot", return_value=False):
             # Increase the view_count.
-            increment_view_count(docket, request)
+            await increment_view_count(docket, request)
 
         # The save chain shouldn't be called.
         self.assertEqual(mock_es_save_chain.call_count, 0)
         with self.captureOnCommitCallbacks(execute=True):
-            docket.delete()
+            await docket.adelete()
 
 
 class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):

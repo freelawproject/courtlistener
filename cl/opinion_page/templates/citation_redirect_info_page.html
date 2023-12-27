@@ -148,7 +148,7 @@
                             <a href="{{ cluster.get_absolute_url }}"
                                {% if cluster.blocked %}rel="nofollow"{% endif %}>{{ cluster.caption|safe|v_wrapper }}</a>
                             <br>
-                            {{ cluster.docket.court }} |
+                            {{ cluster.court }} |
                             {{ cluster.date_filed }}
                         </li>
                     {% endfor %}

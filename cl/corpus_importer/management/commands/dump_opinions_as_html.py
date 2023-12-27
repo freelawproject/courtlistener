@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 
+from asgiref.sync import async_to_sync
 from django.db.models import Q
 from django.template.loader import render_to_string
 
@@ -30,7 +31,10 @@ class Command(VerboseCommand):
         )
 
         for op in ops.iterator():
-            content = render_to_string("simple_opinion.html", {"o": op})
+            content = render_to_string(
+                "simple_opinion.html",
+                {"caption": async_to_sync(op.cluster.acaption)(), "o": op},
+            )
             output_dir = os.path.join(
                 options["output_directory"],
                 str(op.cluster.date_filed.year),
