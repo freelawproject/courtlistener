@@ -39,7 +39,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         cls.rebuild_index("alerts.Alert")
 
     @classmethod
-    def delete_documents_from_index(self, index_alias, queries):
+    def delete_documents_from_index(cls, index_alias, queries):
         es_conn = connections.get_connection()
         for query_id in queries:
             es_conn.delete(index=index_alias, id=query_id)
