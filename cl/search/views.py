@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta, timezone
 from urllib.parse import quote
 
 import waffle
+from asgiref.sync import async_to_sync
 from cache_memoize import cache_memoize
 from django.conf import settings
 from django.contrib import messages
@@ -188,7 +189,7 @@ def do_search(
                 paged_results = paginate_cached_solr_results(
                     get_params, cd, results, rows, cache_key
                 )
-                cited_cluster = add_depth_counts(
+                cited_cluster = async_to_sync(add_depth_counts)(
                     # Also returns cited cluster if found
                     search_data=cd,
                     search_results=paged_results,

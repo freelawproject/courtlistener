@@ -1676,13 +1676,15 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
 class CaptionTest(TestCase):
     """Can we make good looking captions?"""
 
-    def test_simple_caption(self) -> None:
-        c, _ = Court.objects.get_or_create(pk="ca1", defaults={"position": 1})
-        d = Docket.objects.create(source=0, court=c)
-        cluster = OpinionCluster.objects.create(
+    async def test_simple_caption(self) -> None:
+        c, _ = await Court.objects.aget_or_create(
+            pk="ca1", defaults={"position": 1}
+        )
+        d = await Docket.objects.acreate(source=0, court=c)
+        cluster = await OpinionCluster.objects.acreate(
             case_name="foo", docket=d, date_filed=date(1984, 1, 1)
         )
-        Citation.objects.create(
+        await Citation.objects.acreate(
             cluster=cluster,
             type=Citation.FEDERAL,
             volume=22,
@@ -1690,40 +1692,43 @@ class CaptionTest(TestCase):
             page="44",
         )
         self.assertEqual(
-            "foo, 22 F.2d 44&nbsp;(1st&nbsp;Cir.&nbsp;1984)", cluster.caption
+            "foo, 22 F.2d 44&nbsp;(1st&nbsp;Cir.&nbsp;1984)",
+            await cluster.acaption(),
         )
 
-    def test_scotus_caption(self) -> None:
-        c, _ = Court.objects.get_or_create(
+    async def test_scotus_caption(self) -> None:
+        c, _ = await Court.objects.aget_or_create(
             pk="scotus", defaults={"position": 2}
         )
-        d = Docket.objects.create(source=0, court=c)
-        cluster = OpinionCluster.objects.create(
+        d = await Docket.objects.acreate(source=0, court=c)
+        cluster = await OpinionCluster.objects.acreate(
             case_name="foo", docket=d, date_filed=date(1984, 1, 1)
         )
-        Citation.objects.create(
+        await Citation.objects.acreate(
             cluster=cluster,
             type=Citation.FEDERAL,
             volume=22,
             reporter="U.S.",
             page="44",
         )
-        self.assertEqual("foo, 22 U.S. 44", cluster.caption)
+        self.assertEqual("foo, 22 U.S. 44", await cluster.acaption())
 
-    def test_neutral_cites(self) -> None:
-        c, _ = Court.objects.get_or_create(pk="ca1", defaults={"position": 1})
-        d = Docket.objects.create(source=0, court=c)
-        cluster = OpinionCluster.objects.create(
+    async def test_neutral_cites(self) -> None:
+        c, _ = await Court.objects.aget_or_create(
+            pk="ca1", defaults={"position": 1}
+        )
+        d = await Docket.objects.acreate(source=0, court=c)
+        cluster = await OpinionCluster.objects.acreate(
             case_name="foo", docket=d, date_filed=date(1984, 1, 1)
         )
-        Citation.objects.create(
+        await Citation.objects.acreate(
             cluster=cluster,
             type=Citation.NEUTRAL,
             volume=22,
             reporter="IL",
             page="44",
         )
-        self.assertEqual("foo, 22 IL 44", cluster.caption)
+        self.assertEqual("foo, 22 IL 44", await cluster.acaption())
 
     def test_citation_sorting(self) -> None:
         # A list of citations ordered properly

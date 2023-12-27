@@ -316,81 +316,107 @@ class CitationRedirectorTest(TestCase):
         self.assertEqual(r.status_code, HTTP_302_FOUND)
         self.assertEqual(r.url, "/c/f2d/56/9/")
 
-    def test_volume_pagination(self) -> None:
+    async def test_volume_pagination(self) -> None:
         """Can we properly paginate reporter volume numbers?"""
 
         # Create test data usign factories
-        test_obj = CitationWithParentsFactory.create(
+        test_obj = await sync_to_async(CitationWithParentsFactory.create)(
             volume="2016",
             reporter="COA",
             page="1",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
-                docket=DocketFactory(court=CourtFactory(id="coloctapp")),
+            cluster=await sync_to_async(
+                OpinionClusterFactoryWithChildrenAndParents
+            )(
+                docket=await sync_to_async(DocketFactory)(
+                    court=await sync_to_async(CourtFactory)(id="coloctapp")
+                ),
                 case_name="In re the Marriage of Morton",
                 date_filed=datetime.date(2016, 1, 14),
             ),
         )
 
-        CitationWithParentsFactory.create(
+        await sync_to_async(CitationWithParentsFactory.create)(
             volume="2017",
             reporter="COA",
             page="3",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
-                docket=DocketFactory(court=CourtFactory(id="coloctapp")),
+            cluster=await sync_to_async(
+                OpinionClusterFactoryWithChildrenAndParents
+            )(
+                docket=await sync_to_async(DocketFactory)(
+                    court=await sync_to_async(CourtFactory)(id="coloctapp")
+                ),
                 case_name="Begley v. Ireson",
                 date_filed=datetime.date(2017, 1, 12),
             ),
         )
 
-        CitationWithParentsFactory.create(
+        await sync_to_async(CitationWithParentsFactory.create)(
             volume="2018",
             reporter="COA",
             page="1",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
-                docket=DocketFactory(court=CourtFactory(id="coloctapp")),
+            cluster=await sync_to_async(
+                OpinionClusterFactoryWithChildrenAndParents
+            )(
+                docket=await sync_to_async(DocketFactory)(
+                    court=await sync_to_async(CourtFactory)(id="coloctapp")
+                ),
                 case_name="People v. Sparks",
                 date_filed=datetime.date(2018, 1, 11),
             ),
         )
 
-        CitationWithParentsFactory.create(
+        await sync_to_async(CitationWithParentsFactory.create)(
             volume="2018",
             reporter="COA",
             page="1",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
-                docket=DocketFactory(court=CourtFactory(id="coloctapp")),
+            cluster=await sync_to_async(
+                OpinionClusterFactoryWithChildrenAndParents
+            )(
+                docket=await sync_to_async(DocketFactory)(
+                    court=await sync_to_async(CourtFactory)(id="coloctapp")
+                ),
                 case_name="People v. Sparks",
                 date_filed=datetime.date(2018, 1, 11),
             ),
         )
 
         # Get previous and next volume for "2017 COA"
-        volume_next, volume_previous = get_prev_next_volumes("COA", "2017")
+        volume_next, volume_previous = await get_prev_next_volumes(
+            "COA", "2017"
+        )
         self.assertEqual(volume_previous, 2016)
         self.assertEqual(volume_next, 2018)
 
         # Delete previous
-        test_obj.delete()
+        await test_obj.adelete()
 
         # Only get next volume for "2017 COA"
-        volume_next, volume_previous = get_prev_next_volumes("COA", "2017")
+        volume_next, volume_previous = await get_prev_next_volumes(
+            "COA", "2017"
+        )
         self.assertEqual(volume_previous, None)
         self.assertEqual(volume_next, 2018)
 
         # Create new test data
-        CitationWithParentsFactory.create(
+        await sync_to_async(CitationWithParentsFactory.create)(
             volume="454",
             reporter="U.S.",
             page="1",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
-                docket=DocketFactory(court=CourtFactory(id="scotus")),
+            cluster=await sync_to_async(
+                OpinionClusterFactoryWithChildrenAndParents
+            )(
+                docket=await sync_to_async(DocketFactory)(
+                    court=await sync_to_async(CourtFactory)(id="scotus")
+                ),
                 case_name="Duckworth v. Serrano",
                 date_filed=datetime.date(1981, 10, 19),
             ),
         )
 
         # No next or previous volume for "454 U.S."
-        volume_next, volume_previous = get_prev_next_volumes("U.S.", "454")
+        volume_next, volume_previous = await get_prev_next_volumes(
+            "U.S.", "454"
+        )
         self.assertEqual(volume_previous, None)
         self.assertEqual(volume_next, None)
 

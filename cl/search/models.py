@@ -867,9 +867,8 @@ class Docket(AbstractDateTimeModel):
             citing_document__docket_entry__docket_id=self.pk
         )
 
-    @property
-    def has_authorities(self):
-        return self.authorities.exists()
+    async def ahas_authorities(self):
+        return await self.authorities.aexists()
 
     @property
     def authority_count(self):
@@ -2701,8 +2700,7 @@ class OpinionCluster(AbstractDateTimeModel):
         ]
     )
 
-    @property
-    def caption(self):
+    async def acaption(self):
         """Make a proper caption
 
         This selects the best case name, then combines it with the best one or
@@ -2720,10 +2718,12 @@ class OpinionCluster(AbstractDateTimeModel):
         broken up across lines.
         """
         caption = best_case_name(self)
-        citations = sorted(self.citations.all(), key=sort_cites)
+        citation_list = [citation async for citation in self.citations.all()]
+        citations = sorted(citation_list, key=sort_cites)
         if not citations:
-            if self.docket.docket_number:
-                caption += f", {self.docket.docket_number}"
+            docket = await Docket.objects.aget(id=self.docket_id)
+            if docket.docket_number:
+                caption += f", {docket.docket_number}"
         else:
             if citations[0].type == Citation.NEUTRAL:
                 caption += f", {citations[0]}"
@@ -2738,8 +2738,11 @@ class OpinionCluster(AbstractDateTimeModel):
             else:
                 caption += f", {citations[0]}"
 
-        if self.docket.court_id != "scotus":
-            court = re.sub(" ", "&nbsp;", self.docket.court.citation_string)
+        cluster = await OpinionCluster.objects.aget(pk=self.pk)
+        docket = await Docket.objects.aget(id=cluster.docket_id)
+        court = await Court.objects.aget(pk=docket.court_id)
+        if docket.court_id != "scotus":
+            court = re.sub(" ", "&nbsp;", court.citation_string)
             # Strftime fails before 1900. Do it this way instead.
             year = self.date_filed.isoformat().split("-")[0]
             caption += f"&nbsp;({court}&nbsp;{year})"
@@ -2749,6 +2752,12 @@ class OpinionCluster(AbstractDateTimeModel):
     def citation_string(self):
         """Make a citation string, joined by commas"""
         citations = sorted(self.citations.all(), key=sort_cites)
+        return ", ".join(str(c) for c in citations)
+
+    async def acitation_string(self):
+        """Make a citation string, joined by commas"""
+        result = [citation async for citation in self.citations.all()]
+        citations = sorted(result, key=sort_cites)
         return ", ".join(str(c) for c in citations)
 
     @property
@@ -2773,6 +2782,32 @@ class OpinionCluster(AbstractDateTimeModel):
             )
         ).order_by("-citation_count", "-date_filed")
 
+    async def aauthorities(self):
+        """Returns a queryset that can be used for querying and caching
+        authorities.
+        """
+        # All clusters that have sub_opinions cited by the sub_opinions of
+        # the current cluster, ordered by citation count, descending.
+        # Note that:
+        #  - sum()'ing an empty list with a nested one, flattens the nested
+        #    list.
+        #  - QuerySets are lazy by default, so we need to call list() on the
+        #    queryset object to evaluate it here and now.
+        return OpinionCluster.objects.filter(
+            sub_opinions__in=sum(
+                [
+                    [
+                        i
+                        async for i in sub_opinion.opinions_cited.all().only(
+                            "pk"
+                        )
+                    ]
+                    async for sub_opinion in self.sub_opinions.all()
+                ],
+                [],
+            )
+        ).order_by("-citation_count", "-date_filed")
+
     @property
     def parentheticals(self):
         return Parenthetical.objects.filter(
@@ -2791,6 +2826,10 @@ class OpinionCluster(AbstractDateTimeModel):
     def authority_count(self):
         return self.authorities.count()
 
+    async def aauthority_count(self):
+        authorities = await self.aauthorities()
+        return await authorities.acount()
+
     @property
     def has_private_authority(self):
         if not hasattr(self, "_has_private_authority"):
@@ -2803,18 +2842,31 @@ class OpinionCluster(AbstractDateTimeModel):
             self._has_private_authority = private
         return self._has_private_authority
 
-    @property
-    def authorities_with_data(self):
+    async def ahas_private_authority(self):
+        if not hasattr(self, "_has_private_authority"):
+            # Calculate it, then cache it.
+            private = False
+            async for authority in await self.aauthorities():
+                if authority.blocked:
+                    private = True
+                    break
+            self._has_private_authority = private
+        return self._has_private_authority
+
+    async def aauthorities_with_data(self):
         """Returns a list of this cluster's authorities with an extra field
         appended related to citation counts, for eventual injection into a
         view template.
         The returned list is sorted by that citation count field.
         """
-        authorities_with_data = list(self.authorities)
-        for authority in authorities_with_data:
-            authority.citation_depth = get_citation_depth_between_clusters(
-                citing_cluster_pk=self.pk, cited_cluster_pk=authority.pk
+        authorities_with_data = []
+        async for authority in await self.aauthorities():
+            authority.citation_depth = (
+                await get_citation_depth_between_clusters(
+                    citing_cluster_pk=self.pk, cited_cluster_pk=authority.pk
+                )
             )
+            authorities_with_data.append(authority)
 
         authorities_with_data.sort(
             key=lambda x: x.citation_depth, reverse=True
