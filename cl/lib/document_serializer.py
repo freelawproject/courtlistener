@@ -48,7 +48,7 @@ class DocumentSerializer(serializers.Serializer):
     }
 
     def __init__(self, instance=None, data=empty, **kwargs):
-        super(DocumentSerializer, self).__init__(instance, data, **kwargs)
+        super().__init__(instance, data, **kwargs)
 
         if not hasattr(self, "Meta"):
             raise ImproperlyConfigured(
@@ -93,9 +93,9 @@ class DocumentSerializer(serializers.Serializer):
 
     def get_fields(self):
         """Get the required fields for serializing the result."""
-        fields = getattr(self.Meta, "fields", tuple())
-        exclude = getattr(self.Meta, "exclude", tuple())
-        ignore_fields = getattr(self.Meta, "ignore_fields", tuple())
+        fields = getattr(self.Meta, "fields", ())
+        exclude = getattr(self.Meta, "exclude", ())
+        ignore_fields = getattr(self.Meta, "ignore_fields", ())
         document = getattr(self.Meta, "document")
         model = document.Django.model
         document_fields = document._fields
