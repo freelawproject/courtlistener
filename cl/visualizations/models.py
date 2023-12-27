@@ -365,9 +365,7 @@ class SCOTUSMap(AbstractDateTimeModel):
         if update_fields is not None:
             changeable_fields = {"title", "date_published", "date_created"}
             update_fields = changeable_fields.union(update_fields)
-        super(SCOTUSMap, self).save(
-            update_fields=update_fields, *args, **kwargs
-        )
+        super().save(update_fields=update_fields, *args, **kwargs)
         self.__original_deleted = self.deleted
 
 

@@ -1,6 +1,5 @@
 import datetime
 from collections import OrderedDict, defaultdict
-from itertools import groupby
 from typing import Dict, Union
 from urllib.parse import urlencode
 
@@ -58,6 +57,7 @@ from cl.opinion_page.types import AuthoritiesContext
 from cl.opinion_page.utils import core_docket_data, get_case_title
 from cl.people_db.models import AttorneyOrganization, CriminalCount, Role
 from cl.recap.constants import COURT_TIMEZONES
+from cl.recap.models import FjcIntegratedDatabase
 from cl.search.models import (
     Citation,
     Court,
@@ -298,17 +298,11 @@ async def view_parties(
         .order_by("name", "party__name")
     )
 
-    parties = []
-    async for party_type_name, party_types in groupby(
-        party_types, lambda x: x.name
-    ):
-        party_types = list(party_types)
-        parties.append(
-            {
-                "party_type_name": party_type_name,
-                "party_type_objects": party_types,
-            }
-        )
+    parties: Dict[str, list] = {}
+    async for party_type in party_types:
+        if party_type.name not in parties:
+            parties[party_type.name] = []
+        parties[party_type.name].append(party_type)
 
     context.update(
         {
@@ -325,32 +319,31 @@ async def docket_idb_data(
     slug: str,
 ) -> HttpResponse:
     docket, context = await core_docket_data(request, docket_id)
-    if docket.idb_data is None:
+    idb_data = await FjcIntegratedDatabase.objects.aget(pk=docket.idb_data_id)
+    if idb_data is None:
         raise Http404("No IDB data for this docket at this time")
     context.update(
         {
             # Needed to show/hide parties tab.
             "parties": await docket.parties.aexists(),
             "docket_entries": await docket.docket_entries.aexists(),
-            "origin_csv": choices_to_csv(docket.idb_data, "origin"),
-            "jurisdiction_csv": choices_to_csv(
-                docket.idb_data, "jurisdiction"
-            ),
+            "origin_csv": choices_to_csv(idb_data, "origin"),
+            "jurisdiction_csv": choices_to_csv(idb_data, "jurisdiction"),
             "arbitration_csv": choices_to_csv(
-                docket.idb_data, "arbitration_at_filing"
+                idb_data, "arbitration_at_filing"
             ),
             "class_action_csv": choices_to_csv(
-                docket.idb_data, "termination_class_action_status"
+                idb_data, "termination_class_action_status"
             ),
             "procedural_progress_csv": choices_to_csv(
-                docket.idb_data, "procedural_progress"
+                idb_data, "procedural_progress"
             ),
-            "disposition_csv": choices_to_csv(docket.idb_data, "disposition"),
+            "disposition_csv": choices_to_csv(idb_data, "disposition"),
             "nature_of_judgment_csv": choices_to_csv(
-                docket.idb_data, "nature_of_judgement"
+                idb_data, "nature_of_judgement"
             ),
-            "judgment_csv": choices_to_csv(docket.idb_data, "judgment"),
-            "pro_se_csv": choices_to_csv(docket.idb_data, "pro_se"),
+            "judgment_csv": choices_to_csv(idb_data, "judgment"),
+            "pro_se_csv": choices_to_csv(idb_data, "pro_se"),
         }
     )
     return TemplateResponse(request, "docket_idb_data.html", context)
@@ -376,9 +369,10 @@ async def docket_authorities(
     return TemplateResponse(request, "docket_authorities.html", context)
 
 
-def make_rd_title(rd: RECAPDocument) -> str:
-    de = rd.docket_entry
-    d = de.docket
+async def make_rd_title(rd: RECAPDocument) -> str:
+    de = await DocketEntry.objects.aget(id=rd.docket_entry_id)
+    d = await Docket.objects.aget(id=de.docket_id)
+    court = await Court.objects.aget(id=d.court_id)
     return "{desc}#{doc_num}{att_num} in {case_name} ({court}{docket_number})".format(
         desc=f"{rd.description} &ndash; " if rd.description else "",
         doc_num=rd.document_number,
@@ -386,7 +380,7 @@ def make_rd_title(rd: RECAPDocument) -> str:
         if rd.document_type == RECAPDocument.ATTACHMENT
         else "",
         case_name=best_case_name(d),
-        court=d.court.citation_string,
+        court=court.citation_string,
         docket_number=f", {d.docket_number}" if d.docket_number else "",
     )
 
@@ -490,7 +484,7 @@ async def view_recap_document(
             if rd.pacer_url and redirect_or_modal:
                 redirect_to_pacer_modal = True
 
-    title = make_rd_title(rd)
+    title = await make_rd_title(rd)
     rd = await make_thumb_if_needed(request, rd)
     try:
         note = await Note.objects.aget(
@@ -548,7 +542,7 @@ async def view_recap_authorities(
         .order_by("pk")
         .afirst()
     )
-    title = make_rd_title(rd)
+    title = await make_rd_title(rd)
     rd = await make_thumb_if_needed(request, rd)
 
     try:
@@ -568,6 +562,8 @@ async def view_recap_authorities(
 
     # Override the og:url if we're serving a request to an OG crawler bot
     og_file_path_override = f"/{rd.filepath_local}" if is_og_bot else None
+    de = await DocketEntry.objects.aget(id=rd.docket_entry_id)
+    d = await Docket.objects.aget(id=de.docket_id)
     return TemplateResponse(
         request,
         "recap_authorities.html",
@@ -577,9 +573,7 @@ async def view_recap_authorities(
             "og_file_path": og_file_path_override,
             "note_form": note_form,
             "private": True,  # Always True for RECAP docs.
-            "timezone": COURT_TIMEZONES.get(
-                rd.docket_entry.docket.court_id, "US/Eastern"
-            ),
+            "timezone": COURT_TIMEZONES.get(d.court_id, "US/Eastern"),
             "authorities": rd.authorities_with_data,
         },
     )
@@ -697,8 +691,9 @@ async def view_summaries(
 ) -> HttpResponse:
     cluster = await aget_object_or_404(OpinionCluster, pk=pk)
     parenthetical_groups_qs = await get_or_create_parenthetical_groups(cluster)
-    parenthetical_groups = list(
-        parenthetical_groups_qs.prefetch_related(
+    parenthetical_groups = [
+        parenthetical_group
+        async for parenthetical_group in parenthetical_groups_qs.prefetch_related(
             Prefetch(
                 "parentheticals",
                 queryset=Parenthetical.objects.order_by("-score"),
@@ -708,7 +703,7 @@ async def view_summaries(
             "representative__describing_opinion__cluster__citations",
             "representative__describing_opinion__cluster__docket__court",
         )
-    )
+    ]
 
     return TemplateResponse(
         request,

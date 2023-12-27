@@ -67,7 +67,7 @@ class RestartSentEmailQuotaMixin:
     """Restart sent email quota in redis."""
 
     @classmethod
-    def restart_sent_email_quota(self):
+    def restart_sent_email_quota(cls):
         r = make_redis_interface("CACHE")
         keys = r.keys("email:*")
 
@@ -153,22 +153,22 @@ class ESIndexTestCase(SimpleTestCase):
         super().tearDownClass()
 
     @classmethod
-    def rebuild_index(self, model):
+    def rebuild_index(cls, model):
         """Create and populate the Elasticsearch index and mapping"""
         call_command("search_index", "--rebuild", "-f", "--models", model)
 
     @classmethod
-    def create_index(self, model):
+    def create_index(cls, model):
         """Create the elasticsearch index."""
         call_command("search_index", "--create", "-f", "--models", model)
 
     @classmethod
-    def delete_index(self, model):
+    def delete_index(cls, model):
         """Delete the elasticsearch index."""
         call_command("search_index", "--delete", "-f", "--models", model)
 
     @classmethod
-    def restart_celery_throttle_key(self):
+    def restart_celery_throttle_key(cls):
         r = make_redis_interface("CACHE")
         keys = r.keys("celery_throttle:*")
         if keys:

@@ -663,7 +663,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         if not options["file"]:
             raise argparse.ArgumentError(
                 "The 'file' argument is required for that action."

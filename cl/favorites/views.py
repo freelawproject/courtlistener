@@ -134,9 +134,10 @@ async def view_tag(request, username, tag_name):
     )
     await increment_view_count(tag, request)
 
-    if tag.published is False and tag.user != await request.auser():
-        # They don't even get to see if it exists.
-        raise Http404("This tag does not exist")
+    if tag.published is False:
+        if await User.objects.aget(pk=tag.user_id) != await request.auser():
+            # They don't even get to see if it exists.
+            raise Http404("This tag does not exist")
 
     # Calculate the total tag count (as we add more types of taggables, add
     # them here).
