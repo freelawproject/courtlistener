@@ -94,7 +94,7 @@ async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
             results = f"results_{court}"
         else:
             results = "results"
-        render_dict[results] = do_search(
+        response = await sync_to_async(do_search)(
             request.GET.copy(),
             override_params={
                 "filed_after": (
@@ -104,7 +104,8 @@ async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
                 "court": court,
             },
             facet=False,
-        )["results"]
+        )
+        render_dict[results] = response["results"]
     return TemplateResponse(request, template, render_dict)
 
 
