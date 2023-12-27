@@ -68,4 +68,6 @@ def is_safe_url(url: str, request: HttpRequest) -> bool:
         allowed_hosts={request.get_host()},
         require_https=request.is_secure(),
     )
-    return not any([sign_in_url, register_in_url, garbage_url, no_url, not_safe_url])
+    return not any(
+        [sign_in_url, register_in_url, garbage_url, no_url, not_safe_url]
+    )

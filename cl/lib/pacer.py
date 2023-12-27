@@ -372,7 +372,7 @@ def make_address_lookup_key(address_info):
     }
     for k, v in sorted_info.items():
         for bad, good in fixes.items():
-            v = re.sub(fr"\b{bad}\b", good, v, flags=re.IGNORECASE)
+            v = re.sub(rf"\b{bad}\b", good, v, flags=re.IGNORECASE)
         sorted_info[k] = v
     key = "".join(sorted_info.values())
     return re.sub(r"[^a-z0-9]", "", key.lower())
@@ -397,7 +397,7 @@ def normalize_address_info(address_info):
             continue
 
         for bad, good in fixes.items():
-            a = re.sub(fr"\b{bad}\b", good, a, flags=re.IGNORECASE)
+            a = re.sub(rf"\b{bad}\b", good, a, flags=re.IGNORECASE)
 
         address_info[address_part] = a
 
