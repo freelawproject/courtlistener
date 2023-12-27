@@ -1,6 +1,5 @@
 import datetime
 from collections import OrderedDict, defaultdict
-from itertools import groupby
 from typing import Dict, Union
 from urllib.parse import urlencode
 
@@ -298,17 +297,11 @@ async def view_parties(
         .order_by("name", "party__name")
     )
 
-    parties = []
-    async for party_type_name, party_types in groupby(
-        party_types, lambda x: x.name
-    ):
-        party_types = list(party_types)
-        parties.append(
-            {
-                "party_type_name": party_type_name,
-                "party_type_objects": party_types,
-            }
-        )
+    parties: Dict[str, list] = {}
+    async for party_type in party_types:
+        if party_type.name not in parties:
+            parties[party_type.name] = []
+        parties[party_type.name].append(party_type)
 
     context.update(
         {
