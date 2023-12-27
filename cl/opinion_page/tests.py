@@ -3,7 +3,7 @@ import datetime
 import os
 import shutil
 from unittest import mock
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, PropertyMock
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
@@ -21,6 +21,7 @@ from rest_framework.status import (
     HTTP_404_NOT_FOUND,
 )
 
+from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import SimpleUserDataMixin, SitemapTest
 from cl.opinion_page.forms import CourtUploadForm
@@ -49,8 +50,10 @@ from cl.search.models import (
     Docket,
     Opinion,
     OpinionCluster,
+    RECAPDocument,
 )
 from cl.tests.cases import SimpleTestCase, TestCase
+from cl.tests.providers import fake
 from cl.users.factories import UserFactory
 
 
@@ -575,6 +578,32 @@ class OgRedirectLookupViewTest(TestCase):
         )
         self.assertEqual(r.status_code, HTTP_200_OK)
         mock.assert_called_once()
+
+    @mock.patch("cl.lib.thumbnails.microservice")
+    async def test_creates_thumbnail_successfully(
+        self, microservice_mock: MagicMock
+    ) -> None:
+        path = (
+            "recap/dev.gov.uscourts.txnd.28766/gov.uscourts.txnd.28766.1.0.pdf"
+        )
+
+        # Create a fake response object
+        response_mock = MagicMock()
+        type(response_mock).is_success = PropertyMock(return_value=True)
+        type(response_mock).content = PropertyMock(return_value=fake.binary(8))
+
+        microservice_mock.return_value = response_mock
+
+        r = await self.async_client.get(
+            self.url, {"file_path": path}, USER_AGENT="facebookexternalhit"
+        )
+        self.assertEqual(r.status_code, HTTP_200_OK)
+        microservice_mock.assert_called_once()
+
+        recap_doc = await RECAPDocument.objects.aget(pk=1)
+        self.assertEqual(
+            recap_doc.thumbnail_status, THUMBNAIL_STATUSES.COMPLETE
+        )
 
 
 class NewDocketAlertTest(SimpleUserDataMixin, TestCase):

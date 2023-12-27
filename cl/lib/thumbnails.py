@@ -1,6 +1,6 @@
 from typing import Any
 
-from asgiref.sync import async_to_sync
+from asgiref.sync import sync_to_async
 from django.core.files.base import ContentFile
 
 from cl.lib.microservice_utils import microservice
@@ -33,5 +33,7 @@ async def make_png_thumbnail_for_instance(
     else:
         item.thumbnail_status = THUMBNAIL_STATUSES.COMPLETE
         filename = f"{pk}.thumb.{max_dimension}.png"
-        await item.thumbnail.asave(filename, ContentFile(response.content))
+        await sync_to_async(item.thumbnail.save)(
+            filename, ContentFile(response.content)
+        )
     return item.pk
