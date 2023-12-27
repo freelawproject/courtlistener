@@ -297,7 +297,7 @@ async def view_parties(
         .order_by("name", "party__name")
     )
 
-    parties = {}
+    parties: Dict[str, list] = {}
     async for party_type in party_types:
         if party_type.name not in parties:
             parties[party_type.name] = []
