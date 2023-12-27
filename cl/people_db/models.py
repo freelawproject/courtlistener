@@ -276,7 +276,9 @@ class Person(AbstractDateTimeModel):
         """Examine the positions a person has had and identify if they were ever
         a judge.
         """
-        return any(position.is_judicial_position for position in self.positions.all())
+        return any(
+            position.is_judicial_position for position in self.positions.all()
+        )
 
     def as_search_dict(self):
         """Create a dict that can be ingested by Solr"""

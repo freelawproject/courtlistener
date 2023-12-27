@@ -67,9 +67,7 @@ class Command(VerboseCommand):
             help="A list of jurisdiction abbreviations for use with the "
             "assign-authors command. If no value is provided it will "
             "default to all jurisdictions. Valid options are:\n%s"
-            % ", ".join(
-                f"{j[0]} ({j[1]})" for j in Court.JURISDICTIONS
-            ),
+            % ", ".join(f"{j[0]} ({j[1]})" for j in Court.JURISDICTIONS),
             nargs="*",
         )
 
