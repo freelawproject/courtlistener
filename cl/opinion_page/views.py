@@ -298,8 +298,10 @@ async def view_parties(
         .order_by("name", "party__name")
     )
 
-    parties: Dict[str, list] = defaultdict(list)
+    parties: Dict[str, list] = {}
     async for party_type in party_types:
+        if party_type.name not in parties:
+            parties[party_type.name] = []
         parties[party_type.name].append(party_type)
 
     context.update(
