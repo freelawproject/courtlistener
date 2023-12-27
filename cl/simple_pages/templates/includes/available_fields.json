@@ -353,7 +353,7 @@
    },
   {
       "field":"jurisdictionType",
-      "description":"Stands for jurisdiction in RECAP XML docket. For example, 'Diversity', 'U.S. Government Defendant'.",
+      "description":"The \"jurisdiction\" value found in PACER docket reports. For example, 'Diversity' or 'U.S. Government Defendant'.",
       "opinions":false,
       "parentheticals":false,
       "recap_archive":true,
@@ -377,7 +377,7 @@
    },
   {
       "field":"entry_number",
-      "description":"# on the PACER docket page. For appellate cases, this may be the internal PACER ID for the document, when an entry ID is otherwise unavailable.",
+      "description":"The entry number on the PACER docket page. For appellate cases, this may be the internal PACER ID for the document, when an entry ID is otherwise unavailable.",
       "opinions":false,
       "parentheticals":false,
       "recap_archive":true,
@@ -385,7 +385,7 @@
    },
   {
       "field":"pacer_doc_id",
-      "description":"The ID of the document in PACER.",
+      "description":"The internal ID of the document in PACER.",
       "opinions":false,
       "parentheticals":false,
       "recap_archive":true,
@@ -393,7 +393,7 @@
    },
   {
       "field":"plain_text",
-      "description":"The ID of the document in PACER.",
+      "description":"The plain text of the document after extraction.",
       "opinions":false,
       "parentheticals":false,
       "recap_archive":true,
@@ -404,7 +404,7 @@
       "description":"All of the Opinion IDs that cite a RECAP Document.",
       "opinions":false,
       "parentheticals":false,
-      "recap_archive":true,
+      "recap_archive":false,
       "oral_arguments":false
    }
 ]
