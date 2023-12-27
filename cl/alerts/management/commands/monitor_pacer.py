@@ -39,7 +39,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
 
         recipients = options["recipients"].split(",")
         print(f"Recipients list is: {recipients}")
