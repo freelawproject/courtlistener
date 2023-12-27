@@ -20,7 +20,7 @@ class Command(VerboseCommand):
     )
 
     def __init__(self, *args, **kwargs):
-        super(Command, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.new_doc_count = 0
         self.court_count = 0
         self.alerts_sent_count = 0

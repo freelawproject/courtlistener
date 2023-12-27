@@ -68,13 +68,13 @@ class Command(VerboseCommand):
             "assign-authors command. If no value is provided it will "
             "default to all jurisdictions. Valid options are:\n%s"
             % ", ".join(
-                ["%s (%s)" % (j[0], j[1]) for j in Court.JURISDICTIONS]
+                f"{j[0]} ({j[1]})" for j in Court.JURISDICTIONS
             ),
             nargs="*",
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         self.debug = options["debug"]
         self.options = options
 
