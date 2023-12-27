@@ -320,8 +320,11 @@ async def docket_idb_data(
     slug: str,
 ) -> HttpResponse:
     docket, context = await core_docket_data(request, docket_id)
-    idb_data = await FjcIntegratedDatabase.objects.aget(pk=docket.idb_data_id)
-    if idb_data is None:
+    try:
+        idb_data = await FjcIntegratedDatabase.objects.aget(
+            pk=docket.idb_data_id
+        )
+    except ObjectDoesNotExist:
         raise Http404("No IDB data for this docket at this time")
     context.update(
         {
