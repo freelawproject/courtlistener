@@ -47,7 +47,7 @@ class Alert(AbstractDateTimeModel):
     )
     alert_type = models.CharField(
         help_text="The type of search alert this is, one of: %s"
-        % ", ".join(["%s (%s)" % (t[0], t[1]) for t in SEARCH_TYPES.NAMES]),
+        % ", ".join(f"{t[0]} ({t[1]})" for t in SEARCH_TYPES.NAMES),
         max_length=3,
         choices=SEARCH_TYPES.NAMES,
         default=SEARCH_TYPES.OPINION,
@@ -150,7 +150,7 @@ class RealTimeQueue(models.Model):
     )
     item_type = models.CharField(
         help_text="the type of item this is, one of: %s"
-        % ", ".join(["%s (%s)" % (t[0], t[1]) for t in SEARCH_TYPES.NAMES]),
+        % ", ".join(f"{t[0]} ({t[1]})" for t in SEARCH_TYPES.NAMES),
         max_length=3,
         choices=SEARCH_TYPES.NAMES,
         db_index=True,
