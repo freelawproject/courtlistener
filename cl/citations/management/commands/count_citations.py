@@ -65,7 +65,7 @@ class Command(VerboseCommand):
         For any item that has a citation count > 0, update the citation
         count based on the DB.
         """
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         index_during_processing = False
         if options["index"] == "concurrently":
             index_during_processing = True
