@@ -131,7 +131,7 @@ class UserCreationFormExtended(UserCreationForm):
     """
 
     def __init__(self, *args, **kwargs):
-        super(UserCreationFormExtended, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         self.fields["username"].label = "User Name*"
         self.fields["email"].label = "Email Address*"
@@ -324,7 +324,7 @@ class CustomSetPasswordForm(SetPasswordForm):
 
 class WebhookForm(ModelForm):
     def __init__(self, update=None, request_user=None, *args, **kwargs):
-        super(WebhookForm, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         # Determine the webhook type options to show accordingly.
         if update:
