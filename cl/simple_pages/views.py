@@ -119,12 +119,6 @@ def alert_help(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "help/alert_help.html", context)
 
 
-async def donation_help(request: HttpRequest) -> HttpResponse:
-    return TemplateResponse(
-        request, "help/donation_help.html", {"private": False}
-    )
-
-
 async def delete_help(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(
         request, "help/delete_account_help.html", {"private": False}
