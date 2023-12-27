@@ -75,7 +75,12 @@ urlpatterns = [
     # Redirects
     path(
         "donate/",
-        RedirectView.as_view(url="https://free.law/donate"),
+        RedirectView.as_view(url="https://free.law/donate/"),
+    ),
+    path(
+        "help/donations/",
+        RedirectView.as_view(url="https://free.law/donate/help/"),
+        name="donation_help",
     ),
     path(
         "privacy/",
