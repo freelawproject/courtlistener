@@ -57,6 +57,7 @@ from cl.opinion_page.types import AuthoritiesContext
 from cl.opinion_page.utils import core_docket_data, get_case_title
 from cl.people_db.models import AttorneyOrganization, CriminalCount, Role
 from cl.recap.constants import COURT_TIMEZONES
+from cl.recap.models import FjcIntegratedDatabase
 from cl.search.models import (
     Citation,
     Court,
@@ -316,32 +317,31 @@ async def docket_idb_data(
     slug: str,
 ) -> HttpResponse:
     docket, context = await core_docket_data(request, docket_id)
-    if docket.idb_data is None:
+    idb_data = await FjcIntegratedDatabase.objects.aget(pk=docket.idb_data_id)
+    if idb_data is None:
         raise Http404("No IDB data for this docket at this time")
     context.update(
         {
             # Needed to show/hide parties tab.
             "parties": await docket.parties.aexists(),
             "docket_entries": await docket.docket_entries.aexists(),
-            "origin_csv": choices_to_csv(docket.idb_data, "origin"),
-            "jurisdiction_csv": choices_to_csv(
-                docket.idb_data, "jurisdiction"
-            ),
+            "origin_csv": choices_to_csv(idb_data, "origin"),
+            "jurisdiction_csv": choices_to_csv(idb_data, "jurisdiction"),
             "arbitration_csv": choices_to_csv(
-                docket.idb_data, "arbitration_at_filing"
+                idb_data, "arbitration_at_filing"
             ),
             "class_action_csv": choices_to_csv(
-                docket.idb_data, "termination_class_action_status"
+                idb_data, "termination_class_action_status"
             ),
             "procedural_progress_csv": choices_to_csv(
-                docket.idb_data, "procedural_progress"
+                idb_data, "procedural_progress"
             ),
-            "disposition_csv": choices_to_csv(docket.idb_data, "disposition"),
+            "disposition_csv": choices_to_csv(idb_data, "disposition"),
             "nature_of_judgment_csv": choices_to_csv(
-                docket.idb_data, "nature_of_judgement"
+                idb_data, "nature_of_judgement"
             ),
-            "judgment_csv": choices_to_csv(docket.idb_data, "judgment"),
-            "pro_se_csv": choices_to_csv(docket.idb_data, "pro_se"),
+            "judgment_csv": choices_to_csv(idb_data, "judgment"),
+            "pro_se_csv": choices_to_csv(idb_data, "pro_se"),
         }
     )
     return TemplateResponse(request, "docket_idb_data.html", context)
