@@ -51,7 +51,7 @@ class RestartRateLimitMixin:
     """
 
     @classmethod
-    def restart_rate_limit(self):
+    def restart_rate_limit(cls):
         r = make_redis_interface("CACHE")
         keys = r.keys(":1:rl:*")
         if keys:

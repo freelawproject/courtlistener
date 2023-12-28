@@ -703,7 +703,7 @@ def add_filter_queries(main_params: SearchParam, cd) -> None:
         selected_stats_string = get_selected_field_string(cd, "stat_")
         if len(selected_stats_string) > 0:
             main_fq.append(
-                "{!tag=dt}status_exact:(%s)" % selected_stats_string
+                f"{{!tag=dt}}status_exact:({selected_stats_string})"
             )
 
     selected_courts_string = get_selected_field_string(cd, "court_")
@@ -807,7 +807,7 @@ def print_params(params: SearchParam) -> None:
     if settings.DEBUG:
         print(
             "Params sent to search are:\n%s"
-            % " &\n".join(["  %s = %s" % (k, v) for k, v in params.items()])
+            % " &\n".join(f"  {k} = {v}" for k, v in params.items())
         )
 
 

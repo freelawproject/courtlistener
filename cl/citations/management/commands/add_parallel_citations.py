@@ -47,7 +47,7 @@ class Command(VerboseCommand):
     )
 
     def __init__(self, stdout=None, stderr=None, no_color=False):
-        super(Command, self).__init__(stdout=None, stderr=None, no_color=False)
+        super().__init__(stdout=None, stderr=None, no_color=False)
         self.g = nx.Graph()
         self.conn = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
         self.update_count = 0
@@ -266,7 +266,7 @@ class Command(VerboseCommand):
         with actual items in the database and then updating them with parallel
         citations that are sufficiently likely to be good.
         """
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         no_option = not any([options.get("doc_id"), options.get("all")])
         if no_option:
             raise CommandError(
