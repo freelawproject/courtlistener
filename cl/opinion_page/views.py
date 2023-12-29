@@ -12,7 +12,12 @@ from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import F, IntegerField, Prefetch
 from django.db.models.functions import Cast
 from django.http import HttpRequest, HttpResponseRedirect
-from django.http.response import Http404, HttpResponse, HttpResponseNotAllowed
+from django.http.response import (
+    Http404,
+    HttpResponse,
+    HttpResponseBadRequest,
+    HttpResponseNotAllowed,
+)
 from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
 from django.template import loader
 from django.template.defaultfilters import slugify
@@ -1233,21 +1238,35 @@ async def block_item(request: HttpRequest) -> HttpResponse:
     if is_ajax(request) and user.is_superuser:
         obj_type = request.POST["type"]
         pk = request.POST["id"]
-        if obj_type == "docket":
-            # Block the docket
-            d = await aget_object_or_404(Docket, pk=pk)
-            d.blocked = True
-            d.date_blocked = now()
-            await d.asave()
-        elif obj_type == "cluster":
-            # Block the cluster and the docket
+
+        if obj_type not in ["docket", "cluster"]:
+            return HttpResponseBadRequest(
+                f"This view can not handle the provided type"
+            )
+
+        cluster = None
+        if obj_type == "cluster":
+            # Block the cluster
             cluster = await aget_object_or_404(OpinionCluster, pk=pk)
             cluster.blocked = True
             cluster.date_blocked = now()
             await cluster.asave(index=False)
-            cluster.docket.blocked = True
-            cluster.docket.date_blocked = now()
-            await cluster.docket.asave()
+
+        docket_pk = (
+            pk
+            if obj_type == "docket"
+            else cluster.docket_id
+            if cluster is not None
+            else None
+        )
+        if not docket_pk:
+            return HttpResponse("It worked")
+
+        d = await aget_object_or_404(Docket, pk=docket_pk)
+        d.blocked = True
+        d.date_blocked = now()
+        await d.asave()
+
         return HttpResponse("It worked")
     else:
         return HttpResponseNotAllowed(

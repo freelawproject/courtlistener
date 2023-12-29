@@ -2,11 +2,13 @@
 import datetime
 import os
 import shutil
+from datetime import date
 from unittest import mock
 from unittest.mock import MagicMock, PropertyMock
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
+from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
@@ -54,7 +56,7 @@ from cl.search.models import (
 )
 from cl.tests.cases import SimpleTestCase, TestCase
 from cl.tests.providers import fake
-from cl.users.factories import UserFactory
+from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
 
 class TitleTest(SimpleTestCase):
@@ -1036,3 +1038,81 @@ class UploadPublication(TestCase):
         self.assertIn(
             "Document already in database", form2.errors["pdf_upload"][0]
         )
+
+
+class TestBlockSearchItemAjax(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        # User admin
+        cls.admin = UserProfileWithParentsFactory.create(
+            user__username="admin",
+            user__password=make_password("password"),
+        )
+        cls.admin.user.is_superuser = True
+        cls.admin.user.is_staff = True
+        cls.admin.user.save()
+
+        # Courts
+        court_ca2 = CourtFactory(id="ca2")
+        # cluster
+        cls.cluster = OpinionClusterFactoryWithChildrenAndParents(
+            docket=DocketFactory(court=court_ca2),
+            case_name="Fisher v. SD Protection Inc.",
+            date_filed=date(2020, 1, 1),
+        )
+
+    async def test_return_404_for_invalid_type(self) -> None:
+        """is it returning 404 for invalid types?"""
+        self.assertFalse(self.cluster.blocked)
+        self.assertFalse(self.cluster.docket.blocked)
+
+        client = AsyncClient()
+        await client.aforce_login(user=self.admin.user)
+
+        response = await client.post(
+            reverse("block_item"),
+            data={"id": self.cluster.pk, "type": "recap"},
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    async def test_block_docket_via_ajax_view(self) -> None:
+        """can a super_user block a docket?"""
+        self.assertFalse(self.cluster.docket.blocked)
+
+        client = AsyncClient()
+        await client.aforce_login(user=self.admin.user)
+
+        response = await client.post(
+            reverse("block_item"),
+            data={"id": self.cluster.docket.pk, "type": "docket"},
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        await self.cluster.docket.arefresh_from_db()
+        self.assertTrue(self.cluster.docket.blocked)
+
+    async def test_block_cluster_and_docket_via_ajax_view(self) -> None:
+        """can a super_user block an opinion cluster?"""
+        self.assertFalse(self.cluster.blocked)
+        self.assertFalse(self.cluster.docket.blocked)
+
+        client = AsyncClient()
+        await client.aforce_login(user=self.admin.user)
+
+        response = await client.post(
+            reverse("block_item"),
+            data={"id": self.cluster.pk, "type": "cluster"},
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        await self.cluster.docket.arefresh_from_db()
+        self.assertTrue(self.cluster.docket.blocked)
+
+        await self.cluster.arefresh_from_db()
+        self.assertTrue(self.cluster.blocked)
