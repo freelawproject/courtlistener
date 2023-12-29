@@ -2908,6 +2908,22 @@ class OpinionCluster(AbstractDateTimeModel):
                 [self.pk], "search.OpinionCluster", force_commit
             )
 
+    async def asave(
+        self,
+        update_fields=None,
+        index=True,
+        force_commit=False,
+        *args,
+        **kwargs,
+    ):
+        return await sync_to_async(self.save)(
+            update_fields=update_fields,
+            index=index,
+            force_commit=force_commit,
+            *args,
+            **kwargs,
+        )
+
     def delete(self, *args, **kwargs):
         """
         Note that this doesn't get called when an entire queryset
