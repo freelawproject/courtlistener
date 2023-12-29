@@ -112,7 +112,7 @@ psycopg = {extras = ["binary"], version = "^3.1.16"}
 httpx = {extras = ["http2"], version = "^0.25.2"}
 django-model-utils = "^4.3.1"
 inflection = "^0.5.1"  # necessary for DRF schema generation - remove after drf-spectacular
-juriscraper = "^2.5.75"
+juriscraper = "^2.5.76"
 django-permissions-policy = "^4.18.0"
 
 
