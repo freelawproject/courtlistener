@@ -1244,6 +1244,7 @@ async def block_item(request: HttpRequest) -> HttpResponse:
                 f"This view can not handle the provided type"
             )
 
+        cluster = None
         if obj_type == "cluster":
             # Block the cluster
             cluster = await aget_object_or_404(OpinionCluster, pk=pk)
@@ -1251,7 +1252,16 @@ async def block_item(request: HttpRequest) -> HttpResponse:
             cluster.date_blocked = now()
             await cluster.asave(index=False)
 
-        docket_pk = pk if obj_type == "docket" else cluster.docket_id
+        docket_pk = (
+            pk
+            if obj_type == "docket"
+            else cluster.docket_id
+            if cluster is not None
+            else None
+        )
+        if not docket_pk:
+            return HttpResponse("It worked")
+
         d = await aget_object_or_404(Docket, pk=docket_pk)
         d.blocked = True
         d.date_blocked = now()
