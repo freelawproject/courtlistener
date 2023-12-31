@@ -1018,17 +1018,15 @@ async def citation_handler(
             cluster.court = await Court.objects.aget(pk=docket.court_id)
             clusters_list.append(cluster)
         # Multiple results. Show them.
-        return HttpResponse(
-            content=loader.render_to_string(
-                "citation_redirect_info_page.html",
-                {
-                    "too_many": True,
-                    "citation_str": citation_str,
-                    "clusters": clusters_list,
-                    "private": await clusters.filter(blocked=True).aexists(),
-                },
-                request=request,
-            ),
+        return TemplateResponse(
+            request,
+            "citation_redirect_info_page.html",
+            {
+                "too_many": True,
+                "citation_str": citation_str,
+                "clusters": clusters_list,
+                "private": await clusters.filter(blocked=True).aexists(),
+            },
             status=HTTP_300_MULTIPLE_CHOICES,
         )
     return HttpResponse(status=500)
