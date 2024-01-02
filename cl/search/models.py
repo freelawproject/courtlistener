@@ -10,6 +10,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Prefetch, Q, QuerySet
+from django.db.models.functions import MD5
 from django.dispatch import Signal
 from django.template import loader
 from django.urls import NoReverseMatch, reverse
@@ -814,6 +815,14 @@ class Docket(AbstractDateTimeModel):
 
     class Meta:
         unique_together = ("docket_number", "pacer_case_id", "court")
+        constraints = [
+            models.UniqueConstraint(
+                MD5("docket_number"),
+                "pacer_case_id",
+                "court_id",
+                name="unique_docket_per_court",
+            ),
+        ]
         indexes = [
             models.Index(fields=["court_id", "id"]),
             models.Index(
