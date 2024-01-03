@@ -131,10 +131,8 @@ SEARCH_RECAP_HL_FIELDS = [
     "juryDemand.exact",
     "referredTo",
     "referredTo.exact",
-    "short_description",
     "suitNature",
     "suitNature.exact",
-    "text",
 ]
 
 # In RECAP Search, it is necessary to display 'plain_text' as a truncated snippet,
@@ -149,8 +147,6 @@ SEARCH_RECAP_CHILD_HL_FIELDS = {
     "description.exact": 0,
     "document_type": 0,
     "document_type.exact": 0,
-    "document_number": 0,
-    "attachment_number": 0,
     "plain_text": 100,
     "plain_text.exact": 100,
 }
