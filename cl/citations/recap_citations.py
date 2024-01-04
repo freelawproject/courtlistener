@@ -9,7 +9,7 @@ from cl.citations.match_citations import (
     NO_MATCH_RESOURCE,
     do_resolve_citations,
 )
-from cl.lib.types import MatchedResourceType, SupportedCitationType
+from cl.citations.types import MatchedResourceType, SupportedCitationType
 from cl.search.models import OpinionsCitedByRECAPDocument, RECAPDocument
 
 

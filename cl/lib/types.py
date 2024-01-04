@@ -1,38 +1,14 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    NotRequired,
-    Tuple,
-    TypedDict,
-    Union,
-)
+from typing import Any, Callable, Dict, List, NotRequired, TypedDict, Union
 
 from django.http import HttpRequest
-from eyecite.models import (
-    FullCaseCitation,
-    IdCitation,
-    Resource,
-    ShortCaseCitation,
-    SupraCitation,
-)
 
-from cl.search.models import Opinion
 from cl.users.models import User
 
 CleanData = Dict[str, Any]
 TaskData = Dict[str, Any]
-
-SupportedCitationType = Union[
-    FullCaseCitation, ShortCaseCitation, SupraCitation, IdCitation
-]
-MatchedResourceType = Union[Opinion, Resource]
-ResolvedFullCite = Tuple[FullCaseCitation, MatchedResourceType]
-ResolvedFullCites = List[ResolvedFullCite]
 
 
 class AuthenticatedHttpRequest(HttpRequest):

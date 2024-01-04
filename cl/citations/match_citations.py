@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 
-from datetime import date, datetime
+from datetime import datetime
 from typing import Dict, Iterable, List, Optional, Tuple, no_type_check
 
+import waffle
 from django.conf import settings
+from elasticsearch_dsl.response import Response
 from eyecite import resolve_citations
 from eyecite.models import (
     CitationBase,
@@ -19,14 +21,16 @@ from eyecite.utils import strip_punct
 from requests import Session
 from scorched.response import SolrResponse
 
-from cl.custom_filters.templatetags.text_filters import best_case_name
-from cl.lib.scorched_utils import ExtraSolrInterface, ExtraSolrSearch
-from cl.lib.types import (
+from cl.citations.match_citations_queries import es_search_db_for_full_citation
+from cl.citations.types import (
     MatchedResourceType,
     ResolvedFullCites,
-    SearchParam,
     SupportedCitationType,
 )
+from cl.citations.utils import get_years_from_reporter
+from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.lib.scorched_utils import ExtraSolrInterface, ExtraSolrSearch
+from cl.lib.types import SearchParam
 from cl.search.models import Opinion, RECAPDocument
 
 DEBUG = True
@@ -106,23 +110,7 @@ def case_name_query(
             return reverse_match(conn, new_results, citing_opinion)
             # Else, try again
         results = new_results
-    return results
-
-
-def get_years_from_reporter(
-    citation: FullCaseCitation,
-) -> Tuple[int, int]:
-    """Given a citation object, try to look it its dates in the reporter DB"""
-    start_year = 1750
-    end_year = date.today().year
-
-    edition_guess = citation.edition_guess
-    if edition_guess:
-        if hasattr(edition_guess.start, "year"):
-            start_year = edition_guess.start.year
-        if hasattr(edition_guess.end, "year"):
-            start_year = edition_guess.end.year
-    return start_year, end_year
+    return [results]
 
 
 def search_db_for_fullcitation(
@@ -221,10 +209,16 @@ def resolve_fullcase_citation(
 ) -> MatchedResourceType:
     # Case 1: FullCaseCitation
     if type(full_citation) is FullCaseCitation:
-        db_search_results: SolrResponse = search_db_for_fullcitation(
-            full_citation
-        )
-
+        if waffle.switch_is_active("es_resolve_citations"):
+            # Revolve citations using ES; enable once all the opinions are
+            # indexed.
+            db_search_results: Response = es_search_db_for_full_citation(
+                full_citation
+            )
+        else:
+            db_search_results: SolrResponse = search_db_for_fullcitation(
+                full_citation
+            )
         # If there is one search result, try to return it
         if len(db_search_results) == 1:
             result_id = db_search_results[0]["id"]

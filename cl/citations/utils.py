@@ -1,7 +1,11 @@
+from datetime import date, datetime
+from typing import Dict, Iterable, List, Optional, Tuple, no_type_check
+
 from django.apps import (  # Must use apps.get_model() to avoid circular import issue
     apps,
 )
 from django.db.models import Sum
+from eyecite.models import FullCaseCitation
 
 
 def map_reporter_db_cite_type(citation_type: str) -> int:
@@ -44,3 +48,19 @@ async def get_citation_depth_between_clusters(
         cited_opinion__cluster__pk=cited_cluster_pk,
     ).aaggregate(depth=Sum("depth"))
     return result["depth"]
+
+
+def get_years_from_reporter(
+    citation: FullCaseCitation,
+) -> Tuple[int, int]:
+    """Given a citation object, try to look it its dates in the reporter DB"""
+    start_year = 1750
+    end_year = date.today().year
+
+    edition_guess = citation.edition_guess
+    if edition_guess:
+        if hasattr(edition_guess.start, "year"):
+            start_year = edition_guess.start.year
+        if hasattr(edition_guess.end, "year"):
+            start_year = edition_guess.end.year
+    return start_year, end_year

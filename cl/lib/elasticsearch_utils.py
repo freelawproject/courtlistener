@@ -29,20 +29,17 @@ from elasticsearch_dsl.utils import AttrDict
 from cl.lib.bot_detector import is_bot
 from cl.lib.date_time import midnight_pt
 from cl.lib.paginators import ESPaginator
-from cl.lib.search_utils import (
-    BOOSTS,
-    cleanup_main_query,
-    get_array_of_selected_fields,
-)
 from cl.lib.types import (
     ApiPositionMapping,
     BasePositionMapping,
     CleanData,
     ESRangeQueryParams,
 )
+from cl.lib.utils import cleanup_main_query, get_array_of_selected_fields
 from cl.people_db.models import Position
 from cl.search.constants import (
     ALERTS_HL_TAG,
+    BOOSTS,
     MULTI_VALUE_HL_FIELDS,
     RELATED_PATTERN,
     SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS,
