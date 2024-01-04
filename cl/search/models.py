@@ -829,6 +829,9 @@ class Docket(AbstractDateTimeModel):
                 fields=["court_id", "docket_number_core", "pacer_case_id"],
                 name="district_court_docket_lookup_idx",
             ),
+            models.Index(
+                MD5("docket_number"), name="hash_docket_number_lookup_idx"
+            ),
         ]
 
     def __str__(self) -> str:
