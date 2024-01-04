@@ -214,6 +214,7 @@ async def view_docket(
     await increment_view_count(docket, request)
     sort_order_asc = True
 
+    page = request.GET.get("page", 1)
     de_list = docket.docket_entries.all().prefetch_related("recap_documents")
     form = DocketEntryFilterForm(request.GET, request=request)
     if await sync_to_async(form.is_valid)():
@@ -233,23 +234,22 @@ async def view_docket(
                 "-recap_sequence_number", "-entry_number"
             )
 
-    paginator = Paginator(de_list, 200, orphans=10)
-    page = request.GET.get("page", 1)
-    try:
-        docket_entries = await sync_to_async(paginator.page)(page)
-    except PageNotAnInteger:
-        docket_entries = await sync_to_async(paginator.page)(1)
-    except EmptyPage:
-        docket_entries = await sync_to_async(paginator.page)(
-            paginator.num_pages
-        )
+    @sync_to_async
+    def paginate_docket_entries(docket_entries, docket_page):
+        paginator = Paginator(docket_entries, 200, orphans=10)
+        try:
+            return paginator.page(docket_page)
+        except PageNotAnInteger:
+            return paginator.page(1)
+        except EmptyPage:
+            return paginator.page(paginator.num_pages)
 
     context.update(
         {
             "parties": await docket.parties.aexists(),
             # Needed to show/hide parties tab.
             "authorities": await docket.ahas_authorities(),
-            "docket_entries": docket_entries,
+            "docket_entries": await paginate_docket_entries(de_list, page),
             "sort_order_asc": sort_order_asc,
             "form": form,
             "get_string": make_get_string(request),
