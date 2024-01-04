@@ -241,7 +241,7 @@ async def view_docket(
         docket_entries = await sync_to_async(paginator.page)(1)
     except EmptyPage:
         docket_entries = await sync_to_async(paginator.page)(
-            paginator.num_pages
+            await sync_to_async(paginator.num_pages)
         )
 
     context.update(
