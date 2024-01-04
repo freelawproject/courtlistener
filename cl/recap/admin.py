@@ -100,7 +100,8 @@ class EmailProcessingQueueAdmin(CursorPaginatorAdmin):
     )
     list_filter = ("status",)
     actions = [reprocess_failed_epq]
-    raw_id_fields = ["uploader", "court", "recap_documents"]
+    raw_id_fields = ["uploader", "court"]
+    exclude = ["recap_documents", "filepath"]
 
 
 admin.site.register(FjcIntegratedDatabase)
