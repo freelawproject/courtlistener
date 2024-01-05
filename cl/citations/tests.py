@@ -393,7 +393,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         cls.rebuild_index("search.OpinionCluster")
         super().setUpTestData()
         # Courts
-        court_scotus = CourtFactory(id="scotus")
+        cls.court_scotus = CourtFactory(id="scotus")
         court_ca1 = CourtFactory(id="ca1")
 
         # Citation 1
@@ -402,7 +402,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             reporter="U.S.",
             page="1",
             cluster=OpinionClusterFactoryWithChildrenAndParents(
-                docket=DocketFactory(court=court_scotus),
+                docket=DocketFactory(court=cls.court_scotus),
                 case_name="Foo v. Bar",
                 date_filed=date(
                     2000, 1, 1
@@ -434,7 +434,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             reporter="U.S.",
             page="50",
             cluster=OpinionClusterFactoryWithChildrenAndParents(
-                docket=DocketFactory(court=court_scotus),
+                docket=DocketFactory(court=cls.court_scotus),
                 case_name="Lorem v. Ipsum",
             ),
         )
@@ -445,7 +445,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             reporter="U.S.",
             page="999",
             cluster=OpinionClusterFactoryWithChildrenAndParents(
-                docket=DocketFactory(court=court_scotus),
+                docket=DocketFactory(court=cls.court_scotus),
                 case_name="Abcdef v. Ipsum",
                 sub_opinions=RelatedFactory(
                     OpinionWithChildrenFactory,
@@ -461,49 +461,13 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             reporter="U.S.",
             page="123",
             cluster=OpinionClusterFactoryWithChildrenAndParents(
-                docket=DocketFactory(court=court_scotus),
+                docket=DocketFactory(court=cls.court_scotus),
                 case_name="Bush v. Gore",
                 date_filed=date.today(),  # Must be later than any cited opinion
                 sub_opinions=RelatedFactory(
                     OpinionWithChildrenFactory,
                     factory_related_name="cluster",
-                    plain_text="Bush v. John Blah blah Foo v. Bar 1 U.S. 1, 77 blah blah. Asdf asdf Qwerty v. Uiop 2 F.3d 2, 555. Also check out Foo, 1 U.S. at 99 (holding that crime is illegal). Then let's cite Qwerty, supra, at 666 (noting that CourtListener is a great tool and everyone should use it). See also Foo, supra, at 101 as well. Another full citation is Lorem v. Ipsum 1 U. S. 50. Quoting Qwerty, “something something”, 2 F.3d 2, at 59. This case is similar to Fake, supra, and Qwerty supra, as well. This should resolve to the foregoing. Ibid. This should also convert appropriately, see Id., at 57. This should fail to resolve because the reporter and citation is ambiguous, 1 U. S., at 51. However, this should succeed, Lorem, 1 U.S., at 52.",
-                ),
-            ),
-        )
-
-        # Citation 6
-        cls.citation6 = CitationWithParentsFactory.create(
-            volume="2",
-            reporter="U.S.",
-            page="777",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
-                docket=DocketFactory(court=court_scotus),
-                case_name="Bush v. John",
-                date_filed=date.today(),
-                # Must be later than any cited opinion
-                sub_opinions=RelatedFactory(
-                    OpinionWithChildrenFactory,
-                    factory_related_name="cluster",
-                    plain_text="Blah blah Foo v. Bar 1 U.S. 1, 77 blah blah. Asdf asdf Qwerty v. Uiop 2 F.3d 2, 555. Also check out Foo, 1 U.S. at 99 (holding that crime is illegal). Then let's cite Qwerty, supra, at 666 (noting that CourtListener is a great tool and everyone should use it). See also Foo, supra, at 101 as well. Another full citation is Lorem v. Ipsum 1 U. S. 50. Quoting Qwerty, “something something”, 2 F.3d 2, at 59. This case is similar to Fake, supra, and Qwerty supra, as well. This should resolve to the foregoing. Ibid. This should also convert appropriately, see Id., at 57. This should fail to resolve because the reporter and citation is ambiguous, 1 U. S., at 51. However, this should succeed, Lorem, 1 U.S., at 52.",
-                ),
-            ),
-        )
-
-        # Citation 7
-        cls.citation7 = CitationWithParentsFactory.create(
-            volume="2",
-            reporter="U.S.",
-            page="777",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
-                docket=DocketFactory(court=court_scotus),
-                case_name="Bush v. Clinton",
-                date_filed=date.today(),
-                # Must be later than any cited opinion
-                sub_opinions=RelatedFactory(
-                    OpinionWithChildrenFactory,
-                    factory_related_name="cluster",
-                    plain_text="Blah blah Foo v. Bar 1 U.S. 1, 77 blah blah. Asdf asdf Qwerty v. Uiop 2 F.3d 2, 555. Also check out Foo, 1 U.S. at 99 (holding that crime is illegal). Then let's cite Qwerty, supra, at 666 (noting that CourtListener is a great tool and everyone should use it). See also Foo, supra, at 101 as well. Another full citation is Lorem v. Ipsum 1 U. S. 50. Quoting Qwerty, “something something”, 2 F.3d 2, at 59. This case is similar to Fake, supra, and Qwerty supra, as well. This should resolve to the foregoing. Ibid. This should also convert appropriately, see Id., at 57. This should fail to resolve because the reporter and citation is ambiguous, 1 U. S., at 51. However, this should succeed, Lorem, 1 U.S., at 52.",
+                    plain_text="America v. Maxwell, Bush v. John, Blah blah Foo v. Bar 1 U.S. 1, 77 blah blah. Asdf asdf Qwerty v. Uiop 2 F.3d 2, 555. Also check out Foo, 1 U.S. at 99 (holding that crime is illegal). Then let's cite Qwerty, supra, at 666 (noting that CourtListener is a great tool and everyone should use it). See also Foo, supra, at 101 as well. Another full citation is Lorem v. Ipsum 1 U. S. 50. Quoting Qwerty, “something something”, 2 F.3d 2, at 59. This case is similar to Fake, supra, and Qwerty supra, as well. This should resolve to the foregoing. Ibid. This should also convert appropriately, see Id., at 57. This should fail to resolve because the reporter and citation is ambiguous, 1 U. S., at 51. However, this should succeed, Lorem, 1 U.S., at 52.",
                 ),
             ),
         )
@@ -515,6 +479,79 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             testing_mode=True,
         )
 
+    def test_case_name_and_reverse_match_query(self) -> None:
+        """Test refining match by case_name_query and reverse_match if full
+        citations results are > 1
+        """
+        # Create 3 citations that match full_citation
+        for i in range(3):
+            with self.captureOnCommitCallbacks(execute=True):
+                citation = CitationWithParentsFactory.create(
+                    volume="3",
+                    reporter="U.S.",
+                    page="888",
+                    cluster=OpinionClusterFactoryWithChildrenAndParents(
+                        docket=DocketFactory(court=self.court_scotus),
+                        case_name="Obama v. Clinton",
+                        date_filed=date.today(),
+                        # Must be later than any cited opinion
+                        sub_opinions=RelatedFactory(
+                            OpinionWithChildrenFactory,
+                            factory_related_name="cluster",
+                            plain_text="Blah blah Foo v. Bar 1 U.S. 1, 77 blah blah.",
+                        ),
+                    ),
+                )
+
+        # Create the expected match Citation.
+        with self.captureOnCommitCallbacks(execute=True):
+            match_citation = CitationWithParentsFactory.create(
+                volume="3",
+                reporter="U.S.",
+                page="888",
+                cluster=OpinionClusterFactoryWithChildrenAndParents(
+                    docket=DocketFactory(court=self.court_scotus),
+                    case_name="America v. Maxwell",
+                    date_filed=date.today(),
+                    # Must be later than any cited opinion
+                    sub_opinions=RelatedFactory(
+                        OpinionWithChildrenFactory,
+                        factory_related_name="cluster",
+                        plain_text="Blah blah Foo v. Bar 1 U.S. 1, 77 blah blah.",
+                    ),
+                ),
+            )
+
+        full_citation = case_citation(
+            volume="3",
+            reporter="U.S.",
+            page="888",
+            index=1,
+            reporter_found="U.S.",
+            metadata={
+                "court": "scotus",
+                "defendant": "Maxwell",
+                "plaintiff": "Brown",
+            },
+        )
+        citing_opinion = Opinion.objects.get(
+            cluster__pk=self.citation5.cluster_id
+        )
+        match_opinion = Opinion.objects.get(
+            cluster__pk=match_citation.cluster_id
+        )
+
+        # Compare expected_resolutions.
+        citation_resolutions = do_resolve_citations(
+            [full_citation], citing_opinion
+        )
+        expected_resolutions = {match_opinion: [full_citation]}
+        self.assertEqual(
+            citation_resolutions,
+            expected_resolutions,
+            msg=f"\n{citation_resolutions}\n\n    !=\n\n{expected_resolutions}",
+        )
+
     def test_citation_resolution(self) -> None:
         """Tests whether different types of citations (i.e., full, short form,
         supra, id) resolve correctly to opinion matches.
@@ -524,7 +561,6 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         opinion3 = Opinion.objects.get(cluster__pk=self.citation3.cluster_id)
         opinion4 = Opinion.objects.get(cluster__pk=self.citation4.cluster_id)
         opinion5 = Opinion.objects.get(cluster__pk=self.citation5.cluster_id)
-        opinion6 = Opinion.objects.get(cluster__pk=self.citation6.cluster_id)
 
         full1 = case_citation(
             volume="1",
@@ -565,14 +601,6 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             index=1,
             reporter_found="U.S.",
             metadata={"court": "scotus"},
-        )
-        full5 = case_citation(
-            volume="2",
-            reporter="U.S.",
-            page="777",
-            index=1,
-            reporter_found="U.S.",
-            metadata={"court": "scotus", "defendant": "John"},
         )
 
         supra1 = supra_citation(
@@ -729,9 +757,6 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             # Test resolving a journal citation. Since we don't support these
             # yet, we expect no matches to be returned.
             ([journal], {NO_MATCH_RESOURCE: [journal]}),
-            # Refine match by case_name_query and reverse_match if full
-            # citations results are > 1
-            ([full5], {opinion6: [full5]}),
         ]
 
         # fmt: on

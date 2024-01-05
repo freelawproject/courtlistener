@@ -1,11 +1,14 @@
-from datetime import date, datetime
-from typing import Dict, Iterable, List, Optional, Tuple, no_type_check
+from datetime import date
+from typing import Tuple
 
 from django.apps import (  # Must use apps.get_model() to avoid circular import issue
     apps,
 )
 from django.db.models import Sum
 from eyecite.models import FullCaseCitation
+from eyecite.utils import strip_punct
+
+QUERY_LENGTH = 10
 
 
 def map_reporter_db_cite_type(citation_type: str) -> int:
@@ -64,3 +67,16 @@ def get_years_from_reporter(
         if hasattr(edition_guess.end, "year"):
             start_year = edition_guess.end.year
     return start_year, end_year
+
+
+def make_name_param(
+    defendant: str,
+    plaintiff: str | None = None,
+) -> Tuple[str, int]:
+    """Remove punctuation and return cleaned string plus its length in tokens."""
+    token_list = defendant.split()
+    if plaintiff:
+        token_list.extend(plaintiff.split())
+        # Strip out punctuation, which Solr doesn't like
+    query_words = [strip_punct(t) for t in token_list]
+    return " ".join(query_words), len(query_words)

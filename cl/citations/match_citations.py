@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 
 from datetime import datetime
-from typing import Dict, Iterable, List, Optional, Tuple, no_type_check
+from typing import Dict, Iterable, List, Optional, no_type_check
 
 import waffle
 from django.conf import settings
-from elasticsearch_dsl.response import Response
+from elasticsearch_dsl.response import Hit
 from eyecite import resolve_citations
 from eyecite.models import (
     CitationBase,
@@ -27,7 +27,11 @@ from cl.citations.types import (
     ResolvedFullCites,
     SupportedCitationType,
 )
-from cl.citations.utils import get_years_from_reporter
+from cl.citations.utils import (
+    QUERY_LENGTH,
+    get_years_from_reporter,
+    make_name_param,
+)
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.scorched_utils import ExtraSolrInterface, ExtraSolrSearch
 from cl.lib.types import SearchParam
@@ -35,7 +39,6 @@ from cl.search.models import Opinion, RECAPDocument
 
 DEBUG = True
 
-QUERY_LENGTH = 10
 
 NO_MATCH_RESOURCE = Resource(case_citation(source_text="UNMATCHED_CITATION"))
 
@@ -46,19 +49,6 @@ def build_date_range(start_year: int, end_year: int) -> str:
     end = datetime(end_year, 12, 31)
     date_range = f"[{start.isoformat()}Z TO {end.isoformat()}Z]"
     return date_range
-
-
-def make_name_param(
-    defendant: str,
-    plaintiff: str | None = None,
-) -> Tuple[str, int]:
-    """Remove punctuation and return cleaned string plus its length in tokens."""
-    token_list = defendant.split()
-    if plaintiff:
-        token_list.extend(plaintiff.split())
-        # Strip out punctuation, which Solr doesn't like
-    query_words = [strip_punct(t) for t in token_list]
-    return " ".join(query_words), len(query_words)
 
 
 def reverse_match(
@@ -110,7 +100,7 @@ def case_name_query(
             return reverse_match(conn, new_results, citing_opinion)
             # Else, try again
         results = new_results
-    return [results]
+    return results
 
 
 def search_db_for_fullcitation(
@@ -209,16 +199,13 @@ def resolve_fullcase_citation(
 ) -> MatchedResourceType:
     # Case 1: FullCaseCitation
     if type(full_citation) is FullCaseCitation:
+        db_search_results: SolrResponse | list[Hit]
         if waffle.switch_is_active("es_resolve_citations"):
             # Revolve citations using ES; enable once all the opinions are
             # indexed.
-            db_search_results: Response = es_search_db_for_full_citation(
-                full_citation
-            )
+            db_search_results = es_search_db_for_full_citation(full_citation)
         else:
-            db_search_results: SolrResponse = search_db_for_fullcitation(
-                full_citation
-            )
+            db_search_results = search_db_for_fullcitation(full_citation)
         # If there is one search result, try to return it
         if len(db_search_results) == 1:
             result_id = db_search_results[0]["id"]
