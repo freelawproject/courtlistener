@@ -265,7 +265,9 @@ async def get_donation_totals_by_email(email: str) -> TotalResponseType:
 
     :return Dict with None for each value if no user, else the amount
     """
-    profiles = UserProfile.objects.filter(user__email=email)
+    profiles = UserProfile.objects.select_related("user").filter(
+        user__email=email
+    )
     if await profiles.acount() == 0:
         return {"total": None, "last_year": None}
 
@@ -274,6 +276,6 @@ async def get_donation_totals_by_email(email: str) -> TotalResponseType:
     async for profile in profiles:
         # One email address can have more than one profile (sigh). Just add 'em
         # all up.
-        total += profile.total_donated
-        last_year += profile.total_donated_last_year
+        total += await profile.atotal_donated
+        last_year += await profile.atotal_donated_last_year
     return {"total": total, "last_year": last_year}

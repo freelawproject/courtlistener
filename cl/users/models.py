@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import Dict
 
 import pghistory
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import Group, Permission, User
 from django.contrib.postgres.fields import ArrayField
@@ -162,6 +163,14 @@ class UserProfile(models.Model):
         if total is None:
             total = Decimal(0.0)
         return total
+
+    @property
+    async def atotal_donated(self) -> Decimal:
+        return await sync_to_async(lambda: self.total_donated)()
+
+    @property
+    async def atotal_donated_last_year(self) -> Decimal:
+        return await sync_to_async(lambda: self.total_donated_last_year)()
 
     @property
     def is_monthly_donor(self) -> bool:
