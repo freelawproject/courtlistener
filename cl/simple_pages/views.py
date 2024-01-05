@@ -293,20 +293,20 @@ async def coverage_opinions(request: HttpRequest) -> HttpResponse:
     if coverage_data_op is None:
         coverage_data_op = {
             "private": False,
-            "federal": fetch_federal_data(),
+            "federal": await fetch_federal_data(),
             "sections": {
-                "state": fetch_data(Court.STATE_JURISDICTIONS),
-                "territory": fetch_data(Court.TERRITORY_JURISDICTIONS),
-                "international": fetch_data(
+                "state": await fetch_data(Court.STATE_JURISDICTIONS),
+                "territory": await fetch_data(Court.TERRITORY_JURISDICTIONS),
+                "international": await fetch_data(
                     Court.INTERNATIONAL, group_by_state=False
                 ),
-                "tribal": fetch_data(
+                "tribal": await fetch_data(
                     Court.TRIBAL_JURISDICTIONS, group_by_state=False
                 ),
-                "special": fetch_data(
+                "special": await fetch_data(
                     [Court.FEDERAL_SPECIAL], group_by_state=False
                 ),
-                "military": fetch_data(
+                "military": await fetch_data(
                     Court.MILITARY_JURISDICTIONS, group_by_state=False
                 ),
             },
