@@ -30,7 +30,6 @@ from cl.disclosures.models import (
     SpouseIncome,
 )
 from cl.donate.utils import get_donation_totals_by_email
-from cl.lib.ratelimiter import ratelimiter_unsafe_3_per_m
 from cl.people_db.models import Person
 from cl.search.forms import SearchForm
 from cl.search.models import (
@@ -350,7 +349,6 @@ async def contribute(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "contribute.html", {"private": False})
 
 
-@ratelimiter_unsafe_3_per_m
 async def contact(
     request: HttpRequest,
     template_path: str = "contact_form.html",
