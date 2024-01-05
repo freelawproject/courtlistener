@@ -99,7 +99,7 @@ def replication_docs(request: HttpRequest) -> HttpResponse:
 async def bulk_data_index(request: HttpRequest) -> HttpResponse:
     """Shows an index page for the dumps."""
     disclosure_coverage = await get_coverage_data_fds()
-    return render(
+    return await sync_to_async(render)(
         request,
         "bulk-data.html",
         disclosure_coverage,
