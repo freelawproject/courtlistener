@@ -215,7 +215,10 @@ async def view_docket(
     sort_order_asc = True
 
     page = request.GET.get("page", 1)
-    de_list = docket.docket_entries.all().prefetch_related("recap_documents")
+    rd_queryset = RECAPDocument.objects.defer("plain_text")
+    de_list = docket.docket_entries.all().prefetch_related(
+        Prefetch("recap_documents", queryset=rd_queryset)
+    )
     form = DocketEntryFilterForm(request.GET, request=request)
     if await sync_to_async(form.is_valid)():
         cd = form.cleaned_data
