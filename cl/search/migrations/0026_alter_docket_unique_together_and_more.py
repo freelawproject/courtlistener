@@ -4,22 +4,34 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
+    atomic = False
+
     dependencies = [
         ("search", "0025_docket_unique_docket_per_court"),
     ]
 
     operations = [
-        migrations.AlterField(
-            model_name="docket",
-            name="docket_number",
-            field=models.TextField(
-                blank=True,
-                help_text="The docket numbers of a case, can be consolidated and quite long. In some instances they are too long to be indexed by postgres and we store the full docket in the correction field on the Opinion Cluster.",
-                null=True,
-            ),
+        migrations.RunSQL(
+            sql="""DROP INDEX CONCURRENTLY IF EXISTS "search_docket_docket_number_4af29e98dca38326_uniq";""",
+            state_operations=[
+                migrations.AlterField(
+                    model_name="docket",
+                    name="docket_number",
+                    field=models.TextField(
+                        blank=True,
+                        help_text="The docket numbers of a case, can be consolidated and quite long. In some instances they are too long to be indexed by postgres and we store the full docket in the correction field on the Opinion Cluster.",
+                        null=True,
+                    ),
+                ),
+            ],
         ),
-        migrations.AlterUniqueTogether(
-            name="docket",
-            unique_together=set(),
+        migrations.RunSQL(
+            sql="""ALTER TABLE "search_docket" DROP CONSTRAINT IF EXISTS "search_docket_docket_number_7642c6c6dbd04704_uniq";""",
+            state_operations=[
+                migrations.AlterUniqueTogether(
+                    name="docket",
+                    unique_together=set(),
+                ),
+            ],
         ),
     ]
