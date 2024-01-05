@@ -8,6 +8,7 @@ from django.conf import settings
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.template import TemplateDoesNotExist
+from django.template.response import TemplateResponse
 from django.views.decorators.cache import cache_page
 from requests import Session
 from rest_framework import status
@@ -99,7 +100,7 @@ def replication_docs(request: HttpRequest) -> HttpResponse:
 async def bulk_data_index(request: HttpRequest) -> HttpResponse:
     """Shows an index page for the dumps."""
     disclosure_coverage = await get_coverage_data_fds()
-    return render(
+    return TemplateResponse(
         request,
         "bulk-data.html",
         disclosure_coverage,
