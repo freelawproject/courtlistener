@@ -32,7 +32,7 @@ urlpatterns = [
     path("feeds/", feeds, name="feeds_info"),  # type: ignore[arg-type]
     path("podcasts/", podcasts, name="podcasts"),  # type: ignore[arg-type]
     path("contribute/", contribute, name="contribute"),  # type: ignore[arg-type]
-    path("contact/", contact, name="contact"),
+    path("contact/", contact, name="contact"),  # type: ignore[arg-type]
     path("contact/thanks/", contact_thanks, name="contact_thanks"),  # type: ignore[arg-type]
     # Help pages
     path("help/", help_home, name="help_home"),  # type: ignore[arg-type]
