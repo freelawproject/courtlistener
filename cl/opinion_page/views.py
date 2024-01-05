@@ -144,7 +144,9 @@ async def court_publish_page(request: HttpRequest, pk: int) -> HttpResponse:
 
     form = await sync_to_async(CourtUploadForm)(pk=pk)
     if request.method == "POST":
-        form = CourtUploadForm(request.POST, request.FILES, pk=pk)
+        form = await sync_to_async(CourtUploadForm)(
+            request.POST, request.FILES, pk=pk
+        )
         if await sync_to_async(form.is_valid)():
             cluster = await sync_to_async(form.save)()
             goto = reverse("view_case", args=[cluster.pk, cluster.slug])
