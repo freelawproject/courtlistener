@@ -635,7 +635,6 @@ class Docket(AbstractDateTimeModel):
         "the correction field on the Opinion Cluster.",
         blank=True,
         null=True,
-        db_index=True,
     )
     docket_number_core = models.CharField(
         help_text=(
@@ -800,7 +799,6 @@ class Docket(AbstractDateTimeModel):
     )
 
     class Meta:
-        unique_together = ("docket_number", "pacer_case_id", "court")
         constraints = [
             models.UniqueConstraint(
                 MD5("docket_number"),
