@@ -260,18 +260,18 @@ class TotalResponseType(TypedDict):
     last_year: Optional[Decimal]
 
 
-def get_donation_totals_by_email(email: str) -> TotalResponseType:
+async def get_donation_totals_by_email(email: str) -> TotalResponseType:
     """Get the total donations for somebody if they've made any
 
     :return Dict with None for each value if no user, else the amount
     """
     profiles = UserProfile.objects.filter(user__email=email)
-    if len(profiles) == 0:
+    if await profiles.acount() == 0:
         return {"total": None, "last_year": None}
 
     total = Decimal(0)
     last_year = Decimal(0)
-    for profile in profiles:
+    async for profile in profiles:
         # One email address can have more than one profile (sigh). Just add 'em
         # all up.
         total += profile.total_donated
