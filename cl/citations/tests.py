@@ -318,10 +318,12 @@ class CitationTextTest(SimpleTestCase):
                 )
 
 
-class RECAPDocumentObjectTest(IndexedSolrTestCase):
+class RECAPDocumentObjectTest(ESIndexTestCase, TestCase):
     # pass
     @classmethod
     def setUpTestData(cls):
+        cls.rebuild_index("search.OpinionCluster")
+        super().setUpTestData()
         cls.recap_doc = RECAPDocumentFactory.create(
             plain_text="In Fisher v. SD Protection Inc., 948 F.3d 593 (2d Cir. 2020), the Second Circuit held that in the context of settlement of FLSA and NYLL cases, which must be approved by the trial court in accordance with Cheeks v. Freeport Pancake House, Inc., 796 F.3d 199 (2d Cir. 2015), the district court abused its discretion in limiting the amount of recoverable fees to a percentage of the recovery by the successful plaintiffs. But also: sdjnfdsjnk. Fisher, 948 F.3d at 597.",
             ocr_status=RECAPDocument.OCR_UNNECESSARY,
@@ -353,8 +355,13 @@ class RECAPDocumentObjectTest(IndexedSolrTestCase):
                 date_filed=date(2015, 1, 1),
             ),
         )
-
-        super().setUpTestData()
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
 
     def test_opinionscited_recap_creation(self):
         """
@@ -945,13 +952,15 @@ class CitationFeedTest(
         self._tree_has_content(r.content, expected_count)
 
 
-class CitationCommandTest(IndexedSolrTestCase):
+class CitationCommandTest(ESIndexTestCase, TestCase):
     """Test a variety of the ways that find_citations can be called."""
 
     fixtures: List = []
 
     @classmethod
     def setUpTestData(cls) -> None:
+        cls.rebuild_index("search.OpinionCluster")
+        super().setUpTestData()
         # Court
         court_scotus = CourtFactory(id="scotus")
 
@@ -993,6 +1002,14 @@ class CitationCommandTest(IndexedSolrTestCase):
         cls.opinion_id3 = Opinion.objects.get(
             cluster__pk=cls.citation3.cluster_id
         ).pk
+
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
 
     def call_command_and_test_it(self, args):
         call_command("find_citations", *args)
