@@ -379,7 +379,7 @@ async def contact(
 
             donation_totals = await get_donation_totals_by_email(cd["email"])
             default_from = settings.DEFAULT_FROM_EMAIL
-            EmailMessage(
+            message = EmailMessage(
                 subject="[CourtListener] Contact: "
                 "{phone_number}".format(**cd),
                 body="Subject: {phone_number}\n"
@@ -395,7 +395,8 @@ async def contact(
                 ),
                 to=["info@free.law"],
                 reply_to=[cd.get("email", default_from) or default_from],
-            ).send()
+            )
+            await sync_to_async(message.send)()
             return HttpResponseRedirect(reverse("contact_thanks"))
     else:
         # the form is loading for the first time
