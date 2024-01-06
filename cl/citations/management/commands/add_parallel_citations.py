@@ -8,11 +8,9 @@ from django.db import IntegrityError
 from eyecite.find import get_citations
 
 from cl.citations.annotate_citations import get_and_clean_opinion_text
-from cl.citations.match_citations import (
-    build_date_range,
-    get_years_from_reporter,
-)
+from cl.citations.match_citations import build_date_range
 from cl.citations.tasks import identify_parallel_citations
+from cl.citations.utils import get_years_from_reporter
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.search.models import Opinion, OpinionCluster
