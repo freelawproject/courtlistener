@@ -73,6 +73,7 @@
               class="no-underline black-link">{{ rd.docket_entry.docket|best_case_name|safe|v_wrapper }}</a></h2>
       {% include "includes/notes_modal.html" %}
       {% include "includes/buy_pacer_modal.html" %}
+      {% include "includes/buy_acms_modal.html" %}
       {% if redirect_to_pacer_modal %}
         {% include "includes/redirect_to_pacer_modal.html" %}
       {% endif %}
