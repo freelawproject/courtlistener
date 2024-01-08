@@ -88,7 +88,7 @@ async def user_has_alert(
 
 async def es_get_citing_clusters_with_cache(
     cluster: OpinionCluster,
-) -> tuple[list[OpinionClusterDocument], int]:
+) -> tuple[list[OpinionClusterDocument], int | None]:
     """Use Elasticsearch to get clusters citing the one we're looking at
 
     :param cluster: The cluster we're targeting
@@ -124,7 +124,10 @@ async def es_get_citing_clusters_with_cache(
     )
     citing_clusters = list(results)
     a_week = 60 * 60 * 24 * 7
-    await cache.aset(
-        cache_key, (citing_clusters, citing_cluster_count), a_week
-    )
+
+    if citing_cluster_count is not None:
+        # Cache only if the citing_cluster_count query was successful.
+        await cache.aset(
+            cache_key, (citing_clusters, citing_cluster_count), a_week
+        )
     return citing_clusters, citing_cluster_count
