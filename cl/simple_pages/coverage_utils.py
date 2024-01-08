@@ -28,14 +28,15 @@ async def fetch_data(jurisdictions, group_by_state=True):
         # a descendant court
         if not court_has_content and not descendant_json:
             continue
+        courthouse = None
         if group_by_state:
-            court = await court.courthouses.afirst()
-            state = court.get_state_display()
+            courthouse = await court.courthouses.afirst()
+            state = courthouse.get_state_display()
         else:
             state = "NONE"
         courts.setdefault(state, []).append(
             {
-                "court": court,
+                "court": courthouse if courthouse else court,
                 "descendants": descendant_json,
             }
         )
