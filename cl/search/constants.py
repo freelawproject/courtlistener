@@ -131,6 +131,18 @@ SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS = [
     "judge",
     "judge.exact",
 ]
+SOLR_RECAP_HL_FIELDS = [
+    "assignedTo",
+    "caseName",
+    "cause",
+    "court_citation_string",
+    "docketNumber",
+    "juryDemand",
+    "referredTo",
+    "short_description",
+    "suitNature",
+    "text",
+]
 SEARCH_RECAP_HL_FIELDS = [
     "assignedTo",
     "assignedTo.exact",
@@ -145,10 +157,8 @@ SEARCH_RECAP_HL_FIELDS = [
     "juryDemand.exact",
     "referredTo",
     "referredTo.exact",
-    "short_description",
     "suitNature",
     "suitNature.exact",
-    "text",
 ]
 
 SEARCH_OPINION_HL_FIELDS = [

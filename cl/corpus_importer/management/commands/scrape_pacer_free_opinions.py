@@ -299,7 +299,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args: List[str], **options: OptionsType) -> None:
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         action = cast(Callable, options["action"])
         action(options)
 

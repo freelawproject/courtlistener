@@ -1,3 +1,4 @@
+from asgiref.sync import async_to_sync
 from django.db.models import Q
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -60,5 +61,5 @@ class VisualizationViewSet(LoggingMixin, ModelViewSet):
         viz = serializer.save(
             user=self.request.user, cluster_start=start, cluster_end=end
         )
-        status, viz = build_visualization(viz)
+        status, viz = async_to_sync(build_visualization)(viz)
         return status

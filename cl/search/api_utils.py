@@ -89,7 +89,7 @@ class ESList:
     def __init__(
         self, main_query, count, offset, page_size, type, length=None
     ):
-        super(ESList, self).__init__()
+        super().__init__()
         self.main_query = main_query
         self.offset = offset
         self.page_size = page_size
@@ -165,7 +165,7 @@ class SolrList:
     """
 
     def __init__(self, main_query, offset, type, length=None):
-        super(SolrList, self).__init__()
+        super().__init__()
         self.main_query = main_query
         self.offset = offset
         self.type = type

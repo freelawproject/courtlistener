@@ -24,7 +24,7 @@ def map_reporter_db_cite_type(citation_type: str) -> int:
     return citation_map[citation_type]
 
 
-def get_citation_depth_between_clusters(
+async def get_citation_depth_between_clusters(
     citing_cluster_pk: int, cited_cluster_pk: int
 ) -> int:
     """OpinionsCited objects exist as relationships between Opinion objects,
@@ -39,7 +39,8 @@ def get_citation_depth_between_clusters(
         OpinionCited objects
     """
     OpinionsCited = apps.get_model("search.OpinionsCited")
-    return OpinionsCited.objects.filter(
+    result = await OpinionsCited.objects.filter(
         citing_opinion__cluster__pk=citing_cluster_pk,
         cited_opinion__cluster__pk=cited_cluster_pk,
-    ).aggregate(depth=Sum("depth"))["depth"]
+    ).aaggregate(depth=Sum("depth"))
+    return result["depth"]

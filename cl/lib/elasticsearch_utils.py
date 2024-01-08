@@ -7,7 +7,7 @@ from copy import deepcopy
 from dataclasses import fields
 from datetime import date, datetime
 from functools import reduce, wraps
-from typing import Any, Callable, Dict, List, Literal, Tuple
+from typing import Any, Callable, Dict, List, Literal
 
 import regex
 from django.conf import settings
@@ -675,13 +675,12 @@ def build_has_child_query(
             # returning the entire field from the index.
             fields_to_exclude.append(field)
         highlight_options["fields"][field] = {
-            "type": "plain",
+            "type": settings.ES_HIGHLIGHTER,
             "fragment_size": fragment_size,
             "no_match_size": no_match_size,
             "number_of_fragments": number_of_fragments,
             "pre_tags": ["<mark>"],
             "post_tags": ["</mark>"],
-            "max_analyzed_offset": 999_999,
         }
 
     inner_hits = {

@@ -768,10 +768,12 @@ class DocketBaseDocument(Document):
     docket_id = fields.IntegerField(attr="pk")
     caseName = fields.TextField(
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
                 search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
             ),
         },
         search_analyzer="search_analyzer",
@@ -791,10 +793,12 @@ class DocketBaseDocument(Document):
     docketNumber = fields.TextField(
         attr="docket_number",
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 attr="docket_number",
                 analyzer="english_exact",
+                term_vector="with_positions_offsets",
                 search_analyzer="search_analyzer_exact",
             ),
         },
@@ -803,10 +807,12 @@ class DocketBaseDocument(Document):
     suitNature = fields.TextField(
         attr="nature_of_suit",
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 attr="nature_of_suit",
                 analyzer="english_exact",
+                term_vector="with_positions_offsets",
                 search_analyzer="search_analyzer_exact",
             ),
         },
@@ -815,10 +821,12 @@ class DocketBaseDocument(Document):
     cause = fields.TextField(
         attr="cause",
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 attr="cause",
                 analyzer="english_exact",
+                term_vector="with_positions_offsets",
                 search_analyzer="search_analyzer_exact",
             ),
         },
@@ -827,10 +835,12 @@ class DocketBaseDocument(Document):
     juryDemand = fields.TextField(
         attr="jury_demand",
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 attr="jury_demand",
                 analyzer="english_exact",
+                term_vector="with_positions_offsets",
                 search_analyzer="search_analyzer_exact",
             ),
         },
@@ -853,9 +863,11 @@ class DocketBaseDocument(Document):
     dateTerminated = fields.DateField(attr="date_terminated")
     assignedTo = fields.TextField(
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
+                term_vector="with_positions_offsets",
                 search_analyzer="search_analyzer_exact",
             ),
         },
@@ -864,9 +876,11 @@ class DocketBaseDocument(Document):
     assigned_to_id = fields.KeywordField(attr="assigned_to.pk")
     referredTo = fields.TextField(
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
+                term_vector="with_positions_offsets",
                 search_analyzer="search_analyzer_exact",
             ),
         },
@@ -895,6 +909,7 @@ class DocketBaseDocument(Document):
         attr="court.citation_string",
         analyzer="text_en_splitting_cl",
         search_analyzer="search_analyzer",
+        term_vector="with_positions_offsets",
     )
     chapter = fields.TextField(
         analyzer="text_en_splitting_cl",
@@ -926,9 +941,11 @@ class ESRECAPDocument(DocketBaseDocument):
     description = fields.TextField(
         attr="docket_entry.description",
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 attr="docket_entry.description",
+                term_vector="with_positions_offsets",
                 analyzer="english_exact",
                 search_analyzer="search_analyzer_exact",
             ),
@@ -940,10 +957,12 @@ class ESRECAPDocument(DocketBaseDocument):
     short_description = fields.TextField(
         attr="description",
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 attr="description",
                 analyzer="english_exact",
+                term_vector="with_positions_offsets",
                 search_analyzer="search_analyzer_exact",
             ),
         },
@@ -951,9 +970,11 @@ class ESRECAPDocument(DocketBaseDocument):
     )
     document_type = fields.TextField(
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
+                term_vector="with_positions_offsets",
                 search_analyzer="search_analyzer_exact",
             ),
         },
@@ -963,9 +984,11 @@ class ESRECAPDocument(DocketBaseDocument):
     pacer_doc_id = fields.KeywordField(attr="pacer_doc_id")
     plain_text = fields.TextField(
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
+                term_vector="with_positions_offsets",
                 search_analyzer="search_analyzer_exact",
             ),
         },

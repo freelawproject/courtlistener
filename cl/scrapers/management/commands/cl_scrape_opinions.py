@@ -176,7 +176,7 @@ class Command(VerboseCommand):
     help = "Runs the Juriscraper toolkit against one or many jurisdictions."
 
     def __init__(self, stdout=None, stderr=None, no_color=False):
-        super(Command, self).__init__(stdout=None, stderr=None, no_color=False)
+        super().__init__(stdout=None, stderr=None, no_color=False)
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -338,7 +338,7 @@ class Command(VerboseCommand):
         self.scrape_court(site, full_crawl)
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         global die_now
 
         # this line is used for handling SIGTERM (CTRL+4), so things can die

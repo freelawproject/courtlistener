@@ -2,11 +2,13 @@
 import datetime
 import os
 import shutil
+from datetime import date
 from unittest import mock
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, PropertyMock
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
+from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
@@ -22,6 +24,7 @@ from rest_framework.status import (
 )
 from waffle.testutils import override_flag
 
+from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
     CourtTestCase,
@@ -56,9 +59,11 @@ from cl.search.models import (
     Docket,
     Opinion,
     OpinionCluster,
+    RECAPDocument,
 )
 from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
-from cl.users.factories import UserFactory
+from cl.tests.providers import fake
+from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
 
 class TitleTest(SimpleTestCase):
@@ -330,81 +335,107 @@ class CitationRedirectorTest(TestCase):
         self.assertEqual(r.status_code, HTTP_302_FOUND)
         self.assertEqual(r.url, "/c/f2d/56/9/")
 
-    def test_volume_pagination(self) -> None:
+    async def test_volume_pagination(self) -> None:
         """Can we properly paginate reporter volume numbers?"""
 
         # Create test data usign factories
-        test_obj = CitationWithParentsFactory.create(
+        test_obj = await sync_to_async(CitationWithParentsFactory.create)(
             volume="2016",
             reporter="COA",
             page="1",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
-                docket=DocketFactory(court=CourtFactory(id="coloctapp")),
+            cluster=await sync_to_async(
+                OpinionClusterFactoryWithChildrenAndParents
+            )(
+                docket=await sync_to_async(DocketFactory)(
+                    court=await sync_to_async(CourtFactory)(id="coloctapp")
+                ),
                 case_name="In re the Marriage of Morton",
                 date_filed=datetime.date(2016, 1, 14),
             ),
         )
 
-        CitationWithParentsFactory.create(
+        await sync_to_async(CitationWithParentsFactory.create)(
             volume="2017",
             reporter="COA",
             page="3",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
-                docket=DocketFactory(court=CourtFactory(id="coloctapp")),
+            cluster=await sync_to_async(
+                OpinionClusterFactoryWithChildrenAndParents
+            )(
+                docket=await sync_to_async(DocketFactory)(
+                    court=await sync_to_async(CourtFactory)(id="coloctapp")
+                ),
                 case_name="Begley v. Ireson",
                 date_filed=datetime.date(2017, 1, 12),
             ),
         )
 
-        CitationWithParentsFactory.create(
+        await sync_to_async(CitationWithParentsFactory.create)(
             volume="2018",
             reporter="COA",
             page="1",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
-                docket=DocketFactory(court=CourtFactory(id="coloctapp")),
+            cluster=await sync_to_async(
+                OpinionClusterFactoryWithChildrenAndParents
+            )(
+                docket=await sync_to_async(DocketFactory)(
+                    court=await sync_to_async(CourtFactory)(id="coloctapp")
+                ),
                 case_name="People v. Sparks",
                 date_filed=datetime.date(2018, 1, 11),
             ),
         )
 
-        CitationWithParentsFactory.create(
+        await sync_to_async(CitationWithParentsFactory.create)(
             volume="2018",
             reporter="COA",
             page="1",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
-                docket=DocketFactory(court=CourtFactory(id="coloctapp")),
+            cluster=await sync_to_async(
+                OpinionClusterFactoryWithChildrenAndParents
+            )(
+                docket=await sync_to_async(DocketFactory)(
+                    court=await sync_to_async(CourtFactory)(id="coloctapp")
+                ),
                 case_name="People v. Sparks",
                 date_filed=datetime.date(2018, 1, 11),
             ),
         )
 
         # Get previous and next volume for "2017 COA"
-        volume_next, volume_previous = get_prev_next_volumes("COA", "2017")
+        volume_next, volume_previous = await get_prev_next_volumes(
+            "COA", "2017"
+        )
         self.assertEqual(volume_previous, 2016)
         self.assertEqual(volume_next, 2018)
 
         # Delete previous
-        test_obj.delete()
+        await test_obj.adelete()
 
         # Only get next volume for "2017 COA"
-        volume_next, volume_previous = get_prev_next_volumes("COA", "2017")
+        volume_next, volume_previous = await get_prev_next_volumes(
+            "COA", "2017"
+        )
         self.assertEqual(volume_previous, None)
         self.assertEqual(volume_next, 2018)
 
         # Create new test data
-        CitationWithParentsFactory.create(
+        await sync_to_async(CitationWithParentsFactory.create)(
             volume="454",
             reporter="U.S.",
             page="1",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
-                docket=DocketFactory(court=CourtFactory(id="scotus")),
+            cluster=await sync_to_async(
+                OpinionClusterFactoryWithChildrenAndParents
+            )(
+                docket=await sync_to_async(DocketFactory)(
+                    court=await sync_to_async(CourtFactory)(id="scotus")
+                ),
                 case_name="Duckworth v. Serrano",
                 date_filed=datetime.date(1981, 10, 19),
             ),
         )
 
         # No next or previous volume for "454 U.S."
-        volume_next, volume_previous = get_prev_next_volumes("U.S.", "454")
+        volume_next, volume_previous = await get_prev_next_volumes(
+            "U.S.", "454"
+        )
         self.assertEqual(volume_previous, None)
         self.assertEqual(volume_next, None)
 
@@ -536,6 +567,25 @@ class ViewRecapDocketTest(TestCase):
         await self.docket_appellate.arefresh_from_db(fields=["view_count"])
         self.assertEqual(old_view_count + 1, self.docket_appellate.view_count)
 
+    async def test_pagination_returns_last_page_if_page_out_of_range(self):
+        """
+        Verify that the Docket view handles out-of-range page requests by returning
+        the last valid page.
+        """
+        entries = DocketEntriesDataFactory(
+            docket_entries=DocketEntryDataFactory.create_batch(50)
+        )
+        await add_docket_entries(self.docket, entries["docket_entries"])
+        response = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug]),
+            {"page": 0},
+        )
+
+        self.assertEqual(
+            response.context["docket_entries"].number,
+            response.context["docket_entries"].paginator.num_pages,
+        )
+
 
 class OgRedirectLookupViewTest(TestCase):
     fixtures = ["recap_docs.json"]
@@ -564,6 +614,32 @@ class OgRedirectLookupViewTest(TestCase):
         )
         self.assertEqual(r.status_code, HTTP_200_OK)
         mock.assert_called_once()
+
+    @mock.patch("cl.lib.thumbnails.microservice")
+    async def test_creates_thumbnail_successfully(
+        self, microservice_mock: MagicMock
+    ) -> None:
+        path = (
+            "recap/dev.gov.uscourts.txnd.28766/gov.uscourts.txnd.28766.1.0.pdf"
+        )
+
+        # Create a fake response object
+        response_mock = MagicMock()
+        type(response_mock).is_success = PropertyMock(return_value=True)
+        type(response_mock).content = PropertyMock(return_value=fake.binary(8))
+
+        microservice_mock.return_value = response_mock
+
+        r = await self.async_client.get(
+            self.url, {"file_path": path}, USER_AGENT="facebookexternalhit"
+        )
+        self.assertEqual(r.status_code, HTTP_200_OK)
+        microservice_mock.assert_called_once()
+
+        recap_doc = await RECAPDocument.objects.aget(pk=1)
+        self.assertEqual(
+            recap_doc.thumbnail_status, THUMBNAIL_STATUSES.COMPLETE
+        )
 
 
 class NewDocketAlertTest(SimpleUserDataMixin, TestCase):
@@ -996,3 +1072,81 @@ class UploadPublication(TestCase):
         self.assertIn(
             "Document already in database", form2.errors["pdf_upload"][0]
         )
+
+
+class TestBlockSearchItemAjax(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        # User admin
+        cls.admin = UserProfileWithParentsFactory.create(
+            user__username="admin",
+            user__password=make_password("password"),
+        )
+        cls.admin.user.is_superuser = True
+        cls.admin.user.is_staff = True
+        cls.admin.user.save()
+
+        # Courts
+        court_ca2 = CourtFactory(id="ca2")
+        # cluster
+        cls.cluster = OpinionClusterFactoryWithChildrenAndParents(
+            docket=DocketFactory(court=court_ca2),
+            case_name="Fisher v. SD Protection Inc.",
+            date_filed=date(2020, 1, 1),
+        )
+
+    async def test_return_404_for_invalid_type(self) -> None:
+        """is it returning 404 for invalid types?"""
+        self.assertFalse(self.cluster.blocked)
+        self.assertFalse(self.cluster.docket.blocked)
+
+        client = AsyncClient()
+        await client.aforce_login(user=self.admin.user)
+
+        response = await client.post(
+            reverse("block_item"),
+            data={"id": self.cluster.pk, "type": "recap"},
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    async def test_block_docket_via_ajax_view(self) -> None:
+        """can a super_user block a docket?"""
+        self.assertFalse(self.cluster.docket.blocked)
+
+        client = AsyncClient()
+        await client.aforce_login(user=self.admin.user)
+
+        response = await client.post(
+            reverse("block_item"),
+            data={"id": self.cluster.docket.pk, "type": "docket"},
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        await self.cluster.docket.arefresh_from_db()
+        self.assertTrue(self.cluster.docket.blocked)
+
+    async def test_block_cluster_and_docket_via_ajax_view(self) -> None:
+        """can a super_user block an opinion cluster?"""
+        self.assertFalse(self.cluster.blocked)
+        self.assertFalse(self.cluster.docket.blocked)
+
+        client = AsyncClient()
+        await client.aforce_login(user=self.admin.user)
+
+        response = await client.post(
+            reverse("block_item"),
+            data={"id": self.cluster.pk, "type": "cluster"},
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        await self.cluster.docket.arefresh_from_db()
+        self.assertTrue(self.cluster.docket.blocked)
+
+        await self.cluster.arefresh_from_db()
+        self.assertTrue(self.cluster.blocked)

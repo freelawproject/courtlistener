@@ -8,7 +8,7 @@ from cl.lib.solr_core_admin import get_data_dir
 from cl.search.models import Opinion, OpinionsCited
 
 
-def make_and_populate_nx_graph():
+def make_and_populate_nx_graph() -> igraph.Graph:
     """Create a new igraph object and populate it.
 
     This pulls all of the inter-opinion citations into memory then passes all of
@@ -72,7 +72,7 @@ class Command(VerboseCommand):
         return pr_results
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         pr_results = self.do_pagerank()
         pr_dest_dir = settings.SOLR_PAGERANK_DEST_DIR
         make_sorted_pr_file(pr_results, pr_dest_dir)

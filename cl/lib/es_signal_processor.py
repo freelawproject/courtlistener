@@ -622,7 +622,7 @@ def remove_non_judge_person_and_positions_from_index(
         pass
 
 
-class ESSignalProcessor(object):
+class ESSignalProcessor:
     """Custom signal processor for Elasticsearch documents. It is responsible
     for managing the Elasticsearch index after certain events happen, such as
     saving, deleting, or modifying instances of related models.
