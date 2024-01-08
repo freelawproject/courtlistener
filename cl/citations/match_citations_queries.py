@@ -57,17 +57,23 @@ def es_reverse_match(
         # See: https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html#_proximity_searches
         value = f'"{query}"~{len(query_tokens)}'
         # Create a search object with the query
-        search = opinion_document.query(
-            Q(
+
+        reverse_query = Q(
+            "bool",
+            must=Q(
                 "query_string",
                 fields=["text"],
                 query=value,
                 quote_field_suffix=".exact",
                 default_operator="AND",
                 type="phrase",
-            )
+            ),
+            filter=[
+                Q("term", id=citing_opinion.pk),
+                Q("match", cluster_child="opinion"),
+            ],
         )
-        search = search.filter("term", id=citing_opinion.pk)
+        search = opinion_document.query(reverse_query)
         new_response = fetch_citations(search)
         if len(new_response) == 1:
             return [result]
