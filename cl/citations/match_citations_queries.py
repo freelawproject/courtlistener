@@ -12,8 +12,6 @@ from cl.citations.utils import (
     get_years_from_reporter,
     make_name_param,
 )
-from cl.lib.elasticsearch_utils import build_fulltext_query
-from cl.search.constants import CITATION_REVERSE_MATCH_LOOK_UP_FIELDS
 from cl.search.documents import OpinionDocument
 from cl.search.models import Opinion
 
@@ -60,7 +58,14 @@ def es_reverse_match(
         value = f'"{query}"~{len(query_tokens)}'
         # Create a search object with the query
         search = opinion_document.query(
-            build_fulltext_query(CITATION_REVERSE_MATCH_LOOK_UP_FIELDS, value)
+            Q(
+                "query_string",
+                fields=["text"],
+                query=value,
+                quote_field_suffix=".exact",
+                default_operator="AND",
+                type="phrase",
+            )
         )
         search = search.filter("term", id=citing_opinion.pk)
         new_response = fetch_citations(search)
