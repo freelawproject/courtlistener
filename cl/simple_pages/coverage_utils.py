@@ -22,7 +22,7 @@ async def fetch_data(jurisdictions, group_by_state=True):
         jurisdiction__in=jurisdictions,
         parent_court__isnull=True,
     ).exclude(appeals_to__id="cafc"):
-        court_has_content = Docket.objects.filter(court=court).aexists()
+        court_has_content = await Docket.objects.filter(court=court).aexists()
         descendant_json = await get_descendants_dict(court)
         # Dont add any courts without a docket associated with it or
         # a descendant court
