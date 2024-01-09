@@ -7,6 +7,7 @@ from urllib.parse import urljoin
 
 import requests
 from asgiref.sync import async_to_sync
+from courts_db import find_court_by_id, find_court_ids_by_name
 from django.conf import settings
 from django.db.models import QuerySet
 from juriscraper.AbstractSite import logger
@@ -20,7 +21,54 @@ from cl.lib.decorators import retry
 from cl.lib.microservice_utils import microservice
 from cl.recap.mergers import find_docket_object
 from cl.scrapers.tasks import extract_recap_pdf
-from cl.search.models import Docket, RECAPDocument
+from cl.search.models import Court, Docket, RECAPDocument
+
+
+def get_child_court(child_court_name: str, court: Court) -> Optional[Court]:
+    """Get Court object from "child_courts" scraped string
+
+    Ensure that the Court object found has the same parent court id has the
+    Court object got from the scraper
+
+    :param item: scraped court's name
+    :param court: court object got from the scraper
+
+    :return: Court object for the child_court string if it exists and is valid
+    """
+    if not child_court_name:
+        return None
+
+    parent_court_object = find_court_by_id(court.id)[0]
+
+    child_court_ids = find_court_ids_by_name(
+        child_court_name,
+        bankruptcy=parent_court_object["type"] == "bankruptcy",
+        location=parent_court_object["location"],
+        allow_partial_matches=False,
+    )
+
+    if not child_court_ids:
+        logger.error(
+            "Could not get child court id from name %s", child_court_name
+        )
+        return None
+
+    child_court = None
+    if not (child_courts := Court.objects.filter(pk=child_court_ids[0])):
+        logger.error(
+            "Court object does not exist for %s", child_court_ids[0]
+        )
+    elif child_courts[0].parent_court.id != court.id:
+        logger.error(
+            "Child court found from name '%s' with id '%s' has parent court id different from expected parent id '%s'",
+            child_court_name,
+            child_court_ids[0],
+            court.id,
+        )
+    else:
+        child_court = child_courts[0]
+
+    return child_court
 
 
 @retry(
