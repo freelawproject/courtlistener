@@ -364,6 +364,11 @@ class Command(VerboseCommand):
             mod = __import__(
                 f"{package}.{module}", globals(), locals(), [module]
             )
+            court_id = mod.Site().court_id.split(".")[-1].split("_")[0]
+            if not Court.objects.get(id=court_id).has_opinion_scraper:
+                logger.info(f"{court_id} is currently disabled.")
+                i += 1
+                continue
             try:
                 self.parse_and_scrape_site(mod, options["full_crawl"])
             except Exception as e:
