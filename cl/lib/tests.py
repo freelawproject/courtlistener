@@ -1074,6 +1074,7 @@ class TestElasticsearchUtils(SimpleTestCase):
                 ],
                 "input_str": "MOTION for Leave to File",
                 "output": ["MOTION for Leave to File Amicus Curiae Lorem"],
+                "field": "description",
             },
             {
                 "current_list": [
@@ -1081,16 +1082,47 @@ class TestElasticsearchUtils(SimpleTestCase):
                 ],
                 "input_str": "for Leave to File Amicus",
                 "output": ["MOTION for Leave to File Amicus Curiae Lorem"],
+                "field": "description",
             },
             {
                 "current_list": ["Leave to File Amicus"],
                 "input_str": "Leave to File Amicus Curiae Lorem",
                 "output": ["Leave to File Amicus Curiae Lorem"],
+                "field": "description",
             },
             {
                 "current_list": ["to File Amicus Curiae"],
                 "input_str": "Leave to File Amicus Curiae Lorem",
                 "output": ["Leave to File Amicus Curiae Lorem"],
+                "field": "description",
+            },
+            {
+                "current_list": [
+                    "to File Amicus Curiae Lorem pellentesque eu, elementum"
+                ],
+                "input_str": "Leave to File Amicus Curiae Lorem",
+                "output": [
+                    "to File Amicus Curiae Lorem pellentesque eu, elementum"
+                ],
+                "field": "description",
+            },
+            {
+                "current_list": ["22 AL 339"],
+                "input_str": "22 AL 1",
+                "output": ["22 AL 339", "22 AL 1"],
+                "field": "citation",
+            },
+            {
+                "current_list": ["22 AL 1"],
+                "input_str": "22 AL 339",
+                "output": ["22 AL 1", "22 AL 339"],
+                "field": "citation",
+            },
+            {
+                "current_list": ["22 AL 1", "22 AL 2"],
+                "input_str": "22 AL 2",
+                "output": ["22 AL 1", "22 AL 2"],
+                "field": "citation",
             },
         ]
 
@@ -1098,5 +1130,7 @@ class TestElasticsearchUtils(SimpleTestCase):
             output_str = select_unique_hl(
                 test["current_list"],  # type: ignore
                 test["input_str"],  # type: ignore
+                test["field"],  # type: ignore
             )
+            print("Output STR: ", output_str)
             self.assertEqual(output_str, test["output"])

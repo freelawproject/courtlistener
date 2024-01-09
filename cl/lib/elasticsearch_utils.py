@@ -15,6 +15,7 @@ from django.conf import settings
 from django.core.cache import cache, caches
 from django.core.paginator import EmptyPage, Page
 from django.db.models import QuerySet
+from django.forms.boundfield import BoundField
 from django.http import HttpRequest
 from django.http.request import QueryDict
 from django_elasticsearch_dsl.search import Search
@@ -42,6 +43,7 @@ from cl.lib.types import (
 from cl.people_db.models import Position
 from cl.search.constants import (
     ALERTS_HL_TAG,
+    MULTI_VALUE_HL_FIELDS,
     RELATED_PATTERN,
     SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS,
     SEARCH_HL_TAG,
@@ -956,7 +958,7 @@ def build_child_docs_query(
 
 def get_only_status_facets(
     search_query: Search, search_form: SearchForm
-) -> list[str]:
+) -> list[BoundField]:
     """Create a useful facet variable to use in a template
 
     This method creates an Elasticsearch query with the status aggregations
@@ -970,29 +972,7 @@ def get_only_status_facets(
     )
     search_query.aggs.bucket("status", A("terms", field="status.raw"))
     response = search_query.execute()
-
-    facet_fields = []
-    try:
-        buckets = response.aggregations.status.buckets
-        facet_values = {group["key"]: group["doc_count"] for group in buckets}
-    except (KeyError, AttributeError):
-        facet_values = {}
-
-    for field in search_form:
-        if not field.html_name.startswith("stat_"):
-            continue
-
-        try:
-            count = facet_values[field.html_name.replace("stat_", "")]
-        except KeyError:
-            # Happens when a field is iterated on that doesn't exist in the
-            # facets variable
-            count = None
-
-        field.count = count
-        facet_fields.append(field)
-
-    return facet_fields
+    return make_es_stats_variable(search_form, response)
 
 
 def build_es_main_query(
@@ -1118,41 +1098,6 @@ def replace_highlight(
     return cleaned_str
 
 
-def is_contained(str_to_match: str, str_to_match_in: str, field: str) -> bool:
-    """Determine if str_to_match is a substring of str_to_match_in.
-
-    This function checks if str_to_match can be matched within str_to_match_in
-    by progressively removing words from the end of str_to_match_in.
-    It's useful to the longest version of a highlighted string.
-
-    Example:
-    Given two strings:
-
-    "leo sit amet hendrerit vehicula, Maecenas nunc justo. Integer varius"
-    "Mauris, leo sit amet hendrerit vehicula, Maecenas nunc justo. Integer"
-    The function will identify that the first string is a part of the second
-    one after truncating some words from the end of the second string.
-
-    In this case, the second string is chosen as it includes the first one.
-
-    :param str_to_match: The string to check if it's a match.
-    :param str_to_match_in: The string to look for a match in.
-    :param field: The field name being analyzed.
-    :return: True if str_to_match is a match in str_to_match_in, otherwise False
-    """
-
-    if field == "citation" and str_to_match != str_to_match_in:
-        # citation field is a multi-value field, requiring distinct and
-        # completely non-duplicate strings.
-        return False
-
-    sub_parts = str_to_match.split()
-    for i in range(len(sub_parts), 0, -1):
-        if " ".join(sub_parts[:i]) in str_to_match_in:
-            return True
-    return False
-
-
 def select_unique_hl(
     cleaned_unique_strings: list[str], cleaned_str: str, field: str
 ) -> list[str]:
@@ -1161,26 +1106,21 @@ def select_unique_hl(
 
     :param cleaned_unique_strings: The list holding the unique highlighted str
     :param cleaned_str: The incoming string to potentially add to the list.
+    :param field: The HL field being analyzed.
     :return: The updated cleaned_unique_strings
     """
 
-    # Check if cleaned_str is contained or partially matched in any element of
-    # the list
+    if field in MULTI_VALUE_HL_FIELDS:
+        # Multi-value fields like "citation" require complete distinctness to
+        # avoid duplicate strings.
+        if cleaned_str not in cleaned_unique_strings:
+            cleaned_unique_strings.append(cleaned_str)
+    else:
+        # Select the longer string between cleaned_str and the longest in
+        # cleaned_unique_strings
+        longest_str = max(cleaned_unique_strings, key=len, default="")
+        return [max(cleaned_str, longest_str, key=len)]
 
-    for item in cleaned_unique_strings:
-        if is_contained(cleaned_str, item, field):
-            return cleaned_unique_strings
-
-    # Now do the inverse process, checks if any element of the list is
-    # contained in cleaned_str.
-    cleaned_unique_strings = [
-        item
-        for item in cleaned_unique_strings
-        if not is_contained(item, cleaned_str, field)
-    ]
-
-    # Adds cleaned_unique_strings to the list
-    cleaned_unique_strings.append(cleaned_str)
     return cleaned_unique_strings
 
 
@@ -2165,7 +2105,7 @@ async def get_related_clusters_with_cache_and_es(
     # Opinions that belong to the targeted cluster
     sub_opinion_ids = cluster.sub_opinions.values_list("pk", flat=True)
     sub_opinion_pks = [pk async for pk in sub_opinion_ids]
-    if is_bot(request) or not await sub_opinion_ids.aexists():
+    if is_bot(request) or not sub_opinion_pks:
         # If it is a bot or lacks sub-opinion IDs, return empty results
         return [], [], url_search_params
 
@@ -2215,22 +2155,22 @@ async def get_related_clusters_with_cache_and_es(
 
 def make_es_stats_variable(
     search_form: SearchForm,
-    paged_results: Page,
-) -> list[str]:
+    results: Page | Response,
+) -> list[BoundField]:
     """Create a useful facet variable for use in a template
 
-    This function merges the fields in the form with the bucket counts from
-    ES, creating useful variables for the front end.
-
-    The count value is associated with the form fields as an attribute
-    named "count". If the search didn't work, the value will be None.
-    If it did, the value will be an int.
+    :param search_form: The form displayed in the user interface
+    :param results: The Page or Response containing the results to add the
+    status aggregations.
     """
-    facet_fields = []
 
+    facet_fields = []
     try:
-        aggregations = paged_results.paginator.aggregations.to_dict()  # type: ignore
-        buckets = aggregations["status"]["buckets"]
+        if isinstance(results, Page):
+            aggregations = results.paginator.aggregations.to_dict()  # type: ignore
+            buckets = aggregations["status"]["buckets"]
+        else:
+            buckets = results.aggregations.status.buckets
         facet_values = {group["key"]: group["doc_count"] for group in buckets}
     except (KeyError, AttributeError):
         facet_values = {}

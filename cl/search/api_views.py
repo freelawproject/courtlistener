@@ -175,7 +175,7 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
     permission_classes = (permissions.AllowAny,)
 
     def list(self, request, *args, **kwargs):
-        search_form = SearchForm(request.GET, is_es_form=False)
+        search_form = SearchForm(request.GET)
         if search_form.is_valid():
             cd = search_form.cleaned_data
 

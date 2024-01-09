@@ -467,7 +467,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
 
             # But give it a fresh form for the advanced search section
             render_dict.update(
-                {"search_form": SearchForm(request.GET)}, request=request
+                {"search_form": SearchForm(request.GET, request=request)}
             )
 
             # Get a bunch of stats.
