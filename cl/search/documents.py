@@ -1536,10 +1536,12 @@ class OpinionDocument(OpinionBaseDocument):
     local_path = fields.KeywordField(index=False)
     text = fields.TextField(
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
                 search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
             ),
         },
         search_analyzer="search_analyzer",

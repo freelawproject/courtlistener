@@ -10,6 +10,7 @@ from functools import reduce, wraps
 from typing import Any, Callable, Dict, List, Literal
 
 import regex
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.cache import cache, caches
 from django.core.paginator import EmptyPage, Page
@@ -1117,8 +1118,43 @@ def replace_highlight(
     return cleaned_str
 
 
+def is_contained(str_to_match: str, str_to_match_in: str, field: str) -> bool:
+    """Determine if str_to_match is a substring of str_to_match_in.
+
+    This function checks if str_to_match can be matched within str_to_match_in
+    by progressively removing words from the end of str_to_match_in.
+    It's useful to the longest version of a highlighted string.
+
+    Example:
+    Given two strings:
+
+    "leo sit amet hendrerit vehicula, Maecenas nunc justo. Integer varius"
+    "Mauris, leo sit amet hendrerit vehicula, Maecenas nunc justo. Integer"
+    The function will identify that the first string is a part of the second
+    one after truncating some words from the end of the second string.
+
+    In this case, the second string is chosen as it includes the first one.
+
+    :param str_to_match: The string to check if it's a match.
+    :param str_to_match_in: The string to look for a match in.
+    :param field: The field name being analyzed.
+    :return: True if str_to_match is a match in str_to_match_in, otherwise False
+    """
+
+    if field == "citation" and str_to_match != str_to_match_in:
+        # citation field is a multi-value field, requiring distinct and
+        # completely non-duplicate strings.
+        return False
+
+    sub_parts = str_to_match.split()
+    for i in range(len(sub_parts), 0, -1):
+        if " ".join(sub_parts[:i]) in str_to_match_in:
+            return True
+    return False
+
+
 def select_unique_hl(
-    cleaned_unique_strings: list[str], cleaned_str: str
+    cleaned_unique_strings: list[str], cleaned_str: str, field: str
 ) -> list[str]:
     """Select the longest string to be highlighted. This is required when the
     field contains HL for the "normal" and the "exact" version.
@@ -1128,16 +1164,19 @@ def select_unique_hl(
     :return: The updated cleaned_unique_strings
     """
 
-    # Check if cleaned_str is contained in any element of the list
+    # Check if cleaned_str is contained or partially matched in any element of
+    # the list
+
     for item in cleaned_unique_strings:
-        if cleaned_str in item:
-            # cleaned_str is contained in an element of the list, do not add it
+        if is_contained(cleaned_str, item, field):
             return cleaned_unique_strings
 
     # Now do the inverse process, checks if any element of the list is
     # contained in cleaned_str.
     cleaned_unique_strings = [
-        item for item in cleaned_unique_strings if not item in cleaned_str
+        item
+        for item in cleaned_unique_strings
+        if not is_contained(item, cleaned_str, field)
     ]
 
     # Adds cleaned_unique_strings to the list
@@ -1165,7 +1204,7 @@ def merge_highlights_into_result(
         field,
         highlight_list,
     ) in highlights.items():
-        # If a query highlights fields the "field.exact", "field" or
+        # If a query highlights fields, the "field.exact", "field" or
         # both versions are available. Highlighted terms in each
         # version can differ, so the best thing to do is combine
         # highlighted terms from each version and set it.
@@ -1186,10 +1225,15 @@ def merge_highlights_into_result(
             for hl in highlight_list:
                 cleaned_hl = re.sub(r"</?mark>", "", hl)
                 cleaned_unique_strings = select_unique_hl(
-                    cleaned_unique_strings, cleaned_hl
+                    cleaned_unique_strings, cleaned_hl, field
                 )
-                marked_strings.extend(re.findall(rf"<{tag}>(.*?)</{tag}>", hl))
-
+                marked_strings.extend(
+                    [
+                        word
+                        for phrase in re.findall(rf"<{tag}>(.*?)</{tag}>", hl)
+                        for word in phrase.split()
+                    ]
+                )
         if field in highlights:
             # Extract all unique marked strings from "field" if
             # available
@@ -1197,13 +1241,14 @@ def merge_highlights_into_result(
             for hl in highlights[field]:
                 cleaned_hl = re.sub(r"</?mark>", "", hl)
                 cleaned_unique_strings = select_unique_hl(
-                    cleaned_unique_strings, cleaned_hl
+                    cleaned_unique_strings, cleaned_hl, field
                 )
                 marked_strings_exact.extend(
-                    re.findall(
-                        rf"<{tag}>(.*?)</{tag}>",
-                        hl,
-                    )
+                    [
+                        word
+                        for phrase in re.findall(rf"<{tag}>(.*?)</{tag}>", hl)
+                        for word in phrase.split()
+                    ]
                 )
 
         # Merge highlights if there were HL terms in "field" or "field.exact".
@@ -1535,6 +1580,7 @@ def build_join_fulltext_queries(
     :param child_query_fields: A list of child name fields to search in.
     :param parent_fields: The parent fields to search in.
     :param value: The string value to search for.
+    :param mlt_query: A More like this query, optional.
     :return: A Elasticsearch QueryString or [] if the "value" param is empty.
     """
 
@@ -2097,60 +2143,74 @@ def merge_opinion_and_cluster(results: Page | dict) -> None:
         result["status_exact"] = result["status"]
 
 
-def get_related_clusters_with_cache_and_es(
+async def get_related_clusters_with_cache_and_es(
     search: Search,
     cluster: OpinionCluster,
     request: HttpRequest,
-) -> Tuple[list[OpinionCluster], list[int], dict[str, str]]:
-    # By default all statuses are included
+) -> tuple[Page | list, list[int], dict[str, str]]:
+    """Retrieve related opinion clusters from ES or cache.
+
+    :param search: The ES Search object.
+    :param cluster: The current OpinionCluster.
+    :param request: The HttpRequest object.
+    :return: A three tuple containing a Page containing opinion clusters or an
+    empty list. A list containing the cluster sub opinions ids. A dic containing
+    the url_search_params.
+    """
+
+    # By default, all statuses are included
     available_statuses = dict(PRECEDENTIAL_STATUS.NAMES).values()
     url_search_params = {f"stat_{v}": "on" for v in available_statuses}
 
     # Opinions that belong to the targeted cluster
     sub_opinion_ids = cluster.sub_opinions.values_list("pk", flat=True)
-
-    if is_bot(request) or not sub_opinion_ids:
+    sub_opinion_pks = [pk async for pk in sub_opinion_ids]
+    if is_bot(request) or not await sub_opinion_ids.aexists():
         # If it is a bot or lacks sub-opinion IDs, return empty results
         return [], [], url_search_params
 
     # Use cache if enabled
     mlt_cache_key = f"mlt-cluster-es:{cluster.pk}"
     related_clusters = (
-        caches["db_cache"].get(mlt_cache_key)
+        await caches["db_cache"].aget(mlt_cache_key)
         if settings.RELATED_USE_CACHE
         else None
     )
 
     if related_clusters is None:
-        sub_opinion_queries = ",".join(str(i) for i in sub_opinion_ids)
+        sub_opinion_queries = ",".join(str(pk) for pk in sub_opinion_pks)
         url_search_params["q"] = f"related:{sub_opinion_queries}"
         url_search_params["type"] = SEARCH_TYPES.OPINION
 
         query_dict = QueryDict("", mutable=True)
         query_dict.update(url_search_params)
-        search_query, total_query_results, *_ = build_es_main_query(
-            search, url_search_params
-        )
-        hits, _, error = fetch_es_results(
+        search_query, total_query_results, *_ = await sync_to_async(
+            build_es_main_query
+        )(search, url_search_params)
+        hits, _, error = await sync_to_async(fetch_es_results)(
             query_dict, search_query, 1, settings.RELATED_COUNT
         )
-
         if error:
             return [], [], url_search_params
 
-        paginator = ESPaginator(
-            total_query_results, hits, settings.RELATED_COUNT
-        )
-        try:
-            related_clusters = paginator.page(1)
-        except EmptyPage:
-            related_clusters = paginator.page(paginator.num_pages)
+        @sync_to_async
+        def paginate_related_clusters(total_results: int, results: Response):
+            paginator = ESPaginator(
+                total_results, results, settings.RELATED_COUNT
+            )
+            try:
+                return paginator.page(1)
+            except EmptyPage:
+                return paginator.page(paginator.num_pages)
 
-        cache.set(
+        related_clusters = await paginate_related_clusters(
+            total_query_results, hits
+        )
+
+        await cache.aset(
             mlt_cache_key, related_clusters, settings.RELATED_CACHE_TIMEOUT
         )
-
-    return related_clusters, sub_opinion_ids, url_search_params
+    return related_clusters, sub_opinion_pks, url_search_params
 
 
 def make_es_stats_variable(

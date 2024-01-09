@@ -64,8 +64,8 @@ from cl.opinion_page.types import AuthoritiesContext
 from cl.opinion_page.utils import core_docket_data, get_case_title
 from cl.people_db.models import AttorneyOrganization, CriminalCount, Role
 from cl.recap.constants import COURT_TIMEZONES
-from cl.search.documents import OpinionClusterDocument
 from cl.recap.models import FjcIntegratedDatabase
+from cl.search.documents import OpinionClusterDocument
 from cl.search.models import (
     Citation,
     Court,
@@ -644,13 +644,18 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
         citing_cluster_count,
     ) = await get_citing_clusters_with_cache(cluster)
 
-    if waffle.flag_is_active(request, "o-es-active"):
+    es_flag_for_o = await sync_to_async(waffle.flag_is_active)(
+        request, "o-es-active"
+    )
+    if es_flag_for_o:
         search = OpinionClusterDocument.search()
         (
             related_clusters,
             sub_opinion_ids,
             related_search_params,
-        ) = get_related_clusters_with_cache_and_es(search, cluster, request)
+        ) = await get_related_clusters_with_cache_and_es(
+            search, cluster, request
+        )
     else:
         (
             related_clusters,
@@ -705,9 +710,7 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
             "related_algorithm": "mlt",
             "related_clusters": related_clusters,
             "related_cluster_ids": [
-                item["cluster_id"]
-                if waffle.flag_is_active(request, "o-es-active")
-                else item["id"]
+                item["cluster_id"] if es_flag_for_o else item["id"]
                 for item in related_clusters
             ],
             "related_search_params": f"&{urlencode(related_search_params)}",

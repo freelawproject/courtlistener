@@ -1126,7 +1126,6 @@ class RelatedSearchTest(
             recomendations_actual,
             msg="Unexpected opinion recommendations.",
         )
-
         await sync_to_async(self.async_client.logout)()
 
     @override_settings(RELATED_FILTER_BY_STATUS=None)
