@@ -55,9 +55,7 @@ def get_child_court(child_court_name: str, court: Court) -> Optional[Court]:
 
     child_court = None
     if not (child_courts := Court.objects.filter(pk=child_court_ids[0])):
-        logger.error(
-            "Court object does not exist for %s", child_court_ids[0]
-        )
+        logger.error("Court object does not exist for %s", child_court_ids[0])
     elif child_courts[0].parent_court.id != court.id:
         logger.error(
             "Child court found from name '%s' with id '%s' has parent court id different from expected parent id '%s'",
