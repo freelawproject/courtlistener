@@ -1422,13 +1422,13 @@ files = [
 
 [[package]]
 name = "eyecite"
-version = "2.5.2"
+version = "2.5.4"
 description = "Tool for extracting legal citations from text strings."
 optional = false
 python-versions = ">=3.8.1,<4.0.0"
 files = [
-    {file = "eyecite-2.5.2-py3-none-any.whl", hash = "sha256:bf231df10c6a6cde8afedec6cdd0a8cd8f9d3593b4d407efc0e8482eb38261eb"},
-    {file = "eyecite-2.5.2.tar.gz", hash = "sha256:72cd8c57006e83d113fdf4226668427d23472273c3a68f14c41f5cb0fd5fdd3b"},
+    {file = "eyecite-2.5.4-py3-none-any.whl", hash = "sha256:0683fe26edd368604a469c59034297174192765580df4e37608b6284fae6d382"},
+    {file = "eyecite-2.5.4.tar.gz", hash = "sha256:97d949519775dfbc52e2120fc49d4ae0b282d65553e451fbafa8ab9e9daa6a79"},
 ]
 
 [package.dependencies]
@@ -1437,7 +1437,7 @@ fast-diff-match-patch = ">=2.0.0,<3.0.0"
 lxml = ">=4.6.3,<5.0.0"
 pyahocorasick = ">=1.2"
 regex = ">=2020.1.8"
-reporters-db = "3.2.36"
+reporters-db = ">=3.2.38,<4.0.0"
 
 [[package]]
 name = "factory-boy"
@@ -3865,13 +3865,13 @@ files = [
 
 [[package]]
 name = "reporters-db"
-version = "3.2.36"
+version = "3.2.38"
 description = "Database of Court Reporters"
 optional = false
 python-versions = "*"
 files = [
-    {file = "reporters-db-3.2.36.tar.gz", hash = "sha256:a28b4ddf167e179c6176db1d27b6b0cb6e0a8acfbddd0dbce8afdae26b69c421"},
-    {file = "reporters_db-3.2.36-py2.py3-none-any.whl", hash = "sha256:7d0986e1c5ddc260cae65a1fd10dc7c2e550c9de0dc413c5a51c691e539b7315"},
+    {file = "reporters-db-3.2.38.tar.gz", hash = "sha256:c0048d34a4493e24dcfd0cab9e3b0e69e000e5a3c2ef21d04598f93ac1c2582c"},
+    {file = "reporters_db-3.2.38-py2.py3-none-any.whl", hash = "sha256:ab5e818b3a806efe35d3b29e4fe123ae5943aff54c9ef6d7db804a37f20ddf43"},
 ]
 
 [package.dependencies]
@@ -5219,4 +5219,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12, <3.13"
-content-hash = "2ce49cde2d80ab980517a45f37a444a139911ae09cea3c2d472df27377cb40dc"
+content-hash = "c6163e11f9a79158df8a7c3bda99ab01d9c29e2a93fa4a529560700ecee5c6f0"
