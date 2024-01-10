@@ -46,15 +46,19 @@ cnt = CaseNameTweaker()
 
 
 def make_citation(
-    cite_str: str,
-    cluster: OpinionCluster,
+    cite_str: str, cluster: OpinionCluster, court_id: str
 ) -> Optional[Citation]:
     """Create and return a citation object for the input values."""
     citation_objs = get_citations(cite_str)
     if not citation_objs:
         logger.error(
-            "Could not parse citation",
-            extra=dict(cite=cite_str, cluster=cluster),
+            "Could not parse citation from court '%s'",
+            court_id,
+            extra=dict(
+                cite=cite_str,
+                cluster=cluster,
+                fingerprint=f"citation-not-parsed-{court_id}",
+            ),
         )
         return None
     # Convert the found cite type to a valid cite type for our DB.
@@ -114,7 +118,9 @@ def make_objects(
     )
 
     cites = [item.get(key, "") for key in ["citations", "parallel_citations"]]
-    citations = [make_citation(cite, cluster) for cite in cites if cite]
+    citations = [
+        make_citation(cite, cluster, court.id) for cite in cites if cite
+    ]
     # Remove citations that did not parse correctly.
     citations = [cite for cite in citations if cite]
 
