@@ -112,7 +112,7 @@ urlpatterns = [
     path("profile/api-token/", views.view_api_token, name="view_api_token"),
     path("profile/api-usage/", views.view_api_usage, name="view_api_usage"),
     path("profile/webhooks/", views.view_webhooks, name="view_webhooks"),
-    path("profile/donations/", view_donations, name="profile_donations"),
+    path("profile/your-support/", view_donations, name="profile_your_support"),
     re_path(
         "profile/webhooks/(logs|test-logs)/",
         views.view_webhook_logs,
