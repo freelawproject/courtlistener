@@ -1107,9 +1107,7 @@ async def get_related_clusters_with_cache(
     cache = caches["db_cache"]
     mlt_cache_key = f"mlt-cluster:{cluster.pk}"
     related_clusters = (
-        await caches["db_cache"].aget(mlt_cache_key)
-        if settings.RELATED_USE_CACHE
-        else None
+        await cache.aget(mlt_cache_key) if settings.RELATED_USE_CACHE else None
     )
 
     if settings.RELATED_FILTER_BY_STATUS:
