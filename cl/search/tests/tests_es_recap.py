@@ -1160,7 +1160,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         plain_text_string = plain_text[0].strip()
         cleaned_plain_text = re.sub(r"\s+", " ", plain_text_string)
         cleaned_plain_text = cleaned_plain_text.replace("…", "")
-        self.assertLess(len(cleaned_plain_text), 50)
+        # The actual no_match_size in this test using fvh is a bit longer due
+        # to it includes an extra word.
+        self.assertEqual(len(cleaned_plain_text), 58)
 
         # Highlight assigned_to.
         params = {"type": SEARCH_TYPES.RECAP, "q": "Thalassa Miller"}
@@ -1211,9 +1213,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             0, r.content.decode(), 1, "highlights description"
         )
 
-        self.assertIn("<mark>Discharging</mark>", r.content.decode())
+        self.assertIn("<mark>Discharging Debtor</mark>", r.content.decode())
         self.assertEqual(
-            r.content.decode().count("<mark>Discharging</mark>"), 1
+            r.content.decode().count("<mark>Discharging Debtor</mark>"), 1
         )
 
         # Highlight suitNature and text.
@@ -1301,9 +1303,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = await self._test_article_count(params, 1, "filter + query")
         self.assertIn("<mark>Amicus</mark>", r.content.decode())
         self.assertEqual(r.content.decode().count("<mark>Amicus</mark>"), 1)
-        self.assertIn("<mark>attachment</mark>", r.content.decode())
+        self.assertIn("<mark>Document attachment</mark>", r.content.decode())
         self.assertEqual(
-            r.content.decode().count("<mark>attachment</mark>"), 1
+            r.content.decode().count("<mark>Document attachment</mark>"), 1
         )
 
     @override_settings(NO_MATCH_HL_SIZE=50)

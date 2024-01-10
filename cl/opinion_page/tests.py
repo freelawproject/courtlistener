@@ -552,6 +552,25 @@ class ViewRecapDocketTest(TestCase):
         await self.docket_appellate.arefresh_from_db(fields=["view_count"])
         self.assertEqual(old_view_count + 1, self.docket_appellate.view_count)
 
+    async def test_pagination_returns_last_page_if_page_out_of_range(self):
+        """
+        Verify that the Docket view handles out-of-range page requests by returning
+        the last valid page.
+        """
+        entries = DocketEntriesDataFactory(
+            docket_entries=DocketEntryDataFactory.create_batch(50)
+        )
+        await add_docket_entries(self.docket, entries["docket_entries"])
+        response = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug]),
+            {"page": 0},
+        )
+
+        self.assertEqual(
+            response.context["docket_entries"].number,
+            response.context["docket_entries"].paginator.num_pages,
+        )
+
 
 class OgRedirectLookupViewTest(TestCase):
     fixtures = ["recap_docs.json"]

@@ -9,6 +9,7 @@ if TESTING:
     ELASTICSEARCH_RECAP_DOCS_SIGNALS_DISABLED = False
     ELASTICSEARCH_DOCKETS_SIGNALS_DISABLED = False
     ELASTICSEARCH_RECAP_CITES_ENABLED = True
+    ES_HIGHLIGHTER = "fvh"
 else:
     ELASTICSEARCH_DISABLED = env(
         "ELASTICSEARCH_DISABLED",
@@ -26,7 +27,10 @@ else:
         "ELASTICSEARCH_RECAP_CITES_ENABLED",
         default=False,
     )
-
+    ES_HIGHLIGHTER = env(
+        "ES_HIGHLIGHTER",
+        default="plain",
+    )
 #
 # Connection settings
 #
