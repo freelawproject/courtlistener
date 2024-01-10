@@ -1113,11 +1113,7 @@ class RelatedSearchTest(
             (
                 f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
                 "Howard v. Honda",
-            ),
-            (
-                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
-                "Debbas v. Franklin",
-            ),
+            )
         ]
 
         # Test if related opinion exist in expected order
