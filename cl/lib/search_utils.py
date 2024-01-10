@@ -15,7 +15,11 @@ from scorched.response import SolrResponse
 from cl.citations.match_citations import search_db_for_fullcitation
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.lib.bot_detector import is_bot
-from cl.lib.model_helpers import clean_docket_number, is_docket_number
+from cl.lib.model_helpers import (
+    clean_docket_number,
+    is_docket_number,
+    parse_court_id_query,
+)
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.types import CleanData, SearchParam
 from cl.search.constants import (
@@ -586,6 +590,52 @@ def add_highlighting(
         main_params[f"f.{field}.hl.alternateField"] = field  # type: ignore
 
 
+def get_child_courts(parent_courts: list[str]) -> set[str]:
+    """Recursively fetches child courts for the given parent courts.
+
+    :param parent_courts: List of parent court_ids.
+    :return: Set of all child court IDs.
+    """
+
+    cache = caches["db_cache"]
+    all_child_courts = set()
+    for court_id in parent_courts:
+        cached_child_courts = cache.get(f"child_courts:{court_id}")
+        if cached_child_courts is None:
+            child_courts = set(
+                Court.objects.filter(parent_court__id=court_id).values_list(
+                    "id", flat=True
+                )
+            )
+            cache.set(f"child_courts:{court_id}", child_courts)
+        else:
+            child_courts = set(cached_child_courts)
+
+        all_child_courts.update(child_courts)
+    if not all_child_courts:
+        return set()
+
+    final_results = all_child_courts.union(
+        get_child_courts(list(all_child_courts))
+    )
+    return final_results
+
+
+def get_child_court_ids_for_parents(selected_courts_string: str) -> str:
+    """
+    Retrieves and combines court IDs from both the given parents and their
+    child courts and removing duplicates.
+
+    :param selected_courts_string: The courts from the original user query.
+    :return: A string containing the unique combination of parent and child courts.
+    """
+
+    unique_courts = set(re.findall(r'"(.*?)"', selected_courts_string))
+    unique_courts.update(get_child_courts(list(unique_courts)))
+    courts = [f'"{c}"' for c in unique_courts]
+    return " OR ".join(courts)
+
+
 def add_filter_queries(main_params: SearchParam, cd) -> None:
     """Add the fq params"""
     # Changes here are usually mirrored in place_facet_queries, below.
@@ -708,7 +758,9 @@ def add_filter_queries(main_params: SearchParam, cd) -> None:
 
     selected_courts_string = get_selected_field_string(cd, "court_")
     if len(selected_courts_string) > 0:
-        main_fq.append(f"court_exact:({selected_courts_string})")
+        main_fq.append(
+            f"court_exact:({get_child_court_ids_for_parents(selected_courts_string)})"
+        )
 
     # If a param has been added to the fq variables, then we add them to the
     # main_params var. Otherwise, we don't, as doing so throws an error.
@@ -864,7 +916,17 @@ def cleanup_main_query(query_string: str) -> str:
         else:
             cleaned_items.append(f'"{item}"')
 
-    return "".join(cleaned_items)
+    cleaned_query = "".join(cleaned_items)
+    # If it's a court_id query, parse it and return the courts in the query and
+    # their child courts.
+    court_id_query = parse_court_id_query(cleaned_query)
+    if court_id_query:
+        parent_child_courts_query = get_child_court_ids_for_parents(
+            court_id_query
+        )
+        return f"court_id:({parent_child_courts_query})"
+    else:
+        return cleaned_query
 
 
 def build_main_query(

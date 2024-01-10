@@ -487,3 +487,36 @@ def suppress_autotime(model, fields):
                 field.auto_now_add = _original_values[field.name][
                     "auto_now_add"
                 ]
+
+
+def parse_court_id_query(query_str: str) -> str:
+    """Parses a court_id query string and formats it if valid. Returns False
+    if invalid.
+
+    Checks if the query string matches a specific pattern:
+    - A valid inputs are:
+    "court_id:" followed by a word without spaces:
+        court_id:cabc
+    - "court_id:" followed by a list of words separated by "OR" wrapped in parentheses.
+        court_id:(cabc OR nysupctnewyork)
+
+    :param query_str: The query string to be parsed.
+    :return: The courts values separated by "OR" or False for an invalid input.
+    """
+    # Regex to match valid inputs
+    pattern = r"^court_id:((\w+)|\((\w+)( OR \w+)*\))$"
+    match = re.match(pattern, query_str)
+    if match:
+        # Valid input; extract and return the value
+        # Remove parentheses
+        cleaned_str = re.sub(r"[()]", "", match.group(1))
+        # Split the string by spaces to handle each word
+        words = cleaned_str.split()
+        # Wrap each word in double quotes, except for 'OR'
+        formatted_words = [
+            f'"{word}"' if word != "OR" else word for word in words
+        ]
+        return " ".join(formatted_words)
+
+    # Invalid court_id query string, return empty string.
+    return ""

@@ -17,6 +17,7 @@ from cl.lib.model_helpers import (
     is_docket_number,
     make_docket_number_core,
     make_upload_path,
+    parse_court_id_query,
 )
 from cl.lib.pacer import (
     get_blocked_status,
@@ -315,6 +316,31 @@ class TestModelHelpers(TestCase):
         self.assertEqual(is_docket_number("21-string"), False)
         self.assertEqual(is_docket_number("string-2134"), False)
         self.assertEqual(is_docket_number("21"), False)
+
+    def test_parse_court_id_query(self) -> None:
+        """Test parse_court_id_query method, it should properly parse a
+        court_id query
+        """
+        tests = [
+            {"input": "court_id:cabc", "output": '"cabc"'},
+            {"input": "court_id:(cabc)", "output": '"cabc"'},
+            {
+                "input": "court_id:(cabc OR nysupctnewyork)",
+                "output": '"cabc" OR "nysupctnewyork"',
+            },
+            {
+                "input": "court_id:(cabc OR nysupctnewyork OR nysd)",
+                "output": '"cabc" OR "nysupctnewyork" OR "nysd"',
+            },
+            {"input": "court_id:cabc something_else:test", "output": False},
+            {
+                "input": "court_id:(cabc OR nysupctnewyork) something_else",
+                "output": False,
+            },
+        ]
+        for test in tests:
+            output_str = parse_court_id_query(test["input"])  # type: ignore
+            self.assertEqual(output_str, test["output"])  # type: ignore
 
 
 class S3PrivateUUIDStorageTest(TestCase):
