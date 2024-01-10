@@ -63,6 +63,11 @@ class PRECEDENTIAL_STATUS:
         (UNKNOWN, "Unknown Status"),
     )
 
+    @classmethod
+    def get_status_value(cls, name):
+        reverse_names = {value: key for key, value in cls.NAMES}
+        return reverse_names.get(name)
+
 
 class SOURCES:
     COURT_WEBSITE = "C"

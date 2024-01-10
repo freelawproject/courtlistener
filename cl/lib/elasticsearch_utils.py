@@ -12,7 +12,7 @@ from typing import Any, Callable, Dict, List, Literal
 import regex
 from asgiref.sync import sync_to_async
 from django.conf import settings
-from django.core.cache import cache, caches
+from django.core.cache import caches
 from django.core.paginator import EmptyPage, Page
 from django.db.models import QuerySet
 from django.forms.boundfield import BoundField
@@ -1486,6 +1486,8 @@ def fetch_es_results(
     there was an error.
     """
 
+    # Default to page 1 if the user request page 0.
+    page = page or 1
     # Compute "from" parameter for Elasticsearch
     es_from = (page - 1) * rows_per_page
     error = True
@@ -2098,10 +2100,11 @@ async def get_related_clusters_with_cache_and_es(
     the url_search_params.
     """
 
-    # By default, all statuses are included
-    available_statuses = dict(PRECEDENTIAL_STATUS.NAMES).values()
+    # By default, all statuses are included. Retrieve the PRECEDENTIAL_STATUS
+    # attributes (since they're indexed in ES) instead of the NAMES values.
+    available_statuses = [status[0] for status in PRECEDENTIAL_STATUS.NAMES]
     url_search_params = {f"stat_{v}": "on" for v in available_statuses}
-
+    search_params: CleanData = {}
     # Opinions that belong to the targeted cluster
     sub_opinion_ids = cluster.sub_opinions.values_list("pk", flat=True)
     sub_opinion_pks = [pk async for pk in sub_opinion_ids]
@@ -2110,23 +2113,31 @@ async def get_related_clusters_with_cache_and_es(
         return [], [], url_search_params
 
     # Use cache if enabled
+    cache = caches["db_cache"]
     mlt_cache_key = f"mlt-cluster-es:{cluster.pk}"
     related_clusters = (
-        await caches["db_cache"].aget(mlt_cache_key)
-        if settings.RELATED_USE_CACHE
-        else None
+        await cache.aget(mlt_cache_key) if settings.RELATED_USE_CACHE else None
     )
+
+    if settings.RELATED_FILTER_BY_STATUS:
+        # Filter results by status (e.g., Precedential)
+        # Update URL parameters accordingly
+        search_params[
+            f"stat_{PRECEDENTIAL_STATUS.get_status_value(settings.RELATED_FILTER_BY_STATUS)}"
+        ] = True
+        url_search_params = {
+            f"stat_{PRECEDENTIAL_STATUS.get_status_value(settings.RELATED_FILTER_BY_STATUS)}": "on"
+        }
 
     if related_clusters is None:
         sub_opinion_queries = ",".join(str(pk) for pk in sub_opinion_pks)
-        url_search_params["q"] = f"related:{sub_opinion_queries}"
-        url_search_params["type"] = SEARCH_TYPES.OPINION
-
+        search_params["q"] = f"related:{sub_opinion_queries}"
+        search_params["type"] = SEARCH_TYPES.OPINION
         query_dict = QueryDict("", mutable=True)
-        query_dict.update(url_search_params)
+        query_dict.update(search_params)
         search_query, total_query_results, *_ = await sync_to_async(
             build_es_main_query
-        )(search, url_search_params)
+        )(search, search_params)
         hits, _, error = await sync_to_async(fetch_es_results)(
             query_dict, search_query, 1, settings.RELATED_COUNT
         )
@@ -2184,7 +2195,7 @@ def make_es_stats_variable(
         except KeyError:
             # Happens when a field is iterated on that doesn't exist in the
             # facets variable
-            count = None
+            count = 0
 
         field.count = count
         facet_fields.append(field)
