@@ -5,7 +5,7 @@ from urllib.parse import parse_qs, urlencode
 
 from asgiref.sync import sync_to_async
 from django.conf import settings
-from django.core.cache import cache, caches
+from django.core.cache import caches
 from django.http import HttpRequest, QueryDict
 from eyecite import get_citations
 from eyecite.models import FullCaseCitation
@@ -1104,12 +1104,17 @@ async def get_related_clusters_with_cache(
     si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
 
     # Use cache if enabled
+    cache = caches["db_cache"]
     mlt_cache_key = f"mlt-cluster:{cluster.pk}"
     related_clusters = (
         await caches["db_cache"].aget(mlt_cache_key)
         if settings.RELATED_USE_CACHE
         else None
     )
+
+    if settings.RELATED_FILTER_BY_STATUS:
+        # Update URL parameters accordingly
+        url_search_params = {f"stat_{settings.RELATED_FILTER_BY_STATUS}": "on"}
 
     if related_clusters is None:
         # Cache is empty
@@ -1149,11 +1154,6 @@ async def get_related_clusters_with_cache(
             mlt_query = mlt_query.filter(
                 status_exact=settings.RELATED_FILTER_BY_STATUS
             )
-
-            # Update URL parameters accordingly
-            url_search_params = {
-                f"stat_{settings.RELATED_FILTER_BY_STATUS}": "on"
-            }
 
         mlt_res = mlt_query.execute()
 
