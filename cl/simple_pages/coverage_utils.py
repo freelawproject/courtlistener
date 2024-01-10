@@ -8,7 +8,7 @@ from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.search.models import SOURCES, Court, Docket, OpinionCluster
 
 
-def fetch_data(jurisdictions, group_by_state=True):
+async def fetch_data(jurisdictions, group_by_state=True):
     """Fetch Court Data
 
     Fetch data and organize it to group courts
@@ -18,18 +18,19 @@ def fetch_data(jurisdictions, group_by_state=True):
     :return: Ordered court data
     """
     courts = {}
-    for court in Court.objects.filter(
+    async for court in Court.objects.filter(
         jurisdiction__in=jurisdictions,
         parent_court__isnull=True,
     ).exclude(appeals_to__id="cafc"):
-        court_has_content = Docket.objects.filter(court=court).exists()
-        descendant_json = get_descendants_dict(court)
+        court_has_content = await Docket.objects.filter(court=court).aexists()
+        descendant_json = await get_descendants_dict(court)
         # Dont add any courts without a docket associated with it or
         # a descendant court
         if not court_has_content and not descendant_json:
             continue
         if group_by_state:
-            state = court.courthouses.first().get_state_display()
+            courthouse = await court.courthouses.afirst()
+            state = courthouse.get_state_display()
         else:
             state = "NONE"
         courts.setdefault(state, []).append(
@@ -41,7 +42,7 @@ def fetch_data(jurisdictions, group_by_state=True):
     return courts
 
 
-def get_descendants_dict(court):
+async def get_descendants_dict(court):
     """Get descendants (if any) of court
 
     A simple method to help recsuively iterate for child courts
@@ -50,9 +51,9 @@ def get_descendants_dict(court):
     :return: Descendant courts
     """
     descendants = []
-    for child_court in court.child_courts.all():
-        child_descendants = get_descendants_dict(child_court)
-        court_has_content = Docket.objects.filter(court=child_court).exists()
+    async for child_court in court.child_courts.all():
+        child_descendants = await get_descendants_dict(child_court)
+        court_has_content = Docket.objects.filter(court=child_court).aexists()
         if court_has_content or child_descendants:
             descendants.append(
                 {"court": child_court, "descendants": child_descendants}
@@ -60,13 +61,13 @@ def get_descendants_dict(court):
     return descendants
 
 
-def fetch_federal_data():
+async def fetch_federal_data():
     """Gather federal court data hierarchically by circuits
 
     :return: A dict with the data in it
     """
     court_data = {}
-    for court in Court.objects.filter(
+    async for court in Court.objects.filter(
         jurisdiction=Court.FEDERAL_APPELLATE, parent_court__isnull=True
     ):
         court_data[court.id] = {
@@ -80,7 +81,7 @@ def fetch_federal_data():
             # Add Special Article I and III tribunals
             # that appeal cleanly to Federal Circuit
             accepts_appeals_from = {}
-            for appealing_court in court.appeals_from.all():
+            async for appealing_court in court.appeals_from.all():
                 accepts_appeals_from[appealing_court.id] = appealing_court
             court_data[court.id]["appeals_from"] = accepts_appeals_from
         else:
@@ -99,7 +100,7 @@ def fetch_federal_data():
             }
             states_in_circuit = [
                 courthouse["state"]
-                for courthouse in court.courthouses.values("state")
+                async for courthouse in court.courthouses.values("state")
             ]
             # Add district court for canal zone
             if court.id == "ca5":

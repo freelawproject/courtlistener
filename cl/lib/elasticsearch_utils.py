@@ -7,8 +7,9 @@ from copy import deepcopy
 from dataclasses import fields
 from datetime import date, datetime
 from functools import reduce, wraps
-from typing import Any, Callable, Dict, List, Literal, Match
+from typing import Any, Callable, Dict, List, Literal
 
+import regex
 from django.conf import settings
 from django.core.paginator import Page
 from django.db.models import QuerySet
@@ -596,13 +597,12 @@ def build_has_child_query(
             # returning the entire field from the index.
             fields_to_exclude.append(field)
         highlight_options["fields"][field] = {
-            "type": "plain",
+            "type": settings.ES_HIGHLIGHTER,
             "fragment_size": fragment_size,
             "no_match_size": no_match_size,
             "number_of_fragments": number_of_fragments,
             "pre_tags": ["<mark>"],
             "post_tags": ["</mark>"],
-            "max_analyzed_offset": 999_999,
         }
 
     inner_hits = {
@@ -904,22 +904,26 @@ def add_es_highlighting(
 
 
 def replace_highlight(
-    match: Match[str], unique_hl_strings: List[str], tag: str
+    cleaned_str: str, unique_hl_strings: list[str], tag: str
 ) -> str:
-    """Replaces the matched term with a marked version if it exists in the
-    unique highlighted strings list.
+    """Replaces each term that needs to be highlighted by the marked term into
+     the clean string.
 
-    :param match: A regex match object containing the term to be replaced.
+    :param cleaned_str: The original string without html tags.
     :param unique_hl_strings: A list of strings to be highlighted.
     :param tag: The HTML tag to use for marking the term.
-    :return: The highlighted term if it's in the unique_hl_strings, otherwise
-    the original term.
+    :return: The highlighted string.
     """
 
-    term = match.group(0)
-    if term in unique_hl_strings:
-        return f"<{tag}>{term}</{tag}>"
-    return term
+    for word in unique_hl_strings:
+        # Create a pattern to match the word as a whole word.
+        pattern = rf"(?<!\w){regex.escape(word)}(?!\w)"
+
+        # Replace with the specified tag
+        replacement = f"<{tag}>{word}</{tag}>"
+        cleaned_str = regex.sub(pattern, replacement, cleaned_str)
+
+    return cleaned_str
 
 
 def merge_highlights_into_result(
@@ -951,17 +955,24 @@ def merge_highlights_into_result(
             field = field.split(".exact")[0]
             marked_strings_exact = []
             # Extract all unique marked strings from "field.exact"
-            marked_strings = re.findall(
-                rf"<{tag}>(.*?)</{tag}>", highlight_list[0]
-            )
-
+            marked_strings = [
+                word
+                for phrase in re.findall(
+                    rf"<{tag}>(.*?)</{tag}>", highlight_list[0]
+                )
+                for word in phrase.split()
+            ]
             if field in highlights:
                 # Extract all unique marked strings from "field" if
                 # available
-                marked_strings_exact = re.findall(
-                    rf"<{tag}>(.*?)</{tag}>",
-                    highlights[field][0],
-                )
+                marked_strings_exact = [
+                    word
+                    for phrase in re.findall(
+                        rf"<{tag}>(.*?)</{tag}>",
+                        highlights[field][0],
+                    )
+                    for word in phrase.split()
+                ]
 
             # Merge highlights only if the exact.field contains highlight tags.
             # This avoids merging highlights when there are no matching terms,
@@ -970,14 +981,9 @@ def merge_highlights_into_result(
                 unique_marked_strings = list(
                     set(marked_strings + marked_strings_exact)
                 )
-                original_string = highlight_list[0]
-                all_terms_pattern = rf"<{tag}>|</{tag}>|\w+"
-                combined_highlights = re.sub(
-                    all_terms_pattern,
-                    lambda match: replace_highlight(
-                        match, unique_marked_strings, tag
-                    ),
-                    original_string,
+                original_string = re.sub(r"</?mark>", "", highlight_list[0])
+                combined_highlights = replace_highlight(
+                    original_string, unique_marked_strings, tag
                 )
                 # Remove nested <mark> tags after replace.
                 combined_highlights = re.sub(

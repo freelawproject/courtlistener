@@ -5,6 +5,7 @@ from datetime import date
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from asgiref.sync import async_to_sync
+from courts_db import find_court_ids_by_name
 from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
 from django.db import transaction
@@ -25,6 +26,7 @@ from cl.scrapers.models import ErrorLog
 from cl.scrapers.tasks import extract_doc_content
 from cl.scrapers.utils import (
     get_binary_content,
+    get_child_court,
     get_extension,
     signal_handler,
     update_or_create_docket,
@@ -302,8 +304,10 @@ class Command(VerboseCommand):
             )
             dup_checker.reset()
 
+            child_court = get_child_court(item.get("child_courts", ""), court)
+
             docket, opinion, cluster, citations = make_objects(
-                item, court, sha1_hash, content
+                item, child_court or court, sha1_hash, content
             )
 
             save_everything(
@@ -364,6 +368,11 @@ class Command(VerboseCommand):
             mod = __import__(
                 f"{package}.{module}", globals(), locals(), [module]
             )
+            court_id = mod.Site().court_id.split(".")[-1].split("_")[0]
+            if not Court.objects.get(id=court_id).has_opinion_scraper:
+                logger.info(f"{court_id} is currently disabled.")
+                i += 1
+                continue
             try:
                 self.parse_and_scrape_site(mod, options["full_crawl"])
             except Exception as e:
