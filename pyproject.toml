@@ -32,7 +32,7 @@ beautifulsoup4 = "==4.12.*"
 boto3 = "^1.34.14"
 celery = "^5.3.6"
 certifi = "^2023.11.17"
-courts-db = "^0.10.20"
+courts-db = "^0.10.22"
 disposable-email-domains = "*"
 Django = "^5.0.1"
 django-cache-memoize = "==0.*"
@@ -104,7 +104,7 @@ sentry-sdk = {extras = ["celery", "django"], version = "^1.39.1"}
 selenium = "^4.16.0"
 ipython = "^8.19.0"
 time-machine = "^2.13.0"
-dateparser = "1.1.8"
+dateparser = "1.2.0"
 types-dateparser = "^1.1.4.20240106"
 uvicorn = {extras = ["standard"], version = "^0.25.0"}
 daphne = "^4.0.0"
@@ -112,7 +112,7 @@ psycopg = {extras = ["binary"], version = "^3.1.16"}
 httpx = {extras = ["http2"], version = "^0.26.0"}
 django-model-utils = "^4.3.1"
 inflection = "^0.5.1"  # necessary for DRF schema generation - remove after drf-spectacular
-juriscraper = "^2.5.76"
+juriscraper = "^2.5.78"
 django-permissions-policy = "^4.18.0"
 
 
