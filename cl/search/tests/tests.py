@@ -843,7 +843,7 @@ class SearchTest(ESIndexTestCase, IndexedSolrTestCase):
         )
 
     async def test_issue_1296_abnormal_citation_type_queries(self) -> None:
-        """Does search work OK when there are supra, id, or non-opinion
+        """Does search work OK when there are supra, id, or unknown
         citations in the query?
         """
         params = (
