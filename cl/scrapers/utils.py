@@ -24,47 +24,52 @@ from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import Court, Docket, RECAPDocument
 
 
-def get_child_court(child_court_name: str, court: Court) -> Optional[Court]:
+def get_child_court(child_court_name: str, court_id: str) -> Optional[Court]:
     """Get Court object from "child_courts" scraped string
 
     Ensure that the Court object found has the same parent court id has the
     Court object got from the scraper
 
     :param item: scraped court's name
-    :param court: court object got from the scraper
+    :param court_id: court id got from the Site scraper object
 
     :return: Court object for the child_court string if it exists and is valid
     """
     if not child_court_name:
         return None
 
-    parent_court_object = find_court_by_id(court.id)[0]
+    parent_court = find_court_by_id(court_id)[0]
 
     child_court_ids = find_court_ids_by_name(
         child_court_name,
-        bankruptcy=parent_court_object["type"] == "bankruptcy",
-        location=parent_court_object["location"],
+        bankruptcy=parent_court["type"] == "bankruptcy",
+        location=parent_court["location"],
         allow_partial_matches=False,
     )
 
     if not child_court_ids:
         logger.error(
-            "Could not get child court id from name %s", child_court_name
+            "Could not get child court id from name '%s'", child_court_name
         )
         return None
 
-    child_court = None
     if not (child_courts := Court.objects.filter(pk=child_court_ids[0])):
-        logger.error("Court object does not exist for %s", child_court_ids[0])
-    elif child_courts[0].parent_court.id != court.id:
         logger.error(
-            "Child court found from name '%s' with id '%s' has parent court id different from expected parent id '%s'",
+            "Court object does not exist for '%s'", child_court_ids[0]
+        )
+        return None
+
+    child_court = child_courts[0]
+    parent_id = child_court.parent_court.id if child_court.parent_court else ""
+    if parent_id != court_id:
+        logger.error(
+            "Child court found from name '%s' with id '%s' has parent court id different from expected. Expected: '%s' Found: '%s'",
             child_court_name,
             child_court_ids[0],
-            court.id,
+            court_id,
+            parent_id,
         )
-    else:
-        child_court = child_courts[0]
+        return None
 
     return child_court
 

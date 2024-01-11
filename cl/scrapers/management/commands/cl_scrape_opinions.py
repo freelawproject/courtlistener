@@ -5,7 +5,6 @@ from datetime import date
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from asgiref.sync import async_to_sync
-from courts_db import find_court_ids_by_name
 from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
 from django.db import transaction
@@ -304,7 +303,9 @@ class Command(VerboseCommand):
             )
             dup_checker.reset()
 
-            child_court = get_child_court(item.get("child_courts", ""), court)
+            child_court = get_child_court(
+                item.get("child_courts", ""), court.id
+            )
 
             docket, opinion, cluster, citations = make_objects(
                 item, child_court or court, sha1_hash, content
