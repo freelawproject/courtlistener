@@ -590,7 +590,7 @@ def add_highlighting(
         main_params[f"f.{field}.hl.alternateField"] = field  # type: ignore
 
 
-def get_child_courts(parent_courts: list[str]) -> set[str]:
+def lookup_child_courts(parent_courts: list[str]) -> set[str]:
     """Recursively fetches child courts for the given parent courts.
 
     :param parent_courts: List of parent court_ids.
@@ -617,7 +617,7 @@ def get_child_courts(parent_courts: list[str]) -> set[str]:
         return set()
 
     final_results = all_child_courts.union(
-        get_child_courts(list(all_child_courts))
+        lookup_child_courts(list(all_child_courts))
     )
     return final_results
 
@@ -632,7 +632,7 @@ def get_child_court_ids_for_parents(selected_courts_string: str) -> str:
     """
 
     unique_courts = set(re.findall(r'"(.*?)"', selected_courts_string))
-    unique_courts.update(get_child_courts(list(unique_courts)))
+    unique_courts.update(lookup_child_courts(list(unique_courts)))
     courts = [f'"{c}"' for c in unique_courts]
     return " OR ".join(courts)
 
