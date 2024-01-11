@@ -46,7 +46,7 @@
 
     {% for docket in dockets %}
       {% if forloop.first %}
-        <h3 class="v-offset-above-3"><i class="fa-list fa grey" title="Dockets"></i> {{ tag.dockets.all.count|intcomma }} Tagged Docket{{ tag.dockets.all.count|pluralize }}</h3>
+        <h3 class="v-offset-above-3" id="tag-list-title"><i class="fa-list fa grey" title="Dockets" id="docket-icon"></i> {{ tag.dockets.all.count|intcomma }} Tagged Docket{{ tag.dockets.all.count|pluralize }}</h3>
         <div id="docket-list">
           <ul>
       {% endif %}
