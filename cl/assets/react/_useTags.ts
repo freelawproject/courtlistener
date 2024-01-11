@@ -18,7 +18,7 @@ export const useTags = ({ docket, enabled, userId }: UseTagsProps) => {
   );
 
   const getAssociations = React.useCallback(
-    async (key: string) => await appFetch(`/api/rest/v3/docket-tags/?docket=${docket}`),
+    async (key: string) => await appFetch(`/api/rest/v3/docket-tags/?docket=${docket}&tag__user=${userId}`),
     [docket]
   );
 
