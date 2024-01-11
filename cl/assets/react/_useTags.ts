@@ -17,10 +17,22 @@ export const useTags = ({ docket, enabled, userId }: UseTagsProps) => {
     []
   );
 
-  const getAssociations = React.useCallback(
-    async (key: string) => await appFetch(`/api/rest/v3/docket-tags/?docket=${docket}&tag__user=${userId}`),
-    [docket]
-  );
+  const getAssociations = React.useCallback(async (key: string, page = 1) => {
+    let associations: Association[] = [];
+    let morePagesAvailable = true;
+    /* fetches all the tags associated to the given docket at once */
+    while (morePagesAvailable) {
+      const response = await appFetch(`/api/rest/v3/docket-tags/?docket=${docket}&tag__user=${userId}&page=${page}`);
+      (response as ApiResult<Association>).results.forEach((e) => associations.unshift(e));
+      const nextPage = (response as ApiResult<Association>).next;
+      if (!nextPage) morePagesAvailable = false;
+      if (morePagesAvailable) {
+        const matches = nextPage.match(/page=(\d+)/);
+        if (matches) page = parseInt(matches[1]);
+      }
+    }
+    return associations;
+  }, []);
 
   const postTag = React.useCallback(
     async ({ name }: { name: string }) =>
@@ -50,7 +62,7 @@ export const useTags = ({ docket, enabled, userId }: UseTagsProps) => {
 
   const { data: assocData } = useQuery('associations', getAssociations, { enabled: enabled });
 
-  const associations = assocData ? (assocData as ApiResult<Association>).results : [];
+  const associations = assocData ? (assocData as Association[]) : [];
 
   const { status, data: tags, isFetching, isFetchingMore, fetchMore, canFetchMore } = useInfiniteQuery(
     'tags',
@@ -71,11 +83,7 @@ export const useTags = ({ docket, enabled, userId }: UseTagsProps) => {
     onSuccess: (data, variables) => {
       // update the cache to remove the just-deleted association
       queryCache.setQueryData('associations', (old: any) => {
-        console.log(data, old);
-        return {
-          ...old,
-          results: old.results.filter((assoc: Association) => assoc.id !== variables.assocId),
-        };
+        return old.filter((assoc: Association) => assoc.id !== variables.assocId);
       });
     },
   });
@@ -84,11 +92,7 @@ export const useTags = ({ docket, enabled, userId }: UseTagsProps) => {
     onSuccess: (data, variables) =>
       // update the cache to add the just created association
       queryCache.setQueryData('associations', (old: any) => {
-        console.log(data, old);
-        return {
-          ...old,
-          results: [...old.results, data],
-        };
+        return [...old, data];
       }),
   });
 
@@ -122,7 +126,7 @@ export const useTags = ({ docket, enabled, userId }: UseTagsProps) => {
     // rebuild tagData with the assocId
     const enhancedTags = flatTags.map((tag: Tag) => {
       if (!associations) return tag;
-      const assoc = (associations as Association[]).find((a) => a.tag === tag.id);
+      const assoc = associations.find((a) => a.tag === tag.id);
       return { ...tag, assocId: assoc?.id };
     });
 
