@@ -607,7 +607,8 @@ def get_child_courts(parent_courts: list[str]) -> set[str]:
                     "id", flat=True
                 )
             )
-            cache.set(f"child_courts:{court_id}", child_courts)
+            one_month = 60 * 60 * 24 * 30
+            cache.set(f"child_courts:{court_id}", child_courts, one_month)
         else:
             child_courts = set(cached_child_courts)
 

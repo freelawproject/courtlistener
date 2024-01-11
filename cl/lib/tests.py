@@ -332,15 +332,15 @@ class TestModelHelpers(TestCase):
                 "input": "court_id:(cabc OR nysupctnewyork OR nysd)",
                 "output": '"cabc" OR "nysupctnewyork" OR "nysd"',
             },
-            {"input": "court_id:cabc something_else:test", "output": False},
+            {"input": "court_id:cabc something_else:test", "output": ""},
             {
                 "input": "court_id:(cabc OR nysupctnewyork) something_else",
-                "output": False,
+                "output": "",
             },
         ]
         for test in tests:
-            output_str = parse_court_id_query(test["input"])  # type: ignore
-            self.assertEqual(output_str, test["output"])  # type: ignore
+            output_str = parse_court_id_query(test["input"])
+            self.assertEqual(output_str, test["output"])
 
 
 class S3PrivateUUIDStorageTest(TestCase):
