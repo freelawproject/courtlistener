@@ -883,11 +883,11 @@ def modify_court_id_queries(query_str: str) -> str:
     """Modify 'court_id' values in a query string.
 
     Parses valid 'court_id:' values in the string:
-    - "court_id:" followed by a single word without spaces,
-        e.g court_id:cabc.
+    - "court_id:" followed by a single word without spaces:
+        court_id:cabc
     - "court_id:" followed by a list of words separated by "OR", wrapped in
     parentheses:
-        e.g court_id:(cabc OR nysupctnewyork).
+        court_id:(cabc OR nysupctnewyork)
 
     For each valid 'court_id' query, it retrieves the courts and extends them
     with their child courts, then reinserts them back into the original
@@ -910,8 +910,9 @@ def cleanup_main_query(query_string: str) -> str:
      - Add hyphens to district docket numbers that lack them
      - Ignore tokens inside phrases
      - Handle query punctuation correctly by mostly ignoring it
-     - Capture "court_id:court" queries, get the child courts for every court
-     in the query, append them and put them back to the original query.
+     - Capture "court_id:court" queries, retrieve the child courts for each
+     court in the query, append them, and then add them back to the original
+     query.
 
     :param query_string: The query string from the form
     :return The enhanced query string
@@ -959,8 +960,8 @@ def cleanup_main_query(query_string: str) -> str:
             cleaned_items.append(f'"{item}"')
 
     cleaned_query = "".join(cleaned_items)
-    # If it's a court_id query, parse it, append the child courts and get them
-    # back to the original query.
+    # If it's a court_id query, parse it, append the child courts, and then
+    # reintegrate them into the original query.
     final_query = modify_court_id_queries(cleaned_query)
     return final_query
 
