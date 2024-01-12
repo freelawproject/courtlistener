@@ -30,7 +30,7 @@ case "$1" in
         --workers ${NUM_WORKERS:-48} \
         --worker-class cl.workers.UvicornWorker \
         --limit-request-line 6000 \
-        --timeout 180 \
+        --timeout 0 \
         --bind 0.0.0.0:8000
     ;;
 'rss-scraper')
