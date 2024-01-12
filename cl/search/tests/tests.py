@@ -26,7 +26,12 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
 
-from cl.lib.search_utils import cleanup_main_query, make_fq
+from cl.lib.search_utils import (
+    cleanup_main_query,
+    get_child_court_ids_for_parents,
+    make_fq,
+    modify_court_id_queries,
+)
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
     AudioTestCase,
@@ -603,6 +608,30 @@ class SearchTest(ESIndexTestCase, IndexedSolrTestCase):
     @classmethod
     def setUpTestData(cls):
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.child_court_1 = CourtFactory(
+            id="ny_child_l1_1", jurisdiction="FB", parent_court=cls.court
+        )
+        cls.child_court_2 = CourtFactory(
+            id="ny_child_l2_1",
+            jurisdiction="FB",
+            parent_court=cls.child_court_1,
+        )
+        cls.child_court_2_2 = CourtFactory(
+            id="ny_child_l2_2",
+            jurisdiction="FB",
+            parent_court=cls.child_court_1,
+        )
+        cls.child_court_3 = CourtFactory(
+            id="ny_child_l3_1",
+            jurisdiction="FB",
+            parent_court=cls.child_court_2,
+        )
+
+        cls.court_gand = CourtFactory(id="gand", jurisdiction="FB")
+        cls.child_gand_2 = CourtFactory(
+            id="ga_child_l1_1", jurisdiction="FB", parent_court=cls.court_gand
+        )
+
         OpinionClusterFactoryWithChildrenAndParents(
             case_name="Strickland v. Washington.",
             case_name_full="Strickland v. Washington.",
@@ -619,6 +648,28 @@ class SearchTest(ESIndexTestCase, IndexedSolrTestCase):
         OpinionClusterFactoryWithChildrenAndParents(
             case_name="Strickland v. Lorem.",
             docket=DocketFactory(court=cls.court, docket_number="123456"),
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+        )
+        OpinionClusterFactoryWithChildrenAndParents(
+            case_name="America vs Bank",
+            docket=DocketFactory(
+                court=cls.child_court_1, docket_number="34-2535"
+            ),
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+        )
+        OpinionClusterFactoryWithChildrenAndParents(
+            case_name="Johnson v. National",
+            docket=DocketFactory(
+                court=cls.child_court_2_2, docket_number="36-2000"
+            ),
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+        )
+
+        OpinionClusterFactoryWithChildrenAndParents(
+            case_name="California v. Nevada",
+            docket=DocketFactory(
+                court=cls.child_gand_2, docket_number="38-1000"
+            ),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
         )
         super().setUpTestData()
@@ -926,6 +977,199 @@ class SearchTest(ESIndexTestCase, IndexedSolrTestCase):
         expected = 1
         self.assertEqual(actual, expected)
         self.assertIn("Lorem", r.content.decode())
+
+    def test_get_child_court_ids_for_parents(self) -> None:
+        def compare_strings_regardless_order(str1, str2):
+            set1 = {s.strip('" ').strip() for s in str1.split("OR")}
+            set2 = {s.strip('" ').strip() for s in str2.split("OR")}
+            return set1 == set2
+
+        # Get all the courts of 'canb' at all lower levels.
+        parent_child_courts = get_child_court_ids_for_parents('"canb"')
+        self.assertTrue(
+            compare_strings_regardless_order(
+                parent_child_courts,
+                '"canb" OR "ny_child_l1_1" OR "ny_child_l2_1" OR "ny_child_l2_2" OR "ny_child_l3_1"',
+            )
+        )
+
+        # Get all the courts of ny_child_l1_1 at all lower levels.
+        parent_child_courts = get_child_court_ids_for_parents(
+            '"ny_child_l1_1"'
+        )
+        self.assertTrue(
+            compare_strings_regardless_order(
+                parent_child_courts,
+                '"ny_child_l1_1" OR "ny_child_l2_1" OR "ny_child_l2_2" OR "ny_child_l3_1"',
+            )
+        )
+
+        # Get all the courts of ny_child_l1_2 at all lower levels.
+        parent_child_courts = get_child_court_ids_for_parents(
+            '"ny_child_l2_1"'
+        )
+        self.assertTrue(
+            compare_strings_regardless_order(
+                parent_child_courts, '"ny_child_l2_1" OR "ny_child_l3_1"'
+            )
+        )
+
+        # Get all the courts of ny_child_l3_1, no child courts, retrieve itself.
+        parent_child_courts = get_child_court_ids_for_parents(
+            '"ny_child_l3_1"'
+        )
+        self.assertTrue(
+            compare_strings_regardless_order(
+                parent_child_courts, '"ny_child_l3_1"'
+            )
+        )
+
+        # Confirm courts are not duplicated if a parent-child court is included
+        # in the query:
+        parent_child_courts = get_child_court_ids_for_parents(
+            '"ny_child_l1_1" OR "ny_child_l2_1"'
+        )
+        self.assertTrue(
+            compare_strings_regardless_order(
+                parent_child_courts,
+                '"ny_child_l1_1" OR "ny_child_l2_1" OR "ny_child_l2_2" OR "ny_child_l3_1"',
+            )
+        )
+
+        # Get all courts from 2 different parent courts 'canb' and 'gand'.
+        parent_child_courts = get_child_court_ids_for_parents(
+            '"canb" OR "gand"'
+        )
+        self.assertTrue(
+            compare_strings_regardless_order(
+                parent_child_courts,
+                '"canb" OR "ny_child_l1_1" OR "ny_child_l2_1" OR "ny_child_l2_2" OR "ny_child_l3_1" OR "gand" OR "ga_child_l1_1"',
+            )
+        )
+
+    def test_modify_court_id_queries(self) -> None:
+        """Test parse_court_id_query method, it should properly parse a
+        court_id query
+        """
+        tests = [
+            {"input": "court_id:cabc", "output": 'court_id:("cabc")'},
+            {"input": "court_id:(cabc)", "output": 'court_id:("cabc")'},
+            {
+                "input": "court_id:(cabc OR nysupctnewyork)",
+                "output": 'court_id:("cabc" OR "nysupctnewyork")',
+            },
+            {
+                "input": "court_id:(cabc OR nysupctnewyork OR nysd)",
+                "output": 'court_id:("cabc" OR "nysd" OR "nysupctnewyork")',
+            },
+            {
+                "input": "court_id:cabc something_else:test",
+                "output": 'court_id:("cabc") something_else:test',
+            },
+            {
+                "input": "court_id:(cabc OR nysupctnewyork) something_else",
+                "output": 'court_id:("cabc" OR "nysupctnewyork") something_else',
+            },
+            {
+                "input": "docketNumber:23-3434 OR court_id:canb something_else",
+                "output": 'docketNumber:23-3434 OR court_id:("canb" OR "ny_child_l1_1" OR "ny_child_l2_1" OR "ny_child_l2_2" OR "ny_child_l3_1") something_else',
+            },
+            {
+                "input": "docketNumber:23-3434 OR court_id:ny_child_l2_1 something_else court_id:gand",
+                "output": 'docketNumber:23-3434 OR court_id:("ny_child_l2_1" OR "ny_child_l3_1") something_else court_id:("ga_child_l1_1" OR "gand")',
+            },
+            {
+                "input": "docketNumber:23-3434 OR court_id:(ny_child_l2_1 OR gand) something_else",
+                "output": 'docketNumber:23-3434 OR court_id:("ga_child_l1_1" OR "gand" OR "ny_child_l2_1" OR "ny_child_l3_1") something_else',
+            },
+        ]
+        for test in tests:
+            output_str = modify_court_id_queries(test["input"])
+            self.assertEqual(output_str, test["output"])
+
+    async def test_filter_parent_child_courts(self) -> None:
+        """Does filtering in a given parent court return opinions from the
+        parent and its child courts?
+        """
+        r = await self.async_client.get(
+            reverse("show_results"), {"q": "*", "court_canb": "on"}
+        )
+        actual = self.get_article_count(r)
+        self.assertEqual(actual, 4)
+        self.assertIn("Washington", r.content.decode())
+        self.assertIn("Lorem", r.content.decode())
+        self.assertIn("Bank", r.content.decode())
+        self.assertIn("National", r.content.decode())
+
+        r = await self.async_client.get(
+            reverse("show_results"), {"q": "*", "court_ny_child_l1_1": "on"}
+        )
+        actual = self.get_article_count(r)
+        self.assertEqual(actual, 2)
+        self.assertIn("Bank", r.content.decode())
+        self.assertIn("National", r.content.decode())
+
+        r = await self.async_client.get(
+            reverse("show_results"),
+            {"q": "*", "court_canb": "on", "court_gand": "on"},
+        )
+        actual = self.get_article_count(r)
+        self.assertEqual(actual, 5)
+        self.assertIn("Washington", r.content.decode())
+        self.assertIn("Lorem", r.content.decode())
+        self.assertIn("Bank", r.content.decode())
+        self.assertIn("National", r.content.decode())
+        self.assertIn("Nevada", r.content.decode())
+
+    async def test_advanced_search_parent_child_courts(self) -> None:
+        """Does querying in a given parent court return opinions from the
+        parent and its child courts?
+        """
+        r = await self.async_client.get(
+            reverse("show_results"), {"q": "court_id:canb"}
+        )
+        actual = self.get_article_count(r)
+        self.assertEqual(actual, 4)
+        self.assertIn("Washington", r.content.decode())
+        self.assertIn("Lorem", r.content.decode())
+        self.assertIn("Bank", r.content.decode())
+        self.assertIn("National", r.content.decode())
+
+        r = await self.async_client.get(
+            reverse("show_results"), {"q": "court_id:(canb OR gand)"}
+        )
+        actual = self.get_article_count(r)
+        self.assertEqual(actual, 5)
+        self.assertIn("Washington", r.content.decode())
+        self.assertIn("Lorem", r.content.decode())
+        self.assertIn("Bank", r.content.decode())
+        self.assertIn("National", r.content.decode())
+        self.assertIn("Nevada", r.content.decode())
+
+        r = await self.async_client.get(
+            reverse("show_results"),
+            {"q": "caseName:something OR court_id:canb OR caseName:something"},
+        )
+        actual = self.get_article_count(r)
+        self.assertEqual(actual, 4)
+        self.assertIn("Washington", r.content.decode())
+        self.assertIn("Lorem", r.content.decode())
+        self.assertIn("Bank", r.content.decode())
+        self.assertIn("National", r.content.decode())
+
+        r = await self.async_client.get(
+            reverse("show_results"),
+            {
+                "q": "caseName:something OR court_id:(canb) OR docketNumber:23-2345 OR court_id:gand"
+            },
+        )
+        actual = self.get_article_count(r)
+        self.assertEqual(actual, 5)
+        self.assertIn("Washington", r.content.decode())
+        self.assertIn("Lorem", r.content.decode())
+        self.assertIn("Bank", r.content.decode())
+        self.assertIn("National", r.content.decode())
+        self.assertIn("Nevada", r.content.decode())
 
 
 @override_settings(
