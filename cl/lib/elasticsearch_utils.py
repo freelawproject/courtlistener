@@ -33,6 +33,7 @@ from cl.lib.search_utils import (
     BOOSTS,
     cleanup_main_query,
     get_array_of_selected_fields,
+    lookup_child_courts,
 )
 from cl.lib.types import (
     ApiPositionMapping,
@@ -546,6 +547,21 @@ def get_child_sorting_key(cd: CleanData) -> tuple[str, str]:
     return order_by_map_child.get(order_by, ("", ""))
 
 
+def extend_selected_courts_with_child_courts(
+    selected_courts: list[str],
+) -> list[str]:
+    """Extend the list of selected courts with their corresponding child courts
+
+    :param selected_courts: A list of court IDs.
+    :return: A list of unique court IDs, including both the original and their
+    corresponding child courts.
+    """
+
+    unique_courts = set(selected_courts)
+    unique_courts.update(lookup_child_courts(list(unique_courts)))
+    return list(unique_courts)
+
+
 def build_es_filters(cd: CleanData) -> List:
     """Builds elasticsearch filters based on the CleanData object.
 
@@ -562,7 +578,9 @@ def build_es_filters(cd: CleanData) -> List:
         queries_list.extend(
             build_term_query(
                 "court_id",
-                cd.get("court", "").split(),
+                extend_selected_courts_with_child_courts(
+                    cd.get("court", "").split()
+                ),
             )
         )
         # Build docket number term query
@@ -1611,7 +1629,9 @@ def build_has_child_filters(
     if cd["type"] == SEARCH_TYPES.PEOPLE:
         if child_type == "position":
             selection_method = cd.get("selection_method", "")
-            court = cd.get("court", "").split()
+            court = extend_selected_courts_with_child_courts(
+                cd.get("court", "").split()
+            )
             appointer = cd.get("appointer", "")
             if selection_method:
                 queries_list.extend(
@@ -1701,7 +1721,9 @@ def build_join_es_filters(cd: CleanData) -> List:
             [
                 *build_term_query(
                     "court_id.raw",
-                    cd.get("court", "").split(),
+                    extend_selected_courts_with_child_courts(
+                        cd.get("court", "").split()
+                    ),
                 ),
                 *build_text_filter("caseName", cd.get("case_name", "")),
                 *build_term_query(
@@ -1738,7 +1760,9 @@ def build_join_es_filters(cd: CleanData) -> List:
             [
                 *build_term_query(
                     "court_id.raw",
-                    cd.get("court", "").split(),
+                    extend_selected_courts_with_child_courts(
+                        cd.get("court", "").split()
+                    ),
                 ),
                 *build_text_filter("caseName", cd.get("case_name", "")),
                 *build_daterange_query(

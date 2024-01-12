@@ -32,8 +32,11 @@ from cl.lib.search_utils import (
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
     AudioTestCase,
+    CourtTestCase,
     EmptySolrTestCase,
     IndexedSolrTestCase,
+    PeopleTestCase,
+    SearchTestCase,
     SolrTestCase,
 )
 from cl.recap.constants import COURT_TIMEZONES
@@ -472,9 +475,10 @@ class AdvancedTest(IndexedSolrTestCase):
         )
 
 
-class SearchTest(ESIndexTestCase, IndexedSolrTestCase):
+class ExtendChildCourtsSearchTest(ESIndexTestCase, TestCase):
     @classmethod
     def setUpTestData(cls):
+        cls.rebuild_index("search.OpinionCluster")
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
         cls.child_court_1 = CourtFactory(
             id="ny_child_l1_1", jurisdiction="FB", parent_court=cls.court
@@ -540,7 +544,18 @@ class SearchTest(ESIndexTestCase, IndexedSolrTestCase):
             ),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
         )
-        super().setUpTestData()
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
+
+    @staticmethod
+    def get_article_count(r):
+        """Get the article count in a query response"""
+        return len(html.fromstring(r.content.decode()).xpath("//article"))
 
     def test_get_child_court_ids_for_parents(self) -> None:
         def compare_strings_regardless_order(str1, str2):
@@ -655,8 +670,9 @@ class SearchTest(ESIndexTestCase, IndexedSolrTestCase):
         """Does filtering in a given parent court return opinions from the
         parent and its child courts?
         """
+
         r = await self.async_client.get(
-            reverse("show_results"), {"q": "*", "court_canb": "on"}
+            reverse("show_results"), {"q": "*", "court": "canb"}
         )
         actual = self.get_article_count(r)
         self.assertEqual(actual, 4)
@@ -666,7 +682,7 @@ class SearchTest(ESIndexTestCase, IndexedSolrTestCase):
         self.assertIn("National", r.content.decode())
 
         r = await self.async_client.get(
-            reverse("show_results"), {"q": "*", "court_ny_child_l1_1": "on"}
+            reverse("show_results"), {"q": "*", "court": "ny_child_l1_1"}
         )
         actual = self.get_article_count(r)
         self.assertEqual(actual, 2)
@@ -675,7 +691,7 @@ class SearchTest(ESIndexTestCase, IndexedSolrTestCase):
 
         r = await self.async_client.get(
             reverse("show_results"),
-            {"q": "*", "court_canb": "on", "court_gand": "on"},
+            {"q": "*", "court": "gand canb"},
         )
         actual = self.get_article_count(r)
         self.assertEqual(actual, 5)
