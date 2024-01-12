@@ -1,7 +1,7 @@
 --
 -- Concurrently create index hash_docket_number_lookup_idx on field(s)  of model docket
 --
-CREATE INDEX CONCURRENTLY "hash_docket_number_lookup_idx" ON "search_docket" ((MD5("docket_number")));
+CREATE INDEX CONCURRENTLY "hash_docket_number_lookup_idx" ON "search_docket" USING hash ("docket_number");
 --
 -- Create constraint unique_docket_per_court on model docket
 --

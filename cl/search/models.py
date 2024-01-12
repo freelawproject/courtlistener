@@ -7,6 +7,7 @@ import pytz
 from asgiref.sync import sync_to_async
 from celery.canvas import chain
 from django.contrib.contenttypes.fields import GenericRelation
+from django.contrib.postgres.indexes import HashIndex
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Prefetch, Q, QuerySet
@@ -829,9 +830,7 @@ class Docket(AbstractDateTimeModel):
                 fields=["court_id", "docket_number_core", "pacer_case_id"],
                 name="district_court_docket_lookup_idx",
             ),
-            models.Index(
-                MD5("docket_number"), name="hash_docket_number_lookup_idx"
-            ),
+            HashIndex("docket_number", name="hash_docket_number_lookup_idx"),
         ]
 
     def __str__(self) -> str:
