@@ -719,7 +719,7 @@ def do_es_search(
             ]:
                 query_citation = get_query_citation(cd)
 
-            if cd["type"] in [SEARCH_TYPES.OPINION]:
+            if cd["type"] in [SEARCH_TYPES.OPINION] and facet:
                 facet_fields = get_facet_dict_for_search_query(
                     search_query, cd, search_form
                 )
