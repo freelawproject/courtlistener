@@ -30,6 +30,7 @@ from cl.lib.search_utils import (
     cleanup_main_query,
     get_child_court_ids_for_parents,
     make_fq,
+    modify_court_id_queries,
 )
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
@@ -1046,6 +1047,46 @@ class SearchTest(ESIndexTestCase, IndexedSolrTestCase):
             )
         )
 
+    def test_modify_court_id_queries(self) -> None:
+        """Test parse_court_id_query method, it should properly parse a
+        court_id query
+        """
+        tests = [
+            {"input": "court_id:cabc", "output": 'court_id:("cabc")'},
+            {"input": "court_id:(cabc)", "output": 'court_id:("cabc")'},
+            {
+                "input": "court_id:(cabc OR nysupctnewyork)",
+                "output": 'court_id:("cabc" OR "nysupctnewyork")',
+            },
+            {
+                "input": "court_id:(cabc OR nysupctnewyork OR nysd)",
+                "output": 'court_id:("cabc" OR "nysd" OR "nysupctnewyork")',
+            },
+            {
+                "input": "court_id:cabc something_else:test",
+                "output": 'court_id:("cabc") something_else:test',
+            },
+            {
+                "input": "court_id:(cabc OR nysupctnewyork) something_else",
+                "output": 'court_id:("cabc" OR "nysupctnewyork") something_else',
+            },
+            {
+                "input": "docketNumber:23-3434 OR court_id:canb something_else",
+                "output": 'docketNumber:23-3434 OR court_id:("canb" OR "ny_child_l1_1" OR "ny_child_l2_1" OR "ny_child_l2_2" OR "ny_child_l3_1") something_else',
+            },
+            {
+                "input": "docketNumber:23-3434 OR court_id:ny_child_l2_1 something_else court_id:gand",
+                "output": 'docketNumber:23-3434 OR court_id:("ny_child_l2_1" OR "ny_child_l3_1") something_else court_id:("ga_child_l1_1" OR "gand")',
+            },
+            {
+                "input": "docketNumber:23-3434 OR court_id:(ny_child_l2_1 OR gand) something_else",
+                "output": 'docketNumber:23-3434 OR court_id:("ga_child_l1_1" OR "gand" OR "ny_child_l2_1" OR "ny_child_l3_1") something_else',
+            },
+        ]
+        for test in tests:
+            output_str = modify_court_id_queries(test["input"])
+            self.assertEqual(output_str, test["output"])
+
     async def test_filter_parent_child_courts(self) -> None:
         """Does filtering in a given parent court return opinions from the
         parent and its child courts?
@@ -1080,7 +1121,7 @@ class SearchTest(ESIndexTestCase, IndexedSolrTestCase):
         self.assertIn("National", r.content.decode())
         self.assertIn("Nevada", r.content.decode())
 
-    async def test_advance_search_parent_child_courts(self) -> None:
+    async def test_advanced_search_parent_child_courts(self) -> None:
         """Does querying in a given parent court return opinions from the
         parent and its child courts?
         """
@@ -1096,6 +1137,31 @@ class SearchTest(ESIndexTestCase, IndexedSolrTestCase):
 
         r = await self.async_client.get(
             reverse("show_results"), {"q": "court_id:(canb OR gand)"}
+        )
+        actual = self.get_article_count(r)
+        self.assertEqual(actual, 5)
+        self.assertIn("Washington", r.content.decode())
+        self.assertIn("Lorem", r.content.decode())
+        self.assertIn("Bank", r.content.decode())
+        self.assertIn("National", r.content.decode())
+        self.assertIn("Nevada", r.content.decode())
+
+        r = await self.async_client.get(
+            reverse("show_results"),
+            {"q": "caseName:something OR court_id:canb OR caseName:something"},
+        )
+        actual = self.get_article_count(r)
+        self.assertEqual(actual, 4)
+        self.assertIn("Washington", r.content.decode())
+        self.assertIn("Lorem", r.content.decode())
+        self.assertIn("Bank", r.content.decode())
+        self.assertIn("National", r.content.decode())
+
+        r = await self.async_client.get(
+            reverse("show_results"),
+            {
+                "q": "caseName:something OR court_id:(canb) OR docketNumber:23-2345 OR court_id:gand"
+            },
         )
         actual = self.get_article_count(r)
         self.assertEqual(actual, 5)

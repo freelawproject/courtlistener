@@ -1,6 +1,6 @@
 import re
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, List, Match, Optional, Tuple, Union, cast
 from urllib.parse import parse_qs, urlencode
 
 from asgiref.sync import sync_to_async
@@ -15,11 +15,8 @@ from scorched.response import SolrResponse
 from cl.citations.match_citations import search_db_for_fullcitation
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.lib.bot_detector import is_bot
-from cl.lib.model_helpers import (
-    clean_docket_number,
-    is_docket_number,
-    parse_court_id_query,
-)
+from cl.lib.crypto import sha256
+from cl.lib.model_helpers import clean_docket_number, is_docket_number
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.types import CleanData, SearchParam
 from cl.search.constants import (
@@ -599,27 +596,27 @@ def lookup_child_courts(parent_courts: list[str]) -> set[str]:
 
     cache = caches["db_cache"]
     all_child_courts = set()
-    for court_id in parent_courts:
-        cached_child_courts = cache.get(f"child_courts:{court_id}")
-        if cached_child_courts is None:
-            child_courts = set(
-                Court.objects.filter(parent_court__id=court_id).values_list(
-                    "id", flat=True
-                )
-            )
-            one_month = 60 * 60 * 24 * 30
-            cache.set(f"child_courts:{court_id}", child_courts, one_month)
-        else:
-            child_courts = set(cached_child_courts)
+    sorted_courts_hash = sha256("-".join(sorted(parent_courts)))
+    cache_key = f"child_courts:{sorted_courts_hash}"
+    cached_result = cache.get(cache_key)
 
-        all_child_courts.update(child_courts)
+    if cached_result is not None:
+        return set(cached_result)
+
+    child_courts = Court.objects.filter(
+        parent_court_id__in=parent_courts
+    ).values_list("id", flat=True)
+    all_child_courts.update(child_courts)
     if not all_child_courts:
         return set()
 
     final_results = all_child_courts.union(
         lookup_child_courts(list(all_child_courts))
     )
-    return final_results
+    sorted_final_results = sorted(final_results)
+    one_month = 60 * 60 * 24 * 30
+    cache.set(cache_key, sorted_final_results, one_month)
+    return set(sorted_final_results)
 
 
 def get_child_court_ids_for_parents(selected_courts_string: str) -> str:
@@ -630,10 +627,9 @@ def get_child_court_ids_for_parents(selected_courts_string: str) -> str:
     :param selected_courts_string: The courts from the original user query.
     :return: A string containing the unique combination of parent and child courts.
     """
-
     unique_courts = set(re.findall(r'"(.*?)"', selected_courts_string))
     unique_courts.update(lookup_child_courts(list(unique_courts)))
-    courts = [f'"{c}"' for c in unique_courts]
+    courts = [f'"{c}"' for c in sorted(list(unique_courts))]
     return " OR ".join(courts)
 
 
@@ -864,6 +860,49 @@ def print_params(params: SearchParam) -> None:
         )
 
 
+def extend_child_courts(match: Match[str]) -> str:
+    """Extends court_id: queries with their child courts.
+
+    :param match: A regex match object containing the matched court_id: query.
+    :return: A string with the court_id query extended with child courts.
+    """
+
+    # Remove parentheses
+    cleaned_str = re.sub(r"[()]", "", match.group(1))
+    # Split the string by spaces to handle each court
+    courts = cleaned_str.split()
+    # Wrap each word in double quotes, except for 'OR'
+    formatted_courts = [
+        f'"{court}"' if court != "OR" else court for court in courts
+    ]
+    query_content = " ".join(formatted_courts)
+    return f"court_id:({get_child_court_ids_for_parents(query_content)})"
+
+
+def modify_court_id_queries(query_str: str) -> str:
+    """Modify 'court_id' values in a query string.
+
+    Parses valid 'court_id:' values in the string:
+    - "court_id:" followed by a single word without spaces,
+        e.g court_id:cabc.
+    - "court_id:" followed by a list of words separated by "OR", wrapped in
+    parentheses:
+        e.g court_id:(cabc OR nysupctnewyork).
+
+    For each valid 'court_id' query, it retrieves the courts and extends them
+    with their child courts, then reinserts them back into the original
+    query string.
+
+    :param query_str: The query string to be parsed.
+    :return: The modified query string after extending with child courts, or
+    the original query string if no valid 'court_id:' queries are found.
+    """
+
+    pattern = r"court_id:(\w+|\(\w+(?:\sOR\s\w+)*\))"
+    modified_query = re.sub(pattern, extend_child_courts, query_str)
+    return modified_query
+
+
 def cleanup_main_query(query_string: str) -> str:
     """Enhance the query string with some simple fixes
 
@@ -871,6 +910,8 @@ def cleanup_main_query(query_string: str) -> str:
      - Add hyphens to district docket numbers that lack them
      - Ignore tokens inside phrases
      - Handle query punctuation correctly by mostly ignoring it
+     - Capture "court_id:court" queries, get the child courts for every court
+     in the query, append them and put them back to the original query.
 
     :param query_string: The query string from the form
     :return The enhanced query string
@@ -918,16 +959,10 @@ def cleanup_main_query(query_string: str) -> str:
             cleaned_items.append(f'"{item}"')
 
     cleaned_query = "".join(cleaned_items)
-    # If it's a court_id query, parse it and return the courts in the query and
-    # their child courts.
-    court_id_query = parse_court_id_query(cleaned_query)
-    if court_id_query:
-        parent_child_courts_query = get_child_court_ids_for_parents(
-            court_id_query
-        )
-        return f"court_id:({parent_child_courts_query})"
-    else:
-        return cleaned_query
+    # If it's a court_id query, parse it, append the child courts and get them
+    # back to the original query.
+    final_query = modify_court_id_queries(cleaned_query)
+    return final_query
 
 
 def build_main_query(
