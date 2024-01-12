@@ -12,8 +12,8 @@ from eyecite.test_factories import (
     id_citation,
     journal_citation,
     law_citation,
-    nonopinion_citation,
     supra_citation,
+    unknown_citation,
 )
 from factory import RelatedFactory
 from lxml import etree
@@ -580,7 +580,7 @@ class CitationObjectTest(IndexedSolrTestCase):
         )
 
         id = id_citation(index=1)
-        non = nonopinion_citation(index=1, source_text="§99")
+        unknown = unknown_citation(index=1, source_text="§99")
         journal = journal_citation(reporter="Minn. L. Rev.")
         law = law_citation(
             source_text="1 Stat. 2",
@@ -659,10 +659,10 @@ class CitationObjectTest(IndexedSolrTestCase):
                 {opinion1: [full1], NO_MATCH_RESOURCE: [full_na, id]},
             ),
             # Test resolving an Id. citation when the previous citation is to a
-            # non-opinion document. Since we can't match those documents (yet),
+            # unknown document. Since we can't match those documents (yet),
             # we expect the Id. citation to also not be matched.
             (
-                [full1, non, id],
+                [full1, unknown, id],
                 {opinion1: [full1]},
             ),
             # Test resolving an Id. citation when it is the first citation
