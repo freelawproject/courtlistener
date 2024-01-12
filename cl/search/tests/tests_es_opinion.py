@@ -698,6 +698,90 @@ class OpinionsESSearchTest(
         self.assertNotIn("Honda", r.content.decode())
         self.assertIn("Debbas", r.content.decode())
 
+    async def test_facet_fields_counts(self) -> None:
+        """Confirm that the facet fields contain the correct aggregation
+        counts, regardless of the selected status.
+        """
+
+        def assert_facet_fields(facet_fields, expected_vals):
+            for field in facet_fields:
+                field_name = field.name
+                if field_name in expected_vals:
+                    field_count = field.count
+                    self.assertEqual(
+                        field_count,
+                        expected_vals[field_name],
+                        f"Count for {field_name} did not match. Expected: {expected_vals[field_name]}, Found: {field_count}",
+                    )
+
+        # Match all query
+        r = await self.async_client.get(
+            reverse("show_results"), {"q": "*", "stat_Errata": "on"}
+        )
+        expected_values = {
+            "stat_Published": 4,
+            "stat_Unpublished": 0,
+            "stat_Errata": 1,
+            "stat_Separate": 0,
+            "stat_In-chambers": 0,
+            "stat_Relating-to": 0,
+            "stat_Unknown": 0,
+        }
+        assert_facet_fields(r.context["facet_fields"], expected_values)
+
+        # Filter query
+        r = await self.async_client.get(
+            reverse("show_results"),
+            {"case_name": "Debbas v. Franklin", "stat_Errata": "on"},
+        )
+        expected_values = {
+            "stat_Published": 0,
+            "stat_Unpublished": 0,
+            "stat_Errata": 1,
+            "stat_Separate": 0,
+            "stat_In-chambers": 0,
+            "stat_Relating-to": 0,
+            "stat_Unknown": 0,
+        }
+        assert_facet_fields(r.context["facet_fields"], expected_values)
+
+        # Text query
+        r = await self.async_client.get(
+            reverse("show_results"),
+            {"q": "some rando syllabus", "stat_Errata": "on"},
+        )
+        expected_values = {
+            "stat_Published": 3,
+            "stat_Unpublished": 0,
+            "stat_Errata": 1,
+            "stat_Separate": 0,
+            "stat_In-chambers": 0,
+            "stat_Relating-to": 0,
+            "stat_Unknown": 0,
+        }
+        assert_facet_fields(r.context["facet_fields"], expected_values)
+
+        # Text query + Filter
+        r = await self.async_client.get(
+            reverse("show_results"),
+            {
+                "q": "some rando syllabus",
+                "cited_lt": 9,
+                "cited_gt": 5,
+                "stat_Errata": "on",
+            },
+        )
+        expected_values = {
+            "stat_Published": 2,
+            "stat_Unpublished": 0,
+            "stat_Errata": 0,
+            "stat_Separate": 0,
+            "stat_In-chambers": 0,
+            "stat_Relating-to": 0,
+            "stat_Unknown": 0,
+        }
+        assert_facet_fields(r.context["facet_fields"], expected_values)
+
     async def test_citation_ordering_by_citation_count(self) -> None:
         """Can the results be re-ordered by citation count?"""
         search_params = {"q": "*", "order_by": "citeCount desc"}
