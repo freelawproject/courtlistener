@@ -66,7 +66,7 @@
    {
       "field":"attorney",
       "description":"The name of the attorneys in a PACER case. Can have multiple values.",
-      "opinions":false,
+      "opinions":true,
       "parentheticals":false,
       "recap_archive":true,
       "oral_arguments":false
@@ -102,6 +102,14 @@
       "parentheticals":true,
       "recap_archive":false,
       "oral_arguments":true
+   },
+  {
+      "field":"panel_names",
+      "description":"The full name of the judges on a panel for a case.",
+      "opinions":true,
+      "parentheticals":true,
+      "recap_archive":false,
+      "oral_arguments":false
    },
    {
       "field":"joined_by_ids",
@@ -265,7 +273,7 @@
    },
    {
       "field":"status",
-      "description":"The precedential status of a case. Valid entries for this field are <code>u</code> for Unpublished, <code>p</code> for published, <code>r</code> for relating-to, and <code>i</code> for in chambers opinions.",
+      "description":"The precedential status of a case. Valid entries for this field are <code>published</code>, <code>unpublished</code>, <code>errata</code>, <code>separate</code>, <code>in-chambers</code>, <code>relating-to</code>, <code>unknown</code>",
       "opinions":true,
       "parentheticals":true,
       "recap_archive":false,
@@ -352,6 +360,54 @@
       "oral_arguments":false
    },
   {
+      "field":"type",
+      "description":"The Opinion type. Valid entries for this field are <code>combined-opinion</code>, <code>unanimous-opinion</code>, <code>lead-opinion</code>, <code>plurality-opinion</code>, <code>concurrence-opinion</code>, <code>in-part-opinion</code>, <code>dissent</code>, <code>addendum</code>, <code>remittitur</code>, <code>rehearing</code>, <code>on-the-merits</code>, <code>on-motion-to-strike</code>.",
+      "opinions":true,
+      "parentheticals":false,
+      "recap_archive":false,
+      "oral_arguments":false
+   },
+  {
+      "field":"procedural_history",
+      "description":"The history of the case as it jumped from court to court.",
+      "opinions":true,
+      "parentheticals":false,
+      "recap_archive":false,
+      "oral_arguments":false
+   },
+  {
+      "field":"posture",
+      "description":"The procedural posture of the case.",
+      "opinions":true,
+      "parentheticals":false,
+      "recap_archive":false,
+      "oral_arguments":false
+   },
+  {
+      "field":"syllabus",
+      "description":"A summary of the issues presented in the case and the \"outcome.\"",
+      "opinions":true,
+      "parentheticals":false,
+      "recap_archive":false,
+      "oral_arguments":false
+   },
+  {
+      "field":"non_participating_judge_ids",
+      "description":"The judges that heard the case, but did not participate in the opinion",
+      "opinions":true,
+      "parentheticals":false,
+      "recap_archive":false,
+      "oral_arguments":false
+   },
+  {
+      "field":"source",
+      "description":"The source of the cluster. Valid entries for this field are: <br><code>C</code> for \"court website\", <br><code>R</code> for \"public.resource.org\", <br><code>CR</code> for \"court website merged with resource.org\", <br><code>L</code> for \"lawbox\", <br><code>LC</code> for \"lawbox merged with court\", <br><code>LR</code> for \"lawbox merged with resource.org\", <br><code>LCR</code> for \"lawbox merged with court and resource.org\", <br><code>M</code> for \"manual input\", <br><code>A</code> for \"internet archive\", <br><code>H</code> for \"brad heath archive\", <br><code>Z</code> for \"columbia archive\", <br><code>U</code> for \"Harvard, Library Innovation Lab Case Law Access Project\", <br><code>CU</code> for \"court website merged with Harvard\", <br><code>D</code> for \"direct court input\", <br><code>Q</code> for \"2020 anonymous database\", <br><code>QU</code> for \"2020 anonymous database merged with Harvard\", <br><code>CRU</code> for \"court website merged with public.resource.org and Harvard\", <br><code>DU</code> for \"direct court input merged with Harvard\", <br><code>LU</code> for \"lawbox merged with Harvard\", <br><code>LCU</code> for \"Lawbox merged with court website and Harvard\", <br><code>LRU</code> for \"Lawbox merged with public.resource.org and with Harvard\", <br><code>LCRU</code> for \"Lawbox merged with court website\", <br><code>CRU</code> for \"public.resource.org and Harvard\", <br><code>MU</code> for \"Manual input merged with Harvard\", <br><code>RU</code> for \"public.resource.org merged with Harvard\", <br><code>ZA</code> for \"columbia merged with internet archive\", <br><code>ZD</code> for \"columbia merged with direct court input\", <br><code>ZC</code> for \"columbia merged with court\", <br><code>ZH</code> for \"columbia merged with brad heath archive\", <br><code>ZLC</code> for \"columbia merged with lawbox and court\", <br><code>ZLR</code> for \"columbia merged with lawbox and resource.org\", <br><code>ZLCR</code> for \"columbia merged with lawbox, court, and resource.org\", <br><code>ZR</code> for \"columbia merged with resource.org\", <br><code>ZCR</code> for \"columbia merged with court and resource.org\", <br><code>ZL</code> for \"columbia merged with lawbox\", <br><code>ZM</code> for \"columbia merged with manual input\", <br><code>ZQ</code> for \"columbia merged with 2020 anonymous database\", <br><code>ZU</code> for \"columbia archive merged with Harvard\", <br><code>ZLU</code> for \"columbia archive merged with Lawbox and Harvard\", <br><code>ZDU</code> for \"columbia archive merged with direct court input and Harvard\", <br><code>ZLRU</code> for \"columbia archive merged with lawbox, public.resource.org and Harvard\", <br><code>ZLCRU</code> for \"columbia archive merged with lawbox, court website, public.resource.org and Harvard\", <br><code>ZCU</code> for \"columbia archive merged with court website and Harvard\", <br><code>ZMU</code> for \"columbia archive merged with manual input and Harvard\", <br><code>ZRU</code> for \"columbia archive merged with public.resource.org and Harvard\", <br><code>ZLCU</code> for \"columbia archive merged with lawbox, court website and Harvard\"",
+      "opinions":true,
+      "parentheticals":false,
+      "recap_archive":false,
+      "oral_arguments":false
+   },
+   {
       "field":"jurisdictionType",
       "description":"The \"jurisdiction\" value found in PACER docket reports. For example, 'Diversity' or 'U.S. Government Defendant'.",
       "opinions":false,

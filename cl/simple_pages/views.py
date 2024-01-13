@@ -31,7 +31,6 @@ from cl.disclosures.models import (
 )
 from cl.donate.utils import get_donation_totals_by_email
 from cl.people_db.models import Person
-from cl.search.forms import SearchForm
 from cl.search.models import (
     SOURCES,
     Court,
@@ -220,14 +219,6 @@ async def get_coverage_data_o(request: HttpRequest) -> dict[str, Any]:
     if coverage_data is None:
         courts = Court.objects.filter(in_use=True)
         courts_json = json.dumps(await build_court_dicts(courts))
-
-        search_form = await sync_to_async(SearchForm)(request.GET)
-        precedential_statuses = [
-            field
-            for field in search_form.fields.keys()
-            if field.startswith("stat_")
-        ]
-
         # Build up the sourcing stats.
         counts = OpinionCluster.objects.values("source").annotate(
             Count("source")
@@ -260,7 +251,6 @@ async def get_coverage_data_o(request: HttpRequest) -> dict[str, Any]:
 
         coverage_data = {
             "sorted_courts": courts_json,
-            "precedential_statuses": precedential_statuses,
             "oa_duration": oa_duration,
             "count_pro": count_pro,
             "count_lawbox": count_lawbox,

@@ -22,10 +22,17 @@ from rest_framework.status import (
     HTTP_400_BAD_REQUEST,
     HTTP_404_NOT_FOUND,
 )
+from waffle.testutils import override_flag
 
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.storage import clobbering_get_name
-from cl.lib.test_helpers import SimpleUserDataMixin, SitemapTest
+from cl.lib.test_helpers import (
+    CourtTestCase,
+    PeopleTestCase,
+    SearchTestCase,
+    SimpleUserDataMixin,
+    SitemapTest,
+)
 from cl.opinion_page.forms import CourtUploadForm
 from cl.opinion_page.utils import make_docket_title
 from cl.opinion_page.views import get_prev_next_volumes
@@ -54,7 +61,7 @@ from cl.search.models import (
     OpinionCluster,
     RECAPDocument,
 )
-from cl.tests.cases import SimpleTestCase, TestCase
+from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
 from cl.tests.providers import fake
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
@@ -74,13 +81,6 @@ class SimpleLoadTest(TestCase):
         "recap_docs.json",
     ]
 
-    async def test_simple_opinion_page(self) -> None:
-        """Does the page load properly?"""
-        path = reverse("view_case", kwargs={"pk": 1, "_": "asdf"})
-        response = await self.async_client.get(path)
-        self.assertEqual(response.status_code, HTTP_200_OK)
-        self.assertIn("33 state 1", response.content.decode())
-
     async def test_simple_rd_page(self) -> None:
         path = reverse(
             "view_recap_document",
@@ -88,6 +88,19 @@ class SimpleLoadTest(TestCase):
         )
         response = await self.async_client.get(path)
         self.assertEqual(response.status_code, HTTP_200_OK)
+
+
+class OpinionPageLoadTest(
+    ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
+):
+    async def test_simple_opinion_page(self) -> None:
+        """Does the page load properly?"""
+        path = reverse(
+            "view_case", kwargs={"pk": self.opinion_cluster_1.pk, "_": "asdf"}
+        )
+        response = await self.async_client.get(path)
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertIn("33 state 1", response.content.decode())
 
 
 class DocumentPageRedirection(TestCase):
@@ -165,15 +178,16 @@ class CitationRedirectorTest(TestCase):
         r = await self.async_client.get(reverse("citation_homepage"))
         self.assertStatus(r, HTTP_200_OK)
 
-    async def test_with_a_citation(self) -> None:
+    @override_flag("o-es-active", False)
+    def test_with_a_citation(self) -> None:
         """Make sure that the url paths are working properly."""
         # Are we redirected to the correct place when we use GET or POST?
-        r = await self.async_client.get(
+        r = self.client.get(
             reverse("citation_redirector", kwargs=self.citation), follow=True
         )
         self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
 
-        r = await self.async_client.post(
+        r = self.client.post(
             reverse("citation_redirector"), self.citation, follow=True
         )
         self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
@@ -425,11 +439,12 @@ class CitationRedirectorTest(TestCase):
         self.assertEqual(volume_previous, None)
         self.assertEqual(volume_next, None)
 
-    async def test_full_citation_redirect(self) -> None:
+    @override_flag("o-es-active", False)
+    def test_full_citation_redirect(self) -> None:
         """Do we get redirected to the correct URL when we pass in a full
         citation?"""
 
-        r = await self.async_client.get(
+        r = self.client.get(
             reverse(
                 "citation_redirector",
                 kwargs={

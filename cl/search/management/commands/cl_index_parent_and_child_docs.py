@@ -7,7 +7,7 @@ from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand
 from cl.lib.redis_utils import make_redis_interface
 from cl.people_db.models import Person
-from cl.search.models import SEARCH_TYPES, Docket
+from cl.search.models import SEARCH_TYPES, Docket, OpinionCluster
 from cl.search.tasks import index_parent_and_child_docs
 
 
@@ -71,8 +71,12 @@ class Command(VerboseCommand):
             "--search-type",
             type=str,
             required=True,
-            choices=[SEARCH_TYPES.PEOPLE, SEARCH_TYPES.RECAP],
-            help=f"The search type models to index: ({', '.join([SEARCH_TYPES.PEOPLE, SEARCH_TYPES.RECAP])})",
+            choices=[
+                SEARCH_TYPES.PEOPLE,
+                SEARCH_TYPES.RECAP,
+                SEARCH_TYPES.OPINION,
+            ],
+            help=f"The search type models to index: ({', '.join([SEARCH_TYPES.PEOPLE, SEARCH_TYPES.RECAP, SEARCH_TYPES.OPINION])})",
         )
         parser.add_argument(
             "--pk-offset",
@@ -135,6 +139,18 @@ class Command(VerboseCommand):
                 q = queryset.iterator()
                 count = queryset.count()
                 self.process_queryset(q, count, SEARCH_TYPES.RECAP, pk_offset)
+            case SEARCH_TYPES.OPINION:
+                # Get Opinion Clusters objects by pk_offset.
+                queryset = (
+                    OpinionCluster.objects.filter(pk__gte=pk_offset)
+                    .order_by("pk")
+                    .values_list("pk", flat=True)
+                )
+                q = queryset.iterator()
+                count = queryset.count()
+                self.process_queryset(
+                    q, count, SEARCH_TYPES.OPINION, pk_offset
+                )
 
     def process_queryset(
         self,

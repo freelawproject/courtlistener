@@ -63,6 +63,11 @@ class PRECEDENTIAL_STATUS:
         (UNKNOWN, "Unknown Status"),
     )
 
+    @classmethod
+    def get_status_value(cls, name):
+        reverse_names = {value: key for key, value in cls.NAMES}
+        return reverse_names.get(name)
+
 
 class SOURCES:
     COURT_WEBSITE = "C"
@@ -795,6 +800,15 @@ class Docket(AbstractDateTimeModel):
             "referred_to_id",
             "referred_to_str",
             "slug",
+        ]
+    )
+    es_o_field_tracker = FieldTracker(
+        fields=[
+            "court_id",
+            "docket_number",
+            "date_argued",
+            "date_reargued",
+            "date_reargument_denied",
         ]
     )
 
@@ -2699,6 +2713,27 @@ class OpinionCluster(AbstractDateTimeModel):
             "precedential_status",
         ]
     )
+    es_o_field_tracker = FieldTracker(
+        fields=[
+            "docket_id",
+            "case_name",
+            "case_name_short",
+            "case_name_full",
+            "date_filed",
+            "judges",
+            "attorneys",
+            "nature_of_suit",
+            "attorneys",
+            "precedential_status",
+            "procedural_history",
+            "posture",
+            "syllabus",
+            "scdb_id",
+            "citation_count",
+            "slug",
+            "source",
+        ]
+    )
 
     async def acaption(self):
         """Make a proper caption
@@ -3336,6 +3371,23 @@ class Opinion(AbstractDateTimeModel):
     es_pa_field_tracker = FieldTracker(
         fields=["extracted_by_ocr", "cluster_id", "author_id"]
     )
+    es_o_field_tracker = FieldTracker(
+        fields=[
+            "cluster_id",
+            "author_id",
+            "type",
+            "per_curiam",
+            "download_url",
+            "local_path",
+            "html_columbia",
+            "html_lawbox",
+            "xml_harvard",
+            "html_anon_2020",
+            "html",
+            "plain_text",
+            "sha1",
+        ]
+    )
 
     @property
     def siblings(self) -> QuerySet:
@@ -3478,6 +3530,15 @@ class OpinionJoinedBy(Opinion.joined_by.through):
         proxy = True
 
 
+class BulkCreateManager(models.Manager):
+    """Custom manager that will trigger a signal on bulk_create."""
+
+    def bulk_create_with_signal(self, objs, *args, **kwargs):
+        created_objs = super().bulk_create(objs, *args, **kwargs)
+        bulk_create_signal.send(sender=self.model, instances=created_objs)
+        return created_objs
+
+
 class OpinionsCited(models.Model):
     citing_opinion = models.ForeignKey(
         Opinion, related_name="cited_opinions", on_delete=models.CASCADE
@@ -3506,15 +3567,6 @@ class OpinionsCited(models.Model):
     class Meta:
         verbose_name_plural = "Opinions cited"
         unique_together = ("citing_opinion", "cited_opinion")
-
-
-class BulkCreateManager(models.Manager):
-    """Custom manager that will trigger a signal on bulk_create."""
-
-    def bulk_create_with_signal(self, objs, *args, **kwargs):
-        created_objs = super().bulk_create(objs, *args, **kwargs)
-        bulk_create_signal.send(sender=self.model, instances=created_objs)
-        return created_objs
 
 
 class OpinionsCitedByRECAPDocument(models.Model):

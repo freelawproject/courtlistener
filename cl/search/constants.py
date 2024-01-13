@@ -2,7 +2,7 @@
 import re
 from typing import Dict
 
-from cl.search.models import SEARCH_TYPES
+from cl.search.models import SEARCH_TYPES, Opinion
 
 SOLR_OPINION_HL_FIELDS = [
     "caseName",
@@ -87,6 +87,20 @@ SEARCH_RECAP_PARENT_QUERY_FIELDS = [
     "chapter",
     "trustee_str",
 ]
+SEARCH_OPINION_QUERY_FIELDS = [
+    "court",
+    "court_id",
+    "citation",
+    "judge",
+    "caseNameFull",
+    "caseName",
+    "status",
+    "suitNature",
+    "attorney",
+    "procedural_history",
+    "posture",
+    "syllabus",
+]
 
 # ES fields that are used for highlighting
 SEARCH_HL_TAG = "mark"
@@ -147,6 +161,19 @@ SEARCH_RECAP_HL_FIELDS = [
     "suitNature.exact",
 ]
 
+SEARCH_OPINION_HL_FIELDS = [
+    "caseName",
+    "caseName.exact",
+    "citation",
+    "citation.exact",
+    "court_citation_string",
+    "docketNumber",
+    "docketNumber.exact",
+    "suitNature",
+    "suitNature.exact",
+]
+
+
 # In RECAP Search, it is necessary to display 'plain_text' as a truncated snippet,
 # where the snippet length is determined by 'fragment_size'.
 # For all other fields, the complete content should be returned.
@@ -162,7 +189,12 @@ SEARCH_RECAP_CHILD_HL_FIELDS = {
     "plain_text": 100,
     "plain_text.exact": 100,
 }
+SEARCH_OPINION_CHILD_HL_FIELDS = {
+    "text": 100,
+    "text.exact": 100,
+}
 
+MULTI_VALUE_HL_FIELDS = ["citation"]
 # Search query for related items
 RELATED_PATTERN = re.compile(
     r"""
@@ -197,6 +229,8 @@ BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
     "qf": {
         SEARCH_TYPES.OPINION: {
             "text": 1.0,
+            "type": 1.0,
+            # Cluster fields
             "caseName": 4.0,
             "docketNumber": 2.0,
         },
@@ -232,4 +266,20 @@ BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
             # None here. Phrases don't make much sense for people.
         },
     },
+}
+
+
+o_type_index_map = {
+    Opinion.COMBINED: "combined-opinion",
+    Opinion.UNANIMOUS: "unanimous-opinion",
+    Opinion.LEAD: "lead-opinion",
+    Opinion.PLURALITY: "plurality-opinion",
+    Opinion.CONCURRENCE: "concurrence-opinion",
+    Opinion.CONCUR_IN_PART: "in-part-opinion",
+    Opinion.DISSENT: "dissent",
+    Opinion.ADDENDUM: "addendum",
+    Opinion.REMITTUR: "remittitur",
+    Opinion.REHEARING: "rehearing",
+    Opinion.ON_THE_MERITS: "on-the-merits",
+    Opinion.ON_MOTION_TO_STRIKE: "on-motion-to-strike",
 }

@@ -548,19 +548,19 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
             user=cls.user_profile.user,
             rate=Alert.DAILY,
             name="Test Alert O",
-            query="type=o&stat_Precedential=on",
+            query="type=o&stat_Non-Precedential=on",
         )
         cls.search_alert_rt = AlertFactory(
             user=cls.user_profile.user,
             rate=Alert.REAL_TIME,
             name="Test Alert O rt",
-            query="type=o&stat_Precedential=on",
+            query="type=o&stat_Non-Precedential=on",
         )
         cls.search_alert_rt_1 = AlertFactory(
             user=cls.user_profile_1.user,
             rate=Alert.REAL_TIME,
             name="Test Alert O rt",
-            query="type=o&stat_Precedential=on",
+            query="type=o&stat_Non-Precedential=on",
         )
         cls.search_alert_oa = AlertFactory(
             user=cls.user_profile.user,
@@ -572,13 +572,13 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
             user=cls.user_profile.user,
             rate=Alert.WEEKLY,
             name="Test Alert O wly",
-            query="type=o&stat_Precedential=on",
+            query="type=o&stat_Non-Precedential=on",
         )
         cls.search_alert_o_mly = AlertFactory(
             user=cls.user_profile.user,
             rate=Alert.MONTHLY,
             name="Test Alert O mly",
-            query="type=o&stat_Precedential=on",
+            query="type=o&stat_Non-Precedential=on",
         )
 
         cls.user_profile_2 = UserProfileWithParentsFactory()
@@ -592,14 +592,14 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
             user=cls.user_profile_2.user,
             rate=Alert.DAILY,
             name="Test Alert O Disabled",
-            query="type=o&stat_Precedential=on",
+            query="type=o&stat_Non-Precedential=on",
         )
         cls.mock_date = now().replace(day=15, hour=0)
         with time_machine.travel(
             cls.mock_date, tick=False
         ), cls.captureOnCommitCallbacks(execute=True):
             cls.dly_opinion = OpinionWithParentsFactory.create(
-                cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
                 cluster__date_filed=now() - timedelta(hours=5),
             )
             with mock.patch(
@@ -615,11 +615,11 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
                 )
 
             cls.wly_opinion = OpinionWithParentsFactory.create(
-                cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
                 cluster__date_filed=now() - timedelta(days=2),
             )
             cls.mly_opinion = OpinionWithParentsFactory.create(
-                cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
                 cluster__date_filed=now() - timedelta(days=25),
             )
 
@@ -722,7 +722,7 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
         ), self.captureOnCommitCallbacks(execute=True):
             # Get ready the RT opinion for the test.
             rt_opinion = OpinionWithParentsFactory.create(
-                cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
                 cluster__date_filed=now(),
             )
             RealTimeQueue.objects.create(

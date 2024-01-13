@@ -5,6 +5,7 @@ from urllib.parse import urlencode
 
 import eyecite
 import natsort
+import waffle
 from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
@@ -40,6 +41,7 @@ from cl.favorites.forms import NoteForm
 from cl.favorites.models import Note
 from cl.lib.auth import group_required
 from cl.lib.bot_detector import is_og_bot
+from cl.lib.elasticsearch_utils import get_related_clusters_with_cache_and_es
 from cl.lib.http import is_ajax
 from cl.lib.model_helpers import choices_to_csv
 from cl.lib.models import THUMBNAIL_STATUSES
@@ -63,6 +65,7 @@ from cl.opinion_page.utils import core_docket_data, get_case_title
 from cl.people_db.models import AttorneyOrganization, CriminalCount, Role
 from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.models import FjcIntegratedDatabase
+from cl.search.documents import OpinionClusterDocument
 from cl.search.models import (
     Citation,
     Court,
@@ -641,11 +644,24 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
         citing_cluster_count,
     ) = await get_citing_clusters_with_cache(cluster)
 
-    (
-        related_clusters,
-        sub_opinion_ids,
-        related_search_params,
-    ) = await get_related_clusters_with_cache(cluster, request)
+    es_flag_for_o = await sync_to_async(waffle.flag_is_active)(
+        request, "o-es-active"
+    )
+    if es_flag_for_o:
+        search = OpinionClusterDocument.search()
+        (
+            related_clusters,
+            sub_opinion_ids,
+            related_search_params,
+        ) = await get_related_clusters_with_cache_and_es(
+            search, cluster, request
+        )
+    else:
+        (
+            related_clusters,
+            sub_opinion_ids,
+            related_search_params,
+        ) = await get_related_clusters_with_cache(cluster, request)
 
     get_parenthetical_groups = await get_or_create_parenthetical_groups(
         cluster,
@@ -693,7 +709,10 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
             "sub_opinion_ids": sub_opinion_ids,
             "related_algorithm": "mlt",
             "related_clusters": related_clusters,
-            "related_cluster_ids": [item["id"] for item in related_clusters],
+            "related_cluster_ids": [
+                item["cluster_id"] if es_flag_for_o else item["id"]
+                for item in related_clusters
+            ],
             "related_search_params": f"&{urlencode(related_search_params)}",
             "sponsored": sponsored,
         },

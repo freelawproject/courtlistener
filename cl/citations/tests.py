@@ -46,7 +46,12 @@ from cl.citations.tasks import (
     find_citations_and_parentheticals_for_opinion_by_pks,
     store_recap_citations,
 )
-from cl.lib.test_helpers import IndexedSolrTestCase
+from cl.lib.test_helpers import (
+    CourtTestCase,
+    IndexedSolrTestCase,
+    PeopleTestCase,
+    SearchTestCase,
+)
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -57,6 +62,7 @@ from cl.search.factories import (
     RECAPDocumentFactory,
 )
 from cl.search.models import (
+    SEARCH_TYPES,
     Opinion,
     OpinionCluster,
     OpinionsCited,
@@ -65,7 +71,7 @@ from cl.search.models import (
     ParentheticalGroup,
     RECAPDocument,
 )
-from cl.tests.cases import SimpleTestCase
+from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
 
 
 class CitationTextTest(SimpleTestCase):
@@ -802,7 +808,21 @@ class CitationObjectTest(IndexedSolrTestCase):
         )
 
 
-class CitationFeedTest(IndexedSolrTestCase):
+class CitationFeedTest(
+    ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
+):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.rebuild_index("search.OpinionCluster")
+        super().setUpTestData()
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
+
     def _tree_has_content(self, content, expected_count):
         xml_tree = etree.fromstring(content)
         count = len(
