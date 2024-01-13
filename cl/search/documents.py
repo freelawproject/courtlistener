@@ -1229,20 +1229,24 @@ class OpinionBaseDocument(Document):
     )
     docketNumber = fields.TextField(
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
                 search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
             ),
         },
         search_analyzer="search_analyzer",
     )
     caseName = fields.TextField(
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
                 search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
             ),
         },
         search_analyzer="search_analyzer",
@@ -1286,6 +1290,7 @@ class OpinionBaseDocument(Document):
         attr="docket.court.citation_string",
         analyzer="text_en_splitting_cl",
         search_analyzer="search_analyzer",
+        term_vector="with_positions_offsets",
     )
     judge = fields.TextField(
         analyzer="text_en_splitting_cl",
@@ -1316,10 +1321,12 @@ class OpinionBaseDocument(Document):
     )
     suitNature = fields.TextField(
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
                 search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
             ),
         },
         search_analyzer="search_analyzer",
@@ -1327,10 +1334,12 @@ class OpinionBaseDocument(Document):
     citation = fields.ListField(
         fields.TextField(
             analyzer="text_en_splitting_cl",
+            term_vector="with_positions_offsets",
             fields={
                 "exact": fields.TextField(
                     analyzer="english_exact",
                     search_analyzer="search_analyzer_exact",
+                    term_vector="with_positions_offsets",
                     multi=True,
                 ),
             },

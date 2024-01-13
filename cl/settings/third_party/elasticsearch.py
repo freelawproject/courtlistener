@@ -31,11 +31,11 @@ else:
     )
     ELASTICSEARCH_CLUSTERS_SIGNALS_ENABLED = env(
         "ELASTICSEARCH_CLUSTERS_SIGNALS_ENABLED",
-        default=True,
+        default=False,
     )
     ELASTICSEARCH_OPINIONS_SIGNALS_ENABLED = env(
         "ELASTICSEARCH_OPINIONS_SIGNALS_ENABLED",
-        default=True,
+        default=False,
     )
     ES_HIGHLIGHTER = env(
         "ES_HIGHLIGHTER",
