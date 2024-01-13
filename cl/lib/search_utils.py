@@ -412,7 +412,9 @@ def get_selected_field_string(cd: CleanData, prefix: str) -> str:
     Final strings are of the form "A" OR "B" OR "C", with quotes in case there
     are spaces in the values.
     """
-    selected_fields = get_array_of_selected_fields(cd, prefix)
+    selected_fields = [
+        f'"{field}"' for field in get_array_of_selected_fields(cd, prefix)
+    ]
     if len(selected_fields) == cd[f"_{prefix}count"]:
         # All the boxes are checked. No need for filtering.
         return ""

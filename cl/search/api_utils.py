@@ -9,10 +9,7 @@ from cl.lib.elasticsearch_utils import (
 )
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import map_to_docket_entry_sorting
-from cl.search.documents import (
-    AudioDocument,
-    PersonDocument,
-)
+from cl.search.documents import AudioDocument, PersonDocument
 from cl.search.models import SEARCH_TYPES
 
 
