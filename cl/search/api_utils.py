@@ -11,7 +11,6 @@ from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import map_to_docket_entry_sorting
 from cl.search.documents import (
     AudioDocument,
-    OpinionClusterDocument,
     PersonDocument,
 )
 from cl.search.models import SEARCH_TYPES
