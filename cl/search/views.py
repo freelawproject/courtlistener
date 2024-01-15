@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta, timezone
 from urllib.parse import quote
 
 import waffle
+from asgiref.sync import async_to_sync
 from cache_memoize import cache_memoize
 from django.conf import settings
 from django.contrib import messages
@@ -34,6 +35,8 @@ from cl.lib.elasticsearch_utils import (
     convert_str_date_fields_to_date_objects,
     es_index_exists,
     fetch_es_results,
+    get_facet_dict_for_search_query,
+    get_only_status_facets,
     limit_inner_hits,
     merge_courts_from_db,
     merge_unavailable_fields_on_parent_document,
@@ -57,6 +60,7 @@ from cl.search.constants import RELATED_PATTERN
 from cl.search.documents import (
     AudioDocument,
     DocketDocument,
+    OpinionClusterDocument,
     ParentheticalGroupDocument,
     PersonDocument,
 )
@@ -188,7 +192,7 @@ def do_search(
                 paged_results = paginate_cached_solr_results(
                     get_params, cd, results, rows, cache_key
                 )
-                cited_cluster = add_depth_counts(
+                cited_cluster = async_to_sync(add_depth_counts)(
                     # Also returns cited cluster if found
                     search_data=cd,
                     search_results=paged_results,
@@ -395,15 +399,36 @@ def show_results(request: HttpRequest) -> HttpResponse:
 
             # Load the render_dict with good results that can be shown in the
             # "Latest Cases" section
-            render_dict.update(
-                do_search(
-                    mutable_GET,
-                    rows=5,
-                    override_params={"order_by": "dateFiled desc"},
-                    facet=False,
-                    cache_key="homepage-data-o",
+            if not waffle.flag_is_active(request, "o-es-active"):
+                render_dict.update(
+                    {
+                        "results_o": do_search(
+                            mutable_GET,
+                            rows=5,
+                            override_params={"order_by": "dateFiled desc"},
+                            facet=False,
+                            cache_key="homepage-data-o",
+                        )["results"]
+                    }
                 )
-            )
+            else:
+                mutable_GET.update(
+                    {
+                        "order_by": "dateArgued desc",
+                        "type": SEARCH_TYPES.OPINION,
+                    }
+                )
+                render_dict.update(
+                    {
+                        "results_o": do_es_search(
+                            mutable_GET,
+                            rows=5,
+                            facet=False,
+                            cache_key="homepage-data-o-es",
+                        )["results"]
+                    }
+                )
+
             # Get the results from the oral arguments as well
             # Check if waffle flag is active.
             if not waffle.flag_is_active(request, "oa-es-active"):
@@ -441,7 +466,9 @@ def show_results(request: HttpRequest) -> HttpResponse:
                 )
 
             # But give it a fresh form for the advanced search section
-            render_dict.update({"search_form": SearchForm(request.GET)})
+            render_dict.update(
+                {"search_form": SearchForm(request.GET, request=request)}
+            )
 
             # Get a bunch of stats.
             stats = get_homepage_stats()
@@ -483,7 +510,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
                     initial={"query": get_string, "rate": "dly"},
                     user=request.user,
                 )
-            search_type = request.GET.get("type")
+            search_type = request.GET.get("type", SEARCH_TYPES.OPINION)
             match search_type:
                 case SEARCH_TYPES.PARENTHETICAL:
                     render_dict.update(do_es_search(request.GET.copy()))
@@ -494,7 +521,6 @@ def show_results(request: HttpRequest) -> HttpResponse:
                     else:
                         render_dict.update(do_search(request.GET.copy()))
                 case SEARCH_TYPES.PEOPLE:
-                    # Check if waffle flag is active.
                     if waffle.flag_is_active(request, "p-es-active"):
                         render_dict.update(do_es_search(request.GET.copy()))
                     else:
@@ -505,6 +531,11 @@ def show_results(request: HttpRequest) -> HttpResponse:
                     else:
                         search_results = do_search(request.GET.copy())
                     render_dict.update(search_results)
+                case SEARCH_TYPES.OPINION:
+                    if waffle.flag_is_active(request, "o-es-active"):
+                        render_dict.update(do_es_search(request.GET.copy()))
+                    else:
+                        render_dict.update(do_search(request.GET.copy()))
                 case _:
                     render_dict.update(do_search(request.GET.copy()))
 
@@ -523,17 +554,25 @@ def advanced(request: HttpRequest) -> HttpResponse:
     # I'm not thrilled about how this is repeating URLs in a view.
     if request.path == reverse("advanced_o"):
         obj_type = SEARCH_TYPES.OPINION
-        # Needed b/c of facet values.
-
-        o_results = do_search(
-            request.GET.copy(),
-            rows=1,
-            override_params={"type": obj_type},
-            facet=True,
-            cache_key="opinion-homepage-results",
+        render_dict["search_form"] = SearchForm(
+            {"type": obj_type}, request=request
         )
-        render_dict.update(o_results)
-        render_dict["search_form"] = SearchForm({"type": obj_type})
+        # Needed b/c of facet values.
+        if waffle.flag_is_active(request, "o-es-active"):
+            search_query = OpinionClusterDocument.search()
+            facet_results = get_only_status_facets(
+                search_query, render_dict["search_form"]
+            )
+            render_dict.update({"facet_fields": facet_results})
+        else:
+            o_results = do_search(
+                request.GET.copy(),
+                rows=1,
+                override_params={"type": obj_type},
+                facet=True,
+                cache_key="opinion-homepage-results",
+            )
+            render_dict.update(o_results)
         return TemplateResponse(request, "advanced.html", render_dict)
     else:
         courts = Court.objects.filter(in_use=True)
@@ -549,7 +588,7 @@ def advanced(request: HttpRequest) -> HttpResponse:
         else:
             raise NotImplementedError(f"Unknown path: {request.path}")
 
-        search_form = SearchForm({"type": obj_type})
+        search_form = SearchForm({"type": obj_type}, request=request)
         courts, court_count_human, court_count = merge_form_with_courts(
             courts, search_form
         )
@@ -574,12 +613,13 @@ def es_search(request: HttpRequest) -> HttpResponse:
     courts = Court.objects.filter(in_use=True)
     render_dict.update({"search_type": "parenthetical"})
     obj_type = SEARCH_TYPES.PARENTHETICAL
-    search_form = SearchForm({"type": obj_type})
+    search_form = SearchForm({"type": obj_type}, request=request)
     if search_form.is_valid():
         search_form = _clean_form(
             request.GET.copy(),
             search_form.cleaned_data,
             courts,
+            is_es_form=True,
         )
     template = "advanced.html"
 
@@ -624,9 +664,13 @@ def do_es_search(
     error_message = ""
     suggested_query = ""
     total_child_results = 0
+    related_cluster = None
+    cited_cluster = None
+    query_citation = None
+    facet_fields = []
 
-    search_form = SearchForm(get_params)
-    match get_params.get("type"):
+    search_form = SearchForm(get_params, is_es_form=True)
+    match get_params.get("type", SEARCH_TYPES.OPINION):
         case SEARCH_TYPES.PARENTHETICAL:
             document_type = ParentheticalGroupDocument
         case SEARCH_TYPES.ORAL_ARGUMENT:
@@ -635,6 +679,8 @@ def do_es_search(
             document_type = PersonDocument
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             document_type = DocketDocument
+        case SEARCH_TYPES.OPINION:
+            document_type = OpinionClusterDocument
 
     if search_form.is_valid() and es_index_exists(
         index_name=document_type._index._name
@@ -658,10 +704,31 @@ def do_es_search(
                 cache_key=cache_key,
             )
             search_form = _clean_form(
-                get_params,
-                search_form.cleaned_data,
-                courts,
+                get_params, search_form.cleaned_data, courts, is_es_form=True
             )
+            cited_cluster = add_depth_counts(
+                # Also returns cited cluster if found
+                search_data=cd,
+                search_results=paged_results,
+            )
+
+            if cd["type"] in [
+                SEARCH_TYPES.OPINION,
+                SEARCH_TYPES.RECAP,
+                SEARCH_TYPES.DOCKETS,
+            ]:
+                query_citation = get_query_citation(cd)
+
+            if cd["type"] in [SEARCH_TYPES.OPINION] and facet:
+                facet_fields = get_facet_dict_for_search_query(
+                    search_query, cd, search_form
+                )
+            related_prefix = RELATED_PATTERN.search(cd["q"])
+            if related_prefix:
+                related_pks = related_prefix.group("pks").split(",")
+                related_cluster = OpinionCluster.objects.get(
+                    sub_opinions__pk__in=related_pks
+                )
         except UnbalancedQuery:
             error = True
             error_message = "has incorrect syntax. Did you forget to close one or more parentheses?"
@@ -693,6 +760,10 @@ def do_es_search(
         "court_count": court_count,
         "error_message": error_message,
         "suggested_query": suggested_query,
+        "related_cluster": related_cluster,
+        "cited_cluster": cited_cluster,
+        "query_citation": query_citation,
+        "facet_fields": facet_fields,
     }
 
 
@@ -743,9 +814,8 @@ def fetch_and_paginate_results(
     except EmptyPage:
         results = paginator.page(paginator.num_pages)
 
-    search_type = get_params.get("type")
+    search_type = get_params.get("type", SEARCH_TYPES.OPINION)
     # Set highlights in results.
-
     convert_str_date_fields_to_date_objects(results, search_type)
     merge_courts_from_db(results, search_type)
     limit_inner_hits(get_params, results, search_type)

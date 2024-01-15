@@ -1,11 +1,11 @@
 import re
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, List, Match, Optional, Tuple, Union, cast
 from urllib.parse import parse_qs, urlencode
 
 from asgiref.sync import sync_to_async
 from django.conf import settings
-from django.core.cache import cache, caches
+from django.core.cache import caches
 from django.http import HttpRequest, QueryDict
 from eyecite import get_citations
 from eyecite.models import FullCaseCitation
@@ -15,15 +15,16 @@ from scorched.response import SolrResponse
 from cl.citations.match_citations import search_db_for_fullcitation
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.lib.bot_detector import is_bot
+from cl.lib.crypto import sha256
 from cl.lib.model_helpers import clean_docket_number, is_docket_number
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.types import CleanData, SearchParam
 from cl.search.constants import (
     BOOSTS,
     SEARCH_ORAL_ARGUMENT_HL_FIELDS,
-    SEARCH_RECAP_HL_FIELDS,
     SOLR_OPINION_HL_FIELDS,
     SOLR_PEOPLE_HL_FIELDS,
+    SOLR_RECAP_HL_FIELDS,
 )
 from cl.search.forms import SearchForm
 from cl.search.models import (
@@ -392,18 +393,27 @@ def make_cite_count_query(cd: CleanData) -> str:
         return f"citeCount:[{start} TO {end}]"
 
 
+def get_array_of_selected_fields(cd: CleanData, prefix: str) -> list[str]:
+    """Gets the selected checkboxes from the form data, and puts it into
+    an array. Uses a prefix to know which items to pull out of the cleaned
+    data.Check forms.py to see how the prefixes are set up.
+    """
+    return [
+        k.replace(prefix, "")
+        for k, v in cd.items()
+        if (k.startswith(prefix) and v is True)
+    ]
+
+
 def get_selected_field_string(cd: CleanData, prefix: str) -> str:
-    """Pulls the selected checkboxes out of the form data, and puts it into
-    Solr strings. Uses a prefix to know which items to pull out of the cleaned
-    data. Check forms.py to see how the prefixes are set up.
+    """Pulls the selected checkboxes using the get_array_of_selected_fields
+    method, and puts it into Solr strings.
 
     Final strings are of the form "A" OR "B" OR "C", with quotes in case there
     are spaces in the values.
     """
     selected_fields = [
-        f"\"{k.replace(prefix, '')}\""
-        for k, v in cd.items()
-        if (k.startswith(prefix) and v is True)
+        f'"{field}"' for field in get_array_of_selected_fields(cd, prefix)
     ]
     if len(selected_fields) == cd[f"_{prefix}count"]:
         # All the boxes are checked. No need for filtering.
@@ -546,7 +556,7 @@ def add_highlighting(
             "party",
             "referred_to_id",
         ]
-        hlfl = SEARCH_RECAP_HL_FIELDS
+        hlfl = SOLR_RECAP_HL_FIELDS
     elif cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
         fl = [
             "id",
@@ -584,6 +594,52 @@ def add_highlighting(
             continue
         main_params[f"f.{field}.hl.fragListBuilder"] = "single"  # type: ignore
         main_params[f"f.{field}.hl.alternateField"] = field  # type: ignore
+
+
+def lookup_child_courts(parent_courts: list[str]) -> set[str]:
+    """Recursively fetches child courts for the given parent courts.
+
+    :param parent_courts: List of parent court_ids.
+    :return: Set of all child court IDs.
+    """
+
+    cache = caches["db_cache"]
+    all_child_courts = set()
+    sorted_courts_hash = sha256("-".join(sorted(parent_courts)))
+    cache_key = f"child_courts:{sorted_courts_hash}"
+    cached_result = cache.get(cache_key)
+
+    if cached_result is not None:
+        return set(cached_result)
+
+    child_courts = Court.objects.filter(
+        parent_court_id__in=parent_courts
+    ).values_list("id", flat=True)
+    all_child_courts.update(child_courts)
+    if not all_child_courts:
+        return set()
+
+    final_results = all_child_courts.union(
+        lookup_child_courts(list(all_child_courts))
+    )
+    sorted_final_results = sorted(final_results)
+    one_month = 60 * 60 * 24 * 30
+    cache.set(cache_key, sorted_final_results, one_month)
+    return set(sorted_final_results)
+
+
+def get_child_court_ids_for_parents(selected_courts_string: str) -> str:
+    """
+    Retrieves and combines court IDs from both the given parents and their
+    child courts and removing duplicates.
+
+    :param selected_courts_string: The courts from the original user query.
+    :return: A string containing the unique combination of parent and child courts.
+    """
+    unique_courts = set(re.findall(r'"(.*?)"', selected_courts_string))
+    unique_courts.update(lookup_child_courts(list(unique_courts)))
+    courts = [f'"{c}"' for c in sorted(list(unique_courts))]
+    return " OR ".join(courts)
 
 
 def add_filter_queries(main_params: SearchParam, cd) -> None:
@@ -703,12 +759,14 @@ def add_filter_queries(main_params: SearchParam, cd) -> None:
         selected_stats_string = get_selected_field_string(cd, "stat_")
         if len(selected_stats_string) > 0:
             main_fq.append(
-                "{!tag=dt}status_exact:(%s)" % selected_stats_string
+                f"{{!tag=dt}}status_exact:({selected_stats_string})"
             )
 
     selected_courts_string = get_selected_field_string(cd, "court_")
     if len(selected_courts_string) > 0:
-        main_fq.append(f"court_exact:({selected_courts_string})")
+        main_fq.append(
+            f"court_exact:({get_child_court_ids_for_parents(selected_courts_string)})"
+        )
 
     # If a param has been added to the fq variables, then we add them to the
     # main_params var. Otherwise, we don't, as doing so throws an error.
@@ -807,8 +865,51 @@ def print_params(params: SearchParam) -> None:
     if settings.DEBUG:
         print(
             "Params sent to search are:\n%s"
-            % " &\n".join(["  %s = %s" % (k, v) for k, v in params.items()])
+            % " &\n".join(f"  {k} = {v}" for k, v in params.items())
         )
+
+
+def extend_child_courts(match: Match[str]) -> str:
+    """Extends court_id: queries with their child courts.
+
+    :param match: A regex match object containing the matched court_id: query.
+    :return: A string with the court_id query extended with child courts.
+    """
+
+    # Remove parentheses
+    cleaned_str = re.sub(r"[()]", "", match.group(1))
+    # Split the string by spaces to handle each court
+    courts = cleaned_str.split()
+    # Wrap each word in double quotes, except for 'OR'
+    formatted_courts = [
+        f'"{court}"' if court != "OR" else court for court in courts
+    ]
+    query_content = " ".join(formatted_courts)
+    return f"court_id:({get_child_court_ids_for_parents(query_content)})"
+
+
+def modify_court_id_queries(query_str: str) -> str:
+    """Modify 'court_id' values in a query string.
+
+    Parses valid 'court_id:' values in the string:
+    - "court_id:" followed by a single word without spaces:
+        court_id:cabc
+    - "court_id:" followed by a list of words separated by "OR", wrapped in
+    parentheses:
+        court_id:(cabc OR nysupctnewyork)
+
+    For each valid 'court_id' query, it retrieves the courts and extends them
+    with their child courts, then reinserts them back into the original
+    query string.
+
+    :param query_str: The query string to be parsed.
+    :return: The modified query string after extending with child courts, or
+    the original query string if no valid 'court_id:' queries are found.
+    """
+
+    pattern = r"court_id:(\w+|\(\w+(?:\sOR\s\w+)*\))"
+    modified_query = re.sub(pattern, extend_child_courts, query_str)
+    return modified_query
 
 
 def cleanup_main_query(query_string: str) -> str:
@@ -818,6 +919,9 @@ def cleanup_main_query(query_string: str) -> str:
      - Add hyphens to district docket numbers that lack them
      - Ignore tokens inside phrases
      - Handle query punctuation correctly by mostly ignoring it
+     - Capture "court_id:court" queries, retrieve the child courts for each
+     court in the query, append them, and then add them back to the original
+     query.
 
     :param query_string: The query string from the form
     :return The enhanced query string
@@ -864,7 +968,11 @@ def cleanup_main_query(query_string: str) -> str:
         else:
             cleaned_items.append(f'"{item}"')
 
-    return "".join(cleaned_items)
+    cleaned_query = "".join(cleaned_items)
+    # If it's a court_id query, parse it, append the child courts, and then
+    # reintegrate them into the original query.
+    final_query = modify_court_id_queries(cleaned_query)
+    return final_query
 
 
 def build_main_query(
@@ -1004,7 +1112,7 @@ def build_court_count_query(group: bool = False) -> SearchParam:
     return params
 
 
-def add_depth_counts(
+async def add_depth_counts(
     search_data: Dict[str, Any],
     search_results: SolrResponse,
 ) -> Optional[OpinionCluster]:
@@ -1018,17 +1126,23 @@ def add_depth_counts(
     :param search_results: Solr results from paginate_cached_solr_results()
     :return The OpinionCluster if the lookup was successful
     """
+
     cites_query_matches = re.findall(r"cites:\((\d+)\)", search_data["q"])
-    if len(cites_query_matches) == 1:
+    if (
+        len(cites_query_matches) == 1
+        and search_data["type"] == SEARCH_TYPES.OPINION
+    ):
         try:
-            cited_cluster = OpinionCluster.objects.get(
+            cited_cluster = await OpinionCluster.objects.aget(
                 sub_opinions__pk=cites_query_matches[0]
             )
         except OpinionCluster.DoesNotExist:
             return None
         else:
             for result in search_results.object_list:
-                result["citation_depth"] = get_citation_depth_between_clusters(
+                result[
+                    "citation_depth"
+                ] = await get_citation_depth_between_clusters(
                     citing_cluster_pk=result["cluster_id"],
                     cited_cluster_pk=cited_cluster.pk,
                 )
@@ -1037,7 +1151,7 @@ def add_depth_counts(
         return None
 
 
-def get_citing_clusters_with_cache(
+async def get_citing_clusters_with_cache(
     cluster: OpinionCluster,
 ) -> Tuple[list, int]:
     """Use Solr to get clusters citing the one we're looking at
@@ -1048,13 +1162,13 @@ def get_citing_clusters_with_cache(
     """
     cache_key = f"citing:{cluster.pk}"
     cache = caches["db_cache"]
-    cached_results = cache.get(cache_key)
+    cached_results = await cache.aget(cache_key)
     if cached_results is not None:
         return cached_results
 
     # Cache miss. Get the citing results from Solr
     sub_opinion_pks = cluster.sub_opinions.values_list("pk", flat=True)
-    ids_str = " OR ".join([str(pk) for pk in sub_opinion_pks])
+    ids_str = " OR ".join([str(pk) async for pk in sub_opinion_pks])
     q = {
         "q": f"cites:({ids_str})",
         "rows": 5,
@@ -1069,12 +1183,14 @@ def get_citing_clusters_with_cache(
     citing_clusters = list(results)
     citing_cluster_count = results.result.numFound
     a_week = 60 * 60 * 24 * 7
-    cache.set(cache_key, (citing_clusters, citing_cluster_count), a_week)
+    await cache.aset(
+        cache_key, (citing_clusters, citing_cluster_count), a_week
+    )
 
     return citing_clusters, citing_cluster_count
 
 
-def get_related_clusters_with_cache(
+async def get_related_clusters_with_cache(
     cluster: OpinionCluster,
     request: HttpRequest,
 ) -> Tuple[List[OpinionCluster], List[int], Dict[str, str]]:
@@ -1093,25 +1209,30 @@ def get_related_clusters_with_cache(
     # Opinions that belong to the targeted cluster
     sub_opinion_ids = cluster.sub_opinions.values_list("pk", flat=True)
 
-    if is_bot(request) or not sub_opinion_ids:
+    if is_bot(request) or not await sub_opinion_ids.aexists():
         # If it is a bot or lacks sub-opinion IDs, return empty results
         return [], [], url_search_params
 
     si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
 
     # Use cache if enabled
+    cache = caches["db_cache"]
     mlt_cache_key = f"mlt-cluster:{cluster.pk}"
     related_clusters = (
-        caches["db_cache"].get(mlt_cache_key)
-        if settings.RELATED_USE_CACHE
-        else None
+        await cache.aget(mlt_cache_key) if settings.RELATED_USE_CACHE else None
     )
+
+    if settings.RELATED_FILTER_BY_STATUS:
+        # Update URL parameters accordingly
+        url_search_params = {f"stat_{settings.RELATED_FILTER_BY_STATUS}": "on"}
 
     if related_clusters is None:
         # Cache is empty
 
         # Turn list of opinion IDs into list of Q objects
-        sub_opinion_queries = [si.Q(id=sub_id) for sub_id in sub_opinion_ids]
+        sub_opinion_queries = [
+            si.Q(id=sub_id) async for sub_id in sub_opinion_ids
+        ]
 
         # Take one Q object from the list
         sub_opinion_query = sub_opinion_queries.pop()
@@ -1144,11 +1265,6 @@ def get_related_clusters_with_cache(
                 status_exact=settings.RELATED_FILTER_BY_STATUS
             )
 
-            # Update URL parameters accordingly
-            url_search_params = {
-                f"stat_{settings.RELATED_FILTER_BY_STATUS}": "on"
-            }
-
         mlt_res = mlt_query.execute()
 
         if hasattr(mlt_res, "more_like_this"):
@@ -1178,7 +1294,7 @@ def get_related_clusters_with_cache(
             # No MLT results are available (this should not happen)
             related_clusters = []
 
-        cache.set(
+        await cache.aset(
             mlt_cache_key, related_clusters, settings.RELATED_CACHE_TIMEOUT
         )
     si.conn.http_connection.close()

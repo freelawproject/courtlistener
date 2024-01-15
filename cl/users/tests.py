@@ -130,7 +130,7 @@ class UserTest(LiveServerTestCase):
         self.assertRedirects(
             response,
             f"{reverse('register_success')}"
-            f"?next=/&email=pan%40courtlistener.com",
+            "?next=/&email=pan%40courtlistener.com",
         )
 
     async def test_redirects(self) -> None:

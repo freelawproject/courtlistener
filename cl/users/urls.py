@@ -172,7 +172,7 @@ urlpatterns = [
     ),
     # Webhooks
     path(
-        f"webhook/moosend/",
+        "webhook/moosend/",
         views.moosend_webhook,
     ),
     path(

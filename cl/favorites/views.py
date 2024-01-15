@@ -11,7 +11,8 @@ from django.http import (
     HttpResponseNotAllowed,
     HttpResponseServerError,
 )
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import aget_object_or_404
+from django.template.response import TemplateResponse
 from django.utils.datastructures import MultiValueDictKeyError
 
 from cl.favorites.forms import NoteForm
@@ -127,26 +128,28 @@ async def delete_note(request: HttpRequest) -> HttpResponse:
         )
 
 
-def view_tag(request, username, tag_name):
-    tag = get_object_or_404(UserTag, name=tag_name, user__username=username)
-    increment_view_count(tag, request)
+async def view_tag(request, username, tag_name):
+    tag = await aget_object_or_404(
+        UserTag, name=tag_name, user__username=username
+    )
+    await increment_view_count(tag, request)
 
-    if tag.published is False and tag.user != request.user:
-        # They don't even get to see if it exists.
-        raise Http404("This tag does not exist")
+    if tag.published is False:
+        if await User.objects.aget(pk=tag.user_id) != await request.auser():
+            # They don't even get to see if it exists.
+            raise Http404("This tag does not exist")
 
     # Calculate the total tag count (as we add more types of taggables, add
     # them here).
     enhanced_dockets = tag.dockets.all().order_by("date_filed")
-    total_tag_count = len(enhanced_dockets)
-    for docket in enhanced_dockets:
-        docket.association_id = DocketTag.objects.get(
-            docket=docket, tag=tag
-        ).pk
-    requested_user = get_object_or_404(User, username=username)
-    is_page_owner = request.user == requested_user
+    total_tag_count = await enhanced_dockets.acount()
+    async for docket in enhanced_dockets:
+        docket_tag = await DocketTag.objects.aget(docket=docket, tag=tag)
+        docket.association_id = docket_tag.pk
+    requested_user = await aget_object_or_404(User, username=username)
+    is_page_owner = await request.auser() == requested_user
 
-    return render(
+    return TemplateResponse(
         request,
         "tag.html",
         {
@@ -159,13 +162,13 @@ def view_tag(request, username, tag_name):
     )
 
 
-def view_tags(request, username):
+async def view_tags(request, username):
     """Show the user their tags if they're looking at their own, or show the
     public tags of somebody else.
     """
-    requested_user = get_object_or_404(User, username=username)
-    is_page_owner = request.user == requested_user
-    return render(
+    requested_user = await aget_object_or_404(User, username=username)
+    is_page_owner = await request.auser() == requested_user
+    return TemplateResponse(
         request,
         "tag_list.html",
         {

@@ -1,7 +1,16 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Tuple, TypedDict, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    NotRequired,
+    Tuple,
+    TypedDict,
+    Union,
+)
 
 from django.http import HttpRequest
 from eyecite.models import (
@@ -35,6 +44,12 @@ class EmailType(TypedDict, total=False):
     body: str
     from_email: str
     to: List[str]
+
+
+class ESRangeQueryParams(TypedDict):
+    gte: str | int | float
+    lte: str | int | float
+    relation: NotRequired[str]
 
 
 # fmt: off

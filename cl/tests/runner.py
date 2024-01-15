@@ -46,7 +46,7 @@ class TestRunner(DiscoverRunner):
         self.enable_logging = enable_logging
 
     @classmethod
-    def add_arguments(self, parser):
+    def add_arguments(cls, parser):
         # Only log things if the --enable-logging flag is provided.
         parser.add_argument(
             "--enable-logging",

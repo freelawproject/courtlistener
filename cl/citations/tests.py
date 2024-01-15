@@ -12,8 +12,8 @@ from eyecite.test_factories import (
     id_citation,
     journal_citation,
     law_citation,
-    nonopinion_citation,
     supra_citation,
+    unknown_citation,
 )
 from factory import RelatedFactory
 from lxml import etree
@@ -46,7 +46,12 @@ from cl.citations.tasks import (
     find_citations_and_parentheticals_for_opinion_by_pks,
     store_recap_citations,
 )
-from cl.lib.test_helpers import IndexedSolrTestCase
+from cl.lib.test_helpers import (
+    CourtTestCase,
+    IndexedSolrTestCase,
+    PeopleTestCase,
+    SearchTestCase,
+)
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -57,6 +62,7 @@ from cl.search.factories import (
     RECAPDocumentFactory,
 )
 from cl.search.models import (
+    SEARCH_TYPES,
     Opinion,
     OpinionCluster,
     OpinionsCited,
@@ -65,7 +71,7 @@ from cl.search.models import (
     ParentheticalGroup,
     RECAPDocument,
 )
-from cl.tests.cases import SimpleTestCase
+from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
 
 
 class CitationTextTest(SimpleTestCase):
@@ -574,7 +580,7 @@ class CitationObjectTest(IndexedSolrTestCase):
         )
 
         id = id_citation(index=1)
-        non = nonopinion_citation(index=1, source_text="§99")
+        unknown = unknown_citation(index=1, source_text="§99")
         journal = journal_citation(reporter="Minn. L. Rev.")
         law = law_citation(
             source_text="1 Stat. 2",
@@ -653,10 +659,10 @@ class CitationObjectTest(IndexedSolrTestCase):
                 {opinion1: [full1], NO_MATCH_RESOURCE: [full_na, id]},
             ),
             # Test resolving an Id. citation when the previous citation is to a
-            # non-opinion document. Since we can't match those documents (yet),
+            # unknown document. Since we can't match those documents (yet),
             # we expect the Id. citation to also not be matched.
             (
-                [full1, non, id],
+                [full1, unknown, id],
                 {opinion1: [full1]},
             ),
             # Test resolving an Id. citation when it is the first citation
@@ -802,7 +808,21 @@ class CitationObjectTest(IndexedSolrTestCase):
         )
 
 
-class CitationFeedTest(IndexedSolrTestCase):
+class CitationFeedTest(
+    ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
+):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.rebuild_index("search.OpinionCluster")
+        super().setUpTestData()
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
+
     def _tree_has_content(self, content, expected_count):
         xml_tree = etree.fromstring(content)
         count = len(
@@ -1437,7 +1457,7 @@ class GroupParentheticalsTest(SimpleTestCase):
                     [frozenset(pg.parentheticals) for pg in output_groups]
                 )
                 input_sets = frozenset([frozenset(g) for g in groups])
-                self.assertEquals(
+                self.assertEqual(
                     input_sets,
                     output_sets,
                     f"Got incorrect result from get_parenthetical_groups for: {groups}",
@@ -1491,7 +1511,7 @@ class GroupParentheticalsTest(SimpleTestCase):
                 "Testing that representative connected parenthetical is selected correctly.",
                 i=i,
             ):
-                self.assertEquals(
+                self.assertEqual(
                     get_representative_parenthetical(
                         parentheticals_to_test, simgraph_to_test
                     ),
@@ -1542,7 +1562,7 @@ class GroupParentheticalsTest(SimpleTestCase):
             with self.subTest(
                 f"Testing {parenthetical_text} is tokenized correctly.", i=i
             ):
-                self.assertEquals(
+                self.assertEqual(
                     get_parenthetical_tokens(parenthetical_text),
                     tokens,
                     f"Got incorrect result from get_parnethetical_tokens for text (expected {tokens}): {parenthetical_text}",
@@ -1604,7 +1624,7 @@ class GroupParentheticalsTest(SimpleTestCase):
             with self.subTest(
                 f"Testing {inputs} connections are recognized correctly.", i=i
             ):
-                self.assertEquals(
+                self.assertEqual(
                     sorted(get_graph_component(*inputs)),
                     sorted(output),
                     f"Got incorrect result from get_graph_component for inputs (expected {output}): {inputs}",

@@ -25,7 +25,7 @@ MILESTONES = OrderedDict(
 )
 
 MILESTONES_FLAT = sorted(
-    [item for sublist in MILESTONES.values() for item in sublist]
+    item for sublist in MILESTONES.values() for item in sublist
 )
 
 

@@ -197,7 +197,7 @@ class ApiQueryCountTests(TransactionTestCase):
                 bad_query = 'IN (SELECT U0."id" FROM "search_docket" U0)'
                 if bad_query in query["sql"]:
                     self.fail(
-                        f"DRF made a nasty query we thought we "
+                        "DRF made a nasty query we thought we "
                         f"banished: {bad_query=}"
                     )
 
@@ -356,7 +356,7 @@ class DRFOrderingTests(TestCase):
         )
 
 
-class FilteringCountTestCase(object):
+class FilteringCountTestCase:
     """Mixin for adding an additional test assertion."""
 
     # noinspection PyPep8Naming
@@ -392,7 +392,7 @@ class DRFJudgeApiFilterTests(
                 username="pandora", password="password"
             )
         )
-        self.q: Dict[Any, Any] = dict()
+        self.q: Dict[Any, Any] = {}
 
     def test_judge_filtering_by_first_name(self) -> None:
         """Can we filter by first name?"""
@@ -596,7 +596,7 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
                 username="recap-user", password="password"
             )
         )
-        self.q: Dict[Any, Any] = dict()
+        self.q: Dict[Any, Any] = {}
 
     def test_docket_entry_to_docket_filters(self) -> None:
         """Do a variety of docket entry filters work?"""
@@ -752,7 +752,7 @@ class DRFSearchAppAndAudioAppApiFilterTest(
                 username="recap-user", password="password"
             )
         )
-        self.q: Dict[Any, Any] = dict()
+        self.q: Dict[Any, Any] = {}
 
     def test_cluster_filters(self) -> None:
         """Do a variety of cluster filters work?"""

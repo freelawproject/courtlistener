@@ -191,7 +191,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         logger.info(f"Using PACER username: {PACER_USERNAME}")
         if options["task"] == "attachment_pages":
             get_attachment_pages(options)

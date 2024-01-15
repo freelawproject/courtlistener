@@ -76,7 +76,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         if options["task"] == "bulk_export":
             do_bulk_export(options)
         else:

@@ -17,8 +17,8 @@ class ViewAuthority:
 
 @dataclass
 class AuthoritiesContext:
-    citation_record: InitVar[OpinionCluster | RECAPDocument]
-    query_string: InitVar[str]
+    citation_record: OpinionCluster | RECAPDocument
+    query_string: str
     full_list_authorities: list[
         OpinionCluster | OpinionsCitedByRECAPDocument
     ] = field(init=False)
@@ -28,9 +28,11 @@ class AuthoritiesContext:
     doc_type: Literal["opinion", "document"]
     query_all_authorities: bool = False
 
-    def __post_init__(self, citation_record, query_string):
-        if isinstance(citation_record, RECAPDocument):
-            self.full_list_authorities = citation_record.authorities_with_data
+    async def post_init(self):
+        if isinstance(self.citation_record, RECAPDocument):
+            self.full_list_authorities = (
+                self.citation_record.authorities_with_data
+            )
 
             if self.query_all_authorities:
                 # Evaluate and cache the queryset to reused the data for subsequent
@@ -41,18 +43,21 @@ class AuthoritiesContext:
 
             self.top_authorities = [
                 ViewAuthority(
-                    caption=record.cited_opinion.cluster.caption,
+                    caption=await record.cited_opinion.cluster.acaption(),
                     count=record.depth,
-                    url=f"{record.cited_opinion.cluster.get_absolute_url()}?{query_string}",
+                    url=f"{record.cited_opinion.cluster.get_absolute_url()}?{self.query_string}",
                 )
                 for record in self.full_list_authorities[:5]
             ]
         else:
+            authorities_with_data = (
+                await self.citation_record.aauthorities_with_data()
+            )
             self.top_authorities = [
                 ViewAuthority(
-                    caption=record.caption,
+                    caption=await record.acaption(),
                     count=record.citation_depth,
-                    url=f"{record.get_absolute_url()}?{query_string}",
+                    url=f"{record.get_absolute_url()}?{self.query_string}",
                 )
-                for record in citation_record.authorities_with_data[:5]
+                for record in authorities_with_data[:5]
             ]

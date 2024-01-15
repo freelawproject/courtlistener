@@ -106,7 +106,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         self.options = options
         if options["rate"] == Alert.REAL_TIME:
             self.remove_stale_rt_items()

@@ -6,7 +6,7 @@ from typing import Iterable as IterableType
 from typing import Optional, Tuple
 
 
-class _UNSPECIFIED(object):
+class _UNSPECIFIED:
     pass
 
 
@@ -39,7 +39,7 @@ def deepgetattr(obj, name, default=_UNSPECIFIED):
             return default
 
 
-def chunks(iterable, chunk_size):
+def chunks(iterable, chunk_size: int):
     """Like the chunks function, but the iterable can be a generator.
 
     Note that the chunks must be *consumed* for it to work properly. Usually

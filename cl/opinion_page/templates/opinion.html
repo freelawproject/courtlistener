@@ -222,7 +222,7 @@
 {% block content %}
     <article class="col-sm-9">
         {% with opinion_count=cluster.sub_opinions.all.count %}
-            <h2 class="inline">{{ cluster.caption|safe|v_wrapper }}</h2>
+            <h2 class="inline">{{ caption|safe|v_wrapper }}</h2>
             {% include "includes/notes_modal.html" %}
 
             <h3>{{ cluster.docket.court }}</h3>

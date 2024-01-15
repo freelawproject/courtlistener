@@ -8,13 +8,13 @@ from cl.lib.models import AbstractDateTimeModel
 from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
 
 
-class PAYMENT_TYPES(object):
+class PAYMENT_TYPES:
     DONATION = "donation"
     PAYMENT = "payment"
     BADGE_SIGNUP = "badge_signup"
 
 
-class FREQUENCIES(object):
+class FREQUENCIES:
     ONCE = "once"
     MONTHLY = "monthly"
     NAMES = (
@@ -23,7 +23,7 @@ class FREQUENCIES(object):
     )
 
 
-class PROVIDERS(object):
+class PROVIDERS:
     DWOLLA = "dwolla"
     PAYPAL = "paypal"
     CREDIT_CARD = "cc"
