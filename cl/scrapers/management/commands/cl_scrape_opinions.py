@@ -57,7 +57,7 @@ def make_citation(
             extra=dict(
                 cite=cite_str,
                 cluster=cluster,
-                fingerprint=f"citation-not-parsed-{court_id}",
+                fingerprint=[f"{court_id}-no-citation-found"],
             ),
         )
         return None
@@ -375,7 +375,8 @@ class Command(VerboseCommand):
             mod = __import__(
                 f"{package}.{module}", globals(), locals(), [module]
             )
-            court_id = mod.Site().court_id.split(".")[-1].split("_")[0]
+            module_string = mod.Site().court_id
+            court_id = module_string.split(".")[-1].split("_")[0]
             if not Court.objects.get(id=court_id).has_opinion_scraper:
                 logger.info(f"{court_id} is currently disabled.")
                 i += 1
@@ -383,7 +384,9 @@ class Command(VerboseCommand):
             try:
                 self.parse_and_scrape_site(mod, options["full_crawl"])
             except Exception as e:
-                capture_exception(e)
+                capture_exception(
+                    e, fingerprint=[module_string, "{{ default }}"]
+                )
             last_court_in_list = i == (num_courts - 1)
             daemon_mode = options["daemon"]
             if last_court_in_list:

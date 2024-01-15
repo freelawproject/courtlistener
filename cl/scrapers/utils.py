@@ -49,13 +49,17 @@ def get_child_court(child_court_name: str, court_id: str) -> Optional[Court]:
 
     if not child_court_ids:
         logger.error(
-            "Could not get child court id from name '%s'", child_court_name
+            "Could not get child court id from name '%s'",
+            child_court_name,
+            extra={"fingerprint": [f"{court_id}-no-child-in-reportersdb"]},
         )
         return None
 
     if not (child_courts := Court.objects.filter(pk=child_court_ids[0])):
         logger.error(
-            "Court object does not exist for '%s'", child_court_ids[0]
+            "Court object does not exist for '%s'",
+            child_court_ids[0],
+            extra={"fingerprint": [f"{court_id}-no-child-in-db"]},
         )
         return None
 
@@ -68,6 +72,7 @@ def get_child_court(child_court_name: str, court_id: str) -> Optional[Court]:
             child_court_ids[0],
             court_id,
             parent_id,
+            extra={"fingerprint": [f"{court_id}-child-found-no-parent-match"]},
         )
         return None
 
