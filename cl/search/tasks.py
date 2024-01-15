@@ -1,6 +1,6 @@
 import logging
 import socket
-from datetime import timedelta
+from datetime import datetime, timedelta
 from importlib import import_module
 from random import randint
 from typing import Any, Generator
@@ -1047,11 +1047,12 @@ def index_related_cites_fields(
             # Query all clusters to update and retrieve only their sub_opinions
             # with the necessary fields.
             prefetch = Prefetch(
-                "sub_opinions", queryset=Opinion.objects.only("pk")
+                "sub_opinions",
+                queryset=Opinion.objects.only("pk", "date_created"),
             )
             clusters_with_sub_opinions = (
                 OpinionCluster.objects.filter(pk__in=cluster_ids_to_update)
-                .only("pk", "citation_count")
+                .only("pk", "citation_count", "date_created")
                 .prefetch_related(prefetch)
             )
 
@@ -1061,14 +1062,19 @@ def index_related_cites_fields(
             }
             for cluster in clusters_with_sub_opinions:
                 if not OpinionClusterDocument.exists(id=cluster.pk):
-                    # If the OpinionClusterDocument does not exist, it might
-                    # not be indexed yet. Raise a NotFoundError to retry the
-                    # task; hopefully, it will be indexed soon.
-                    raise NotFoundError(
-                        f"The OpinionCluster {cluster.pk} is not indexed.",
-                        "",
-                        {"id": cluster.pk},
-                    )
+                    # Check if the Cluster is new (created today)
+                    if cluster.date_created.date() == datetime.today().date():
+                        # OpinionCluster is new and not indexed yet. Raise a
+                        # NotFoundError to retry the task; hopefully, it will
+                        # be indexed soon.
+                        raise NotFoundError(
+                            f"The OpinionCluster {cluster.pk} is not indexed.",
+                            "",
+                            {"id": cluster.pk},
+                        )
+                    # Cluster is not new, just ignore it. It will be indexed
+                    # soon by the indexing command.
+                    continue
 
                 # Build the OpinionCluster dicts for updating the citeCount.
                 doc_to_update = {
@@ -1082,14 +1088,22 @@ def index_related_cites_fields(
                     if not OpinionClusterDocument.exists(
                         id=ES_CHILD_ID(opinion.pk).OPINION
                     ):
-                        # If the OpinionDocument does not exist, it might
-                        # not be indexed yet. Raise a NotFoundError to retry the
-                        # task; hopefully, it will be indexed soon.
-                        raise NotFoundError(
-                            f"The Opinion {opinion.pk} is not indexed.",
-                            "",
-                            {"id": opinion.pk},
-                        )
+                        # Check if the opinion is new (created today)
+                        if (
+                            opinion.date_created.date()
+                            == datetime.today().date()
+                        ):
+                            # Opinion is new and not indexed yet. Raise a
+                            # NotFoundError to retry the task; hopefully, it
+                            # will be indexed soon.
+                            raise NotFoundError(
+                                f"The Opinion {opinion.pk} is not indexed.",
+                                "",
+                                {"id": opinion.pk},
+                            )
+                        # Opinion is not new, just ignore it. It will be indexed
+                        # soon by the indexing command.
+                        continue
 
                     # Build the Opinion dicts for updating the citeCount.
                     doc_to_update = {
@@ -1106,18 +1120,27 @@ def index_related_cites_fields(
             cites_prepared = OpinionDocument().prepare_cites(opinion_instance)
             doc_id = ES_CHILD_ID(opinion_instance.pk).OPINION
             if not OpinionClusterDocument.exists(id=doc_id):
-                # If the OpinionDocument does not exist, it might
-                # not be indexed yet. Raise a NotFoundError to retry the
-                # task; hopefully, it will be indexed soon.
-                raise NotFoundError(
-                    f"The Opinion {opinion_instance.pk} is not indexed.",
-                    "",
-                    {"id": opinion_instance.pk},
-                )
-
-            doc_to_update = {"_id": doc_id, "doc": {"cites": cites_prepared}}
-            doc_to_update.update(base_doc)
-            documents_to_update.append(doc_to_update)
+                # Check if the opinion is new (created today)
+                if (
+                    opinion_instance.date_created.date()
+                    == datetime.today().date()
+                ):
+                    # Opinion is new and not indexed yet. Raise a
+                    # NotFoundError to retry the task; hopefully, it
+                    # will be indexed soon.
+                    raise NotFoundError(
+                        f"The Opinion {opinion_instance.pk} is not indexed.",
+                        "",
+                        {"id": opinion_instance.pk},
+                    )
+            else:
+                # OpinionDocument is indexed. Update it.
+                doc_to_update = {
+                    "_id": doc_id,
+                    "doc": {"cites": cites_prepared},
+                }
+                doc_to_update.update(base_doc)
+                documents_to_update.append(doc_to_update)
 
     if not documents_to_update:
         return

@@ -1,6 +1,7 @@
 import datetime
 from unittest import mock
 
+import time_machine
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
@@ -10,6 +11,7 @@ from django.db.models import F
 from django.http import HttpRequest
 from django.test import AsyncRequestFactory, override_settings
 from django.urls import reverse
+from elasticsearch.exceptions import NotFoundError
 from elasticsearch_dsl import Q
 from factory import RelatedFactory
 from lxml import etree, html
@@ -53,6 +55,7 @@ from cl.search.models import (
 from cl.search.tasks import (
     es_save_document,
     index_related_cites_fields,
+    remove_document_from_es_index,
     update_children_docs_by_query,
     update_es_document,
 )
@@ -1750,6 +1753,67 @@ class EsOpinionsIndexingTest(
             self.assertIn(judge.pk, es_doc.joined_by_ids)
 
         opinion.delete()
+
+    def test_not_found_error_on_related_cites_fields_indexing(self) -> None:
+        """Confirm that a NotFoundError is raised for new, unindexed documents
+        but not for older documents when updating related cites in ES.
+        """
+
+        opinion_cluster = OpinionClusterFactory.create(
+            date_filed=datetime.date(2015, 8, 14),
+            source="C",
+            slug="case-name-cluster",
+            citation_count=4,
+            docket=self.docket,
+        )
+        opinion = OpinionFactory.create(
+            extracted_by_ocr=False,
+            author=self.person,
+            cluster=opinion_cluster,
+            local_path="test/search/opinion_doc.doc",
+        )
+
+        # Remove opinion from index to simulate a missing document.
+        remove_document_from_es_index.delay("OpinionDocument", opinion.pk)
+        self.assertFalse(
+            OpinionDocument.exists(id=ES_CHILD_ID(opinion.pk).OPINION)
+        )
+
+        # NotFoundError should be raised on new documents.
+        with self.assertRaises(NotFoundError):
+            # Update changes in ES using index_related_cites_fields
+            index_related_cites_fields(
+                OpinionsCited.__name__, opinion.pk, [opinion_cluster.pk]
+            )
+
+        opinion.delete()
+
+        # NotFoundError shouldn't be raised on an old document.
+        with time_machine.travel(
+            datetime.datetime.now().replace(year=2015, hour=0), tick=False
+        ):
+            opinion_2 = OpinionFactory.create(
+                extracted_by_ocr=False,
+                author=self.person,
+                cluster=opinion_cluster,
+                local_path="test/search/opinion_doc.doc",
+            )
+        # Remove opinion from index to simulate a missing document.
+        remove_document_from_es_index.delay("OpinionDocument", opinion_2.pk)
+        self.assertFalse(
+            OpinionDocument.exists(id=ES_CHILD_ID(opinion_2.pk).OPINION)
+        )
+
+        try:
+            # Update changes in ES using index_related_cites_fields
+            index_related_cites_fields(
+                OpinionsCited.__name__, opinion_2.pk, [opinion_cluster.pk]
+            )
+        except NotFoundError:
+            self.fail("NotFoundError() was raised when it was not expected.")
+
+        opinion_cluster.delete()
+        opinion_2.delete()
 
     def test_parent_document_update_fields_properly(self) -> None:
         """Confirm that parent fields are properly update when changing DB records"""
