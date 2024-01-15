@@ -16,17 +16,26 @@ ignore_logger("internetarchive.session")
 ignore_logger("internetarchive.item")
 
 
-def refine_fingerprint(event: Dict[str, Any], hint: Dict[str, Any]):
+def fingerprint_event(
+    event: Dict[str, Any], hint: Dict[str, Any]
+) -> Dict[str, Any]:
     """If a fingerprint key is present in "extra", pass it to Sentry
 
-    This fingerprint will be a "group ID" on Sentry, forcing all events
+    This function expects error.log(extra={"fingerprint": []})
+    to be a List
+
+    The fingerprint will be a "group ID" on Sentry, forcing all events
     with that key to be grouped on a single issue
 
-    This implementation expects the fingerprint to be a string
-    The event["fingerprint"] should be a list
+    :param event: event dict to be sent to Sentry
+    :param hint: dict with extra information about the event
+
+    :return: the event that will be sent to Sentry
     """
-    if fingerprint := event.get("extra", {}).pop("fingerprint", ""):
-        event["fingerprint"] = [fingerprint]
+    # logger.error calls can take an 'extra' keyword argument
+    # which is used here to pass the fingerprint key
+    if fingerprint := event.get("extra", {}).pop("fingerprint", []):
+        event["fingerprint"] = fingerprint
 
     return event
 
@@ -40,5 +49,5 @@ if SENTRY_DSN:
             RedisIntegration(),
         ],
         ignore_errors=[KeyboardInterrupt],
-        before_send=refine_fingerprint,
+        before_send=fingerprint_event,
     )
