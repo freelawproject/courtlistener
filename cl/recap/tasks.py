@@ -418,7 +418,7 @@ async def process_recap_pdf(pk):
         await associate_related_instances(
             pq,
             d_id=de.docket_id,
-            de_id=rd.docket_entry.pk,
+            de_id=de.pk,
             rd_id=rd.pk,
         )
         await mark_pq_successful(pq)
