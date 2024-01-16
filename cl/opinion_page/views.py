@@ -61,7 +61,11 @@ from cl.opinion_page.forms import (
     DocketEntryFilterForm,
 )
 from cl.opinion_page.types import AuthoritiesContext
-from cl.opinion_page.utils import core_docket_data, get_case_title
+from cl.opinion_page.utils import (
+    core_docket_data,
+    es_get_citing_clusters_with_cache,
+    get_case_title,
+)
 from cl.people_db.models import AttorneyOrganization, CriminalCount, Role
 from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.models import FjcIntegratedDatabase
@@ -639,11 +643,6 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     else:
         note_form = NoteForm(instance=note)
 
-    (
-        citing_clusters,
-        citing_cluster_count,
-    ) = await get_citing_clusters_with_cache(cluster)
-
     es_flag_for_o = await sync_to_async(waffle.flag_is_active)(
         request, "o-es-active"
     )
@@ -656,12 +655,20 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
         ) = await get_related_clusters_with_cache_and_es(
             search, cluster, request
         )
+        (
+            citing_clusters,
+            citing_cluster_count,
+        ) = await es_get_citing_clusters_with_cache(cluster)
     else:
         (
             related_clusters,
             sub_opinion_ids,
             related_search_params,
         ) = await get_related_clusters_with_cache(cluster, request)
+        (
+            citing_clusters,
+            citing_cluster_count,
+        ) = await get_citing_clusters_with_cache(cluster)
 
     get_parenthetical_groups = await get_or_create_parenthetical_groups(
         cluster,
