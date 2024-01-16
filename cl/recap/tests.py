@@ -1250,8 +1250,12 @@ class RecapPdfTaskTest(TestCase):
         rd = async_to_sync(process_recap_pdf)(self.pq.pk)
         self.assertIsNone(rd)
         self.pq.refresh_from_db()
+        # Confirm PQ values.
         self.assertEqual(self.pq.status, PROCESSING_STATUS.FAILED)
         self.assertIn("Unable to find docket entry", self.pq.error_message)
+        self.assertEqual(self.pq.docket_id, None)
+        self.assertEqual(self.pq.docket_entry_id, None)
+        self.assertEqual(self.pq.recap_document_id, None)
 
     @mock.patch("cl.recap.tasks.extract_recap_pdf.si")
     def test_docket_and_docket_entry_already_exist(self, mock_extract):
@@ -1285,8 +1289,12 @@ class RecapPdfTaskTest(TestCase):
         rd = async_to_sync(process_recap_pdf)(self.pq.pk)
         self.assertIsNone(rd)
         self.pq.refresh_from_db()
+        # Confirm PQ values.
         self.assertEqual(self.pq.status, PROCESSING_STATUS.FAILED)
         self.assertIn("Unable to find docket", self.pq.error_message)
+        self.assertEqual(self.pq.docket_id, None)
+        self.assertEqual(self.pq.docket_entry_id, None)
+        self.assertEqual(self.pq.recap_document_id, None)
 
     def test_ocr_extraction_recap_document(self):
         """Can we extract a recap document via OCR?"""
@@ -2025,6 +2033,9 @@ class RecapDocketTaskTest(TestCase):
         self.assertEqual(d.source, Docket.RECAP)
         self.assertTrue(d.case_name)
         self.assertEqual(d.jury_demand, "None")
+        # Confirm docket_id is associated to the PQ
+        self.pq.refresh_from_db()
+        self.assertEqual(self.pq.docket_id, d.pk)
 
     def test_parsing_docket_already_exists(self) -> None:
         """Can we parse an HTML docket for a docket we have in the DB?"""
@@ -2036,6 +2047,9 @@ class RecapDocketTaskTest(TestCase):
         self.assertEqual(d.source, Docket.RECAP_AND_SCRAPER)
         self.assertTrue(d.case_name)
         self.assertEqual(existing_d.pacer_case_id, d.pacer_case_id)
+        # Confirm docket_id is associated to the PQ
+        self.pq.refresh_from_db()
+        self.assertEqual(self.pq.docket_id, existing_d.pk)
 
     def test_adding_harvard_and_recap_source(self) -> None:
         """Is the HARVARD_AND_RECAP source properly added when updating a
@@ -2299,12 +2313,12 @@ class RecapAttachmentPageTaskTest(TestCase):
         att_path = os.path.join(test_dir, self.att_filename)
         with open(att_path, "rb") as f:
             self.att = SimpleUploadedFile(self.att_filename, f.read())
-        d = Docket.objects.create(
+        self.d = Docket.objects.create(
             source=0, court_id="scotus", pacer_case_id="asdf"
         )
-        de = DocketEntry.objects.create(docket=d, entry_number=1)
+        self.de = DocketEntry.objects.create(docket=self.d, entry_number=1)
         RECAPDocument.objects.create(
-            docket_entry=de,
+            docket_entry=self.de,
             document_number="1",
             pacer_doc_id="04505578698",
             document_type=RECAPDocument.PACER_DOCUMENT,
@@ -2334,6 +2348,9 @@ class RecapAttachmentPageTaskTest(TestCase):
         )
         self.pq.refresh_from_db()
         self.assertEqual(self.pq.status, PROCESSING_STATUS.SUCCESSFUL)
+        # Confirm docket_id and docket_entry_id are associated to the PQ
+        self.assertEqual(self.pq.docket_id, self.d.pk)
+        self.assertEqual(self.pq.docket_entry_id, self.de.pk)
 
     def test_no_rd_match(self, mock):
         """If there's no RECAPDocument to match on, do we fail gracefully?"""
@@ -3006,7 +3023,7 @@ class RecapEmailDocketAlerts(TestCase):
         self.client.post(self.path, self.data_3, format="json")
 
         # Can we get the recap.email recipient properly?
-        email_processing = EmailProcessingQueue.objects.all()
+        email_processing = EmailProcessingQueue.objects.all().order_by("pk")
         self.assertEqual(
             email_processing[0].destination_emails, ["testing_2@recap.email"]
         )
@@ -3017,6 +3034,22 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(recap_document.count(), 1)
         message_sent_2 = mail.outbox[0]
         self.assertEqual(message_sent_2.to, [self.recipient_user_2.user.email])
+
+        # Confirm EPQ values.
+        self.assertEqual(len(email_processing), 1)
+        self.assertEqual(
+            email_processing[0].status, PROCESSING_STATUS.SUCCESSFUL
+        )
+
+        # Confirm RDs are correctly associated to the new EQP.
+        self.assertEqual(
+            list(
+                email_processing[0].recap_documents.values_list(
+                    "pk", flat=True
+                )
+            ),
+            list(RECAPDocument.objects.all().values_list("pk", flat=True)),
+        )
 
         # A DocketAlert should be created when receiving the first notification
         # for this case and user (testing_2@recap.email)
@@ -3057,6 +3090,23 @@ class RecapEmailDocketAlerts(TestCase):
             alert_type=DocketAlert.SUBSCRIPTION,
         )
         self.assertEqual(docket_alert_2.count(), 1)
+
+        # Confirm a new EQP is created.
+        email_processing = EmailProcessingQueue.objects.all().order_by("pk")
+        self.assertEqual(len(email_processing), 2)
+        self.assertEqual(
+            email_processing[1].status, PROCESSING_STATUS.SUCCESSFUL
+        )
+
+        # Confirm RDs are correctly associated to the new EQP.
+        self.assertEqual(
+            list(
+                email_processing[1].recap_documents.values_list(
+                    "pk", flat=True
+                )
+            ),
+            list(RECAPDocument.objects.all().values_list("pk", flat=True)),
+        )
 
         # Webhook for users that were subscribed previously shouldn't be
         # triggered again
@@ -3255,12 +3305,30 @@ class RecapEmailDocketAlerts(TestCase):
         # A DocketAlert should be created when receiving the first notification
         # for this case with Unsubscription type, since user has the
         # auto-subscribe False.
+        email_processing = EmailProcessingQueue.objects.all().order_by("pk")
         recap_document = RECAPDocument.objects.all()
         docket = recap_document[0].docket_entry.docket
         docket_alert = DocketAlert.objects.filter(
             user=self.recipient_user.user,
             docket=docket,
         )
+
+        # Confirm EPQ values.
+        self.assertEqual(len(email_processing), 1)
+        self.assertEqual(
+            email_processing[0].status, PROCESSING_STATUS.SUCCESSFUL
+        )
+
+        # Confirm RDs are correctly associated to the new EQP.
+        self.assertEqual(
+            list(
+                email_processing[0].recap_documents.values_list(
+                    "pk", flat=True
+                )
+            ),
+            list(RECAPDocument.objects.all().values_list("pk", flat=True)),
+        )
+
         self.assertEqual(docket_alert.count(), 1)
         self.assertEqual(
             docket_alert[0].alert_type, DocketAlert.UNSUBSCRIPTION
@@ -3449,9 +3517,25 @@ class RecapEmailDocketAlerts(TestCase):
         self.client.post(self.path, self.data_4, format="json")
 
         # Can we get the recap.email recipient properly?
-        email_processing = EmailProcessingQueue.objects.all()
+        email_processing = EmailProcessingQueue.objects.all().order_by("pk")
         self.assertEqual(
             email_processing[0].destination_emails, ["testing_1@recap.email"]
+        )
+
+        # Confirm EPQ values.
+        self.assertEqual(len(email_processing), 1)
+        self.assertEqual(
+            email_processing[0].status, PROCESSING_STATUS.SUCCESSFUL
+        )
+
+        # Confirm RDs are correctly associated to the new EQP.
+        self.assertEqual(
+            list(
+                email_processing[0].recap_documents.values_list(
+                    "pk", flat=True
+                )
+            ),
+            list(RECAPDocument.objects.all().values_list("pk", flat=True)),
         )
 
         # A DocketAlert should be created when receiving the first notification
@@ -3799,7 +3883,21 @@ class RecapEmailDocketAlerts(TestCase):
         self.client.post(self.path, self.data_multi_jpml, format="json")
 
         email_processing = EmailProcessingQueue.objects.all()
+        # Confirm EPQ values.
         self.assertEqual(len(email_processing), 1)
+        self.assertEqual(
+            email_processing[0].status, PROCESSING_STATUS.SUCCESSFUL
+        )
+
+        # Confirm RDs are correctly associated to the new EQP.
+        self.assertEqual(
+            list(
+                email_processing[0].recap_documents.values_list(
+                    "pk", flat=True
+                )
+            ),
+            list(RECAPDocument.objects.all().values_list("pk", flat=True)),
+        )
 
         # Compare the docket and recap document metadata
         dockets = Docket.objects.all()
