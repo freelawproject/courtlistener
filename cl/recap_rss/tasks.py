@@ -358,7 +358,7 @@ def merge_rss_feed_contents(self, feed_data, court_pk, metadata_only=False):
             if metadata_only:
                 continue
 
-            des_returned, rds_created, content_updated = async_to_sync(
+            items_returned, rds_created, content_updated = async_to_sync(
                 add_docket_entries
             )(d, docket["docket_entries"])
 
