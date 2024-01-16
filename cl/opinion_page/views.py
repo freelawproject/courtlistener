@@ -1044,7 +1044,6 @@ async def citation_handler(
     if cluster_count > 1:
         clusters_list = []
         async for cluster in clusters:
-            cluster.caption = await cluster.acaption()
             docket = await Docket.objects.aget(pk=cluster.docket_id)
             cluster.court = await Court.objects.aget(pk=docket.court_id)
             clusters_list.append(cluster)
