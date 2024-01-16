@@ -687,7 +687,7 @@ async def process_recap_attachment(
         return pq_status, msg, []
 
     await add_tags_to_objs(tag_names, rds_affected)
-    await associate_related_instances(pq, d_id=de.docket.pk, de_id=de.pk)
+    await associate_related_instances(pq, d_id=de.docket_id, de_id=de.pk)
     pq_status, msg = await mark_pq_successful(pq)
     return pq_status, msg, rds_affected
 
@@ -1168,7 +1168,7 @@ async def process_recap_appellate_attachment(
         )
         return pq_status, msg, []
 
-    await associate_related_instances(pq, d_id=de.docket.pk, de_id=de.pk)
+    await associate_related_instances(pq, d_id=de.docket_id, de_id=de.pk)
     pq_status, msg = await mark_pq_successful(pq)
     return pq_status, msg, rds_affected
 
