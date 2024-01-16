@@ -179,14 +179,10 @@ async def mark_pq_successful(pq: ProcessingQueue) -> tuple[int, str]:
     """
     # Ditch the original file
     await sync_to_async(pq.filepath_local.delete)(save=False)
+    message = "Successful upload! Nice work."
     if pq.debug:
-        pq.error_message = "Successful debugging upload! Nice work."
-    else:
-        pq.error_message = "Successful upload! Nice work."
-    pq.status = PROCESSING_STATUS.SUCCESSFUL
-
-    await pq.asave()
-    return pq.status, pq.error_message
+        message = "Successful debugging upload! Nice work."
+    return await mark_pq_status(pq, message, PROCESSING_STATUS.SUCCESSFUL)
 
 
 async def associate_related_instances(
@@ -218,14 +214,18 @@ async def associate_related_instances(
 
 
 async def mark_pq_status(
-    pq, msg, status, message_property_name="error_message"
-):
+    pq: ProcessingQueue,
+    msg: str,
+    status: int,
+    message_property_name: str = "error_message",
+) -> tuple[int, str]:
     """Mark the processing queue item as some process, and log the message.
 
     :param pq: The ProcessingQueue object to manipulate
     :param msg: The message to log and to save to pq's error_message field.
     :param status: A pq status code as defined on the ProcessingQueue model.
     :param message_property_name: The message property to attach the msg argument to.
+    :return: A two tuple, the PQ status, the PQ error message.
     """
     if msg:
         logger.info(msg)
