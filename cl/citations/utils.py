@@ -1,5 +1,4 @@
 from datetime import date
-from typing import Tuple
 
 from django.apps import (  # Must use apps.get_model() to avoid circular import issue
     apps,
@@ -55,7 +54,7 @@ async def get_citation_depth_between_clusters(
 
 def get_years_from_reporter(
     citation: FullCaseCitation,
-) -> Tuple[int, int]:
+) -> tuple[int, int]:
     """Given a citation object, try to look it its dates in the reporter DB"""
     start_year = 1750
     end_year = date.today().year
@@ -72,7 +71,7 @@ def get_years_from_reporter(
 def make_name_param(
     defendant: str,
     plaintiff: str | None = None,
-) -> Tuple[str, int]:
+) -> tuple[str, int]:
     """Remove punctuation and return cleaned string plus its length in tokens."""
     token_list = defendant.split()
     if plaintiff:
