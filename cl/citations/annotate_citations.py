@@ -4,7 +4,7 @@ from typing import Dict, List
 from eyecite import annotate_citations, clean_text
 
 from cl.citations.match_citations import NO_MATCH_RESOURCE
-from cl.lib.types import MatchedResourceType, SupportedCitationType
+from cl.citations.types import MatchedResourceType, SupportedCitationType
 from cl.search.models import Opinion, RECAPDocument
 
 

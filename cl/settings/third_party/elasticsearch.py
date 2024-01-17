@@ -213,10 +213,11 @@ ELASTICSEARCH_DSL_AUTO_REFRESH = env(
     "ELASTICSEARCH_DSL_AUTO_REFRESH", default=True
 )
 
-####################################
-# Percolator batch size for Alerts #
-####################################
-PERCOLATOR_PAGE_SIZE = 100
+#############################################################
+# Batch size for Elasticsearch queries utilizing pagination #
+# such as Percolator              #
+#############################################################
+ELASTICSEARCH_PAGINATION_BATCH_SIZE = 100
 
 ###################################################
 # The maximum number of scheduled hits per alert. #

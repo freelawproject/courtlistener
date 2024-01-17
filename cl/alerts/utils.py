@@ -87,7 +87,7 @@ def percolate_document(
     )
     s = s.source(excludes=["percolator_query"])
     s = s.sort("date_created")
-    s = s[: settings.PERCOLATOR_PAGE_SIZE]
+    s = s[: settings.ELASTICSEARCH_PAGINATION_BATCH_SIZE]
     if search_after:
         s = s.extra(search_after=search_after)
     return s.execute()

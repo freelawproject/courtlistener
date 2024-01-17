@@ -23,18 +23,18 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
 
-from cl.lib.search_utils import (
-    cleanup_main_query,
-    get_child_court_ids_for_parents,
-    make_fq,
-    modify_court_id_queries,
-)
+from cl.lib.search_utils import make_fq
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
     AudioTestCase,
     EmptySolrTestCase,
     IndexedSolrTestCase,
     SolrTestCase,
+)
+from cl.lib.utils import (
+    cleanup_main_query,
+    get_child_court_ids_for_parents,
+    modify_court_id_queries,
 )
 from cl.people_db.factories import PersonFactory, PositionFactory
 from cl.recap.constants import COURT_TIMEZONES

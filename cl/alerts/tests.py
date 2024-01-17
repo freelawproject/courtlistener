@@ -2146,10 +2146,10 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         rt_oral_argument_2.delete()
         rt_oral_argument_3.delete()
 
-    @override_settings(PERCOLATOR_PAGE_SIZE=5)
+    @override_settings(ELASTICSEARCH_PAGINATION_BATCH_SIZE=5)
     def test_send_multiple_rt_alerts(self, mock_abort_audio):
         """Confirm all RT alerts are properly sent if the percolator response
-        contains more than PERCOLATOR_PAGE_SIZE results. So additional
+        contains more than ELASTICSEARCH_PAGINATION_BATCH_SIZE results. So additional
         requests are performed in order to retrieve all the available results.
         """
 
@@ -2238,7 +2238,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         for alert in alerts_created:
             alert.delete()
 
-    @override_settings(PERCOLATOR_PAGE_SIZE=5)
+    @override_settings(ELASTICSEARCH_PAGINATION_BATCH_SIZE=5)
     def test_batched_alerts_match_documents_ingestion(self, mock_abort_audio):
         """Confirm that batched alerts are properly stored according to
         document ingestion when percolated in real time.
@@ -2322,7 +2322,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         for alert in alerts_created:
             alert.delete()
 
-    @override_settings(PERCOLATOR_PAGE_SIZE=5)
+    @override_settings(ELASTICSEARCH_PAGINATION_BATCH_SIZE=5)
     def test_percolate_document_in_batches(self, mock_abort_audio):
         """Confirm when getting alerts in batches and an alert previously
         retrieved is updated during this process. It's not returned again.
@@ -2712,7 +2712,7 @@ class SearchAlertsIndexingCommandTests(ESIndexTestCase, TestCase):
         self.delete_index("alerts.Alert")
         self.create_index("alerts.Alert")
 
-    @override_settings(PERCOLATOR_PAGE_SIZE=20)
+    @override_settings(ELASTICSEARCH_PAGINATION_BATCH_SIZE=20)
     @mock.patch("cl.alerts.management.commands.cl_index_search_alerts.logger")
     def test_cl_index_search_alerts_command(self, mock_logger):
         """Confirm the command only index the right Alerts into the ES."""
