@@ -1113,6 +1113,7 @@ def index_related_cites_fields(
                     # Build the Opinion dicts for updating the citeCount.
                     doc_to_update = {
                         "_id": ES_CHILD_ID(opinion.pk).OPINION,
+                        "_routing": cluster.pk,
                         "doc": {"citeCount": cluster.citation_count},
                     }
                     doc_to_update.update(base_doc)
@@ -1136,7 +1137,11 @@ def index_related_cites_fields(
                     {"id": opinion_instance.pk},
                 )
 
-            doc_to_update = {"_id": doc_id, "doc": {"cites": cites_prepared}}
+            doc_to_update = {
+                "_id": doc_id,
+                "_routing": opinion_instance.cluster_id,
+                "doc": {"cites": cites_prepared},
+            }
             doc_to_update.update(base_doc)
             documents_to_update.append(doc_to_update)
 
