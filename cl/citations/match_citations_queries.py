@@ -17,7 +17,7 @@ from cl.search.models import Opinion
 
 
 def fetch_citations(search_query: Search) -> list[Hit]:
-    """Fetches all citation matches from Elasticsearch based on the provided
+    """Fetches citation matches from Elasticsearch based on the provided
     search query.
 
     :param search_query: The Elasticsearch DSL Search object.
@@ -28,6 +28,8 @@ def fetch_citations(search_query: Search) -> list[Hit]:
     search_query = search_query.sort("id")
     # Only retrieve fields required for the lookup.
     search_query = search_query.source(includes=["id", "caseName"])
+    # Citation resolution aims for a single match. Setting up a size of 2 is
+    # enough to determine if there is more than one match.
     search_query = search_query.extra(size=2)
     response = search_query.execute()
     citation_hits.extend(response.hits)
