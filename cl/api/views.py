@@ -245,12 +245,10 @@ async def get_result_count(request, version, day_count):
                     cd["type"],
                 )
                 raise
-
-            response = (
-                si.query()
-                .add_extra(**build_alert_estimation_query(cd, int(day_count)))
-                .execute()
+            extra = await sync_to_async(build_alert_estimation_query)(
+                cd, int(day_count)
             )
+            response = si.query().add_extra(**extra).execute()
             total_query_results = response.result.numFound
     return JsonResponse({"count": total_query_results}, safe=True)
 
