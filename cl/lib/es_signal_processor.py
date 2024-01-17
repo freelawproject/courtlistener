@@ -44,6 +44,7 @@ from cl.search.models import (
 )
 from cl.search.tasks import (
     es_save_document,
+    get_es_doc_id_and_parent_id,
     remove_document_from_es_index,
     update_children_docs_by_query,
     update_es_document,
@@ -607,13 +608,16 @@ def remove_non_judge_person_and_positions_from_index(
         person_positions = Position.objects.filter(person_id=instance.person)
         # Remove all the remaining positions from the index.
         for position in person_positions:
+            instance_id, parent_id = get_es_doc_id_and_parent_id(
+                PositionDocument, position
+            )
             remove_document_from_es_index.delay(
-                PositionDocument.__name__, position.pk
+                PositionDocument.__name__, instance_id, parent_id
             )
 
         # Remove the Person from the index.
         remove_document_from_es_index.delay(
-            PersonDocument.__name__, instance.person.pk
+            PersonDocument.__name__, instance.person_id, None
         )
 
     except (Person.DoesNotExist, ValueError):
@@ -759,8 +763,12 @@ class ESSignalProcessor:
     @elasticsearch_enabled
     def handle_delete(self, sender, instance, **kwargs):
         """Receiver function that gets called after an object instance is deleted"""
+
+        doc_id, routing_id = get_es_doc_id_and_parent_id(
+            self.es_document, instance
+        )
         remove_document_from_es_index.delay(
-            self.es_document.__name__, instance.pk
+            self.es_document.__name__, doc_id, routing_id
         )
 
         # If a Position is removed and the Person is not a Judge anymore,

@@ -27,11 +27,8 @@ from cl.lib.search_utils import make_fq
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
     AudioTestCase,
-    CourtTestCase,
     EmptySolrTestCase,
     IndexedSolrTestCase,
-    PeopleTestCase,
-    SearchTestCase,
     SolrTestCase,
 )
 from cl.lib.utils import (
@@ -39,16 +36,24 @@ from cl.lib.utils import (
     get_child_court_ids_for_parents,
     modify_court_id_queries,
 )
+from cl.people_db.factories import PersonFactory, PositionFactory
 from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.factories import DocketEntriesDataFactory, DocketEntryDataFactory
 from cl.recap.mergers import add_docket_entries
 from cl.scrapers.factories import PACERFreeDocumentLogFactory
+from cl.search.documents import (
+    DocketDocument,
+    ESRECAPDocument,
+    OpinionDocument,
+    PositionDocument,
+)
 from cl.search.factories import (
     CourtFactory,
     DocketEntryWithParentsFactory,
     DocketFactory,
     OpinionClusterFactoryWithChildrenAndParents,
     OpinionWithChildrenFactory,
+    OpinionWithParentsFactory,
     RECAPDocumentFactory,
 )
 from cl.search.management.commands.cl_calculate_pagerank import Command
@@ -64,7 +69,10 @@ from cl.search.models import (
     RECAPDocument,
     sort_cites,
 )
-from cl.search.tasks import add_docket_to_solr_by_rds
+from cl.search.tasks import (
+    add_docket_to_solr_by_rds,
+    get_es_doc_id_and_parent_id,
+)
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.utils import get_with_wait
@@ -1651,3 +1659,69 @@ class DocketEntriesTimezone(TestCase):
             datetime.datetime(2023, 1, 15, 21, 46, 51)
         )
         self.assertEqual(de_nyed_utc.datetime_filed, target_date_aware)
+
+
+class ESIndexingTasksUtils(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.opinion = OpinionWithParentsFactory.create(
+            cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
+        )
+        cls.person = PersonFactory.create(name_first="John American")
+        cls.position = PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            court=cls.court,
+            date_start=datetime.date(2015, 12, 14),
+            person=cls.person,
+            how_selected="e_part",
+            nomination_process="fed_senate",
+        )
+        cls.de = DocketEntryWithParentsFactory(
+            docket=DocketFactory(court=cls.court),
+            entry_number=1,
+        )
+        cls.rd = RECAPDocumentFactory(
+            docket_entry=cls.de,
+            document_number="1",
+            is_available=True,
+        )
+
+    def test_get_es_doc_id_and_parent_id(self) -> None:
+        """Confirm that get_es_doc_id_and_parent_id returns the correct doc_id
+        and parent_id for their use in ES indexing.
+        """
+
+        tests = [
+            {
+                "es_doc": PositionDocument,
+                "instance": self.position,
+                "expected_doc_id": f"po_{self.position.pk}",
+                "expected_parent_id": self.position.person_id,
+            },
+            {
+                "es_doc": ESRECAPDocument,
+                "instance": self.rd,
+                "expected_doc_id": f"rd_{self.rd.pk}",
+                "expected_parent_id": self.de.docket_id,
+            },
+            {
+                "es_doc": OpinionDocument,
+                "instance": self.opinion,
+                "expected_doc_id": f"o_{self.opinion.pk}",
+                "expected_parent_id": self.opinion.cluster_id,
+            },
+            {
+                "es_doc": DocketDocument,
+                "instance": self.de.docket,
+                "expected_doc_id": self.de.docket.pk,
+                "expected_parent_id": None,
+            },
+        ]
+        for test in tests:
+            doc_id, parent_id = get_es_doc_id_and_parent_id(
+                test["es_doc"],  # type: ignore
+                test["instance"],  # type: ignore
+            )
+            self.assertEqual(doc_id, test["expected_doc_id"])
+            self.assertEqual(parent_id, test["expected_parent_id"])

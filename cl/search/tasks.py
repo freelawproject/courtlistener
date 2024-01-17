@@ -234,7 +234,7 @@ def person_first_time_indexing(parent_id: int, position: Position) -> None:
     ]
     for person_position in non_judicial_positions:
         doc_id = ES_CHILD_ID(person_position.pk).POSITION
-        if PositionDocument.exists(id=doc_id):
+        if PositionDocument.exists(id=doc_id, routing=parent_id):
             continue
 
         position_doc = PositionDocument()
@@ -533,6 +533,34 @@ def update_es_document(
     )
 
 
+def get_es_doc_id_and_parent_id(
+    es_document: ESDocumentClassType, instance: ESModelType
+) -> tuple[int | str, int | None]:
+    """Retrieve the Elasticsearch document ID and parent ID for a given
+     ES document type and DB instance.
+
+    :param es_document: The ES document class type.
+    :param instance: The DB instance related to the ES document.
+    :return: A two-tuple containing the Elasticsearch document ID and the
+    parent ID.
+    """
+
+    if es_document is PositionDocument:
+        doc_id = ES_CHILD_ID(instance.pk).POSITION
+        parent_id = getattr(instance, "person_id", None)
+    elif es_document is ESRECAPDocument:
+        doc_id = ES_CHILD_ID(instance.pk).RECAP
+        parent_id = getattr(instance.docket_entry, "docket_id", None)
+    elif es_document is OpinionDocument:
+        doc_id = ES_CHILD_ID(instance.pk).OPINION
+        parent_id = getattr(instance, "cluster_id", None)
+    else:
+        doc_id = instance.pk
+        parent_id = None
+
+    return doc_id, parent_id
+
+
 def get_doc_from_es(
     es_document: ESDocumentClassType,
     instance: ESModelType,
@@ -543,29 +571,23 @@ def get_doc_from_es(
     :return: An Elasticsearch document if found, otherwise None.
     """
 
-    # Get doc_id for parent-child documents.
-    es_args = {}
-    instance_id = instance.pk
-    if es_document is PositionDocument:
-        instance_id = ES_CHILD_ID(instance.pk).POSITION
-        parent_id = getattr(instance.person, "pk", None)
-        es_args["_routing"] = parent_id
-
-    elif es_document is ESRECAPDocument:
-        instance_id = ES_CHILD_ID(instance.pk).RECAP
-        parent_id = getattr(instance.docket_entry.docket, "pk", None)
-        es_args["_routing"] = parent_id
-    elif es_document is OpinionDocument:
-        instance_id = ES_CHILD_ID(instance_id).OPINION
-        parent_id = getattr(instance.cluster, "pk", None)
-        es_args["_routing"] = parent_id
-
+    # Get doc_id and routing for parent and child documents.
+    instance_id, parent_id = get_es_doc_id_and_parent_id(es_document, instance)
+    get_args: dict[str, int | str] = (
+        {"id": instance_id, "routing": parent_id}
+        if parent_id
+        else {"id": instance_id}
+    )
     try:
-        main_doc = es_document.get(id=instance_id)
+        main_doc = es_document.get(**get_args)
     except NotFoundError:
         if isinstance(instance, Person) and not instance.is_judge:
             # If the instance is a Person and is not a Judge, avoid indexing.
             return None
+
+        es_args: dict[str, int | str | dict] = (
+            {"_routing": parent_id} if parent_id else {}
+        )
         doc = es_document().prepare(instance)
         es_args["meta"] = {"id": instance_id}
         try:
@@ -937,7 +959,7 @@ def index_parent_and_child_docs(
     queue=settings.CELERY_ETL_TASK_QUEUE,
 )
 def remove_document_from_es_index(
-    self: Task, es_document_name: str, instance_id: int
+    self: Task, es_document_name: str, instance_id: int, routing: int | None
 ) -> None:
     """Remove a document from an Elasticsearch index.
 
@@ -945,21 +967,18 @@ def remove_document_from_es_index(
     :param es_document_name: The Elasticsearch document type name.
     :param instance_id: The ID of the instance to be removed from the
     Elasticsearch index.
+    :param routing: The routing value used to look up the document.
     :return: None
     """
 
     es_document = getattr(es_document_module, es_document_name)
-    if es_document is PositionDocument:
-        doc_id = ES_CHILD_ID(instance_id).POSITION
-    elif es_document is ESRECAPDocument:
-        doc_id = ES_CHILD_ID(instance_id).RECAP
-    elif es_document is OpinionDocument:
-        doc_id = ES_CHILD_ID(instance_id).OPINION
-    else:
-        doc_id = instance_id
-
+    get_args: dict[str, int | str] = (
+        {"id": instance_id, "routing": routing}
+        if routing
+        else {"id": instance_id}
+    )
     try:
-        doc = es_document.get(id=doc_id)
+        doc = es_document.get(**get_args)
         doc.delete(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)
     except NotFoundError:
         model_label = es_document.Django.model.__name__.capitalize()
@@ -1080,7 +1099,7 @@ def index_related_cites_fields(
 
                 for opinion in cluster.sub_opinions.all():
                     if not OpinionClusterDocument.exists(
-                        id=ES_CHILD_ID(opinion.pk).OPINION
+                        id=ES_CHILD_ID(opinion.pk).OPINION, routing=cluster.pk
                     ):
                         # If the OpinionDocument does not exist, it might
                         # not be indexed yet. Raise a NotFoundError to retry the
@@ -1094,6 +1113,7 @@ def index_related_cites_fields(
                     # Build the Opinion dicts for updating the citeCount.
                     doc_to_update = {
                         "_id": ES_CHILD_ID(opinion.pk).OPINION,
+                        "_routing": cluster.pk,
                         "doc": {"citeCount": cluster.citation_count},
                     }
                     doc_to_update.update(base_doc)
@@ -1105,7 +1125,9 @@ def index_related_cites_fields(
                 return
             cites_prepared = OpinionDocument().prepare_cites(opinion_instance)
             doc_id = ES_CHILD_ID(opinion_instance.pk).OPINION
-            if not OpinionClusterDocument.exists(id=doc_id):
+            if not OpinionClusterDocument.exists(
+                id=doc_id, routing=opinion_instance.cluster_id
+            ):
                 # If the OpinionDocument does not exist, it might
                 # not be indexed yet. Raise a NotFoundError to retry the
                 # task; hopefully, it will be indexed soon.
@@ -1115,7 +1137,11 @@ def index_related_cites_fields(
                     {"id": opinion_instance.pk},
                 )
 
-            doc_to_update = {"_id": doc_id, "doc": {"cites": cites_prepared}}
+            doc_to_update = {
+                "_id": doc_id,
+                "_routing": opinion_instance.cluster_id,
+                "doc": {"cites": cites_prepared},
+            }
             doc_to_update.update(base_doc)
             documents_to_update.append(doc_to_update)
 
