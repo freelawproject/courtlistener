@@ -35,9 +35,9 @@ from cl.lib.elasticsearch_utils import (
     convert_str_date_fields_to_date_objects,
     es_index_exists,
     fetch_es_results,
+    get_facet_dict_for_search_query,
     get_only_status_facets,
     limit_inner_hits,
-    make_es_stats_variable,
     merge_courts_from_db,
     merge_unavailable_fields_on_parent_document,
     sanitize_unbalanced_parenthesis,
@@ -667,6 +667,7 @@ def do_es_search(
     related_cluster = None
     cited_cluster = None
     query_citation = None
+    facet_fields = []
 
     search_form = SearchForm(get_params, is_es_form=True)
     match get_params.get("type", SEARCH_TYPES.OPINION):
@@ -718,6 +719,10 @@ def do_es_search(
             ]:
                 query_citation = get_query_citation(cd)
 
+            if cd["type"] in [SEARCH_TYPES.OPINION] and facet:
+                facet_fields = get_facet_dict_for_search_query(
+                    search_query, cd, search_form
+                )
             related_prefix = RELATED_PATTERN.search(cd["q"])
             if related_prefix:
                 related_pks = related_prefix.group("pks").split(",")
@@ -758,7 +763,7 @@ def do_es_search(
         "related_cluster": related_cluster,
         "cited_cluster": cited_cluster,
         "query_citation": query_citation,
-        "facet_fields": make_es_stats_variable(search_form, paged_results),
+        "facet_fields": facet_fields,
     }
 
 

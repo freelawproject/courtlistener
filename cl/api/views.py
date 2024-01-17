@@ -232,7 +232,7 @@ async def get_result_count(request, version, day_count):
         cd["argued_after"] = date.today() - timedelta(days=int(day_count))
         cd["argued_before"] = None
         search_query = document_type.search()
-        s, _ = build_es_base_query(search_query, cd)
+        s, _ = await sync_to_async(build_es_base_query)(search_query, cd)
         total_query_results = s.count()
     else:
         with Session() as session:
@@ -245,12 +245,10 @@ async def get_result_count(request, version, day_count):
                     cd["type"],
                 )
                 raise
-
-            response = (
-                si.query()
-                .add_extra(**build_alert_estimation_query(cd, int(day_count)))
-                .execute()
+            extra = await sync_to_async(build_alert_estimation_query)(
+                cd, int(day_count)
             )
+            response = si.query().add_extra(**extra).execute()
             total_query_results = response.result.numFound
     return JsonResponse({"count": total_query_results}, safe=True)
 

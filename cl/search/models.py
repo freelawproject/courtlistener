@@ -2784,6 +2784,50 @@ class OpinionCluster(AbstractDateTimeModel):
         return caption
 
     @property
+    def caption(self):
+        """Make a proper caption
+
+        This selects the best case name, then combines it with the best one or
+        two citations we have in our system. Finally, if it's not a SCOTUS
+        opinion, it adds the court abbreviation to the end. The result is
+        something like:
+
+            Plessy v. Ferguson, 410 U.S. 113
+
+        or
+
+            Lenore Foman v. Elvira A. Davis (1st Cir. 1961)
+
+        Note that nbsp; are used liberally to prevent the end from getting
+        broken up across lines.
+        """
+        caption = best_case_name(self)
+        citations = sorted(self.citations.all(), key=sort_cites)
+        if not citations:
+            if self.docket.docket_number:
+                caption += f", {self.docket.docket_number}"
+        else:
+            if citations[0].type == Citation.NEUTRAL:
+                caption += f", {citations[0]}"
+                # neutral cites lack the parentheses, so we're done here.
+                return caption
+            elif (
+                len(citations) >= 2
+                and citations[0].type == Citation.WEST
+                and citations[1].type == Citation.LEXIS
+            ):
+                caption += f", {citations[0]}, {citations[1]}"
+            else:
+                caption += f", {citations[0]}"
+
+        if self.docket.court_id != "scotus":
+            court = re.sub(" ", "&nbsp;", self.docket.court.citation_string)
+            # Strftime fails before 1900. Do it this way instead.
+            year = self.date_filed.isoformat().split("-")[0]
+            caption += f"&nbsp;({court}&nbsp;{year})"
+        return caption
+
+    @property
     def citation_string(self):
         """Make a citation string, joined by commas"""
         citations = sorted(self.citations.all(), key=sort_cites)

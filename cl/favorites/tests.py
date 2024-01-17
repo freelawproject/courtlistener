@@ -548,6 +548,81 @@ class APITests(APITestCase):
         )
         self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
 
+    async def test_can_filter_tag_associations_using_docket_id(self) -> None:
+        """Test filter for the docket field in the docket-tags endpoint"""
+
+        # create a tag and use it for docket #1 and #2
+        response = await self.make_a_good_tag(self.client, tag_name="foo")
+        tag_id = response.json()["id"]
+        response = await self.tag_a_docket(self.client, 1, tag_id)
+        response = await self.tag_a_docket(self.client, 2, tag_id)
+
+        # create another tag for docket #2
+        response = await self.make_a_good_tag(self.client, tag_name="foo-2")
+        tag_id = response.json()["id"]
+        response = await self.tag_a_docket(self.client, 2, tag_id)
+
+        # filter the associations using the docket id
+        response = await sync_to_async(self.client.get)(
+            self.docket_path, {"docket": 1}
+        )
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.json()["count"], 1)
+
+        response = await sync_to_async(self.client.get)(
+            self.docket_path, {"docket": 2}
+        )
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.json()["count"], 2)
+
+    async def test_can_filter_tag_associations_using_user_id(self) -> None:
+        """Test filter for the docket field in the docket-tags endpoint"""
+
+        # create a two tags using client 1 and use them in docket #1
+        response = await self.make_a_good_tag(self.client, tag_name="foo")
+        tag_id = response.json()["id"]
+        response = await self.tag_a_docket(self.client, 1, tag_id)
+        response = await self.make_a_good_tag(self.client, tag_name="foo-c1")
+        tag_id = response.json()["id"]
+        response = await self.tag_a_docket(self.client, 1, tag_id)
+
+        await UserTag.objects.filter(name="foo").aupdate(published=True)
+
+        # create another tag using client 2 and use it in docket #1
+        response = await self.make_a_good_tag(self.client2, tag_name="foo-c2")
+        tag_id = response.json()["id"]
+        response = await self.tag_a_docket(self.client2, 1, tag_id)
+
+        await UserTag.objects.filter(name="foo-c2").aupdate(published=True)
+
+        # query the associations(own + public) for docket #1 using client 1
+        response = await sync_to_async(self.client.get)(
+            self.docket_path, {"docket": 1}
+        )
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.json()["count"], 3)
+
+        # query the associations(own + public) for docket #1 using client 2
+        response = await sync_to_async(self.client2.get)(
+            self.docket_path, {"docket": 1}
+        )
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.json()["count"], 2)
+
+        # filter association using user id
+        response = await sync_to_async(self.client.get)(
+            self.docket_path, {"docket": 1, "tag__user": self.pandora.user.pk}
+        )
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.json()["count"], 2)
+
+        response = await sync_to_async(self.client2.get)(
+            self.docket_path,
+            {"docket": 1, "tag__user": self.unconfirmed.user.pk},
+        )
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.json()["count"], 1)
+
     async def test_can_only_see_your_tag_associations(self) -> None:
         # Make a tag, and tag a docket with it
         response = await self.make_a_good_tag(self.client, tag_name="foo")

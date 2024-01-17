@@ -537,14 +537,14 @@ if not settings.ELASTICSEARCH_DOCKETS_SIGNALS_DISABLED:
     _docket_signal_processor = ESSignalProcessor(
         Docket, DocketDocument, docket_field_mapping
     )
-
-_o_signal_processor = ESSignalProcessor(
-    Opinion, OpinionDocument, o_field_mapping
-)
-
-_o_cluster_signal_processor = ESSignalProcessor(
-    OpinionCluster, OpinionClusterDocument, o_cluster_field_mapping
-)
+if settings.ELASTICSEARCH_OPINIONS_SIGNALS_ENABLED:
+    _o_signal_processor = ESSignalProcessor(
+        Opinion, OpinionDocument, o_field_mapping
+    )
+if settings.ELASTICSEARCH_CLUSTERS_SIGNALS_ENABLED:
+    _o_cluster_signal_processor = ESSignalProcessor(
+        OpinionCluster, OpinionClusterDocument, o_cluster_field_mapping
+    )
 
 
 @receiver(

@@ -543,6 +543,21 @@ def get_child_sorting_key(cd: CleanData) -> tuple[str, str]:
     return order_by_map_child.get(order_by, ("", ""))
 
 
+def extend_selected_courts_with_child_courts(
+    selected_courts: list[str],
+) -> list[str]:
+    """Extend the list of selected courts with their corresponding child courts
+
+    :param selected_courts: A list of court IDs.
+    :return: A list of unique court IDs, including both the original and their
+    corresponding child courts.
+    """
+
+    unique_courts = set(selected_courts)
+    unique_courts.update(lookup_child_courts(list(unique_courts)))
+    return list(unique_courts)
+
+
 def build_es_filters(cd: CleanData) -> List:
     """Builds elasticsearch filters based on the CleanData object.
 
@@ -559,7 +574,9 @@ def build_es_filters(cd: CleanData) -> List:
         queries_list.extend(
             build_term_query(
                 "court_id",
-                cd.get("court", "").split(),
+                extend_selected_courts_with_child_courts(
+                    cd.get("court", "").split()
+                ),
             )
         )
         # Build docket number term query
@@ -751,7 +768,7 @@ def get_search_query(
                             "size": 10,
                         },
                     ),
-                    Q("match_all"),
+                    Q("match", cluster_child="opinion_cluster"),
                 ]
                 search_query = search_query.query(
                     Q("bool", should=q_should, minimum_should_match=1)
@@ -781,7 +798,7 @@ def build_es_base_query(
 
     string_query = None
     join_query = None
-    join_field_documents = [SEARCH_TYPES.PEOPLE, SEARCH_TYPES.OPINION]
+    join_field_documents = [SEARCH_TYPES.PEOPLE]
     if cd["type"] in join_field_documents:
         filters = build_join_es_filters(cd)
     else:
@@ -964,10 +981,30 @@ def get_only_status_facets(
     :param search_form: The form displayed in the user interface
     """
     search_query = search_query.extra(size=0)
+    # filter out opinions and get just the clusters
     search_query = search_query.query(
-        Q("bool", must_not=Q("match", cluster_child="opinion_cluster"))
+        Q("bool", must=Q("match", cluster_child="opinion_cluster"))
     )
     search_query.aggs.bucket("status", A("terms", field="status.raw"))
+    response = search_query.execute()
+    return make_es_stats_variable(search_form, response)
+
+
+def get_facet_dict_for_search_query(
+    search_query: Search, cd: CleanData, search_form: SearchForm
+):
+    """Create facets variables to use in a template omitting the stat_ filter
+    so the facets counts consider cluster for all status.
+
+    :param search_query: The Elasticsearch search query object.
+    :param cd: The user input CleanedData
+    :param search_form: The form displayed in the user interface
+    """
+
+    cd["just_facets_query"] = True
+    search_query, _ = build_es_base_query(search_query, cd)
+    search_query.aggs.bucket("status", A("terms", field="status.raw"))
+    search_query = search_query.extra(size=0)
     response = search_query.execute()
     return make_es_stats_variable(search_form, response)
 
@@ -1018,9 +1055,6 @@ def build_es_main_query(
 
     search_query = add_es_highlighting(search_query, cd)
     search_query = search_query.sort(build_sort_results(cd))
-
-    if SEARCH_TYPES.OPINION:
-        search_query.aggs.bucket("status", A("terms", field="status.raw"))
 
     return (
         search_query,
@@ -1591,7 +1625,9 @@ def build_has_child_filters(
     if cd["type"] == SEARCH_TYPES.PEOPLE:
         if child_type == "position":
             selection_method = cd.get("selection_method", "")
-            court = cd.get("court", "").split()
+            court = extend_selected_courts_with_child_courts(
+                cd.get("court", "").split()
+            )
             appointer = cd.get("appointer", "")
             if selection_method:
                 queries_list.extend(
@@ -1681,7 +1717,9 @@ def build_join_es_filters(cd: CleanData) -> List:
             [
                 *build_term_query(
                     "court_id.raw",
-                    cd.get("court", "").split(),
+                    extend_selected_courts_with_child_courts(
+                        cd.get("court", "").split()
+                    ),
                 ),
                 *build_text_filter("caseName", cd.get("case_name", "")),
                 *build_term_query(
@@ -1706,7 +1744,7 @@ def build_join_es_filters(cd: CleanData) -> List:
 
     if cd["type"] == SEARCH_TYPES.OPINION:
         selected_stats = get_array_of_selected_fields(cd, "stat_")
-        if len(selected_stats):
+        if len(selected_stats) and not cd.get("just_facets_query"):
             queries_list.extend(
                 build_term_query(
                     "status.raw",
@@ -1718,7 +1756,9 @@ def build_join_es_filters(cd: CleanData) -> List:
             [
                 *build_term_query(
                     "court_id.raw",
-                    cd.get("court", "").split(),
+                    extend_selected_courts_with_child_courts(
+                        cd.get("court", "").split()
+                    ),
                 ),
                 *build_text_filter("caseName", cd.get("case_name", "")),
                 *build_daterange_query(

@@ -11,6 +11,7 @@ from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
 from django.test import override_settings
 from django.test.client import AsyncClient
 from django.urls import reverse
@@ -34,7 +35,10 @@ from cl.lib.test_helpers import (
     SitemapTest,
 )
 from cl.opinion_page.forms import CourtUploadForm
-from cl.opinion_page.utils import make_docket_title
+from cl.opinion_page.utils import (
+    es_get_citing_clusters_with_cache,
+    make_docket_title,
+)
 from cl.opinion_page.views import get_prev_next_volumes
 from cl.people_db.factories import PersonFactory, PositionFactory
 from cl.people_db.models import Person
@@ -51,6 +55,8 @@ from cl.search.factories import (
     DocketFactory,
     OpinionClusterFactoryWithChildrenAndParents,
     OpinionClusterWithParentsFactory,
+    OpinionFactory,
+    OpinionsCitedWithParentsFactory,
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
@@ -91,8 +97,75 @@ class SimpleLoadTest(TestCase):
 
 
 class OpinionPageLoadTest(
-    ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
+    ESIndexTestCase,
+    CourtTestCase,
+    PeopleTestCase,
+    SearchTestCase,
+    TestCase,
 ):
+    @classmethod
+    def setUpTestData(cls):
+        cls.o_cluster_1 = OpinionClusterWithParentsFactory.create(
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            citation_count=1,
+            date_filed=datetime.date.today(),
+        )
+        cls.o_1 = OpinionFactory.create(
+            cluster=cls.o_cluster_1,
+            type=Opinion.COMBINED,
+        )
+        cls.o_cluster_2 = OpinionClusterWithParentsFactory.create(
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            citation_count=4,
+            date_filed=datetime.date.today(),
+        )
+        cls.o_2 = OpinionFactory.create(
+            cluster=cls.o_cluster_2,
+            type=Opinion.COMBINED,
+        )
+        cls.o_cluster_3 = OpinionClusterWithParentsFactory.create(
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            citation_count=0,
+            date_filed=datetime.date.today(),
+        )
+        cls.o_3 = OpinionFactory.create(
+            cluster=cls.o_cluster_3,
+            type=Opinion.COMBINED,
+        )
+        cls.o_3_1 = OpinionFactory.create(
+            cluster=cls.o_cluster_3,
+            type=Opinion.COMBINED,
+        )
+        cls.o_cluster_4 = OpinionClusterWithParentsFactory.create(
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            citation_count=5,
+            date_filed=datetime.date.today(),
+        )
+        cls.o_4 = OpinionFactory.create(
+            cluster=cls.o_cluster_4,
+            type=Opinion.COMBINED,
+        )
+        OpinionsCitedWithParentsFactory.create(
+            cited_opinion=cls.o_3,
+            citing_opinion=cls.o_1,
+        )
+        OpinionsCitedWithParentsFactory.create(
+            cited_opinion=cls.o_3,
+            citing_opinion=cls.o_2,
+        )
+        OpinionsCitedWithParentsFactory.create(
+            cited_opinion=cls.o_3_1,
+            citing_opinion=cls.o_4,
+        )
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
+        super().setUpTestData()
+
     async def test_simple_opinion_page(self) -> None:
         """Does the page load properly?"""
         path = reverse(
@@ -101,6 +174,24 @@ class OpinionPageLoadTest(
         response = await self.async_client.get(path)
         self.assertEqual(response.status_code, HTTP_200_OK)
         self.assertIn("33 state 1", response.content.decode())
+
+    async def test_es_get_citing_clusters_with_cache(self) -> None:
+        """Does es_get_citing_clusters_with_cache return the correct clusters
+        citing and the total cites count?
+        """
+
+        clusters, count = await es_get_citing_clusters_with_cache(
+            self.o_cluster_3
+        )
+        c_list_names = [c["caseName"] for c in clusters]
+        expected_clusters = [
+            self.o_cluster_1.case_name,
+            self.o_cluster_2.case_name,
+            self.o_cluster_4.case_name,
+        ]
+        # Compare expected clusters citing and total count.
+        self.assertEqual(set(c_list_names), set(expected_clusters))
+        self.assertEqual(count, len(expected_clusters))
 
 
 class DocumentPageRedirection(TestCase):
