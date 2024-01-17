@@ -35,7 +35,11 @@ from cl.lib.types import (
     CleanData,
     ESRangeQueryParams,
 )
-from cl.lib.utils import cleanup_main_query, get_array_of_selected_fields
+from cl.lib.utils import (
+    cleanup_main_query,
+    get_array_of_selected_fields,
+    lookup_child_courts,
+)
 from cl.people_db.models import Position
 from cl.search.constants import (
     ALERTS_HL_TAG,
