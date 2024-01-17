@@ -76,6 +76,7 @@ def make_name_param(
     token_list = defendant.split()
     if plaintiff:
         token_list.extend(plaintiff.split())
-        # Strip out punctuation, which Solr doesn't like
+
+    # Strip out punctuation, which Solr doesn't like
     query_words = [strip_punct(t) for t in token_list]
     return " ".join(query_words), len(query_words)
