@@ -1,6 +1,6 @@
 import re
 from datetime import date, datetime, timedelta
-from typing import Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
 from urllib.parse import parse_qs, urlencode
 
 from asgiref.sync import sync_to_async
@@ -953,7 +953,7 @@ def build_court_count_query(group: bool = False) -> SearchParam:
 
 
 async def add_depth_counts(
-    search_data: dict[str, any],
+    search_data: dict[str, Any],
     search_results: Page,
 ) -> OpinionCluster | None:
     """If the search data contains a single "cites" term (e.g., "cites:(123)"),
