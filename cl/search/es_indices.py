@@ -36,7 +36,7 @@ people_db_index.settings(
 
 
 # Define RECAP elasticsearch index
-recap_index = Index("recap")
+recap_index = Index("recap_vectors")
 recap_index.settings(
     number_of_shards=settings.ELASTICSEARCH_RECAP_NUMBER_OF_SHARDS,
     number_of_replicas=settings.ELASTICSEARCH_RECAP_NUMBER_OF_REPLICAS,
