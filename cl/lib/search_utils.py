@@ -6,6 +6,7 @@ from urllib.parse import parse_qs, urlencode
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.cache import caches
+from django.core.paginator import Page
 from django.http import HttpRequest, QueryDict
 from eyecite import get_citations
 from eyecite.models import FullCaseCitation
@@ -952,17 +953,17 @@ def build_court_count_query(group: bool = False) -> SearchParam:
 
 
 async def add_depth_counts(
-    search_data: Dict[str, Any],
-    search_results: SolrResponse,
-) -> Optional[OpinionCluster]:
+    search_data: dict[str, Any],
+    search_results: Page,
+) -> OpinionCluster | None:
     """If the search data contains a single "cites" term (e.g., "cites:(123)"),
-    calculate and append the citation depth information between each Solr
+    calculate and append the citation depth information between each Solr/ES
     result and the cited OpinionCluster. We only do this for *single* "cites"
     terms to avoid the complexity of trying to render multiple depth
     relationships for all the possible result-citation combinations.
 
     :param search_data: The cleaned search form data
-    :param search_results: Solr results from paginate_cached_solr_results()
+    :param search_results: The paginated Solr/ES results
     :return The OpinionCluster if the lookup was successful
     """
 

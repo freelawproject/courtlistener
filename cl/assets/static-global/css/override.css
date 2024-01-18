@@ -629,7 +629,7 @@ body {
   /* Adjust to the left and set blur of 1px. This eliminates a tiny line
      between the input box and this box */
   box-shadow: inset -1px 1px 1px rgba(0, 0, 0, 0.075);
-  padding-left: 0;
+  padding: 0.5em 1em 0.5em 0;
 }
 
 #advanced {

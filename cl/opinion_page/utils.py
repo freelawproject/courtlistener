@@ -95,7 +95,7 @@ async def es_get_citing_clusters_with_cache(
     :type cluster: OpinionCluster
     :return: A tuple of the list of ES results and the number of results
     """
-    cache_key = f"citing:{cluster.pk}"
+    cache_key = f"citing-es:{cluster.pk}"
     cache = caches["db_cache"]
     cached_results = await cache.aget(cache_key)
     if cached_results is not None:
