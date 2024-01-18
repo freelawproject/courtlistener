@@ -554,16 +554,33 @@ def advanced(request: HttpRequest) -> HttpResponse:
     # I'm not thrilled about how this is repeating URLs in a view.
     if request.path == reverse("advanced_o"):
         obj_type = SEARCH_TYPES.OPINION
-        render_dict["search_form"] = SearchForm(
-            {"type": obj_type}, request=request
-        )
+        search_form = SearchForm({"type": obj_type}, request=request)
+        render_dict["search_form"] = search_form
         # Needed b/c of facet values.
         if waffle.flag_is_active(request, "o-es-active"):
             search_query = OpinionClusterDocument.search()
             facet_results = get_only_status_facets(
                 search_query, render_dict["search_form"]
             )
-            render_dict.update({"facet_fields": facet_results})
+
+            # Merge form with courts.
+            courts = Court.objects.filter(in_use=True)
+            search_form.is_valid()
+            cd = search_form.cleaned_data
+            search_form = _clean_form(
+                {"type": obj_type}, cd, courts, is_es_form=True
+            )
+            courts, court_count_human, court_count = merge_form_with_courts(
+                courts, search_form
+            )
+            render_dict.update(
+                {
+                    "facet_fields": facet_results,
+                    "courts": courts,
+                    "court_count_human": court_count_human,
+                    "court_count": court_count,
+                }
+            )
         else:
             o_results = do_search(
                 request.GET.copy(),
@@ -706,7 +723,7 @@ def do_es_search(
             search_form = _clean_form(
                 get_params, search_form.cleaned_data, courts, is_es_form=True
             )
-            cited_cluster = add_depth_counts(
+            cited_cluster = async_to_sync(add_depth_counts)(
                 # Also returns cited cluster if found
                 search_data=cd,
                 search_results=paged_results,
