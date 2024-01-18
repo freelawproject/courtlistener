@@ -7,8 +7,17 @@ from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand
 from cl.lib.redis_utils import make_redis_interface
 from cl.people_db.models import Person
-from cl.search.models import SEARCH_TYPES, Docket, OpinionCluster
-from cl.search.tasks import index_parent_and_child_docs
+from cl.search.models import (
+    SEARCH_TYPES,
+    Docket,
+    Opinion,
+    OpinionCluster,
+    RECAPDocument,
+)
+from cl.search.tasks import (
+    index_parent_and_child_docs,
+    index_parent_or_child_docs,
+)
 
 
 def compose_redis_key(search_type: str) -> str:
@@ -107,12 +116,21 @@ class Command(VerboseCommand):
             action="store_true",
             help="Use this flag only when running the command in tests based on TestCase",
         )
+        parser.add_argument(
+            "--document-type",
+            type=str,
+            required=False,
+            choices=["parent", "child"],
+            help=f"The document type to index, only 'parent' or 'child' documents. "
+            f"If not provided, parent and child documents will be indexed.",
+        )
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
         self.options = options
         search_type = options["search_type"]
         auto_resume = options.get("auto_resume", False)
+        document_type = options.get("document_type", None)
 
         pk_offset = options["pk_offset"]
         if auto_resume:
@@ -131,25 +149,42 @@ class Command(VerboseCommand):
                 self.process_queryset(q, count, SEARCH_TYPES.PEOPLE, pk_offset)
             case SEARCH_TYPES.RECAP:
                 # Get Docket objects by pk_offset.
-                queryset = (
-                    Docket.objects.filter(pk__gte=pk_offset)
-                    .order_by("pk")
-                    .values_list("pk", flat=True)
-                )
-                q = queryset.iterator()
-                count = queryset.count()
-                self.process_queryset(q, count, SEARCH_TYPES.RECAP, pk_offset)
-            case SEARCH_TYPES.OPINION:
-                # Get Opinion Clusters objects by pk_offset.
-                queryset = (
-                    OpinionCluster.objects.filter(pk__gte=pk_offset)
-                    .order_by("pk")
-                    .values_list("pk", flat=True)
-                )
+                if document_type == "child":
+                    queryset = (
+                        RECAPDocument.objects.filter(pk__gte=pk_offset)
+                        .order_by("pk")
+                        .values_list("pk", flat=True)
+                    )
+                else:
+                    queryset = (
+                        Docket.objects.filter(pk__gte=pk_offset)
+                        .order_by("pk")
+                        .values_list("pk", flat=True)
+                    )
                 q = queryset.iterator()
                 count = queryset.count()
                 self.process_queryset(
-                    q, count, SEARCH_TYPES.OPINION, pk_offset
+                    q, count, SEARCH_TYPES.RECAP, pk_offset, document_type
+                )
+            case SEARCH_TYPES.OPINION:
+                if document_type == "child":
+                    queryset = (
+                        Opinion.objects.filter(pk__gte=pk_offset)
+                        .order_by("pk")
+                        .values_list("pk", flat=True)
+                    )
+                else:
+                    # Get Opinion Clusters objects by pk_offset.
+                    queryset = (
+                        OpinionCluster.objects.filter(pk__gte=pk_offset)
+                        .order_by("pk")
+                        .values_list("pk", flat=True)
+                    )
+
+                q = queryset.iterator()
+                count = queryset.count()
+                self.process_queryset(
+                    q, count, SEARCH_TYPES.OPINION, pk_offset, document_type
                 )
 
     def process_queryset(
@@ -158,6 +193,7 @@ class Command(VerboseCommand):
         count: int,
         search_type: str,
         pk_offset: int,
+        document_type: str | None = None,
     ) -> None:
         queue = self.options["queue"]
         chunk_size = self.options["chunk_size"]
@@ -173,9 +209,18 @@ class Command(VerboseCommand):
             chunk.append(item_id)
             if processed_count % chunk_size == 0 or last_item:
                 throttle.maybe_wait()
-                index_parent_and_child_docs.si(
-                    chunk, search_type, testing_mode=testing_mode
-                ).set(queue=queue).apply_async()
+                if not document_type:
+                    index_parent_and_child_docs.si(
+                        chunk, search_type, testing_mode=testing_mode
+                    ).set(queue=queue).apply_async()
+                else:
+                    index_parent_or_child_docs.si(
+                        chunk,
+                        search_type,
+                        document_type,
+                        testing_mode=testing_mode,
+                    ).set(queue=queue).apply_async()
+
                 chunk = []
                 self.stdout.write(
                     "\rProcessed {}/{}, ({:.0%}), last PK indexed: {},".format(
