@@ -46,15 +46,19 @@ cnt = CaseNameTweaker()
 
 
 def make_citation(
-    cite_str: str,
-    cluster: OpinionCluster,
+    cite_str: str, cluster: OpinionCluster, court_id: str
 ) -> Optional[Citation]:
     """Create and return a citation object for the input values."""
     citation_objs = get_citations(cite_str)
     if not citation_objs:
         logger.error(
-            "Could not parse citation",
-            extra=dict(cite=cite_str, cluster=cluster),
+            "Could not parse citation from court '%s'",
+            court_id,
+            extra=dict(
+                cite=cite_str,
+                cluster=cluster,
+                fingerprint=[f"{court_id}-no-citation-found"],
+            ),
         )
         return None
     # Convert the found cite type to a valid cite type for our DB.
@@ -114,7 +118,9 @@ def make_objects(
     )
 
     cites = [item.get(key, "") for key in ["citations", "parallel_citations"]]
-    citations = [make_citation(cite, cluster) for cite in cites if cite]
+    citations = [
+        make_citation(cite, cluster, court.id) for cite in cites if cite
+    ]
     # Remove citations that did not parse correctly.
     citations = [cite for cite in citations if cite]
 
@@ -369,7 +375,8 @@ class Command(VerboseCommand):
             mod = __import__(
                 f"{package}.{module}", globals(), locals(), [module]
             )
-            court_id = mod.Site().court_id.split(".")[-1].split("_")[0]
+            module_string = mod.Site().court_id
+            court_id = module_string.split(".")[-1].split("_")[0]
             if not Court.objects.get(id=court_id).has_opinion_scraper:
                 logger.info(f"{court_id} is currently disabled.")
                 i += 1
@@ -377,7 +384,9 @@ class Command(VerboseCommand):
             try:
                 self.parse_and_scrape_site(mod, options["full_crawl"])
             except Exception as e:
-                capture_exception(e)
+                capture_exception(
+                    e, fingerprint=[module_string, "{{ default }}"]
+                )
             last_court_in_list = i == (num_courts - 1)
             daemon_mode = options["daemon"]
             if last_court_in_list:

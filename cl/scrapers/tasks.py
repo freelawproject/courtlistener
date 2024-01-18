@@ -188,9 +188,10 @@ def extract_doc_content(
             # according to schedule
             opinion.save(index=True)
     except Exception:
-        print(
-            "****Error saving text to the db for: %s****\n%s"
-            % (opinion, traceback.format_exc())
+        logger.error(
+            "****Error saving text to the db for: %s****\n%s",
+            opinion,
+            traceback.format_exc(),
         )
         return
 
