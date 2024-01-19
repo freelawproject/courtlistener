@@ -391,7 +391,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
         if len(request.GET) == 0:
             # No parameters --> Homepage.
             if not is_bot(request):
-                tally_stat("search.homepage_loaded")
+                async_to_sync(tally_stat)("search.homepage_loaded")
 
             # Ensure we get nothing from the future.
             mutable_GET = request.GET.copy()  # Makes it mutable
@@ -503,7 +503,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
             else:
                 # Just a regular search
                 if not is_bot(request):
-                    tally_stat("search.results")
+                    async_to_sync(tally_stat)("search.results")
 
                 # Create bare-bones alert form.
                 alert_form = CreateAlertForm(

@@ -3,6 +3,7 @@ import traceback
 import warnings
 
 import waffle
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives
@@ -241,7 +242,7 @@ class Command(VerboseCommand):
                 alerts_sent_count += 1
                 send_alert(user.profile, hits)
 
-        tally_stat(f"alerts.sent.{rate}", inc=alerts_sent_count)
+        async_to_sync(tally_stat)(f"alerts.sent.{rate}", inc=alerts_sent_count)
         logger.info(f"Sent {alerts_sent_count} {rate} email alerts.")
 
     def clean_rt_queue(self):

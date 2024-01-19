@@ -3,6 +3,7 @@ from collections import defaultdict
 from typing import DefaultDict
 
 import waffle
+from asgiref.sync import async_to_sync
 
 from cl.alerts.models import (
     SCHEDULED_ALERT_HIT_STATUS,
@@ -116,7 +117,7 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
             f"Removed {scheduled_alerts_deleted} Scheduled Alert Hits."
         )
 
-    tally_stat(f"alerts.sent.{rate}", inc=alerts_sent_count)
+    async_to_sync(tally_stat)(f"alerts.sent.{rate}", inc=alerts_sent_count)
     logger.info(f"Sent {alerts_sent_count} {rate} email alerts.")
 
 
