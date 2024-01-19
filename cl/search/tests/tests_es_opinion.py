@@ -409,7 +409,6 @@ class OpinionsESSearchTest(
 ):
     @classmethod
     def setUpTestData(cls):
-        cls.rebuild_index("search.OpinionCluster")
         super().setUpTestData()
         court = CourtFactory(
             id="canb",
@@ -443,6 +442,11 @@ class OpinionsESSearchTest(
             case_name_full="Strickland v. Lorem.",
             date_filed=datetime.date(2020, 8, 15),
             docket=DocketFactory(court=court, docket_number="123456"),
+            sub_opinions=RelatedFactory(
+                OpinionWithChildrenFactory,
+                factory_related_name="cluster",
+                type=Opinion.ADDENDUM,
+            ),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
             syllabus="This is a opinion syllabus",
             posture="This is a opinion posture",
@@ -1044,6 +1048,24 @@ class OpinionsESSearchTest(
         self.assertIn("docket number 3", r.content.decode())
         self.assertIn("2 Opinions", r.content.decode())
 
+    async def test_cites_query(self) -> None:
+        """Does a cites:(*) query work?"""
+
+        search_params = {"q": f"cites:({self.opinion_1.pk})"}
+        r = await self._test_article_count(search_params, 1, "cites:() query")
+
+        # Confirm "cite" cluster legend is within the results' header.
+        h2_element = html.fromstring(r.content.decode()).xpath(
+            '//h2[@id="result-count"]'
+        )
+        h2_content = html.tostring(
+            h2_element[0], method="text", encoding="unicode"
+        )
+        self.assertIn("cite", h2_content)
+        self.assertIn("Debbas", h2_content)
+        self.assertIn("Franklin", h2_content)
+        self.assertIn("1 reference to this case", r.content.decode())
+
     async def test_can_filter_using_date_ranges(self) -> None:
         """Does a date query work"""
         search_params = {
@@ -1171,6 +1193,16 @@ class RelatedSearchTest(
             < r.content.decode().index("/opinion/%i/" % expected_second_pk),
             msg="'Howard v. Honda' should come AFTER 'case name cluster 3'.",
         )
+        # Confirm "related to" cluster legend is within the results' header.
+        h2_element = html.fromstring(r.content.decode()).xpath(
+            '//h2[@id="result-count"]'
+        )
+        h2_content = html.tostring(
+            h2_element[0], method="text", encoding="unicode"
+        )
+        self.assertIn("related to", h2_content)
+        self.assertIn("Debbas", h2_content)
+        self.assertIn("Franklin", h2_content)
 
     async def test_more_like_this_opinion_detail_detail(self) -> None:
         """MoreLikeThis query on opinion detail page with status filter"""
