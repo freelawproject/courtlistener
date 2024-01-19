@@ -343,7 +343,7 @@ class AlertSeleniumTest(BaseSeleniumTest):
             user__username="pandora",
             user__password=make_password("password"),
         )
-        super(AlertSeleniumTest, self).setUp()
+        super().setUp()
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_edit_alert(self) -> None:
@@ -548,19 +548,19 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
             user=cls.user_profile.user,
             rate=Alert.DAILY,
             name="Test Alert O",
-            query="type=o&stat_Precedential=on",
+            query="type=o&stat_Non-Precedential=on",
         )
         cls.search_alert_rt = AlertFactory(
             user=cls.user_profile.user,
             rate=Alert.REAL_TIME,
             name="Test Alert O rt",
-            query="type=o&stat_Precedential=on",
+            query="type=o&stat_Non-Precedential=on",
         )
         cls.search_alert_rt_1 = AlertFactory(
             user=cls.user_profile_1.user,
             rate=Alert.REAL_TIME,
             name="Test Alert O rt",
-            query="type=o&stat_Precedential=on",
+            query="type=o&stat_Non-Precedential=on",
         )
         cls.search_alert_oa = AlertFactory(
             user=cls.user_profile.user,
@@ -572,13 +572,13 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
             user=cls.user_profile.user,
             rate=Alert.WEEKLY,
             name="Test Alert O wly",
-            query="type=o&stat_Precedential=on",
+            query="type=o&stat_Non-Precedential=on",
         )
         cls.search_alert_o_mly = AlertFactory(
             user=cls.user_profile.user,
             rate=Alert.MONTHLY,
             name="Test Alert O mly",
-            query="type=o&stat_Precedential=on",
+            query="type=o&stat_Non-Precedential=on",
         )
 
         cls.user_profile_2 = UserProfileWithParentsFactory()
@@ -592,14 +592,14 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
             user=cls.user_profile_2.user,
             rate=Alert.DAILY,
             name="Test Alert O Disabled",
-            query="type=o&stat_Precedential=on",
+            query="type=o&stat_Non-Precedential=on",
         )
         cls.mock_date = now().replace(day=15, hour=0)
         with time_machine.travel(
             cls.mock_date, tick=False
         ), cls.captureOnCommitCallbacks(execute=True):
             cls.dly_opinion = OpinionWithParentsFactory.create(
-                cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
                 cluster__date_filed=now() - timedelta(hours=5),
             )
             with mock.patch(
@@ -615,16 +615,16 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
                 )
 
             cls.wly_opinion = OpinionWithParentsFactory.create(
-                cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
                 cluster__date_filed=now() - timedelta(days=2),
             )
             cls.mly_opinion = OpinionWithParentsFactory.create(
-                cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
                 cluster__date_filed=now() - timedelta(days=25),
             )
 
     def setUp(self) -> None:
-        super(SearchAlertsWebhooksTest, self).setUp()
+        super().setUp()
         obj_types = {
             "audio.Audio": Audio,
             "search.Opinion": Opinion,
@@ -722,7 +722,7 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
         ), self.captureOnCommitCallbacks(execute=True):
             # Get ready the RT opinion for the test.
             rt_opinion = OpinionWithParentsFactory.create(
-                cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
                 cluster__date_filed=now(),
             )
             RealTimeQueue.objects.create(
@@ -2146,10 +2146,10 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         rt_oral_argument_2.delete()
         rt_oral_argument_3.delete()
 
-    @override_settings(PERCOLATOR_PAGE_SIZE=5)
+    @override_settings(ELASTICSEARCH_PAGINATION_BATCH_SIZE=5)
     def test_send_multiple_rt_alerts(self, mock_abort_audio):
         """Confirm all RT alerts are properly sent if the percolator response
-        contains more than PERCOLATOR_PAGE_SIZE results. So additional
+        contains more than ELASTICSEARCH_PAGINATION_BATCH_SIZE results. So additional
         requests are performed in order to retrieve all the available results.
         """
 
@@ -2238,7 +2238,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         for alert in alerts_created:
             alert.delete()
 
-    @override_settings(PERCOLATOR_PAGE_SIZE=5)
+    @override_settings(ELASTICSEARCH_PAGINATION_BATCH_SIZE=5)
     def test_batched_alerts_match_documents_ingestion(self, mock_abort_audio):
         """Confirm that batched alerts are properly stored according to
         document ingestion when percolated in real time.
@@ -2322,7 +2322,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         for alert in alerts_created:
             alert.delete()
 
-    @override_settings(PERCOLATOR_PAGE_SIZE=5)
+    @override_settings(ELASTICSEARCH_PAGINATION_BATCH_SIZE=5)
     def test_percolate_document_in_batches(self, mock_abort_audio):
         """Confirm when getting alerts in batches and an alert previously
         retrieved is updated during this process. It's not returned again.
@@ -2712,7 +2712,7 @@ class SearchAlertsIndexingCommandTests(ESIndexTestCase, TestCase):
         self.delete_index("alerts.Alert")
         self.create_index("alerts.Alert")
 
-    @override_settings(PERCOLATOR_PAGE_SIZE=20)
+    @override_settings(ELASTICSEARCH_PAGINATION_BATCH_SIZE=20)
     @mock.patch("cl.alerts.management.commands.cl_index_search_alerts.logger")
     def test_cl_index_search_alerts_command(self, mock_logger):
         """Confirm the command only index the right Alerts into the ES."""

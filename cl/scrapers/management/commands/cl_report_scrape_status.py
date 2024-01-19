@@ -199,7 +199,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         report, subject = generate_report()
         send_report(report, subject, options["debug"])
         truncate_database_logs()

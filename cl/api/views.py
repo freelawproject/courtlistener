@@ -8,6 +8,7 @@ from django.conf import settings
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.template import TemplateDoesNotExist
+from django.template.response import TemplateResponse
 from django.views.decorators.cache import cache_page
 from requests import Session
 from rest_framework import status
@@ -96,10 +97,10 @@ def replication_docs(request: HttpRequest) -> HttpResponse:
     return render(request, "replication.html", {"private": False})
 
 
-def bulk_data_index(request: HttpRequest) -> HttpResponse:
+async def bulk_data_index(request: HttpRequest) -> HttpResponse:
     """Shows an index page for the dumps."""
-    disclosure_coverage = get_coverage_data_fds()
-    return render(
+    disclosure_coverage = await get_coverage_data_fds()
+    return TemplateResponse(
         request,
         "bulk-data.html",
         disclosure_coverage,
@@ -231,7 +232,7 @@ async def get_result_count(request, version, day_count):
         cd["argued_after"] = date.today() - timedelta(days=int(day_count))
         cd["argued_before"] = None
         search_query = document_type.search()
-        s, _ = build_es_base_query(search_query, cd)
+        s, _ = await sync_to_async(build_es_base_query)(search_query, cd)
         total_query_results = s.count()
     else:
         with Session() as session:
@@ -244,12 +245,10 @@ async def get_result_count(request, version, day_count):
                     cd["type"],
                 )
                 raise
-
-            response = (
-                si.query()
-                .add_extra(**build_alert_estimation_query(cd, int(day_count)))
-                .execute()
+            extra = await sync_to_async(build_alert_estimation_query)(
+                cd, int(day_count)
             )
+            response = si.query().add_extra(**extra).execute()
             total_query_results = response.result.numFound
     return JsonResponse({"count": total_query_results}, safe=True)
 

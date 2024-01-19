@@ -46,7 +46,7 @@ class Audio(AbstractDateTimeModel):
     )
     source = models.CharField(
         help_text="the source of the audio file, one of: %s"
-        % ", ".join(["%s (%s)" % (t[0], t[1]) for t in SOURCES.NAMES]),
+        % ", ".join(f"{t[0]} ({t[1]})" for t in SOURCES.NAMES),
         max_length=10,
         choices=SOURCES.NAMES,
         blank=True,
@@ -205,7 +205,7 @@ class Audio(AbstractDateTimeModel):
         :param force_commit: Should a commit be performed in solr after
         indexing it?
         """
-        super(Audio, self).save(*args, **kwargs)  # type: ignore
+        super().save(*args, **kwargs)  # type: ignore
         if index:
             from cl.search.tasks import add_items_to_solr
 
@@ -220,7 +220,7 @@ class Audio(AbstractDateTimeModel):
         Update the index as items are deleted.
         """
         id_cache = self.pk
-        super(Audio, self).delete(*args, **kwargs)  # type: ignore
+        super().delete(*args, **kwargs)  # type: ignore
         from cl.search.tasks import delete_items
 
         delete_items.delay([id_cache], "audio.Audio")

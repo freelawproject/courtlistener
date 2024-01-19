@@ -76,6 +76,13 @@ CORS_ALLOW_METHODS = (
 )
 CORS_ALLOW_CREDENTIALS = True
 
+# PERMISSIONS_POLICY
+# Dictionary to disable many potentially privacy-invading and annoying features
+# for all scripts:
+PERMISSIONS_POLICY: dict[str, list[str]] = {
+    "browsing-topics": [],
+}
+
 # CSP
 # Components:
 # - hCaptcha: https://docs.hcaptcha.com/#content-security-policy-settings

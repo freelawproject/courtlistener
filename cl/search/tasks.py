@@ -11,7 +11,7 @@ from celery import Task
 from django.apps import apps
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import QuerySet
+from django.db.models import Prefetch, QuerySet
 from django.utils.timezone import now
 from elasticsearch.exceptions import (
     ConflictError,
@@ -19,7 +19,7 @@ from elasticsearch.exceptions import (
     NotFoundError,
     RequestError,
 )
-from elasticsearch.helpers import parallel_bulk, streaming_bulk
+from elasticsearch.helpers import bulk, parallel_bulk, streaming_bulk
 from elasticsearch_dsl import Document, UpdateByQuery, connections
 from requests import Session
 from scorched.exc import SolrError
@@ -34,13 +34,17 @@ from cl.search.documents import (
     AudioDocument,
     DocketDocument,
     ESRECAPDocument,
+    OpinionClusterDocument,
+    OpinionDocument,
     PersonDocument,
     PositionDocument,
 )
 from cl.search.models import (
     SEARCH_TYPES,
     Docket,
+    Opinion,
     OpinionCluster,
+    OpinionsCited,
     RECAPDocument,
 )
 from cl.search.types import (
@@ -230,7 +234,7 @@ def person_first_time_indexing(parent_id: int, position: Position) -> None:
     ]
     for person_position in non_judicial_positions:
         doc_id = ES_CHILD_ID(person_position.pk).POSITION
-        if PositionDocument.exists(id=doc_id):
+        if PositionDocument.exists(id=doc_id, routing=parent_id):
             continue
 
         position_doc = PositionDocument()
@@ -261,7 +265,7 @@ def get_instance_from_db(
     except ObjectDoesNotExist:
         logger.warning(
             f"The {model.__name__} with ID {instance_id} doesn't exists and it"
-            f"cannot be updated in ES."
+            "cannot be updated in ES."
         )
         return None
 
@@ -345,6 +349,27 @@ def es_save_document(
                     skip_empty=False, return_doc_meta=True
                 )
             doc_id = ES_CHILD_ID(instance.pk).RECAP
+            es_args["_routing"] = parent_id
+        case "search.Opinion":
+            parent_id = getattr(instance.cluster, "pk", None)
+            if not all(
+                [
+                    es_index_exists(es_document._index._name),
+                    parent_id,
+                ]
+            ):
+                self.request.chain = None
+                return None
+
+            if not OpinionClusterDocument.exists(id=parent_id):
+                # create the parent document if it does not exist in ES
+                cluster_doc = OpinionClusterDocument()
+                doc = cluster_doc.prepare(instance.cluster)
+                OpinionClusterDocument(meta={"id": parent_id}, **doc).save(
+                    skip_empty=False, return_doc_meta=True
+                )
+
+            doc_id = ES_CHILD_ID(instance.pk).OPINION
             es_args["_routing"] = parent_id
         case _:
             doc_id = instance_id
@@ -508,6 +533,34 @@ def update_es_document(
     )
 
 
+def get_es_doc_id_and_parent_id(
+    es_document: ESDocumentClassType, instance: ESModelType
+) -> tuple[int | str, int | None]:
+    """Retrieve the Elasticsearch document ID and parent ID for a given
+     ES document type and DB instance.
+
+    :param es_document: The ES document class type.
+    :param instance: The DB instance related to the ES document.
+    :return: A two-tuple containing the Elasticsearch document ID and the
+    parent ID.
+    """
+
+    if es_document is PositionDocument:
+        doc_id = ES_CHILD_ID(instance.pk).POSITION
+        parent_id = getattr(instance, "person_id", None)
+    elif es_document is ESRECAPDocument:
+        doc_id = ES_CHILD_ID(instance.pk).RECAP
+        parent_id = getattr(instance.docket_entry, "docket_id", None)
+    elif es_document is OpinionDocument:
+        doc_id = ES_CHILD_ID(instance.pk).OPINION
+        parent_id = getattr(instance, "cluster_id", None)
+    else:
+        doc_id = instance.pk
+        parent_id = None
+
+    return doc_id, parent_id
+
+
 def get_doc_from_es(
     es_document: ESDocumentClassType,
     instance: ESModelType,
@@ -518,25 +571,23 @@ def get_doc_from_es(
     :return: An Elasticsearch document if found, otherwise None.
     """
 
-    # Get doc_id for parent-child documents.
-    es_args = {}
-    instance_id = instance.pk
-    if es_document is PositionDocument:
-        instance_id = ES_CHILD_ID(instance.pk).POSITION
-        parent_id = getattr(instance.person, "pk", None)
-        es_args["_routing"] = parent_id
-
-    elif es_document is ESRECAPDocument:
-        instance_id = ES_CHILD_ID(instance.pk).RECAP
-        parent_id = getattr(instance.docket_entry.docket, "pk", None)
-        es_args["_routing"] = parent_id
-
+    # Get doc_id and routing for parent and child documents.
+    instance_id, parent_id = get_es_doc_id_and_parent_id(es_document, instance)
+    get_args: dict[str, int | str] = (
+        {"id": instance_id, "routing": parent_id}
+        if parent_id
+        else {"id": instance_id}
+    )
     try:
-        main_doc = es_document.get(id=instance_id)
+        main_doc = es_document.get(**get_args)
     except NotFoundError:
         if isinstance(instance, Person) and not instance.is_judge:
             # If the instance is a Person and is not a Judge, avoid indexing.
             return None
+
+        es_args: dict[str, int | str | dict] = (
+            {"_routing": parent_id} if parent_id else {}
+        )
         doc = es_document().prepare(instance)
         es_args["meta"] = {"id": instance_id}
         try:
@@ -553,6 +604,45 @@ def get_doc_from_es(
 
         return None
     return main_doc
+
+
+def handle_ubq_retries(
+    self: Task,
+    exc: ConnectionError | ConflictError,
+    count_query=QuerySet | None,
+) -> None:
+    """Handles the retry logic for update_children_docs_by_query task based on
+    the exception received and number of documents to update.
+
+    :param self: The celery task
+    :param exc: The exception that triggered the retry.
+    :param count_query: Optional a Queryset to retrieve the number of docs to
+    update.
+    :return: None
+    """
+
+    retry_count = self.request.retries
+    if retry_count >= self.max_retries:
+        raise exc
+
+    if isinstance(exc, ConnectionError) and count_query:
+        num_documents = count_query.count()
+        estimated_time_ms = num_documents * 15  # 15ms per document
+        # Convert ms to seconds
+        estimated_delay_sec = round(estimated_time_ms / 1000)
+        # Apply exponential backoff with jitter
+        min_delay_sec = max(estimated_delay_sec, 10)
+        jitter_sec = randint(10, 30)
+        countdown_sec = ((retry_count + 1) * min_delay_sec) + jitter_sec
+    else:
+        # Default case for ConflictError
+        min_delay_sec = 10  # 10 seconds
+        max_delay_sec = 15  # 15 seconds
+        countdown_sec = ((retry_count + 1) * min_delay_sec) + randint(
+            min_delay_sec, max_delay_sec
+        )
+
+    raise self.retry(exc=exc, countdown=countdown_sec)
 
 
 @app.task(
@@ -584,6 +674,7 @@ def update_children_docs_by_query(
     main_doc = None
     parent_instance = None
     parent_doc_class = None
+    count_query = None
     if es_document is PositionDocument:
         s = s.query("parent_id", type="position", id=parent_instance_id)
         parent_doc_class = PersonDocument
@@ -591,6 +682,8 @@ def update_children_docs_by_query(
         parent_instance = get_instance_from_db(parent_instance_id, Person)
         if not parent_instance:
             return
+        count_query = Position.objects.filter(person_id=parent_instance_id)
+
     elif es_document is ESRECAPDocument:
         s = s.query("parent_id", type="recap_document", id=parent_instance_id)
         parent_doc_class = DocketDocument
@@ -598,6 +691,21 @@ def update_children_docs_by_query(
         parent_instance = get_instance_from_db(parent_instance_id, Docket)
         if not parent_instance:
             return
+    elif (
+        es_document is OpinionDocument or es_document is OpinionClusterDocument
+    ):
+        s = s.query("parent_id", type="opinion", id=parent_instance_id)
+        parent_doc_class = OpinionClusterDocument
+        main_doc = parent_doc_class.exists(parent_instance_id)
+        parent_instance = get_instance_from_db(
+            parent_instance_id, OpinionCluster
+        )
+        if not parent_instance:
+            return
+
+        count_query = RECAPDocument.objects.filter(
+            docket_entry__docket_id=parent_instance_id
+        )
 
     if not main_doc:
         # Abort bulk update for a not supported document or non-existing parent
@@ -611,6 +719,7 @@ def update_children_docs_by_query(
         .params(timeout=f"{settings.ELASTICSEARCH_TIMEOUT}s")
     )
 
+    # Build the UpdateByQuery script and execute it
     script_lines = []
     params = {}
     for field_to_update in fields_to_update:
@@ -629,20 +738,12 @@ def update_children_docs_by_query(
             else:
                 params[field_name] = getattr(parent_instance, field_to_update)
     script_source = "\n".join(script_lines)
-    # Build the UpdateByQuery script and execute it
+
     ubq = ubq.script(source=script_source, params=params)
     try:
         ubq.execute()
     except (ConnectionError, ConflictError) as exc:
-        retry_count = self.request.retries
-        if retry_count >= self.max_retries:
-            raise exc
-        min_delay = 10  # 10 seconds
-        max_delay = 15  # 15 seconds
-        countdown = ((retry_count + 1) * min_delay) + randint(
-            min_delay, max_delay
-        )
-        raise self.retry(exc=exc, countdown=countdown)
+        handle_ubq_retries(self, exc, count_query=count_query)
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
@@ -689,7 +790,7 @@ def bulk_indexing_generator(
     es_document: ESDocumentClassType,
     base_doc: dict[str, str],
     child_id_property: str | None = None,
-    instance_id: int | None = None,
+    parent_id: int | None = None,
 ) -> Generator[ESDictDocument, None, None]:
     """Generate ES documents for bulk indexing.
 
@@ -698,17 +799,26 @@ def bulk_indexing_generator(
     the instance model.
     :param child_id_property: Optional, the property to be used for generating
      ES child document ID.
-    :param instance_id: Optional, the parent instance ID used for routing in ES.
+    :param parent_id: Optional, the parent instance ID used for routing in ES.
     :param base_doc: The base ES document fields.
     :return: Yields ES child documents for bulk indexing.
     """
 
+    parent_id_mappings = {
+        "RECAP": lambda document: document.docket_entry.docket_id,
+        "OPINION": lambda document: document.cluster_id,
+    }
     for doc in docs_query_set.iterator():
         es_doc = es_document().prepare(doc)
         if child_id_property:
+            if not parent_id:
+                parent_id_lambda = parent_id_mappings.get(child_id_property)
+                if not parent_id_lambda:
+                    continue
+                parent_id = parent_id_lambda(doc)
             doc_params = {
                 "_id": getattr(ES_CHILD_ID(doc.pk), child_id_property),
-                "_routing": f"{instance_id}",
+                "_routing": f"{parent_id}",
             }
         else:
             doc_params = {
@@ -717,6 +827,69 @@ def bulk_indexing_generator(
         es_doc.update(base_doc)
         es_doc.update(doc_params)
         yield es_doc
+
+
+def index_documents_in_bulk_from_queryset(
+    docs_queryset: QuerySet,
+    es_document: ESDocumentClassType,
+    base_doc: dict[str, str],
+    child_id_property: str | None = None,
+    parent_instance_id: int | None = None,
+    testing_mode: bool = False,
+) -> list[str]:
+    """Index documents in bulk from a queryset into ES. Indexes documents
+    using either streaming or parallel bulk  operations, depending on the mode.
+
+    :param docs_queryset: A queryset containing the documents to index.
+    :param es_document: The Elasticsearch document class corresponding to
+    the instance model.
+    :param child_id_property: Optional, the property to be used for generating
+     ES child document ID.
+    :param base_doc: The base ES document fields.
+    :param parent_instance_id: Optional, the parent instance ID used for
+    routing in ES.
+    :param testing_mode: Set to True to use streaming bulk for test cases.
+    Default is False.
+    :return: A list of IDs of documents that failed to index.
+    """
+
+    client = connections.get_connection()
+    failed_child_docs = []
+
+    if testing_mode:
+        # Use streaming_bulk in TestCase based tests. Since parallel_bulk
+        # doesn't work on them.
+        for success, info in streaming_bulk(
+            client,
+            bulk_indexing_generator(
+                docs_queryset,
+                es_document,
+                base_doc,
+                child_id_property,
+                parent_instance_id,
+            ),
+            chunk_size=settings.ELASTICSEARCH_BULK_BATCH_SIZE,
+        ):
+            if not success:
+                failed_child_docs.append(info["index"]["_id"])
+    else:
+        # Use parallel_bulk in production and tests based on TransactionTestCase
+        for success, info in parallel_bulk(
+            client,
+            bulk_indexing_generator(
+                docs_queryset,
+                es_document,
+                base_doc,
+                child_id_property,
+                parent_instance_id,
+            ),
+            thread_count=settings.ELASTICSEARCH_PARALLEL_BULK_THREADS,
+            chunk_size=settings.ELASTICSEARCH_BULK_BATCH_SIZE,
+        ):
+            if not success:
+                failed_child_docs.append(info["index"]["_id"])
+
+    return failed_child_docs
 
 
 @app.task(
@@ -751,6 +924,10 @@ def index_parent_and_child_docs(
             parent_es_document = DocketDocument
             child_es_document = ESRECAPDocument
             child_id_property = "RECAP"
+        case SEARCH_TYPES.OPINION:
+            parent_es_document = OpinionClusterDocument
+            child_es_document = OpinionDocument
+            child_id_property = "OPINION"
         case _:
             return
 
@@ -766,6 +943,9 @@ def index_parent_and_child_docs(
             child_docs = RECAPDocument.objects.filter(
                 docket_entry__docket=instance
             )
+        elif search_type == SEARCH_TYPES.OPINION:
+            instance = OpinionCluster.objects.get(pk=instance_id)
+            child_docs = instance.sub_opinions.all()
         else:
             return
 
@@ -789,50 +969,150 @@ def index_parent_and_child_docs(
                 continue
 
         # Index child documents in bulk.
-        client = connections.get_connection()
         base_doc = {
             "_op_type": "index",
             "_index": parent_es_document._index._name,
         }
 
-        failed_child_docs = []
-        if testing_mode:
-            # Use streaming_bulk in TestCase based tests. Since parallel_bulk
-            # doesn't work on them.
-            for success, info in streaming_bulk(
-                client,
-                bulk_indexing_generator(
-                    child_docs,
-                    child_es_document,
-                    base_doc,
-                    child_id_property,
-                    instance_id,
-                ),
-                chunk_size=settings.ELASTICSEARCH_BULK_BATCH_SIZE,
-            ):
-                if not success:
-                    failed_child_docs.append(info["index"]["_id"])
-        else:
-            # Use parallel_bulk in production and tests based on TransactionTestCase
-            for success, info in parallel_bulk(
-                client,
-                bulk_indexing_generator(
-                    child_docs,
-                    child_es_document,
-                    base_doc,
-                    child_id_property,
-                    instance_id,
-                ),
-                thread_count=settings.ELASTICSEARCH_PARALLEL_BULK_THREADS,
-                chunk_size=settings.ELASTICSEARCH_BULK_BATCH_SIZE,
-            ):
-                if not success:
-                    failed_child_docs.append(info["index"]["_id"])
+        failed_child_docs = index_documents_in_bulk_from_queryset(
+            child_docs,
+            child_es_document,
+            base_doc,
+            child_id_property=child_id_property,
+            parent_instance_id=instance_id,
+            testing_mode=testing_mode,
+        )
 
         if failed_child_docs:
             logger.error(
                 f"Error indexing child documents from the {model_label}"
                 f" with ID: {instance_id}. Child IDs are: {failed_child_docs}"
+            )
+
+    if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
+        # Set auto-refresh, used for testing.
+        parent_es_document._index.refresh()
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(ConnectionError,),
+    max_retries=3,
+    interval_start=5,
+    ignore_result=True,
+)
+def index_parent_or_child_docs(
+    self: Task,
+    instance_ids: list[int],
+    search_type: str,
+    document_type: str | None,
+    testing_mode: bool = False,
+) -> None:
+    """Index parent or child documents in Elasticsearch.
+
+    :param self: The Celery task instance
+    :param instance_ids: The parent instance IDs to index.
+    :param search_type: The Search Type to index parent and child docs.
+    :param document_type: The document type to index, 'parent' or 'child' documents
+    :param testing_mode: If True uses streaming_bulk in TestCase based tests,
+    otherwise uses parallel_bulk in production.
+    :return: None
+    """
+
+    parent_instances = []
+    child_instances = []
+    parent_ids = []
+    match search_type:
+        case SEARCH_TYPES.RECAP:
+            parent_es_document = DocketDocument
+            child_es_document = ESRECAPDocument
+            child_id_property = "RECAP"
+            parent_model = Docket
+            if document_type == "parent":
+                parent_instances = Docket.objects.filter(pk__in=instance_ids)
+            elif document_type == "child":
+                child_instances = RECAPDocument.objects.filter(
+                    pk__in=instance_ids
+                )
+                parent_ids = RECAPDocument.objects.filter(
+                    pk__in=instance_ids
+                ).values_list("docket_entry__docket_id", flat=True)
+        case SEARCH_TYPES.OPINION:
+            parent_es_document = OpinionClusterDocument
+            child_es_document = OpinionDocument
+            child_id_property = "OPINION"
+            parent_model = OpinionCluster
+            if document_type == "parent":
+                parent_instances = OpinionCluster.objects.filter(
+                    pk__in=instance_ids
+                )
+            elif document_type == "child":
+                child_instances = Opinion.objects.filter(pk__in=instance_ids)
+        case _:
+            return
+
+    base_doc = {
+        "_op_type": "index",
+        "_index": parent_es_document._index._name,
+    }
+    if document_type == "child":
+        # Index only child documents.
+        parent_ids_to_index = []
+        for parent_id in parent_ids:
+            # Confirm all the child's parent documents are already indexed.
+            # Otherwise, index them.
+            if not parent_es_document.exists(parent_id):
+                parent_ids_to_index.append(parent_id)
+
+        missing_parent_instances = parent_model.objects.filter(
+            pk__in=parent_ids_to_index
+        )
+        if parent_ids_to_index:
+            # Index missing parent documents in bulk.
+            failed_docs = index_documents_in_bulk_from_queryset(
+                missing_parent_instances,
+                parent_es_document,
+                base_doc,
+                testing_mode=testing_mode,
+            )
+            if failed_docs:
+                model_label = (
+                    parent_es_document.Django.model.__name__.capitalize()
+                )
+                logger.error(
+                    f"Error indexing documents from {model_label}, "
+                    f"Failed Doc IDs are: {failed_docs}"
+                )
+
+        # Then index only child documents in bulk.
+        failed_docs = index_documents_in_bulk_from_queryset(
+            child_instances,
+            child_es_document,
+            base_doc,
+            child_id_property=child_id_property,
+            testing_mode=testing_mode,
+        )
+
+        if failed_docs:
+            model_label = child_es_document.Django.model.__name__.capitalize()
+            logger.error(
+                f"Error indexing documents from {model_label}, "
+                f"Failed Doc IDs are: {failed_docs}"
+            )
+
+    if document_type == "parent":
+        # Index only parent documents.
+        failed_docs = index_documents_in_bulk_from_queryset(
+            parent_instances,
+            parent_es_document,
+            base_doc,
+            testing_mode=testing_mode,
+        )
+        if failed_docs:
+            model_label = parent_es_document.Django.model.__name__.capitalize()
+            logger.error(
+                f"Error indexing documents from {model_label}, "
+                f"Failed Doc IDs are: {failed_docs}"
             )
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
@@ -851,7 +1131,7 @@ def index_parent_and_child_docs(
     queue=settings.CELERY_ETL_TASK_QUEUE,
 )
 def remove_document_from_es_index(
-    self: Task, es_document_name: str, instance_id: int
+    self: Task, es_document_name: str, instance_id: int, routing: int | None
 ) -> None:
     """Remove a document from an Elasticsearch index.
 
@@ -859,25 +1139,24 @@ def remove_document_from_es_index(
     :param es_document_name: The Elasticsearch document type name.
     :param instance_id: The ID of the instance to be removed from the
     Elasticsearch index.
+    :param routing: The routing value used to look up the document.
     :return: None
     """
 
     es_document = getattr(es_document_module, es_document_name)
-    if es_document is PositionDocument:
-        doc_id = ES_CHILD_ID(instance_id).POSITION
-    elif es_document is ESRECAPDocument:
-        doc_id = ES_CHILD_ID(instance_id).RECAP
-    else:
-        doc_id = instance_id
-
+    get_args: dict[str, int | str] = (
+        {"id": instance_id, "routing": routing}
+        if routing
+        else {"id": instance_id}
+    )
     try:
-        doc = es_document.get(id=doc_id)
+        doc = es_document.get(**get_args)
         doc.delete(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)
     except NotFoundError:
         model_label = es_document.Django.model.__name__.capitalize()
         logger.error(
             f"The {model_label} with ID:{instance_id} can't be deleted from "
-            f"the ES index, it doesn't exists."
+            "the ES index, it doesn't exists."
         )
 
 
@@ -926,3 +1205,125 @@ def index_dockets_in_bulk(
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
         DocketDocument._index.refresh()
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(ConnectionError, ConflictError, NotFoundError),
+    max_retries=6,
+    retry_backoff=2 * 60,
+    retry_backoff_max=20 * 60,
+    retry_jitter=True,
+    queue=settings.CELERY_ETL_TASK_QUEUE,
+    ignore_result=True,
+)
+def index_related_cites_fields(
+    self: Task,
+    model_name: str,
+    child_id: int,
+    cluster_ids_to_update: list[int] | None = None,
+) -> None:
+    """Index 'cites' and 'citeCount' fields in ES documents in a one request.
+    :param self: The Celery task instance.
+    :param model_name: The model name that originated the request.
+    :param child_id: The child document ID to update with the cites.
+    :param cluster_ids_to_update: Optional; the cluster IDs where 'citeCount'
+    should be updated.
+    :return: None.
+    """
+
+    documents_to_update = []
+    match model_name:
+        case OpinionsCited.__name__:
+            # Query all clusters to update and retrieve only their sub_opinions
+            # with the necessary fields.
+            prefetch = Prefetch(
+                "sub_opinions", queryset=Opinion.objects.only("pk")
+            )
+            clusters_with_sub_opinions = (
+                OpinionCluster.objects.filter(pk__in=cluster_ids_to_update)
+                .only("pk", "citation_count")
+                .prefetch_related(prefetch)
+            )
+
+            base_doc = {
+                "_op_type": "update",
+                "_index": OpinionClusterDocument._index._name,
+            }
+            for cluster in clusters_with_sub_opinions:
+                if not OpinionClusterDocument.exists(id=cluster.pk):
+                    # If the OpinionClusterDocument does not exist, it might
+                    # not be indexed yet. Raise a NotFoundError to retry the
+                    # task; hopefully, it will be indexed soon.
+                    raise NotFoundError(
+                        f"The OpinionCluster {cluster.pk} is not indexed.",
+                        "",
+                        {"id": cluster.pk},
+                    )
+
+                # Build the OpinionCluster dicts for updating the citeCount.
+                doc_to_update = {
+                    "_id": cluster.pk,
+                    "doc": {"citeCount": cluster.citation_count},
+                }
+                doc_to_update.update(base_doc)
+                documents_to_update.append(doc_to_update)
+
+                for opinion in cluster.sub_opinions.all():
+                    if not OpinionClusterDocument.exists(
+                        id=ES_CHILD_ID(opinion.pk).OPINION, routing=cluster.pk
+                    ):
+                        # If the OpinionDocument does not exist, it might
+                        # not be indexed yet. Raise a NotFoundError to retry the
+                        # task; hopefully, it will be indexed soon.
+                        raise NotFoundError(
+                            f"The Opinion {opinion.pk} is not indexed.",
+                            "",
+                            {"id": opinion.pk},
+                        )
+
+                    # Build the Opinion dicts for updating the citeCount.
+                    doc_to_update = {
+                        "_id": ES_CHILD_ID(opinion.pk).OPINION,
+                        "_routing": cluster.pk,
+                        "doc": {"citeCount": cluster.citation_count},
+                    }
+                    doc_to_update.update(base_doc)
+                    documents_to_update.append(doc_to_update)
+
+            # Finally build the Opinion dict for updating the cites.
+            opinion_instance = get_instance_from_db(child_id, Opinion)
+            if not opinion_instance:
+                return
+            cites_prepared = OpinionDocument().prepare_cites(opinion_instance)
+            doc_id = ES_CHILD_ID(opinion_instance.pk).OPINION
+            if not OpinionClusterDocument.exists(
+                id=doc_id, routing=opinion_instance.cluster_id
+            ):
+                # If the OpinionDocument does not exist, it might
+                # not be indexed yet. Raise a NotFoundError to retry the
+                # task; hopefully, it will be indexed soon.
+                raise NotFoundError(
+                    f"The Opinion {opinion_instance.pk} is not indexed.",
+                    "",
+                    {"id": opinion_instance.pk},
+                )
+
+            doc_to_update = {
+                "_id": doc_id,
+                "_routing": opinion_instance.cluster_id,
+                "doc": {"cites": cites_prepared},
+            }
+            doc_to_update.update(base_doc)
+            documents_to_update.append(doc_to_update)
+
+    if not documents_to_update:
+        return
+
+    client = connections.get_connection(alias="no_retry_connection")
+    # Execute the bulk update
+    bulk(client, documents_to_update)
+
+    if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
+        # Set auto-refresh, used for testing.
+        OpinionClusterDocument._index.refresh()

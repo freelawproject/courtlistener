@@ -7,6 +7,7 @@ from urllib.parse import urljoin
 
 import requests
 from asgiref.sync import async_to_sync
+from courts_db import find_court_by_id, find_court_ids_by_name
 from django.conf import settings
 from django.db.models import QuerySet
 from juriscraper.AbstractSite import logger
@@ -20,7 +21,62 @@ from cl.lib.decorators import retry
 from cl.lib.microservice_utils import microservice
 from cl.recap.mergers import find_docket_object
 from cl.scrapers.tasks import extract_recap_pdf
-from cl.search.models import Docket, RECAPDocument
+from cl.search.models import Court, Docket, RECAPDocument
+
+
+def get_child_court(child_court_name: str, court_id: str) -> Optional[Court]:
+    """Get Court object from "child_courts" scraped string
+
+    Ensure that the Court object found has the same parent court id has the
+    Court object got from the scraper
+
+    :param item: scraped court's name
+    :param court_id: court id got from the Site scraper object
+
+    :return: Court object for the child_court string if it exists and is valid
+    """
+    if not child_court_name:
+        return None
+
+    parent_court = find_court_by_id(court_id)[0]
+
+    child_court_ids = find_court_ids_by_name(
+        child_court_name,
+        bankruptcy=parent_court["type"] == "bankruptcy",
+        location=parent_court["location"],
+        allow_partial_matches=False,
+    )
+
+    if not child_court_ids:
+        logger.error(
+            "Could not get child court id from name '%s'",
+            child_court_name,
+            extra={"fingerprint": [f"{court_id}-no-child-in-reportersdb"]},
+        )
+        return None
+
+    if not (child_courts := Court.objects.filter(pk=child_court_ids[0])):
+        logger.error(
+            "Court object does not exist for '%s'",
+            child_court_ids[0],
+            extra={"fingerprint": [f"{court_id}-no-child-in-db"]},
+        )
+        return None
+
+    child_court = child_courts[0]
+    parent_id = child_court.parent_court.id if child_court.parent_court else ""
+    if parent_id != court_id:
+        logger.error(
+            "Child court found from name '%s' with id '%s' has parent court id different from expected. Expected: '%s' Found: '%s'",
+            child_court_name,
+            child_court_ids[0],
+            court_id,
+            parent_id,
+            extra={"fingerprint": [f"{court_id}-child-found-no-parent-match"]},
+        )
+        return None
+
+    return child_court
 
 
 @retry(

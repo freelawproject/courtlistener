@@ -1,9 +1,4 @@
-import os
-import pickle
 import re
-from math import ceil
-
-from django.conf import settings
 
 conn_counties = ")|(".join(
     [
@@ -415,7 +410,7 @@ state_pairs = (
 
     (re.compile(r'Supreme Court of California', re.I), 'cal'),
     (re.compile(r'California Court of Appeals', re.I), 'calctapp'),
-        (re.compile(r'Court of Appeal of the State of California',re.I), 'calctapp'),
+        (re.compile(r'Court of Appeal of the State of California', re.I), 'calctapp'),
         (re.compile(r'Court of Appeals? of California', re.I), 'calctapp'),
     (re.compile(r'Appellate Division, Superior Court', re.I), 'calappdeptsuperct'),
         (re.compile(r'Appellate Division of the Superior Court of the State of California', re.I), 'calappdeptsuperct'),
@@ -701,14 +696,14 @@ international_pairs = (
 
 
 def match_court_string(
-    court_str,
-    federal_appeals=False,
-    federal_district=False,
-    bankruptcy=False,
-    state=False,
-    state_ag=False,
-    international=False,
-):
+    court_str: str,
+    federal_appeals: bool = False,
+    federal_district: bool = False,
+    bankruptcy: bool = False,
+    state: bool = False,
+    state_ag: bool = False,
+    international: bool = False,
+) -> str | None:
     """Look up a court string and return a CourtListener ID.
 
     Note you cannot use bankruptcy and federal_district together due to

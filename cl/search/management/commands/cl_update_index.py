@@ -60,7 +60,7 @@ class Command(VerboseCommand):
     )
 
     def __init__(self, *args, **kwargs):
-        super(Command, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.solr_url = None
         self.si = None
         self.verbosity = None
@@ -170,7 +170,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         self.verbosity = int(options.get("verbosity", 1))
         self.options = options
         self.noinput = options["noinput"]

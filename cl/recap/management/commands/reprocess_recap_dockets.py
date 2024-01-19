@@ -84,7 +84,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         if options["extract_and_add_solr_unextracted_rds"]:
             queue = options["queue"]
             sys.stdout.write(

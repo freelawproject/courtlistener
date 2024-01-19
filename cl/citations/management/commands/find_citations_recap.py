@@ -115,7 +115,7 @@ class Command(VerboseCommand):
             self.log_progress(processed_count, doc.pk)
 
     def handle(self, *args: List[str], **options: OptionsType):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         both_list_and_endpoints = options.get("doc_id") is not None and (
             options.get("start_id") is not None
             or options.get("end_id") is not None

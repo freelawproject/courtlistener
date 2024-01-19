@@ -6,7 +6,7 @@ from unittest import mock
 from asgiref.sync import async_to_sync, sync_to_async
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
-from django.test import RequestFactory, override_settings
+from django.test import AsyncClient, override_settings
 from django.urls import reverse
 from elasticsearch_dsl import Q
 from lxml import etree, html
@@ -841,6 +841,8 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIn("Document #2", r.content.decode())
 
         with self.captureOnCommitCallbacks(execute=True):
+            e_2_d_1.delete()
+            e_1_d_1.delete()
             docket.delete()
 
     async def test_atty_name_filter(self) -> None:
@@ -1160,7 +1162,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         plain_text_string = plain_text[0].strip()
         cleaned_plain_text = re.sub(r"\s+", " ", plain_text_string)
         cleaned_plain_text = cleaned_plain_text.replace("…", "")
-        self.assertLess(len(cleaned_plain_text), 50)
+        # The actual no_match_size in this test using fvh is a bit longer due
+        # to it includes an extra word.
+        self.assertEqual(len(cleaned_plain_text), 58)
 
         # Highlight assigned_to.
         params = {"type": SEARCH_TYPES.RECAP, "q": "Thalassa Miller"}
@@ -1199,8 +1203,10 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             0, r.content.decode(), 2, "highlights docketNumber"
         )
 
-        self.assertIn("<mark>1:21", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>1:21</mark>"), 1)
+        self.assertIn("<mark>1:21-bk-1234", r.content.decode())
+        self.assertEqual(
+            r.content.decode().count("<mark>1:21-bk-1234</mark>"), 1
+        )
 
         # Highlight description.
         params = {"type": SEARCH_TYPES.RECAP, "q": "Discharging Debtor"}
@@ -1215,7 +1221,6 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(
             r.content.decode().count("<mark>Discharging</mark>"), 1
         )
-
         # Highlight suitNature and text.
         params = {"type": SEARCH_TYPES.RECAP, "q": "Lorem 440"}
 
@@ -1227,7 +1232,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIn("<mark>Lorem</mark>", r.content.decode())
         self.assertEqual(r.content.decode().count("<mark>Lorem</mark>"), 2)
 
-        # Highlight plain_text snippet.
+        # Highlight plain_text exact snippet.
         params = {"type": SEARCH_TYPES.RECAP, "q": 'Maecenas nunc "justo"'}
 
         r = await self._test_article_count(params, 1, "highlights plain_text")
@@ -1238,6 +1243,30 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(r.content.decode().count("<mark>Maecenas</mark>"), 1)
         self.assertEqual(r.content.decode().count("<mark>nunc</mark>"), 1)
         self.assertEqual(r.content.decode().count("<mark>justo</mark>"), 1)
+
+        # Highlight plain_text snippet.
+        params = {"type": SEARCH_TYPES.RECAP, "q": "Mauris leo"}
+
+        r = await self._test_article_count(params, 1, "highlights plain_text")
+        # Count child documents under docket.
+        self._count_child_documents(
+            0, r.content.decode(), 1, "highlights plain_text"
+        )
+        self.assertEqual(r.content.decode().count("<mark>Mauris</mark>"), 1)
+        self.assertEqual(r.content.decode().count("<mark>leo</mark>"), 1)
+
+        # Highlight short_description.
+        params = {"type": SEARCH_TYPES.RECAP, "q": '"Document attachment"'}
+
+        r = await self._test_article_count(params, 1, "short_description")
+        # Count child documents under docket.
+        self._count_child_documents(
+            0, r.content.decode(), 1, "highlights plain_text"
+        )
+        self.assertEqual(r.content.decode().count("<mark>Document</mark>"), 1)
+        self.assertEqual(
+            r.content.decode().count("<mark>attachment</mark>"), 1
+        )
 
         # Highlight filter: caseName
         params = {
@@ -1267,8 +1296,10 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = await self._test_article_count(
             params, 1, "highlights docket number"
         )
-        self.assertIn("<mark>1:21", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>1:21</mark>"), 1)
+        self.assertIn("<mark>1:21-bk-1234", r.content.decode())
+        self.assertEqual(
+            r.content.decode().count("<mark>1:21-bk-1234</mark>"), 1
+        )
 
         # Highlight filter: Nature of Suit
         params = {
@@ -1301,7 +1332,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = await self._test_article_count(params, 1, "filter + query")
         self.assertIn("<mark>Amicus</mark>", r.content.decode())
         self.assertEqual(r.content.decode().count("<mark>Amicus</mark>"), 1)
+        self.assertIn("<mark>Document</mark>", r.content.decode())
         self.assertIn("<mark>attachment</mark>", r.content.decode())
+        self.assertEqual(r.content.decode().count("<mark>Document</mark>"), 1)
         self.assertEqual(
             r.content.decode().count("<mark>attachment</mark>"), 1
         )
@@ -1512,13 +1545,13 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             de_4.delete()
 
     @mock.patch("cl.lib.es_signal_processor.chain")
-    def test_avoid_updating_docket_in_es_on_view_count_increment(
+    async def test_avoid_updating_docket_in_es_on_view_count_increment(
         self, mock_es_save_chain
     ) -> None:
         """Confirm a docket is not updated in ES on a view_count increment."""
 
         with self.captureOnCommitCallbacks(execute=True):
-            docket = DocketFactory(
+            docket = await sync_to_async(DocketFactory)(
                 court=self.court,
                 case_name="Lorem Ipsum",
                 case_name_full="Jackson & Sons Holdings vs. Bank",
@@ -1533,16 +1566,16 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         mock_es_save_chain.reset_mock()
         self.assertEqual(mock_es_save_chain.call_count, 0)
 
-        request_factory = RequestFactory()
-        request = request_factory.get("/docket/")
+        request_factory = AsyncClient()
+        request = await request_factory.get("/docket/")
         with mock.patch("cl.lib.view_utils.is_bot", return_value=False):
             # Increase the view_count.
-            increment_view_count(docket, request)
+            await increment_view_count(docket, request)
 
         # The save chain shouldn't be called.
         self.assertEqual(mock_es_save_chain.call_count, 0)
         with self.captureOnCommitCallbacks(execute=True):
-            docket.delete()
+            await docket.adelete()
 
 
 class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):
@@ -2175,13 +2208,12 @@ class IndexDocketRECAPDocumentsCommandTest(
 ):
     """cl_index_parent_and_child_docs command tests for Elasticsearch"""
 
-    @classmethod
-    def setUpClass(cls):
-        cls.rebuild_index("search.Docket")
-        cls.court = CourtFactory(id="canb", jurisdiction="FB")
-        cls.de = DocketEntryWithParentsFactory(
+    def setUp(self):
+        self.rebuild_index("search.Docket")
+        self.court = CourtFactory(id="canb", jurisdiction="FB")
+        self.de = DocketEntryWithParentsFactory(
             docket=DocketFactory(
-                court=cls.court,
+                court=self.court,
                 date_filed=datetime.date(2015, 8, 16),
                 docket_number="1:21-bk-1234",
                 nature_of_suit="440",
@@ -2189,35 +2221,35 @@ class IndexDocketRECAPDocumentsCommandTest(
             entry_number=1,
             date_filed=datetime.date(2015, 8, 19),
         )
-        cls.rd = RECAPDocumentFactory(
-            docket_entry=cls.de,
+        self.rd = RECAPDocumentFactory(
+            docket_entry=self.de,
             document_number="1",
         )
-        cls.rd_att = RECAPDocumentFactory(
-            docket_entry=cls.de,
+        self.rd_att = RECAPDocumentFactory(
+            docket_entry=self.de,
             document_number="1",
             attachment_number=2,
         )
-        cls.de_1 = DocketEntryWithParentsFactory(
+        self.de_1 = DocketEntryWithParentsFactory(
             docket=DocketFactory(
-                court=cls.court,
+                court=self.court,
                 date_filed=datetime.date(2016, 8, 16),
                 date_argued=datetime.date(2012, 6, 23),
             ),
             entry_number=None,
             date_filed=datetime.date(2014, 7, 19),
         )
-        cls.rd_2 = RECAPDocumentFactory(
-            docket_entry=cls.de_1,
+        self.rd_2 = RECAPDocumentFactory(
+            docket_entry=self.de_1,
             document_number="",
         )
-        cls.delete_index("search.Docket")
-        cls.create_index("search.Docket")
+        self.delete_index("search.Docket")
+        self.create_index("search.Docket")
 
-        cls.r = make_redis_interface("CACHE")
-        keys = cls.r.keys(compose_redis_key(SEARCH_TYPES.RECAP))
+        self.r = make_redis_interface("CACHE")
+        keys = self.r.keys(compose_redis_key(SEARCH_TYPES.RECAP))
         if keys:
-            cls.r.delete(*keys)
+            self.r.delete(*keys)
 
     def test_cl_index_parent_and_child_docs_command(self):
         """Confirm the command can properly index Dockets and their
@@ -2337,6 +2369,121 @@ class IndexDocketRECAPDocumentsCommandTest(
         d_2.delete()
         d_3.delete()
         d_4.delete()
+
+    def test_cl_index_only_parent_or_child_documents_command(self):
+        """Confirm the command can properly index only RECAPDocuments or only
+        Dockets into ES."""
+
+        s = DocketDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0)
+        # Call cl_index_parent_and_child_docs command for dockets.
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            queue="celery",
+            pk_offset=0,
+            document_type="parent",
+        )
+
+        # Two dockets should be indexed.
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="docket"))
+        self.assertEqual(s.count(), 2, msg="Wrong number of Dockets returned.")
+
+        # No RECAPDocuments should be indexed.
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="recap_document"))
+        self.assertEqual(
+            s.count(), 0, msg="Wrong number of RECAPDocuments returned."
+        )
+
+        # Now index only RECAPDocuments.
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            queue="celery",
+            pk_offset=0,
+            document_type="child",
+        )
+        s = DocketDocument.search()
+        # 3 RECAPDocuments should be indexed.
+        s = s.query(Q("match", docket_child="recap_document"))
+        self.assertEqual(
+            s.count(), 3, msg="Wrong number of RECAPDocuments returned."
+        )
+
+        # RECAPDocuments are indexed.
+        rds_pks = [
+            self.rd.pk,
+            self.rd_att.pk,
+            self.rd_2.pk,
+        ]
+        for rd_pk in rds_pks:
+            self.assertTrue(
+                ESRECAPDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP)
+            )
+
+        # Confirm parent-child relation.
+        s = DocketDocument.search()
+        s = s.query("parent_id", type="recap_document", id=self.de.docket.pk)
+        self.assertEqual(
+            s.count(), 2, msg="Wrong number of RECAPDocuments returned."
+        )
+        s = DocketDocument.search()
+        s = s.query("parent_id", type="recap_document", id=self.de_1.docket.pk)
+        self.assertEqual(
+            s.count(), 1, msg="Wrong number of RECAPDocuments returned."
+        )
+
+    def test_index_missing_parent_docs_when_indexing_only_child_docs(self):
+        """Confirm the command can properly index missing dockets when indexing
+        only RECAPDocuments.
+        """
+
+        s = DocketDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0)
+        # Call cl_index_parent_and_child_docs command for RECAPDocuments.
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            queue="celery",
+            pk_offset=0,
+            document_type="child",
+        )
+
+        # Dockets and the RECAPDocuments should be indexed.
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="docket"))
+        self.assertEqual(s.count(), 2, msg="Wrong number of Dockets returned.")
+
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="recap_document"))
+        self.assertEqual(
+            s.count(), 3, msg="Wrong number of RECAPDocuments returned."
+        )
+
+        # RECAPDocuments are indexed.
+        rds_pks = [
+            self.rd.pk,
+            self.rd_att.pk,
+            self.rd_2.pk,
+        ]
+        for rd_pk in rds_pks:
+            self.assertTrue(
+                ESRECAPDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP)
+            )
+
+        # Confirm parent-child relation.
+        s = DocketDocument.search()
+        s = s.query("parent_id", type="recap_document", id=self.de.docket.pk)
+        self.assertEqual(
+            s.count(), 2, msg="Wrong number of RECAPDocuments returned."
+        )
+        s = DocketDocument.search()
+        s = s.query("parent_id", type="recap_document", id=self.de_1.docket.pk)
+        self.assertEqual(
+            s.count(), 1, msg="Wrong number of RECAPDocuments returned."
+        )
 
 
 class RECAPIndexingTest(
@@ -3243,13 +3390,13 @@ class RECAPIndexingTest(
         self.assertEqual(r_doc.docket_child["parent"], docket_2.pk)
 
         # Add cites to RECAPDocument.
+        opinion = OpinionWithParentsFactory()
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.delay",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
                 update_es_document, *args, **kwargs
             ),
         ):
-            opinion = OpinionWithParentsFactory()
             OpinionsCitedByRECAPDocument.objects.bulk_create_with_signal(
                 [
                     OpinionsCitedByRECAPDocument(
@@ -3260,6 +3407,7 @@ class RECAPIndexingTest(
                 ]
             )
 
+        # update_es_document task should be called 1 on tracked fields update
         self.reset_and_assert_task_count(expected=1)
         r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
         self.assertIn(opinion.pk, r_doc.cites)
@@ -3302,7 +3450,7 @@ class RECAPIndexingTest(
                 [o_cited, o_cited_2]
             )
 
-        self.reset_and_assert_task_count(expected=1)
+        self.reset_and_assert_task_count(expected=3)
         r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
         self.assertIn(opinion.pk, r_doc.cites)
         self.assertIn(opinion_2.pk, r_doc.cites)

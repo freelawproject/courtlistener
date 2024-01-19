@@ -44,7 +44,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         r = delete_from_ia(options["ia_download_url"])
         if r.ok:
             print("Item deleted successfully")

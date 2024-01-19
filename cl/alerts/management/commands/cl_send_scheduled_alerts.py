@@ -174,7 +174,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         if not waffle.switch_is_active("oa-es-alerts-active"):
             logger.info("ES OA Alerts are disabled.")
             return None

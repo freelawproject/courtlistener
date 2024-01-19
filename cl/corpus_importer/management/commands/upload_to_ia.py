@@ -18,7 +18,7 @@ def upload_non_free_pdfs_to_internet_archive(options):
     upload_pdfs_to_internet_archive(options, do_non_free=True)
 
 
-def upload_pdfs_to_internet_archive(options, do_non_free=False):
+def upload_pdfs_to_internet_archive(options, do_non_free: bool = False):
     """Upload items to the Internet Archive."""
     q = options["queue"]
     rds = (
@@ -187,7 +187,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         options["action"](options)
 
     VALID_ACTIONS = {

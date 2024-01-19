@@ -32,7 +32,7 @@ class UserTagViewSet(ModelViewSet):
 class DocketTagViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated, IsTagOwner]
     serializer_class = DocketTagSerializer
-    filter_class = DocketTagFilter
+    filterset_class = DocketTagFilter
     pagination_class = MediumAdjustablePagination
 
     def get_queryset(self):
