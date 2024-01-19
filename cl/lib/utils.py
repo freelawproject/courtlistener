@@ -3,10 +3,17 @@ from collections.abc import Iterable
 from itertools import chain, islice, tee
 from typing import Any
 from typing import Iterable as IterableType
-from typing import Optional, Tuple
+from typing import Match, Optional, Tuple
+
+from django.core.cache import caches
+
+import cl.search.models as search_model
+from cl.lib.crypto import sha256
+from cl.lib.model_helpers import clean_docket_number, is_docket_number
+from cl.lib.types import CleanData
 
 
-class _UNSPECIFIED(object):
+class _UNSPECIFIED:
     pass
 
 
@@ -39,7 +46,7 @@ def deepgetattr(obj, name, default=_UNSPECIFIED):
             return default
 
 
-def chunks(iterable, chunk_size):
+def chunks(iterable, chunk_size: int):
     """Like the chunks function, but the iterable can be a generator.
 
     Note that the chunks must be *consumed* for it to work properly. Usually
@@ -70,17 +77,15 @@ def previous_and_next(some_iterable):
 
 def is_iter(item: Any) -> bool:
     # See: http://stackoverflow.com/a/1952655/64911
-    if isinstance(item, Iterable):
-        return True
-    return False
+    return isinstance(item, Iterable)
 
 
-def remove_duplicate_dicts(l):
+def remove_duplicate_dicts(l: list[dict]) -> list[dict]:
     """Given a list of dicts, remove any that are the same.
 
     See: http://stackoverflow.com/a/9427216/64911
     """
-    return [dict(t) for t in set([tuple(d.items()) for d in l])]
+    return [dict(t) for t in {tuple(d.items()) for d in l}]
 
 
 def human_sort(
@@ -122,3 +127,167 @@ def wrap_text(length: int, text: str) -> str:
                 break
         return " ".join(lines)
     return ""
+
+
+def get_array_of_selected_fields(cd: CleanData, prefix: str) -> list[str]:
+    """Gets the selected checkboxes from the form data, and puts it into
+    an array. Uses a prefix to know which items to pull out of the cleaned
+    data.Check forms.py to see how the prefixes are set up.
+    """
+    return [
+        k.replace(prefix, "")
+        for k, v in cd.items()
+        if (k.startswith(prefix) and v is True)
+    ]
+
+
+def lookup_child_courts(parent_courts: list[str]) -> set[str]:
+    """Recursively fetches child courts for the given parent courts.
+
+    :param parent_courts: List of parent court_ids.
+    :return: Set of all child court IDs.
+    """
+
+    cache = caches["db_cache"]
+    all_child_courts = set()
+    sorted_courts_hash = sha256("-".join(sorted(parent_courts)))
+    cache_key = f"child_courts:{sorted_courts_hash}"
+    cached_result = cache.get(cache_key)
+
+    if cached_result is not None:
+        return set(cached_result)
+
+    child_courts = search_model.Court.objects.filter(
+        parent_court_id__in=parent_courts
+    ).values_list("id", flat=True)
+    all_child_courts.update(child_courts)
+    if not all_child_courts:
+        return set()
+
+    final_results = all_child_courts.union(
+        lookup_child_courts(list(all_child_courts))
+    )
+    sorted_final_results = sorted(final_results)
+    one_month = 60 * 60 * 24 * 30
+    cache.set(cache_key, sorted_final_results, one_month)
+    return set(sorted_final_results)
+
+
+def get_child_court_ids_for_parents(selected_courts_string: str) -> str:
+    """
+    Retrieves and combines court IDs from both the given parents and their
+    child courts and removing duplicates.
+
+    :param selected_courts_string: The courts from the original user query.
+    :return: A string containing the unique combination of parent and child courts.
+    """
+    unique_courts = set(re.findall(r'"(.*?)"', selected_courts_string))
+    unique_courts.update(lookup_child_courts(list(unique_courts)))
+    courts = [f'"{c}"' for c in sorted(list(unique_courts))]
+    return " OR ".join(courts)
+
+
+def extend_child_courts(match: Match[str]) -> str:
+    """Extends court_id: queries with their child courts.
+
+    :param match: A regex match object containing the matched court_id: query.
+    :return: A string with the court_id query extended with child courts.
+    """
+
+    # Remove parentheses
+    cleaned_str = re.sub(r"[()]", "", match.group(1))
+    # Split the string by spaces to handle each court
+    courts = cleaned_str.split()
+    # Wrap each word in double quotes, except for 'OR'
+    formatted_courts = [
+        f'"{court}"' if court != "OR" else court for court in courts
+    ]
+    query_content = " ".join(formatted_courts)
+    return f"court_id:({get_child_court_ids_for_parents(query_content)})"
+
+
+def modify_court_id_queries(query_str: str) -> str:
+    """Modify 'court_id' values in a query string.
+
+    Parses valid 'court_id:' values in the string:
+    - "court_id:" followed by a single word without spaces:
+        court_id:cabc
+    - "court_id:" followed by a list of words separated by "OR", wrapped in
+    parentheses:
+        court_id:(cabc OR nysupctnewyork)
+
+    For each valid 'court_id' query, it retrieves the courts and extends them
+    with their child courts, then reinserts them back into the original
+    query string.
+
+    :param query_str: The query string to be parsed.
+    :return: The modified query string after extending with child courts, or
+    the original query string if no valid 'court_id:' queries are found.
+    """
+
+    pattern = r"court_id:(\w+|\(\w+(?:\sOR\s\w+)*\))"
+    modified_query = re.sub(pattern, extend_child_courts, query_str)
+    return modified_query
+
+
+def cleanup_main_query(query_string: str) -> str:
+    """Enhance the query string with some simple fixes
+
+     - Make any numerical queries into phrases (except dates)
+     - Add hyphens to district docket numbers that lack them
+     - Ignore tokens inside phrases
+     - Handle query punctuation correctly by mostly ignoring it
+     - Capture "court_id:court" queries, retrieve the child courts for each
+     court in the query, append them, and then add them back to the original
+     query.
+
+    :param query_string: The query string from the form
+    :return The enhanced query string
+    """
+    inside_a_phrase = False
+    cleaned_items = []
+    for item in re.split(r'([^a-zA-Z0-9_\-~":]+)', query_string):
+        if not item:
+            continue
+
+        if item.startswith('"') or item.endswith('"'):
+            # Start or end of a phrase; flip whether we're inside a phrase
+            inside_a_phrase = not inside_a_phrase
+            cleaned_items.append(item)
+            continue
+
+        if inside_a_phrase:
+            # Don't do anything if we're already in a phrase query
+            cleaned_items.append(item)
+            continue
+
+        not_numeric = not item[0].isdigit()
+        is_date_str = re.match(
+            "[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", item
+        )
+        if any([not_numeric, is_date_str]):
+            cleaned_items.append(item)
+            continue
+
+        m = re.match(r"(\d{2})(cv|cr|mj|po)(\d{1,5})", item)
+        if m:
+            # It's a docket number missing hyphens, e.g. 19cv38374
+            item = "-".join(m.groups())
+
+        # Some sort of number, probably a docket number or other type of number
+        # Wrap in quotes to do a phrase search
+        if is_docket_number(item) and "docketNumber:" not in query_string:
+            # Confirm is a docket number and clean it. So docket_numbers with
+            # suffixes can be searched: 1:21-bk-1234-ABC -> 1:21-bk-1234,
+            item = clean_docket_number(item)
+            # Adds a proximity query of ~1 to match
+            # numbers like 1:21-cv-1234 -> 21-1234
+            cleaned_items.append(f'docketNumber:"{item}"~1')
+        else:
+            cleaned_items.append(f'"{item}"')
+
+    cleaned_query = "".join(cleaned_items)
+    # If it's a court_id query, parse it, append the child courts, and then
+    # reintegrate them into the original query.
+    final_query = modify_court_id_queries(cleaned_query)
+    return final_query

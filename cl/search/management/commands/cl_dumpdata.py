@@ -9,7 +9,7 @@ import traceback
 from django.core import serializers
 from django.db.models.query_utils import Q
 
-from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.command_utils import VerboseCommand
 from cl.search.models import Docket, Opinion, OpinionCluster, OpinionsCited
 
 SUPPORTED_MODELS = (Docket, OpinionCluster, Opinion, OpinionsCited)
@@ -19,7 +19,7 @@ class Command(VerboseCommand):
     help = "CL-specific data dumper for making fixtures from production"
 
     def __init__(self, *args, **kwargs):
-        super(Command, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -33,7 +33,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         n = options["n"]
         fmt = options["format"]
 
@@ -67,7 +67,7 @@ class Command(VerboseCommand):
                 traceback.print_exc()
 
     @staticmethod
-    def _select_pks(sample_size):
+    def _select_pks(sample_size: int):
         """
         Select a random sampling of Opinions from the database.
 
@@ -96,7 +96,7 @@ class Command(VerboseCommand):
             format -- supported Django serizliation format ('json', 'xml'...)
             filter -- Django QuerySet filter
         """
-        if not model in SUPPORTED_MODELS:
+        if model not in SUPPORTED_MODELS:
             raise ModelTypeError(model)
 
         modelname = model.__name__

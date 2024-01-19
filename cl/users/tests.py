@@ -37,12 +37,7 @@ from timeout_decorator import timeout_decorator
 from cl.alerts.factories import DocketAlertFactory
 from cl.alerts.models import DocketAlert, DocketAlertEvent
 from cl.api.factories import WebhookEventFactory, WebhookFactory
-from cl.api.models import (
-    Webhook,
-    WebhookEvent,
-    WebhookEventType,
-    WebhookHistoryEvent,
-)
+from cl.api.models import Webhook, WebhookEvent, WebhookEventType
 from cl.favorites.factories import UserTagFactory
 from cl.favorites.models import (
     DocketTag,
@@ -135,7 +130,7 @@ class UserTest(LiveServerTestCase):
         self.assertRedirects(
             response,
             f"{reverse('register_success')}"
-            f"?next=/&email=pan%40courtlistener.com",
+            "?next=/&email=pan%40courtlistener.com",
         )
 
     async def test_redirects(self) -> None:
@@ -1343,7 +1338,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
             to=["success@simulator.amazonses.com"],
             bcc=["bcc_success@simulator.amazonses.com"],
             cc=["cc_success@simulator.amazonses.com"],
-            headers={f"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+            headers={"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
         )
         html = "<p>Body goes here</p>"
         msg.attach_alternative(html, "text/html")
@@ -1395,7 +1390,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
             to=["success@simulator.amazonses.com"],
             bcc=["bcc_success@simulator.amazonses.com"],
             cc=["cc_success@simulator.amazonses.com"],
-            headers={f"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+            headers={"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
         )
         msg.send()
 
@@ -1435,7 +1430,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
             to=["success@simulator.amazonses.com"],
             bcc=["bcc_success@simulator.amazonses.com"],
             cc=["cc_success@simulator.amazonses.com"],
-            headers={f"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+            headers={"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
         )
         msg.content_subtype = "html"
         msg.send()
@@ -1589,7 +1584,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
             bcc=["bcc_success@simulator.amazonses.com"],
             cc=["cc_success@simulator.amazonses.com"],
             reply_to=["reply_success@simulator.amazonses.com"],
-            headers={f"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+            headers={"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
         )
         html = "<p>Body goes here</p>"
         msg.attach_alternative(html, "text/html")
@@ -1955,7 +1950,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         returned True.
         """
         total = 0
-        for i in range(50):
+        for _ in range(50):
             val = self.call_bcc_random(message, bcc_rate, iterations)
             total = total + val
         average = total / 50
@@ -2154,7 +2149,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
 
         # Send an additional email that exceeds the quota.
         email = EmailMessage(
-            f"This is the subject 6",
+            "This is the subject 6",
             "Body goes here",
             "testing@courtlistener.com",
             ["bounce@simulator.amazonses.com"],
@@ -2194,7 +2189,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
 
         # Send an additional email that exceeds the quota.
         email = EmailMessage(
-            f"This is the subject 6",
+            "This is the subject 6",
             "Body goes here",
             "testing@courtlistener.com",
             ["bounce@simulator.amazonses.com"],
@@ -2300,7 +2295,7 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
 
         # Check if warning is logged
         mock_logging.warning.assert_called_with(
-            f"The message: 5e9b3e8e-93c8-497f-abd4-00f6ddd566f0 can't be "
+            "The message: 5e9b3e8e-93c8-497f-abd4-00f6ddd566f0 can't be "
             "enqueued because it doesn't exist anymore."
         )
 
@@ -2321,7 +2316,7 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
             bcc=["bcc_success@simulator.amazonses.com"],
             cc=["cc_success@simulator.amazonses.com"],
             reply_to=["reply_success@simulator.amazonses.com"],
-            headers={f"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+            headers={"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
         )
         html = "<p>Body goes here</p>"
         msg.attach_alternative(html, "text/html")

@@ -11,12 +11,7 @@ from django.core.mail import EmailMultiAlternatives, get_connection, send_mail
 from django.db import transaction
 from django.template import loader
 from django.utils.timezone import now
-from elasticsearch.exceptions import (
-    ConnectionError,
-    NotFoundError,
-    RequestError,
-    TransportError,
-)
+from elasticsearch.exceptions import ConnectionError
 
 from cl.alerts.models import Alert, DocketAlert, ScheduledAlertHit
 from cl.alerts.utils import (
@@ -34,16 +29,16 @@ from cl.celery_init import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.models import Note, UserTag
 from cl.lib.command_utils import logger
-from cl.lib.elasticsearch_utils import merge_highlights_into_result
+from cl.lib.elasticsearch_utils import (
+    fetch_all_search_results,
+    merge_highlights_into_result,
+)
 from cl.lib.redis_utils import create_redis_semaphore, delete_redis_semaphore
 from cl.lib.string_utils import trunc
 from cl.recap.constants import COURT_TIMEZONES
 from cl.search.constants import ALERTS_HL_TAG
-from cl.search.documents import ES_CHILD_ID, ESRECAPDocument, PositionDocument
 from cl.search.models import Docket, DocketEntry
 from cl.search.types import (
-    AudioPercolator,
-    ESDocumentClassType,
     PercolatorResponseType,
     SaveDocumentResponseType,
     SearchAlertHitType,
@@ -242,7 +237,7 @@ def make_alert_messages(
             body=txt_template.render(email_context),
             from_email=settings.DEFAULT_ALERTS_EMAIL,
             to=[recipient.email_address],
-            headers={f"X-Entity-Ref-ID": f"docket.alert:{d.pk}"},
+            headers={"X-Entity-Ref-ID": f"docket.alert:{d.pk}"},
         )
         html = html_template.render(email_context)
         msg.attach_alternative(html, "text/html")
@@ -414,7 +409,7 @@ def send_unsubscription_confirmation(
         body=txt_template.render(email_context),
         from_email=settings.DEFAULT_ALERTS_EMAIL,
         to=[email_address],
-        headers={f"X-Entity-Ref-ID": f"docket.alert:{docket.pk}"},
+        headers={"X-Entity-Ref-ID": f"docket.alert:{docket.pk}"},
     )
     html = html_template.render(email_context)
     msg.attach_alternative(html, "text/html")
@@ -432,7 +427,7 @@ def send_recap_email_user_not_found(recap_email_recipients: list[str]) -> None:
 
     template = loader.get_template("recap_email_user_not_found.txt")
     send_mail(
-        subject=f"@recap.email user not found",
+        subject="@recap.email user not found",
         message=template.render(
             {"recap_email_recipients": recap_email_recipients}
         ),
@@ -620,7 +615,7 @@ def send_or_schedule_alerts(
     is real-time, and if the user has donated enough. If so it sends an email
     alert and triggers webhooks.
     The process begins with an initial percolator query and continues to fetch
-    additional results in chunks determined by settings.PERCOLATOR_PAGE_SIZE,
+    additional results in chunks determined by settings.ELASTICSEARCH_PAGINATION_BATCH_SIZE,
     until all results are retrieved or no more results are available.
 
     :param self: The celery task
@@ -637,42 +632,22 @@ def send_or_schedule_alerts(
 
     document_id, document_content = response
     # Perform an initial percolator query and process its response.
-    alerts_triggered = []
     percolator_response = percolate_document(document_id, document_index)
     if not percolator_response:
         self.request.chain = None
         return None
 
-    alerts_triggered.extend(percolator_response.hits)
-
-    # Check if the query contains more documents than PERCOLATOR_PAGE_SIZE.
+    # Check if the query contains more documents than ELASTICSEARCH_PAGINATION_BATCH_SIZE.
     # If so, return additional results until there are not more.
     # Remember, percolator results are alerts, not documents, so what you're
     # paginating are user alerts that the document matched, not documents that
     # an alert matched. 🙃.
-    batch_size = settings.PERCOLATOR_PAGE_SIZE
-    total_hits = percolator_response.hits.total.value
-    results_returned = len(percolator_response.hits.hits)
-    if total_hits > batch_size:
-        documents_retrieved = results_returned
-        search_after = percolator_response.hits[-1].meta.sort
-        while True:
-            percolator_response = percolate_document(
-                document_id, document_index, search_after=search_after
-            )
-            if not percolator_response:
-                break
-
-            alerts_triggered.extend(percolator_response.hits)
-            results_returned = len(percolator_response.hits.hits)
-            documents_retrieved += results_returned
-            # Check if all results have been retrieved. If so break the loop
-            # Otherwise, increase search_after.
-            if documents_retrieved >= total_hits or results_returned == 0:
-                break
-            else:
-                search_after = percolator_response.hits[-1].meta.sort
-
+    alerts_triggered = fetch_all_search_results(
+        percolate_document,
+        percolator_response,
+        document_id,
+        document_index,
+    )
     return alerts_triggered, document_content
 
 
@@ -709,5 +684,5 @@ def es_save_alert_document(
     doc_indexed = es_document(meta={"id": alert.pk}, **doc).save(
         skip_empty=True, refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH
     )
-    if not doc_indexed in ["created", "updated"]:
+    if doc_indexed not in ["created", "updated"]:
         logger.warning(f"Error indexing Alert ID: {alert.pk}")

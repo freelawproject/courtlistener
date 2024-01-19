@@ -10,10 +10,10 @@
 {% block tab-content %}
 <div class="visible-md visible-lg col-md-1 col-lg-2"></div>
 <div class="col-xs-12 col-md-10 col-lg-8">
-    {% for party_dict in parties %}
-        <h3><i class="fa fa-user gray"></i>&nbsp;{{ party_dict.party_type_name }}</h3>
+    {% for party_type_name, party_type_objects in parties.items %}
+        <h3><i class="fa fa-user gray"></i>&nbsp;{{ party_type_name }}</h3>
         <hr class="top">
-        {% for party_type in party_dict.party_type_objects %}
+        {% for party_type in party_type_objects %}
             <div class="row v-offset-above-2">
                 {% with party=party_type.party %}
 

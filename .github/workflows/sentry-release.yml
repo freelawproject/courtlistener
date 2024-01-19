@@ -9,7 +9,7 @@ jobs:
   createSentryRelease:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Create a Sentry.io release
         uses: getsentry/action-release@v1.4.1
         env:

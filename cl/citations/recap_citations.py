@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 from django.db import transaction
 from eyecite import get_citations
@@ -9,7 +9,7 @@ from cl.citations.match_citations import (
     NO_MATCH_RESOURCE,
     do_resolve_citations,
 )
-from cl.lib.types import MatchedResourceType, SupportedCitationType
+from cl.citations.types import MatchedResourceType, SupportedCitationType
 from cl.search.models import OpinionsCitedByRECAPDocument, RECAPDocument
 
 

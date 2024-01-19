@@ -32,7 +32,7 @@ urlpatterns = [
         toggle_docket_alert,
         name="toggle_docket_alert",
     ),
-    path("alert/docket/new/", new_docket_alert, name="new_docket_alert"),
+    path("alert/docket/new/", new_docket_alert, name="new_docket_alert"),  # type: ignore[arg-type]
     re_path(
         "alert/docket/(unsubscribe|subscribe)/([a-zA-Z0-9]{40})/",
         toggle_docket_alert_confirmation,

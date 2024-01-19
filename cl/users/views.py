@@ -3,7 +3,6 @@ import logging
 from collections import OrderedDict
 from datetime import timedelta
 from email.utils import parseaddr
-from json import JSONDecodeError
 
 from django.conf import settings
 from django.contrib import messages
@@ -155,31 +154,29 @@ def view_notes(request: AuthenticatedHttpRequest) -> HttpResponse:
     docket_search_url = (
         "/?type=r&q=xxx AND docket_id:("
         + " OR ".join(
-            [str(a.instance.docket_id.pk) for a in note_forms["Dockets"]]
+            str(a.instance.docket_id.pk) for a in note_forms["Dockets"]
         )
         + ")"
     )
     oral_search_url = (
         "/?type=oa&q=xxx AND id:("
         + " OR ".join(
-            [str(a.instance.audio_id.pk) for a in note_forms["Oral Arguments"]]
+            str(a.instance.audio_id.pk) for a in note_forms["Oral Arguments"]
         )
         + ")"
     )
     recap_search_url = (
         "/?type=r&q=xxx AND docket_entry_id:("
         + " OR ".join(
-            [
-                str(a.instance.recap_doc_id.pk)
-                for a in note_forms["RECAP Documents"]
-            ]
+            str(a.instance.recap_doc_id.pk)
+            for a in note_forms["RECAP Documents"]
         )
         + ")"
     )
     opinion_search_url = (
         "/?q=xxx AND cluster_id:("
         + " OR ".join(
-            [str(a.instance.cluster_id.pk) for a in note_forms["Opinions"]]
+            str(a.instance.cluster_id.pk) for a in note_forms["Opinions"]
         )
         + ")&stat_Precedential=on&stat_Non-Precedential=on&stat_Errata=on&stat_Separate%20Opinion=on&stat_In-chambers=on&stat_Relating-to%20orders=on&stat_Unknown%20Status=on"
     )

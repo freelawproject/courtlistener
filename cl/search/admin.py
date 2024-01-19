@@ -214,14 +214,14 @@ class RECAPDocumentAdmin(CursorPaginatorAdmin):
             self.message_user(
                 request,
                 f"Failed to remove {len(ia_failures)} item(s) from Internet "
-                f"Archive. Please do so by hand. Sorry. The URL(s): "
+                "Archive. Please do so by hand. Sorry. The URL(s): "
                 f"{ia_failures}.",
             )
         else:
             self.message_user(
                 request,
                 f"Successfully sealed and removed {queryset.count()} "
-                f"document(s).",
+                "document(s).",
             )
 
 

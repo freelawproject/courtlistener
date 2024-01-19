@@ -11,7 +11,7 @@ from cl.alerts.models import Alert
 class CreateAlertForm(ModelForm):
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop("user", None)
-        super(CreateAlertForm, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def clean_rate(self):
         rate = self.cleaned_data["rate"]

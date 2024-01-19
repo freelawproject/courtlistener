@@ -10,7 +10,7 @@ from cl.audio.views import view_audio_file
 urlpatterns = [
     path(
         "audio/<int:pk>/<blank-slug:_>/",
-        view_audio_file,
+        view_audio_file,  # type: ignore[arg-type]
         name="view_audio_file",
     ),
     # Podcasts

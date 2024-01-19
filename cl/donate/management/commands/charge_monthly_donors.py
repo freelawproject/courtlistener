@@ -25,7 +25,7 @@ class Command(VerboseCommand):
     help = "Charges people that have monthly subscriptions."
 
     def handle(self, *args, **options) -> None:
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
 
         m_donations = MonthlyDonation.objects.filter(
             enabled=True,
@@ -57,7 +57,7 @@ class Command(VerboseCommand):
                     },
                     reverse("donate_complete"),
                 )
-            except PaymentFailureException as e:
+            except PaymentFailureException:
                 m_donation.failure_count += 1
                 m_donation.enabled = False
                 m_donation.save()

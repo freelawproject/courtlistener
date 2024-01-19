@@ -4,13 +4,16 @@ from typing import Tuple, TypedDict, cast
 from asgiref.sync import async_to_sync
 from django.contrib.auth.hashers import make_password
 from django.core.files.base import ContentFile
-from django.db.models import F
 from django.test import override_settings
 from django.urls import reverse
 from rest_framework.status import HTTP_200_OK, HTTP_503_SERVICE_UNAVAILABLE
 
 from cl.lib.date_time import midnight_pt
-from cl.lib.elasticsearch_utils import append_query_conjunctions
+from cl.lib.elasticsearch_utils import (
+    append_query_conjunctions,
+    replace_highlight,
+    select_unique_hl,
+)
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import (
@@ -967,14 +970,14 @@ class TestDateTimeHelpers(SimpleTestCase):
         self.assertEqual(pdt_utc_offset_hours, -7.0)
 
 
-class TestAppendQueryConjunctions(SimpleTestCase):
+class TestElasticsearchUtils(SimpleTestCase):
     def test_can_add_conjunction(self) -> None:
         tests = [
             {"input": "a", "output": "a"},
             {"input": "a b", "output": "a AND b"},
             {"input": "a b (c d)", "output": "a AND b AND (c d)"},
             {
-                "input": f"caseName:Loretta AND docketNumber:(ASBCA No. 59126)",
+                "input": "caseName:Loretta AND docketNumber:(ASBCA No. 59126)",
                 "output": "caseName:Loretta AND docketNumber:(ASBCA No. 59126)",
             },
             {
@@ -1014,3 +1017,120 @@ class TestAppendQueryConjunctions(SimpleTestCase):
         for test in tests:
             ouput_str = append_query_conjunctions(test["input"])
             self.assertEqual(ouput_str, test["output"])
+
+    def test_replace_highlight(self) -> None:
+        """Confirm that the replace_highlight helper properly replaces
+        highlighted terms, ensuring it can handle Unicode characters, such as
+        emojis.
+        """
+
+        tests = [
+            {
+                "cleaned_str": "MOTION for Leave to File Amicus Curiae Lorem",
+                "unique_hl_strings": ["Lorem", "Amicus", "Curiae"],
+                "output": "MOTION for Leave to File <mark>Amicus</mark> <mark>Curiae</mark> <mark>Lorem</mark>",
+            },
+            {
+                "cleaned_str": "Strickland v. Washington.",
+                "unique_hl_strings": ["Washington", "v.", "Curiae"],
+                "output": "Strickland <mark>v.</mark> <mark>Washington</mark>.",
+            },
+            {
+                "cleaned_str": "Strickland v. Washington Washington.",
+                "unique_hl_strings": ["Washington", "v."],
+                "output": "Strickland <mark>v.</mark> <mark>Washington</mark> <mark>Washington</mark>.",
+            },
+            {
+                "cleaned_str": "Code, § 1-815",
+                "unique_hl_strings": ["§", "1-815"],
+                "output": "Code, <mark>§</mark> <mark>1-815</mark>",
+            },
+            {
+                "cleaned_str": "Dr. Israel also demonstrated a misunderstanding",
+                "unique_hl_strings": ["Dr.", "a"],
+                "output": "<mark>Dr.</mark> Israel also demonstrated <mark>a</mark> misunderstanding",
+            },
+            {
+                "cleaned_str": "Friedland ⚖️ Deposit",
+                "unique_hl_strings": ["⚖️", "Deposit"],
+                "output": "Friedland <mark>⚖️</mark> <mark>Deposit</mark>",
+            },
+        ]
+
+        for test in tests:
+            output_str = replace_highlight(
+                test["cleaned_str"], test["unique_hl_strings"], "mark"  # type: ignore
+            )
+            self.assertEqual(output_str, test["output"])
+
+    def test_select_unique_hl(self) -> None:
+        """Confirm that select_unique_hl correctly identifies and returns the
+        longest string for highlighting purposes.
+        """
+        tests = [
+            {
+                "current_list": [
+                    "MOTION for Leave to File Amicus Curiae Lorem"
+                ],
+                "input_str": "MOTION for Leave to File",
+                "output": ["MOTION for Leave to File Amicus Curiae Lorem"],
+                "field": "description",
+            },
+            {
+                "current_list": [
+                    "MOTION for Leave to File Amicus Curiae Lorem"
+                ],
+                "input_str": "for Leave to File Amicus",
+                "output": ["MOTION for Leave to File Amicus Curiae Lorem"],
+                "field": "description",
+            },
+            {
+                "current_list": ["Leave to File Amicus"],
+                "input_str": "Leave to File Amicus Curiae Lorem",
+                "output": ["Leave to File Amicus Curiae Lorem"],
+                "field": "description",
+            },
+            {
+                "current_list": ["to File Amicus Curiae"],
+                "input_str": "Leave to File Amicus Curiae Lorem",
+                "output": ["Leave to File Amicus Curiae Lorem"],
+                "field": "description",
+            },
+            {
+                "current_list": [
+                    "to File Amicus Curiae Lorem pellentesque eu, elementum"
+                ],
+                "input_str": "Leave to File Amicus Curiae Lorem",
+                "output": [
+                    "to File Amicus Curiae Lorem pellentesque eu, elementum"
+                ],
+                "field": "description",
+            },
+            {
+                "current_list": ["22 AL 339"],
+                "input_str": "22 AL 1",
+                "output": ["22 AL 339", "22 AL 1"],
+                "field": "citation",
+            },
+            {
+                "current_list": ["22 AL 1"],
+                "input_str": "22 AL 339",
+                "output": ["22 AL 1", "22 AL 339"],
+                "field": "citation",
+            },
+            {
+                "current_list": ["22 AL 1", "22 AL 2"],
+                "input_str": "22 AL 2",
+                "output": ["22 AL 1", "22 AL 2"],
+                "field": "citation",
+            },
+        ]
+
+        for test in tests:
+            output_str = select_unique_hl(
+                test["current_list"],  # type: ignore
+                test["input_str"],  # type: ignore
+                test["field"],  # type: ignore
+            )
+            print("Output STR: ", output_str)
+            self.assertEqual(output_str, test["output"])

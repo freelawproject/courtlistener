@@ -1,7 +1,7 @@
 import argparse
 import os
 from datetime import date, timedelta
-from typing import Callable, Dict, List, Optional, Tuple, Union, cast
+from typing import Callable, Dict, List, Optional, Tuple, cast
 
 from celery.canvas import chain
 from django.conf import settings
@@ -118,7 +118,7 @@ def get_and_save_free_document_reports(options: OptionsType) -> None:
             if next_end_d is None:
                 logger.warning(
                     f"Free opinion scraper for {pacer_court_id} still "
-                    f"in progress."
+                    "in progress."
                 )
                 break
 
@@ -153,7 +153,7 @@ def get_and_save_free_document_reports(options: OptionsType) -> None:
                 else:
                     reason = "unknown reason."
                 logger.error(
-                    f"Failed to get free document references for "
+                    "Failed to get free document references for "
                     f"{pacer_court_id} between {next_start_d} and "
                     f"{next_end_d} due to {reason}."
                 )
@@ -299,7 +299,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args: List[str], **options: OptionsType) -> None:
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         action = cast(Callable, options["action"])
         action(options)
 

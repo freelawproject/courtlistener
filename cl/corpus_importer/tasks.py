@@ -602,7 +602,7 @@ def get_and_process_free_pdf(
             HTTP_504_GATEWAY_TIMEOUT,
         ]:
             msg = (
-                f"Ran into HTTPError while getting PDF: "
+                "Ran into HTTPError while getting PDF: "
                 f"{exc.response.status_code}."
             )
             if self.request.retries == self.max_retries:
@@ -613,7 +613,7 @@ def get_and_process_free_pdf(
             raise self.retry(exc=exc)
         elif exc.response:
             msg = (
-                f"Ran into unknown HTTPError while getting PDF: "
+                "Ran into unknown HTTPError while getting PDF: "
                 f"{exc.response.status_code}. Aborting."
             )
             logger.error(msg)
@@ -621,8 +621,8 @@ def get_and_process_free_pdf(
             return None
         else:
             msg = (
-                f"Ran into unknown HTTPError while getting PDF: "
-                f"{str(exc)}. Aborting."
+                "Ran into unknown HTTPError while getting PDF: "
+                f"{exc}. Aborting."
             )
             logger.error(msg)
             self.request.chain = None
@@ -836,7 +836,7 @@ def upload_to_ia(
             # Give up for now. It'll get done next time cron is run.
             return None
         raise self.retry(exc=exc)
-    except FileNotFoundError as exc:
+    except FileNotFoundError:
         # For some reason the file path is populated but no good. No point in
         # retrying. Just abort.
         return None

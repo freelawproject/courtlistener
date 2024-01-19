@@ -64,7 +64,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         self.debug = options["debug"]
         self.file = options["file"]
         self.skip_human_review = options["skip_human_review"]
@@ -280,9 +280,9 @@ class Command(VerboseCommand):
                 c for c in cluster.case_name if c not in exclude
             )
             case_name_words = case_name.lower().split()
-            cluster_words = set(
-                [word for word in case_name_words if word not in bad_words]
-            )
+            cluster_words = {
+                word for word in case_name_words if word not in bad_words
+            }
             if scdb_words.issuperset(cluster_words):
                 good_cluster_ids.append(cluster.pk)
 
