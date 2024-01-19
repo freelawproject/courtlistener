@@ -790,7 +790,7 @@ def bulk_indexing_generator(
     es_document: ESDocumentClassType,
     base_doc: dict[str, str],
     child_id_property: str | None = None,
-    instance_id: int | None = None,
+    parent_id: int | None = None,
 ) -> Generator[ESDictDocument, None, None]:
     """Generate ES documents for bulk indexing.
 
@@ -799,17 +799,26 @@ def bulk_indexing_generator(
     the instance model.
     :param child_id_property: Optional, the property to be used for generating
      ES child document ID.
-    :param instance_id: Optional, the parent instance ID used for routing in ES.
+    :param parent_id: Optional, the parent instance ID used for routing in ES.
     :param base_doc: The base ES document fields.
     :return: Yields ES child documents for bulk indexing.
     """
 
+    parent_id_mappings = {
+        "RECAP": lambda document: document.docket_entry.docket_id,
+        "OPINION": lambda document: document.cluster_id,
+    }
     for doc in docs_query_set.iterator():
         es_doc = es_document().prepare(doc)
         if child_id_property:
+            if not parent_id:
+                parent_id_lambda = parent_id_mappings.get(child_id_property)
+                if not parent_id_lambda:
+                    continue
+                parent_id = parent_id_lambda(doc)
             doc_params = {
                 "_id": getattr(ES_CHILD_ID(doc.pk), child_id_property),
-                "_routing": f"{instance_id}",
+                "_routing": f"{parent_id}",
             }
         else:
             doc_params = {
@@ -818,6 +827,69 @@ def bulk_indexing_generator(
         es_doc.update(base_doc)
         es_doc.update(doc_params)
         yield es_doc
+
+
+def index_documents_in_bulk_from_queryset(
+    docs_queryset: QuerySet,
+    es_document: ESDocumentClassType,
+    base_doc: dict[str, str],
+    child_id_property: str | None = None,
+    parent_instance_id: int | None = None,
+    testing_mode: bool = False,
+) -> list[str]:
+    """Index documents in bulk from a queryset into ES. Indexes documents
+    using either streaming or parallel bulk  operations, depending on the mode.
+
+    :param docs_queryset: A queryset containing the documents to index.
+    :param es_document: The Elasticsearch document class corresponding to
+    the instance model.
+    :param child_id_property: Optional, the property to be used for generating
+     ES child document ID.
+    :param base_doc: The base ES document fields.
+    :param parent_instance_id: Optional, the parent instance ID used for
+    routing in ES.
+    :param testing_mode: Set to True to use streaming bulk for test cases.
+    Default is False.
+    :return: A list of IDs of documents that failed to index.
+    """
+
+    client = connections.get_connection()
+    failed_child_docs = []
+
+    if testing_mode:
+        # Use streaming_bulk in TestCase based tests. Since parallel_bulk
+        # doesn't work on them.
+        for success, info in streaming_bulk(
+            client,
+            bulk_indexing_generator(
+                docs_queryset,
+                es_document,
+                base_doc,
+                child_id_property,
+                parent_instance_id,
+            ),
+            chunk_size=settings.ELASTICSEARCH_BULK_BATCH_SIZE,
+        ):
+            if not success:
+                failed_child_docs.append(info["index"]["_id"])
+    else:
+        # Use parallel_bulk in production and tests based on TransactionTestCase
+        for success, info in parallel_bulk(
+            client,
+            bulk_indexing_generator(
+                docs_queryset,
+                es_document,
+                base_doc,
+                child_id_property,
+                parent_instance_id,
+            ),
+            thread_count=settings.ELASTICSEARCH_PARALLEL_BULK_THREADS,
+            chunk_size=settings.ELASTICSEARCH_BULK_BATCH_SIZE,
+        ):
+            if not success:
+                failed_child_docs.append(info["index"]["_id"])
+
+    return failed_child_docs
 
 
 @app.task(
@@ -897,50 +969,150 @@ def index_parent_and_child_docs(
                 continue
 
         # Index child documents in bulk.
-        client = connections.get_connection()
         base_doc = {
             "_op_type": "index",
             "_index": parent_es_document._index._name,
         }
 
-        failed_child_docs = []
-        if testing_mode:
-            # Use streaming_bulk in TestCase based tests. Since parallel_bulk
-            # doesn't work on them.
-            for success, info in streaming_bulk(
-                client,
-                bulk_indexing_generator(
-                    child_docs,
-                    child_es_document,
-                    base_doc,
-                    child_id_property,
-                    instance_id,
-                ),
-                chunk_size=settings.ELASTICSEARCH_BULK_BATCH_SIZE,
-            ):
-                if not success:
-                    failed_child_docs.append(info["index"]["_id"])
-        else:
-            # Use parallel_bulk in production and tests based on TransactionTestCase
-            for success, info in parallel_bulk(
-                client,
-                bulk_indexing_generator(
-                    child_docs,
-                    child_es_document,
-                    base_doc,
-                    child_id_property,
-                    instance_id,
-                ),
-                thread_count=settings.ELASTICSEARCH_PARALLEL_BULK_THREADS,
-                chunk_size=settings.ELASTICSEARCH_BULK_BATCH_SIZE,
-            ):
-                if not success:
-                    failed_child_docs.append(info["index"]["_id"])
+        failed_child_docs = index_documents_in_bulk_from_queryset(
+            child_docs,
+            child_es_document,
+            base_doc,
+            child_id_property=child_id_property,
+            parent_instance_id=instance_id,
+            testing_mode=testing_mode,
+        )
 
         if failed_child_docs:
             logger.error(
                 f"Error indexing child documents from the {model_label}"
                 f" with ID: {instance_id}. Child IDs are: {failed_child_docs}"
+            )
+
+    if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
+        # Set auto-refresh, used for testing.
+        parent_es_document._index.refresh()
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(ConnectionError,),
+    max_retries=3,
+    interval_start=5,
+    ignore_result=True,
+)
+def index_parent_or_child_docs(
+    self: Task,
+    instance_ids: list[int],
+    search_type: str,
+    document_type: str | None,
+    testing_mode: bool = False,
+) -> None:
+    """Index parent or child documents in Elasticsearch.
+
+    :param self: The Celery task instance
+    :param instance_ids: The parent instance IDs to index.
+    :param search_type: The Search Type to index parent and child docs.
+    :param document_type: The document type to index, 'parent' or 'child' documents
+    :param testing_mode: If True uses streaming_bulk in TestCase based tests,
+    otherwise uses parallel_bulk in production.
+    :return: None
+    """
+
+    parent_instances = []
+    child_instances = []
+    parent_ids = []
+    match search_type:
+        case SEARCH_TYPES.RECAP:
+            parent_es_document = DocketDocument
+            child_es_document = ESRECAPDocument
+            child_id_property = "RECAP"
+            parent_model = Docket
+            if document_type == "parent":
+                parent_instances = Docket.objects.filter(pk__in=instance_ids)
+            elif document_type == "child":
+                child_instances = RECAPDocument.objects.filter(
+                    pk__in=instance_ids
+                )
+                parent_ids = RECAPDocument.objects.filter(
+                    pk__in=instance_ids
+                ).values_list("docket_entry__docket_id", flat=True)
+        case SEARCH_TYPES.OPINION:
+            parent_es_document = OpinionClusterDocument
+            child_es_document = OpinionDocument
+            child_id_property = "OPINION"
+            parent_model = OpinionCluster
+            if document_type == "parent":
+                parent_instances = OpinionCluster.objects.filter(
+                    pk__in=instance_ids
+                )
+            elif document_type == "child":
+                child_instances = Opinion.objects.filter(pk__in=instance_ids)
+        case _:
+            return
+
+    base_doc = {
+        "_op_type": "index",
+        "_index": parent_es_document._index._name,
+    }
+    if document_type == "child":
+        # Index only child documents.
+        parent_ids_to_index = []
+        for parent_id in parent_ids:
+            # Confirm all the child's parent documents are already indexed.
+            # Otherwise, index them.
+            if not parent_es_document.exists(parent_id):
+                parent_ids_to_index.append(parent_id)
+
+        missing_parent_instances = parent_model.objects.filter(
+            pk__in=parent_ids_to_index
+        )
+        if parent_ids_to_index:
+            # Index missing parent documents in bulk.
+            failed_docs = index_documents_in_bulk_from_queryset(
+                missing_parent_instances,
+                parent_es_document,
+                base_doc,
+                testing_mode=testing_mode,
+            )
+            if failed_docs:
+                model_label = (
+                    parent_es_document.Django.model.__name__.capitalize()
+                )
+                logger.error(
+                    f"Error indexing documents from {model_label}, "
+                    f"Failed Doc IDs are: {failed_docs}"
+                )
+
+        # Then index only child documents in bulk.
+        failed_docs = index_documents_in_bulk_from_queryset(
+            child_instances,
+            child_es_document,
+            base_doc,
+            child_id_property=child_id_property,
+            testing_mode=testing_mode,
+        )
+
+        if failed_docs:
+            model_label = child_es_document.Django.model.__name__.capitalize()
+            logger.error(
+                f"Error indexing documents from {model_label}, "
+                f"Failed Doc IDs are: {failed_docs}"
+            )
+
+    if document_type == "parent":
+        # Index only parent documents.
+        failed_docs = index_documents_in_bulk_from_queryset(
+            parent_instances,
+            parent_es_document,
+            base_doc,
+            testing_mode=testing_mode,
+        )
+        if failed_docs:
+            model_label = parent_es_document.Django.model.__name__.capitalize()
+            logger.error(
+                f"Error indexing documents from {model_label}, "
+                f"Failed Doc IDs are: {failed_docs}"
             )
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:

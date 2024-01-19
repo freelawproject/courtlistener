@@ -31,15 +31,15 @@ else:
     )
     ELASTICSEARCH_CLUSTERS_SIGNALS_ENABLED = env(
         "ELASTICSEARCH_CLUSTERS_SIGNALS_ENABLED",
-        default=False,
+        default=True,
     )
     ELASTICSEARCH_OPINIONS_SIGNALS_ENABLED = env(
         "ELASTICSEARCH_OPINIONS_SIGNALS_ENABLED",
-        default=False,
+        default=True,
     )
     ES_HIGHLIGHTER = env(
         "ES_HIGHLIGHTER",
-        default="plain",
+        default="fvh",
     )
 #
 # Connection settings
