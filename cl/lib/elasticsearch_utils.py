@@ -797,7 +797,9 @@ def build_es_base_query(
 
     :param search_query: The Elasticsearch search query object.
     :param cd: The cleaned data object containing the query and filters.
-    :return:The Elasticsearch search query object.
+    :return: A two-tuple, the Elasticsearch search query object and an ES
+    QueryString for child documents, or None if there is no need to query
+    child documents.
     """
 
     string_query = None
@@ -915,10 +917,35 @@ def build_es_base_query(
     return search_query, join_query
 
 
+def build_has_parent_parties_query(
+    parties_filters: list[QueryString],
+) -> QueryString:
+    """Build a has_parent query based on the parties fields (party and attorney).
+
+    This method is used where it is required to include all the RECAPDocuments
+    that belong to dockets matching a query that includes party filters.
+    It is applicable in scenarios such as the child document count query and
+    the RECAP Search feed.
+
+    :param parties_filters: A list of party and or attorney filters.
+    :return: An ES has parent query.
+    """
+
+    return Q(
+        "has_parent",
+        parent_type="docket",
+        query=Q(
+            "bool",
+            filter=parties_filters,
+        ),
+    )
+
+
 def build_child_docs_query(
     join_query: QueryString | None,
     cd: CleanData,
     exclude_docs_for_empty_field: str = "",
+    search_query: Search | None = None,
 ) -> QueryString:
     """Build a query for counting child documents in Elasticsearch, using the
     has_child query filters and queries. And append a match filter to only
@@ -928,25 +955,42 @@ def build_child_docs_query(
     :param cd: The user input CleanedData
     :param exclude_docs_for_empty_field: Field that should not be empty for a
     document to be included
+    :param search_query: The Elasticsearch search query object.
     :return: An Elasticsearch QueryString object
     """
 
     child_query_opinion = Q("match", cluster_child="opinion")
     child_query_recap = Q("match", docket_child="recap_document")
+    if search_query:
+        parties_filters = [
+            query
+            for query in search_query.query.filter
+            if isinstance(query, QueryString)
+            and query.fields[0] in ["party", "attorney"]
+        ]
+        parties_has_parent_query = build_has_parent_parties_query(
+            parties_filters
+        )
+
     if not join_query:
         # Match all query case.
         if not exclude_docs_for_empty_field:
             if cd["type"] == SEARCH_TYPES.OPINION:
                 return child_query_opinion
             else:
+                if parties_has_parent_query:
+                    return parties_has_parent_query
                 return child_query_recap
         else:
             filters = [
                 Q("exists", field=exclude_docs_for_empty_field),
             ]
+
             if cd["type"] == SEARCH_TYPES.OPINION:
                 filters.append(child_query_opinion)
             else:
+                if parties_has_parent_query:
+                    filters.append(parties_has_parent_query)
                 filters.append(child_query_recap)
             return Q("bool", filter=filters)
 
@@ -956,6 +1000,9 @@ def build_child_docs_query(
         if cd["type"] == SEARCH_TYPES.OPINION:
             existing_filter.append(child_query_opinion)
         else:
+            # RECAP case: Append has_parent query with parties filters.
+            if parties_has_parent_query:
+                existing_filter.append(parties_has_parent_query)
             existing_filter.append(child_query_recap)
         if exclude_docs_for_empty_field:
             existing_filter.append(
@@ -966,6 +1013,9 @@ def build_child_docs_query(
             query_dict["bool"]["filter"] = [child_query_opinion]
         else:
             query_dict["bool"]["filter"] = [child_query_recap]
+            # RECAP case: Append has_parent query with parties filters.
+            if parties_has_parent_query:
+                query_dict["bool"]["filter"].append(parties_has_parent_query)
         if exclude_docs_for_empty_field:
             query_dict["bool"]["filter"].append(
                 Q("exists", field=exclude_docs_for_empty_field)
@@ -1047,7 +1097,9 @@ def build_es_main_query(
                 total_child_results,
             )
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
-            child_docs_count_query = build_child_docs_query(join_query, cd)
+            child_docs_count_query = build_child_docs_query(
+                join_query, cd, search_query=search_query
+            )
             if child_docs_count_query:
                 # Get the total RECAP Documents count.
                 search_query_base = search_query_base.query(
@@ -1813,12 +1865,13 @@ def do_es_feed_query(
     """
     match cd["type"]:
         case SEARCH_TYPES.RECAP:
-            _, join_query = build_es_base_query(search_query, cd)
+            parent_query, join_query = build_es_base_query(search_query, cd)
             # Eliminate items that lack the ordering field.
             s = build_child_docs_query(
                 join_query,
                 cd,
                 exclude_docs_for_empty_field=exclude_docs_for_empty_field,
+                search_query=parent_query,
             )
             s = search_query.query(s)
         case _:
@@ -1861,7 +1914,6 @@ def build_full_join_es_queries(
     """
 
     q_should = []
-
     match cd["type"]:
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             child_type = "recap_document"
@@ -1890,6 +1942,8 @@ def build_full_join_es_queries(
 
         # Build parent filters.
         parent_filters = build_join_es_filters(cd)
+        # Copy the original parent_filters before appending child fields.
+        parent_filters_original = deepcopy(parent_filters)
         # If parent filters, extend into child_filters.
         if parent_filters:
             # Removes the party and attorney filter if they were provided because
@@ -1902,8 +1956,6 @@ def build_full_join_es_queries(
                     or query.fields[0] not in ["party", "attorney"]
                 ]
             )
-        if child_filters:
-            child_filters = reduce(operator.iand, child_filters)
         # Build the child query based on child_filters and child child_text_query
         match child_filters, child_text_query:
             case [], []:
@@ -1977,22 +2029,62 @@ def build_full_join_es_queries(
                 )
             case _, []:
                 parent_filters.extend([default_parent_filter])
-                p_filters = reduce(operator.iand, parent_filters)
                 parent_query = Q(
                     "bool",
-                    filter=p_filters,
+                    filter=parent_filters,
                 )
             case _, _:
                 parent_filters.extend([default_parent_filter])
-                p_filters = reduce(operator.iand, parent_filters)
                 parent_query = Q(
                     "bool",
-                    filter=p_filters,
+                    filter=parent_filters,
                     should=string_query,
                     minimum_should_match=1,
                 )
         if parent_query:
             q_should.append(parent_query)
+
+        # If party filters were provided, build an additional level of
+        # filtering in order to constrain the results. This ensures they only
+        # match dockets with child documents where the docket matches the party
+        # filters.
+        parties_filters = [
+            query
+            for query in parent_filters
+            if isinstance(query, QueryString)
+            and query.fields[0] in ["party", "attorney"]
+        ]
+        if parties_filters:
+            if join_query:
+                # If child query is available, build a clean has_child query.
+                has_child_parties = Q(
+                    "has_child",
+                    type=child_type,
+                    score_mode="max",
+                    query=join_query,
+                )
+
+            else:
+                # If no child query, build a match_all query for RECAPDocuments
+                _, query_hits_limit = get_child_top_hits_limit(cd, cd["type"])
+                has_child_parties = build_has_child_query(
+                    "match_all",
+                    "recap_document",
+                    query_hits_limit,
+                    SEARCH_RECAP_CHILD_HL_FIELDS,
+                    get_child_sorting_key(cd),
+                )
+            # Append either the has_child query or the match_all query to the
+            # original parent filters. Then, return it as a new level of filters.
+            parent_filters_original.append(has_child_parties)
+            return (
+                Q(
+                    "bool",
+                    should=q_should,
+                    filter=parent_filters_original,
+                ),
+                join_query,
+            )
 
     if not q_should:
         return [], join_query
