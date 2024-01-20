@@ -125,8 +125,8 @@ class BasicAPIPageTest(TestCase):
 
 
 class CoverageTests(IndexedSolrTestCase):
-    def test_coverage_data_view_provides_court_data(self) -> None:
-        response = coverage_data(HttpRequest(), "v2", "ca1")
+    async def test_coverage_data_view_provides_court_data(self) -> None:
+        response = await coverage_data(HttpRequest(), "v2", "ca1")
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response, JsonResponse)
         self.assertContains(response, "annual_counts")

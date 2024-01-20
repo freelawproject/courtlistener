@@ -1,5 +1,6 @@
 from django.http import HttpRequest, HttpResponse
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import aget_object_or_404
+from django.template.response import TemplateResponse
 
 from cl.disclosures.models import FinancialDisclosure
 from cl.disclosures.utils import make_disclosure_data
@@ -7,7 +8,7 @@ from cl.people_db.models import Person
 from cl.people_db.utils import make_title_str
 
 
-def financial_disclosures_home(request: HttpRequest) -> HttpResponse:
+async def financial_disclosures_home(request: HttpRequest) -> HttpResponse:
     """The home page for financial disclosures
 
     This page shows:
@@ -18,9 +19,9 @@ def financial_disclosures_home(request: HttpRequest) -> HttpResponse:
     people_with_disclosures = Person.objects.filter(
         financial_disclosures__isnull=False,
     ).distinct()
-    disclosure_count = FinancialDisclosure.objects.all().count()
-    people_count = people_with_disclosures.count()
-    return render(
+    disclosure_count = await FinancialDisclosure.objects.all().acount()
+    people_count = await people_with_disclosures.acount()
+    return TemplateResponse(
         request,
         "financial_disclosures_home.html",
         {
@@ -32,18 +33,18 @@ def financial_disclosures_home(request: HttpRequest) -> HttpResponse:
     )
 
 
-def financial_disclosures_viewer(
+async def financial_disclosures_viewer(
     request: HttpRequest,
     person_pk: int,
     pk: int,
     slug: str,
 ) -> HttpResponse:
     """Show the financial disclosures for a particular person"""
-    person = get_object_or_404(Person, pk=person_pk)
-    title = make_title_str(person)
-    years, ids = make_disclosure_data(person)
+    person = await aget_object_or_404(Person, pk=person_pk)
+    title = await make_title_str(person)
+    years, ids = await make_disclosure_data(person)
 
-    return render(
+    return TemplateResponse(
         request,
         "financial_disclosures_viewer.html",
         {

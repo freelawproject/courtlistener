@@ -1,3 +1,4 @@
+from asgiref.sync import async_to_sync
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Q
@@ -170,7 +171,7 @@ def ca_judges(request: AuthenticatedHttpRequest) -> HttpResponse:
             # The judge
             "judge_page": judge_page,
             "judge": judge,
-            "title": make_title_str(judge),
+            "title": async_to_sync(make_title_str)(judge),
             # Forms
             "person_form": person_form,
             "politics_formset": politics_formset,
