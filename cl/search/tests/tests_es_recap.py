@@ -123,6 +123,19 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "     Got: %s\n\n" % (field_name, expected_count, got),
         )
 
+    def _assert_results_header_content(self, html_content, expected_text):
+        h2_element = html.fromstring(html_content).xpath(
+            '//h2[@id="result-count"]'
+        )
+        h2_content = html.tostring(
+            h2_element[0], method="text", encoding="unicode"
+        ).replace("\xa0", " ")
+        self.assertIn(
+            expected_text,
+            h2_content.strip(),
+            msg=f"'{expected_text}' was not found within the results header.",
+        )
+
     def _test_main_es_query(self, cd, parent_expected, field_name):
         search_query = DocketDocument.search()
         (
@@ -795,7 +808,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         with self.captureOnCommitCallbacks(execute=True):
             docket = DocketFactory(
                 court=self.court,
-                case_name="Mott v. NYU Hospitals Center",
+                case_name="America v. Lorem",
                 date_filed=datetime.date(2015, 8, 16),
                 date_argued=datetime.date(2013, 5, 20),
                 docket_number="1:17-cv-04465",
@@ -807,6 +820,23 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 date_filed=datetime.date(2015, 8, 19),
                 description="COMPLAINT against NYU Hospitals Center, Tisch Hospital",
             )
+            firm = AttorneyOrganizationFactory(
+                name="Lawyers LLP", lookup_key="6201in816"
+            )
+            attorney = AttorneyFactory(
+                name="Harris Martin",
+                organizations=[firm],
+                docket=docket,
+            )
+            PartyTypeFactory.create(
+                party=PartyFactory(
+                    name="Bill Lorem",
+                    docket=docket,
+                    attorneys=[attorney],
+                ),
+                docket=docket,
+            )
+
             RECAPDocumentFactory(
                 docket_entry=e_1_d_1,
                 document_number="1",
@@ -826,24 +856,297 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 page_count=5,
             )
 
+            # Filter document withing docket and parties
+
+            # Filter two dockets with party and attorney
+
+            docket_2 = DocketFactory(
+                case_name="America v. Lorem",
+                court=self.court,
+            )
+            firm_2 = AttorneyOrganizationFactory(
+                name="America LLP", lookup_key="4421in816"
+            )
+            attorney_2 = AttorneyFactory(
+                name="Harris Martin",
+                organizations=[firm_2],
+                docket=docket_2,
+            )
+            PartyTypeFactory.create(
+                party=PartyFactory(
+                    name="Bill Lorem",
+                    docket=docket_2,
+                    attorneys=[attorney_2],
+                ),
+                docket=docket_2,
+            )
+            d3 = DocketEntryWithParentsFactory(
+                docket=docket_2,
+                entry_number=3,
+                date_filed=datetime.date(2015, 8, 19),
+                description="COMPLAINT against NYU Hospitals Center, Tisch Hospital",
+            )
+            RECAPDocumentFactory(
+                docket_entry=d3,
+                document_number="3",
+                is_available=True,
+                page_count=5,
+                description="Ut lobortis urna at condimentum lacinia",
+            )
+            docket_3 = DocketFactory(
+                case_name="America v. Lorem",
+                court=self.court,
+            )
+            firm_3 = AttorneyOrganizationFactory(
+                name="America LLP", lookup_key="4421in818"
+            )
+            attorney_3 = AttorneyFactory(
+                name="Harris Martin",
+                organizations=[firm_3],
+                docket=docket_3,
+            )
+            PartyTypeFactory.create(
+                party=PartyFactory(
+                    name="Other Party",
+                    docket=docket_3,
+                    attorneys=[attorney_3],
+                ),
+                docket=docket_3,
+            )
+            d4 = DocketEntryWithParentsFactory(
+                docket=docket_3,
+                entry_number=4,
+                date_filed=datetime.date(2015, 8, 19),
+                description="COMPLAINT against Lorem",
+            )
+            RECAPDocumentFactory(
+                docket_entry=d4,
+                document_number="4",
+                is_available=True,
+                page_count=5,
+                description="Ut lobortis urna at condimentum lacinia",
+            )
+            RECAPDocumentFactory(
+                docket_entry=d4,
+                document_number="5",
+                is_available=False,
+                page_count=5,
+                description="Suspendisse bibendum eu",
+            )
+
+        ## The party filter does not match any documents for the given search criteria
         params = {
             "type": SEARCH_TYPES.RECAP,
             "q": "hospital",
             "description": "center",
             "party_name": "Frank Paul Sabatini",
         }
+        # 0 result expected. The party_name doesn't match any case.
+        async_to_sync(self._test_article_count)(
+            params, 0, "text query + description + party_name"
+        )
 
-        # Frontend, 1 result expected since RECAPDocuments are grouped by case
+        ## The party filter can constrain the results returned, along with a parent filter.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "court": "canb ca1",
+            "party_name": "Defendant Jane Roe",
+        }
+        # 1 result expected. The party_name field match one case with two RDs.
         r = async_to_sync(self._test_article_count)(
-            params, 1, "text query + description + party_name"
+            params, 1, "court + party_name"
+        )
+        self._count_child_documents(
+            0, r.content.decode(), 2, "court + party_name"
+        )
+        self._assert_results_header_content(r.content.decode(), "1 Case")
+        self._assert_results_header_content(
+            r.content.decode(), "2 Docket Entries"
+        )
+
+        ## The party filter can constrain the results returned, along with
+        # case_name filter.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": '"America v. Lorem"',
+            "party_name": "Bill Lorem",
+        }
+        # 2 results expected. It matches 2 cases: one with 2 RDs and one with 1.
+        r = async_to_sync(self._test_article_count)(
+            params, 2, "case_name + party_name"
+        )
+        self._count_child_documents(
+            0, r.content.decode(), 2, "case_name + party_name"
+        )
+        self._count_child_documents(
+            1, r.content.decode(), 1, "case_name + party_name"
         )
         self.assertIn("Document #1", r.content.decode())
         self.assertIn("Document #2", r.content.decode())
+        self.assertIn("Document #3", r.content.decode())
+        self._assert_results_header_content(r.content.decode(), "2 Cases")
+        self._assert_results_header_content(
+            r.content.decode(), "3 Docket Entries"
+        )
+
+        ## The party filter can constrain the results returned, along with
+        # query string and child filters.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "against",
+            "description": "COMPLAINT",
+            "available_only": True,
+            "party_name": "Other Party",
+        }
+        # 1 result expected. It matches 1 case with one RD.
+        r = async_to_sync(self._test_article_count)(
+            params, 1, "text query + description + party_name"
+        )
+        self._count_child_documents(
+            0, r.content.decode(), 1, "text query + description + party_name"
+        )
+        self.assertIn("Document #4", r.content.decode())
+        self._assert_results_header_content(r.content.decode(), "1 Case")
+        self._assert_results_header_content(
+            r.content.decode(), "1 Docket Entry"
+        )
+
+        ## The attorney filter can constrain the results returned, along with
+        # child filters.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "party_name": "Bill Lorem",
+            "document_number": 3,
+        }
+        # 1 result expected. It matches only one RD.
+        r = async_to_sync(self._test_article_count)(
+            params, 1, "case_name + description + atty_name + document_number"
+        )
+        self._count_child_documents(
+            0,
+            r.content.decode(),
+            1,
+            "case_name + description + atty_name + document_number",
+        )
+        self.assertIn("Document #3", r.content.decode())
+        self._assert_results_header_content(r.content.decode(), "1 Case")
+        self._assert_results_header_content(
+            r.content.decode(), "1 Docket Entry"
+        )
+
+        ## The party_name and attorney filter can constrain the results
+        # returned, along with parent and child filters.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": '"America v. Lorem"',
+            "description": "COMPLAINT against",
+            "party_name": "Bill Lorem",
+            "atty_name": "Harris Martin",
+        }
+        # 2 results expected. Each of them with one RD.
+        r = async_to_sync(self._test_article_count)(
+            params, 2, "case_name + description + party_name + atty_name"
+        )
+        self._count_child_documents(
+            0,
+            r.content.decode(),
+            1,
+            "case_name + description + party_name + atty_name",
+        )
+        self._count_child_documents(
+            1,
+            r.content.decode(),
+            1,
+            "case_name + description + party_name + atty_name",
+        )
+        self.assertIn("Document #1", r.content.decode())
+        self.assertIn("Document #3", r.content.decode())
+        self._assert_results_header_content(r.content.decode(), "2 Cases")
+        self._assert_results_header_content(
+            r.content.decode(), "2 Docket Entries"
+        )
+
+        ## The party_name and attorney filter can constrain the results
+        # returned, along with string query, parent and child filters.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "America v. Lorem",
+            "party_name": "Bill Lorem",
+            "atty_name": "Harris Martin",
+        }
+        # It matches 2 cases: one with 2 RDs and one with 1.
+        r = async_to_sync(self._test_article_count)(
+            params, 2, "text query + party_name + attorney"
+        )
+        self._count_child_documents(
+            0, r.content.decode(), 2, "text query + party_name + attorney"
+        )
+        self._count_child_documents(
+            1, r.content.decode(), 1, "text query + party_name + attorney"
+        )
+        self.assertIn("Document #1", r.content.decode())
+        self.assertIn("Document #2", r.content.decode())
+        self.assertIn("Document #3", r.content.decode())
+        self._assert_results_header_content(r.content.decode(), "2 Cases")
+        self._assert_results_header_content(
+            r.content.decode(), "3 Docket Entries"
+        )
+
+        ## The attorney filter can constrain the results returned at document
+        # level, along with string query, parent and child filters.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Ut lobortis urna",
+            "case_name": '"America v. Lorem"',
+            "description": "COMPLAINT against",
+            "party_name": "Other Party",
+        }
+        # It matches 1 cases with one RD.
+        r = async_to_sync(self._test_article_count)(
+            params, 1, "text query + case_name + description + party_name"
+        )
+        self._count_child_documents(
+            0,
+            r.content.decode(),
+            1,
+            "text query + case_name + description + party_name",
+        )
+        self.assertIn("Document #4", r.content.decode())
+        self._assert_results_header_content(r.content.decode(), "1 Case")
+        self._assert_results_header_content(
+            r.content.decode(), "1 Docket Entry"
+        )
+
+        ## Only filter by party and attorney. It returns the cases that match
+        # the filters and all their RDs (max 5 per case).
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "party_name": "Bill Lorem",
+            "atty_name": "Harris Martin",
+        }
+        # It matches 2 cases: one with 2 RDs and one with 1.
+        r = async_to_sync(self._test_article_count)(
+            params, 2, "party_name + attorney"
+        )
+        self._count_child_documents(
+            0, r.content.decode(), 2, "party_name + attorney"
+        )
+        self._count_child_documents(
+            1, r.content.decode(), 1, "party_name + attorney"
+        )
+        self.assertIn("Document #1", r.content.decode())
+        self.assertIn("Document #2", r.content.decode())
+        self.assertIn("Document #3", r.content.decode())
+        self._assert_results_header_content(r.content.decode(), "2 Cases")
+        self._assert_results_header_content(
+            r.content.decode(), "3 Docket Entries"
+        )
 
         with self.captureOnCommitCallbacks(execute=True):
             e_2_d_1.delete()
             e_1_d_1.delete()
             docket.delete()
+            docket_2.delete()
 
     async def test_atty_name_filter(self) -> None:
         """Confirm atty_name filter works properly"""
@@ -2063,7 +2366,7 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                     nature_of_suit="440",
                 ),
                 date_filed=None,
-                description="MOTION for Leave to File Amicus Curiae Lorem",
+                description="MOTION for Leave to File Document attachment",
             )
             RECAPDocumentFactory(
                 docket_entry=de_1,
@@ -2191,6 +2494,82 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             ("//atom:entry/atom:summary", 3),
         )
 
+        for test, count in node_tests:
+            node_count = len(
+                xml_tree.xpath(test, namespaces=namespaces)
+            )  # type: ignore
+            self.assertEqual(
+                node_count,
+                count,
+                msg="Did not find %s node(s) with XPath query: %s. "
+                "Instead found: %s" % (count, test, node_count),
+            )
+
+        # Parent Filter + Child Filter + Query string + Parties
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "court": self.court.pk,
+            "document_number": 1,
+            "q": "Document attachment",
+            "party_name": "Defendant Jane Roe",
+        }
+        response = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(
+            200, response.status_code, msg="Did not get a 200 OK status code."
+        )
+        xml_tree = etree.fromstring(response.content)
+        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
+        node_tests = (
+            ("//atom:feed/atom:title", 1),
+            ("//atom:feed/atom:link", 2),
+            ("//atom:entry", 1),
+            ("//atom:entry/atom:title", 1),
+            ("//atom:entry/atom:link", 1),
+            ("//atom:entry/atom:published", 1),
+            ("//atom:entry/atom:author/atom:name", 1),
+            ("//atom:entry/atom:id", 1),
+            ("//atom:entry/atom:summary", 1),
+        )
+        for test, count in node_tests:
+            node_count = len(
+                xml_tree.xpath(test, namespaces=namespaces)
+            )  # type: ignore
+            self.assertEqual(
+                node_count,
+                count,
+                msg="Did not find %s node(s) with XPath query: %s. "
+                "Instead found: %s" % (count, test, node_count),
+            )
+
+        # Only party filters. Return all the RECAPDocuments where parent dockets
+        # match the party filters.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "party_name": "Defendant Jane Roe",
+        }
+        response = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(
+            200, response.status_code, msg="Did not get a 200 OK status code."
+        )
+        xml_tree = etree.fromstring(response.content)
+        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
+        node_tests = (
+            ("//atom:feed/atom:title", 1),
+            ("//atom:feed/atom:link", 2),
+            ("//atom:entry", 2),
+            ("//atom:entry/atom:title", 2),
+            ("//atom:entry/atom:link", 2),
+            ("//atom:entry/atom:published", 2),
+            ("//atom:entry/atom:author/atom:name", 2),
+            ("//atom:entry/atom:id", 2),
+            ("//atom:entry/atom:summary", 2),
+        )
         for test, count in node_tests:
             node_count = len(
                 xml_tree.xpath(test, namespaces=namespaces)
