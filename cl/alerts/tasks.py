@@ -4,6 +4,7 @@ from datetime import datetime
 from importlib import import_module
 from typing import Dict, List, Tuple, Union, cast
 
+from asgiref.sync import async_to_sync
 from celery import Task
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -342,7 +343,7 @@ def send_alert_and_webhook(
     connection.send_messages(messages)
 
     # Work completed. Tally, log, and clean up
-    tally_stat("alerts.docket.alerts.sent", inc=len(messages))
+    async_to_sync(tally_stat)("alerts.docket.alerts.sent", inc=len(messages))
     DocketAlert.objects.filter(docket=d).update(date_last_hit=now())
 
     # Send docket entries to webhook
@@ -594,7 +595,9 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
             date_last_hit=now()
         )
         alerts_sent = len(rt_alerts_to_send)
-        tally_stat(f"alerts.sent.{Alert.REAL_TIME}", inc=alerts_sent)
+        async_to_sync(tally_stat)(
+            f"alerts.sent.{Alert.REAL_TIME}", inc=alerts_sent
+        )
         logger.info(f"Sent {alerts_sent} {Alert.REAL_TIME} email alerts.")
 
 

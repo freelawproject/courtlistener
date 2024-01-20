@@ -837,9 +837,9 @@ async def add_docket_entries(
             rds_updated.append(rd)
         except RECAPDocument.DoesNotExist:
             try:
+                params["pacer_doc_id"] = docket_entry["pacer_doc_id"]
                 rd = await RECAPDocument.objects.acreate(
                     document_number=docket_entry["document_number"] or "",
-                    pacer_doc_id=docket_entry["pacer_doc_id"],
                     is_available=False,
                     **params,
                 )

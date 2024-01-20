@@ -2587,13 +2587,12 @@ class IndexDocketRECAPDocumentsCommandTest(
 ):
     """cl_index_parent_and_child_docs command tests for Elasticsearch"""
 
-    @classmethod
-    def setUpClass(cls):
-        cls.rebuild_index("search.Docket")
-        cls.court = CourtFactory(id="canb", jurisdiction="FB")
-        cls.de = DocketEntryWithParentsFactory(
+    def setUp(self):
+        self.rebuild_index("search.Docket")
+        self.court = CourtFactory(id="canb", jurisdiction="FB")
+        self.de = DocketEntryWithParentsFactory(
             docket=DocketFactory(
-                court=cls.court,
+                court=self.court,
                 date_filed=datetime.date(2015, 8, 16),
                 docket_number="1:21-bk-1234",
                 nature_of_suit="440",
@@ -2601,35 +2600,35 @@ class IndexDocketRECAPDocumentsCommandTest(
             entry_number=1,
             date_filed=datetime.date(2015, 8, 19),
         )
-        cls.rd = RECAPDocumentFactory(
-            docket_entry=cls.de,
+        self.rd = RECAPDocumentFactory(
+            docket_entry=self.de,
             document_number="1",
         )
-        cls.rd_att = RECAPDocumentFactory(
-            docket_entry=cls.de,
+        self.rd_att = RECAPDocumentFactory(
+            docket_entry=self.de,
             document_number="1",
             attachment_number=2,
         )
-        cls.de_1 = DocketEntryWithParentsFactory(
+        self.de_1 = DocketEntryWithParentsFactory(
             docket=DocketFactory(
-                court=cls.court,
+                court=self.court,
                 date_filed=datetime.date(2016, 8, 16),
                 date_argued=datetime.date(2012, 6, 23),
             ),
             entry_number=None,
             date_filed=datetime.date(2014, 7, 19),
         )
-        cls.rd_2 = RECAPDocumentFactory(
-            docket_entry=cls.de_1,
+        self.rd_2 = RECAPDocumentFactory(
+            docket_entry=self.de_1,
             document_number="",
         )
-        cls.delete_index("search.Docket")
-        cls.create_index("search.Docket")
+        self.delete_index("search.Docket")
+        self.create_index("search.Docket")
 
-        cls.r = make_redis_interface("CACHE")
-        keys = cls.r.keys(compose_redis_key(SEARCH_TYPES.RECAP))
+        self.r = make_redis_interface("CACHE")
+        keys = self.r.keys(compose_redis_key(SEARCH_TYPES.RECAP))
         if keys:
-            cls.r.delete(*keys)
+            self.r.delete(*keys)
 
     def test_cl_index_parent_and_child_docs_command(self):
         """Confirm the command can properly index Dockets and their
@@ -2749,6 +2748,121 @@ class IndexDocketRECAPDocumentsCommandTest(
         d_2.delete()
         d_3.delete()
         d_4.delete()
+
+    def test_cl_index_only_parent_or_child_documents_command(self):
+        """Confirm the command can properly index only RECAPDocuments or only
+        Dockets into ES."""
+
+        s = DocketDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0)
+        # Call cl_index_parent_and_child_docs command for dockets.
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            queue="celery",
+            pk_offset=0,
+            document_type="parent",
+        )
+
+        # Two dockets should be indexed.
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="docket"))
+        self.assertEqual(s.count(), 2, msg="Wrong number of Dockets returned.")
+
+        # No RECAPDocuments should be indexed.
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="recap_document"))
+        self.assertEqual(
+            s.count(), 0, msg="Wrong number of RECAPDocuments returned."
+        )
+
+        # Now index only RECAPDocuments.
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            queue="celery",
+            pk_offset=0,
+            document_type="child",
+        )
+        s = DocketDocument.search()
+        # 3 RECAPDocuments should be indexed.
+        s = s.query(Q("match", docket_child="recap_document"))
+        self.assertEqual(
+            s.count(), 3, msg="Wrong number of RECAPDocuments returned."
+        )
+
+        # RECAPDocuments are indexed.
+        rds_pks = [
+            self.rd.pk,
+            self.rd_att.pk,
+            self.rd_2.pk,
+        ]
+        for rd_pk in rds_pks:
+            self.assertTrue(
+                ESRECAPDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP)
+            )
+
+        # Confirm parent-child relation.
+        s = DocketDocument.search()
+        s = s.query("parent_id", type="recap_document", id=self.de.docket.pk)
+        self.assertEqual(
+            s.count(), 2, msg="Wrong number of RECAPDocuments returned."
+        )
+        s = DocketDocument.search()
+        s = s.query("parent_id", type="recap_document", id=self.de_1.docket.pk)
+        self.assertEqual(
+            s.count(), 1, msg="Wrong number of RECAPDocuments returned."
+        )
+
+    def test_index_missing_parent_docs_when_indexing_only_child_docs(self):
+        """Confirm the command can properly index missing dockets when indexing
+        only RECAPDocuments.
+        """
+
+        s = DocketDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0)
+        # Call cl_index_parent_and_child_docs command for RECAPDocuments.
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            queue="celery",
+            pk_offset=0,
+            document_type="child",
+        )
+
+        # Dockets and the RECAPDocuments should be indexed.
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="docket"))
+        self.assertEqual(s.count(), 2, msg="Wrong number of Dockets returned.")
+
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="recap_document"))
+        self.assertEqual(
+            s.count(), 3, msg="Wrong number of RECAPDocuments returned."
+        )
+
+        # RECAPDocuments are indexed.
+        rds_pks = [
+            self.rd.pk,
+            self.rd_att.pk,
+            self.rd_2.pk,
+        ]
+        for rd_pk in rds_pks:
+            self.assertTrue(
+                ESRECAPDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP)
+            )
+
+        # Confirm parent-child relation.
+        s = DocketDocument.search()
+        s = s.query("parent_id", type="recap_document", id=self.de.docket.pk)
+        self.assertEqual(
+            s.count(), 2, msg="Wrong number of RECAPDocuments returned."
+        )
+        s = DocketDocument.search()
+        s = s.query("parent_id", type="recap_document", id=self.de_1.docket.pk)
+        self.assertEqual(
+            s.count(), 1, msg="Wrong number of RECAPDocuments returned."
+        )
 
 
 class RECAPIndexingTest(
