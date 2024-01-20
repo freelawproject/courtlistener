@@ -1914,7 +1914,6 @@ def build_full_join_es_queries(
     """
 
     q_should = []
-    parties_filters = []
     match cd["type"]:
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             child_type = "recap_document"
@@ -1957,8 +1956,6 @@ def build_full_join_es_queries(
                     or query.fields[0] not in ["party", "attorney"]
                 ]
             )
-        if child_filters:
-            child_filters = reduce(operator.iand, child_filters)
         # Build the child query based on child_filters and child child_text_query
         match child_filters, child_text_query:
             case [], []:
@@ -2032,17 +2029,15 @@ def build_full_join_es_queries(
                 )
             case _, []:
                 parent_filters.extend([default_parent_filter])
-                p_filters = reduce(operator.iand, parent_filters)
                 parent_query = Q(
                     "bool",
-                    filter=p_filters,
+                    filter=parent_filters,
                 )
             case _, _:
                 parent_filters.extend([default_parent_filter])
-                p_filters = reduce(operator.iand, parent_filters)
                 parent_query = Q(
                     "bool",
-                    filter=p_filters,
+                    filter=parent_filters,
                     should=string_query,
                     minimum_should_match=1,
                 )
