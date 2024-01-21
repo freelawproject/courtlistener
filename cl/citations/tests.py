@@ -12,8 +12,8 @@ from eyecite.test_factories import (
     id_citation,
     journal_citation,
     law_citation,
-    nonopinion_citation,
     supra_citation,
+    unknown_citation,
 )
 from factory import RelatedFactory
 from lxml import etree
@@ -46,7 +46,12 @@ from cl.citations.tasks import (
     find_citations_and_parentheticals_for_opinion_by_pks,
     store_recap_citations,
 )
-from cl.lib.test_helpers import IndexedSolrTestCase
+from cl.lib.test_helpers import (
+    CourtTestCase,
+    IndexedSolrTestCase,
+    PeopleTestCase,
+    SearchTestCase,
+)
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -57,6 +62,7 @@ from cl.search.factories import (
     RECAPDocumentFactory,
 )
 from cl.search.models import (
+    SEARCH_TYPES,
     Opinion,
     OpinionCluster,
     OpinionsCited,
@@ -65,7 +71,7 @@ from cl.search.models import (
     ParentheticalGroup,
     RECAPDocument,
 )
-from cl.tests.cases import SimpleTestCase
+from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
 
 
 class CitationTextTest(SimpleTestCase):
@@ -312,10 +318,12 @@ class CitationTextTest(SimpleTestCase):
                 )
 
 
-class RECAPDocumentObjectTest(IndexedSolrTestCase):
+class RECAPDocumentObjectTest(ESIndexTestCase, TestCase):
     # pass
     @classmethod
     def setUpTestData(cls):
+        cls.rebuild_index("search.OpinionCluster")
+        super().setUpTestData()
         cls.recap_doc = RECAPDocumentFactory.create(
             plain_text="In Fisher v. SD Protection Inc., 948 F.3d 593 (2d Cir. 2020), the Second Circuit held that in the context of settlement of FLSA and NYLL cases, which must be approved by the trial court in accordance with Cheeks v. Freeport Pancake House, Inc., 796 F.3d 199 (2d Cir. 2015), the district court abused its discretion in limiting the amount of recoverable fees to a percentage of the recovery by the successful plaintiffs. But also: sdjnfdsjnk. Fisher, 948 F.3d at 597.",
             ocr_status=RECAPDocument.OCR_UNNECESSARY,
@@ -347,8 +355,13 @@ class RECAPDocumentObjectTest(IndexedSolrTestCase):
                 date_filed=date(2015, 1, 1),
             ),
         )
-
-        super().setUpTestData()
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
 
     def test_opinionscited_recap_creation(self):
         """
@@ -379,13 +392,15 @@ class RECAPDocumentObjectTest(IndexedSolrTestCase):
                 self.assertEqual(citation_obj.depth, depth)
 
 
-class CitationObjectTest(IndexedSolrTestCase):
+class CitationObjectTest(ESIndexTestCase, TestCase):
     fixtures: List = []
 
     @classmethod
     def setUpTestData(cls) -> None:
+        cls.rebuild_index("search.OpinionCluster")
+        super().setUpTestData()
         # Courts
-        court_scotus = CourtFactory(id="scotus")
+        cls.court_scotus = CourtFactory(id="scotus")
         court_ca1 = CourtFactory(id="ca1")
 
         # Citation 1
@@ -394,7 +409,7 @@ class CitationObjectTest(IndexedSolrTestCase):
             reporter="U.S.",
             page="1",
             cluster=OpinionClusterFactoryWithChildrenAndParents(
-                docket=DocketFactory(court=court_scotus),
+                docket=DocketFactory(court=cls.court_scotus),
                 case_name="Foo v. Bar",
                 date_filed=date(
                     2000, 1, 1
@@ -426,7 +441,7 @@ class CitationObjectTest(IndexedSolrTestCase):
             reporter="U.S.",
             page="50",
             cluster=OpinionClusterFactoryWithChildrenAndParents(
-                docket=DocketFactory(court=court_scotus),
+                docket=DocketFactory(court=cls.court_scotus),
                 case_name="Lorem v. Ipsum",
             ),
         )
@@ -437,7 +452,7 @@ class CitationObjectTest(IndexedSolrTestCase):
             reporter="U.S.",
             page="999",
             cluster=OpinionClusterFactoryWithChildrenAndParents(
-                docket=DocketFactory(court=court_scotus),
+                docket=DocketFactory(court=cls.court_scotus),
                 case_name="Abcdef v. Ipsum",
                 sub_opinions=RelatedFactory(
                     OpinionWithChildrenFactory,
@@ -453,15 +468,95 @@ class CitationObjectTest(IndexedSolrTestCase):
             reporter="U.S.",
             page="123",
             cluster=OpinionClusterFactoryWithChildrenAndParents(
-                docket=DocketFactory(court=court_scotus),
+                docket=DocketFactory(court=cls.court_scotus),
                 case_name="Bush v. Gore",
                 date_filed=date.today(),  # Must be later than any cited opinion
                 sub_opinions=RelatedFactory(
                     OpinionWithChildrenFactory,
                     factory_related_name="cluster",
-                    plain_text="Blah blah Foo v. Bar 1 U.S. 1, 77 blah blah. Asdf asdf Qwerty v. Uiop 2 F.3d 2, 555. Also check out Foo, 1 U.S. at 99 (holding that crime is illegal). Then let's cite Qwerty, supra, at 666 (noting that CourtListener is a great tool and everyone should use it). See also Foo, supra, at 101 as well. Another full citation is Lorem v. Ipsum 1 U. S. 50. Quoting Qwerty, “something something”, 2 F.3d 2, at 59. This case is similar to Fake, supra, and Qwerty supra, as well. This should resolve to the foregoing. Ibid. This should also convert appropriately, see Id., at 57. This should fail to resolve because the reporter and citation is ambiguous, 1 U. S., at 51. However, this should succeed, Lorem, 1 U.S., at 52.",
+                    plain_text="America v. Maxwell, Bush v. John, Blah blah Foo v. Bar 1 U.S. 1, 77 blah blah. Asdf asdf Qwerty v. Uiop 2 F.3d 2, 555. Also check out Foo, 1 U.S. at 99 (holding that crime is illegal). Then let's cite Qwerty, supra, at 666 (noting that CourtListener is a great tool and everyone should use it). See also Foo, supra, at 101 as well. Another full citation is Lorem v. Ipsum 1 U. S. 50. Quoting Qwerty, “something something”, 2 F.3d 2, at 59. This case is similar to Fake, supra, and Qwerty supra, as well. This should resolve to the foregoing. Ibid. This should also convert appropriately, see Id., at 57. This should fail to resolve because the reporter and citation is ambiguous, 1 U. S., at 51. However, this should succeed, Lorem, 1 U.S., at 52.",
                 ),
             ),
+        )
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
+
+    def test_case_name_and_reverse_match_query(self) -> None:
+        """Test refining match by case_name_query and reverse_match if full
+        citations results are > 1
+        """
+        # Create 3 citations that match full_citation
+        for i in range(3):
+            with self.captureOnCommitCallbacks(execute=True):
+                citation = CitationWithParentsFactory.create(
+                    volume="3",
+                    reporter="U.S.",
+                    page="888",
+                    cluster=OpinionClusterFactoryWithChildrenAndParents(
+                        docket=DocketFactory(court=self.court_scotus),
+                        case_name="Obama v. Clinton",
+                        date_filed=date.today(),
+                        # Must be later than any cited opinion
+                        sub_opinions=RelatedFactory(
+                            OpinionWithChildrenFactory,
+                            factory_related_name="cluster",
+                            plain_text="Blah blah Foo v. Bar 1 U.S. 1, 77 blah blah.",
+                        ),
+                    ),
+                )
+
+        # Create the expected match Citation.
+        with self.captureOnCommitCallbacks(execute=True):
+            match_citation = CitationWithParentsFactory.create(
+                volume="3",
+                reporter="U.S.",
+                page="888",
+                cluster=OpinionClusterFactoryWithChildrenAndParents(
+                    docket=DocketFactory(court=self.court_scotus),
+                    case_name="America v. Maxwell",
+                    date_filed=date.today(),
+                    # Must be later than any cited opinion
+                    sub_opinions=RelatedFactory(
+                        OpinionWithChildrenFactory,
+                        factory_related_name="cluster",
+                        plain_text="Blah blah Foo v. Bar 1 U.S. 1, 77 blah blah.",
+                    ),
+                ),
+            )
+
+        full_citation = case_citation(
+            volume="3",
+            reporter="U.S.",
+            page="888",
+            index=1,
+            reporter_found="U.S.",
+            metadata={
+                "court": "scotus",
+                "defendant": "Maxwell",
+                "plaintiff": "Brown",
+            },
+        )
+        citing_opinion = Opinion.objects.get(
+            cluster__pk=self.citation5.cluster_id
+        )
+        match_opinion = Opinion.objects.get(
+            cluster__pk=match_citation.cluster_id
+        )
+
+        # Compare expected_resolutions.
+        citation_resolutions = do_resolve_citations(
+            [full_citation], citing_opinion
+        )
+        expected_resolutions = {match_opinion: [full_citation]}
+        self.assertEqual(
+            citation_resolutions,
+            expected_resolutions,
+            msg=f"\n{citation_resolutions}\n\n    !=\n\n{expected_resolutions}",
         )
 
     def test_citation_resolution(self) -> None:
@@ -574,7 +669,7 @@ class CitationObjectTest(IndexedSolrTestCase):
         )
 
         id = id_citation(index=1)
-        non = nonopinion_citation(index=1, source_text="§99")
+        unknown = unknown_citation(index=1, source_text="§99")
         journal = journal_citation(reporter="Minn. L. Rev.")
         law = law_citation(
             source_text="1 Stat. 2",
@@ -653,10 +748,10 @@ class CitationObjectTest(IndexedSolrTestCase):
                 {opinion1: [full1], NO_MATCH_RESOURCE: [full_na, id]},
             ),
             # Test resolving an Id. citation when the previous citation is to a
-            # non-opinion document. Since we can't match those documents (yet),
+            # unknown document. Since we can't match those documents (yet),
             # we expect the Id. citation to also not be matched.
             (
-                [full1, non, id],
+                [full1, unknown, id],
                 {opinion1: [full1]},
             ),
             # Test resolving an Id. citation when it is the first citation
@@ -685,7 +780,6 @@ class CitationObjectTest(IndexedSolrTestCase):
                 citation_resolutions = do_resolve_citations(
                     citations, citing_opinion
                 )
-
                 self.assertEqual(
                     citation_resolutions,
                     expected_resolutions,
@@ -802,7 +896,21 @@ class CitationObjectTest(IndexedSolrTestCase):
         )
 
 
-class CitationFeedTest(IndexedSolrTestCase):
+class CitationFeedTest(
+    ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
+):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.rebuild_index("search.OpinionCluster")
+        super().setUpTestData()
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
+
     def _tree_has_content(self, content, expected_count):
         xml_tree = etree.fromstring(content)
         count = len(
@@ -844,13 +952,15 @@ class CitationFeedTest(IndexedSolrTestCase):
         self._tree_has_content(r.content, expected_count)
 
 
-class CitationCommandTest(IndexedSolrTestCase):
+class CitationCommandTest(ESIndexTestCase, TestCase):
     """Test a variety of the ways that find_citations can be called."""
 
     fixtures: List = []
 
     @classmethod
     def setUpTestData(cls) -> None:
+        cls.rebuild_index("search.OpinionCluster")
+        super().setUpTestData()
         # Court
         court_scotus = CourtFactory(id="scotus")
 
@@ -892,6 +1002,14 @@ class CitationCommandTest(IndexedSolrTestCase):
         cls.opinion_id3 = Opinion.objects.get(
             cluster__pk=cls.citation3.cluster_id
         ).pk
+
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
 
     def call_command_and_test_it(self, args):
         call_command("find_citations", *args)

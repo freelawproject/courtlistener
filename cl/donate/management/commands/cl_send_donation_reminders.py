@@ -20,7 +20,7 @@ class Command(VerboseCommand):
     )
 
     def __init__(self, *args, **kwargs):
-        super(Command, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.new_doc_count = 0
         self.court_count = 0
         self.alerts_sent_count = 0
@@ -67,7 +67,7 @@ class Command(VerboseCommand):
         msg.send(fail_silently=False)
 
     def handle(self, *args, **options) -> None:
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         self.verbosity = options.get("verbosity", 1)
         self.gather_stats_and_users()
         for user in self.users:

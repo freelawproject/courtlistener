@@ -24,7 +24,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         self.stdout.write("#\n" * 25)
         if options["simulate"]:
             self.stdout.write("# SIMULATE MODE IS ON.  #\n")

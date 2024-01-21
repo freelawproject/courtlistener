@@ -21,7 +21,7 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         "hcaptcha": "xxx",
     }
 
-    def test_multiple_requests_request(self, mock: MagicMock) -> None:
+    async def test_multiple_requests_request(self, mock: MagicMock) -> None:
         """Is state persisted in the contact form?
 
         The contact form is abstracted in a way that it can have peculiar
@@ -29,33 +29,41 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         behavior does not regress.
         """
         self.assertTrue(
-            self.client.login(username="pandora", password="password")
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
         )
-        self.client.get(reverse("contact"))
-        self.client.logout()
+        await self.async_client.get(reverse("contact"))
+        await self.async_client.alogout()
 
         # Now, as an anonymous user, we get the page again. If the bug is
         # resolved, we should not see anything about the previously logged-in
         # user, pandora.
-        r = self.client.get(reverse("contact"))
+        r = await self.async_client.get(reverse("contact"))
         self.assertNotIn("pandora", r.content.decode())
 
-    def test_contact_logged_in(self, mock: MagicMock) -> None:
+    async def test_contact_logged_in(self, mock: MagicMock) -> None:
         """Can we use the contact form to send a message when logged in?"""
         self.assertTrue(
-            self.client.login(username="pandora", password="password")
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
         )
-        response = self.client.post(reverse("contact"), self.test_msg)
+        response = await self.async_client.post(
+            reverse("contact"), self.test_msg
+        )
         self.assertEqual(response.status_code, HTTP_302_FOUND)
         self.assertEqual(len(mail.outbox), 1)
 
-    def test_contact_logged_out(self, mock: MagicMock) -> None:
+    async def test_contact_logged_out(self, mock: MagicMock) -> None:
         """Can we use the contact form to send a message when logged out?"""
-        response = self.client.post(reverse("contact"), self.test_msg)
+        response = await self.async_client.post(
+            reverse("contact"), self.test_msg
+        )
         self.assertEqual(response.status_code, HTTP_302_FOUND)
         self.assertEqual(len(mail.outbox), 1)
 
-    def test_contact_unicode(self, mock: MagicMock) -> None:
+    async def test_contact_unicode(self, mock: MagicMock) -> None:
         """Can unicode be used when contacting us?"""
         msg = self.test_msg.copy()
         msg["message"] = (
@@ -64,11 +72,11 @@ class ContactTest(SimpleUserDataMixin, TestCase):
             "vocabulary. The problem in language is to express many ideas and "
             "thoughts with comparatively few words. — John Wesley Powell"
         )
-        response = self.client.post(reverse("contact"), msg)
+        response = await self.async_client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTP_302_FOUND)
         self.assertEqual(len(mail.outbox), 1)
 
-    def test_spam_message_is_rejected(self, mock: MagicMock) -> None:
+    async def test_spam_message_is_rejected(self, mock: MagicMock) -> None:
         """Do we reject it if people put a phone number in the phone_number
         field?
 
@@ -77,42 +85,42 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         """
         msg = self.test_msg.copy()
         msg["phone_number"] = "909-576-4123"
-        response = self.client.post(reverse("contact"), msg)
+        response = await self.async_client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTP_302_FOUND)
         self.assertEqual(len(mail.outbox), 0)
 
         # Number in middle of subject is OK!
         msg["phone_number"] = "asdf 909 asdf"
-        response = self.client.post(reverse("contact"), msg)
+        response = await self.async_client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTP_302_FOUND)
         self.assertEqual(len(mail.outbox), 1)
 
-    def test_removals_require_http(self, mock: MagicMock) -> None:
+    async def test_removals_require_http(self, mock: MagicMock) -> None:
         """Do we ensure removals have an HTTP link?"""
         msg = self.test_msg.copy()
 
         # Removal subject without link fails
         msg["phone_number"] = "Removal request"
         msg["message"] = "test in message with lots of long words"
-        response = self.client.post(reverse("contact"), msg)
+        response = await self.async_client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTP_200_OK)
         self.assertEqual(len(mail.outbox), 0)
 
         msg["phone_number"] = "Please remove link!"
         msg["message"] = "test in message with lots of long words"
-        response = self.client.post(reverse("contact"), msg)
+        response = await self.async_client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTP_200_OK)
         self.assertEqual(len(mail.outbox), 0)
 
         # Test regex matching on removals fails
         msg["phone_number"] = "take down request"
-        response = self.client.post(reverse("contact"), msg)
+        response = await self.async_client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTP_200_OK)
         self.assertEqual(len(mail.outbox), 0)
 
         # Removal subject with link is OK!
         msg["message"] = "test http in message"
-        response = self.client.post(reverse("contact"), msg)
+        response = await self.async_client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTP_302_FOUND)
         self.assertEqual(len(mail.outbox), 1)
 
@@ -135,7 +143,7 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
         )
         print("✓")
 
-    def assert_page_loads_ok(self, reverse_param: dict) -> None:
+    async def assert_page_loads_ok(self, reverse_param: dict) -> None:
         """Does a page load properly?
 
         :param reverse_param: Params that can be sent to Django's reverse
@@ -144,7 +152,7 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
         """
         path = reverse(**reverse_param)
         print(f"Testing basic load of: {path}...", end="")
-        r = self.client.get(path)
+        r = await self.async_client.get(path)
         self.assertEqual(
             r.status_code,
             HTTP_200_OK,
@@ -161,7 +169,7 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
         if r["content-type"] and is_html:
             self.assert_page_title_in_html(r.content)
 
-    def test_simple_pages(self) -> None:
+    async def test_simple_pages(self) -> None:
         """Do all the simple pages load properly?"""
         reverse_params: List[Dict[str, Any]] = [
             {"viewname": "faq"},
@@ -189,12 +197,14 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
             with self.subTest(
                 "Checking simple pages", reverse_params=reverse_param
             ):
-                self.assert_page_loads_ok(reverse_param)
+                await self.assert_page_loads_ok(reverse_param)
 
-    def test_profile_urls(self) -> None:
+    async def test_profile_urls(self) -> None:
         """Do all of the profile URLs load properly?"""
         self.assertTrue(
-            self.client.login(username="pandora", password="password")
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
         )
         reverse_params = [
             {"viewname": "view_settings"},
@@ -209,4 +219,4 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
             {"viewname": "view_api"},
         ]
         for reverse_param in reverse_params:
-            self.assert_page_loads_ok(reverse_param)
+            await self.assert_page_loads_ok(reverse_param)

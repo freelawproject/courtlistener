@@ -1,4 +1,4 @@
-{% load text_filters %}{% load humanize %}*****************
+{% load extras %}{% load text_filters %}{% load humanize %}*****************
 CourtListener.com
 *****************
 {% comment %}
@@ -15,9 +15,9 @@ We have news regarding your alerts at CourtListener.com
 View Full Results / Edit this Alert: https://www.courtlistener.com/?{{ alert.query_run|safe }}&edit_alert={{ alert.pk }}
 Disable this Alert (one click): https://www.courtlistener.com{% url "disable_alert" alert.secret_key %}{% endif %}
 
-{{forloop.counter}}. {{ result.caseName|safe|striptags }} ({% if result.court_id != 'scotus' %}{{ result.court_citation_string|striptags }} {% endif %}{% if type == 'o' %}{{ result.dateFiled|date:"Y" }}{% elif type == 'oa' %}{{ result.dateArgued|date:"Y" }}{% endif %})
-{% if type == 'oa' %}{% if result.dateArgued %}Date Argued: {{ result.dateArgued|date:"F jS, Y" }}{% else %}Date Argued: Unknown Date {% endif %}{% if result.docketNumber %} | Docket Number: {{ result.docketNumber|safe|striptags }}{% endif %} | Duration: {{ result.duration|naturalduration }}{% if result.judge %} | Judge: {{ result.judge|safe|striptags|underscore_to_space }}{% endif %}{% endif %}
-{% if type == 'o' or type == 'oa' %}{% if result.text %}...{{ result.text|safe|striptags|underscore_to_space|compress_whitespace }}...{% endif %}
+{{forloop.counter}}. {{ result.caseName|render_string_or_list|safe|striptags }} ({% if result.court_id != 'scotus' %}{{ result.court_citation_string|render_string_or_list|striptags }} {% endif %}{% if type == 'o' %}{{ result.dateFiled|date:"Y" }}{% elif type == 'oa' %}{{ result.dateArgued|date:"Y" }}{% endif %})
+{% if type == 'oa' %}{% if result.dateArgued %}Date Argued: {{ result.dateArgued|date:"F jS, Y" }}{% else %}Date Argued: Unknown Date {% endif %}{% if result.docketNumber %} | Docket Number: {{ result.docketNumber|render_string_or_list|safe|striptags }}{% endif %} | Duration: {{ result.duration|naturalduration }}{% if result.judge %} | Judge: {{ result.judge|render_string_or_list|safe|striptags|underscore_to_space }}{% endif %}{% endif %}
+{% if type == 'o' or type == 'oa' %}{% if result.text %}...{{ result.text|render_string_or_list|safe|striptags|underscore_to_space|compress_whitespace }}...{% endif %}
 {% endif %}~~~~~
  - View this item on our site: https://www.courtlistener.com{{result.absolute_url}}
 {% if result.download_url %} - Download original from the court: {{result.download_url}}

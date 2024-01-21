@@ -4,6 +4,7 @@ from collections import OrderedDict
 from datetime import timedelta
 from email.utils import parseaddr
 
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import logout, update_session_auth_hash
@@ -532,7 +533,7 @@ def register(request: HttpRequest) -> HttpResponse:
                     email["from_email"],
                     email["to"],
                 )
-                tally_stat("user.created")
+                async_to_sync(tally_stat)("user.created")
                 get_str = "?next=%s&email=%s" % (
                     urlencode(redirect_to),
                     urlencode(user.email),

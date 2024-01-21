@@ -17,7 +17,7 @@ jobs:
         tag_flags: ["--exclude-tag selenium", "--tag selenium"]
     steps:
       - name: Check out solr
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: freelawproject/courtlistener-solr-server
           ref: main
@@ -34,7 +34,7 @@ jobs:
           sudo find data -type f -exec chmod 664 {} \;
           sudo find solr -type f -exec chmod 664 {} \;
       - name: Check out CourtListener
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           path: courtlistener
 

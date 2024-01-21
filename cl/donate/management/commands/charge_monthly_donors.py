@@ -25,7 +25,7 @@ class Command(VerboseCommand):
     help = "Charges people that have monthly subscriptions."
 
     def handle(self, *args, **options) -> None:
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
 
         m_donations = MonthlyDonation.objects.filter(
             enabled=True,

@@ -480,7 +480,7 @@ def find_dups(docket, cluster):
         "fq": [
             f"court_id:{docket.court_id}",
             "citation:(%s)"
-            % " OR ".join('"%s"~5' % c for c in cluster.citations.all() if c),
+            % " OR ".join(f'"{c}"~5' for c in cluster.citations.all() if c),
         ],
         "rows": 100,
         "caller": "corpus_importer.import_columbia.populate_opinions",
@@ -576,7 +576,7 @@ def get_good_words(word_list, stop_words_size=500):
     return list(OrderedDict.fromkeys(good_words))
 
 
-class StopWords(object):
+class StopWords:
     """A very simple object that can hold stopwords, but that is only
     initialized once.
     """

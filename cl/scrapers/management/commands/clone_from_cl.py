@@ -88,8 +88,8 @@ def clone_opinion_cluster(
     cluster_ids: list,
     download_cluster_files: bool,
     add_docket_entries: bool,
-    add_to_solr=False,
-    person_positions=False,
+    add_to_solr: bool = False,
+    person_positions: bool = False,
     object_type="search.OpinionCluster",
 ):
     """Download opinion cluster data from courtlistener.com and add it to
@@ -188,7 +188,7 @@ def clone_opinion_cluster(
 
                 except Exception:
                     print(
-                        f"Can't download filepath_json_harvard file for "
+                        "Can't download filepath_json_harvard file for "
                         f"cluster id: {cluster_id}"
                     )
 
@@ -936,7 +936,7 @@ class Command(BaseCommand):
     )
 
     def __init__(self, *args, **kwargs):
-        super(Command, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.type = None
         self.ids = []
         self.download_cluster_files = False
