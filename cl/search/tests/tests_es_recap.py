@@ -6,7 +6,7 @@ from unittest import mock
 from asgiref.sync import async_to_sync, sync_to_async
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
-from django.test import RequestFactory, override_settings
+from django.test import AsyncClient, override_settings
 from django.urls import reverse
 from elasticsearch_dsl import Q
 from lxml import etree, html
@@ -121,6 +121,19 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             msg="Did not get the right number of child documents %s\n"
             "Expected: %s\n"
             "     Got: %s\n\n" % (field_name, expected_count, got),
+        )
+
+    def _assert_results_header_content(self, html_content, expected_text):
+        h2_element = html.fromstring(html_content).xpath(
+            '//h2[@id="result-count"]'
+        )
+        h2_content = html.tostring(
+            h2_element[0], method="text", encoding="unicode"
+        ).replace("\xa0", " ")
+        self.assertIn(
+            expected_text,
+            h2_content.strip(),
+            msg=f"'{expected_text}' was not found within the results header.",
         )
 
     def _test_main_es_query(self, cd, parent_expected, field_name):
@@ -795,7 +808,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         with self.captureOnCommitCallbacks(execute=True):
             docket = DocketFactory(
                 court=self.court,
-                case_name="Mott v. NYU Hospitals Center",
+                case_name="America v. Lorem",
                 date_filed=datetime.date(2015, 8, 16),
                 date_argued=datetime.date(2013, 5, 20),
                 docket_number="1:17-cv-04465",
@@ -807,6 +820,23 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 date_filed=datetime.date(2015, 8, 19),
                 description="COMPLAINT against NYU Hospitals Center, Tisch Hospital",
             )
+            firm = AttorneyOrganizationFactory(
+                name="Lawyers LLP", lookup_key="6201in816"
+            )
+            attorney = AttorneyFactory(
+                name="Harris Martin",
+                organizations=[firm],
+                docket=docket,
+            )
+            PartyTypeFactory.create(
+                party=PartyFactory(
+                    name="Bill Lorem",
+                    docket=docket,
+                    attorneys=[attorney],
+                ),
+                docket=docket,
+            )
+
             RECAPDocumentFactory(
                 docket_entry=e_1_d_1,
                 document_number="1",
@@ -826,22 +856,297 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 page_count=5,
             )
 
+            # Filter document withing docket and parties
+
+            # Filter two dockets with party and attorney
+
+            docket_2 = DocketFactory(
+                case_name="America v. Lorem",
+                court=self.court,
+            )
+            firm_2 = AttorneyOrganizationFactory(
+                name="America LLP", lookup_key="4421in816"
+            )
+            attorney_2 = AttorneyFactory(
+                name="Harris Martin",
+                organizations=[firm_2],
+                docket=docket_2,
+            )
+            PartyTypeFactory.create(
+                party=PartyFactory(
+                    name="Bill Lorem",
+                    docket=docket_2,
+                    attorneys=[attorney_2],
+                ),
+                docket=docket_2,
+            )
+            d3 = DocketEntryWithParentsFactory(
+                docket=docket_2,
+                entry_number=3,
+                date_filed=datetime.date(2015, 8, 19),
+                description="COMPLAINT against NYU Hospitals Center, Tisch Hospital",
+            )
+            RECAPDocumentFactory(
+                docket_entry=d3,
+                document_number="3",
+                is_available=True,
+                page_count=5,
+                description="Ut lobortis urna at condimentum lacinia",
+            )
+            docket_3 = DocketFactory(
+                case_name="America v. Lorem",
+                court=self.court,
+            )
+            firm_3 = AttorneyOrganizationFactory(
+                name="America LLP", lookup_key="4421in818"
+            )
+            attorney_3 = AttorneyFactory(
+                name="Harris Martin",
+                organizations=[firm_3],
+                docket=docket_3,
+            )
+            PartyTypeFactory.create(
+                party=PartyFactory(
+                    name="Other Party",
+                    docket=docket_3,
+                    attorneys=[attorney_3],
+                ),
+                docket=docket_3,
+            )
+            d4 = DocketEntryWithParentsFactory(
+                docket=docket_3,
+                entry_number=4,
+                date_filed=datetime.date(2015, 8, 19),
+                description="COMPLAINT against Lorem",
+            )
+            RECAPDocumentFactory(
+                docket_entry=d4,
+                document_number="4",
+                is_available=True,
+                page_count=5,
+                description="Ut lobortis urna at condimentum lacinia",
+            )
+            RECAPDocumentFactory(
+                docket_entry=d4,
+                document_number="5",
+                is_available=False,
+                page_count=5,
+                description="Suspendisse bibendum eu",
+            )
+
+        ## The party filter does not match any documents for the given search criteria
         params = {
             "type": SEARCH_TYPES.RECAP,
             "q": "hospital",
             "description": "center",
             "party_name": "Frank Paul Sabatini",
         }
+        # 0 result expected. The party_name doesn't match any case.
+        async_to_sync(self._test_article_count)(
+            params, 0, "text query + description + party_name"
+        )
 
-        # Frontend, 1 result expected since RECAPDocuments are grouped by case
+        ## The party filter can constrain the results returned, along with a parent filter.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "court": "canb ca1",
+            "party_name": "Defendant Jane Roe",
+        }
+        # 1 result expected. The party_name field match one case with two RDs.
         r = async_to_sync(self._test_article_count)(
-            params, 1, "text query + description + party_name"
+            params, 1, "court + party_name"
+        )
+        self._count_child_documents(
+            0, r.content.decode(), 2, "court + party_name"
+        )
+        self._assert_results_header_content(r.content.decode(), "1 Case")
+        self._assert_results_header_content(
+            r.content.decode(), "2 Docket Entries"
+        )
+
+        ## The party filter can constrain the results returned, along with
+        # case_name filter.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": '"America v. Lorem"',
+            "party_name": "Bill Lorem",
+        }
+        # 2 results expected. It matches 2 cases: one with 2 RDs and one with 1.
+        r = async_to_sync(self._test_article_count)(
+            params, 2, "case_name + party_name"
+        )
+        self._count_child_documents(
+            0, r.content.decode(), 2, "case_name + party_name"
+        )
+        self._count_child_documents(
+            1, r.content.decode(), 1, "case_name + party_name"
         )
         self.assertIn("Document #1", r.content.decode())
         self.assertIn("Document #2", r.content.decode())
+        self.assertIn("Document #3", r.content.decode())
+        self._assert_results_header_content(r.content.decode(), "2 Cases")
+        self._assert_results_header_content(
+            r.content.decode(), "3 Docket Entries"
+        )
+
+        ## The party filter can constrain the results returned, along with
+        # query string and child filters.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "against",
+            "description": "COMPLAINT",
+            "available_only": True,
+            "party_name": "Other Party",
+        }
+        # 1 result expected. It matches 1 case with one RD.
+        r = async_to_sync(self._test_article_count)(
+            params, 1, "text query + description + party_name"
+        )
+        self._count_child_documents(
+            0, r.content.decode(), 1, "text query + description + party_name"
+        )
+        self.assertIn("Document #4", r.content.decode())
+        self._assert_results_header_content(r.content.decode(), "1 Case")
+        self._assert_results_header_content(
+            r.content.decode(), "1 Docket Entry"
+        )
+
+        ## The attorney filter can constrain the results returned, along with
+        # child filters.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "party_name": "Bill Lorem",
+            "document_number": 3,
+        }
+        # 1 result expected. It matches only one RD.
+        r = async_to_sync(self._test_article_count)(
+            params, 1, "case_name + description + atty_name + document_number"
+        )
+        self._count_child_documents(
+            0,
+            r.content.decode(),
+            1,
+            "case_name + description + atty_name + document_number",
+        )
+        self.assertIn("Document #3", r.content.decode())
+        self._assert_results_header_content(r.content.decode(), "1 Case")
+        self._assert_results_header_content(
+            r.content.decode(), "1 Docket Entry"
+        )
+
+        ## The party_name and attorney filter can constrain the results
+        # returned, along with parent and child filters.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": '"America v. Lorem"',
+            "description": "COMPLAINT against",
+            "party_name": "Bill Lorem",
+            "atty_name": "Harris Martin",
+        }
+        # 2 results expected. Each of them with one RD.
+        r = async_to_sync(self._test_article_count)(
+            params, 2, "case_name + description + party_name + atty_name"
+        )
+        self._count_child_documents(
+            0,
+            r.content.decode(),
+            1,
+            "case_name + description + party_name + atty_name",
+        )
+        self._count_child_documents(
+            1,
+            r.content.decode(),
+            1,
+            "case_name + description + party_name + atty_name",
+        )
+        self.assertIn("Document #1", r.content.decode())
+        self.assertIn("Document #3", r.content.decode())
+        self._assert_results_header_content(r.content.decode(), "2 Cases")
+        self._assert_results_header_content(
+            r.content.decode(), "2 Docket Entries"
+        )
+
+        ## The party_name and attorney filter can constrain the results
+        # returned, along with string query, parent and child filters.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "America v. Lorem",
+            "party_name": "Bill Lorem",
+            "atty_name": "Harris Martin",
+        }
+        # It matches 2 cases: one with 2 RDs and one with 1.
+        r = async_to_sync(self._test_article_count)(
+            params, 2, "text query + party_name + attorney"
+        )
+        self._count_child_documents(
+            0, r.content.decode(), 2, "text query + party_name + attorney"
+        )
+        self._count_child_documents(
+            1, r.content.decode(), 1, "text query + party_name + attorney"
+        )
+        self.assertIn("Document #1", r.content.decode())
+        self.assertIn("Document #2", r.content.decode())
+        self.assertIn("Document #3", r.content.decode())
+        self._assert_results_header_content(r.content.decode(), "2 Cases")
+        self._assert_results_header_content(
+            r.content.decode(), "3 Docket Entries"
+        )
+
+        ## The attorney filter can constrain the results returned at document
+        # level, along with string query, parent and child filters.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Ut lobortis urna",
+            "case_name": '"America v. Lorem"',
+            "description": "COMPLAINT against",
+            "party_name": "Other Party",
+        }
+        # It matches 1 cases with one RD.
+        r = async_to_sync(self._test_article_count)(
+            params, 1, "text query + case_name + description + party_name"
+        )
+        self._count_child_documents(
+            0,
+            r.content.decode(),
+            1,
+            "text query + case_name + description + party_name",
+        )
+        self.assertIn("Document #4", r.content.decode())
+        self._assert_results_header_content(r.content.decode(), "1 Case")
+        self._assert_results_header_content(
+            r.content.decode(), "1 Docket Entry"
+        )
+
+        ## Only filter by party and attorney. It returns the cases that match
+        # the filters and all their RDs (max 5 per case).
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "party_name": "Bill Lorem",
+            "atty_name": "Harris Martin",
+        }
+        # It matches 2 cases: one with 2 RDs and one with 1.
+        r = async_to_sync(self._test_article_count)(
+            params, 2, "party_name + attorney"
+        )
+        self._count_child_documents(
+            0, r.content.decode(), 2, "party_name + attorney"
+        )
+        self._count_child_documents(
+            1, r.content.decode(), 1, "party_name + attorney"
+        )
+        self.assertIn("Document #1", r.content.decode())
+        self.assertIn("Document #2", r.content.decode())
+        self.assertIn("Document #3", r.content.decode())
+        self._assert_results_header_content(r.content.decode(), "2 Cases")
+        self._assert_results_header_content(
+            r.content.decode(), "3 Docket Entries"
+        )
 
         with self.captureOnCommitCallbacks(execute=True):
+            e_2_d_1.delete()
+            e_1_d_1.delete()
             docket.delete()
+            docket_2.delete()
 
     async def test_atty_name_filter(self) -> None:
         """Confirm atty_name filter works properly"""
@@ -1160,7 +1465,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         plain_text_string = plain_text[0].strip()
         cleaned_plain_text = re.sub(r"\s+", " ", plain_text_string)
         cleaned_plain_text = cleaned_plain_text.replace("…", "")
-        self.assertLess(len(cleaned_plain_text), 50)
+        # The actual no_match_size in this test using fvh is a bit longer due
+        # to it includes an extra word.
+        self.assertEqual(len(cleaned_plain_text), 58)
 
         # Highlight assigned_to.
         params = {"type": SEARCH_TYPES.RECAP, "q": "Thalassa Miller"}
@@ -1199,8 +1506,10 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             0, r.content.decode(), 2, "highlights docketNumber"
         )
 
-        self.assertIn("<mark>1:21", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>1:21</mark>"), 1)
+        self.assertIn("<mark>1:21-bk-1234", r.content.decode())
+        self.assertEqual(
+            r.content.decode().count("<mark>1:21-bk-1234</mark>"), 1
+        )
 
         # Highlight description.
         params = {"type": SEARCH_TYPES.RECAP, "q": "Discharging Debtor"}
@@ -1215,7 +1524,6 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(
             r.content.decode().count("<mark>Discharging</mark>"), 1
         )
-
         # Highlight suitNature and text.
         params = {"type": SEARCH_TYPES.RECAP, "q": "Lorem 440"}
 
@@ -1227,7 +1535,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIn("<mark>Lorem</mark>", r.content.decode())
         self.assertEqual(r.content.decode().count("<mark>Lorem</mark>"), 2)
 
-        # Highlight plain_text snippet.
+        # Highlight plain_text exact snippet.
         params = {"type": SEARCH_TYPES.RECAP, "q": 'Maecenas nunc "justo"'}
 
         r = await self._test_article_count(params, 1, "highlights plain_text")
@@ -1238,6 +1546,30 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(r.content.decode().count("<mark>Maecenas</mark>"), 1)
         self.assertEqual(r.content.decode().count("<mark>nunc</mark>"), 1)
         self.assertEqual(r.content.decode().count("<mark>justo</mark>"), 1)
+
+        # Highlight plain_text snippet.
+        params = {"type": SEARCH_TYPES.RECAP, "q": "Mauris leo"}
+
+        r = await self._test_article_count(params, 1, "highlights plain_text")
+        # Count child documents under docket.
+        self._count_child_documents(
+            0, r.content.decode(), 1, "highlights plain_text"
+        )
+        self.assertEqual(r.content.decode().count("<mark>Mauris</mark>"), 1)
+        self.assertEqual(r.content.decode().count("<mark>leo</mark>"), 1)
+
+        # Highlight short_description.
+        params = {"type": SEARCH_TYPES.RECAP, "q": '"Document attachment"'}
+
+        r = await self._test_article_count(params, 1, "short_description")
+        # Count child documents under docket.
+        self._count_child_documents(
+            0, r.content.decode(), 1, "highlights plain_text"
+        )
+        self.assertEqual(r.content.decode().count("<mark>Document</mark>"), 1)
+        self.assertEqual(
+            r.content.decode().count("<mark>attachment</mark>"), 1
+        )
 
         # Highlight filter: caseName
         params = {
@@ -1267,8 +1599,10 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = await self._test_article_count(
             params, 1, "highlights docket number"
         )
-        self.assertIn("<mark>1:21", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>1:21</mark>"), 1)
+        self.assertIn("<mark>1:21-bk-1234", r.content.decode())
+        self.assertEqual(
+            r.content.decode().count("<mark>1:21-bk-1234</mark>"), 1
+        )
 
         # Highlight filter: Nature of Suit
         params = {
@@ -1301,7 +1635,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = await self._test_article_count(params, 1, "filter + query")
         self.assertIn("<mark>Amicus</mark>", r.content.decode())
         self.assertEqual(r.content.decode().count("<mark>Amicus</mark>"), 1)
+        self.assertIn("<mark>Document</mark>", r.content.decode())
         self.assertIn("<mark>attachment</mark>", r.content.decode())
+        self.assertEqual(r.content.decode().count("<mark>Document</mark>"), 1)
         self.assertEqual(
             r.content.decode().count("<mark>attachment</mark>"), 1
         )
@@ -1512,13 +1848,13 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             de_4.delete()
 
     @mock.patch("cl.lib.es_signal_processor.chain")
-    def test_avoid_updating_docket_in_es_on_view_count_increment(
+    async def test_avoid_updating_docket_in_es_on_view_count_increment(
         self, mock_es_save_chain
     ) -> None:
         """Confirm a docket is not updated in ES on a view_count increment."""
 
         with self.captureOnCommitCallbacks(execute=True):
-            docket = DocketFactory(
+            docket = await sync_to_async(DocketFactory)(
                 court=self.court,
                 case_name="Lorem Ipsum",
                 case_name_full="Jackson & Sons Holdings vs. Bank",
@@ -1533,16 +1869,16 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         mock_es_save_chain.reset_mock()
         self.assertEqual(mock_es_save_chain.call_count, 0)
 
-        request_factory = RequestFactory()
-        request = request_factory.get("/docket/")
+        request_factory = AsyncClient()
+        request = await request_factory.get("/docket/")
         with mock.patch("cl.lib.view_utils.is_bot", return_value=False):
             # Increase the view_count.
-            increment_view_count(docket, request)
+            await increment_view_count(docket, request)
 
         # The save chain shouldn't be called.
         self.assertEqual(mock_es_save_chain.call_count, 0)
         with self.captureOnCommitCallbacks(execute=True):
-            docket.delete()
+            await docket.adelete()
 
 
 class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):
@@ -2030,7 +2366,7 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                     nature_of_suit="440",
                 ),
                 date_filed=None,
-                description="MOTION for Leave to File Amicus Curiae Lorem",
+                description="MOTION for Leave to File Document attachment",
             )
             RECAPDocumentFactory(
                 docket_entry=de_1,
@@ -2169,19 +2505,94 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 "Instead found: %s" % (count, test, node_count),
             )
 
+        # Parent Filter + Child Filter + Query string + Parties
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "court": self.court.pk,
+            "document_number": 1,
+            "q": "Document attachment",
+            "party_name": "Defendant Jane Roe",
+        }
+        response = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(
+            200, response.status_code, msg="Did not get a 200 OK status code."
+        )
+        xml_tree = etree.fromstring(response.content)
+        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
+        node_tests = (
+            ("//atom:feed/atom:title", 1),
+            ("//atom:feed/atom:link", 2),
+            ("//atom:entry", 1),
+            ("//atom:entry/atom:title", 1),
+            ("//atom:entry/atom:link", 1),
+            ("//atom:entry/atom:published", 1),
+            ("//atom:entry/atom:author/atom:name", 1),
+            ("//atom:entry/atom:id", 1),
+            ("//atom:entry/atom:summary", 1),
+        )
+        for test, count in node_tests:
+            node_count = len(
+                xml_tree.xpath(test, namespaces=namespaces)
+            )  # type: ignore
+            self.assertEqual(
+                node_count,
+                count,
+                msg="Did not find %s node(s) with XPath query: %s. "
+                "Instead found: %s" % (count, test, node_count),
+            )
+
+        # Only party filters. Return all the RECAPDocuments where parent dockets
+        # match the party filters.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "party_name": "Defendant Jane Roe",
+        }
+        response = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(
+            200, response.status_code, msg="Did not get a 200 OK status code."
+        )
+        xml_tree = etree.fromstring(response.content)
+        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
+        node_tests = (
+            ("//atom:feed/atom:title", 1),
+            ("//atom:feed/atom:link", 2),
+            ("//atom:entry", 2),
+            ("//atom:entry/atom:title", 2),
+            ("//atom:entry/atom:link", 2),
+            ("//atom:entry/atom:published", 2),
+            ("//atom:entry/atom:author/atom:name", 2),
+            ("//atom:entry/atom:id", 2),
+            ("//atom:entry/atom:summary", 2),
+        )
+        for test, count in node_tests:
+            node_count = len(
+                xml_tree.xpath(test, namespaces=namespaces)
+            )  # type: ignore
+            self.assertEqual(
+                node_count,
+                count,
+                msg="Did not find %s node(s) with XPath query: %s. "
+                "Instead found: %s" % (count, test, node_count),
+            )
+
 
 class IndexDocketRECAPDocumentsCommandTest(
     ESIndexTestCase, TransactionTestCase
 ):
     """cl_index_parent_and_child_docs command tests for Elasticsearch"""
 
-    @classmethod
-    def setUpClass(cls):
-        cls.rebuild_index("search.Docket")
-        cls.court = CourtFactory(id="canb", jurisdiction="FB")
-        cls.de = DocketEntryWithParentsFactory(
+    def setUp(self):
+        self.rebuild_index("search.Docket")
+        self.court = CourtFactory(id="canb", jurisdiction="FB")
+        self.de = DocketEntryWithParentsFactory(
             docket=DocketFactory(
-                court=cls.court,
+                court=self.court,
                 date_filed=datetime.date(2015, 8, 16),
                 docket_number="1:21-bk-1234",
                 nature_of_suit="440",
@@ -2189,35 +2600,35 @@ class IndexDocketRECAPDocumentsCommandTest(
             entry_number=1,
             date_filed=datetime.date(2015, 8, 19),
         )
-        cls.rd = RECAPDocumentFactory(
-            docket_entry=cls.de,
+        self.rd = RECAPDocumentFactory(
+            docket_entry=self.de,
             document_number="1",
         )
-        cls.rd_att = RECAPDocumentFactory(
-            docket_entry=cls.de,
+        self.rd_att = RECAPDocumentFactory(
+            docket_entry=self.de,
             document_number="1",
             attachment_number=2,
         )
-        cls.de_1 = DocketEntryWithParentsFactory(
+        self.de_1 = DocketEntryWithParentsFactory(
             docket=DocketFactory(
-                court=cls.court,
+                court=self.court,
                 date_filed=datetime.date(2016, 8, 16),
                 date_argued=datetime.date(2012, 6, 23),
             ),
             entry_number=None,
             date_filed=datetime.date(2014, 7, 19),
         )
-        cls.rd_2 = RECAPDocumentFactory(
-            docket_entry=cls.de_1,
+        self.rd_2 = RECAPDocumentFactory(
+            docket_entry=self.de_1,
             document_number="",
         )
-        cls.delete_index("search.Docket")
-        cls.create_index("search.Docket")
+        self.delete_index("search.Docket")
+        self.create_index("search.Docket")
 
-        cls.r = make_redis_interface("CACHE")
-        keys = cls.r.keys(compose_redis_key(SEARCH_TYPES.RECAP))
+        self.r = make_redis_interface("CACHE")
+        keys = self.r.keys(compose_redis_key(SEARCH_TYPES.RECAP))
         if keys:
-            cls.r.delete(*keys)
+            self.r.delete(*keys)
 
     def test_cl_index_parent_and_child_docs_command(self):
         """Confirm the command can properly index Dockets and their
@@ -2337,6 +2748,121 @@ class IndexDocketRECAPDocumentsCommandTest(
         d_2.delete()
         d_3.delete()
         d_4.delete()
+
+    def test_cl_index_only_parent_or_child_documents_command(self):
+        """Confirm the command can properly index only RECAPDocuments or only
+        Dockets into ES."""
+
+        s = DocketDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0)
+        # Call cl_index_parent_and_child_docs command for dockets.
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            queue="celery",
+            pk_offset=0,
+            document_type="parent",
+        )
+
+        # Two dockets should be indexed.
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="docket"))
+        self.assertEqual(s.count(), 2, msg="Wrong number of Dockets returned.")
+
+        # No RECAPDocuments should be indexed.
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="recap_document"))
+        self.assertEqual(
+            s.count(), 0, msg="Wrong number of RECAPDocuments returned."
+        )
+
+        # Now index only RECAPDocuments.
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            queue="celery",
+            pk_offset=0,
+            document_type="child",
+        )
+        s = DocketDocument.search()
+        # 3 RECAPDocuments should be indexed.
+        s = s.query(Q("match", docket_child="recap_document"))
+        self.assertEqual(
+            s.count(), 3, msg="Wrong number of RECAPDocuments returned."
+        )
+
+        # RECAPDocuments are indexed.
+        rds_pks = [
+            self.rd.pk,
+            self.rd_att.pk,
+            self.rd_2.pk,
+        ]
+        for rd_pk in rds_pks:
+            self.assertTrue(
+                ESRECAPDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP)
+            )
+
+        # Confirm parent-child relation.
+        s = DocketDocument.search()
+        s = s.query("parent_id", type="recap_document", id=self.de.docket.pk)
+        self.assertEqual(
+            s.count(), 2, msg="Wrong number of RECAPDocuments returned."
+        )
+        s = DocketDocument.search()
+        s = s.query("parent_id", type="recap_document", id=self.de_1.docket.pk)
+        self.assertEqual(
+            s.count(), 1, msg="Wrong number of RECAPDocuments returned."
+        )
+
+    def test_index_missing_parent_docs_when_indexing_only_child_docs(self):
+        """Confirm the command can properly index missing dockets when indexing
+        only RECAPDocuments.
+        """
+
+        s = DocketDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0)
+        # Call cl_index_parent_and_child_docs command for RECAPDocuments.
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            queue="celery",
+            pk_offset=0,
+            document_type="child",
+        )
+
+        # Dockets and the RECAPDocuments should be indexed.
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="docket"))
+        self.assertEqual(s.count(), 2, msg="Wrong number of Dockets returned.")
+
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="recap_document"))
+        self.assertEqual(
+            s.count(), 3, msg="Wrong number of RECAPDocuments returned."
+        )
+
+        # RECAPDocuments are indexed.
+        rds_pks = [
+            self.rd.pk,
+            self.rd_att.pk,
+            self.rd_2.pk,
+        ]
+        for rd_pk in rds_pks:
+            self.assertTrue(
+                ESRECAPDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP)
+            )
+
+        # Confirm parent-child relation.
+        s = DocketDocument.search()
+        s = s.query("parent_id", type="recap_document", id=self.de.docket.pk)
+        self.assertEqual(
+            s.count(), 2, msg="Wrong number of RECAPDocuments returned."
+        )
+        s = DocketDocument.search()
+        s = s.query("parent_id", type="recap_document", id=self.de_1.docket.pk)
+        self.assertEqual(
+            s.count(), 1, msg="Wrong number of RECAPDocuments returned."
+        )
 
 
 class RECAPIndexingTest(
@@ -3243,13 +3769,13 @@ class RECAPIndexingTest(
         self.assertEqual(r_doc.docket_child["parent"], docket_2.pk)
 
         # Add cites to RECAPDocument.
+        opinion = OpinionWithParentsFactory()
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.delay",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
                 update_es_document, *args, **kwargs
             ),
         ):
-            opinion = OpinionWithParentsFactory()
             OpinionsCitedByRECAPDocument.objects.bulk_create_with_signal(
                 [
                     OpinionsCitedByRECAPDocument(
@@ -3260,6 +3786,7 @@ class RECAPIndexingTest(
                 ]
             )
 
+        # update_es_document task should be called 1 on tracked fields update
         self.reset_and_assert_task_count(expected=1)
         r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
         self.assertIn(opinion.pk, r_doc.cites)
@@ -3302,7 +3829,7 @@ class RECAPIndexingTest(
                 [o_cited, o_cited_2]
             )
 
-        self.reset_and_assert_task_count(expected=1)
+        self.reset_and_assert_task_count(expected=3)
         r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
         self.assertIn(opinion.pk, r_doc.cites)
         self.assertIn(opinion_2.pk, r_doc.cites)

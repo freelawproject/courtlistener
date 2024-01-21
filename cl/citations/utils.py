@@ -1,7 +1,13 @@
+from datetime import date
+
 from django.apps import (  # Must use apps.get_model() to avoid circular import issue
     apps,
 )
 from django.db.models import Sum
+from eyecite.models import FullCaseCitation
+from eyecite.utils import strip_punct
+
+QUERY_LENGTH = 10
 
 
 def map_reporter_db_cite_type(citation_type: str) -> int:
@@ -24,7 +30,7 @@ def map_reporter_db_cite_type(citation_type: str) -> int:
     return citation_map[citation_type]
 
 
-def get_citation_depth_between_clusters(
+async def get_citation_depth_between_clusters(
     citing_cluster_pk: int, cited_cluster_pk: int
 ) -> int:
     """OpinionsCited objects exist as relationships between Opinion objects,
@@ -39,7 +45,38 @@ def get_citation_depth_between_clusters(
         OpinionCited objects
     """
     OpinionsCited = apps.get_model("search.OpinionsCited")
-    return OpinionsCited.objects.filter(
+    result = await OpinionsCited.objects.filter(
         citing_opinion__cluster__pk=citing_cluster_pk,
         cited_opinion__cluster__pk=cited_cluster_pk,
-    ).aggregate(depth=Sum("depth"))["depth"]
+    ).aaggregate(depth=Sum("depth"))
+    return result["depth"]
+
+
+def get_years_from_reporter(
+    citation: FullCaseCitation,
+) -> tuple[int, int]:
+    """Given a citation object, try to look it its dates in the reporter DB"""
+    start_year = 1750
+    end_year = date.today().year
+
+    edition_guess = citation.edition_guess
+    if edition_guess:
+        if hasattr(edition_guess.start, "year"):
+            start_year = edition_guess.start.year
+        if hasattr(edition_guess.end, "year"):
+            start_year = edition_guess.end.year
+    return start_year, end_year
+
+
+def make_name_param(
+    defendant: str,
+    plaintiff: str | None = None,
+) -> tuple[str, int]:
+    """Remove punctuation and return cleaned string plus its length in tokens."""
+    token_list = defendant.split()
+    if plaintiff:
+        token_list.extend(plaintiff.split())
+
+    # Strip out punctuation, which Solr doesn't like
+    query_words = [strip_punct(t) for t in token_list]
+    return " ".join(query_words), len(query_words)

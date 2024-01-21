@@ -78,7 +78,7 @@ class Command(VerboseCommand, CommandUtils):
         parser.add_argument(
             "--filetype",
             help="The type of file from FJC. One of: %s"
-            % "\n ".join("%s: %s" % (t[0], t[1]) for t in DATASET_SOURCES),
+            % "\n ".join(f"{t[0]}: {t[1]}" for t in DATASET_SOURCES),
             required=True,
             type=int,
         )
@@ -90,7 +90,7 @@ class Command(VerboseCommand, CommandUtils):
         )
 
     def __init__(self, *args, **kwargs):
-        super(Command, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.field_mappings = {}
         self.int_fields = []
         self.str_fields = []
@@ -179,7 +179,7 @@ class Command(VerboseCommand, CommandUtils):
         return row_dict
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
 
         self.ensure_file_ok(options["input_file"])
         self.ensure_filetype_ok(options["filetype"])

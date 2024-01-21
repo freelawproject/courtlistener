@@ -25,6 +25,7 @@ from cl.scrapers.models import ErrorLog
 from cl.scrapers.tasks import extract_doc_content
 from cl.scrapers.utils import (
     get_binary_content,
+    get_child_court,
     get_extension,
     signal_handler,
     update_or_create_docket,
@@ -45,15 +46,19 @@ cnt = CaseNameTweaker()
 
 
 def make_citation(
-    cite_str: str,
-    cluster: OpinionCluster,
+    cite_str: str, cluster: OpinionCluster, court_id: str
 ) -> Optional[Citation]:
     """Create and return a citation object for the input values."""
     citation_objs = get_citations(cite_str)
     if not citation_objs:
         logger.error(
-            "Could not parse citation",
-            extra=dict(cite=cite_str, cluster=cluster),
+            "Could not parse citation from court '%s'",
+            court_id,
+            extra=dict(
+                cite=cite_str,
+                cluster=cluster,
+                fingerprint=[f"{court_id}-no-citation-found"],
+            ),
         )
         return None
     # Convert the found cite type to a valid cite type for our DB.
@@ -113,7 +118,9 @@ def make_objects(
     )
 
     cites = [item.get(key, "") for key in ["citations", "parallel_citations"]]
-    citations = [make_citation(cite, cluster) for cite in cites if cite]
+    citations = [
+        make_citation(cite, cluster, court.id) for cite in cites if cite
+    ]
     # Remove citations that did not parse correctly.
     citations = [cite for cite in citations if cite]
 
@@ -176,7 +183,7 @@ class Command(VerboseCommand):
     help = "Runs the Juriscraper toolkit against one or many jurisdictions."
 
     def __init__(self, stdout=None, stderr=None, no_color=False):
-        super(Command, self).__init__(stdout=None, stderr=None, no_color=False)
+        super().__init__(stdout=None, stderr=None, no_color=False)
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -302,8 +309,12 @@ class Command(VerboseCommand):
             )
             dup_checker.reset()
 
+            child_court = get_child_court(
+                item.get("child_courts", ""), court.id
+            )
+
             docket, opinion, cluster, citations = make_objects(
-                item, court, sha1_hash, content
+                item, child_court or court, sha1_hash, content
             )
 
             save_everything(
@@ -338,7 +349,7 @@ class Command(VerboseCommand):
         self.scrape_court(site, full_crawl)
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         global die_now
 
         # this line is used for handling SIGTERM (CTRL+4), so things can die
@@ -364,10 +375,18 @@ class Command(VerboseCommand):
             mod = __import__(
                 f"{package}.{module}", globals(), locals(), [module]
             )
+            module_string = mod.Site().court_id
+            court_id = module_string.split(".")[-1].split("_")[0]
+            if not Court.objects.get(id=court_id).has_opinion_scraper:
+                logger.info(f"{court_id} is currently disabled.")
+                i += 1
+                continue
             try:
                 self.parse_and_scrape_site(mod, options["full_crawl"])
             except Exception as e:
-                capture_exception(e)
+                capture_exception(
+                    e, fingerprint=[module_string, "{{ default }}"]
+                )
             last_court_in_list = i == (num_courts - 1)
             daemon_mode = options["daemon"]
             if last_court_in_list:

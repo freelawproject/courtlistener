@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load waffle_tags %}
 
 {% block title %}Advanced Search Techniques – CourtListener.com{% endblock %}
 {% block og_title %}Advanced Search Techniques – CourtListener.com{% endblock %}
@@ -40,9 +41,12 @@
   <p>This query does "immigration" <em>or</em> "border" but not "border patrol":</p>
   <p><code>immigration border -"border patrol"</code>.</p>
 
-  <h3>Phrase Queries: <code>" "</code></h3>
-  <p>Creates a phrase search (e.g. <code>"border patrol"</code>). In the case that quotation marks are not balanced (i.e. there is an odd number of them), they will be ignored.
-  </p>
+  <h3>Phrase and Exact Queries: <code>" "</code></h3>
+  <p>Creates a phrase search (e.g. <code>"border patrol"</code>).</p>
+  <p>You can also use <code>" "</code> to perform an exact query, which will not apply stemming or match synonyms.</p>
+  <p>For instance: <code>"Inform" people</code> will return results containing only <code>inform</code> and <code>people</code>, thus avoiding results that include <code>information</code>. Conversely, <code>"Information" people</code>, will exclude results containing <code>inform</code>.</p>
+  <p>It's important to notice that a phrase query behaves as an exact query for each term within the phrase. Therefore, avoid nesting quotes, such as <code>""Inform" people"</code> as all the quotes will be ignored.</p>
+  <p>In the case that quotation marks are not balanced (i.e. there is an odd number of them), they will be ignored.</p>
 
   <h3>Grouped Queries and subqueries: <code>( )</code></h3>
   <p>Using parentheses will group parts of a query (e.g. <code>(customs OR "border patrol") AND asylum</code>). Parentheses can be nested as deeply as needed.
@@ -67,23 +71,39 @@
   </p>
 
   <h3>Date Queries</h3>
-  <p>Unfortunately, date queries are difficult to place at present, requiring the full <a href="https://en.wikipedia.org/wiki/ISO_8601" target="_blank" rel="nofollow">ISO-8601 standard</a> date formatting. This means that dates must be formatted as follows:
-  </p>
-  <p>
-    <code>YYYY-MM-DDTHH-MM-SSZ</code>
-  </p>
-  <p>In English that's year-month-day-T-hour-minute-second-Z. For example, here's a date range that finds all opinions from October, 2018:
-  </p>
-  <p>
-    <code><a href="{% url "show_results" %}?q=dateFiled%3A[2018-10-01T00%3A00%3A00Z+TO+2018-10-31T00%3A00%3A00Z]">dateFiled:[2018-10-01T00:00:00Z TO 2018-10-31T00:00:00Z]</a>
-    </code>
-  </p>
-  <p>We are working to make this easier for our users.</p>
+  {% flag "r-es-active" %}
+    <p>Date queries require the <a href="https://en.wikipedia.org/wiki/ISO_8601" target="_blank" rel="nofollow">ISO-8601 standard</a> date formatting. This means that dates must be formatted as follows:
+    </p>
+    <p>
+      <code>YYYY-MM-DD</code>
+    </p>
+    <p>In English that's year-month-day. For example, here's a date range that finds all docket filings from October 2018:
+    </p>
+    <p>
+      <code><a href="{% url "show_results" %}?type=r&q=dateFiled%3A%5B2018-10-01%20TO%202018-10-31%5D">dateFiled:[2018-10-01 TO 2018-10-31]</a>
+      </code>
+    </p>
+  {% else %}
+    <p>Unfortunately, date queries are difficult to place at present, requiring the full <a href="https://en.wikipedia.org/wiki/ISO_8601" target="_blank" rel="nofollow">ISO-8601 standard</a> date formatting. This means that dates must be formatted as follows:
+    </p>
+    <p>
+      <code>YYYY-MM-DDTHH-MM-SSZ</code>
+    </p>
+    <p>In English that's year-month-day-T-hour-minute-second-Z. For example, here's a date range that finds all opinions from October, 2018:
+    </p>
+    <p>
+      <code><a href="{% url "show_results" %}?q=dateFiled%3A[2018-10-01T00%3A00%3A00Z+TO+2018-10-31T00%3A00%3A00Z]">dateFiled:[2018-10-01T00:00:00Z TO 2018-10-31T00:00:00Z]</a>
+      </code>
+    </p>
+    <p>We are working to make this easier for our users.</p>
+  {% endflag %}
 
   <h2>Fielded Queries: <code>fieldname:term</code></h2>
   <p>In addition to being able to place fielded searches in the side bar, advanced users can also place fielded searches in their main query. For example, a search for <code>court_id:ca1 status:precedential</code> would return only precedential cases (<code>status:precedential</code>)in the First Circuit of Federal Appeals (<code>court_id:ca1</code>).
   </p>
-  <p>Parentheses can be used to create more complex queries. For example, <code>casename:(wade OR roe)</code> would find cases containing "wade" or "roe" in the name of the case.
+  <p>Parentheses can be used to create more complex queries. Or multi-terms queries.
+    For example: <code>casename:(wade OR roe)</code> would find cases containing "wade" or "roe" in the name of the case.
+    <code>casename:(Roe v. Wade)</code> would find cases containing all the terms provided, equivalent to "Roe" <code>AND</code>  "v." <code>AND</code> "Wade".
   </p>
 
   <p>Different search interfaces support different fields according to the following two tables:

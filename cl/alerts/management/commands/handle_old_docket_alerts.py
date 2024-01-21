@@ -134,7 +134,7 @@ The schedule is thus:
 """
 
     def create_parser(self, *args, **kwargs):
-        parser = super(Command, self).create_parser(*args, **kwargs)
+        parser = super().create_parser(*args, **kwargs)
         parser.formatter_class = RawTextHelpFormatter
         return parser
 
@@ -153,7 +153,7 @@ The schedule is thus:
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
 
         # Needs to be user-oriented so that we only send one email per person.
         users_with_alerts = User.objects.filter(

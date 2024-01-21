@@ -169,7 +169,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         import_tn_corpus(
             options["log"],
             options["skip_until"],

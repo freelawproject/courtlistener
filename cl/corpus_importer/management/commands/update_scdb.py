@@ -64,7 +64,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         self.debug = options["debug"]
         self.file = options["file"]
         self.skip_human_review = options["skip_human_review"]

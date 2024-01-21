@@ -99,7 +99,7 @@ class TestVizModels(TestCase):
             "max_hops": 3,
         }
 
-        g = await sync_to_async(viz.build_nx_digraph)(**build_kwargs)
+        g = await viz.build_nx_digraph(**build_kwargs)
         self.assertTrue(len(g.edges()) > 0)
 
     def test_SCOTUSMap_deletes_cascade(self) -> None:

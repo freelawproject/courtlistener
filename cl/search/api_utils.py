@@ -77,7 +77,7 @@ def get_object_list(request, cd, paginator):
     return sl
 
 
-class ESList(object):
+class ESList:
     """This class implements a yielding list object that fetches items from ES
     as they are queried.
     """
@@ -85,7 +85,7 @@ class ESList(object):
     def __init__(
         self, main_query, count, offset, page_size, type, length=None
     ):
-        super(ESList, self).__init__()
+        super().__init__()
         self.main_query = main_query
         self.offset = offset
         self.page_size = page_size
@@ -115,7 +115,11 @@ class ESList(object):
 
         # Merge unavailable fields in ES by pulling data from the DB to make
         # the API backwards compatible
-        merge_unavailable_fields_on_parent_document(results, self.type, "api")
+        if self.type == SEARCH_TYPES.PEOPLE:
+            merge_unavailable_fields_on_parent_document(
+                results, self.type, "api"
+            )
+
         # Pull the text snippet up a level
         for result in results:
             if hasattr(result.meta, "highlight") and hasattr(
@@ -151,13 +155,13 @@ class ESList(object):
         self._item_cache.append(p_object)
 
 
-class SolrList(object):
+class SolrList:
     """This implements a yielding list object that fetches items as they are
     queried.
     """
 
     def __init__(self, main_query, offset, type, length=None):
-        super(SolrList, self).__init__()
+        super().__init__()
         self.main_query = main_query
         self.offset = offset
         self.type = type
@@ -230,7 +234,7 @@ class SolrList(object):
         self._item_cache.append(p_object)
 
 
-class ResultObject(object):
+class ResultObject:
     def __init__(self, initial=None):
         self.__dict__["_data"] = initial or {}
 

@@ -35,7 +35,7 @@ LASC_SESSION_STATUS_KEY = "session:lasc:status"
 LASC_SESSION_COOKIE_KEY = "session:lasc:cookies"
 
 
-class SESSION_IS(object):
+class SESSION_IS:
     LOGGING_IN = "logging_in"
     OK = "ok"
 

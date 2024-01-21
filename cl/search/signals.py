@@ -19,6 +19,8 @@ from cl.search.documents import (
     AudioDocument,
     DocketDocument,
     ESRECAPDocument,
+    OpinionClusterDocument,
+    OpinionDocument,
     ParentheticalGroupDocument,
     PersonDocument,
     PositionDocument,
@@ -26,6 +28,7 @@ from cl.search.documents import (
 from cl.search.models import (
     BankruptcyInformation,
     Citation,
+    Court,
     Docket,
     DocketEntry,
     Opinion,
@@ -81,10 +84,7 @@ pa_field_mapping = {
                 "docket_id": ["docket_id"],
                 "judges": ["judge"],
                 "nature_of_suit": ["suitNature"],
-                "get_precedential_status_display": [
-                    "status"
-                ],  # On fields where
-                # indexed values needs to be the display() value, use get_{field_name}_display as key.
+                "precedential_status": ["status"],
             },
         },
         Parenthetical: {
@@ -213,7 +213,6 @@ p_field_mapping = {
     },
     "bulk-create": {},
 }
-
 
 position_field_mapping = {
     "save": {
@@ -387,6 +386,125 @@ recap_document_field_mapping = {
     },
 }
 
+o_field_mapping = {
+    "save": {
+        Docket: {
+            "docket": {
+                "docket_number": ["docketNumber"],
+                "date_argued": ["dateArgued"],
+                "date_reargued": ["dateReargued"],
+                "date_reargument_denied": ["dateReargumentDenied"],
+            }
+        },
+        OpinionCluster: {
+            "sub_opinions": {
+                "case_name": ["caseName"],
+                "case_name_full": ["caseName", "caseNameFull"],
+                "case_name_short": ["caseName"],
+                "date_filed": ["dateFiled"],
+                "judges": ["judge"],
+                "attorneys": ["attorney"],
+                "nature_of_suit": ["suitNature"],
+                "precedential_status": ["status"],
+                "procedural_history": ["procedural_history"],
+                "posture": ["posture"],
+                "syllabus": ["syllabus"],
+                "scdb_id": ["scdb_id"],
+                "citation_count": ["citeCount"],
+            }
+        },
+        Opinion: {
+            "self": {
+                "author_id": ["author_id"],
+                "type": ["type", "type_text"],
+                "per_curiam": ["per_curiam"],
+                "download_url": ["download_url"],
+                "local_path": ["local_path"],
+                "html_columbia": ["text"],
+                "html_lawbox": ["text"],
+                "xml_harvard": ["text"],
+                "html_anon_2020": ["text"],
+                "html": ["text"],
+                "plain_text": ["text"],
+                "sha1": ["sha1"],
+            },
+        },
+    },
+    "delete": {Opinion: {}},
+    "m2m": {
+        Opinion.joined_by.through: {
+            "opinion": {
+                "joined_by_ids": "joined_by_ids",
+            },
+        },
+    },
+    "reverse": {
+        OpinionsCited: {"cited_opinions": {"all": ["cites"]}},
+    },  # For handling OpinionsCited.save() in add_manual_citations command
+    "reverse-delete": {},
+    "bulk-create": {},
+}
+
+o_cluster_field_mapping = {
+    "save": {
+        Docket: {
+            "docket": {
+                "court_id": ["court_exact"],
+                "docket_number": ["docketNumber"],
+                "date_argued": ["dateArgued"],
+                "date_reargued": ["dateReargued"],
+                "date_reargument_denied": ["dateReargumentDenied"],
+            }
+        },
+        OpinionCluster: {
+            "self": {
+                "docket_id": ["prepare"],
+                "case_name": ["caseName"],
+                "case_name_short": ["caseName"],
+                "case_name_full": ["caseNameFull", "caseName"],
+                "date_filed": ["dateFiled"],
+                "judges": ["judge"],
+                "attorneys": ["attorney"],
+                "nature_of_suit": ["suitNature"],
+                "precedential_status": ["status"],
+                "procedural_history": ["procedural_history"],
+                "posture": ["posture"],
+                "syllabus": ["syllabus"],
+                "scdb_id": ["scdb_id"],
+                "citation_count": ["citeCount"],
+                "slug": ["absolute_url"],
+                "source": ["source"],
+            },
+        },
+    },
+    "delete": {OpinionCluster: {}},
+    "m2m": {
+        OpinionCluster.panel.through: {
+            "opinioncluster": {
+                "panel_ids": "panel_ids",
+            },
+        },
+        OpinionCluster.non_participating_judges.through: {
+            "opinioncluster": {
+                "non_participating_judge_ids": "non_participating_judge_ids",
+            },
+        },
+    },
+    "reverse": {
+        Opinion: {"sub_opinions": {"cluster_id": ["sibling_ids"]}},
+        Citation: {
+            "citations": {"all": ["citation", "neutralCite", "lexisCite"]}
+        },
+    },
+    "reverse-delete": {
+        Opinion: {"cluster": {"all": ["sibling_ids"]}},
+        Citation: {
+            "cluster": {"all": ["citation", "neutralCite", "lexisCite"]}
+        },
+    },
+    "bulk-create": {},
+}
+
 
 # Instantiate a new ESSignalProcessor() for each Model/Document that needs to
 # be tracked. The arguments are: main model, ES document mapping, and field mapping dict.
@@ -418,6 +536,14 @@ if not settings.ELASTICSEARCH_RECAP_DOCS_SIGNALS_DISABLED:
 if not settings.ELASTICSEARCH_DOCKETS_SIGNALS_DISABLED:
     _docket_signal_processor = ESSignalProcessor(
         Docket, DocketDocument, docket_field_mapping
+    )
+if settings.ELASTICSEARCH_OPINIONS_SIGNALS_ENABLED:
+    _o_signal_processor = ESSignalProcessor(
+        Opinion, OpinionDocument, o_field_mapping
+    )
+if settings.ELASTICSEARCH_CLUSTERS_SIGNALS_ENABLED:
+    _o_cluster_signal_processor = ESSignalProcessor(
+        OpinionCluster, OpinionClusterDocument, o_cluster_field_mapping
     )
 
 
