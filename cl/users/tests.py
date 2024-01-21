@@ -2880,7 +2880,7 @@ class EmailBrokenTest(ESIndexTestCase, TestCase):
         user.password = make_password("password")
         await user.asave()
         # Authenticate user
-        login = await sync_to_async(self.async_client.login)(
+        login = await self.async_client.alogin(
             username=user.username, password="password"
         )
         r = await self.async_client.get(path)
@@ -2931,7 +2931,7 @@ class EmailBrokenTest(ESIndexTestCase, TestCase):
         user.email = "complaint@simulator.amazonses.com"
         user.password = make_password("password")
         await user.asave()
-        login = await sync_to_async(self.async_client.login)(
+        login = await self.async_client.alogin(
             username=user.username, password="password"
         )
         r = await self.async_client.get(path)
@@ -2965,7 +2965,7 @@ class EmailBrokenTest(ESIndexTestCase, TestCase):
         user.password = make_password("password")
         await user.asave()
         # Authenticate user
-        login = await sync_to_async(self.async_client.login)(
+        login = await self.async_client.alogin(
             username=user.username, password="password"
         )
         r = await self.async_client.get(path)
@@ -3008,7 +3008,7 @@ class EmailBrokenTest(ESIndexTestCase, TestCase):
         # email error.
         user.email = "new@simulator.amazonses.com"
         await user.asave()
-        login = await sync_to_async(self.async_client.login)(
+        login = await self.async_client.alogin(
             username=user.username, password="password"
         )
 
@@ -3026,7 +3026,7 @@ class EmailBrokenTest(ESIndexTestCase, TestCase):
         user.email = "bounce@simulator.amazonses.com"
         user.password = make_password("password")
         await user.asave()
-        await sync_to_async(self.async_client.login)(
+        await self.async_client.alogin(
             username=user.username, password="password"
         )
         r = await self.async_client.get(path)
@@ -3155,7 +3155,7 @@ class WebhooksHTMXTests(APITestCase):
     def tearDown(cls):
         Webhook.objects.all().delete()
 
-    def make_a_webhook(
+    async def make_a_webhook(
         self,
         client,
         url="https://example.com",
@@ -3167,14 +3167,14 @@ class WebhooksHTMXTests(APITestCase):
             "event_type": event_type,
             "enabled": enabled,
         }
-        return client.post(self.webhook_path, data)
+        return await client.post(self.webhook_path, data)
 
     async def test_make_an_webhook(self) -> None:
         """Can we make a webhook?"""
 
         # Make a webhook
         webhooks = Webhook.objects.all()
-        response = await sync_to_async(self.make_a_webhook)(self.client)
+        response = await self.make_a_webhook(self.client)
         self.assertEqual(await webhooks.acount(), 1)
         self.assertEqual(response.status_code, HTTP_201_CREATED)
 
@@ -3188,7 +3188,7 @@ class WebhooksHTMXTests(APITestCase):
 
         # Make a webhook
         webhooks = Webhook.objects.all()
-        response = await sync_to_async(self.make_a_webhook)(
+        response = await self.make_a_webhook(
             self.client, url="http://example.com"
         )
         # No webhook should be created since we don't allow HTTP endpoints.
@@ -3199,14 +3199,14 @@ class WebhooksHTMXTests(APITestCase):
         """Can we list user's own webhooks?"""
 
         # Make a webhook for user_1
-        await sync_to_async(self.make_a_webhook)(self.client)
+        await self.make_a_webhook(self.client)
 
         webhook_path_list = reverse(
             "webhooks-list",
             kwargs={"format": "html"},
         )
         # Get the webhooks for user_1
-        response = await sync_to_async(self.client.get)(webhook_path_list)
+        response = await self.client.get(webhook_path_list)
         self.assertEqual(response.status_code, HTTP_200_OK)
 
     async def test_delete_webhook(self) -> None:
@@ -3215,10 +3215,10 @@ class WebhooksHTMXTests(APITestCase):
         """
 
         # Make two webhooks for user_1
-        await sync_to_async(self.make_a_webhook)(
+        await self.make_a_webhook(
             self.client, event_type=WebhookEventType.DOCKET_ALERT
         )
-        await sync_to_async(self.make_a_webhook)(
+        await self.make_a_webhook(
             self.client, event_type=WebhookEventType.SEARCH_ALERT
         )
 
@@ -3232,9 +3232,7 @@ class WebhooksHTMXTests(APITestCase):
         )
 
         # Delete the webhook for user_1
-        response = await sync_to_async(self.client.delete)(
-            webhook_1_path_detail
-        )
+        response = await self.client.delete(webhook_1_path_detail)
         self.assertEqual(response.status_code, HTTP_204_NO_CONTENT)
         self.assertEqual(await webhooks.acount(), 1)
 
@@ -3245,9 +3243,7 @@ class WebhooksHTMXTests(APITestCase):
         )
 
         # user_2 tries to delete a user_1 webhook, it should fail
-        response = await sync_to_async(self.client_2.delete)(
-            webhook_2_path_detail
-        )
+        response = await self.client_2.delete(webhook_2_path_detail)
         self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
         self.assertEqual(await webhooks.acount(), 1)
 
@@ -3257,7 +3253,7 @@ class WebhooksHTMXTests(APITestCase):
         """
 
         # Make one webhook for user_1
-        await sync_to_async(self.make_a_webhook)(self.client)
+        await self.make_a_webhook(self.client)
         webhooks = Webhook.objects.all()
         self.assertEqual(await webhooks.acount(), 1)
         webhooks_first = await webhooks.afirst()
@@ -3267,20 +3263,18 @@ class WebhooksHTMXTests(APITestCase):
         )
 
         # Get the webhook detail for user_1
-        response = await sync_to_async(self.client.get)(webhook_1_path_detail)
+        response = await self.client.get(webhook_1_path_detail)
         self.assertEqual(response.status_code, HTTP_200_OK)
 
         # user_2 tries to get user_1 webhook, it should fail
-        response = await sync_to_async(self.client_2.get)(
-            webhook_1_path_detail
-        )
+        response = await self.client_2.get(webhook_1_path_detail)
         self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
 
     async def test_webhook_update(self) -> None:
         """Can we update a webhook?"""
 
         # Make one webhook for user_1
-        await sync_to_async(self.make_a_webhook)(self.client)
+        await self.make_a_webhook(self.client)
         webhooks = Webhook.objects.all()
         self.assertEqual(await webhooks.acount(), 1)
 
@@ -3301,9 +3295,7 @@ class WebhooksHTMXTests(APITestCase):
             "event_type": webhooks_first.event_type,
             "enabled": webhooks_first.enabled,
         }
-        response = await sync_to_async(self.client.put)(
-            webhook_1_path_detail, data_updated
-        )
+        response = await self.client.put(webhook_1_path_detail, data_updated)
 
         # Check that the webhook was updated
         self.assertEqual(response.status_code, HTTP_200_OK)
@@ -3319,7 +3311,7 @@ class WebhooksHTMXTests(APITestCase):
         """Can we send a test webhook event?"""
 
         # Make one webhook for user_1
-        await sync_to_async(self.make_a_webhook)(self.client)
+        await self.make_a_webhook(self.client)
         webhooks = Webhook.objects.all()
         self.assertEqual(await webhooks.acount(), 1)
 
@@ -3334,9 +3326,7 @@ class WebhooksHTMXTests(APITestCase):
                 200, mock_raw=True
             ),
         ):
-            response = await sync_to_async(self.client.post)(
-                webhook_1_path_test, {}
-            )
+            response = await self.client.post(webhook_1_path_test, {})
         # Compare the test webhook event data.
         self.assertEqual(response.status_code, HTTP_200_OK)
         webhook_event = WebhookEvent.objects.all().order_by("date_created")
@@ -3354,9 +3344,7 @@ class WebhooksHTMXTests(APITestCase):
                 500, mock_raw=True
             ),
         ):
-            response = await sync_to_async(self.client.post)(
-                webhook_1_path_test, {}
-            )
+            response = await self.client.post(webhook_1_path_test, {})
         # Compare the test webhook event data.
         self.assertEqual(await webhook_event.acount(), 2)
         webhook_event_last = await webhook_event.select_related(
@@ -3395,9 +3383,7 @@ class WebhooksHTMXTests(APITestCase):
         self.assertEqual(await webhooks.acount(), 1)
 
         # Get the webhooks for user_1
-        response = await sync_to_async(self.client.get)(
-            webhook_event_path_list
-        )
+        response = await self.client.get(webhook_event_path_list)
         self.assertEqual(response.status_code, HTTP_200_OK)
         # There shouldn't be results for user_1
         self.assertEqual(response.content, b"\n\n")
@@ -3415,9 +3401,7 @@ class WebhooksHTMXTests(APITestCase):
         self.assertEqual(await webhooks.acount(), 2)
 
         # Get the webhooks for user_1
-        response = await sync_to_async(self.client.get)(
-            webhook_event_path_list
-        )
+        response = await self.client.get(webhook_event_path_list)
         self.assertEqual(response.status_code, HTTP_200_OK)
         # There should be results for user_1
         self.assertNotEqual(response.content, b"\n\n")
