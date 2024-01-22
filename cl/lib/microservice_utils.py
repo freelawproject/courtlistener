@@ -80,7 +80,9 @@ async def microservice(
     elif file:
         files = {"file": ("filename", file)}
 
-    async with AsyncClient(follow_redirects=True, http2=True) as client:
+    async with AsyncClient(
+        follow_redirects=True, http2=True, timeout=None
+    ) as client:
         req = client.build_request(
             method=method,
             url=services[service]["url"],  # type: ignore
