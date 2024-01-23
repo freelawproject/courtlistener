@@ -1155,8 +1155,8 @@ def remove_document_from_es_index(
     except NotFoundError:
         model_label = es_document.Django.model.__name__.capitalize()
         logger.error(
-            f"The {model_label} with ID:{instance_id} can't be deleted from "
-            "the ES index, it doesn't exists."
+            f"The {model_label} can't be deleted from the ES index, it doesn't "
+            f"exists."
         )
 
 
