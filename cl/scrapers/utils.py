@@ -5,6 +5,7 @@ from datetime import date
 from typing import Optional, Tuple
 from urllib.parse import urljoin
 
+import httpx
 import requests
 from asgiref.sync import async_to_sync
 from courts_db import find_court_by_id, find_court_ids_by_name
@@ -81,8 +82,8 @@ def get_child_court(child_court_name: str, court_id: str) -> Optional[Court]:
 
 @retry(
     (
-        requests.ConnectionError,
-        requests.ReadTimeout,
+        httpx.NetworkError,
+        httpx.TimeoutException,
     ),
     tries=3,
     delay=5,
@@ -135,8 +136,8 @@ def follow_redirections(r: Response, s: Session) -> Response:
 
 @retry(
     (
-        requests.ConnectionError,
-        requests.ReadTimeout,
+        httpx.NetworkError,
+        httpx.TimeoutException,
     ),
     tries=3,
     delay=5,
