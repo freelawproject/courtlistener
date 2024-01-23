@@ -20,7 +20,8 @@ from django.http import HttpRequest
 from django.http.request import QueryDict
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.exceptions import RequestError, TransportError
-from elasticsearch_dsl import A, Q
+from elasticsearch_dsl import A, MultiSearch, Q
+from elasticsearch_dsl import Search as SearchDSL
 from elasticsearch_dsl.connections import connections
 from elasticsearch_dsl.query import Query, QueryString, Range
 from elasticsearch_dsl.response import Hit, Response
@@ -1065,7 +1066,7 @@ def get_facet_dict_for_search_query(
 
 def build_es_main_query(
     search_query: Search, cd: CleanData
-) -> tuple[Search, int | None, int, int | None]:
+) -> tuple[Search, Search | None, int | None]:
     """Builds and returns an elasticsearch query based on the given cleaned
      data, also performs grouping if required, add highlighting and returns
      additional query related metrics.
@@ -1073,14 +1074,14 @@ def build_es_main_query(
     :param search_query: The Elasticsearch search query object.
     :param cd: The cleaned data object containing the query and filters.
     :return: A three tuple, the Elasticsearch search query object after applying
-    filters, string query and grouping if needed, the total number of results,
-    the total number of top hits returned by a group if applicable.
+    filters, string query and grouping if needed, the child documents count
+    query if required, the total number of top hits returned by a group if
+    applicable.
     """
     search_query_base = search_query
     search_query, join_query = build_es_base_query(search_query, cd)
-    total_query_results = do_count_query(search_query)
     top_hits_limit = 5
-    total_child_results: int | None = None
+    child_docs_count_query = None
     match cd["type"]:
         case SEARCH_TYPES.PARENTHETICAL:
             # Create groups aggregation, add highlight and
@@ -1092,9 +1093,8 @@ def build_es_main_query(
             )
             return (
                 search_query,
-                total_query_results,
+                child_docs_count_query,
                 top_hits_limit,
-                total_child_results,
             )
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             child_docs_count_query = build_child_docs_query(
@@ -1102,10 +1102,9 @@ def build_es_main_query(
             )
             if child_docs_count_query:
                 # Get the total RECAP Documents count.
-                search_query_base = search_query_base.query(
+                child_docs_count_query = search_query_base.query(
                     child_docs_count_query
                 )
-                total_child_results = do_count_query(search_query_base)
         case _:
             pass
 
@@ -1114,9 +1113,8 @@ def build_es_main_query(
 
     return (
         search_query,
-        total_query_results,
+        child_docs_count_query,
         top_hits_limit,
-        total_child_results,
     )
 
 
@@ -1557,45 +1555,105 @@ def merge_unavailable_fields_on_parent_document(
             result[cleaned_name] = value
 
 
+def clean_count_query(search_query: Search) -> SearchDSL:
+    """Cleans a given ES Search object for a count query.
+
+    Modifies the input Search object by removing 'inner_hits' from
+    any 'has_child' queries within the 'should' clause of the boolean query.
+    It then creates a new Search object with the modified query.
+
+    :param search_query: The ES Search object.
+    :return: A new ES Search object with the count query.
+    """
+
+    parent_total_query_dict = search_query.to_dict()
+    try:
+        # Clean the has_child query in queries that contain it.
+        for query in parent_total_query_dict["query"]["bool"]["should"]:
+            if "has_child" in query and "inner_hits" in query["has_child"]:
+                del query["has_child"]["inner_hits"]
+    except KeyError:
+        # Omit queries that don't contain it.
+        pass
+
+    # Select only the query and omit other elements like sorting, highlighting, etc
+    parent_total_query_dict = parent_total_query_dict["query"]
+    # Generate a new Search object from scratch
+    search_query = SearchDSL(index=search_query._index)
+    search_query = search_query.query(Q(parent_total_query_dict))
+    return search_query
+
+
 def fetch_es_results(
     get_params: QueryDict,
     search_query: Search,
+    child_docs_count_query: Search | None,
     page: int = 1,
     rows_per_page: int = settings.SEARCH_PAGE_SIZE,
-) -> tuple[Response | list, int, bool]:
+) -> tuple[Response | list, int, bool, int | None, int | None]:
     """Fetch elasticsearch results with pagination.
 
     :param get_params: The user get params.
     :param search_query: Elasticsearch DSL Search object
-    :param page: Current page number
-    :param rows_per_page: Number of records wanted per page
-    :return: A three tuple, the ES response, the ES query time and if
-    there was an error.
+    :param child_docs_count_query: The ES Search object to perform the count
+    for child documents if required, otherwise None.
+    :param page: Current page number.
+    :param rows_per_page: Number of records wanted per page.
+    :return: A five-tuple: The ES main response, the ES query time, whether
+    there was an error, the total number of hits for the main document, and
+    the total number of hits for the child document.
     """
 
+    child_total = None
+    child_total_query = None
     # Default to page 1 if the user request page 0.
     page = page or 1
     # Compute "from" parameter for Elasticsearch
     es_from = (page - 1) * rows_per_page
     error = True
-    # Execute the Elasticsearch search with "size" and "from" parameters
     try:
-        # Execute the Elasticsearch search with "size" and "from" parameters
-        response = search_query.extra(
-            from_=es_from, size=rows_per_page
-        ).execute()
-        query_time = response.took
+        main_query = search_query.extra(from_=es_from, size=rows_per_page)
+        main_doc_count_query = clean_count_query(search_query)
+        # Set size to 0 to avoid retrieving documents in the count queries for
+        # better performance. Set track_total_hits to True to consider all the
+        # documents.
+        main_doc_count_query = main_doc_count_query.extra(
+            size=0, track_total_hits=True
+        )
+        if child_docs_count_query:
+            child_total_query = child_docs_count_query.extra(
+                size=0, track_total_hits=True
+            )
+
+        # Execute the ES main query + count queries in a single request.
+        multi_search = MultiSearch()
+        multi_search = multi_search.add(main_query).add(main_doc_count_query)
+        if child_total_query:
+            multi_search = multi_search.add(child_total_query)
+        responses = multi_search.execute()
+
+        main_response = responses[0]
+        main_doc_count_response = responses[1]
+        parent_total = main_doc_count_response.hits.total.value
+        if child_total_query:
+            child_doc_count_response = responses[2]
+            child_total = child_doc_count_response.hits.total.value
+
+        query_time = main_response.took
         error = False
         search_type = get_params.get("type", SEARCH_TYPES.OPINION)
-        if response.aggregations and search_type == SEARCH_TYPES.PARENTHETICAL:
-            response = response.aggregations.groups.buckets
-        return response, query_time, error
+        if (
+            main_response.aggregations
+            and search_type == SEARCH_TYPES.PARENTHETICAL
+        ):
+            main_response = main_response.aggregations.groups.buckets
+        return main_response, query_time, error, parent_total, child_total
     except (TransportError, ConnectionError, RequestError) as e:
         logger.warning(f"Error loading search page with request: {get_params}")
         logger.warning(f"Error was: {e}")
         if settings.DEBUG is True:
             traceback.print_exc()
-    return [], 0, error
+    return [], 0, error, None, None
 
 
 def build_join_fulltext_queries(
@@ -2268,11 +2326,17 @@ async def get_related_clusters_with_cache_and_es(
         search_params["type"] = SEARCH_TYPES.OPINION
         query_dict = QueryDict("", mutable=True)
         query_dict.update(search_params)
-        search_query, total_query_results, *_ = await sync_to_async(
+        search_query, child_docs_count_query, _ = await sync_to_async(
             build_es_main_query
         )(search, search_params)
-        hits, _, error = await sync_to_async(fetch_es_results)(
-            query_dict, search_query, 1, settings.RELATED_COUNT
+        hits, _, error, total_query_results, _ = await sync_to_async(
+            fetch_es_results
+        )(
+            query_dict,
+            search_query,
+            child_docs_count_query,
+            1,
+            settings.RELATED_COUNT,
         )
         if error:
             return [], [], url_search_params
