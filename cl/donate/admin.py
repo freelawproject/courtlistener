@@ -1,6 +1,11 @@
 from django.contrib import admin
 
-from cl.donate.models import Donation, MonthlyDonation
+from cl.donate.models import (
+    Donation,
+    MonthlyDonation,
+    NeonMembership,
+    NeonWebhookEvent,
+)
 
 
 @admin.register(Donation)
@@ -55,3 +60,22 @@ class MonthlyDonationAdmin(admin.ModelAdmin):
 class MonthlyDonationInline(admin.TabularInline):
     model = MonthlyDonation
     extra = 0
+
+
+class NeonMembershipInline(admin.StackedInline):
+    model = NeonMembership
+    extra = 0
+
+
+@admin.register(NeonWebhookEvent)
+class NeonWebhookEventAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "get_trigger",
+        "account_id",
+        "membership_id",
+    )
+
+    @admin.display(description="Trigger")
+    def get_trigger(self, obj):
+        return obj.get_trigger_display()
