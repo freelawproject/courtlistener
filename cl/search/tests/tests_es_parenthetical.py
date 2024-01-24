@@ -311,12 +311,7 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
             "type": "pa",
         }
         search_query = ParentheticalGroupDocument.search()
-        (
-            s,
-            total_query_results,
-            top_hits_limit,
-            total_child_results,
-        ) = build_es_main_query(search_query, cd)
+        s, *_ = build_es_main_query(search_query, cd)
         self.assertEqual(s.count(), 1)
 
     def test_cd_query_2(self) -> None:
