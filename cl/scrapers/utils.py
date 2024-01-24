@@ -12,6 +12,7 @@ from courts_db import find_court_by_id, find_court_ids_by_name
 from django.conf import settings
 from django.db.models import QuerySet
 from juriscraper.AbstractSite import logger
+from juriscraper.lib.network_utils import SSLAdapter
 from juriscraper.lib.test_utils import MockRequest
 from lxml import html
 from requests import Response, Session
@@ -152,11 +153,36 @@ def get_extension(content: bytes) -> str:
     ).text
 
 
+def make_session(court_str: str):
+    """Create and configure a requests session for a specified court.
+
+    This function initializes a requests session and mounts an SSLAdapter
+    with a cipher tailored to the specified court. If the court string is
+    not recognized, the session is returned without any special SSL configuration.
+
+    :param court_str: A string identifier for the court.
+    :return: A configured requests.Session object.
+    """
+    s = requests.session()
+
+    cipher_map = {
+        "conn": "AES256-SHA256",
+        "connappct": "AES256-SHA256",
+        "lactapp": "AES128-SHA",
+        "calag": "ECDHE-RSA-AES128-GCM-SHA256",
+    }
+    cipher = cipher_map.get(court_str, None)
+    if cipher:
+        s.mount("https://", SSLAdapter(ciphers=cipher))
+    return s
+
+
 def get_binary_content(
     download_url: str,
     cookies: RequestsCookieJar,
     headers: dict,
     method: str = "GET",
+    court_str: str = None,
 ) -> Tuple[str, Optional[Response]]:
     """Downloads the file, covering a few special cases such as invalid SSL
     certificates and empty file errors.
@@ -184,7 +210,7 @@ def get_binary_content(
     else:
         # Note that we do a GET even if site.method is POST. This is
         # deliberate.
-        s = requests.session()
+        s = make_session(court_str=court_str)
 
         r = s.get(
             download_url,

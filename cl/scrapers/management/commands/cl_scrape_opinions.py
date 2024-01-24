@@ -256,6 +256,7 @@ class Command(VerboseCommand):
                 site.cookies,
                 headers,
                 method=site.method,
+                court_str=court_str,
             )
             if msg:
                 logger.warning(msg)
