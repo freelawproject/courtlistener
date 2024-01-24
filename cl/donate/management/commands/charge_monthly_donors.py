@@ -89,7 +89,7 @@ class Command(VerboseCommand):
                 # is triggered.
 
         if results["users"]:
-            email: EmailType = emails["admin_donation_report"]
+            email: EmailType = emails["admin_monthly_donation_report"]
             body = email["body"] % (
                 results["amount"],
                 "\n".join(results["users"]),

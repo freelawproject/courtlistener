@@ -60,6 +60,15 @@ emails: Dict[str, EmailType] = {
         "https://free.law/contact/",
         "from_email": settings.DEFAULT_FROM_EMAIL,
     },
+    "admin_monthly_donation_report": {
+        "subject": "$%s were donated by monthly donors today",
+        "body": "The following monthly donors contributed a total of $%s:\n\n "
+        "%s\n\n"
+        "(Note that some of these charges still can fail to go "
+        "through.)",
+        "from_email": settings.DEFAULT_FROM_EMAIL,
+        "to": [a[1] for a in settings.MANAGERS],
+    },
 }
 
 
