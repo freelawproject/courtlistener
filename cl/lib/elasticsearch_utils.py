@@ -19,7 +19,7 @@ from django.forms.boundfield import BoundField
 from django.http import HttpRequest
 from django.http.request import QueryDict
 from django_elasticsearch_dsl.search import Search
-from elasticsearch.exceptions import RequestError, TransportError
+from elasticsearch.exceptions import ApiError, RequestError, TransportError
 from elasticsearch_dsl import A, MultiSearch, Q
 from elasticsearch_dsl import Search as SearchDSL
 from elasticsearch_dsl.connections import connections
@@ -1640,19 +1640,26 @@ def fetch_es_results(
             child_total = child_doc_count_response.hits.total.value
 
         query_time = main_response.took
-        error = False
         search_type = get_params.get("type", SEARCH_TYPES.OPINION)
         if (
             main_response.aggregations
             and search_type == SEARCH_TYPES.PARENTHETICAL
         ):
             main_response = main_response.aggregations.groups.buckets
+        error = False
         return main_response, query_time, error, parent_total, child_total
     except (TransportError, ConnectionError, RequestError) as e:
-        logger.warning(f"Error loading search page with request: {get_params}")
-        logger.warning(f"Error was: {e}")
+        logger.warning(
+            "Error loading search page with request: %s", dict(get_params)
+        )
+        logger.warning("Error was: %s", e)
         if settings.DEBUG is True:
             traceback.print_exc()
+    except ApiError as e:
+        if "Failed to parse query" in str(e):
+            logger.warning("Failed to parse query: %s", e)
+        else:
+            logger.error("Multi-search API Error: %s", e)
     return [], 0, error, None, None
 
 
