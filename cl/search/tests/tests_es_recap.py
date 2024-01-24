@@ -2581,6 +2581,56 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 "Instead found: %s" % (count, test, node_count),
             )
 
+    def test_cleanup_control_characters_for_xml_rendering(self) -> None:
+        """Can we remove control characters in the plain_text for a proper XML
+        rendering?
+        """
+        with mock.patch(
+            "cl.search.documents.escape",
+            return_value="Lorem ipsum control chars \x07\x08\x0B.",
+        ), self.captureOnCommitCallbacks(execute=True):
+            de_1 = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=self.court,
+                    case_name="Lorem Ipsum",
+                    date_filed=datetime.date(2020, 5, 20),
+                ),
+                date_filed=datetime.date(2020, 5, 20),
+                description="MOTION for Leave to File Document attachment",
+            )
+            RECAPDocumentFactory(
+                docket_entry=de_1,
+                description="Control chars test",
+                document_number="1",
+                is_available=True,
+                plain_text="Lorem ipsum control chars \x07\x08\x0B.",
+            )
+
+        params = {
+            "q": "Lorem ipsum control chars",
+            "type": SEARCH_TYPES.RECAP,
+        }
+        response = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(
+            200, response.status_code, msg="Did not get a 200 OK status code."
+        )
+        xml_tree = etree.fromstring(response.content)
+        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
+        entry_summary = "//atom:entry/atom:summary"
+
+        # Confirm the summary is properly rendered without control chars.
+        # And without highlighting
+        expected_summary = "Lorem ipsum control chars ."
+        actual_summary = xml_tree.xpath(entry_summary, namespaces=namespaces)[
+            0
+        ].text
+        self.assertIn(expected_summary, actual_summary)
+        with self.captureOnCommitCallbacks(execute=True):
+            de_1.delete()
+
 
 class IndexDocketRECAPDocumentsCommandTest(
     ESIndexTestCase, TransactionTestCase
@@ -3905,3 +3955,24 @@ class RECAPIndexingTest(
 
         for d in d_created:
             d.delete()
+
+    def test_remove_control_chars_on_plain_text_indexing(self) -> None:
+        """Confirm control chars are removed at indexing time."""
+
+        de_1 = DocketEntryWithParentsFactory(
+            docket=DocketFactory(
+                court=self.court,
+            ),
+            date_filed=datetime.date(2024, 8, 19),
+            entry_number=1,
+        )
+        rd_1 = RECAPDocumentFactory(
+            docket_entry=de_1,
+            description="Leave to File",
+            document_number="1",
+            plain_text="Lorem ipsum control chars \x07\x08\x0B.",
+        )
+
+        r_doc = ESRECAPDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
+        self.assertEqual(r_doc.plain_text, "Lorem ipsum control chars .")
+        de_1.docket.delete()
