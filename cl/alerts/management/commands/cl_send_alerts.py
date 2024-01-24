@@ -13,7 +13,7 @@ from django.template import loader
 from django.utils.timezone import now
 
 from cl.alerts.models import Alert, RealTimeQueue
-from cl.alerts.utils import InvalidDateError, user_has_donated_enough
+from cl.alerts.utils import InvalidDateError
 from cl.api.models import WebhookEventType
 from cl.api.webhooks import send_search_alert_webhook
 from cl.lib import search_utils
@@ -201,10 +201,7 @@ class Command(VerboseCommand):
             logger.info(f"Running alerts for user '{user}': {alerts}")
 
             if rate == Alert.REAL_TIME:
-                user_donated_enough = user_has_donated_enough(
-                    user, alerts.count()
-                )
-                if not user_donated_enough:
+                if not user.profile.is_member:
                     continue
 
             hits = []

@@ -55,7 +55,6 @@ class Command(VerboseCommand):
                             "type": PAYMENT_TYPES.DONATION,
                         },
                     },
-                    reverse("donate_complete"),
                 )
             except PaymentFailureException:
                 m_donation.failure_count += 1

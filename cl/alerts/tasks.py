@@ -19,7 +19,6 @@ from cl.alerts.utils import (
     alert_hits_limit_reached,
     override_alert_query,
     percolate_document,
-    user_has_donated_enough,
 )
 from cl.api.models import WebhookEventType
 from cl.api.tasks import (
@@ -556,10 +555,7 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
 
         # Send RT Alerts
         if alert_triggered.rate == Alert.REAL_TIME:
-            user_donated_enough = user_has_donated_enough(
-                alert_user, alerts_count=1
-            )
-            if not user_donated_enough:
+            if not alert_user.profile.is_member:
                 continue
 
             # Append alert RT email to be sent.
