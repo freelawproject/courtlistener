@@ -29,7 +29,6 @@ from cl.disclosures.models import (
     Reimbursement,
     SpouseIncome,
 )
-from cl.donate.utils import get_donation_totals_by_email
 from cl.people_db.models import Person
 from cl.search.models import (
     SOURCES,
@@ -119,12 +118,6 @@ async def alert_help(request: HttpRequest) -> HttpResponse:
     }
     context.update(data)
     return TemplateResponse(request, "help/alert_help.html", context)
-
-
-async def donation_help(request: HttpRequest) -> HttpResponse:
-    return TemplateResponse(
-        request, "help/donation_help.html", {"private": False}
-    )
 
 
 async def delete_help(request: HttpRequest) -> HttpResponse:
@@ -367,20 +360,15 @@ async def contact(
                 logger.info("Detected spam message. Not sending email.")
                 return HttpResponseRedirect(reverse("contact_thanks"))
 
-            donation_totals = await get_donation_totals_by_email(cd["email"])
             default_from = settings.DEFAULT_FROM_EMAIL
             message = EmailMessage(
                 subject="[CourtListener] Contact: "
                 "{phone_number}".format(**cd),
                 body="Subject: {phone_number}\n"
-                "From: {name} ({email})\n"
-                "Total donated: {total_donated}\n"
-                "Total last year: {total_last_year}\n\n\n"
+                "From: {name} ({email})\n\n\n"
                 "{message}\n\n"
                 "Browser: {browser}".format(
                     browser=request.META.get("HTTP_USER_AGENT", "Unknown"),
-                    total_donated=donation_totals["total"],
-                    total_last_year=donation_totals["last_year"],
                     **cd,
                 ),
                 to=["info@free.law"],

@@ -202,7 +202,7 @@ def view_donations(request: AuthenticatedHttpRequest) -> HttpResponse:
     return TemplateResponse(
         request,
         "profile/donations.html",
-        {"page": "profile_donations", "private": True},
+        {"page": "profile_your_support", "private": True},
     )
 
 

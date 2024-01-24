@@ -12,7 +12,7 @@ from elasticsearch_dsl import Q
 from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
 
-from cl.lib.elasticsearch_utils import build_es_main_query
+from cl.lib.elasticsearch_utils import build_es_main_query, fetch_es_results
 from cl.lib.redis_utils import make_redis_interface
 from cl.lib.test_helpers import IndexedSolrTestCase, RECAPSearchTestCase
 from cl.lib.view_utils import increment_view_count
@@ -138,12 +138,13 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
     def _test_main_es_query(self, cd, parent_expected, field_name):
         search_query = DocketDocument.search()
-        (
+        (s, child_docs_count_query, *_) = build_es_main_query(search_query, cd)
+        hits, _, _, total_query_results, child_total = fetch_es_results(
+            cd,
             s,
-            total_query_results,
-            top_hits_limit,
-            total_child_results,
-        ) = build_es_main_query(search_query, cd)
+            child_docs_count_query,
+            1,
+        )
         self.assertEqual(
             total_query_results,
             parent_expected,
@@ -152,8 +153,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "     Got: %s\n\n"
             % (field_name, parent_expected, total_query_results),
         )
-
-        return s.execute().to_dict()
+        return hits.to_dict()
 
     def _compare_response_child_value(
         self,
@@ -2946,12 +2946,13 @@ class RECAPIndexingTest(
 
     def _test_main_es_query(self, cd, parent_expected, field_name):
         search_query = DocketDocument.search()
-        (
+        (s, child_docs_count_query, *_) = build_es_main_query(search_query, cd)
+        hits, _, _, total_query_results, child_total = fetch_es_results(
+            cd,
             s,
-            total_query_results,
-            top_hits_limit,
-            total_child_results,
-        ) = build_es_main_query(search_query, cd)
+            child_docs_count_query,
+            1,
+        )
         self.assertEqual(
             total_query_results,
             parent_expected,
@@ -2960,8 +2961,7 @@ class RECAPIndexingTest(
             "     Got: %s\n\n"
             % (field_name, parent_expected, total_query_results),
         )
-
-        return s.execute().to_dict()
+        return hits.to_dict()
 
     def test_minute_entry_indexing(self) -> None:
         """Confirm a minute entry can be properly indexed."""
@@ -3890,13 +3890,6 @@ class RECAPIndexingTest(
         """Confirm that the last page in the pagination is properly computed
         based on the number of results returned by Elasticsearch.
         """
-        d_created = []
-        for i in range(21):
-            d = DocketFactory(
-                court=self.court,
-            )
-            d_created.append(d)
-
         # Test pagination requests.
         search_params = {
             "type": SEARCH_TYPES.RECAP,
@@ -3904,11 +3897,12 @@ class RECAPIndexingTest(
 
         # 100 results, 5 pages.
         with mock.patch(
-            "cl.search.views.build_es_main_query",
-            side_effect=lambda x, y: (
-                DocketDocument.search().query("match_all"),
+            "cl.search.views.fetch_es_results",
+            side_effect=lambda *x: (
+                [],
+                1,
+                False,
                 100,
-                5,
                 1000,
             ),
         ):
@@ -3921,11 +3915,12 @@ class RECAPIndexingTest(
 
         # 101 results, 6 pages.
         with mock.patch(
-            "cl.search.views.build_es_main_query",
-            side_effect=lambda x, y: (
-                DocketDocument.search().query("match_all"),
+            "cl.search.views.fetch_es_results",
+            side_effect=lambda *x: (
+                [],
+                1,
+                False,
                 101,
-                5,
                 1000,
             ),
         ):
@@ -3938,11 +3933,12 @@ class RECAPIndexingTest(
 
         # 20,000 results, 1,000 pages.
         with mock.patch(
-            "cl.search.views.build_es_main_query",
-            side_effect=lambda x, y: (
-                DocketDocument.search().query("match_all"),
+            "cl.search.views.fetch_es_results",
+            side_effect=lambda *x: (
+                [],
+                1,
+                False,
                 20_000,
-                5,
                 1000,
             ),
         ):
@@ -3952,9 +3948,6 @@ class RECAPIndexingTest(
             )
         self.assertIn("20,000 Results", r.content.decode())
         self.assertIn("1 of 1,000", r.content.decode())
-
-        for d in d_created:
-            d.delete()
 
     def test_remove_control_chars_on_plain_text_indexing(self) -> None:
         """Confirm control chars are removed at indexing time."""

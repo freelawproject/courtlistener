@@ -196,8 +196,8 @@
                     <li><a href="{% url "tag_list" username=user.username %}"
                            tabindex="205"><i class="fa fa-tags gray fa-fw"></i>&nbsp;Tags</a></li>
                     <li class="divider"></li>
-                    <li><a href="{% url "profile_donations" %}"
-                           tabindex="206"><i class="fa fa-money gray fa-fw"></i>&nbsp;Donations</a></li>
+                    <li><a href="{% url "profile_your_support" %}"
+                           tabindex="206"><i class="fa fa-money gray fa-fw"></i>&nbsp;Your Support</a></li>
                     <li><a href="{% url "view_settings" %}"
                            tabindex="207"><i class="fa fa-user gray fa-fw"></i>&nbsp;Account</a></li>
                     <li>
@@ -216,8 +216,8 @@
                 <li><a href="https://free.law/about/" tabindex="200">About</a></li>
                 <li><a href="{% url "faq" %}" tabindex="201">FAQ</a></li>
                 <li class="visible-xs">
-                  <a href="{% url "donate" %}?referrer=navbar"
-                     tabindex="203">Donate</a>
+                  <a href="https://donate.free.law/forms/membership"
+                     tabindex="203">Become a Member</a>
                 </li>
                 <li><a href="{% url "sign-in" %}"
                        tabindex="205">Sign in / Register</a></li>
@@ -278,7 +278,7 @@
           <ul class="nav navbar-nav navbar-right">
             <li
               class="{% block navbar-donate %}inactive{% endblock %} hidden-xs">
-              <a href="{% url "donate" %}?referrer=navbar-v2"
+              <a href="https://donate.free.law/forms/membership"
                  tabindex="109"
                  class="donate"><i class="fa fa-heart-o"></i>&nbsp;Donate</a>
             </li>
@@ -346,7 +346,7 @@
               <a href="{% url "help_home" %}">Help</a> &amp; <a href="{% url "faq" %}">FAQ</a>
             </div>
             <div class="footer-item">
-              <a href="{% url "donate" %}?referrer=footer-link">Donate</a>
+              <a href="https://donate.free.law/forms/membership">Donate</a>
             </div>
           </div>
 
@@ -405,7 +405,7 @@
       </div>
     </div>
     <div class="col-sm-4 text-right" id="donate-image">
-      <a href="{% url "donate" %}?referrer=footer-button">
+      <a href="https://donate.free.law/forms/membership">
         <img src="{% static "png/donate-button.png" %}"
              alt="Donate to support our work"
              height="75"
@@ -461,7 +461,7 @@
 <script type="text/javascript" src="{% static "js/base.js" %}"></script>
 <script type="text/javascript" nonce="{{ request.csp_nonce }}">
   {# Default values are to ensure JS parsing even if 500 error thrown #}
-  var totalDonatedLastYear = parseFloat({{ user.profile.total_donated_last_year|safe|default:0}}),
+  var isMember = {{ user.profile.is_member|yesno:"true,false" }},
       userAlertCount = {{ user.docket_alerts.subscriptions.count|default:"0" }},
       priceRtAlerts = parseFloat({{ MIN_DONATION.rt_alerts|default:0 }}),
       maxFreeDocketAlerts = {{ MAX_FREE_DOCKET_ALERTS|default:0 }},

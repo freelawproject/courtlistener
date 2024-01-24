@@ -626,13 +626,7 @@ class PeopleSearchTestElasticSearch(
             "order_by": "name_reverse asc",
         }
         search_query = PersonDocument.search()
-        (
-            s,
-            total_query_results,
-            top_hits_limit,
-            total_child_results,
-        ) = build_es_main_query(search_query, cd)
-
+        s, *_ = build_es_main_query(search_query, cd)
         # Main result.
         # Person 3 Judith Susan Sheindlin II
         #    Inner hits:
@@ -682,12 +676,7 @@ class PeopleSearchTestElasticSearch(
             )
 
         search_query = PersonDocument.search()
-        (
-            s,
-            total_query_results,
-            top_hits_limit,
-            total_child_results,
-        ) = build_es_main_query(search_query, cd)
+        s, *_ = build_es_main_query(search_query, cd)
         response = s.execute().to_dict()
         # Main result. All Courts
         # Person 3 Judith Susan Sheindlin II
@@ -727,12 +716,7 @@ class PeopleSearchTestElasticSearch(
             "order_by": "name_reverse asc",
         }
         search_query = PersonDocument.search()
-        (
-            s,
-            total_query_results,
-            top_hits_limit,
-            total_child_results,
-        ) = build_es_main_query(search_query, cd)
+        s, *_ = build_es_main_query(search_query, cd)
         # Main result. Court that doesn't belong any of the positions
         # No results
         self.assertEqual(s.count(), 0)
@@ -744,12 +728,7 @@ class PeopleSearchTestElasticSearch(
         }
 
         search_query = PersonDocument.search()
-        (
-            s,
-            total_query_results,
-            top_hits_limit,
-            total_child_results,
-        ) = build_es_main_query(search_query, cd)
+        s, *_ = build_es_main_query(search_query, cd)
         # Two main results, matched by has_child.
         # [parent_filter, has_child_filters[]]
         # Only 1 result.
@@ -763,12 +742,7 @@ class PeopleSearchTestElasticSearch(
         }
 
         search_query = PersonDocument.search()
-        (
-            s,
-            total_query_results,
-            top_hits_limit,
-            total_child_results,
-        ) = build_es_main_query(search_query, cd)
+        s, *_ = build_es_main_query(search_query, cd)
         # Main result. Combine has child filters and parent filter.
         # Must:
         # [parent_filter, has_child_filters[]]
@@ -784,12 +758,7 @@ class PeopleSearchTestElasticSearch(
         }
 
         search_query = PersonDocument.search()
-        (
-            s,
-            total_query_results,
-            top_hits_limit,
-            total_child_results,
-        ) = build_es_main_query(search_query, cd)
+        s, *_ = build_es_main_query(search_query, cd)
         self.assertEqual(s.count(), 1)
 
         cd = {
@@ -799,12 +768,7 @@ class PeopleSearchTestElasticSearch(
         }
 
         search_query = PersonDocument.search()
-        (
-            s,
-            total_query_results,
-            top_hits_limit,
-            total_child_results,
-        ) = build_es_main_query(search_query, cd)
+        s, *_ = build_es_main_query(search_query, cd)
         # Two main results, matched by string queries on parent and position
         self.assertEqual(s.count(), 2)
 
@@ -815,12 +779,7 @@ class PeopleSearchTestElasticSearch(
         }
 
         search_query = PersonDocument.search()
-        (
-            s,
-            total_query_results,
-            top_hits_limit,
-            total_child_results,
-        ) = build_es_main_query(search_query, cd)
+        s, *_ = build_es_main_query(search_query, cd)
         # Two main results, matched by string queries on parent and position
         self.assertEqual(s.count(), 2)
 
@@ -833,12 +792,7 @@ class PeopleSearchTestElasticSearch(
         }
 
         search_query = PersonDocument.search()
-        (
-            s,
-            total_query_results,
-            top_hits_limit,
-            total_child_results,
-        ) = build_es_main_query(search_query, cd)
+        s, *_ = build_es_main_query(search_query, cd)
         self.assertEqual(s.count(), 1)
         person_2_position.delete()
         position_obama.delete()

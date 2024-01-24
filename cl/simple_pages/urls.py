@@ -13,7 +13,6 @@ from cl.simple_pages.views import (
     coverage_graph,
     coverage_opinions,
     delete_help,
-    donation_help,
     faq,
     feeds,
     help_home,
@@ -47,7 +46,6 @@ urlpatterns = [
     ),
     path("help/markdown/", markdown_help, name="markdown_help"),  # type: ignore[arg-type]
     path("help/alerts/", alert_help, name="alert_help"),  # type: ignore[arg-type]
-    path("help/donations/", donation_help, name="donation_help"),  # type: ignore[arg-type]
     path("help/delete-account/", delete_help, name="delete_help"),  # type: ignore[arg-type]
     path("help/tags-notes/", tag_notes_help, name="tag_notes_help"),  # type: ignore[arg-type]
     path("help/search-operators/", advanced_search, name="advanced_search"),  # type: ignore[arg-type]
