@@ -1187,10 +1187,10 @@ def replace_highlight(
 
     for word in unique_hl_strings:
         # Create a pattern to match the word as a whole word.
-        pattern = rf"(?<!\w){regex.escape(word)}(?!\w)"
+        pattern = rf"(?<!\w){word}(?!\w)"
 
         # Replace with the specified tag
-        replacement = f"<{tag}>{regex.escape(word)}</{tag}>"
+        replacement = f"<{tag}>{word}</{tag}>"
         cleaned_str = regex.sub(pattern, replacement, cleaned_str)
 
     return cleaned_str
