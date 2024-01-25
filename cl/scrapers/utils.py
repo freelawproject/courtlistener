@@ -11,7 +11,7 @@ from asgiref.sync import async_to_sync
 from courts_db import find_court_by_id, find_court_ids_by_name
 from django.conf import settings
 from django.db.models import QuerySet
-from juriscraper import OpinionSite, OralArgumentSite
+from juriscraper import AbstractSite
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.test_utils import MockRequest
 from lxml import html
@@ -154,7 +154,7 @@ def get_extension(content: bytes) -> str:
 
 def get_binary_content(
     download_url: str,
-    site: OpinionSite | OralArgumentSite,
+    site: AbstractSite,
     headers: dict,
     method: str = "GET",
 ) -> Tuple[str, Optional[Response]]:
