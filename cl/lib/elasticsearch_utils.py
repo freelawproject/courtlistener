@@ -698,6 +698,7 @@ def build_has_child_query(
             fields_to_exclude.append(field)
         highlight_options["fields"][field] = {
             "type": settings.ES_HIGHLIGHTER,
+            "matched_fields": [field, f"{field}.exact"],
             "fragment_size": fragment_size,
             "no_match_size": no_match_size,
             "number_of_fragments": number_of_fragments,
@@ -1131,7 +1132,7 @@ def add_es_highlighting(
     fields_to_exclude = []
     highlighting_fields = []
     hl_tag = ALERTS_HL_TAG if alerts else SEARCH_HL_TAG
-
+    matched_fields = False
     match cd["type"]:
         case SEARCH_TYPES.ORAL_ARGUMENT:
             highlighting_fields = (
@@ -1144,18 +1145,30 @@ def add_es_highlighting(
             highlighting_fields = SOLR_PEOPLE_ES_HL_FIELDS
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             highlighting_fields = SEARCH_RECAP_HL_FIELDS
+            matched_fields = True
         case SEARCH_TYPES.OPINION:
             highlighting_fields = SEARCH_OPINION_HL_FIELDS
+            matched_fields = True
 
     search_query = search_query.source(excludes=fields_to_exclude)
     for field in highlighting_fields:
-        search_query = search_query.highlight(
-            field,
-            type="plain",
-            number_of_fragments=0,
-            pre_tags=[f"<{hl_tag}>"],
-            post_tags=[f"</{hl_tag}>"],
-        )
+        if matched_fields:
+            search_query = search_query.highlight(
+                field,
+                type=settings.ES_HIGHLIGHTER,
+                matched_fields=[field, f"{field}.exact"],
+                number_of_fragments=0,
+                pre_tags=[f"<{hl_tag}>"],
+                post_tags=[f"</{hl_tag}>"],
+            )
+        else:
+            search_query = search_query.highlight(
+                field,
+                type="plain",
+                number_of_fragments=0,
+                pre_tags=[f"<{hl_tag}>"],
+                post_tags=[f"</{hl_tag}>"],
+            )
 
     return search_query
 
@@ -1177,7 +1190,7 @@ def replace_highlight(
         pattern = rf"(?<!\w){regex.escape(word)}(?!\w)"
 
         # Replace with the specified tag
-        replacement = f"<{tag}>{word}</{tag}>"
+        replacement = f"<{tag}>{regex.escape(word)}</{tag}>"
         cleaned_str = regex.sub(pattern, replacement, cleaned_str)
 
     return cleaned_str
@@ -1210,7 +1223,10 @@ def select_unique_hl(
 
 
 def merge_highlights_into_result(
-    highlights: dict[str, Any], result: AttrDict | dict[str, Any], tag: str
+    highlights: dict[str, Any],
+    result: AttrDict | dict[str, Any],
+    tag: str,
+    search_type: str | None = None,
 ) -> None:
     """Merges the highlight terms into the search result.
     This function processes highlighted fields in the `highlights` attribute
@@ -1221,6 +1237,7 @@ def merge_highlights_into_result(
     their highlighted terms.
     :param result: The AttrDict object containing search results.
     :param tag: The HTML tag used to mark highlighted terms.
+    :param search_type: The search type being performed.
     :return: None, the function updates the results in place.
     """
 
@@ -1229,6 +1246,12 @@ def merge_highlights_into_result(
         field,
         highlight_list,
     ) in highlights.items():
+        if search_type in [SEARCH_TYPES.RECAP, SEARCH_TYPES.OPINION]:
+            # For RECAP and Opinions Search that use FVH, highlighted results
+            # are already combined. Simply assign them to the _source field.
+            result[field] = highlight_list
+            continue
+
         # If a query highlights fields, the "field.exact", "field" or
         # both versions are available. Highlighted terms in each
         # version can differ, so the best thing to do is combine
@@ -1338,6 +1361,7 @@ def set_results_highlights(results: Page | Response, search_type: str) -> None:
                     highlights,
                     result,
                     SEARCH_HL_TAG,
+                    search_type,
                 )
 
             # Merge child document highlights
@@ -1350,6 +1374,7 @@ def set_results_highlights(results: Page | Response, search_type: str) -> None:
                         highlights,
                         child_doc["_source"],
                         SEARCH_HL_TAG,
+                        search_type,
                     )
 
 

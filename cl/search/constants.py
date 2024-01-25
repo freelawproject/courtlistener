@@ -145,32 +145,21 @@ SOLR_RECAP_HL_FIELDS = [
 ]
 SEARCH_RECAP_HL_FIELDS = [
     "assignedTo",
-    "assignedTo.exact",
     "caseName",
-    "caseName.exact",
     "cause",
-    "cause.exact",
     "court_citation_string",
     "docketNumber",
-    "docketNumber.exact",
     "juryDemand",
-    "juryDemand.exact",
     "referredTo",
-    "referredTo.exact",
     "suitNature",
-    "suitNature.exact",
 ]
 
 SEARCH_OPINION_HL_FIELDS = [
     "caseName",
-    "caseName.exact",
     "citation",
-    "citation.exact",
     "court_citation_string",
     "docketNumber",
-    "docketNumber.exact",
     "suitNature",
-    "suitNature.exact",
 ]
 
 
@@ -181,17 +170,11 @@ SEARCH_OPINION_HL_FIELDS = [
 # or provide a different integer to limit the snippet length.
 SEARCH_RECAP_CHILD_HL_FIELDS = {
     "short_description": 0,
-    "short_description.exact": 0,
     "description": 0,
-    "description.exact": 0,
-    "document_type": 0,
-    "document_type.exact": 0,
     "plain_text": 100,
-    "plain_text.exact": 100,
 }
 SEARCH_OPINION_CHILD_HL_FIELDS = {
     "text": 100,
-    "text.exact": 100,
 }
 
 MULTI_VALUE_HL_FIELDS = ["citation"]
