@@ -2190,13 +2190,13 @@ setuptools = "*"
 
 [[package]]
 name = "juriscraper"
-version = "2.5.82"
+version = "2.5.83"
 description = "An API to scrape American court websites for metadata."
 optional = false
 python-versions = "*"
 files = [
-    {file = "juriscraper-2.5.82-py27-none-any.whl", hash = "sha256:4d4e65423cf993c8debb6fe03c1ae998438d0a164e2241383c00534b8e7a53b6"},
-    {file = "juriscraper-2.5.82.tar.gz", hash = "sha256:a0c0bc2daa1fad1f53c13e9c280d7942a909f60540c7eadc5c0023f65e95e18a"},
+    {file = "juriscraper-2.5.83-py27-none-any.whl", hash = "sha256:9345b9a1962a384dfb1a4bc948c0e89f4abce5581e67190b63554f2a81e2b4ae"},
+    {file = "juriscraper-2.5.83.tar.gz", hash = "sha256:1a3e051a18bc6dfd29344886eff7dda680d635de0a3afba6bf4e082657937b8d"},
 ]
 
 [package.dependencies]
@@ -3622,6 +3622,7 @@ files = [
     {file = "PyYAML-6.0.1-cp311-cp311-win_amd64.whl", hash = "sha256:bf07ee2fef7014951eeb99f56f39c9bb4af143d8aa3c21b1677805985307da34"},
     {file = "PyYAML-6.0.1-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:855fb52b0dc35af121542a76b9a84f8d1cd886ea97c84703eaa6d88e37a2ad28"},
     {file = "PyYAML-6.0.1-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:40df9b996c2b73138957fe23a16a4f0ba614f4c0efce1e9406a184b6d07fa3a9"},
+    {file = "PyYAML-6.0.1-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:a08c6f0fe150303c1c6b71ebcd7213c2858041a7e01975da3a99aed1e7a378ef"},
     {file = "PyYAML-6.0.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:6c22bec3fbe2524cde73d7ada88f6566758a8f7227bfbf93a408a9d86bcc12a0"},
     {file = "PyYAML-6.0.1-cp312-cp312-musllinux_1_1_x86_64.whl", hash = "sha256:8d4e9c88387b0f5c7d5f281e55304de64cf7f9c0021a3525bd3b1c542da3b0e4"},
     {file = "PyYAML-6.0.1-cp312-cp312-win32.whl", hash = "sha256:d483d2cdf104e7c9fa60c544d92981f12ad66a457afae824d146093b8c294c54"},
@@ -3877,13 +3878,13 @@ files = [
 
 [[package]]
 name = "reporters-db"
-version = "3.2.38"
+version = "3.2.39"
 description = "Database of Court Reporters"
 optional = false
 python-versions = "*"
 files = [
-    {file = "reporters-db-3.2.38.tar.gz", hash = "sha256:c0048d34a4493e24dcfd0cab9e3b0e69e000e5a3c2ef21d04598f93ac1c2582c"},
-    {file = "reporters_db-3.2.38-py2.py3-none-any.whl", hash = "sha256:ab5e818b3a806efe35d3b29e4fe123ae5943aff54c9ef6d7db804a37f20ddf43"},
+    {file = "reporters-db-3.2.39.tar.gz", hash = "sha256:4a44858227958a79b358de5bdc924308bd7d67f386c9bbc25afdf0b82ec70951"},
+    {file = "reporters_db-3.2.39-py2.py3-none-any.whl", hash = "sha256:1d736c52874409483d0388d321f392897a9fdf731d9d8c2dc89fbd0cdef5449b"},
 ]
 
 [package.dependencies]
