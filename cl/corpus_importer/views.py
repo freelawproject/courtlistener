@@ -40,6 +40,7 @@ def ca_judges(request: AuthenticatedHttpRequest) -> HttpResponse:
             positions__court__in=cts,
             positions__date_termination=None,
         )
+        .prefetch_related("positions__court")
         .order_by("name_last", "name_first")
         .distinct()
     )

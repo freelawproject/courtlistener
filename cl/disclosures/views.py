@@ -40,7 +40,8 @@ async def financial_disclosures_viewer(
     slug: str,
 ) -> HttpResponse:
     """Show the financial disclosures for a particular person"""
-    person = await aget_object_or_404(Person, pk=person_pk)
+    queryset = Person.objects.prefetch_related("positions__court")
+    person = await aget_object_or_404(queryset, pk=person_pk)
     title = await make_title_str(person)
     years, ids = await make_disclosure_data(person)
 
