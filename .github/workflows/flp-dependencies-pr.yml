@@ -1,0 +1,33 @@
+name: PR update Free Law Project dependencies
+
+on:
+  workflow_dispatch:
+
+jobs:
+  update-flp-dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+
+      - name: Update FLP dependencies
+        run: |
+          poetry update courts-db eyecite juriscraper reporters-db
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v3
+        with:
+          token: ${{ secrets.TOKEN }}
+          commit-message: Update freelawproject dependencies
+          title: Update freelawproject dependencies
+          body: This PR updates FLP dependencies to their latest version
+          branch: update-freelawproject-dependencies
