@@ -980,11 +980,11 @@ async def add_depth_counts(
             return None
         else:
             for result in search_results.object_list:
-                result[
-                    "citation_depth"
-                ] = await get_citation_depth_between_clusters(
-                    citing_cluster_pk=result["cluster_id"],
-                    cited_cluster_pk=cited_cluster.pk,
+                result["citation_depth"] = (
+                    await get_citation_depth_between_clusters(
+                        citing_cluster_pk=result["cluster_id"],
+                        cited_cluster_pk=cited_cluster.pk,
+                    )
                 )
             return cited_cluster
     else:

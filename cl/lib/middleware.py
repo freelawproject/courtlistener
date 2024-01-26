@@ -86,7 +86,7 @@ class RobotsHeaderMiddleware:
         if response.context_data:
             private = response.context_data.get("private", False)
         if private:
-            response.headers[
-                "X-Robots-Tag"
-            ] = "noindex, noarchive, noimageindex"
+            response.headers["X-Robots-Tag"] = (
+                "noindex, noarchive, noimageindex"
+            )
         return response

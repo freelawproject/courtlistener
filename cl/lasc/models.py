@@ -551,7 +551,6 @@ class CrossReference(AbstractDateTimeModel):
 
 
 class Party(AbstractDateTimeModel):
-
     """
     # "EntityNumber": "3",
     # "PartyFlag": "L",
@@ -633,7 +632,6 @@ class FutureProceedingManager(models.Manager):
 
 
 class Proceeding(AbstractDateTimeModel):
-
     """
     "ProceedingDateString": "08/24/2018",
     "CourtAlt": "",

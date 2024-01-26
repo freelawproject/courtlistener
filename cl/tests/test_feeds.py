@@ -1,6 +1,7 @@
 """
 Functional testing of courtlistener RSS feeds
 """
+
 import os
 
 import feedparser

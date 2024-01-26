@@ -137,9 +137,9 @@ class SimpleMetadataWithFilters(SimpleMetadata):
                     model_name = (
                         filter_type.filterset.Meta.model._meta.verbose_name_plural.title()
                     )
-                    attrs[
-                        "lookup_types"
-                    ] = f"See available filters for '{model_name}'"
+                    attrs["lookup_types"] = (
+                        f"See available filters for '{model_name}'"
+                    )
                 else:
                     attrs["lookup_types"] = ["exact"]
 

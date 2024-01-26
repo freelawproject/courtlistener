@@ -1,6 +1,7 @@
 """
 Unit tests for Visualizations
 """
+
 from typing import Any, Callable, Dict
 
 from asgiref.sync import sync_to_async

@@ -42,6 +42,7 @@ manage.py clone_from_cl --type search.OpinionCluster --id 1814616 --add-to-solr
 
 This is still work in progress, some data is not cloned yet.
 """
+
 import json
 import os
 import pathlib
