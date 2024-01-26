@@ -1,4 +1,4 @@
-name: PR update Free Law Project dependencies
+name: Auto-update FLP Dependencies
 
 on:
   workflow_dispatch:
