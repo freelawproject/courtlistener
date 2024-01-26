@@ -207,9 +207,9 @@ class ApiPositionMapping(BasePositionMapping):
     date_referred_to_judicial_committee_dict: defaultdict[
         int, list[datetime]
     ] = field(default_factory=lambda: defaultdict(list))
-    date_judicial_committee_action_dict: defaultdict[
-        int, list[datetime]
-    ] = field(default_factory=lambda: defaultdict(list))
+    date_judicial_committee_action_dict: defaultdict[int, list[datetime]] = (
+        field(default_factory=lambda: defaultdict(list))
+    )
     date_hearing_dict: defaultdict[int, list[datetime]] = field(
         default_factory=lambda: defaultdict(list)
     )
@@ -228,9 +228,9 @@ class ApiPositionMapping(BasePositionMapping):
     date_termination_dict: defaultdict[int, list[datetime]] = field(
         default_factory=lambda: defaultdict(list)
     )
-    date_granularity_termination_dict: defaultdict[
-        int, list[datetime]
-    ] = field(default_factory=lambda: defaultdict(list))
+    date_granularity_termination_dict: defaultdict[int, list[datetime]] = (
+        field(default_factory=lambda: defaultdict(list))
+    )
 
     judicial_committee_action_dict: defaultdict[int, list[str]] = field(
         default_factory=lambda: defaultdict(list)

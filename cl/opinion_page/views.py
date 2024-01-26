@@ -1285,9 +1285,7 @@ async def block_item(request: HttpRequest) -> HttpResponse:
         docket_pk = (
             pk
             if obj_type == "docket"
-            else cluster.docket_id
-            if cluster is not None
-            else None
+            else cluster.docket_id if cluster is not None else None
         )
         if not docket_pk:
             return HttpResponse("It worked")

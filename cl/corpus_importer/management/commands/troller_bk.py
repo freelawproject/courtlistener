@@ -266,9 +266,9 @@ async def merge_rss_data(
     dockets_to_create: list[Docket] = []
     unique_dockets: dict[str, Any] = {}
     des_to_add_existing_docket: list[tuple[int, dict[str, Any]]] = []
-    des_to_add_no_existing_docket: DefaultDict[
-        str, list[dict[str, Any]]
-    ] = defaultdict(list)
+    des_to_add_no_existing_docket: DefaultDict[str, list[dict[str, Any]]] = (
+        defaultdict(list)
+    )
     for docket in feed_data:
         skip_or_break = await check_for_early_termination(court_id, docket)
         if skip_or_break == "continue":
