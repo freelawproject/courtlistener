@@ -1450,10 +1450,10 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             0, r.content.decode(), 1, "highlights case name"
         )
 
-        self.assertIn("<mark>SUBPOENAS</mark>", r.content.decode())
-        self.assertIn("<mark>SERVED</mark>", r.content.decode())
-        self.assertIn("<mark>OFF</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>OFF</mark>"), 1)
+        self.assertIn("<mark>SUBPOENAS SERVED OFF</mark>", r.content.decode())
+        self.assertEqual(
+            r.content.decode().count("<mark>SUBPOENAS SERVED OFF</mark>"), 1
+        )
 
         # Confirm we can limit the length of the plain_text snippet using the
         # NO_MATCH_HL_SIZE setting.
@@ -1478,8 +1478,10 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             0, r.content.decode(), 2, "highlights case name"
         )
 
-        self.assertIn("<mark>Thalassa</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>Thalassa</mark>"), 1)
+        self.assertIn("<mark>Thalassa Miller</mark>", r.content.decode())
+        self.assertEqual(
+            r.content.decode().count("<mark>Thalassa Miller</mark>"), 1
+        )
 
         # Highlight referred_to.
         params = {"type": SEARCH_TYPES.RECAP, "q": "Persephone Sinclair"}
@@ -1490,9 +1492,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             0, r.content.decode(), 2, "highlights case name"
         )
 
-        self.assertIn("<mark>Persephone</mark>", r.content.decode())
+        self.assertIn("<mark>Persephone Sinclair</mark>", r.content.decode())
         self.assertEqual(
-            r.content.decode().count("<mark>Persephone</mark>"), 1
+            r.content.decode().count("<mark>Persephone Sinclair</mark>"), 1
         )
 
         # Highlight docketNumber.
@@ -1520,9 +1522,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             0, r.content.decode(), 1, "highlights description"
         )
 
-        self.assertIn("<mark>Discharging</mark>", r.content.decode())
+        self.assertIn("<mark>Discharging Debtor</mark>", r.content.decode())
         self.assertEqual(
-            r.content.decode().count("<mark>Discharging</mark>"), 1
+            r.content.decode().count("<mark>Discharging Debtor</mark>"), 1
         )
         # Highlight suitNature and text.
         params = {"type": SEARCH_TYPES.RECAP, "q": "Lorem 440"}
@@ -1543,8 +1545,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self._count_child_documents(
             0, r.content.decode(), 1, "highlights plain_text"
         )
-        self.assertEqual(r.content.decode().count("<mark>Maecenas</mark>"), 1)
-        self.assertEqual(r.content.decode().count("<mark>nunc</mark>"), 1)
+        self.assertEqual(
+            r.content.decode().count("<mark>Maecenas nunc</mark>"), 1
+        )
         self.assertEqual(r.content.decode().count("<mark>justo</mark>"), 1)
 
         # Highlight plain_text snippet.
@@ -1566,9 +1569,8 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self._count_child_documents(
             0, r.content.decode(), 1, "highlights plain_text"
         )
-        self.assertEqual(r.content.decode().count("<mark>Document</mark>"), 1)
         self.assertEqual(
-            r.content.decode().count("<mark>attachment</mark>"), 1
+            r.content.decode().count("<mark>Document attachment</mark>"), 1
         )
 
         # Highlight filter: caseName
@@ -1620,6 +1622,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             params, 1, "highlights Nature of Suit"
         )
         self.assertIn("<mark>Thalassa</mark>", r.content.decode())
+        self.assertIn("<mark>Miller</mark>", r.content.decode())
 
         # Highlight filter: Referred to
         params = {"type": SEARCH_TYPES.RECAP, "referred_to": "Persephone"}
@@ -1635,11 +1638,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = await self._test_article_count(params, 1, "filter + query")
         self.assertIn("<mark>Amicus</mark>", r.content.decode())
         self.assertEqual(r.content.decode().count("<mark>Amicus</mark>"), 1)
-        self.assertIn("<mark>Document</mark>", r.content.decode())
-        self.assertIn("<mark>attachment</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>Document</mark>"), 1)
+        self.assertIn("<mark>Document attachment</mark>", r.content.decode())
         self.assertEqual(
-            r.content.decode().count("<mark>attachment</mark>"), 1
+            r.content.decode().count("<mark>Document attachment</mark>"), 1
         )
 
     @override_settings(NO_MATCH_HL_SIZE=50)
@@ -1666,9 +1667,8 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         )
 
         # Confirm phrase search are properly highlighted.
-        terms_list = search_phrase.replace('"', "").split(" ")
-        for term in terms_list:
-            self.assertIn(f"<mark>{term}</mark>", r.content.decode())
+        search_term = search_phrase.replace('"', "")
+        self.assertIn(f"<mark>{search_term}</mark>", r.content.decode())
 
         with self.captureOnCommitCallbacks(execute=True):
             rd_1.delete()
@@ -1707,9 +1707,8 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         )
 
         # Confirm phrase search are properly highlighted.
-        terms_list = search_phrase.replace('"', "").split(" ")
-        for term in terms_list:
-            self.assertIn(f"<mark>{term}</mark>", r.content.decode())
+        search_term = search_phrase.replace('"', "")
+        self.assertIn(f"<mark>{search_term}</mark>", r.content.decode())
 
         # Confirm we're able to HL terms combined with chars like ",", "." or
         # or any other symbols.
@@ -1725,9 +1724,11 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         )
 
         # Confirm phrase search are properly highlighted.
-        terms_list = search_phrase.replace('"', "").split(" ")
-        for term in terms_list:
-            self.assertIn(f"<mark>{term}</mark>", r.content.decode())
+        self.assertIn(
+            f"<mark>this was finished, this unwieldy process</mark>",
+            r.content.decode(),
+        )
+        self.assertIn(f"<mark>ipsum</mark>", r.content.decode())
 
         with self.captureOnCommitCallbacks(execute=True):
             rd_1.delete()

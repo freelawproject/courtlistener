@@ -1094,11 +1094,10 @@ class OpinionsESSearchTest(
         params = {"q": "'Howard v. Honda'"}
 
         r = await self._test_article_count(params, 1, "highlights case name")
-        self.assertIn("<mark>Howard</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>Howard</mark>"), 1)
-
-        self.assertIn("<mark>Honda</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>Honda</mark>"), 1)
+        self.assertIn("<mark>Howard v. Honda</mark>", r.content.decode())
+        self.assertEqual(
+            r.content.decode().count("<mark>Howard v. Honda</mark>"), 1
+        )
 
         # Highlight Citation. Multiple HL fields are properly merged.
         params = {"q": "citation:(22 AL) OR citation:(33 state)"}
@@ -1110,23 +1109,18 @@ class OpinionsESSearchTest(
 
         params = {"q": '"22 AL 339"'}
         r = await self._test_article_count(params, 1, "highlights case name")
-        self.assertIn("<mark>22</mark>", r.content.decode())
-        self.assertIn("<mark>AL</mark>", r.content.decode())
-        self.assertIn("<mark>339</mark>", r.content.decode())
+        self.assertIn("<mark>22 AL 339</mark>", r.content.decode())
 
         params = {"q": '22 AL OR "Yeates 1"'}
         r = await self._test_article_count(params, 1, "highlights case name")
         self.assertIn("<mark>22</mark>", r.content.decode())
         self.assertIn("<mark>AL</mark>", r.content.decode())
-        self.assertIn("<mark>Yeates</mark>", r.content.decode())
-        self.assertIn("<mark>1</mark>", r.content.decode())
+        self.assertIn("<mark>Yeates 1</mark>", r.content.decode())
 
         # Highlight docketNumber.
         params = {"q": 'docketNumber:"docket number 2"'}
         r = await self._test_article_count(params, 1, "highlights case name")
-        self.assertIn("<mark>docket</mark>", r.content.decode())
-        self.assertIn("<mark>number</mark>", r.content.decode())
-        self.assertIn("<mark>2</mark>", r.content.decode())
+        self.assertIn("<mark>docket number 2</mark>", r.content.decode())
 
         # Highlight suitNature.
         params = {"q": '"copyright"'}

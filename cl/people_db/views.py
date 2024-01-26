@@ -1,6 +1,7 @@
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.http import HttpResponseRedirect
-from django.shortcuts import get_object_or_404
+from django.shortcuts import aget_object_or_404
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from judge_pics.search import ImageSizes, portrait
@@ -11,8 +12,9 @@ from cl.people_db.models import Person
 from cl.people_db.utils import make_title_str
 
 
-def view_person(request, pk, slug):
-    person = get_object_or_404(Person, pk=pk)
+async def view_person(request, pk, slug):
+    queryset = Person.objects.prefetch_related("positions__court")
+    person = await aget_object_or_404(queryset, pk=pk)
     # Redirect the user if they're trying to check out an alias.
     if person.is_alias:
         return HttpResponseRedirect(
@@ -22,7 +24,7 @@ def view_person(request, pk, slug):
             )
         )
 
-    title = make_title_str(person)
+    title = await make_title_str(person)
 
     img_path = portrait(person.id, ImageSizes.LARGE)
 
@@ -31,7 +33,7 @@ def view_person(request, pk, slug):
     # template.
     judicial_positions = []
     other_positions = []
-    for p in person.positions.all().order_by("-date_start"):
+    async for p in person.positions.all().order_by("-date_start"):
         if p.is_judicial_position:
             judicial_positions.append(p)
         else:
@@ -39,78 +41,87 @@ def view_person(request, pk, slug):
     positions = judicial_positions + other_positions
 
     # Use Solr to get relevant opinions that the person wrote
-    with Session() as session:
-        conn = ExtraSolrInterface(
-            settings.SOLR_OPINION_URL, http_connection=session, mode="r"
-        )
-        q = {
-            "q": f"author_id:{person.pk} OR panel_ids:{person.pk}",
-            "fl": [
-                "id",
-                "court_id",
-                "caseName",
-                "absolute_url",
-                "court",
-                "court_citation_string",
-                "dateFiled",
-                "docketNumber",
-                "citeCount",
-                "status",
-                "citation",
-            ],
-            "rows": 5,
-            "start": 0,
-            "sort": "dateFiled desc",
-            "caller": "view_person",
-        }
-        authored_opinions = conn.query().add_extra(**q).execute()
+    @sync_to_async
+    def authored_opinions(p):
+        with Session() as session:
+            conn = ExtraSolrInterface(
+                settings.SOLR_OPINION_URL, http_connection=session, mode="r"
+            )
+            q = {
+                "q": f"author_id:{p.pk} OR panel_ids:{p.pk}",
+                "fl": [
+                    "id",
+                    "court_id",
+                    "caseName",
+                    "absolute_url",
+                    "court",
+                    "court_citation_string",
+                    "dateFiled",
+                    "docketNumber",
+                    "citeCount",
+                    "status",
+                    "citation",
+                ],
+                "rows": 5,
+                "start": 0,
+                "sort": "dateFiled desc",
+                "caller": "view_person",
+            }
+            return conn.query().add_extra(**q).execute()
+
     # Use Solr to get the oral arguments for the judge
-    with Session() as session:
-        conn = ExtraSolrInterface(
-            settings.SOLR_AUDIO_URL, http_connection=session, mode="r"
-        )
-        q = {
-            "q": f"panel_ids:{person.pk}",
-            "fl": [
-                "id",
-                "absolute_url",
-                "caseName",
-                "court_id",
-                "dateArgued",
-                "docketNumber",
-                "court_citation_string",
-            ],
-            "rows": 5,
-            "start": 0,
-            "sort": "dateArgued desc",
-            "caller": "view_person",
-        }
-        oral_arguments_heard = conn.query().add_extra(**q).execute()
-    with Session() as session:
-        conn = ExtraSolrInterface(
-            settings.SOLR_RECAP_URL, http_connection=session, mode="r"
-        )
-        q = {
-            "q": f"assigned_to_id:{person.pk} OR referred_to_id:{person.pk}",
-            "fl": [
-                "id",
-                "docket_absolute_url",
-                "caseName",
-                "court_citation_string",
-                "dateFiled",
-                "docketNumber",
-            ],
-            "group": "true",
-            "group.ngroups": "true",
-            "group.limit": 1,
-            "group.field": "docket_id",
-            "group.sort": "dateFiled desc",
-            "rows": 5,
-            "start": 0,
-            "sort": "dateFiled desc",
-            "caller": "view_person",
-        }
-        recap_cases_assigned = conn.query().add_extra(**q).execute()
+    @sync_to_async
+    def oral_arguments_heard(p):
+        with Session() as session:
+            conn = ExtraSolrInterface(
+                settings.SOLR_AUDIO_URL, http_connection=session, mode="r"
+            )
+            q = {
+                "q": f"panel_ids:{p.pk}",
+                "fl": [
+                    "id",
+                    "absolute_url",
+                    "caseName",
+                    "court_id",
+                    "dateArgued",
+                    "docketNumber",
+                    "court_citation_string",
+                ],
+                "rows": 5,
+                "start": 0,
+                "sort": "dateArgued desc",
+                "caller": "view_person",
+            }
+            return conn.query().add_extra(**q).execute()
+
+    @sync_to_async
+    def recap_cases_assigned(p):
+        with Session() as session:
+            conn = ExtraSolrInterface(
+                settings.SOLR_RECAP_URL, http_connection=session, mode="r"
+            )
+            q = {
+                "q": f"assigned_to_id:{p.pk} OR referred_to_id:{p.pk}",
+                "fl": [
+                    "id",
+                    "docket_absolute_url",
+                    "caseName",
+                    "court_citation_string",
+                    "dateFiled",
+                    "docketNumber",
+                ],
+                "group": "true",
+                "group.ngroups": "true",
+                "group.limit": 1,
+                "group.field": "docket_id",
+                "group.sort": "dateFiled desc",
+                "rows": 5,
+                "start": 0,
+                "sort": "dateFiled desc",
+                "caller": "view_person",
+            }
+            return conn.query().add_extra(**q).execute()
+
     return TemplateResponse(
         request,
         "view_person.html",
@@ -125,9 +136,9 @@ def view_person(request, pk, slug):
             "disclosures": person.financial_disclosures.all().order_by("year"),
             "positions": positions,
             "educations": person.educations.all().order_by("-degree_year"),
-            "authored_opinions": authored_opinions,
-            "oral_arguments_heard": oral_arguments_heard,
-            "recap_cases_assigned": recap_cases_assigned,
+            "authored_opinions": await authored_opinions(person),
+            "oral_arguments_heard": await oral_arguments_heard(person),
+            "recap_cases_assigned": await recap_cases_assigned(person),
             "ftm_last_updated": settings.FTM_LAST_UPDATED,
             "private": False,
         },
