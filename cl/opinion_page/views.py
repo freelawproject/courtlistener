@@ -397,9 +397,11 @@ async def make_rd_title(rd: RECAPDocument) -> str:
     return "{desc}#{doc_num}{att_num} in {case_name} ({court}{docket_number})".format(
         desc=f"{rd.description} &ndash; " if rd.description else "",
         doc_num=rd.document_number,
-        att_num=f", Att. #{rd.attachment_number}"
-        if rd.document_type == RECAPDocument.ATTACHMENT
-        else "",
+        att_num=(
+            f", Att. #{rd.attachment_number}"
+            if rd.document_type == RECAPDocument.ATTACHMENT
+            else ""
+        ),
         case_name=best_case_name(d),
         court=court.citation_string,
         docket_number=f", {d.docket_number}" if d.docket_number else "",

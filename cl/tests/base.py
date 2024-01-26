@@ -1,6 +1,7 @@
 """
 Base class(es) for functional testing CourtListener using Selenium and PhantomJS
 """
+
 import os
 import socket
 from contextlib import contextmanager
