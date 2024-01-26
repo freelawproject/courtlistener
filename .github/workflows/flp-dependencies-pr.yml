@@ -21,7 +21,7 @@ jobs:
 
       - name: Update FLP dependencies
         run: |
-          poetry update juriscraper reporters-db courts-db eyecite
+          poetry update courts-db eyecite juriscraper reporters-db
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v3
@@ -29,5 +29,5 @@ jobs:
           token: ${{ secrets.TOKEN }}
           commit-message: Update freelawproject dependencies
           title: Update freelawproject dependencies
-          body: This PR updates the juriscraper package.
+          body: This PR updates FLP dependencies to their latest version
           branch: update-freelawproject-dependencies
