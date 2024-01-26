@@ -2,6 +2,7 @@
 
 This should help us organize the kinds of things we routinely do.
 """
+
 from celery import chain
 from django.contrib.auth.models import User
 

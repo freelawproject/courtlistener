@@ -1077,9 +1077,9 @@ class OpinionsESSearchTest(
         self.assertIn("docket number 3", r.content.decode())
         self.assertIn("1 Opinion", r.content.decode())
 
-        search_params[
-            "q"
-        ] = "dateFiled:[1895-01-01T00:00:00Z TO 2015-12-31T00:00:00Z]"
+        search_params["q"] = (
+            "dateFiled:[1895-01-01T00:00:00Z TO 2015-12-31T00:00:00Z]"
+        )
         r = await self._test_article_count(
             search_params, 2, "citation range query"
         )
