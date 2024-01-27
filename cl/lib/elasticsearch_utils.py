@@ -1935,6 +1935,33 @@ def build_join_es_filters(cd: CleanData) -> List:
     return queries_list
 
 
+def add_highlighting_for_feed_query(s: Search, field: str) -> Search:
+    """Add highlighting parameters for a feed query in ES.
+    Although highlighting is not displayed in Feeds, this is required as an
+    optimization to avoid returning the entire plain_text in RECAPDocuments
+    or text in Opinions, which could be massive in some documents. This takes
+    advantage of the no_match_size feature in highlighting to return only up to
+    500 characters from the text field.
+
+    :param s: Elasticsearch DSL Search object
+    :param field: The field name for which highlighting is to be set.
+    :return: The modified Elasticsearch DSL Search object with highlighting
+    settings applied.
+    """
+
+    s = s.highlight(
+        field,
+        type=settings.ES_HIGHLIGHTER,
+        fragment_size=500,
+        no_match_size=settings.NO_MATCH_HL_SIZE,
+        pre_tags=[f"<{SEARCH_HL_TAG}>"],
+        post_tags=[f"</{SEARCH_HL_TAG}>"],
+    )
+    s = s.source(excludes=[field])
+
+    return s
+
+
 def do_es_feed_query(
     search_query: Search,
     cd: CleanData,
@@ -1964,10 +1991,11 @@ def do_es_feed_query(
                 search_query=parent_query,
             )
             s = search_query.query(s)
+            s = add_highlighting_for_feed_query(s, "plain_text")
+
         case _:
-            s, _ = build_es_base_query(search_query, cd)
+            s, join_query = build_es_base_query(search_query, cd)
             if jurisdiction:
-                _, join_query = build_es_base_query(search_query, cd)
                 # Eliminate items that lack the ordering field.
                 s = build_child_docs_query(
                     join_query,
@@ -1975,15 +2003,16 @@ def do_es_feed_query(
                     exclude_docs_for_empty_field=exclude_docs_for_empty_field,
                 )
                 s = search_query.query(s)
+                s = add_highlighting_for_feed_query(s, "text")
 
     s = s.sort(build_sort_results(cd))
     response = s.extra(from_=0, size=rows).execute()
-
     if cd["type"] == SEARCH_TYPES.OPINION:
         # Merge the text field for Opinions.
         if not jurisdiction:
             limit_inner_hits(cd, response, cd["type"])
-        set_results_highlights(response, cd["type"])
+
+    set_results_highlights(response, cd["type"])
     return response
 
 
