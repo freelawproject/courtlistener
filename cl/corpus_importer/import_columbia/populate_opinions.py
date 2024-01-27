@@ -236,11 +236,9 @@ def make_and_save(
 
     min_date: if not none, will skip cases after min_date
     """
-    date_filed = (
-        date_argued
-    ) = (
-        date_reargued
-    ) = date_reargument_denied = date_cert_granted = date_cert_denied = None
+    date_filed = date_argued = date_reargued = date_reargument_denied = (
+        date_cert_granted
+    ) = date_cert_denied = None
     unknown_date = None
     for date_cluster in item["dates"]:
         for date_info in date_cluster:

@@ -80,9 +80,9 @@ class ProfileForm(ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields[
-            "wants_newsletter"
-        ].label = "Send me the monthly Free Law Project newsletter"
+        self.fields["wants_newsletter"].label = (
+            "Send me the monthly Free Law Project newsletter"
+        )
         for key in ["address1", "city", "state", "zip_code"]:
             self.fields[key].required = True
 

@@ -125,8 +125,8 @@ class BasicAPIPageTest(TestCase):
 
 
 class CoverageTests(IndexedSolrTestCase):
-    def test_coverage_data_view_provides_court_data(self) -> None:
-        response = coverage_data(HttpRequest(), "v2", "ca1")
+    async def test_coverage_data_view_provides_court_data(self) -> None:
+        response = await coverage_data(HttpRequest(), "v2", "ca1")
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response, JsonResponse)
         self.assertContains(response, "annual_counts")
@@ -835,13 +835,13 @@ class DRFSearchAppAndAudioAppApiFilterTest(
         self.q["clusters__panel__name_first__istartswith"] = "jud"
         await self.assertCountInResults(1)
 
-        self.q[
-            "audio_files__sha1"
-        ] = "de8cff186eb263dc06bdc5340860eb6809f898d3-nope"
+        self.q["audio_files__sha1"] = (
+            "de8cff186eb263dc06bdc5340860eb6809f898d3-nope"
+        )
         await self.assertCountInResults(0)
-        self.q[
-            "audio_files__sha1"
-        ] = "de8cff186eb263dc06bdc5340860eb6809f898d3"
+        self.q["audio_files__sha1"] = (
+            "de8cff186eb263dc06bdc5340860eb6809f898d3"
+        )
         await self.assertCountInResults(1)
 
     async def test_audio_filters(self) -> None:

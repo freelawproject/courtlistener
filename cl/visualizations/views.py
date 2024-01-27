@@ -12,7 +12,7 @@ from django.http import (
     HttpResponseNotAllowed,
     HttpResponseRedirect,
 )
-from django.shortcuts import aget_object_or_404, render
+from django.shortcuts import aget_object_or_404
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.views.decorators.cache import never_cache

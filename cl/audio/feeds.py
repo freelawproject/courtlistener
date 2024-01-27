@@ -80,9 +80,9 @@ class JurisdictionPodcast(JurisdictionFeed):
         else:
             # Not a jurisdiction API -- A search API.
             path = static("png/producer-2000x2000.png")
-        extra_args[
-            "iTunes_image_url"
-        ] = f"https://storage.courtlistener.com{path}"
+        extra_args["iTunes_image_url"] = (
+            f"https://storage.courtlistener.com{path}"
+        )
 
         return extra_args
 
