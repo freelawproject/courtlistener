@@ -1,6 +1,7 @@
 """
 Functional tests for the Visualization feature of CourtListener
 """
+
 from django.contrib.auth.hashers import make_password
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator

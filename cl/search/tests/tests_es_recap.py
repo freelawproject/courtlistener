@@ -415,9 +415,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIn("2 Cases", r.content.decode())
         self.assertIn("SUBPOENAS SERVED ON", r.content.decode())
 
-        params[
-            "description"
-        ] = '"leave to file" AND "amicus" "Discharging Debtor"'
+        params["description"] = (
+            '"leave to file" AND "amicus" "Discharging Debtor"'
+        )
         r = await self.async_client.get(
             reverse("show_results"),
             params,
