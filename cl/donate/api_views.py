@@ -1,3 +1,4 @@
+from collections import defaultdict
 from http import HTTPStatus
 
 from django.contrib.auth.models import User
@@ -59,6 +60,31 @@ class MembershipWebhookViewSet(
 
         return Response(status=HTTPStatus.CREATED)
 
+    def _get_address_from_neon_response(self, addresses: list[dict[str, str]]):
+        """
+        Retrieves an address from the Neon response.
+
+        Args:
+            addresses: An array of dictionaries representing addresses.
+
+        Returns:
+            A dictionary containing the first address if available, otherwise a defaultdict.
+        """
+        if not addresses:
+            address = defaultdict(lambda: "")
+            address["wants_newsletter"] = False
+            return address
+
+        return {
+            # Neon API returns an array of addresses.
+            "address1": addresses[0]["addressLine1"],
+            "address2": addresses[0]["addressLine2"],
+            "city": addresses[0]["city"],
+            "state": addresses[0]["stateProvince"]["code"],
+            "zip_code": addresses["zipCode"],
+            "wants_newsletter": False,
+        }
+
     def _get_member_record(self, account_id: str) -> User:
         """
         Retrieves a user record associated with a Neon CRM account ID.
@@ -91,27 +117,16 @@ class MembershipWebhookViewSet(
                 "-last_login"
             )
             if not users.exists():
+                address = self._get_address_from_neon_response(
+                    contact_data["addresses"]
+                )
                 user, _ = create_stub_account(
                     {
                         "email": contact_data["email1"],
                         "first_name": contact_data["firstName"],
                         "last_name": contact_data["lastName"],
                     },
-                    {
-                        # Neon API returns an array of addresses.
-                        "address1": contact_data["addresses"][0][
-                            "addressLine1"
-                        ],
-                        "address2": contact_data["addresses"][0][
-                            "addressLine2"
-                        ],
-                        "city": contact_data["addresses"][0]["city"],
-                        "state": contact_data["addresses"][0]["stateProvince"][
-                            "code"
-                        ],
-                        "zip_code": contact_data["addresses"][0]["zipCode"],
-                        "wants_newsletter": False,
-                    },
+                    address,
                 )
             else:
                 user = users.first()
