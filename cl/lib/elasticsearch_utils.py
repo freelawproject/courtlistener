@@ -639,9 +639,17 @@ def build_has_child_query(
     :return: The 'has_child' query.
     """
 
-    if order_by and all(order_by):
+    if order_by and all(order_by) and child_type == "recap_document":
         sort_field, order = order_by
-        # Define the function score for sorting based in the child sort_field.
+        # Define the function score for sorting, based on the child sort_field.
+        # When the order is 'entry_date_filed desc', the 'date_filed_time'
+        # value is used as the score, sorting newer documents first.
+        # In 'asc' order, the score is the difference between  'current_time'
+        # and 'date_filed_time', prioritizing older documents. If a document
+        # does not have a 'date_filed' set, the function returns 1. This
+        # ensures that dockets containing documents without a 'date_filed'
+        # are displayed before dockets without filings, which have a default score of 0.
+
         query = Q(
             "function_score",
             query=query,
@@ -650,7 +658,7 @@ def build_has_child_query(
                     "source": f"""
                     // Check if the document has a value for the 'sort_field'
                     if (doc['{sort_field}'].size() == 0) {{
-                        return 0;  // If not, return 0 as the score
+                        return 1;  // If not, return 1 as the score
                     }} else {{
                         // Get the current time in milliseconds
                         long current_time = new Date().getTime();
@@ -666,8 +674,8 @@ def build_has_child_query(
                             // in order to boost older documents if the order is asc.
                             long diff = current_time - date_filed_time;
 
-                            // Return the difference if it's non-negative, otherwise return 0
-                            return diff >= 0 ? diff : 0;
+                            // Return the difference if it's non-negative, otherwise return 1
+                            return diff >= 0 ? diff : 1;
                         }}
                     }}
                     """,
@@ -744,7 +752,7 @@ def get_search_query(
             case SEARCH_TYPES.PEOPLE:
                 return search_query.query(Q("match", person_child="person"))
             case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
-                # Match all query for RECAP dn Dockets, it'll return dockets
+                # Match all query for RECAP and Dockets, it'll return dockets
                 # with child documents and also empty dockets.
                 _, query_hits_limit = get_child_top_hits_limit(cd, cd["type"])
                 match_all_child_query = build_has_child_query(
@@ -754,7 +762,9 @@ def get_search_query(
                     SEARCH_RECAP_CHILD_HL_FIELDS,
                     get_child_sorting_key(cd),
                 )
-                match_all_parent_query = Q("match", docket_child="docket")
+                match_all_parent_query = nullify_parent_score_on_child_sorting(
+                    cd, Q("match", docket_child="docket")
+                )
                 return search_query.query(
                     Q(
                         "bool",
@@ -921,7 +931,7 @@ def build_es_base_query(
 
 def build_has_parent_parties_query(
     parties_filters: list[QueryString],
-) -> QueryString:
+) -> QueryString | None:
     """Build a has_parent query based on the parties fields (party and attorney).
 
     This method is used where it is required to include all the RECAPDocuments
@@ -930,17 +940,19 @@ def build_has_parent_parties_query(
     the RECAP Search feed.
 
     :param parties_filters: A list of party and or attorney filters.
-    :return: An ES has parent query.
+    :return: An ES has parent query or None if there are no parties_filters.
     """
 
-    return Q(
-        "has_parent",
-        parent_type="docket",
-        query=Q(
-            "bool",
-            filter=parties_filters,
-        ),
-    )
+    if parties_filters:
+        return Q(
+            "has_parent",
+            parent_type="docket",
+            query=Q(
+                "bool",
+                filter=parties_filters,
+            ),
+        )
+    return None
 
 
 def build_child_docs_query(
@@ -963,10 +975,18 @@ def build_child_docs_query(
 
     child_query_opinion = Q("match", cluster_child="opinion")
     child_query_recap = Q("match", docket_child="recap_document")
-    if search_query:
+    parties_has_parent_query = None
+    must_query = search_query.query.must if search_query else None
+    if search_query and must_query:
+        # Extract parent filters from the query, if any, for building the
+        # has_parent query.
+        try:
+            query_strings = search_query.query.must[0].should[0].must
+        except (AttributeError, IndexError):
+            query_strings = must_query
         parties_filters = [
             query
-            for query in search_query.query.filter
+            for query in query_strings
             if isinstance(query, QueryString)
             and query.fields[0] in ["party", "attorney"]
         ]
@@ -1987,6 +2007,41 @@ def do_es_feed_query(
     return response
 
 
+def nullify_parent_score_on_child_sorting(
+    cd: CleanData, query: Query
+) -> Query:
+    """Nullify the parent score in child document sorting.
+
+    It applies a function score to the parent query to nullify the parent score
+    (sets it to 0) to prioritize child documents sorting criteria.
+    This will ensure that dockets without documents come last on results.
+
+    :param cd: The query CleanedData
+    :param query: The ES Query object to be modified.
+    :return: The function_score query contains the base query, applied when
+    child_order is used.
+    """
+    child_order_by = get_child_sorting_key(cd)
+    if (
+        child_order_by
+        and all(child_order_by)
+        and cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]
+    ):
+        query = Q(
+            "function_score",
+            query=query,
+            script_score={
+                "script": {
+                    "source": f""" return 0; """,
+                },
+            },
+            # Replace the original score with the one computed by the script
+            boost_mode="replace",
+        )
+
+    return query
+
+
 def build_full_join_es_queries(
     cd: CleanData,
     child_query_fields: dict[str, list[str]],
@@ -2033,7 +2088,7 @@ def build_full_join_es_queries(
         # Build parent filters.
         parent_filters = build_join_es_filters(cd)
         # Copy the original parent_filters before appending child fields.
-        parent_filters_original = deepcopy(parent_filters)
+        outer_parent_filters = deepcopy(parent_filters)
         # If parent filters, extend into child_filters.
         if parent_filters:
             # Removes the party and attorney filter if they were provided because
@@ -2132,6 +2187,9 @@ def build_full_join_es_queries(
                     minimum_should_match=1,
                 )
         if parent_query:
+            parent_query = nullify_parent_score_on_child_sorting(
+                cd, parent_query
+            )
             q_should.append(parent_query)
 
         # If party filters were provided, build an additional level of
@@ -2153,7 +2211,8 @@ def build_full_join_es_queries(
                     score_mode="max",
                     query=join_query,
                 )
-
+                outer_parent_filters.append(has_child_parties)
+                outer_parent_filters.append(Q("match", docket_child="docket"))
             else:
                 # If no child query, build a match_all query for RECAPDocuments
                 _, query_hits_limit = get_child_top_hits_limit(cd, cd["type"])
@@ -2164,14 +2223,29 @@ def build_full_join_es_queries(
                     SEARCH_RECAP_CHILD_HL_FIELDS,
                     get_child_sorting_key(cd),
                 )
-            # Append either the has_child query or the match_all query to the
-            # original parent filters. Then, return it as a new level of filters.
-            parent_filters_original.append(has_child_parties)
+                parent_filters_has_child_parties = deepcopy(
+                    outer_parent_filters
+                )
+                parent_filters_has_child_parties.append(has_child_parties)
+                outer_parent_filters.append(Q("match", docket_child="docket"))
+                # Include a 'should' clause to retrieve dockets either with
+                # filings that matched the party filters or without filings but
+                # still matching the party filters.
+                outer_parent_filters = Q(
+                    "bool",
+                    should=[
+                        Q("bool", must=parent_filters_has_child_parties),
+                        nullify_parent_score_on_child_sorting(
+                            cd, Q("bool", must=outer_parent_filters)
+                        ),
+                    ],
+                )
+
             return (
                 Q(
                     "bool",
                     should=q_should,
-                    filter=parent_filters_original,
+                    must=outer_parent_filters,
                 ),
                 join_query,
             )
