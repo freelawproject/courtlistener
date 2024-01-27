@@ -448,3 +448,37 @@ class MembershipWebhookTest(TestCase):
         query = NeonMembership.objects.filter(neon_id="9876")
         self.assertEqual(r.status_code, HTTP_201_CREATED)
         self.assertEqual(await query.acount(), 0)
+
+    @patch(
+        "cl.lib.neon_utils.NeonClient.get_acount_by_id",
+    )
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    async def test_create_stub_account_missing_address(
+        self, mock_store_webhook, mock_get_account
+    ):
+        self.data["eventTrigger"] = "createMembership"
+        self.data["data"]["membership"]["accountId"] = "1245"
+
+        # mocks the Neon API response
+        mock_get_account.return_value = {
+            "accountId": "1245",
+            "primaryContact": {
+                "email1": "test@free.law",
+                "firstName": "test",
+                "lastName": "test",
+                "addresses": [],
+            },
+        }
+
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+            data=self.data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+
+        query = NeonMembership.objects.filter(neon_id="12345")
+        self.assertEqual(await query.acount(), 1)
