@@ -13,6 +13,7 @@ from cl.custom_filters.templatetags.text_filters import (
 from cl.lib.command_utils import logger
 from cl.lib.elasticsearch_utils import build_es_base_query
 from cl.lib.fields import JoinField, PercolatorField
+from cl.lib.search_index_utils import null_map
 from cl.lib.utils import deepgetattr
 from cl.people_db.models import Person, Position
 from cl.search.constants import o_type_index_map
@@ -1097,7 +1098,7 @@ class ESRECAPDocument(DocketBaseDocument):
             )
 
     def prepare_plain_text(self, instance):
-        return escape(instance.plain_text)
+        return escape(instance.plain_text.translate(null_map))
 
     def prepare_cites(self, instance):
         return list(
@@ -1595,17 +1596,25 @@ class OpinionDocument(OpinionBaseDocument):
 
     def prepare_text(self, instance):
         if instance.html_columbia:
-            return html_decode(strip_tags(instance.html_columbia))
+            return html_decode(
+                strip_tags(instance.html_columbia.translate(null_map))
+            )
         elif instance.html_lawbox:
-            return html_decode(strip_tags(instance.html_lawbox))
+            return html_decode(
+                strip_tags(instance.html_lawbox.translate(null_map))
+            )
         elif instance.xml_harvard:
-            return html_decode(strip_tags(instance.xml_harvard))
+            return html_decode(
+                strip_tags(instance.xml_harvard.translate(null_map))
+            )
         elif instance.html_anon_2020:
-            return html_decode(strip_tags(instance.html_anon_2020))
+            return html_decode(
+                strip_tags(instance.html_anon_2020.translate(null_map))
+            )
         elif instance.html:
-            return html_decode(strip_tags(instance.html))
+            return html_decode(strip_tags(instance.html.translate(null_map)))
         else:
-            return instance.plain_text
+            return escape(instance.plain_text.translate(null_map))
 
     def prepare_cluster_id(self, instance):
         return instance.cluster.pk
