@@ -46,16 +46,18 @@ emails: Dict[str, EmailType] = {
         "body": "Dear %s,\n\n"
         "We just attempted to process your recurring donation to Free Law "
         "Project, host of CourtListener and RECAP, but we had an issue "
-        "processing your card. As a result, unfortunately, we have disabled "
-        "this monthly contribution.\n\n"
-        "You were donating $%0.2f each month. The easiest way to fix this is "
-        "to set up a new monthly contribution, here:\n\n"
-        "    %s\n\n"
-        "Would you mind setting that up again so that your donations and "
-        "other services keep working properly?\n\n"
-        "Sorry for the hassle. Hopefully this isn't too much trouble to fix, "
-        "and thank you for supporting Free Law Project!\n\n"
-        "Thanks again,\n\n\n"
+        "processing your card.\n\n"
+        "As a result, unfortunately, we have disabled this monthly contribution.\n\n"
+        "We hope you will continue supporting Free Law Project. To do so, "
+        "you can either become a member (and enjoy member benefits like swag, "
+        "features on CourtListener, and more):\n\n"
+        "https://donate.free.law/forms/membership\n\n"
+        "Or you can continue being a monthly supporter of our work without a "
+        "full membership (more of your money will support our work and you'll "
+        "enjoy a greater tax benefit):\n\n"
+        "https://donate.free.law/forms/supportflp\n\n"
+        "Please let us know if you have any questions, and thank thank you for "
+        "supporting Free Law Project!\n\n"
         "Free Law Project\n"
         "https://free.law/contact/",
         "from_email": settings.DEFAULT_FROM_EMAIL,
@@ -101,12 +103,9 @@ def send_failed_subscription_email(m_donation: MonthlyDonation) -> None:
     m_donation: The MonthlyDonation object that failed.
     """
     email = emails["user_bad_subscription"]
-    body = email["body"] % (
-        m_donation.donor.first_name,
-        m_donation.monthly_donation_amount,
-        "https://donate.free.law/forms/supportflp",
-        m_donation.monthly_donation_amount,
-    )
     send_mail(
-        email["subject"], body, email["from_email"], [m_donation.donor.email]
+        email["subject"],
+        email["body"],
+        email["from_email"],
+        [m_donation.donor.email],
     )
