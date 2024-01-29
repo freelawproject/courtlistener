@@ -43,6 +43,7 @@ from cl.lib.test_helpers import (
     UserProfileWithParentsFactory,
 )
 from cl.tests.cases import TestCase
+from cl.users.models import UserProfile
 
 stripe_test_numbers = {
     "good": {"visa": "4242424242424242"},
@@ -336,7 +337,12 @@ class MembershipWebhookTest(TestCase):
         }
 
     @override_settings(NEON_MAX_WEBHOOK_NUMBER=10)
-    def test_store_and_truncate_webhook_data(self) -> None:
+    @patch(
+        "cl.donate.api_views.MembershipWebhookViewSet._handle_membership_creation_or_update",
+    )
+    def test_store_and_truncate_webhook_data(
+        self, mock_membership_creation
+    ) -> None:
         self.data["eventTrigger"] = "createMembership"
         client = Client()
         r = client.post(
@@ -347,13 +353,28 @@ class MembershipWebhookTest(TestCase):
         self.assertEqual(r.status_code, HTTP_201_CREATED)
         self.assertEqual(NeonWebhookEvent.objects.all().count(), 1)
 
-        NeonWebhookEventFactory.create_batch(18)
+        # Make sure to save the webhook payload even if an error occurs.
+        mock_membership_creation.side_effect = Exception()
+        self.data["data"]["membership"]["accountId"] = "9999"
+        with self.assertRaises(Exception):
+            client.post(
+                reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+                data=self.data,
+                content_type="application/json",
+            )
+        failed_log_query = NeonWebhookEvent.objects.filter(account_id="9999")
+        self.assertEqual(failed_log_query.count(), 1)
+        self.assertEqual(NeonWebhookEvent.objects.all().count(), 2)
+        profile_query = UserProfile.objects.filter(neon_account_id="9999")
+        self.assertEqual(profile_query.count(), 0)
+
+        NeonWebhookEventFactory.create_batch(17)
 
         # Update the trigger type and Adds a new webhook to the log. After
         # adding this new record the post_save signal should truncate the
         # events table and keep the latest NEON_MAX_WEBHOOK_NUMBER records
         self.data["eventTrigger"] = "editMembership"
-        client = Client()
+        mock_membership_creation.side_effect = None
         r = client.post(
             reverse("membership-webhooks-list", kwargs={"version": "v3"}),
             data=self.data,

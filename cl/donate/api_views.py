@@ -28,7 +28,6 @@ class MembershipWebhookViewSet(
     serializer_class = NeonMembershipWebhookSerializer
     queryset = NeonMembership.objects.all()
 
-    @transaction.atomic
     def create(self, request: Request, *args, **kwargs):
         """
         Processes membership webhooks received from Neon CRM.
@@ -49,14 +48,19 @@ class MembershipWebhookViewSet(
 
         webhook_data = serializer.validated_data
         self._store_webhook_payload(webhook_data)
-        match webhook_data["eventTrigger"]:
-            case "createMembership" | "editMembership" | "updateMembership":
-                self._handle_membership_creation_or_update(webhook_data)
-            case "deleteMembership":
-                self._handle_membership_deletion(webhook_data)
-            case _:
-                trigger = webhook_data["eventTrigger"]
-                raise NotImplementedError(f"Unknown event trigger-{trigger}")
+        with transaction.atomic():
+            match webhook_data["eventTrigger"]:
+                case (
+                    "createMembership" | "editMembership" | "updateMembership"
+                ):
+                    self._handle_membership_creation_or_update(webhook_data)
+                case "deleteMembership":
+                    self._handle_membership_deletion(webhook_data)
+                case _:
+                    trigger = webhook_data["eventTrigger"]
+                    raise NotImplementedError(
+                        f"Unknown event trigger-{trigger}"
+                    )
 
         return Response(status=HTTPStatus.CREATED)
 
