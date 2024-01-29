@@ -5,6 +5,7 @@ from unittest import skipIf
 from unittest.mock import MagicMock, patch
 
 import stripe
+import time_machine
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core import mail
@@ -15,7 +16,14 @@ from django.utils.timezone import now
 from rest_framework.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_302_FOUND
 
 from cl.donate.api_views import MembershipWebhookViewSet
-from cl.donate.factories import DonationFactory, NeonWebhookEventFactory
+from cl.donate.factories import (
+    DonationFactory,
+    MonthlyDonationFactory,
+    NeonWebhookEventFactory,
+)
+from cl.donate.management.commands.charge_monthly_donors import (
+    Command as ChargeMonthlyDonorsCommand,
+)
 from cl.donate.management.commands.cl_send_donation_reminders import (
     Command as DonationReminderCommand,
 )
@@ -27,6 +35,7 @@ from cl.donate.models import (
     NeonMembership,
     NeonWebhookEvent,
 )
+from cl.donate.utils import PaymentFailureException
 
 # From: https://stripe.com/docs/testing#cards
 from cl.lib.test_helpers import (
@@ -271,6 +280,38 @@ class DonationIntegrationTest(SimpleUserDataMixin, TestCase):
             reverse("stripe_callback"),
             data=json.dumps(event),
             content_type="application/json",
+        )
+
+
+class ChargeMonthlyDonationTest(TestCase):
+    def setUp(self) -> None:
+        twenty_days_ago = now() - timedelta(days=20)
+        with time_machine.travel(twenty_days_ago, tick=False):
+            self.monthly_donation = MonthlyDonationFactory(
+                stripe_customer_id="test_1"
+            )
+        self.monthly_donation.monthly_donation_day = now().date().day
+        self.monthly_donation.save()
+
+    @patch(
+        "cl.donate.management.commands.charge_monthly_donors.process_stripe_payment",
+        side_effect=PaymentFailureException("failed charge"),
+    )
+    def test_can_send_failed_subscription_email(
+        self, mock_process_stripe_payment
+    ):
+        ChargeMonthlyDonorsCommand().handle()
+
+        self.monthly_donation.refresh_from_db()
+        self.assertFalse(self.monthly_donation.enabled)
+        self.assertEqual(self.monthly_donation.failure_count, 1)
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(
+            "https://donate.free.law/forms/membership", mail.outbox[0].body
+        )
+        self.assertIn(
+            "https://donate.free.law/forms/supportflp", mail.outbox[0].body
         )
 
 

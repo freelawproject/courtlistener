@@ -13,6 +13,11 @@ class AllowNeonWebhook(permissions.BasePermission):
             return True
 
         payload = request.data
+        if not payload:
+            raise exceptions.ParseError(
+                detail="The request contains malformed data"
+            )
+
         request_token = payload["customParameters"].get("webhook_token", None)
         if not request_token:
             raise exceptions.PermissionDenied("The token was not provided")
