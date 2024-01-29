@@ -13,7 +13,9 @@ from cl.people_db.utils import make_title_str
 
 
 async def view_person(request, pk, slug):
-    queryset = Person.objects.prefetch_related("positions__court")
+    queryset = Person.objects.select_related("is_alias_of").prefetch_related(
+        "positions__court"
+    )
     person = await aget_object_or_404(queryset, pk=pk)
     # Redirect the user if they're trying to check out an alias.
     if person.is_alias:
