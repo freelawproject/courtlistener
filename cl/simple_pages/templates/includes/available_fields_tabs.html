@@ -29,6 +29,24 @@
               {% endfor %}
           </tbody>
         </table>
+        {% if type == "recap_archive" %}
+          <p>
+            <sup>*</sup> <code>party</code> and <code>attorney</code> values are associated with dockets, not filings. Therefore, when dockets have no filings, combining these two fields with other docket filters is possible but may yield unexpected results when paired with non-docket filters or a query string. To include dockets with no filings in your search results while combining <code>party</code> and/or <code>attorney</code> fields, consider one of the following options:
+          </p>
+          <ul>
+            <li>Use a fielded search that includes party fields and any other docket field:
+             <ul>
+               <li><code>party:(Party Name) AND attorney:(Attorney) AND caseName:(Docket Name)</code></li>
+             </ul>
+            </li>
+            <li>Use docket field filters and a fielded search for party and attorney:
+              <ul>
+                <li><code>case_name:"Docket case name"</code></li>
+                <li><code>q: "party:(Party Name) AND attorney:(Attorney Name)"</code></li>
+              </ul>
+            </li>
+          </ul>
+        {% endif %}
       </div>
     </div>
   {% endfor %}
