@@ -959,7 +959,6 @@ def build_child_docs_query(
     join_query: QueryString | None,
     cd: CleanData,
     exclude_docs_for_empty_field: str = "",
-    search_query: Search | None = None,
 ) -> QueryString:
     """Build a query for counting child documents in Elasticsearch, using the
     has_child query filters and queries. And append a match filter to only
@@ -969,30 +968,19 @@ def build_child_docs_query(
     :param cd: The user input CleanedData
     :param exclude_docs_for_empty_field: Field that should not be empty for a
     document to be included
-    :param search_query: The Elasticsearch search query object.
     :return: An Elasticsearch QueryString object
     """
 
     child_query_opinion = Q("match", cluster_child="opinion")
     child_query_recap = Q("match", docket_child="recap_document")
-    parties_has_parent_query = None
-    must_query = search_query.query.must if search_query else None
-    if search_query and must_query:
-        # Extract parent filters from the query, if any, for building the
-        # has_parent query.
-        try:
-            query_strings = search_query.query.must[0].should[0].must
-        except (AttributeError, IndexError):
-            query_strings = must_query
-        parties_filters = [
-            query
-            for query in query_strings
-            if isinstance(query, QueryString)
-            and query.fields[0] in ["party", "attorney"]
-        ]
-        parties_has_parent_query = build_has_parent_parties_query(
-            parties_filters
-        )
+    parent_filters = build_join_es_filters(cd)
+    parties_filters = [
+        query
+        for query in parent_filters
+        if isinstance(query, QueryString)
+        and query.fields[0] in ["party", "attorney"]
+    ]
+    parties_has_parent_query = build_has_parent_parties_query(parties_filters)
 
     if not join_query:
         # Match all query case.
@@ -1118,9 +1106,7 @@ def build_es_main_query(
                 top_hits_limit,
             )
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
-            child_docs_count_query = build_child_docs_query(
-                join_query, cd, search_query=search_query
-            )
+            child_docs_count_query = build_child_docs_query(join_query, cd)
             if child_docs_count_query:
                 # Get the total RECAP Documents count.
                 child_docs_count_query = search_query_base.query(
@@ -2002,13 +1988,12 @@ def do_es_feed_query(
     """
     match cd["type"]:
         case SEARCH_TYPES.RECAP:
-            parent_query, join_query = build_es_base_query(search_query, cd)
+            _, join_query = build_es_base_query(search_query, cd)
             # Eliminate items that lack the ordering field.
             s = build_child_docs_query(
                 join_query,
                 cd,
                 exclude_docs_for_empty_field=exclude_docs_for_empty_field,
-                search_query=parent_query,
             )
             s = search_query.query(s)
             s = add_highlighting_for_feed_query(s, "plain_text")
@@ -2116,8 +2101,6 @@ def build_full_join_es_queries(
 
         # Build parent filters.
         parent_filters = build_join_es_filters(cd)
-        # Copy the original parent_filters before appending child fields.
-        outer_parent_filters = deepcopy(parent_filters)
         # If parent filters, extend into child_filters.
         if parent_filters:
             # Removes the party and attorney filter if they were provided because
@@ -2153,21 +2136,49 @@ def build_full_join_es_queries(
                     minimum_should_match=1,
                 )
 
+        _, query_hits_limit = get_child_top_hits_limit(cd, cd["type"])
+        parties_filters = [
+            query
+            for query in parent_filters
+            if isinstance(query, QueryString)
+            and query.fields[0] in ["party", "attorney"]
+        ]
+        has_child_query = None
         if child_text_query or child_filters:
-            _, query_hits_limit = get_child_top_hits_limit(cd, cd["type"])
             hl_fields = (
                 SEARCH_OPINION_CHILD_HL_FIELDS
                 if cd["type"] == SEARCH_TYPES.OPINION
                 else SEARCH_RECAP_CHILD_HL_FIELDS
             )
-            query = build_has_child_query(
+            has_child_query = build_has_child_query(
                 join_query,
                 child_type,
                 query_hits_limit,
                 hl_fields,
                 get_child_sorting_key(cd),
             )
-            q_should.append(query)
+            if not parties_filters:
+                q_should.append(has_child_query)
+
+        if parties_filters:
+            # If party filters were provided append an additional parties
+            # filter to constrain the has_child query matches. This ensures
+            # they only match dockets with child documents where the docket
+            # matches the party filters.
+            if not has_child_query:
+                # If no child query is present, build a match_all query to
+                # match up to 5 RECAPDocuments in dockets with documents that
+                # matched the party filters.
+                has_child_query = build_has_child_query(
+                    "match_all",
+                    "recap_document",
+                    query_hits_limit,
+                    SEARCH_RECAP_CHILD_HL_FIELDS,
+                    get_child_sorting_key(cd),
+                )
+            parties_filters_has_child_query = deepcopy(parties_filters)
+            parties_filters_has_child_query.append(has_child_query)
+            q_should.append(Q("bool", must=parties_filters_has_child_query))
 
         # Build the parent filter and text queries.
         string_query = build_fulltext_query(
@@ -2220,64 +2231,6 @@ def build_full_join_es_queries(
                 cd, parent_query
             )
             q_should.append(parent_query)
-
-        # If party filters were provided, build an additional level of
-        # filtering in order to constrain the results. This ensures they only
-        # match dockets with child documents where the docket matches the party
-        # filters.
-        parties_filters = [
-            query
-            for query in parent_filters
-            if isinstance(query, QueryString)
-            and query.fields[0] in ["party", "attorney"]
-        ]
-        if parties_filters:
-            if join_query:
-                # If child query is available, build a clean has_child query.
-                has_child_parties = Q(
-                    "has_child",
-                    type=child_type,
-                    score_mode="max",
-                    query=join_query,
-                )
-                outer_parent_filters.append(has_child_parties)
-                outer_parent_filters.append(Q("match", docket_child="docket"))
-            else:
-                # If no child query, build a match_all query for RECAPDocuments
-                _, query_hits_limit = get_child_top_hits_limit(cd, cd["type"])
-                has_child_parties = build_has_child_query(
-                    "match_all",
-                    "recap_document",
-                    query_hits_limit,
-                    SEARCH_RECAP_CHILD_HL_FIELDS,
-                    get_child_sorting_key(cd),
-                )
-                parent_filters_has_child_parties = deepcopy(
-                    outer_parent_filters
-                )
-                parent_filters_has_child_parties.append(has_child_parties)
-                outer_parent_filters.append(Q("match", docket_child="docket"))
-                # Include a 'should' clause to retrieve dockets either with
-                # filings that matched the party filters or without filings but
-                # still matching the party filters.
-                outer_parent_filters = Q(
-                    "bool",
-                    should=[
-                        Q("bool", must=parent_filters_has_child_parties),
-                        nullify_parent_score_on_child_sorting(
-                            cd, Q("bool", must=outer_parent_filters)
-                        ),
-                    ],
-                )
-
-            return (
-                Q(
-                    "bool",
-                    should=q_should,
-                    must=outer_parent_filters,
-                ),
-                join_query,
-            )
 
     if not q_should:
         return [], join_query
