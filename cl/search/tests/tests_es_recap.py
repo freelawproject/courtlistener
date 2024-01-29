@@ -1109,6 +1109,19 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             r.content.decode(), "3 Docket Entries"
         )
 
+        ## To search for a docket without filings by parties, it is possible to
+        # use the Advanced Search syntax and combine docket-level fields.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "party:(Bill Lorem) AND attorney:(Harris Martin)",
+            "case_name": "California",
+        }
+        # It matches 1 case without filings.
+        r = async_to_sync(self._test_article_count)(
+            params, 1, "text query + party_name + attorney"
+        )
+        self.assertIn(empty_docket.docket_number, r.content.decode())
+
         ## The attorney filter can constrain the results returned at document
         # level, along with string query, parent and child filters.
         params = {
