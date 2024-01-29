@@ -523,3 +523,64 @@ class MembershipWebhookTest(TestCase):
 
         query = NeonMembership.objects.filter(neon_id="12345")
         self.assertEqual(await query.acount(), 1)
+
+    @patch(
+        "cl.lib.neon_utils.NeonClient.get_acount_by_id",
+    )
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    async def test_can_create_stub_account_properly(
+        self, mock_store_webhook, mock_get_account
+    ):
+        self.data["eventTrigger"] = "createMembership"
+        self.data["data"]["membership"]["accountId"] = "9524"
+
+        # mocks the Neon API response
+        mock_get_account.return_value = {
+            "accountId": "9524",
+            "primaryContact": {
+                "email1": "test@free.law",
+                "firstName": "test",
+                "lastName": "test",
+                "addresses": [
+                    {
+                        "addressId": "91449",
+                        "addressLine1": "Suite 338 886 Hugh Shoal",
+                        "addressLine2": "",
+                        "addressLine3": None,
+                        "addressLine4": None,
+                        "city": "New Louveniamouth",
+                        "stateProvince": {
+                            "code": "WA",
+                            "name": "Washington",
+                            "status": None,
+                        },
+                        "country": {
+                            "id": "1",
+                            "name": "United States of America",
+                            "status": None,
+                        },
+                        "territory": None,
+                        "zipCode": "30716",
+                    }
+                ],
+            },
+        }
+
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+            data=self.data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+
+        query = NeonMembership.objects.select_related(
+            "user", "user__profile"
+        ).filter(neon_id="12345")
+        self.assertEqual(await query.acount(), 1)
+
+        membership = await query.afirst()
+        self.assertEqual(membership.user.email, "test@free.law")
+        self.assertEqual(membership.user.profile.neon_account_id, "9524")

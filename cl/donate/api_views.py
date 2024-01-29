@@ -81,7 +81,7 @@ class MembershipWebhookViewSet(
             "address2": addresses[0]["addressLine2"],
             "city": addresses[0]["city"],
             "state": addresses[0]["stateProvince"]["code"],
-            "zip_code": addresses["zipCode"],
+            "zip_code": addresses[0]["zipCode"],
             "wants_newsletter": False,
         }
 
