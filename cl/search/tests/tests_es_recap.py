@@ -1081,9 +1081,6 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         ## The party_name and attorney filter can constrain the results
         # returned, along with string query, parent and child filters.
-        # Note that the case 'California v. America' is not found here.
-        # Dockets without filings cannot be located by parties fields if
-        # combined with any other filter or string query.
         params = {
             "type": SEARCH_TYPES.RECAP,
             "q": "America",
@@ -1103,6 +1100,10 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIn("Document #1", r.content.decode())
         self.assertIn("Document #2", r.content.decode())
         self.assertIn("Document #3", r.content.decode())
+        # Note that the case 'California v. America' is not found here.
+        # Dockets without filings cannot be located by parties fields if
+        # combined with any other filter or string query.
+        self.assertNotIn(empty_docket.docket_number, r.content.decode())
         self._assert_results_header_content(r.content.decode(), "2 Cases")
         self._assert_results_header_content(
             r.content.decode(), "3 Docket Entries"
