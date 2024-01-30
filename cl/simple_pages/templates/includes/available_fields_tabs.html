@@ -31,20 +31,16 @@
         </table>
         {% if type == "recap_archive" %}
           <p>
-            <sup>*</sup> <code>party</code> and <code>attorney</code> values are associated with dockets, not filings. Therefore, when dockets have no filings, combining these two fields with other docket filters is possible but may yield unexpected results when paired with non-docket filters or a query string. To include dockets with no filings in your search results while combining <code>party</code> and/or <code>attorney</code> fields, consider one of the following options:
+            <sup>*</sup> <code>party</code> and <code>attorney</code> values are associated with dockets, not filings. Therefore, avoid combining non-docket fields with <code>party</code> and <code>attorney</code> in fielded searches, as these combinations won't yield any results. For example, a query like:
           </p>
           <ul>
-            <li>Use a fielded search that includes party fields and any other docket field:
-             <ul>
-               <li><code>party:(Party Name) AND attorney:(Attorney) AND caseName:(Docket Name)</code></li>
-             </ul>
-            </li>
-            <li>Use docket field filters and a fielded search for party and attorney:
-              <ul>
-                <li><code>case_name:"Docket case name"</code></li>
-                <li><code>q: "party:(Party Name) AND attorney:(Attorney Name)"</code></li>
-              </ul>
-            </li>
+            <li><code>party:(Party Name) AND attorney:(Attorney) AND description:(some description)</code></li>
+          </ul>
+          <p>Will not return any results. To achieve the desired results, utilize filters instead:</p>
+          <ul>
+            <li><code>Document Description: "some description"</code></li>
+            <li><code>Party Name: "The party name"</code></li>
+            <li><code>Attorney  Name: "The attorney name"</code></li>
           </ul>
         {% endif %}
       </div>
