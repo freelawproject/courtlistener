@@ -981,12 +981,13 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # case_name filter.
         params = {
             "type": SEARCH_TYPES.RECAP,
-            "case_name": '"America v. Lorem"',
+            "case_name": '"America"',
             "party_name": "Bill Lorem",
         }
-        # 2 results expected. It matches 2 cases: one with 2 RDs and one with 1.
+        # 3 results expected. It matches 2 cases: one with 2 RDs and one with 1
+        # and 1 empty docket.
         r = async_to_sync(self._test_article_count)(
-            params, 2, "case_name + party_name"
+            params, 3, "case_name + party_name"
         )
         self._count_child_documents(
             0, r.content.decode(), 2, "case_name + party_name"
@@ -997,9 +998,39 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIn("Document #1", r.content.decode())
         self.assertIn("Document #2", r.content.decode())
         self.assertIn("Document #3", r.content.decode())
-        self._assert_results_header_content(r.content.decode(), "2 Cases")
+        self.assertIn(docket.docket_number, r.content.decode())
+        self.assertIn(docket_2.docket_number, r.content.decode())
+        self.assertIn(empty_docket.docket_number, r.content.decode())
+        self._assert_results_header_content(r.content.decode(), "3 Cases")
         self._assert_results_header_content(
             r.content.decode(), "3 Docket Entries"
+        )
+
+        ## The party filter can constrain the results returned, along with
+        # parent and child filters. The empty docket is excluded from results.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "America",
+            "party_name": "Bill Lorem",
+            "available_only": True,
+        }
+        # 2 results expected. It matches 2 cases each with 1 RD
+        r = async_to_sync(self._test_article_count)(
+            params, 2, "case_name + party_name + available_only "
+        )
+        self._count_child_documents(
+            0, r.content.decode(), 1, "case_name + party_name +available_only"
+        )
+        self._count_child_documents(
+            1, r.content.decode(), 1, "case_name + party_name +available_only"
+        )
+        self.assertIn("Document #1", r.content.decode())
+        self.assertIn("Document #3", r.content.decode())
+        self.assertIn(docket.docket_number, r.content.decode())
+        self.assertIn(docket_2.docket_number, r.content.decode())
+        self._assert_results_header_content(r.content.decode(), "2 Cases")
+        self._assert_results_header_content(
+            r.content.decode(), "2 Docket Entries"
         )
 
         ## The party filter can constrain the results returned, along with
@@ -1080,14 +1111,14 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         )
 
         ## The party_name and attorney filter can constrain the results
-        # returned, along with string query, parent and child filters.
+        # returned, along with string query.
         params = {
             "type": SEARCH_TYPES.RECAP,
             "q": "America",
             "party_name": "Bill Lorem",
             "atty_name": "Harris Martin",
         }
-        # It matches 3 cases: one with 2 RDs and one with 1 and an empty case.
+        # It matches 3 cases: one with 2 RDs and one with 1 and an empty docket
         r = async_to_sync(self._test_article_count)(
             params, 3, "text query + party_name + attorney"
         )
