@@ -43,6 +43,7 @@ from cl.lib.test_helpers import (
     UserProfileWithParentsFactory,
 )
 from cl.tests.cases import TestCase
+from cl.users.models import UserProfile
 
 stripe_test_numbers = {
     "good": {"visa": "4242424242424242"},
@@ -336,7 +337,12 @@ class MembershipWebhookTest(TestCase):
         }
 
     @override_settings(NEON_MAX_WEBHOOK_NUMBER=10)
-    def test_store_and_truncate_webhook_data(self) -> None:
+    @patch(
+        "cl.donate.api_views.MembershipWebhookViewSet._handle_membership_creation_or_update",
+    )
+    def test_store_and_truncate_webhook_data(
+        self, mock_membership_creation
+    ) -> None:
         self.data["eventTrigger"] = "createMembership"
         client = Client()
         r = client.post(
@@ -347,13 +353,28 @@ class MembershipWebhookTest(TestCase):
         self.assertEqual(r.status_code, HTTP_201_CREATED)
         self.assertEqual(NeonWebhookEvent.objects.all().count(), 1)
 
-        NeonWebhookEventFactory.create_batch(18)
+        # Make sure to save the webhook payload even if an error occurs.
+        mock_membership_creation.side_effect = Exception()
+        self.data["data"]["membership"]["accountId"] = "9999"
+        with self.assertRaises(Exception):
+            client.post(
+                reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+                data=self.data,
+                content_type="application/json",
+            )
+        failed_log_query = NeonWebhookEvent.objects.filter(account_id="9999")
+        self.assertEqual(failed_log_query.count(), 1)
+        self.assertEqual(NeonWebhookEvent.objects.all().count(), 2)
+        profile_query = UserProfile.objects.filter(neon_account_id="9999")
+        self.assertEqual(profile_query.count(), 0)
+
+        NeonWebhookEventFactory.create_batch(17)
 
         # Update the trigger type and Adds a new webhook to the log. After
         # adding this new record the post_save signal should truncate the
         # events table and keep the latest NEON_MAX_WEBHOOK_NUMBER records
         self.data["eventTrigger"] = "editMembership"
-        client = Client()
+        mock_membership_creation.side_effect = None
         r = client.post(
             reverse("membership-webhooks-list", kwargs={"version": "v3"}),
             data=self.data,
@@ -523,3 +544,64 @@ class MembershipWebhookTest(TestCase):
 
         query = NeonMembership.objects.filter(neon_id="12345")
         self.assertEqual(await query.acount(), 1)
+
+    @patch(
+        "cl.lib.neon_utils.NeonClient.get_acount_by_id",
+    )
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    async def test_can_create_stub_account_properly(
+        self, mock_store_webhook, mock_get_account
+    ):
+        self.data["eventTrigger"] = "createMembership"
+        self.data["data"]["membership"]["accountId"] = "9524"
+
+        # mocks the Neon API response
+        mock_get_account.return_value = {
+            "accountId": "9524",
+            "primaryContact": {
+                "email1": "test@free.law",
+                "firstName": "test",
+                "lastName": "test",
+                "addresses": [
+                    {
+                        "addressId": "91449",
+                        "addressLine1": "Suite 338 886 Hugh Shoal",
+                        "addressLine2": "",
+                        "addressLine3": None,
+                        "addressLine4": None,
+                        "city": "New Louveniamouth",
+                        "stateProvince": {
+                            "code": "WA",
+                            "name": "Washington",
+                            "status": None,
+                        },
+                        "country": {
+                            "id": "1",
+                            "name": "United States of America",
+                            "status": None,
+                        },
+                        "territory": None,
+                        "zipCode": "30716",
+                    }
+                ],
+            },
+        }
+
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+            data=self.data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+
+        query = NeonMembership.objects.select_related(
+            "user", "user__profile"
+        ).filter(neon_id="12345")
+        self.assertEqual(await query.acount(), 1)
+
+        membership = await query.afirst()
+        self.assertEqual(membership.user.email, "test@free.law")
+        self.assertEqual(membership.user.profile.neon_account_id, "9524")
