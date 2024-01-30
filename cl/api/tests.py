@@ -283,7 +283,13 @@ class ApiEventCreationTestCase(TestCase):
 
         await sync_to_async(view)(request)
 
-    async def test_are_events_created_properly(self) -> None:
+    @mock.patch(
+        "cl.api.utils.get_logging_prefix",
+        return_value="api:Test",
+    )
+    async def test_are_events_created_properly(
+        self, mock_logging_prefix
+    ) -> None:
         """Are event objects created as API requests are made?"""
         await self.hit_the_api()
 
