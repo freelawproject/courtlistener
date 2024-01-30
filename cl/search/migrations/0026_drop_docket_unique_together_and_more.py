@@ -7,7 +7,7 @@ class Migration(migrations.Migration):
     atomic = False
 
     dependencies = [
-        ("search", "0025_docket_unique_docket_per_court"),
+        ("search", "0025_add_docket_hash_index_and_more"),
     ]
 
     operations = [
