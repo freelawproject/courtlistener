@@ -57,7 +57,7 @@
    },
    {
       "field":"party",
-      "description":"The name of the parties in a PACER case. Can have multiple values.",
+      "description":"The name of the parties in a PACER case. Can have multiple values.<sup>*</sup>",
       "opinions":false,
       "parentheticals":false,
       "recap_archive":true,
@@ -65,7 +65,7 @@
    },
    {
       "field":"attorney",
-      "description":"The name of the attorneys in a PACER case. Can have multiple values.",
+      "description":"The name of the attorneys in a PACER case. Can have multiple values.<sup>*</sup>",
       "opinions":true,
       "parentheticals":false,
       "recap_archive":true,
