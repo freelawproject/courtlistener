@@ -202,6 +202,11 @@ def get_binary_content(
             msg = f"EmptyFileError: {download_url}\n{traceback.format_exc()}"
             return msg, None
 
+        # test for captcha redirects
+        if r.headers.get("Content-Type") == "text/javascript":
+            msg = f"RedirectJSError: {download_url}"
+            return msg, None
+
         # test for and follow meta redirects
         r = follow_redirections(r, s)
         r.raise_for_status()
