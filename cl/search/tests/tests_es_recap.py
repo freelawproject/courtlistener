@@ -856,13 +856,10 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 page_count=5,
             )
 
-            # Filter document withing docket and parties
-
-            # Filter two dockets with party and attorney
-
             docket_2 = DocketFactory(
                 case_name="America v. Lorem",
                 court=self.court,
+                docket_number="3:98-ms-148395",
             )
             firm_2 = AttorneyOrganizationFactory(
                 name="America LLP", lookup_key="4421in816"
@@ -896,6 +893,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             docket_3 = DocketFactory(
                 case_name="America v. Lorem",
                 court=self.court,
+                docket_number="1:56-ms-1000",
             )
             firm_3 = AttorneyOrganizationFactory(
                 name="America LLP", lookup_key="4421in818"
@@ -934,6 +932,21 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 description="Suspendisse bibendum eu",
             )
 
+            empty_docket = DocketFactory(
+                court=self.court,
+                case_name="California v. America",
+                date_filed=datetime.date(2010, 8, 16),
+                docket_number="1:19-cv-04400",
+            )
+            PartyTypeFactory.create(
+                party=PartyFactory(
+                    name="Bill Lorem",
+                    docket=empty_docket,
+                    attorneys=[attorney],
+                ),
+                docket=empty_docket,
+            )
+
         ## The party filter does not match any documents for the given search criteria
         params = {
             "type": SEARCH_TYPES.RECAP,
@@ -968,12 +981,13 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # case_name filter.
         params = {
             "type": SEARCH_TYPES.RECAP,
-            "case_name": '"America v. Lorem"',
+            "case_name": '"America"',
             "party_name": "Bill Lorem",
         }
-        # 2 results expected. It matches 2 cases: one with 2 RDs and one with 1.
+        # 3 results expected. It matches 2 cases: one with 2 RDs and one with 1
+        # and 1 empty docket.
         r = async_to_sync(self._test_article_count)(
-            params, 2, "case_name + party_name"
+            params, 3, "case_name + party_name"
         )
         self._count_child_documents(
             0, r.content.decode(), 2, "case_name + party_name"
@@ -984,9 +998,39 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIn("Document #1", r.content.decode())
         self.assertIn("Document #2", r.content.decode())
         self.assertIn("Document #3", r.content.decode())
-        self._assert_results_header_content(r.content.decode(), "2 Cases")
+        self.assertIn(docket.docket_number, r.content.decode())
+        self.assertIn(docket_2.docket_number, r.content.decode())
+        self.assertIn(empty_docket.docket_number, r.content.decode())
+        self._assert_results_header_content(r.content.decode(), "3 Cases")
         self._assert_results_header_content(
             r.content.decode(), "3 Docket Entries"
+        )
+
+        ## The party filter can constrain the results returned, along with
+        # parent and child filters. The empty docket is excluded from results.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "America",
+            "party_name": "Bill Lorem",
+            "available_only": True,
+        }
+        # 2 results expected. It matches 2 cases each with 1 RD
+        r = async_to_sync(self._test_article_count)(
+            params, 2, "case_name + party_name + available_only "
+        )
+        self._count_child_documents(
+            0, r.content.decode(), 1, "case_name + party_name +available_only"
+        )
+        self._count_child_documents(
+            1, r.content.decode(), 1, "case_name + party_name +available_only"
+        )
+        self.assertIn("Document #1", r.content.decode())
+        self.assertIn("Document #3", r.content.decode())
+        self.assertIn(docket.docket_number, r.content.decode())
+        self.assertIn(docket_2.docket_number, r.content.decode())
+        self._assert_results_header_content(r.content.decode(), "2 Cases")
+        self._assert_results_header_content(
+            r.content.decode(), "2 Docket Entries"
         )
 
         ## The party filter can constrain the results returned, along with
@@ -1067,16 +1111,16 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         )
 
         ## The party_name and attorney filter can constrain the results
-        # returned, along with string query, parent and child filters.
+        # returned, along with string query.
         params = {
             "type": SEARCH_TYPES.RECAP,
-            "q": "America v. Lorem",
+            "q": "America",
             "party_name": "Bill Lorem",
             "atty_name": "Harris Martin",
         }
-        # It matches 2 cases: one with 2 RDs and one with 1.
+        # It matches 3 cases: one with 2 RDs and one with 1 and an empty docket
         r = async_to_sync(self._test_article_count)(
-            params, 2, "text query + party_name + attorney"
+            params, 3, "text query + party_name + attorney"
         )
         self._count_child_documents(
             0, r.content.decode(), 2, "text query + party_name + attorney"
@@ -1087,10 +1131,26 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIn("Document #1", r.content.decode())
         self.assertIn("Document #2", r.content.decode())
         self.assertIn("Document #3", r.content.decode())
-        self._assert_results_header_content(r.content.decode(), "2 Cases")
+        self.assertIn(docket.docket_number, r.content.decode())
+        self.assertIn(docket_2.docket_number, r.content.decode())
+        self.assertIn(empty_docket.docket_number, r.content.decode())
+        self._assert_results_header_content(r.content.decode(), "3 Cases")
         self._assert_results_header_content(
             r.content.decode(), "3 Docket Entries"
         )
+
+        ## To search for a docket without filings by parties, it is possible to
+        # use the Advanced Search syntax and combine docket-level fields.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "party:(Bill Lorem) AND attorney:(Harris Martin)",
+            "case_name": "California",
+        }
+        # It matches 1 case without filings.
+        r = async_to_sync(self._test_article_count)(
+            params, 1, "text query + case_name"
+        )
+        self.assertIn(empty_docket.docket_number, r.content.decode())
 
         ## The attorney filter can constrain the results returned at document
         # level, along with string query, parent and child filters.
@@ -1124,9 +1184,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "party_name": "Bill Lorem",
             "atty_name": "Harris Martin",
         }
-        # It matches 2 cases: one with 2 RDs and one with 1.
+        # It matches 3 cases. One with 2 RDs, one with 1 and one without RDs
         r = async_to_sync(self._test_article_count)(
-            params, 2, "party_name + attorney"
+            params, 3, "party_name + attorney"
         )
         self._count_child_documents(
             0, r.content.decode(), 2, "party_name + attorney"
@@ -1137,22 +1197,26 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIn("Document #1", r.content.decode())
         self.assertIn("Document #2", r.content.decode())
         self.assertIn("Document #3", r.content.decode())
-        self._assert_results_header_content(r.content.decode(), "2 Cases")
+
+        self.assertIn(docket.docket_number, r.content.decode())
+        self.assertIn(docket_2.docket_number, r.content.decode())
+        self.assertIn(empty_docket.docket_number, r.content.decode())
+        self._assert_results_header_content(r.content.decode(), "3 Cases")
         self._assert_results_header_content(
             r.content.decode(), "3 Docket Entries"
         )
 
         with self.captureOnCommitCallbacks(execute=True):
-            e_2_d_1.delete()
-            e_1_d_1.delete()
             docket.delete()
             docket_2.delete()
+            docket_3.delete()
+            empty_docket.delete()
 
     async def test_atty_name_filter(self) -> None:
         """Confirm atty_name filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "atty_name": "Debbie Russell"}
 
-        # Frontend, 1 result expected since RECAPDocuments are grouped by case
+        # Frontend, 2 result expected since RECAPDocuments are grouped by case
         await self._test_article_count(params, 1, "atty_name")
 
     async def test_combine_filters(self) -> None:
@@ -1763,17 +1827,69 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 entry_number=4,
                 date_filed=None,
             )
-            rd_4 = RECAPDocumentFactory(
+            RECAPDocumentFactory(
                 docket_entry=de_4,
                 document_number="4",
             )
+            firm = AttorneyOrganizationFactory(
+                lookup_key="280kingofi",
+                name="Law Firm LLP",
+            )
+            attorney = AttorneyFactory(
+                name="Debbie Russell",
+                organizations=[firm],
+                docket=de_4.docket,
+            )
+            PartyTypeFactory.create(
+                party=PartyFactory(
+                    name="Defendant Jane Roe",
+                    docket=de_4.docket,
+                    attorneys=[attorney],
+                ),
+                docket=de_4.docket,
+            )
+            index_docket_parties_in_es.delay(de_4.docket.pk)
+
+            de_5 = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    docket_number="12-1238",
+                    court=self.court_2,
+                    case_name="Macenas Justo",
+                ),
+                date_filed=datetime.date(2013, 6, 19),
+            )
+            RECAPDocumentFactory(
+                docket_entry=de_5,
+                document_number="5",
+            )
+            PartyTypeFactory.create(
+                party=PartyFactory(
+                    name="Defendant Jane Roe",
+                    docket=de_5.docket,
+                    attorneys=[attorney],
+                ),
+                docket=de_5.docket,
+            )
+            index_docket_parties_in_es.delay(de_5.docket.pk)
+
             empty_docket = DocketFactory(
                 court=self.court,
                 case_name="SUBPOENAS SERVED FIVE",
                 docket_number="12-1237",
             )
 
+            PartyTypeFactory.create(
+                party=PartyFactory(
+                    name="Defendant Jane Roe",
+                    docket=empty_docket,
+                    attorneys=[attorney],
+                ),
+                docket=empty_docket,
+            )
+            index_docket_parties_in_es.delay(empty_docket.pk)
+
         # Order by entry_date_filed desc
+        # Ordering by a child field, dockets without entries should come last.
         params = {
             "type": SEARCH_TYPES.RECAP,
             "q": "SUBPOENAS SERVED",
@@ -1792,6 +1908,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         )
 
         # Order by entry_date_filed asc
+        # Ordering by a child field, dockets without entries should come last.
         params = {
             "type": SEARCH_TYPES.RECAP,
             "q": "SUBPOENAS SERVED",
@@ -1808,8 +1925,86 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             < r.content.decode().index("12-1237"),
             msg="'12-1235' should come BEFORE '1:21-bk-1234' when order_by entry_date_filed asc.",
         )
+
+        # Order by entry_date_filed desc in match all queries.
+        # Ordering by a child field, dockets without entries should come last.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "order_by": "entry_date_filed desc",
+        }
+        # Frontend
+        r = async_to_sync(self._test_article_count)(
+            params, 5, "order entry_date_filed desc"
+        )
+        self.assertTrue(
+            r.content.decode().index("1:21-bk-1234")
+            < r.content.decode().index("12-1235")
+            < r.content.decode().index("12-1238")
+            < r.content.decode().index("12-1236")
+            < r.content.decode().index("12-1237"),
+            msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by entry_date_filed  desc.",
+        )
+
+        # Order by entry_date_filed asc in match all queries.
+        # Ordering by a child field, dockets without entries should come last.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "order_by": "entry_date_filed asc",
+        }
+        # Frontend
+        r = async_to_sync(self._test_article_count)(
+            params, 5, "order entry_date_filed asc"
+        )
+        self.assertTrue(
+            r.content.decode().index("12-1238")
+            < r.content.decode().index("12-1235")
+            < r.content.decode().index("1:21-bk-1234")
+            < r.content.decode().index("12-1236")
+            < r.content.decode().index("12-1237"),
+            msg="'12-1238' should come BEFORE '12-1235' when order_by entry_date_filed asc.",
+        )
+
+        # Order by entry_date_filed desc filtering only parties
+        # Ordering by a child field, dockets without entries should come last.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "order_by": "entry_date_filed desc",
+            "party_name": "Defendant Jane Roe",
+        }
+        # Frontend
+        r = async_to_sync(self._test_article_count)(
+            params, 4, "order entry_date_filed desc"
+        )
+        self.assertTrue(
+            r.content.decode().index("1:21-bk-1234")
+            < r.content.decode().index("12-1238")
+            < r.content.decode().index("12-1236")
+            < r.content.decode().index("12-1237"),
+            msg="'1:21-bk-1234' should come BEFORE '12-1238' when order_by entry_date_filed  desc.",
+        )
+
+        # Order by entry_date_filed asc filtering only parties.
+        # Ordering by a child field, dockets without entries should come last.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "order_by": "entry_date_filed asc",
+            "party_name": "Defendant Jane Roe",
+        }
+        # Frontend
+        r = async_to_sync(self._test_article_count)(
+            params, 4, "order entry_date_filed asc"
+        )
+        self.assertTrue(
+            r.content.decode().index("12-1238")
+            < r.content.decode().index("1:21-bk-1234")
+            < r.content.decode().index("12-1236")
+            < r.content.decode().index("12-1237"),
+            msg="'12-1238' should come BEFORE '1:21-bk-1234' when order_by entry_date_filed asc.",
+        )
+
         with self.captureOnCommitCallbacks(execute=True):
-            rd_4.docket_entry.docket.delete()
+            de_4.docket.delete()
+            de_5.docket.delete()
             empty_docket.delete()
 
         # Order by dateFiled desc
@@ -1844,9 +2039,6 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             < r.content.decode().index("12-1235"),
             msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by dateFiled asc.",
         )
-
-        with self.captureOnCommitCallbacks(execute=True):
-            de_4.delete()
 
     @mock.patch("cl.lib.es_signal_processor.chain")
     async def test_avoid_updating_docket_in_es_on_view_count_increment(

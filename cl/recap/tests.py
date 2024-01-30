@@ -2492,6 +2492,7 @@ class IdbMergeTest(TestCase):
         self.assertEqual(Docket.objects.count(), 3)
 
 
+@mock.patch("cl.recap_rss.tasks.enqueue_docket_alert", return_value=True)
 @mock.patch(
     "cl.recap.tasks.RecapEmailSESStorage.open",
     side_effect=mock_bucket_open,
@@ -2681,6 +2682,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     async def test_new_recap_email_case_auto_subscription(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -2754,6 +2756,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     async def test_new_recap_email_case_auto_subscription_prev_user(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -2845,6 +2848,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     async def test_new_recap_email_case_no_auto_subscription(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -2906,6 +2910,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     async def test_new_recap_email_case_no_auto_subscription_prev_user(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -3001,6 +3006,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     async def test_no_recap_email_user_found(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -3040,6 +3046,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     async def test_receive_same_recap_email_notification_different_users(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -3195,6 +3202,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     async def test_new_recap_email_subscribe_by_email_link(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -3263,6 +3271,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     async def test_new_recap_email_unsubscribe_by_email_link(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -3356,6 +3365,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     async def test_new_recap_email_alerts_integration(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -3508,6 +3518,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     async def test_docket_alert_toggle_confirmation_fails(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -3605,6 +3616,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     async def test_new_recap_email_with_attachments(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -3760,6 +3772,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     async def test_extract_pdf_for_recap_email(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_pacer_court_accessible,
         mock_cookies,
@@ -3803,6 +3816,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     async def test_new_nda_recap_email(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -3852,6 +3866,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     async def test_new_nda_recap_email_case_auto_subscription(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -3926,6 +3941,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     async def test_new_nda_recap_email_case_no_auto_subscription(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -3997,6 +4013,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     async def test_multiple_docket_nef(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -4165,6 +4182,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     async def test_recap_email_no_magic_number(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -4248,6 +4266,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     async def test_mark_as_sealed_nda_document_not_available_from_magic_link(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -4293,6 +4312,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     async def test_mark_as_sealed_nef_documents_not_available_from_magic_link(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -4341,6 +4361,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     async def test_recap_email_no_magic_number_sealed_document(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -4381,6 +4402,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     async def test_recap_email_minute_entry(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -4432,6 +4454,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     async def test_recap_email_minute_entry_multi_nef(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -5110,6 +5133,7 @@ class CheckCourtConnectivityTest(TestCase):
         self.assertEqual(court_status, False)
 
 
+@mock.patch("cl.recap_rss.tasks.enqueue_docket_alert", return_value=True)
 @mock.patch(
     "cl.recap.tasks.RecapEmailSESStorage.open",
     side_effect=mock_bucket_open,
@@ -5195,6 +5219,7 @@ class WebhooksRetries(TestCase):
 
     def test_get_next_webhook_retry_date(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -5230,6 +5255,7 @@ class WebhooksRetries(TestCase):
 
     def test_retry_webhook_disabled(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -5262,6 +5288,7 @@ class WebhooksRetries(TestCase):
 
     def test_retry_webhook_events(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -5361,6 +5388,7 @@ class WebhooksRetries(TestCase):
 
     def test_webhook_response_status_codes(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -5412,6 +5440,7 @@ class WebhooksRetries(TestCase):
     )
     async def test_update_webhook_after_http_error(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -5484,6 +5513,7 @@ class WebhooksRetries(TestCase):
     )
     async def test_update_webhook_after_network_error(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -5557,6 +5587,7 @@ class WebhooksRetries(TestCase):
     )
     async def test_success_webhook_delivery(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -5622,6 +5653,7 @@ class WebhooksRetries(TestCase):
     )
     async def test_retry_webhooks_integration(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -5751,6 +5783,7 @@ class WebhooksRetries(TestCase):
 
     def test_webhook_disabling(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -5858,6 +5891,7 @@ class WebhooksRetries(TestCase):
 
     def test_cut_off_time_for_retry_events_and_restore_retry_counter(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -5993,6 +6027,7 @@ class WebhooksRetries(TestCase):
 
     def test_webhook_continues_failing_after_an_event_delivery(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -6131,6 +6166,7 @@ class WebhooksRetries(TestCase):
 
     def test_delete_old_webhook_events(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -6180,6 +6216,7 @@ class WebhooksRetries(TestCase):
 
     def test_send_notifications_if_webhook_still_disabled(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
