@@ -2190,13 +2190,13 @@ setuptools = "*"
 
 [[package]]
 name = "juriscraper"
-version = "2.5.85"
+version = "2.5.87"
 description = "An API to scrape American court websites for metadata."
 optional = false
 python-versions = "*"
 files = [
-    {file = "juriscraper-2.5.85-py27-none-any.whl", hash = "sha256:5883107fb57308da9115283f28a549aa8f8455ae9258554e5ccf8777cf68fcd4"},
-    {file = "juriscraper-2.5.85.tar.gz", hash = "sha256:f6eefb145fa4490653cd7af88c9166211b6c0cc9ad5edfa4bf01da23d810c49b"},
+    {file = "juriscraper-2.5.87-py27-none-any.whl", hash = "sha256:9a387d41c67ed8b4a5b2bb850d3385e850d0165ea4ae55b96afd72aa604f2810"},
+    {file = "juriscraper-2.5.87.tar.gz", hash = "sha256:86f26919f317f244b56b7953e898f8f10b1fd62e68d3f38b62a426975a00ef2e"},
 ]
 
 [package.dependencies]
