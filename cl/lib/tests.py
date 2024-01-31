@@ -33,6 +33,13 @@ from cl.lib.privacy_tools import anonymize
 from cl.lib.ratelimiter import parse_rate
 from cl.lib.search_utils import make_fq
 from cl.lib.string_utils import normalize_dashes, trunc
+from cl.lib.utils import (
+    check_for_proximity_tokens,
+    check_unbalanced_parenthesis,
+    check_unbalanced_quotes,
+    sanitize_unbalanced_parenthesis,
+    sanitize_unbalanced_quotes,
+)
 from cl.people_db.models import Role
 from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
 from cl.search.factories import (
@@ -1134,3 +1141,124 @@ class TestElasticsearchUtils(SimpleTestCase):
             )
             print("Output STR: ", output_str)
             self.assertEqual(output_str, test["output"])
+
+    def test_check_and_sanitize_queries_bad_syntax(self) -> None:
+        """Tests for methods that check and sanitize queries with a bad search
+        syntax.
+        """
+
+        # Check for bad proximity tokens.
+        tests = [
+            {
+                "input_str": "This is a range /p query",
+                "output": True,
+            },
+            {
+                "input_str": "This is a range /s query",
+                "output": True,
+            },
+            {
+                "input_str": "This is a range/s query",
+                "output": True,
+            },
+            {
+                "input_str": "This is a range/p query",
+                "output": True,
+            },
+            {
+                "input_str": "This is a /s range /p query",
+                "output": True,
+            },
+            {
+                "input_str": "This is not a range query",
+                "output": False,
+            },
+        ]
+        for test in tests:
+            output = check_for_proximity_tokens(
+                test["input_str"]  # type: ignore
+            )
+            self.assertEqual(output, test["output"])
+
+        # Check for Unbalanced parentheses.
+        tests = [
+            {
+                "input_str": "This is (unbalanced",
+                "output": True,
+                "sanitized": "This is unbalanced",
+            },
+            {
+                "input_str": "This is unbalanced)",
+                "output": True,
+                "sanitized": "This is unbalanced",
+            },
+            {
+                "input_str": "This is (unbalanced)(",
+                "output": True,
+                "sanitized": "This is (unbalanced)",
+            },
+            {
+                "input_str": "This (is (unbalanced)(",
+                "output": True,
+                "sanitized": "This (is unbalanced)",
+            },
+            {
+                "input_str": "This (is (unbalanced)()",
+                "output": True,
+                "sanitized": "This (is (unbalanced))",
+            },
+            {
+                "input_str": "(This) (is (balanced))",
+                "output": False,
+                "sanitized": "(This) (is (balanced))",
+            },
+        ]
+        for test in tests:
+            output = check_unbalanced_parenthesis(
+                test["input_str"]  # type: ignore
+            )
+            self.assertEqual(output, test["output"])
+
+        for test in tests:
+            output = sanitize_unbalanced_parenthesis(
+                test["input_str"]  # type: ignore
+            )
+            self.assertEqual(output, test["sanitized"])
+
+        # Check for Unbalanced quotes.
+        tests = [
+            {
+                "input_str": 'This is "unbalanced',
+                "output": True,
+                "sanitized": "This is unbalanced",
+            },
+            {
+                "input_str": 'This is "unbalanced""',
+                "output": True,
+                "sanitized": 'This is "unbalanced"',
+            },
+            {
+                "input_str": 'This "is" unbalanced"',
+                "output": True,
+                "sanitized": 'This "is" unbalanced',
+            },
+            {
+                "input_str": 'This "is" unbalanced"""',
+                "output": True,
+                "sanitized": 'This "is" unbalanced""',
+            },
+            {
+                "input_str": '"This is" "balanced"',
+                "output": False,
+                "sanitized": '"This is" "balanced"',
+            },
+        ]
+        for test in tests:
+            output = check_unbalanced_quotes(test["input_str"])  # type: ignore
+            self.assertEqual(output, test["output"])
+
+        for test in tests:
+            output = sanitize_unbalanced_quotes(
+                test["input_str"]  # type: ignore
+            )
+            self.assertEqual(output, test["sanitized"])
