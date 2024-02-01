@@ -2015,7 +2015,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 200, mock_raw=True
             ),
         ):
-            mock_date = now().replace(day=30, hour=0)
+            mock_date = now().replace(month=1, day=30, hour=0)
             with time_machine.travel(mock_date, tick=False):
                 # Call mly command
                 with self.assertRaises(InvalidDateError):
