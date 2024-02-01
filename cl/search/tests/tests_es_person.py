@@ -808,8 +808,7 @@ class PeopleSearchTestElasticSearch(
             "order_by": "score desc",
         }
         r = self._test_article_count(params, 1, "q")
-        self.assertIn("<mark>Sheindlin</mark>", r.content.decode())
-        self.assertIn("<mark>Olivia</mark>", r.content.decode())
+        self.assertIn("<mark>Sheindlin Olivia</mark>", r.content.decode())
 
         # name.exact query highlights in text query.
         params = {
@@ -851,6 +850,24 @@ class PeopleSearchTestElasticSearch(
         r = self._test_article_count(params, 2, "q")
         self.assertIn("<mark>NY</mark>", r.content.decode())
         self.assertEqual(r.content.decode().count("<mark>NY</mark>"), 2)
+
+        # Schools highlights
+        params = {
+            "q": "New York Law School",
+            "type": SEARCH_TYPES.PEOPLE,
+            "order_by": "score desc",
+        }
+        r = self._test_article_count(params, 2, "q")
+        self.assertIn("<mark>New York Law School</mark>", r.content.decode())
+
+        # Political affiliation highlights
+        params = {
+            "q": "Independent",
+            "type": SEARCH_TYPES.PEOPLE,
+            "order_by": "score desc",
+        }
+        r = self._test_article_count(params, 1, "q")
+        self.assertIn("<mark>Independent</mark>", r.content.decode())
 
     def test_api_fields(self) -> None:
         """Confirm the search API for People return the expected fields."""

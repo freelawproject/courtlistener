@@ -46,6 +46,8 @@ from cl.search.constants import (
     ALERTS_HL_TAG,
     BOOSTS,
     MULTI_VALUE_HL_FIELDS,
+    PEOPLE_ES_HL_FIELDS,
+    PEOPLE_ES_HL_KEYWORD_FIELDS,
     RELATED_PATTERN,
     SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS,
     SEARCH_HL_TAG,
@@ -60,7 +62,6 @@ from cl.search.constants import (
     SEARCH_RECAP_CHILD_QUERY_FIELDS,
     SEARCH_RECAP_HL_FIELDS,
     SEARCH_RECAP_PARENT_QUERY_FIELDS,
-    SOLR_PEOPLE_ES_HL_FIELDS,
 )
 from cl.search.exception import UnbalancedQuery
 from cl.search.forms import SearchForm
@@ -1137,6 +1138,7 @@ def add_es_highlighting(
     """
     fields_to_exclude = []
     highlighting_fields = []
+    highlighting_keyword_fields = []
     hl_tag = ALERTS_HL_TAG if alerts else SEARCH_HL_TAG
     matched_fields = False
     match cd["type"]:
@@ -1148,7 +1150,8 @@ def add_es_highlighting(
             )
             fields_to_exclude = ["sha1"]
         case SEARCH_TYPES.PEOPLE:
-            highlighting_fields = SOLR_PEOPLE_ES_HL_FIELDS
+            highlighting_fields = PEOPLE_ES_HL_FIELDS
+            highlighting_keyword_fields = PEOPLE_ES_HL_KEYWORD_FIELDS
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             highlighting_fields = SEARCH_RECAP_HL_FIELDS
             matched_fields = True
@@ -1157,17 +1160,37 @@ def add_es_highlighting(
             matched_fields = True
 
     search_query = search_query.source(excludes=fields_to_exclude)
-    for field in highlighting_fields:
-        if matched_fields:
-            search_query = search_query.highlight(
-                field,
-                type=settings.ES_HIGHLIGHTER,
-                matched_fields=[field, f"{field}.exact"],
-                number_of_fragments=0,
-                pre_tags=[f"<{hl_tag}>"],
-                post_tags=[f"</{hl_tag}>"],
-            )
-        else:
+    if settings.TESTING or matched_fields:
+        # Use FVH in testing and documents that already support FVH.
+        for field in highlighting_fields:
+            # Omit "exact" fields for FVH.
+            # TODO remove "exact" fields from HL list fields.
+            if "exact" not in field:
+                search_query = search_query.highlight(
+                    field,
+                    type=settings.ES_HIGHLIGHTER,
+                    matched_fields=[field, f"{field}.exact"],
+                    number_of_fragments=0,
+                    pre_tags=[f"<{hl_tag}>"],
+                    post_tags=[f"</{hl_tag}>"],
+                )
+        # Keyword fields do not support term_vector indexing; thus, FVH is not
+        # supported either. Use plain text in this case. Keyword fields don't
+        # have an exact version, so no HL merging is required either.
+        if highlighting_keyword_fields:
+            for field in highlighting_keyword_fields:
+                search_query = search_query.highlight(
+                    field,
+                    type="plain",
+                    number_of_fragments=0,
+                    pre_tags=[f"<{hl_tag}>"],
+                    post_tags=[f"</{hl_tag}>"],
+                )
+    else:
+        # Continue using the plain version for documents that do not yet
+        # support FVH in production.
+        highlighting_fields.extend(highlighting_keyword_fields)
+        for field in highlighting_fields:
             search_query = search_query.highlight(
                 field,
                 type="plain",
@@ -1248,11 +1271,16 @@ def merge_highlights_into_result(
     """
 
     exact_hl_fields = []
+    docs_with_fvh_support = [SEARCH_TYPES.RECAP, SEARCH_TYPES.OPINION]
+    if settings.TESTING:
+        docs_with_fvh_support.extend(
+            [SEARCH_TYPES.ORAL_ARGUMENT, SEARCH_TYPES.PEOPLE]
+        )
     for (
         field,
         highlight_list,
     ) in highlights.items():
-        if search_type in [SEARCH_TYPES.RECAP, SEARCH_TYPES.OPINION]:
+        if search_type in docs_with_fvh_support:
             # For RECAP and Opinions Search that use FVH, highlighted results
             # are already combined. Simply assign them to the _source field.
             result[field] = highlight_list

@@ -16,13 +16,17 @@ SOLR_OPINION_HL_FIELDS = [
     "text",
 ]
 SOLR_PEOPLE_HL_FIELDS = ["name", "dob_city", "dob_state", "name_reverse"]
-SOLR_PEOPLE_ES_HL_FIELDS = [
+PEOPLE_ES_HL_FIELDS = [
     "name",
     "name.exact",
     "dob_city",
+    "political_affiliation",
+    "political_affiliation.exact",
+    "school",
+    "school.exact",
+]
+PEOPLE_ES_HL_KEYWORD_FIELDS = [
     "dob_state_id",
-    "text",
-    "text.exact",
 ]
 
 # ES fields that are used in the search queries
