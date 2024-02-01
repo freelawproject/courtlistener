@@ -9,7 +9,7 @@ parenthetical_group_index.settings(
 )
 
 # Define oral arguments elasticsearch index
-oral_arguments_index = Index("oral_arguments")
+oral_arguments_index = Index("oral_arguments_vectors")
 oral_arguments_index.settings(
     number_of_shards=settings.ELASTICSEARCH_OA_NUMBER_OF_SHARDS,
     number_of_replicas=settings.ELASTICSEARCH_OA_NUMBER_OF_REPLICAS,
@@ -18,7 +18,7 @@ oral_arguments_index.settings(
 
 
 # Define oral arguments alerts elasticsearch index
-oral_arguments_percolator_index = Index("oral_arguments_percolator")
+oral_arguments_percolator_index = Index("oral_arguments_percolator_vectors")
 oral_arguments_percolator_index.settings(
     number_of_shards=settings.ELASTICSEARCH_OA_ALERTS_NUMBER_OF_SHARDS,
     number_of_replicas=settings.ELASTICSEARCH_OA_ALERTS_NUMBER_OF_REPLICAS,
@@ -27,7 +27,7 @@ oral_arguments_percolator_index.settings(
 
 
 # Define people elasticsearch index
-people_db_index = Index("people_db_index")
+people_db_index = Index("people_db_index_vectors")
 people_db_index.settings(
     number_of_shards=settings.ELASTICSEARCH_PEOPLE_NUMBER_OF_SHARDS,
     number_of_replicas=settings.ELASTICSEARCH_PEOPLE_NUMBER_OF_REPLICAS,
