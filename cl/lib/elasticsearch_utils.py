@@ -1271,16 +1271,18 @@ def merge_highlights_into_result(
     """
 
     exact_hl_fields = []
+    alert_document = False
     docs_with_fvh_support = [SEARCH_TYPES.RECAP, SEARCH_TYPES.OPINION]
     if settings.TESTING:
         docs_with_fvh_support.extend(
             [SEARCH_TYPES.ORAL_ARGUMENT, SEARCH_TYPES.PEOPLE]
         )
+        alert_document = tag == ALERTS_HL_TAG
     for (
         field,
         highlight_list,
     ) in highlights.items():
-        if search_type in docs_with_fvh_support:
+        if search_type in docs_with_fvh_support or alert_document:
             # For RECAP and Opinions Search that use FVH, highlighted results
             # are already combined. Simply assign them to the _source field.
             result[field] = highlight_list
