@@ -35,10 +35,10 @@
     </h2>
 
     <div id="all-summaries">
-      <h3>{{ summaries_count|intcomma }} judge-written summar{{ summaries_count|pluralize:"y,ies" }} of this opinion
+      <h3>{{ summaries_count|intcomma }} judge-written summar{{ summaries_count|pluralize:"y,ies" }} of this case law
         from other cases.</h3>
       {% if summaries_count > 0 %}
-        <p>We looked through our complete collection of opinions for parenthetical summaries of this case and
+        <p>We looked through our complete collection of case law records for parenthetical summaries of this case and
           organized them into {{ parenthetical_groups|length }}
           group{{ parenthetical_groups|length|pluralize }}.</p>
       {% endif %}

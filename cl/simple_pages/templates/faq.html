@@ -54,11 +54,11 @@
     <p>
       <a href="#what-coverage-exists">What is your coverage of legal materials and how comprehensive is
           it?</a><br>
-      <a href="#why-many-copies">Why do some opinions show up more than once in search results?</a><br>
+      <a href="#why-many-copies">Why do some case law records show up more than once in search results?</a><br>
       <a href="#why-my-case">Why is my case appearing on this site?</a><br>
       <a href="#non-precedential">Why does this site contain documents that say "Not for Publication",
           "Unpublished" etc?</a><br>
-      <a href="#explain-pin-cites">What are the gray numbers that appear in the middle of many opinions?</a><br>
+      <a href="#explain-pin-cites">What are the gray numbers that appear in the middle of many case law records?</a><br>
       <a href="#explain-neutral-citations">What are neutral citations and why do you promote them?</a><br>
       <a href="#why-bulk">Why do you provide bulk data files?</a><br>
       <a href="#explain-fingerprint">What is the "fingerprint" of the document?</a>
@@ -105,7 +105,7 @@
       <li>{{ total_oa_minutes|intcomma }} minutes of oral argument recordings.</li>
       <li>A database of {{ total_judge_count|intcomma }} judges.</li>
     </ul>
-    <p>CourtListener is operated by the non-profit <a href="https://free.law">Free Law Project</a>. Free Law Project seeks to provide free access to primary legal materials, develop legal research tools, and support academic research on legal corpora. CourtListener embodies all of these efforts, as the primary free repository of all the court opinions we have collected, as the platform on which we attempt to deploy legal research tools, and as the source of bulk downloads that enable academic researchers to study our collection.
+    <p>CourtListener is operated by the non-profit <a href="https://free.law">Free Law Project</a>. Free Law Project seeks to provide free access to primary legal materials, develop legal research tools, and support academic research on legal corpora. CourtListener embodies all of these efforts, as the primary free repository of all the court case law records we have collected, as the platform on which we attempt to deploy legal research tools, and as the source of bulk downloads that enable academic researchers to study our collection.
     </p>
 
 
@@ -117,7 +117,7 @@
 
 
     <h3 id="submit-documents">Can I send you documents from my case?</h3>
-    <p>In general, no, we can't accept documents from you about your case. As you might expect, people occasionally create fraudulent documents and that's a risk we cannot take. If your case in a <a href="{% url "coverage" %}#scraped-jurisdictions">jurisdiction that we cover</a>, we will eventually receive the opinion directly from the court itself.
+    <p>In general, no, we can't accept documents from you about your case. As you might expect, people occasionally create fraudulent documents and that's a risk we cannot take. If your case in a <a href="{% url "coverage" %}#scraped-jurisdictions">jurisdiction that we cover</a>, we will eventually receive the case law record directly from the court itself.
     </p>
     <p>The exception to this is that if your documents are on PACER, it's possible for you to use our <a href="https://free.law/recap/">RECAP Project</a> to get us copies of the documents. To do so, simply install either our Firefox, Chrome or Safari extension, and then purchase the documents from PACER.
     </p>
@@ -146,22 +146,22 @@
 
     <h3 id="how-different">What Makes This Site Different from Other Sites that
         Put Legal Documents online?</h3>
-    <p>Our site has a citator that shows you which subsequent opinions have cited to the opinion you
+    <p>Our site has a citator that shows you which subsequent case law records have cited to the case law record you
         are viewing, an important tool in researching whether a given precedent is still good law. Many free
         sites lack such a tool. We also think our search filters, advanced search options, and relevancy
         search enhancements that we call
         <a href="https://free.law/2013/11/12/citegeist/">
             CiteGeist</a>, produce search results that are particularly impressive.</p>
 
-    <p>Unlike many sites that may be several days or weeks behind, we strive to collect new opinions from
+    <p>Unlike many sites that may be several days or weeks behind, we strive to collect new case law from
         the courts in near real time. For <a href="{% url "coverage" %}#scraped-jurisdictions">the courts we cover</a>, new
-        opinions should typically appear within 30 minutes of being posted on the court's website.</p>
+        case law should typically appear within 30 minutes of being posted on the court's website.</p>
 
     <p>But the most important distinguishing factor about this site is that it is <a
             href="https://en.wikipedia.org/wiki/Open_source">open source</a> and <a
             href="https://en.wikipedia.org/wiki/Open_access">open access</a>.
         Anyone can download all the source code we use to operate this site and run their own site that does exactly
-        the same thing. And since our bulk downloads provide access to our entire collection of opinions, we hope
+        the same thing. And since our bulk downloads provide access to our entire collection of case law, we hope
         we've given our effort its own life that can continue no matter what. Many <a
                 href="https://en.wikipedia.org/wiki/AltLaw">people</a> <a
                 href="http://library2.lawschool.cornell.edu/insiteasp/public/display_browse.asp?style=st_browse&id=1542&prevpage=1Legal">have</a> <a
@@ -174,7 +174,7 @@
 
     <h3 id="explain-alerts">What Are Alerts and How Do They Work?</h3>
     <p>You can sign up to receive free daily, weekly or monthly email alerts for
-        any search query that interests you. When a new opinion matches your
+        any search query that interests you. When a new case law record matches your
         search, you'll get an email alert at about 5:30 Pacific time. If you
         have donated at least $10 in the last year, you can also set up real
         time alerts to get notified even more quickly.</p>
@@ -183,7 +183,7 @@
     </p>
 
     <h3 id="explain-citations">How Do You Identify Citations?</h3>
-    <p>It's not easy. Currently we only detect citaitons to court opinions. Citations to statutes, law
+    <p>It's not easy. Currently we only detect citations to court opinions. Citations to statutes, law
         review articles, or other resources are currently ignored. When a new document is added, we search
         the document text for standard case law citation formats and if we can match what we find with one (and
         only one) document in our collection, then we create a hyperlink from the original document's citation
@@ -234,7 +234,7 @@
     <p>Circles change size based on the number of citations to it by other cases in the network. The more cases that cite to <i>Case A</i>, the larger it will be. The only exception to this rule is the rightmost case on network (with the most recent date). For visual clarity, this anchor case is always represented with a large circle.</p>
 
     <h3 id="what-cases-mean">How can I find out what the cases in my network mean?</h3>
-    <p>This tool will not read the cases for you but it will make your reading more efficient. You can read opinion text directly by clicking on opinions in the visualization. You can see all the Supreme Court Database information for a case. Information will open in a separate window and includes issue area, legal provision involved, and detailed voting information. By using SCDB information and skimming opinion text, you can figure out what is going on in the case fairly quickly. Some networks also have helpful user descriptions. </p>
+    <p>This tool will not read the cases for you but it will make your reading more efficient. You can read opinion text directly by clicking on case law records in the visualization. You can see all the Supreme Court Database information for a case. Information will open in a separate window and includes issue area, legal provision involved, and detailed voting information. By using SCDB information and skimming opinion text, you can figure out what is going on in the case fairly quickly. Some networks also have helpful user descriptions. </p>
 
     <h3 id="default-two-degree">Why did my network default to 2-degrees?</h3>
     <p>We do not generate 3-degree networks when it will contain more than 70 cases. We have found networks larger than 70 are too unwieldy and so default those networks to 2-degrees.</p>
@@ -266,17 +266,17 @@
         constantly working to fill gaps in our coverage, but until we have the entirety of United States case law,
         you should consult additional sources for any important legal research task.</p>
     <p>When we think we are closer to having everything, we intend to conduct an "audit" of our documents to
-        confirm that we have every opinion that appears in the bound volumes of case law. Once that audit is complete,
+        confirm that we have every case law record that appears in the bound volumes of case law. Once that audit is complete,
         we will be able to post even more details about our coverage.</p>
 
     <h3 id="why-many-copies">Why Do Some Opinions Show Up More Than Once In
         Search Results?</h3>
     <p>CourtListener uses an automatic process to find and download opinions on court websites. This is an extremely
         efficient and effective method of finding new opinions as they are posted, but in some cases, a court will post
-        several edits to an opinion. Sometimes these edits are for seemingly minor typos, but other times they can be
+        several edits to a case law. Sometimes these edits are for seemingly minor typos, but other times they can be
         the result of something more interesting, like <a
                 href="http://talkingpointsmemo.com/dc/antonin-scalia-error-supreme-court-dissent-epa">a judicial
-            blunder</a>. When this happens, we maintain an archive of all of the versions of that opinion.
+            blunder</a>. When this happens, we maintain an archive of all of the versions of that case law.
     </p>
     <p>We've discussed this topic in more depth <a
             href="https://free.law/2014/05/03/detecting-judicial-corrections/">on our blog</a>.</p>

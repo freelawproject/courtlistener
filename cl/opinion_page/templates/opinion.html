@@ -8,7 +8,7 @@
 {% block canonical %}{% get_canonical_element %}{% endblock %}
 {% block title %}{{ title }} – CourtListener.com{% endblock %}
 {% block og_title %}{{ title }} – CourtListener.com{% endblock %}
-{% block description %}Opinion for {{ title }} — Brought to you by Free Law Project, a non-profit dedicated to creating high quality open legal information.{% endblock %}
+{% block description %}Case Law record for {{ title }} — Brought to you by Free Law Project, a non-profit dedicated to creating high quality open legal information.{% endblock %}
 {% block og_description %}{{ cluster|best_case_name }}{% if summaries_count > 0 %} — {{ top_parenthetical_groups.0.representative.text|capfirst }}{% else %} — Brought to you by Free Law Project, a non-profit dedicated to creating high quality open legal information.{% endif %}
 {% endblock %}
 
@@ -50,7 +50,7 @@
                     {% if perms.search.change_opinion %}
                         {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
                             <a href="{% url 'admin:search_opinion_change' sub_opinion.pk %}"
-                               class="btn btn-primary btn-xs">{{ sub_opinion.type }} opinion</a>
+                               class="btn btn-primary btn-xs">{{ sub_opinion.type }} case law</a>
                         {% endfor %}
                     {% endif %}
                     {% if request.user.is_superuser %}
@@ -161,9 +161,9 @@
         {# Related opinions #}
         {% if related_clusters %}
             <div id="recommendations" class="sidebar-section">
-                <h3><span>Related Opinions</span></h3>
+                <h3><span>Related Case Law Records</span></h3>
 
-                <p class="bottom">The following opinions cover similar topics:</p>
+                <p class="bottom">The following case law records cover similar topics:</p>
 
                 {% url 'show_results' as show_results_url %}
 
@@ -390,7 +390,7 @@
 
             {% if cluster.syllabus %}
                 <div class="well well-sm">
-                    <h4>Summary of Opinion</h4>
+                    <h4>Case Law Summary</h4>
                     <p>{{ cluster.syllabus | safe }} </p>
                 </div>
             {% endif %}

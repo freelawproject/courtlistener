@@ -41,7 +41,7 @@
     <div id="homepage" class="col-xs-12">
 
     <div id="above-main-query">
-        <p class="text-center x-large bottom">Search millions of opinions by case name, topic,&nbsp;or&nbsp;citation.</p>
+        <p class="text-center x-large bottom">Search millions of case law records by case name, topic,&nbsp;or&nbsp;citation.</p>
         <p class="text-center large gray">{{ court_count }} Jurisdictions. Sponsored by the Non-Profit Free&nbsp;Law&nbsp;Project.</p>
     </div>
 
@@ -81,7 +81,7 @@
             <h3>About CourtListener</h3>
             <p>CourtListener is a free legal research website containing millions of legal opinions from federal and
                 state courts. With CourtListener, lawyers, journalists, academics, and the public can research an
-                important case, stay up to date with new opinions as they are filed, or do deep analysis using our
+                important case, stay up to date with case law as it is filed, or do deep analysis using our
                 raw data.
             </p>
         </div>
@@ -102,7 +102,7 @@
     <div class="row lg-v-offset-below-3">
         <div class="col-sm-6">
             <h3>Latest Opinions&nbsp;<i class="gray fa fa-file-text-o"></i></h3>
-            <p>We download opinions from many jurisdictions on an ongoing basis. Here are the most recent ones.
+            <p>We download case law records from many jurisdictions on an ongoing basis. Here are the most recent ones.
             </p>
             {% flag "o-es-active" %}
               {% include "includes/search_result.html" with results=results_o type_override=SEARCH_TYPES.OPINION simple=True %}
@@ -112,7 +112,7 @@
             <p class="right">
                 <a href="/?order_by=dateFiled+desc"
                    rel="nofollow"
-                   class="btn btn-primary btn-lg v-offset-above-2">See Recent Opinions</a>
+                   class="btn btn-primary btn-lg v-offset-above-2">See Recent Case Law Records</a>
             </p>
         </div>
 
@@ -183,7 +183,7 @@
             <span class="homepage-stat bold"
                   id="stat-num-opinions-in-last-ten">{{ opinions_in_last_ten|intcomma }}</span>
           </div>
-          <div class="col-xs-9"><p>Opinions added in last ten days.</p>
+          <div class="col-xs-9"><p>Case Law records added in last ten days.</p>
           </div>
         </div>
 
