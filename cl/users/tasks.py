@@ -1,14 +1,16 @@
 import logging
 from urllib.parse import urljoin
 
-import requests
 from celery import Task
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.utils.timezone import now
+from requests.exceptions import Timeout
 
 from cl.api.models import Webhook, WebhookEvent
 from cl.celery_init import app
 from cl.lib.email_utils import make_multipart_email
+from cl.lib.neon_utils import NeonClient
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +21,58 @@ def abort_or_retry(task, exc):
         return
     else:
         raise task.retry(exc=exc)
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(Timeout,),
+    max_retries=3,
+    interval_start=5,
+    ignore_result=True,
+)
+def create_neon_account(self: Task, user_id: int) -> None:
+    """
+    Checks for existing Neon CRM accounts using the user's email address
+    and handles account creation or raises AssertionError when multiple
+    unmerged accounts share the same email address, requiring further
+    action to maintain data integrity.
+
+    Args:
+        user_id (int): The ID of the user to check and potentially create an
+        account for.
+
+    Raises:
+        AssertionError: If more than one matching account is found in Neon CRM.
+    """
+    user = User.objects.select_related("profile").get(pk=user_id)
+    neon_client = NeonClient()
+    neon_accounts = neon_client.search_account_by_email(user.email)
+
+    if len(neon_accounts) > 1:
+        # Neon CRM automatically merges accounts with identical names and
+        # email addresses. This process, called Account Match feature, ensures
+        # consistent data across records. However, If the accounts are very
+        # close (email and phone match but not name) the accounts will be
+        # entered into the Partial Match Queue. This queue allows users to
+        # review these potential matches and decide whether to merge them
+        # manually.
+        raise AssertionError(
+            "There's more than one account using the same email address. "
+            "We should check the Partial Match Queue."
+        )
+
+    profile = user.profile  # type: ignore
+    if len(neon_accounts) == 1:
+        # We found an existing account that matches the email address. we'll
+        # use that one instead of creating a new one to avoid potential future
+        # merges.
+        profile.neon_account_id = neon_accounts[0]["Account ID"]
+        profile.save()
+        return None
+
+    new_account_id = neon_client.create_account(user)
+    profile.neon_account_id = new_account_id
+    profile.save()
 
 
 @app.task(ignore_result=True)

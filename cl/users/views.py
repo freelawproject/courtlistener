@@ -59,6 +59,7 @@ from cl.users.forms import (
     UserForm,
 )
 from cl.users.models import UserProfile
+from cl.users.tasks import create_neon_account
 from cl.users.utils import (
     convert_to_stub_account,
     delete_user_assets,
@@ -522,6 +523,8 @@ def register(request: HttpRequest) -> HttpResponse:
                     urlencode(redirect_to),
                     urlencode(user.email),
                 )
+                if not settings.DEVELOPMENT:
+                    create_neon_account.delay(user.pk)
                 return HttpResponseRedirect(
                     reverse("register_success") + get_str
                 )
