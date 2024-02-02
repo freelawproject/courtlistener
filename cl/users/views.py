@@ -59,7 +59,7 @@ from cl.users.forms import (
     UserForm,
 )
 from cl.users.models import UserProfile
-from cl.users.tasks import create_neon_account
+from cl.users.tasks import create_neon_account, update_neon_account
 from cl.users.utils import (
     convert_to_stub_account,
     delete_user_assets,
@@ -355,6 +355,9 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
         # New email address and changes above are saved here.
         profile_form.save()
         user_form.save()
+
+        if not settings.DEVELOPMENT:
+            update_neon_account.delay(user.pk)
 
         return HttpResponseRedirect(reverse("view_settings"))
 

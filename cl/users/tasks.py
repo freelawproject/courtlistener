@@ -75,6 +75,32 @@ def create_neon_account(self: Task, user_id: int) -> None:
     profile.save()
 
 
+@app.task(
+    bind=True,
+    autoretry_for=(Timeout,),
+    max_retries=3,
+    interval_start=5,
+    ignore_result=True,
+)
+def update_neon_account(self: Task, user_id: int) -> None:
+    """
+    Updates the Neon CRM account associated with the given user_id.
+
+    This task retrieves the user information from the database, fetches the
+    Neon CRM account ID, and then updates the Neon CRM account with any
+    relevant user data changes.
+
+    Args:
+        user_id (int): The ID of the user whose Neon CRM account should be
+        updated.
+
+    """
+    user = User.objects.select_related("profile").get(pk=user_id)
+    profile = user.profile  # type: ignore
+    neon_client = NeonClient()
+    neon_client.update_account(user, profile.neon_account_id)
+
+
 @app.task(ignore_result=True)
 def notify_new_or_updated_webhook(
     webhook_pk: int,
