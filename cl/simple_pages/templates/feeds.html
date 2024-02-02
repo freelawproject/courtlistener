@@ -36,7 +36,7 @@
             <div class="col-xs-4">
                 <h2 id="search-feeds" class="text-center">Search Feeds</h2>
                 <p>As you use the search engine, a feed is generated for
-                    every search that you do. For opinions, you can subscribe to these
+                    every search that you do. For case law, you can subscribe to these
                     feeds using a URL like:</p>
                 <blockquote>
                     <code>/feed/search/?q={your-query}</code>
@@ -51,7 +51,7 @@
             <div class="col-xs-4">
                 <h2 id="cited-by-feeds" class="text-center">New Citation Feeds</h2>
                 <p>As we add items to our collection, we regularly discover new
-                    citations to existing opinions. If you wish to stay up to date
+                    citations to existing case law. If you wish to stay up to date
                     with these new citations, you can do so using a search feed.
                 </p>
                 <p>Citation feeds thus take the form:</p>
@@ -63,8 +63,7 @@
                     browser or the RSS icon (<i class="gray fa fa-rss"></i>) on the search results page.
                 </p>
                 <p>By using a search query for this feed, we are also able to
-                    set up <a href="{% url "faq" %}#explain-alerts">alerts</a>, sending
-                    you an email whenever there is a new opinion citing one you
+                    set up <a href="{% url "faq" %}#explain-alerts">alerts</a> that notify you whenever there is a new decision citing one you
                     follow.
                 </p>
             </div>
@@ -82,9 +81,9 @@
         </div>
 
         <h2 id="opinion-feeds">Jurisdiction Feeds for Opinions</h2>
-        <p>At present, the jurisdictions below get opinions as they are
+        <p>At present, the jurisdictions below get case law as it is
             published on court websites. Subscribing to the feeds listed below
-            will provide you with the latest opinions as they are written.</p>
+            will provide you with the latest case law as it is gathered.</p>
         <div class="row">
             {% for row in opinion_courts|rows:3 %}
                 <div class="col-sm-4">
@@ -98,7 +97,7 @@
                 </div>
             {% endfor %}
         </div>
-        <p>We also have <a href="/feed/court/all/">a feed for all of the
-            opinions</a>.</p>
+        <p>We also have <a href="/feed/court/all/">a feed for all
+            case law</a>.</p>
     </div>
 {% endblock %}
