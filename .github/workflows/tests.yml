@@ -56,17 +56,7 @@ jobs:
         uses: docker/setup-buildx-action@v2
         with:
           driver-opts: network=host
-      - name: Build latest docker django image
-        uses: docker/build-push-action@v4
-        with:
-          context: ./courtlistener
-          file: ./courtlistener/docker/django/Dockerfile
-          load: true
-          build-args: |
-            BUILD_ENV=dev
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      - name: Build latest docker celery image
+      - name: Prebuild docker images
         uses: docker/build-push-action@v4
         with:
           context: ./courtlistener
