@@ -37,6 +37,9 @@ from cl.lib.types import (
     ESRangeQueryParams,
 )
 from cl.lib.utils import (
+    check_for_proximity_tokens,
+    check_unbalanced_parenthesis,
+    check_unbalanced_quotes,
     cleanup_main_query,
     get_array_of_selected_fields,
     lookup_child_courts,
@@ -62,7 +65,12 @@ from cl.search.constants import (
     SEARCH_RECAP_PARENT_QUERY_FIELDS,
     SOLR_PEOPLE_ES_HL_FIELDS,
 )
-from cl.search.exception import UnbalancedQuery
+from cl.search.exception import (
+    BadProximityQuery,
+    QueryType,
+    UnbalancedParenthesesQuery,
+    UnbalancedQuotesQuery,
+)
 from cl.search.forms import SearchForm
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
@@ -245,49 +253,6 @@ def add_fields_boosting(
     return make_es_boost_list(qf)
 
 
-def check_unbalanced_parenthesis(query: str) -> bool:
-    """Check whether the query string has unbalanced opening or closing parentheses.
-
-    :param query: The input query string
-    :return: Whether the query is balanced or not.
-    """
-    opening_count = query.count("(")
-    closing_count = query.count(")")
-
-    return opening_count != closing_count
-
-
-def sanitize_unbalanced_parenthesis(query: str) -> str:
-    """Sanitize a query by removing unbalanced opening or closing parentheses.
-
-    :param query: The input query string
-    :return: The sanitized query string, after removing unbalanced parentheses.
-    """
-    opening_count = query.count("(")
-    closing_count = query.count(")")
-    while opening_count > closing_count:
-        # Find last unclosed opening parenthesis position
-        last_parenthesis_opened_pos = query.rfind("(")
-        # Remove the parenthesis from the query.
-        query = (
-            query[:last_parenthesis_opened_pos]
-            + query[last_parenthesis_opened_pos + 1 :]
-        )
-        opening_count -= 1
-
-    while closing_count > opening_count:
-        # Find last unclosed closing parenthesis position
-        last_parenthesis_closed_pos = query.rfind(")")
-        # Remove the parenthesis from the query.
-        query = (
-            query[:last_parenthesis_closed_pos]
-            + query[last_parenthesis_closed_pos + 1 :]
-        )
-        closing_count -= 1
-
-    return query
-
-
 def append_query_conjunctions(query: str) -> str:
     """Append default AND conjunctions to the query string.
     :param query: The input query string
@@ -336,6 +301,32 @@ def append_query_conjunctions(query: str) -> str:
     return " ".join(clean_q)
 
 
+def validate_query_syntax(value: str, query_type: QueryType) -> None:
+    """Validate the syntax of a query string. It checks for common syntax
+    errors in query strings, such as unbalanced parentheses, unbalanced quotes,
+    and unrecognized proximity tokens. If any of these errors are found, the
+    corresponding exception is raised.
+
+    :param value: The query string to validate.
+    :param query_type: The type of the query, used to specify the context in
+    which the validation is being performed.
+    :return: None, it raises the corresponding exception.
+    """
+
+    if check_unbalanced_parenthesis(value):
+        raise UnbalancedParenthesesQuery(
+            "The query contains unbalanced parentheses.", query_type
+        )
+    if check_unbalanced_quotes(value):
+        raise UnbalancedQuotesQuery(
+            "The query contains unbalanced quotes.", query_type
+        )
+    if check_for_proximity_tokens(value):
+        raise BadProximityQuery(
+            "The query contains an unrecognized proximity token.", query_type
+        )
+
+
 def build_fulltext_query(
     fields: list[str], value: str, only_queries=False
 ) -> QueryString | List:
@@ -349,8 +340,7 @@ def build_fulltext_query(
     :return: A Elasticsearch QueryString or [] if the "value" param is empty.
     """
     if value:
-        if check_unbalanced_parenthesis(value):
-            raise UnbalancedQuery("The query contains unbalanced parentheses.")
+        validate_query_syntax(value, QueryType.QUERY_STRING)
         # In Elasticsearch, the colon (:) character is used to separate the
         # field name and the field value in a query.
         # To avoid parsing errors escape any colon characters in the value
@@ -420,6 +410,9 @@ def build_term_query(
     if not value:
         return []
 
+    if isinstance(value, str):
+        validate_query_syntax(value, QueryType.FILTER)
+
     if make_phrase:
         return [Q("match_phrase", **{field: {"query": value, "slop": slop}})]
 
@@ -443,7 +436,10 @@ def build_text_filter(field: str, value: str) -> List:
     :param value: the phrase to find
     :return: Empty list or list with DSL Phrase query
     """
+
     if value:
+        if isinstance(value, str):
+            validate_query_syntax(value, QueryType.FILTER)
         return [
             Q(
                 "query_string",

@@ -27,7 +27,7 @@ cl-manage = "manage:main"
 
 [tool.poetry.dependencies]
 argparse = "*"
-asgiref = {git = "https://github.com/django/asgiref.git", rev = "d920c3c44f59ef037be3a09a41a5640014cfb1e2"}
+asgiref = {git = "https://github.com/django/asgiref.git", rev = "8108512196b0831962eb923b7c3f5c5935b1fde1"}
 beautifulsoup4 = "==4.12.*"
 boto3 = "^1.34.17"
 celery = "^5.3.6"
@@ -113,7 +113,7 @@ httpx = {extras = ["http2"], version = "^0.26.0"}
 django-model-utils = "^4.3.1"
 inflection = "^0.5.1"  # necessary for DRF schema generation - remove after drf-spectacular
 juriscraper = "*"
-django-permissions-policy = "^4.18.0"
+django-permissions-policy = "^4.19.0"
 
 
 [tool.poetry.group.dev.dependencies]
