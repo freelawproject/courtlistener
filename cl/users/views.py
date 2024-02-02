@@ -310,7 +310,6 @@ def view_api_usage(request: AuthenticatedHttpRequest) -> HttpResponse:
 @never_cache
 def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
     old_email = request.user.email  # this line has to be at the top to work.
-    old_wants_newsletter = request.user.profile.wants_newsletter
     user = request.user
     up = user.profile
     user_form = UserForm(request.POST or None, instance=user)
@@ -349,8 +348,6 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
             # if the email wasn't changed, simply inform of success.
             msg = message_dict["settings_changed_successfully"]
             messages.add_message(request, msg["level"], msg["message"])
-
-        new_wants_newsletter = profile_cd["wants_newsletter"]
 
         # New email address and changes above are saved here.
         profile_form.save()
