@@ -21,60 +21,6 @@ def abort_or_retry(task, exc):
         raise task.retry(exc=exc)
 
 
-@app.task(
-    bind=True, max_retries=5, interval_start=5 * 60, interval_step=5 * 60
-)
-def update_moosend_subscription(self: Task, email: str, action: str) -> None:
-    """Subscribe or unsubscribe email address to moosend mailing list.
-
-    Perform update if email address is already registered.
-
-    :param self: The celery task
-    :param email: The user's email address
-    :param action: Action to perfom on moosend
-    :return: None
-    """
-    allowed_actions = ["subscribe", "unsubscribe"]
-    assert action in allowed_actions, f"'{action}' is not an allowed action."
-    params = {"apikey": settings.MOOSEND_API_KEY}  # type: ignore
-
-    if action == "subscribe":
-        path = f"/v3/subscribers/{settings.MOOSEND_DEFAULT_LIST_ID}/subscribe.json"  # type: ignore
-    else:
-        path = f"/v3/subscribers/{settings.MOOSEND_DEFAULT_LIST_ID}/unsubscribe.json"  # type: ignore
-
-    try:
-        r = requests.post(
-            url=urljoin(settings.MOOSEND_API_URL, path),  # type: ignore
-            params=params,
-            json={
-                "Email": email,
-            },
-            timeout=30,
-        )
-    except requests.RequestException as exc:
-        abort_or_retry(self, exc)
-        return
-
-    j = r.json()
-    code = j.get("Code")
-
-    if code == 0:
-        logger.info(
-            "Successfully completed '%s' action on '%s' in moosend.",
-            action,
-            email,
-        )
-    else:
-        error = j.get("Error", "Unknown error")
-        logger.warning(
-            "Did not complete '%s' action on '%s' in moosend: '%s'",
-            action,
-            email,
-            error,
-        )
-
-
 @app.task(ignore_result=True)
 def notify_new_or_updated_webhook(
     webhook_pk: int,
