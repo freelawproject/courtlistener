@@ -1,12 +1,31 @@
-from typing import Any
+from typing import NotRequired, TypedDict
 
 import requests
 from django.conf import settings
+from django.contrib.auth.models import User
 from requests.auth import HTTPBasicAuth
 
-from cl.users.models import UserProfile
-
 NEON_API_URL = "https://api.neoncrm.com/v2"
+
+
+class NeonStateProvince(TypedDict):
+    code: str
+
+
+class NeonAddress(TypedDict):
+    isPrimaryAddress: NotRequired[bool]
+    addressLine1: str
+    addressLine2: str
+    city: str
+    zipCode: str
+    stateProvince: NotRequired[NeonStateProvince]
+
+
+class NeonContact(TypedDict):
+    firstName: str
+    lastName: str
+    email1: str
+    addresses: NotRequired[list[NeonAddress]]
 
 
 class NeonClient:
@@ -53,19 +72,33 @@ class NeonClient:
         return json_data["searchResults"]
 
     def get_individual_account_payload(
-        self, user: UserProfile.user
-    ) -> dict[str, Any]:
-        return {
-            "individualAccount": {
-                "primaryContact": {
-                    "firstName": user.first_name,
-                    "lastName": user.last_name,
-                    "email1": user.email,
-                }
-            }
+        self, user: User
+    ) -> dict[str, dict[str, NeonContact]]:
+
+        contact_data: NeonContact = {
+            "firstName": user.first_name,
+            "lastName": user.last_name,
+            "email1": user.email,
         }
 
-    def create_account(self, user: UserProfile.user) -> int:
+        profile = user.profile  # type: ignore
+        address_dict: NeonAddress = {
+            "addressLine1": profile.address1,
+            "addressLine2": profile.address2,
+            "city": profile.city,
+            "zipCode": profile.zip_code,
+        }
+        if profile.state:
+            address_dict["stateProvince"] = {"code": profile.state}
+
+        if any(address_dict.values()):
+            address_dict["isPrimaryAddress"] = True
+            contact_data["addresses"] = [address_dict]
+
+        return {"individualAccount": {"primaryContact": contact_data}}
+
+    def create_account(self, user: User) -> int:
+
         payload = self.get_individual_account_payload(user)
         response = requests.post(
             f"{NEON_API_URL}/accounts/",
