@@ -581,7 +581,7 @@ $(document).ready(function(){
       <div class="col-xs-12">
         <h3 id="authored-opinions">
           <i class="fa-file-text-o fa gray"></i>
-          Case Law records Authored by {{ person.name_last }} ({{ authored_opinions.result.numFound|intcomma }})
+          Case Law Authored by {{ person.name_last }} ({{ authored_opinions.result.numFound|intcomma }})
           {% if not person.date_dod and not person.dod_state and not person.dod_city %}
             <a href="/feed/search/?type=o&q=author_id%3A{{ person.pk }}+OR+panel_ids%3A{{ person.pk }}">
               <i class="gray fa fa-rss"
@@ -589,7 +589,7 @@ $(document).ready(function(){
             </a>
           {% endif %}
         </h3>
-        <p class="gray">Includes case law records for which {{ person.name_full }} was on the panel, ordered by <a href="https://free.law/2013/11/12/citegeist/">CiteGeist</a> relevance.</p>
+        <p class="gray">Includes case law for which {{ person.name_full }} was on the panel, ordered by <a href="https://free.law/2013/11/12/citegeist/">CiteGeist</a> relevance.</p>
         <hr class="top">
 
         {% for o in authored_opinions %}
@@ -646,7 +646,7 @@ $(document).ready(function(){
             <a href="/?type=o&q=author_id%3A{{ person.pk }}+OR+panel_ids%3A{{ person.pk }}&stat_Precedential=on&stat_Non-Precedential=on&stat_Errata=on&stat_Separate%20Opinion=on&stat_In-chambers=on&stat_Relating-to%20orders=on&stat_Unknown%20Status=on"
                rel="nofollow"
                class="btn btn-primary"
-            >Search for All Case Law records Authored by {{ person.name_last }} in CourtListener</a>
+            >Search for All Case Law Authored by {{ person.name_last }} in CourtListener</a>
         </p>
       </div>
     </div>

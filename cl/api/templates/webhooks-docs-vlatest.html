@@ -271,7 +271,7 @@ xargs curl -X POST \
   </p>
 
   <h3 id="search-alerts">Search Alert Events</h3>
-  <p><a href="{% url "alert_help" %}#search-alerts">Search alerts in CourtListener</a> allow you to subscribe to a particular query so that you are sent a webhook event whenever it has new results. For example, you can use search alerts to get a notification whenever a case is cited or whenever a particular keyword appears in a case law record.
+  <p><a href="{% url "alert_help" %}#search-alerts">Search alerts in CourtListener</a> allow you to subscribe to a particular query so that you are sent a webhook event whenever it has new results. For example, you can use search alerts to get a notification whenever a case is cited or whenever a particular keyword appears in a legal decision.
   </p>
   <p>To get search alert events, begin by subscribing to particular queries in CourtListener. This can be done in one of two ways:</p>
   <ol>
@@ -281,7 +281,7 @@ xargs curl -X POST \
     <li>
       <p><strong>For servers</strong>, the best way is to use the <a href="{% url 'rest_docs' %}#alerts-endpoint">Search Alert endpoint</a> of our REST API.
       </p>
-      <p>For example, this shell code creates a Search Alert for new case law records mentioning the <a href="{% url "view_case" 2812209 "obergefell-v-hodges" %}">Obergefell v. Hodges case</a>:</p>
+      <p>For example, this shell code creates a Search Alert for new legal decisions mentioning the <a href="{% url "view_case" 2812209 "obergefell-v-hodges" %}">Obergefell v. Hodges case</a>:</p>
       <pre class="v-offset-below-1 scrollable" >curl -X POST \
   --url {% get_full_host %}{% url "alert-list" version="v3" %} \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
