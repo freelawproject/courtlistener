@@ -129,7 +129,6 @@ MIDDLEWARE = [
     "waffle.middleware.WaffleMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "cl.lib.middleware.RobotsHeaderMiddleware",
-    "cl.lib.middleware.MaintenanceModeMiddleware",
     "pghistory.middleware.HistoryMiddleware",
 ]
 
