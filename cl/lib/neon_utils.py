@@ -111,3 +111,18 @@ class NeonClient:
         json_data = response.json()
 
         return json_data["id"]
+
+    def update_account(self, user: User, account_id: str) -> str:
+
+        payload = self.get_individual_account_payload(user)
+        response = requests.patch(
+            f"{NEON_API_URL}/accounts/{account_id}",
+            auth=self._basic,
+            timeout=self._timeout,
+            json=payload,
+        )
+
+        response.raise_for_status()
+        json_data = response.json()
+
+        return json_data["accountId"]
