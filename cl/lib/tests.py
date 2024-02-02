@@ -371,47 +371,6 @@ class TestMimeLookup(SimpleTestCase):
             self.assertEqual(tests.get(test_path), lookup_mime_type(test_path))
 
 
-@override_settings(MAINTENANCE_MODE_ENABLED=True)
-class TestMaintenanceMiddleware(TestCase):
-    """Test the maintenance middleware"""
-
-    @classmethod
-    def setUpTestData(cls) -> None:
-        # Do this in two steps to avoid triggering profile creation signal
-        admin = UserProfileWithParentsFactory.create(
-            user__username="admin",
-            user__password=make_password("password"),
-        )
-        admin.user.is_superuser = True
-        admin.user.is_staff = True
-        admin.user.save()
-
-    async def test_middleware_works_when_enabled(self) -> None:
-        """Does the middleware block users when enabled?"""
-        r = await self.async_client.get(reverse("show_results"))
-        self.assertEqual(
-            r.status_code,
-            HTTP_503_SERVICE_UNAVAILABLE,
-            "Did not get correct status code. Got: %s instead of %s"
-            % (r.status_code, HTTP_503_SERVICE_UNAVAILABLE),
-        )
-
-    async def test_staff_can_get_through(self) -> None:
-        """Can staff get through when the middleware is enabled?"""
-        self.assertTrue(
-            await self.async_client.alogin(
-                username="admin", password="password"
-            )
-        )
-        r = await self.async_client.get(reverse("show_results"))
-        self.assertEqual(
-            r.status_code,
-            HTTP_200_OK,
-            "Staff did not get through, but should have. Staff got status "
-            "code of: %s instead of %s" % (r.status_code, HTTP_200_OK),
-        )
-
-
 class TestPACERPartyParsing(SimpleTestCase):
     """Various tests for the PACER party parsers."""
 

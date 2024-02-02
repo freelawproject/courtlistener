@@ -60,8 +60,8 @@ tests = ["mypy (>=0.800)", "pytest", "pytest-asyncio"]
 [package.source]
 type = "git"
 url = "https://github.com/django/asgiref.git"
-reference = "d920c3c44f59ef037be3a09a41a5640014cfb1e2"
-resolved_reference = "d920c3c44f59ef037be3a09a41a5640014cfb1e2"
+reference = "8108512196b0831962eb923b7c3f5c5935b1fde1"
+resolved_reference = "8108512196b0831962eb923b7c3f5c5935b1fde1"
 
 [[package]]
 name = "astor"
@@ -1097,16 +1097,17 @@ files = [
 
 [[package]]
 name = "django-permissions-policy"
-version = "4.18.0"
+version = "4.19.0"
 description = "Set the draft security HTTP header Permissions-Policy (previously Feature-Policy) on your Django app."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "django_permissions_policy-4.18.0-py3-none-any.whl", hash = "sha256:36aeb2ab7e694b8db5a60780c0325608014bbfd10df16cd51ef3b1522f922d23"},
-    {file = "django_permissions_policy-4.18.0.tar.gz", hash = "sha256:a6bfd94910f95c0b1c911dbeda6ad340902d3c9caac78d1c20c76f9a4b27929f"},
+    {file = "django-permissions-policy-4.19.0.tar.gz", hash = "sha256:eb3b1d7fae46d0ce26ae2fa3b1b9865f4120e3bfbae9fda838fed53cf150e591"},
+    {file = "django_permissions_policy-4.19.0-py3-none-any.whl", hash = "sha256:0286d925c4ea2de2ddbd34852b8eea562bfb7f2d3fc6492ffc0290de3c90bddc"},
 ]
 
 [package.dependencies]
+asgiref = ">=3.6"
 Django = ">=3.2"
 
 [[package]]
@@ -2190,13 +2191,13 @@ setuptools = "*"
 
 [[package]]
 name = "juriscraper"
-version = "2.5.89"
+version = "2.5.90"
 description = "An API to scrape American court websites for metadata."
 optional = false
 python-versions = "*"
 files = [
-    {file = "juriscraper-2.5.89-py27-none-any.whl", hash = "sha256:f7f3d645f4df184d395fec61361eac571d749ef8c3e325c2672fd7c984bd114f"},
-    {file = "juriscraper-2.5.89.tar.gz", hash = "sha256:a39c9edc53557c18734b7a0572c05377cb85d86fa4c405283719305d93df4fbd"},
+    {file = "juriscraper-2.5.90-py27-none-any.whl", hash = "sha256:ebbb5638b68ea24e89719ef2cf6852225c0b98cd0f33f4f67fade4670a6895f5"},
+    {file = "juriscraper-2.5.90.tar.gz", hash = "sha256:f07a898e7459879fc74c6225e6e88a12424d100998c44ff25f1d93fa533eea0b"},
 ]
 
 [package.dependencies]
@@ -5232,4 +5233,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12, <3.13"
-content-hash = "4045353621cb1ec8c48b2f9084175f98322734d1867c53792f8a512f6fd12b2f"
+content-hash = "9be3939951b384239e7d77280ef6087b164ee683b2d4bc356aac1df2feef8b07"
