@@ -1261,9 +1261,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
-        # When using FVH, if the abbreviation term is indexed, then performing
-        # a search using the whole term does not highlight the abbreviation.
-        self.assertNotIn("<mark>ptsd</mark>", r.content.decode())
+        self.assertIn("<mark>ptsd</mark>", r.content.decode())
 
         # Split terms post traumatic
         search_params["q"] = "post traumatic stress disorder"
@@ -1274,9 +1272,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
-        # When using FVH, if the abbreviation term is indexed, then performing
-        # a search using the whole term does not highlight the abbreviation.
-        self.assertNotIn("<mark>ptsd</mark>", r.content.decode())
+        self.assertIn("<mark>ptsd</mark>", r.content.decode())
 
         # Search acronym "apa"
         search_params["q"] = "apa"
@@ -1287,8 +1283,6 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 2
         self.assertEqual(actual, expected)
-        # Note that if the whole term is indexed and a search is performed
-        # using the abbreviation term, the whole term is properly highlighted.
         self.assertIn("<mark>apa</mark>", r.content.decode())
         self.assertIn(
             "<mark>Administrative procedures act</mark>", r.content.decode()
@@ -1303,16 +1297,28 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 2
         self.assertEqual(actual, expected)
-        self.assertIn("<mark>Administrative</mark>", r.content.decode())
-        self.assertIn("<mark>procedures</mark>", r.content.decode())
-        self.assertIn("<mark>act</mark>", r.content.decode())
-        # When using FVH, if the abbreviation term is indexed, then performing
-        # a search using the whole term does not highlight the abbreviation.
-        self.assertNotIn("<mark>apa</mark>", r.content.decode())
+        self.assertIn(
+            "<mark>Administrative procedures act</mark>", r.content.decode()
+        )
+        self.assertIn("<mark>apa</mark>", r.content.decode())
 
-        # Search by "Administrative" shouldn't return results for "apa" but for
-        # "Administrative" and "Administrative procedures act".
+        # Search by "Administrative" returns results "apa", "Administrative"
+        # and "Administrative procedures act".
         search_params["q"] = "Administrative"
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 3
+        self.assertEqual(actual, expected)
+        self.assertIn("Hong Liu Yang", r.content.decode())
+        self.assertIn("procedures act", r.content.decode())
+        self.assertIn("apa", r.content.decode())
+
+        # Search by '"Administrative"' shouldn't return results for "apa" but
+        # for "Administrative" and "Administrative procedures act".
+        search_params["q"] = '"Administrative"'
         r = self.client.get(
             reverse("show_results"),
             search_params,
@@ -1337,8 +1343,20 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         self.assertIn("<mark>magazine</mark>", r.content.decode())
         self.assertIn("<mark>magistrate</mark>", r.content.decode())
 
-        # Searching "magazine" only returns results containing "magazine"
+        # Searching 'magazine' returns results containing "magazine" and "mag"
         search_params["q"] = "magazine"
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        actual = self.get_article_count(r)
+        expected = 2
+        self.assertEqual(actual, expected)
+        self.assertIn("<mark>magazine</mark>", r.content.decode())
+        self.assertIn("<mark>mag</mark>", r.content.decode())
+
+        # Searching '"magazine"' only returns results containing "magazine"
+        search_params["q"] = '"magazine"'
         r = self.client.get(
             reverse("show_results"),
             search_params,
