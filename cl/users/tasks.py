@@ -70,9 +70,11 @@ def create_neon_account(self: Task, user_id: int) -> None:
         profile.save()
         return None
 
-    new_account_id = neon_client.create_account(user)
-    profile.neon_account_id = new_account_id
-    profile.save()
+    if len(neon_accounts) == 0:
+        # No account found, create one
+        new_account_id = neon_client.create_account(user)
+        profile.neon_account_id = new_account_id
+        profile.save()
 
 
 @app.task(
