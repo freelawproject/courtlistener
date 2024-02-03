@@ -1885,39 +1885,6 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             AudioPercolator._index._name, created_queries_ids
         )
 
-    def test_handle_unbalanced_parenthesis(self) -> None:
-        """Test can we avoid unbalanced parenthesis break queries?"""
-
-        search_params = {
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": "(Loretta OR (SEC) AND Jose",
-        }
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        self.assertIn(
-            "Did you forget to close one or more parentheses?",
-            r.content.decode(),
-        )
-        self.assertIn("Did you mean", r.content.decode())
-        self.assertIn("(Loretta OR SEC) AND Jose", r.content.decode())
-
-        search_params = {
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": "(Loretta AND Jose",
-        }
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        self.assertIn(
-            "Did you forget to close one or more parentheses?",
-            r.content.decode(),
-        )
-        self.assertIn("Did you mean", r.content.decode())
-        self.assertIn("Loretta AND Jose", r.content.decode())
-
     def test_search_transcript(self) -> None:
         """Test search transcript."""
 

@@ -8,7 +8,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
 
   {% block meta %}
-  <meta name="description" content="{% block description %}Create alerts, search for and browse the latest court opinions, PACER documents, judges, and oral arguments. Updated automatically with the latest court documents. An initiative of Free Law Project.{% endblock %}"/>
+  <meta name="description" content="{% block description %}Create alerts, search for and browse the latest case law, PACER documents, judges, and oral arguments. Updated automatically with the latest court documents. An initiative of Free Law Project.{% endblock %}"/>
 
   {# Open Search Plugin #}
   <link rel="search"
@@ -18,7 +18,7 @@
 
   {# MS Application Icons #}
   <meta name="application-name" content="CourtListener"/>
-  <meta name="msapplication-tooltip" content="Create alerts, search for and browse the latest court opinions."/>
+  <meta name="msapplication-tooltip" content="Create alerts, search for and browse the latest case law."/>
   <meta name="msapplication-starturl" content="https://www.courtlistener.com"/>
   <meta name="msapplication-navbutton-color" content="#6683B7"/>
 
@@ -31,7 +31,7 @@
   <meta property="og:type" content="website"/>
   <meta property="og:title" content="{% block og_title %}CourtListener{% endblock %}"/>
   <meta property="og:description"
-        content="{% block og_description %}Create alerts, search for and browse the latest court opinions, PACER documents, judges, and oral arguments. Updated automatically with the latest court documents. An initiative of Free Law Project.{% endblock %}">
+        content="{% block og_description %}Create alerts, search for and browse the latest case law, PACER documents, judges, and oral arguments. Updated automatically with the latest court documents. An initiative of Free Law Project.{% endblock %}">
   <meta property="og:url" content="{% block og_url %}{% get_full_host %}{{ request.path }}{% endblock %}"/>
   <meta property="og:site_name" content="CourtListener"/>
   <meta property="og:image"
@@ -241,12 +241,12 @@
               <a href="#"
                  class="dropdown-toggle"
                  tabindex="100"
-                 data-toggle="dropdown">Opinions&nbsp;<span
+                 data-toggle="dropdown">Case Law&nbsp;<span
                 class="caret"></span>
               </a>
               <ul class="dropdown-menu" role="menu">
                 <li>
-                  <a href="{% url "advanced_o" %}" tabindex="101">Opinions Search</a>
+                  <a href="{% url "advanced_o" %}" tabindex="101">Case Law Search</a>
                 </li>
                 {% flag "parenthetical-search" %}
                   <li>

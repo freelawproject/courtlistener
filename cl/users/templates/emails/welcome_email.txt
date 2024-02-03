@@ -12,7 +12,7 @@ trying to do.
 
 Some of the highlights of CourtListener and RECAP are:
 
- - A searchable archive of opinions with high quality metadata and citations:
+ - A searchable case law archive with high quality metadata and citations:
 
        https://www.courtlistener.com{% url "advanced_o" %}
 

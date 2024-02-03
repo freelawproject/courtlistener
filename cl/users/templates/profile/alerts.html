@@ -37,7 +37,7 @@
   {# We have either search or docket alerts. #}
   {% if search_alerts %}
     <div class="col-xs-12">
-      <h2>Search Alerts for Opinions and Oral Arguments</h2>
+      <h2>Search Alerts for Case Law and Oral Arguments</h2>
     </div>
     <div class="col-xs-12">
       <div class="table-responsive">
@@ -56,7 +56,7 @@
               <td>
                 <p class="bottom">
                   {% if alert.type == SEARCH_TYPES.OPINION %}
-                    Opinion
+                    Case Law
                   {% elif alert.type == SEARCH_TYPES.ORAL_ARGUMENT %}
                     Oral Argument
                   {% elif alert.type == SEARCH_TYPES.RECAP or alert.type == SEARCH_TYPES.DOCKETS %}
