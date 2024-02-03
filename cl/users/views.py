@@ -523,8 +523,6 @@ def register(request: HttpRequest) -> HttpResponse:
                     urlencode(redirect_to),
                     urlencode(user.email),
                 )
-                if not settings.DEVELOPMENT:
-                    create_neon_account.delay(user.pk)
                 return HttpResponseRedirect(
                     reverse("register_success") + get_str
                 )
@@ -603,6 +601,8 @@ def confirm_email(request, activation_key):
     # Tests pass; Save the profile
     for up in ups:
         up.email_confirmed = True
+        if not settings.DEVELOPMENT:
+            create_neon_account.delay(up.user.pk)
         up.save()
 
     return TemplateResponse(
