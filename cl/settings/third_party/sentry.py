@@ -1,5 +1,6 @@
 import environ
 import sentry_sdk
+from sentry_sdk.integrations.asyncio import AsyncioIntegration
 from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.logging import ignore_logger
@@ -44,6 +45,7 @@ if SENTRY_DSN:
     sentry_sdk.init(
         dsn=SENTRY_DSN,
         integrations=[
+            AsyncioIntegration(),
             CeleryIntegration(),
             DjangoIntegration(),
             RedisIntegration(),
