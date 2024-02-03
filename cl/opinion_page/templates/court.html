@@ -72,7 +72,7 @@
         <h3>Recent Decisions of the&nbsp;{{ court }} <i class="gray fa fa-file-text-o"></i></h3>
         {% if request.user|in_group:"uploaders_{{ pk }}" %}
           <p><a href="{% url "court_publish_page" pk=pk %}"
-                class="btn btn-default">Upload New {{ court }} Opinion</a></p>
+                class="btn btn-default">Upload New {{ court }} Decision</a></p>
         {% endif %}
         {% if results.paginator.count > 0 %}
           {% include "includes/search_result.html" with results=results type_override=SEARCH_TYPES.OPINION simple=True %}
