@@ -2743,7 +2743,7 @@ class RecapEmailDocketAlerts(TestCase):
         ]
         docket_id = content["payload"]["results"][0]["docket"]
         self.assertEqual(docket.pk, docket_id)
-        recap_document_first = await recap_document.afirst()
+        await recap_document_first.arefresh_from_db()
         self.assertEqual(recap_document_first.pacer_doc_id, pacer_doc_id)
 
     @mock.patch(
@@ -3083,7 +3083,7 @@ class RecapEmailDocketAlerts(TestCase):
 
         # Confirm EPQ values.
         self.assertEqual(await email_processing.acount(), 1)
-        email_processing_first = await email_processing.afirst()
+        await email_processing_first.arefresh_from_db()
         self.assertEqual(
             email_processing_first.status, PROCESSING_STATUS.SUCCESSFUL
         )
@@ -3123,9 +3123,8 @@ class RecapEmailDocketAlerts(TestCase):
         pacer_doc_id = content["payload"]["results"][0]["recap_documents"][0][
             "pacer_doc_id"
         ]
-        recap_document_first = await recap_document.afirst()
+        await recap_document_first.arefresh_from_db()
         self.assertEqual(recap_document_first.pacer_doc_id, pacer_doc_id)
-        webhook_triggered_first = await webhook_triggered.afirst()
         self.assertEqual(
             webhook_triggered_first.event_status,
             WEBHOOK_EVENT_STATUS.SUCCESSFUL,
@@ -3189,7 +3188,7 @@ class RecapEmailDocketAlerts(TestCase):
         pacer_doc_id = content["payload"]["results"][0]["recap_documents"][0][
             "pacer_doc_id"
         ]
-        recap_document_first = await recap_document.afirst()
+        await recap_document_first.arefresh_from_db()
         self.assertEqual(recap_document_first.pacer_doc_id, pacer_doc_id)
 
     @mock.patch(
@@ -3233,6 +3232,7 @@ class RecapEmailDocketAlerts(TestCase):
             docket=docket,
             alert_type=DocketAlert.UNSUBSCRIPTION,
         )
+        docket_alert_first = await docket_alert.afirst()
         self.assertEqual(await docket_alert.acount(), 1)
 
         # No webhook should be triggered for testing_1@recap.email
@@ -3245,7 +3245,6 @@ class RecapEmailDocketAlerts(TestCase):
             username=self.recipient_user.user.username, password="password"
         )
         # Subscribe to the case from first user-case email subscription link
-        docket_alert_first = await docket_alert.afirst()
         await self.async_client.get(
             reverse(
                 "toggle_docket_alert_confirmation",
@@ -3324,7 +3323,6 @@ class RecapEmailDocketAlerts(TestCase):
             username=self.recipient_user.user.username, password="password"
         )
         # Unsubscribe from email link
-        docket_alert_first = await docket_alert.afirst()
         await self.async_client.get(
             reverse(
                 "toggle_docket_alert_confirmation",
@@ -3333,7 +3331,7 @@ class RecapEmailDocketAlerts(TestCase):
         )
 
         # The DocketAlert should be toggled to Unsubscription type.
-        docket_alert_first = await docket_alert.afirst()
+        await docket_alert_first.arefresh_from_db()
         self.assertEqual(
             docket_alert_first.alert_type, DocketAlert.UNSUBSCRIPTION
         )
@@ -3398,6 +3396,7 @@ class RecapEmailDocketAlerts(TestCase):
             docket=docket,
         )
 
+        docket_alert_first = await docket_alert.afirst()
         # Confirm EPQ values.
         self.assertEqual(await email_processing.acount(), 1)
         email_processing_first = await email_processing.afirst()
@@ -3422,7 +3421,7 @@ class RecapEmailDocketAlerts(TestCase):
         )
 
         self.assertEqual(await docket_alert.acount(), 1)
-        docket_alert_first = await docket_alert.afirst()
+        await docket_alert_first.arefresh_from_db()
         self.assertEqual(
             docket_alert_first.alert_type, DocketAlert.UNSUBSCRIPTION
         )
@@ -3442,14 +3441,13 @@ class RecapEmailDocketAlerts(TestCase):
             username=self.recipient_user.user.username, password="password"
         )
         # Subscribe to the case from first user-case email subscription link
-        docket_alert_first = await docket_alert.afirst()
         await self.async_client.get(
             reverse(
                 "toggle_docket_alert_confirmation",
                 args=["subscribe", docket_alert_first.secret_key],
             )
         )
-        docket_alert_first = await docket_alert.afirst()
+        await docket_alert_first.arefresh_from_db()
         self.assertEqual(
             docket_alert_first.alert_type, DocketAlert.SUBSCRIPTION
         )
@@ -3487,9 +3485,6 @@ class RecapEmailDocketAlerts(TestCase):
             webhook_triggered_first.event_status,
             WEBHOOK_EVENT_STATUS.SUCCESSFUL,
         )
-
-        # Unsubscribe from email link
-        docket_alert_first = await docket_alert.afirst()
         await self.async_client.get(
             reverse(
                 "toggle_docket_alert_confirmation",
@@ -3498,7 +3493,7 @@ class RecapEmailDocketAlerts(TestCase):
         )
 
         # The DocketAlert should be toggled to Unsubscription type.
-        docket_alert_first = await docket_alert.afirst()
+        await docket_alert_first.arefresh_from_db()
         self.assertEqual(
             docket_alert_first.alert_type, DocketAlert.UNSUBSCRIPTION
         )
@@ -3552,14 +3547,12 @@ class RecapEmailDocketAlerts(TestCase):
         )
 
         # Unauthenticated user tries to unsubscribe via GET and POST
-        docket_alert_first = await docket_alert.afirst()
         await self.async_client.get(
             reverse(
                 "toggle_docket_alert_confirmation",
                 args=["unsubscribe", docket_alert_first.secret_key],
             )
         )
-        docket_alert_first = await docket_alert.afirst()
         await self.async_client.post(
             reverse(
                 "toggle_docket_alert_confirmation",
@@ -3568,7 +3561,7 @@ class RecapEmailDocketAlerts(TestCase):
             {},
         )
         # The DocketAlert should remain in Subscription type.
-        docket_alert_first = await docket_alert.afirst()
+        await docket_alert_first.arefresh_from_db()
         self.assertEqual(
             docket_alert_first.alert_type, DocketAlert.SUBSCRIPTION
         )
@@ -3576,14 +3569,12 @@ class RecapEmailDocketAlerts(TestCase):
         # Update the DocketAlert to Unsubscription type
         await docket_alert.aupdate(alert_type=DocketAlert.UNSUBSCRIPTION)
         # Unauthenticated user tries to subscribe via GET and POST
-        docket_alert_first = await docket_alert.afirst()
         await self.async_client.get(
             reverse(
                 "toggle_docket_alert_confirmation",
                 args=["subscribe", docket_alert_first.secret_key],
             )
         )
-        docket_alert_first = await docket_alert.afirst()
         await self.async_client.post(
             reverse(
                 "toggle_docket_alert_confirmation",
@@ -3592,7 +3583,7 @@ class RecapEmailDocketAlerts(TestCase):
             {},
         )
         # The DocketAlert should remain in unsubscription type.
-        docket_alert_first = await docket_alert.afirst()
+        await docket_alert_first.arefresh_from_db()
         self.assertEqual(
             docket_alert_first.alert_type, DocketAlert.UNSUBSCRIPTION
         )
@@ -3695,7 +3686,6 @@ class RecapEmailDocketAlerts(TestCase):
             webhook_triggered_first.event_status,
             WEBHOOK_EVENT_STATUS.SUCCESSFUL,
         )
-        webhook_triggered_first = await webhook_triggered.afirst()
         content = webhook_triggered_first.content
         # Compare the content of the webhook to the recap document
         pacer_doc_id = content["payload"]["results"][0]["recap_documents"][0][
@@ -3704,7 +3694,7 @@ class RecapEmailDocketAlerts(TestCase):
         recap_documents_webhook = content["payload"]["results"][0][
             "recap_documents"
         ]
-        recap_document_first = await recap_document.afirst()
+        await recap_document_first.arefresh_from_db()
         self.assertEqual(recap_document_first.pacer_doc_id, pacer_doc_id)
         # Document available from magic link, not sealed.
         self.assertEqual(recap_document_first.is_sealed, False)
@@ -3921,7 +3911,7 @@ class RecapEmailDocketAlerts(TestCase):
         pacer_doc_id = content["payload"]["results"][0]["recap_documents"][0][
             "pacer_doc_id"
         ]
-        recap_document_first = await recap_document.afirst()
+        await recap_document_first.arefresh_from_db()
         self.assertEqual(recap_document_first.pacer_doc_id, pacer_doc_id)
 
     @mock.patch(
@@ -4238,7 +4228,7 @@ class RecapEmailDocketAlerts(TestCase):
         )
 
         # Mock returns the document is not sealed.
-        recap_document_first = await recap_document.afirst()
+        await recap_document_first.arefresh_from_db()
         self.assertEqual(recap_document_first.is_sealed, False)
         webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
         webhook_triggered_first = await webhook_triggered.afirst()
@@ -5101,12 +5091,16 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         self.assertEqual(recap_document_first.docket_entry.entry_number, 148)
 
 
+@mock.patch("cl.lib.pacer.socket.gethostbyname", return_value="127.0.0.1")
 class CheckCourtConnectivityTest(TestCase):
     """Test the is_pacer_court_accessible method."""
 
     def setUp(self) -> None:
+        self.court_id = "alnb"
         self.r = make_redis_interface("CACHE")
-        self.r.flushdb()
+        key = self.r.keys(f"status:pacer:court.{self.court_id}:ip.127.0.0.1")
+        if key:
+            self.r.delete(*key)
 
     @mock.patch(
         "cl.lib.pacer.check_pacer_court_connectivity",
@@ -5116,8 +5110,10 @@ class CheckCourtConnectivityTest(TestCase):
             "date_time": datetime.now(timezone.utc),
         },
     )
-    def test_is_pacer_court_accessible_pass(self, mock_check_court):
-        court_status = is_pacer_court_accessible("alnb")
+    def test_is_pacer_court_accessible_pass(
+        self, mock_get_ip, mock_check_court
+    ):
+        court_status = is_pacer_court_accessible(self.court_id)
         self.assertEqual(court_status, True)
 
     @mock.patch(
@@ -5128,8 +5124,10 @@ class CheckCourtConnectivityTest(TestCase):
             "date_time": datetime.now(timezone.utc),
         },
     )
-    def test_is_pacer_court_accessible_fails(self, mock_check_court):
-        court_status = is_pacer_court_accessible("alnb")
+    def test_is_pacer_court_accessible_fails(
+        self, mock_get_ip, mock_check_court
+    ):
+        court_status = is_pacer_court_accessible(self.court_id)
         self.assertEqual(court_status, False)
 
 
@@ -5216,6 +5214,13 @@ class WebhooksRetries(TestCase):
         self.recipient_user = recipient_user
 
         self.r = make_redis_interface("CACHE")
+
+    @classmethod
+    def restart_webhook_executed(cls):
+        r = make_redis_interface("CACHE")
+        key = r.keys("daemon:webhooks:executed")
+        if key:
+            r.delete(*key)
 
     def test_get_next_webhook_retry_date(
         self,
@@ -5486,14 +5491,12 @@ class WebhooksRetries(TestCase):
                 )
 
                 # Does the Idempotency-Key is generated
-                webhook_triggered_first = await webhook_triggered.afirst()
                 self.assertNotEqual(webhook_triggered_first.event_id, "")
                 self.assertEqual(webhook_triggered_first.status_code, 500)
                 self.assertEqual(webhook_triggered_first.error_message, "")
 
                 # Is the webhook event updated for retry?
                 first_retry_time = fake_now_0 + timedelta(minutes=3)
-                webhook_triggered_first = await webhook_triggered.afirst()
                 self.assertEqual(
                     webhook_triggered_first.next_retry_date, first_retry_time
                 )
@@ -5557,7 +5560,6 @@ class WebhooksRetries(TestCase):
                 )
 
                 # Does the Idempotency-Key is generated
-                webhook_triggered_first = await webhook_triggered.afirst()
                 self.assertNotEqual(webhook_triggered_first.event_id, "")
                 self.assertEqual(webhook_triggered_first.status_code, None)
                 self.assertEqual(
@@ -5567,7 +5569,6 @@ class WebhooksRetries(TestCase):
 
                 # Is the webhook event updated for retry?
                 first_retry_time = fake_now_0 + timedelta(minutes=3)
-                webhook_triggered_first = await webhook_triggered.afirst()
                 self.assertEqual(
                     webhook_triggered_first.next_retry_date, first_retry_time
                 )
@@ -5631,7 +5632,6 @@ class WebhooksRetries(TestCase):
                 )
 
                 # Does the Idempotency-Key is generated
-                webhook_triggered_first = await webhook_triggered.afirst()
                 self.assertNotEqual(webhook_triggered_first.event_id, "")
                 self.assertEqual(webhook_triggered_first.status_code, 200)
                 self.assertEqual(webhook_triggered_first.error_message, "")
@@ -5696,11 +5696,9 @@ class WebhooksRetries(TestCase):
                 self.assertEqual(
                     recap_document_first.pacer_doc_id, pacer_doc_id
                 )
-                webhook_triggered_first = await webhook_triggered.afirst()
                 self.assertNotEqual(webhook_triggered_first.event_id, "")
                 self.assertEqual(webhook_triggered_first.status_code, 500)
                 first_retry_time = fake_now_0 + timedelta(minutes=3)
-                webhook_triggered_first = await webhook_triggered.afirst()
                 self.assertEqual(
                     webhook_triggered_first.next_retry_date, first_retry_time
                 )
@@ -5720,7 +5718,7 @@ class WebhooksRetries(TestCase):
                 with time_machine.travel(fake_now, tick=False):
                     await sync_to_async(retry_webhook_events)()
 
-                    webhook_triggered_first = await webhook_triggered.afirst()
+                    await webhook_triggered_first.arefresh_from_db()
                     self.assertEqual(
                         webhook_triggered_first.event_status,
                         status,
@@ -6194,7 +6192,7 @@ class WebhooksRetries(TestCase):
         no_time_to_delete_1 = now().replace(hour=11, minute=59, second=0)
         with time_machine.travel(no_time_to_delete_1, tick=False):
             deleted_count, notifications_send = execute_additional_tasks()
-            self.r.flushdb()
+            self.restart_webhook_executed()
             self.assertEqual(deleted_count, None)
 
         # The delete method should be executed at 12:00 UTC.
@@ -6207,7 +6205,7 @@ class WebhooksRetries(TestCase):
         no_time_to_delete = now().replace(hour=12, minute=5, second=0)
         with time_machine.travel(no_time_to_delete, tick=False):
             deleted_count, notifications_send = execute_additional_tasks()
-            self.r.flushdb()
+            self.restart_webhook_executed()
             self.assertEqual(deleted_count, None)
 
         webhook_events = WebhookEvent.objects.all()
@@ -6284,7 +6282,7 @@ class WebhooksRetries(TestCase):
             )
             with time_machine.travel(hours_after, tick=False):
                 execute_additional_tasks()
-                self.r.flushdb()
+                self.restart_webhook_executed()
                 self.assertEqual(len(mail.outbox), email_out)
 
                 subject_to_compare = "webhook is now disabled"
