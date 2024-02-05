@@ -202,6 +202,17 @@ def get_binary_content(
             msg = f"EmptyFileError: {download_url}\n{traceback.format_exc()}"
             return msg, None
 
+        # test for expected content type (thanks mont for nil)
+        if site.expected_content_types and (
+            r.headers.get("Content-Type").lower()
+            not in site.expected_content_types
+        ):
+            msg = (
+                f"UnexpectedContentTypeError: {download_url}\n"
+                f"'\"{r.headers.get('Content-Type').lower()}\" not in {site.expected_content_types}"
+            )
+            return msg, None
+
         # test for and follow meta redirects
         r = follow_redirections(r, s)
         r.raise_for_status()
