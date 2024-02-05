@@ -2103,9 +2103,14 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
             stored_email[1].bcc, ["bcc@example.com", "bcc@example.com"]
         )
 
+    @patch(
+        "cl.lib.email_backends.get_email_prefix",
+        return_value="test-email-counter",
+    )
     @override_settings(EMAIL_MAX_TEMP_COUNTER=5)
-    def test_redis_email_counter(self) -> None:
+    def test_redis_email_counter(self, mock_prefix) -> None:
         """Test logic to count the number of emails sent by the app"""
+        self.restart_sent_email_quota("test-email-counter")
         for i in range(23):
             email = EmailMessage(
                 f"This is the subject {i}",
@@ -2116,17 +2121,21 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
             email.send()
 
         r = make_redis_interface("CACHE")
-        self.assertEqual(int(r.get("email:temp_counter")), 3)
-        self.assertEqual(r.zcard("email:delivery_attempts"), 4)
+        self.assertEqual(int(r.get("test-email-counter:temp_counter")), 3)
+        self.assertEqual(r.zcard("test-email-counter:delivery_attempts"), 4)
         email_counter = get_email_count(r)
         self.assertEqual(email_counter, 23)
 
+    @patch(
+        "cl.lib.email_backends.get_email_prefix",
+        return_value="test-emergency-break",
+    )
     @override_settings(
         EMAIL_EMERGENCY_THRESHOLD=5,
     )
-    def test_daily_quota_emergency_brake(self) -> None:
+    def test_daily_quota_emergency_brake(self, mock_prefix) -> None:
         """Test email daily quota emergency brake"""
-
+        self.restart_sent_email_quota("test-emergency-break")
         # Send 5 emails independently.
         for i in range(5):
             email = EmailMessage(
@@ -2159,12 +2168,16 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         # No additional messsage should be stored.
         self.assertEqual(stored_email.count(), 5)
 
+    @patch(
+        "cl.lib.email_backends.get_email_prefix",
+        return_value="test-mass-email",
+    )
     @override_settings(
         EMAIL_EMERGENCY_THRESHOLD=5,
     )
-    def test_daily_quota_emergency_brake_mass_mail(self) -> None:
+    def test_daily_quota_emergency_brake_mass_mail(self, mock_prefix) -> None:
         """Test email daily quota emergency brake sending mass email."""
-
+        self.restart_sent_email_quota("test-mass-email")
         # Send 5 emails at once.
         messages = []
         for i in range(5):
