@@ -601,9 +601,9 @@ def confirm_email(request, activation_key):
     # Tests pass; Save the profile
     for up in ups:
         up.email_confirmed = True
+        up.save()
         if not settings.DEVELOPMENT:
             create_neon_account.delay(up.user.pk)
-        up.save()
 
     return TemplateResponse(
         request, "register/confirm.html", {"success": True, "private": True}

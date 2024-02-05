@@ -4,6 +4,8 @@ from urllib.parse import urljoin
 from celery import Task
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.mail import send_mail
+from django.template import loader
 from django.utils.timezone import now
 from requests.exceptions import Timeout
 
@@ -56,10 +58,16 @@ def create_neon_account(self: Task, user_id: int) -> None:
         # entered into the Partial Match Queue. This queue allows users to
         # review these potential matches and decide whether to merge them
         # manually.
-        raise AssertionError(
-            "There's more than one account using the same email address. "
-            "We should check the Partial Match Queue."
+        subject = f"[Action Needed]: Please merge multiple accounts found for {user.email}"
+        txt_template = "emails/neon_multiple_accounts.txt"
+        body = loader.get_template(txt_template).render({"user": user})
+        send_mail(
+            subject,
+            body,
+            settings.DEFAULT_FROM_EMAIL,
+            ["donate@free.law"],
         )
+        return None
 
     profile = user.profile  # type: ignore
     if len(neon_accounts) == 1:
@@ -67,14 +75,14 @@ def create_neon_account(self: Task, user_id: int) -> None:
         # use that one instead of creating a new one to avoid potential future
         # merges.
         profile.neon_account_id = neon_accounts[0]["Account ID"]
-        profile.save()
+        profile.save(update_fields=["neon_account_id"])
         return None
 
     if len(neon_accounts) == 0:
         # No account found, create one
         new_account_id = neon_client.create_account(user)
         profile.neon_account_id = new_account_id
-        profile.save()
+        profile.save(update_fields=["neon_account_id"])
 
 
 @app.task(

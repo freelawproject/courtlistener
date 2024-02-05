@@ -3337,3 +3337,107 @@ class WebhooksHTMXTests(APITestCase):
         self.assertEqual(response.status_code, HTTP_200_OK)
         # There should be results for user_1
         self.assertNotEqual(response.content, b"\n\n")
+
+
+@override_settings(DEVELOPMENT=False)
+@patch("cl.users.tasks.NeonClient")
+class NeonAccountCreationTest(TestCase):
+
+    async def test_can_send_email_for_multiple_neon_accounts(
+        self, mock_neon_client
+    ) -> None:
+        """Tests whether we can send the email notification when multiple
+        neon accounts are found
+        """
+        # mock the search_account_by_email method to return array with two elements
+        mock_neon_client.return_value.search_account_by_email.return_value = [
+            {},
+            {},
+        ]
+
+        # Update the expiration since the fixture has one some time ago.
+        up = await sync_to_async(UserProfileWithParentsFactory.create)(
+            email_confirmed=False
+        )
+
+        r = await self.async_client.get(
+            reverse("email_confirm", args=[up.activation_key])
+        )
+        self.assertEqual(
+            200,
+            r.status_code,
+            msg="Did not get 200 code when activating account. "
+            "Instead got %s" % r.status_code,
+        )
+
+        self.assertIn("[Action Needed]:", mail.outbox[-1].subject)
+        self.assertIn(up.user.email, mail.outbox[-1].subject)
+
+        self.assertIn(up.user.email, mail.outbox[-1].body)
+        self.assertIn(
+            f"https://www.courtlistener.com/admin/user/{up.user.pk}",
+            mail.outbox[-1].body,
+        )
+        self.assertIn(
+            "https://support.neonone.com/hc/en-us/articles/4407408776717-Account-Match-Queue",
+            mail.outbox[-1].body,
+        )
+
+    async def test_can_update_profile_with_neon_data(
+        self, mock_neon_client
+    ) -> None:
+        """Tests whether we can use the existing neon account to set
+        the neon_account_id in the user's profile.
+        """
+
+        # mock the search_account_by_email method to return array with one element
+        mock_neon_client.return_value.search_account_by_email.return_value = [
+            {"Account ID": "1256"}
+        ]
+
+        # Update the expiration since the fixture has one some time ago.
+        up = await sync_to_async(UserProfileWithParentsFactory.create)(
+            email_confirmed=False
+        )
+
+        r = await self.async_client.get(
+            reverse("email_confirm", args=[up.activation_key])
+        )
+        self.assertEqual(
+            200,
+            r.status_code,
+            msg="Did not get 200 code when activating account. "
+            "Instead got %s" % r.status_code,
+        )
+
+        await up.arefresh_from_db()
+        self.assertEqual(up.neon_account_id, "1256")
+
+    async def test_can_create_neon_account(self, mock_neon_client) -> None:
+        """Tests whether we can create a new neon account after we
+        confirm the email address
+        """
+
+        # mock the search_account_by_email method to return am empty array
+        mock_neon_client.return_value.search_account_by_email.return_value = []
+
+        # mock the method to create a new user
+        mock_neon_client.return_value.create_account.return_value = 9876
+
+        # Update the expiration since the fixture has one some time ago.
+        up = await sync_to_async(UserProfileWithParentsFactory.create)(
+            email_confirmed=False
+        )
+
+        r = await self.async_client.get(
+            reverse("email_confirm", args=[up.activation_key])
+        )
+        self.assertEqual(
+            200,
+            r.status_code,
+            msg="Did not get 200 code when activating account. "
+            "Instead got %s" % r.status_code,
+        )
+
+        await up.arefresh_from_db()
+        self.assertEqual(up.neon_account_id, "9876")
