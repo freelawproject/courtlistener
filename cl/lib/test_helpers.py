@@ -471,7 +471,7 @@ class RECAPSearchTestCase(SimpleTestCase):
         cls.opinion = OpinionFactory(
             cluster=OpinionClusterFactory(docket=cls.de.docket)
         )
-        OpinionsCitedByRECAPDocument.objects.bulk_create_with_signal(
+        OpinionsCitedByRECAPDocument.objects.bulk_create(
             [
                 OpinionsCitedByRECAPDocument(
                     citing_document=cls.rd,
