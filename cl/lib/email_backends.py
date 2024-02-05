@@ -23,7 +23,7 @@ from cl.users.email_handlers import (
 
 
 def get_email_prefix() -> str:
-    """Simple helper for getting the prefix for the email countr.
+    """Simple helper for getting the prefix for the email counter.
     Useful for mocking the logger.
     """
     return "email"
