@@ -3386,7 +3386,7 @@ class NeonAccountCreationTest(TestCase):
         self.assertIn("[Action Needed]:", mail.outbox[-1].subject)
         self.assertIn(up.user.email, mail.outbox[-1].subject)
 
-        self.assertIn(up.user.email, mail.outbox[-1].body)
+        self.assertIn(f"'{up.user.email}'", mail.outbox[-1].body)
         self.assertIn(
             f"https://www.courtlistener.com/admin/user/{up.user.pk}",
             mail.outbox[-1].body,

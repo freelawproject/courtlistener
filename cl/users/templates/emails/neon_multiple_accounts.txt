@@ -1,10 +1,10 @@
 A new user signed up for CourtListener and we tried to match their email address
-to Neon. Alas, it didn't work because the email address {{ user.email }} appears
+to Neon. Alas, it didn't work because the email address '{{ user.email }}' appears
 is in Neon more than once.
 
 Please take the following actions to fix this situation:
 
-i. Please review the "Partial Match Queue" in Neon, as documented here:
+1. Please review the "Partial Match Queue" in Neon, as documented here:
 
     https://support.neonone.com/hc/en-us/articles/4407408776717-Account-Match-Queue
 
