@@ -2561,7 +2561,7 @@ class HarvardMergerTests(TestCase):
         docket.docket_number = updated_docket_number
         docket.save()
         docket.refresh_from_db()
-        self.assertEqual(docket.docket_number, "Master Docket 17-3000L")
+        self.assertEqual(docket.docket_number, "Master 17-3000L")
 
     def test_sources_query(self):
         """Test query for Non Harvard Sources"""
