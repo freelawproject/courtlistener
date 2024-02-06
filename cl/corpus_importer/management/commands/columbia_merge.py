@@ -370,8 +370,12 @@ def merge_docket_data(docket_data: dict, cluster: OpinionCluster) -> None:
     data_to_update = {}
 
     if docket_data["docket_number"]:
-        merge_docket_numbers(cluster, docket_data["docket_number"])
-        cluster.docket.refresh_from_db()
+        new_docket_number = merge_docket_numbers(
+            cluster, docket_data["docket_number"]
+        )
+        if new_docket_number:
+            data_to_update["docket_number"] = new_docket_number
+
     if (
         docket_data["date_cert_granted"]
         and not cluster.docket.date_cert_granted

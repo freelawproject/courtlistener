@@ -315,23 +315,51 @@ def clean_docket_number(docket_number: str) -> str:
     :param docket_number: Case docket number
     :return: A stripped down docket number.
     """
-
+    docket_number = docket_number.strip(".")
     docket_number = re.sub("Department.*", "", docket_number)
-    docket_number = re.sub("Nos?. ", "", docket_number)
+    # Remove No. or Nos.
+    docket_number = re.sub("Nos?.? ", "", docket_number)
+    # remove word Docket
+    docket_number = re.sub("Docket ", "", docket_number)
+    # Remove Crim. in Crim. 40801
+    docket_number = re.sub("Crim.? ", "", docket_number)
+    # Remove Civ. in Civ. 7394
+    docket_number = re.sub("Civ.? ", "", docket_number)
+    # remove Petition Nos. in Petition No.
+    docket_number = re.sub("Petition Nos?.? ", "", docket_number)
+    # remove Record No. in Record No. 3331
+    docket_number = re.sub("Record Nos?.? ", "", docket_number)
+    # remove File in File CV-03 0402585
+    docket_number = re.sub("File ", "", docket_number)
+    # remove judgement affirmed in "31130. Judgment affirmed."
+    docket_number = re.sub("Judgment affirmed.?", "", docket_number)
+    # remove cause transferred in "31342. Cause transferred."
+    docket_number = re.sub("Cause transferred.?", "", docket_number)
+    # remove parentheses/brackets in (AC 16691)
+    docket_number = re.sub("[()]", "", docket_number)
+    # remove comma in No. 28,049
+    docket_number = docket_number.replace(",", "")
+    # replace semicolon with comma when multiple docket numbers
+    docket_number = docket_number.replace(";", ",")
+    # remove any possible double space left and leading and trailing whitespace
+    docket_number = re.sub(" +", " ", docket_number).strip()
+    # remove dot at the end
+    docket_number = docket_number.strip(".")
+
     return docket_number
 
 
 def merge_docket_numbers(
     cluster: OpinionCluster, docket_number: str
 ) -> Optional[str]:
-    """Merge docket number
+    """Get best docket number
 
     :param cluster: The cluster of the merging item
     :param docket_number: The docket number from file
-    :return: None
+    :return: best docket number or None
     """
     cl_docket = cluster.docket
-    file_cleaned_docket = clean_docket_number(docket_number)
+    file_cleaned_docket = clean_docket_number(str(docket_number))
 
     if cl_docket.docket_number:
         # Check if docket number exists
@@ -454,16 +482,14 @@ def merge_long_fields(
     file_data, cl_data = overlapping_data
     # Do some text comparison
     similarity = get_cosine_similarity(file_data, cl_data)
-    if similarity < 0.9:
-        # they are not too similar, choose the larger one
+    if similarity > 0.3:
+        # at least one-third of the content is similar, choose the larger one
         if len(file_data) > len(cl_data):
             return {field_name: file_data}
-
     else:
-        if similarity <= 0.5:
-            logger.info(
-                f"The content compared is very different. Cluster id: {cluster_id}"
-            )
+        logger.info(
+            f"The content compared is very different. Cluster id: {cluster_id}"
+        )
     return {}
 
 
@@ -727,10 +753,14 @@ def winnow_case_name(case_name: str) -> Set:
         "st",
         "ex",
         "rel",
+        "people",
+        "debtor",
+        "debtors",
+        "commonwealth",
     }
 
     # strings where order matters
-    false_positive_strings = ["united states"]
+    false_positive_strings = ["united states", "in re"]
 
     false_positive_strings_regex = re.compile(
         "|".join(map(re.escape, false_positive_strings))
@@ -746,11 +776,17 @@ def winnow_case_name(case_name: str) -> Set:
     # "R. L. C. R. v. L. Z. S." -> "RLCR v. LZS"
     # "J. B. v. C. E." -> "JB v. CE"
     # "County v. A. D. B. County" -> "County v. ADB County"
-    case_name = re.sub(
-        r"\b[A-Z][A-Z\.\s]*[A-Z]\b\.?",
-        lambda m: m.group().replace(".", "").replace(" ", ""),
-        case_name,
-    )
+    # "OFFICIAL LIQUIDATOR FOR GOLD & APPEL TRANSFER SA v. ICEBERG TRANSPORT SA"
+    tokens = re.findall(r"(?:[A-Z][.] ?){2,}|.", case_name)
+    new_tokens = []
+    for token in tokens:
+        if "." in token and len(token) > 1:
+            add_space = token[-1] == " "
+            token = token.replace(". ", ".").replace(".", "")
+            if add_space:
+                token = f"{token} "
+        new_tokens.append(token)
+    case_name = "".join(new_tokens)
 
     # Remove all non-alphanumeric characters
     case_title = re.sub(r"[^a-z0-9 ]", " ", case_name.lower())
