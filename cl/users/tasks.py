@@ -35,16 +35,13 @@ def abort_or_retry(task, exc):
 def create_neon_account(self: Task, user_id: int) -> None:
     """
     Checks for existing Neon CRM accounts using the user's email address
-    and handles account creation or raises AssertionError when multiple
-    unmerged accounts share the same email address, requiring further
-    action to maintain data integrity.
+    and handles account creation or sends an email alert to donate@free.law
+    when multiple unmerged accounts share the same email address, requesting
+    further action to resolve the issue and minimize data inconsistencies.
 
     Args:
         user_id (int): The ID of the user to check and potentially create an
         account for.
-
-    Raises:
-        AssertionError: If more than one matching account is found in Neon CRM.
     """
     user = User.objects.select_related("profile").get(pk=user_id)
     neon_client = NeonClient()
