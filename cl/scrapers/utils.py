@@ -203,16 +203,17 @@ def get_binary_content(
             return msg, None
 
         # test for expected content type (thanks mont for nil)
-        matched_content_type = any(
-            r.headers.get("Content-Type").lower() in mime
-            for mime in site.expected_content_types
-        )
-        if site.expected_content_types and not matched_content_type:
-            msg = (
-                f"UnexpectedContentTypeError: {download_url}\n"
-                f"'\"{r.headers.get('Content-Type').lower()}\" not in {site.expected_content_types}"
+        if site.expected_content_types:
+            content_type = r.headers.get("Content-Type").lower()
+            m = any(
+                content_type in mime for mime in site.expected_content_types
             )
-            return msg, None
+            if not m:
+                msg = (
+                    f"UnexpectedContentTypeError: {download_url}\n"
+                    f"'\"{r.headers.get('Content-Type').lower()}\" not in {site.expected_content_types}"
+                )
+                return msg, None
 
         # test for and follow meta redirects
         r = follow_redirections(r, s)
