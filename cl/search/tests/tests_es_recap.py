@@ -46,6 +46,7 @@ from cl.search.tasks import (
     add_docket_to_solr_by_rds,
     es_save_document,
     index_docket_parties_in_es,
+    index_related_cites_fields,
     update_es_document,
 )
 from cl.tests.cases import (
@@ -1439,7 +1440,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # Add a new OpinionsCitedByRECAPDocument
         with self.captureOnCommitCallbacks(execute=True):
             opinion_2 = OpinionWithParentsFactory()
-            OpinionsCitedByRECAPDocument.objects.bulk_create_with_signal(
+            OpinionsCitedByRECAPDocument.objects.bulk_create(
                 [
                     OpinionsCitedByRECAPDocument(
                         citing_document=self.rd_att,
@@ -1447,6 +1448,10 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                         depth=1,
                     )
                 ]
+            )
+            # Update changes in ES using index_related_cites_fields
+            index_related_cites_fields.delay(
+                OpinionsCitedByRECAPDocument.__name__, self.rd_att.pk
             )
         # Frontend
         params = {
@@ -4019,7 +4024,7 @@ class RECAPIndexingTest(
                 update_es_document, *args, **kwargs
             ),
         ):
-            OpinionsCitedByRECAPDocument.objects.bulk_create_with_signal(
+            OpinionsCitedByRECAPDocument.objects.bulk_create(
                 [
                     OpinionsCitedByRECAPDocument(
                         citing_document=rd_1,
@@ -4028,9 +4033,14 @@ class RECAPIndexingTest(
                     )
                 ]
             )
+            # No update_es_document task should be called on bulk creation or update
+            self.reset_and_assert_task_count(expected=0)
 
-        # update_es_document task should be called 1 on tracked fields update
-        self.reset_and_assert_task_count(expected=1)
+        # Update changes in ES using index_related_cites_fields
+        index_related_cites_fields.delay(
+            OpinionsCitedByRECAPDocument.__name__, rd_1.pk
+        )
+
         r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
         self.assertIn(opinion.pk, r_doc.cites)
 
@@ -4049,6 +4059,8 @@ class RECAPIndexingTest(
         r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
         self.assertIn(opinion.pk, r_doc.cites)
 
+        opinion = OpinionWithParentsFactory()
+        opinion_2 = OpinionWithParentsFactory()
         # Update cites to RECAPDocument.
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.delay",
@@ -4056,8 +4068,6 @@ class RECAPIndexingTest(
                 update_es_document, *args, **kwargs
             ),
         ):
-            opinion = OpinionWithParentsFactory()
-            opinion_2 = OpinionWithParentsFactory()
             o_cited = OpinionsCitedByRECAPDocument(
                 citing_document=rd_1,
                 cited_opinion=opinion,
@@ -4068,11 +4078,15 @@ class RECAPIndexingTest(
                 cited_opinion=opinion_2,
                 depth=1,
             )
-            OpinionsCitedByRECAPDocument.objects.bulk_create_with_signal(
+            OpinionsCitedByRECAPDocument.objects.bulk_create(
                 [o_cited, o_cited_2]
             )
 
-        self.reset_and_assert_task_count(expected=3)
+        self.reset_and_assert_task_count(expected=0)
+        # Update changes in ES using index_related_cites_fields
+        index_related_cites_fields.delay(
+            OpinionsCitedByRECAPDocument.__name__, rd_1.pk
+        )
         r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
         self.assertIn(opinion.pk, r_doc.cites)
         self.assertIn(opinion_2.pk, r_doc.cites)

@@ -10,7 +10,6 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Prefetch, Q, QuerySet
-from django.dispatch import Signal
 from django.template import loader
 from django.urls import NoReverseMatch, reverse
 from django.utils.encoding import force_str
@@ -39,9 +38,6 @@ from cl.lib.search_index_utils import (
 from cl.lib.storage import IncrementingAWSMediaStorage
 from cl.lib.string_utils import trunc
 from cl.lib.utils import deepgetattr
-
-# Custom signal for use with bulk_create.
-bulk_create_signal = Signal()
 
 
 class PRECEDENTIAL_STATUS:
@@ -3574,15 +3570,6 @@ class OpinionJoinedBy(Opinion.joined_by.through):
         proxy = True
 
 
-class BulkCreateManager(models.Manager):
-    """Custom manager that will trigger a signal on bulk_create."""
-
-    def bulk_create_with_signal(self, objs, *args, **kwargs):
-        created_objs = super().bulk_create(objs, *args, **kwargs)
-        bulk_create_signal.send(sender=self.model, instances=created_objs)
-        return created_objs
-
-
 class OpinionsCited(models.Model):
     citing_opinion = models.ForeignKey(
         Opinion, related_name="cited_opinions", on_delete=models.CASCADE
@@ -3625,8 +3612,6 @@ class OpinionsCitedByRECAPDocument(models.Model):
         "in the citing document",
         default=1,
     )
-
-    objects = BulkCreateManager()
 
     def __str__(self) -> str:
         return f"{self.citing_document.id} ⤜--cites⟶  {self.cited_opinion.id}"
