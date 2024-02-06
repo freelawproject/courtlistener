@@ -45,6 +45,7 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     OpinionsCited,
+    OpinionsCitedByRECAPDocument,
     RECAPDocument,
 )
 from cl.search.types import (
@@ -1207,6 +1208,54 @@ def index_dockets_in_bulk(
         DocketDocument._index.refresh()
 
 
+def build_bulk_cites_doc(
+    es_child_doc_class: ESDocumentClassType,
+    child_id: int,
+    child_doc_model: ESModelClassType,
+) -> ESDictDocument:
+    """Builds a bulk document for updating cites field in an ES document.
+
+    :param es_child_doc_class: The ES child document class to update.
+    :param child_id: The child document ID to update.
+    :param child_doc_model: The child document to update model class.
+    :return: A dictionary representing the ES update operation if the document
+    exists, otherwise, it returns an empty dictionary.
+    """
+
+    child_instance = get_instance_from_db(child_id, child_doc_model)
+    if not child_instance:
+        return {}
+
+    match child_doc_model.__name__:
+        case "RECAPDocument":
+            parent_document_id = child_instance.docket_entry.docket.pk
+            child_id_property = "RECAP"
+        case "Opinion":
+            parent_document_id = child_instance.cluster.pk
+            child_id_property = "OPINION"
+        case _:
+            return {}
+
+    cites_prepared = es_child_doc_class().prepare_cites(child_instance)
+    doc_id = getattr(ES_CHILD_ID(child_id), child_id_property)
+    if not es_child_doc_class.exists(id=doc_id, routing=parent_document_id):
+        # If the ChildDocument does not exist, it might not be indexed yet.
+        # Raise a NotFoundError to retry the task; hopefully, it will be
+        # indexed soon.
+        raise NotFoundError(
+            f"The {child_doc_model.__name__} {child_instance.pk} is not indexed.",
+            "",
+            {"id": child_instance.pk},
+        )
+
+    doc_to_update = {
+        "_id": doc_id,
+        "_routing": parent_document_id,
+        "doc": {"cites": cites_prepared},
+    }
+    return doc_to_update
+
+
 @app.task(
     bind=True,
     autoretry_for=(ConnectionError, ConflictError, NotFoundError),
@@ -1233,6 +1282,8 @@ def index_related_cites_fields(
     """
 
     documents_to_update = []
+    cites_doc_to_update = {}
+    base_doc = {}
     match model_name:
         case OpinionsCited.__name__:
             # Query all clusters to update and retrieve only their sub_opinions
@@ -1292,30 +1343,28 @@ def index_related_cites_fields(
                     documents_to_update.append(doc_to_update)
 
             # Finally build the Opinion dict for updating the cites.
-            opinion_instance = get_instance_from_db(child_id, Opinion)
-            if not opinion_instance:
-                return
-            cites_prepared = OpinionDocument().prepare_cites(opinion_instance)
-            doc_id = ES_CHILD_ID(opinion_instance.pk).OPINION
-            if not OpinionClusterDocument.exists(
-                id=doc_id, routing=opinion_instance.cluster_id
-            ):
-                # If the OpinionDocument does not exist, it might
-                # not be indexed yet. Raise a NotFoundError to retry the
-                # task; hopefully, it will be indexed soon.
-                raise NotFoundError(
-                    f"The Opinion {opinion_instance.pk} is not indexed.",
-                    "",
-                    {"id": opinion_instance.pk},
-                )
+            child_doc_model = Opinion
+            es_child_doc_class = OpinionDocument
+            cites_doc_to_update = build_bulk_cites_doc(
+                es_child_doc_class, child_id, child_doc_model
+            )
 
-            doc_to_update = {
-                "_id": doc_id,
-                "_routing": opinion_instance.cluster_id,
-                "doc": {"cites": cites_prepared},
+        case OpinionsCitedByRECAPDocument.__name__:
+            # Build the RECAPDocument dict for updating the cites.
+            base_doc = {
+                "_op_type": "update",
+                "_index": DocketDocument._index._name,
             }
-            doc_to_update.update(base_doc)
-            documents_to_update.append(doc_to_update)
+
+            child_doc_model = RECAPDocument
+            es_child_doc_class = ESRECAPDocument
+            cites_doc_to_update = build_bulk_cites_doc(
+                es_child_doc_class, child_id, child_doc_model
+            )
+
+    if cites_doc_to_update and base_doc:
+        cites_doc_to_update.update(base_doc)
+        documents_to_update.append(cites_doc_to_update)
 
     if not documents_to_update:
         return

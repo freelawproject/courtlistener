@@ -38,7 +38,7 @@ class VisualizationCrudTests(BaseSeleniumTest):
         self.attempt_sign_in("user", "password")
 
         # She selects "New Visualization" from the new Visualization menu
-        menu = self.browser.find_element(By.PARTIAL_LINK_TEXT, "Opinions")
+        menu = self.browser.find_element(By.PARTIAL_LINK_TEXT, "Case Law")
         menu.click()
         menu_item = self.browser.find_element(
             By.LINK_TEXT, "Citation Visualizations"

@@ -483,7 +483,7 @@ class AdvancedTest(IndexedSolrTestCase):
         )
 
 
-class ExtendChildCourtsSearchTest(ESIndexTestCase, TestCase):
+class ESCommonSearchTest(ESIndexTestCase, TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.rebuild_index("search.OpinionCluster")
@@ -758,6 +758,133 @@ class ExtendChildCourtsSearchTest(ESIndexTestCase, TestCase):
         self.assertIn("Bank", r.content.decode())
         self.assertIn("National", r.content.decode())
         self.assertIn("Nevada", r.content.decode())
+
+    async def test_es_bad_syntax_proximity_tokens(self) -> None:
+        """Can we make a suggestion for queries that use unrecognized proximity
+        search?
+        """
+
+        # On string queries
+        r = await self.async_client.get(
+            reverse("show_results"),
+            {"q": "This query contains /s proximity token"},
+        )
+        self.assertIn(
+            "Are you attempting to perform a proximity search?",
+            r.content.decode(),
+        )
+        self.assertNotIn("Did you mean:", r.content.decode())
+
+        r = await self.async_client.get(
+            reverse("show_results"),
+            {"q": "This query contains /p proximity token"},
+        )
+        self.assertIn(
+            "Are you attempting to perform a proximity search?",
+            r.content.decode(),
+        )
+        self.assertNotIn("Did you mean:", r.content.decode())
+
+        # On filters
+        r = await self.async_client.get(
+            reverse("show_results"),
+            {"case_name": "This query contains /p proximity token"},
+        )
+        self.assertIn(
+            "Are you attempting to perform a proximity search within a filter?",
+            r.content.decode(),
+        )
+        r = await self.async_client.get(
+            reverse("show_results"),
+            {"docket_number": "12-2345 /p"},
+        )
+        self.assertIn(
+            "Are you attempting to perform a proximity search within a filter?",
+            r.content.decode(),
+        )
+
+    async def test_es_unbalanced_quotes(self) -> None:
+        """Can we make a suggestion for queries that use include unbalanced
+        quotes?
+        """
+
+        # On string queries
+        r = await self.async_client.get(
+            reverse("show_results"), {"q": 'Test query with "quotes'}
+        )
+        self.assertIn(
+            "Did you forget to close one or more quotes?", r.content.decode()
+        )
+        self.assertIn("Did you mean:", r.content.decode())
+        self.assertIn("Test query with quotes", r.content.decode())
+        r = await self.async_client.get(
+            reverse("show_results"), {"q": 'Test query with "quotes""'}
+        )
+        self.assertIn(
+            "Did you forget to close one or more quotes?", r.content.decode()
+        )
+        self.assertIn("Did you mean:", r.content.decode())
+        self.assertIn("Test query with &quot;quotes&quot;", r.content.decode())
+
+        # On filters
+        r = await self.async_client.get(
+            reverse("show_results"), {"case_name": 'Test query with "quotes""'}
+        )
+        self.assertIn(
+            "Did you forget to close one or more quotes?", r.content.decode()
+        )
+        self.assertNotIn("Did you mean:", r.content.decode())
+
+    def test_handle_unbalanced_parentheses(self) -> None:
+        """Can we make a suggestion for queries that use include unbalanced
+        parentheses?
+        """
+
+        # On string queries
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": "(Loretta OR (SEC) AND Jose",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        self.assertIn(
+            "Did you forget to close one or more parentheses?",
+            r.content.decode(),
+        )
+        self.assertIn("Did you mean", r.content.decode())
+        self.assertIn("(Loretta OR SEC) AND Jose", r.content.decode())
+
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": "(Loretta AND Jose",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        self.assertIn(
+            "Did you forget to close one or more parentheses?",
+            r.content.decode(),
+        )
+        self.assertIn("Did you mean", r.content.decode())
+        self.assertIn("Loretta AND Jose", r.content.decode())
+
+        # On filters
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "case_name": "(Loretta OR (SEC) AND Jose",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        self.assertIn(
+            "Did you forget to close one or more parentheses?",
+            r.content.decode(),
+        )
+        self.assertNotIn("Did you mean", r.content.decode())
 
 
 class PagerankTest(TestCase):
