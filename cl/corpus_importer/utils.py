@@ -309,11 +309,14 @@ def match_opinion_lists(
     return matches
 
 
-def clean_docket_number(docket_number: str) -> str:
-    """Strip non-numeric content from docket numbers
+def prepare_docket_number(docket_number: str) -> str:
+    """Clean document number
 
-    :param docket_number: Case docket number
-    :return: A stripped down docket number.
+    Remove unnecessary data in the docket number, this is useful when we want to
+    compare two docket numbers, and we want to increase the accuracy of the comparison
+
+    :param docket_number: a docket number
+    :return: cleaned docket number
     """
     docket_number = docket_number.strip(".")
     docket_number = re.sub("Department.*", "", docket_number)
@@ -345,6 +348,18 @@ def clean_docket_number(docket_number: str) -> str:
     docket_number = re.sub(" +", " ", docket_number).strip()
     # remove dot at the end
     docket_number = docket_number.strip(".")
+
+    return docket_number
+
+
+def clean_docket_number(docket_number: str) -> str:
+    """Strip non-numeric content from docket numbers
+
+    :param docket_number: Case docket number
+    :return: A stripped down docket number.
+    """
+    docket_number = re.sub("Department.*", "", docket_number)
+    docket_number = re.sub("Nos?.? ", "", docket_number)
 
     return docket_number
 
