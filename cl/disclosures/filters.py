@@ -4,6 +4,7 @@ from cl.api.utils import (
     ALL_TEXT_LOOKUPS,
     BOOLEAN_LOOKUPS,
     DATETIME_LOOKUPS,
+    INTEGER_LOOKUPS,
     NoEmptyFilterSet,
 )
 from cl.disclosures.models import (
@@ -20,7 +21,7 @@ from cl.disclosures.models import (
 from cl.people_db.models import Person
 
 disclosure_fields = {
-    "id": ["exact"],
+    "id": INTEGER_LOOKUPS,
     "date_created": DATETIME_LOOKUPS,
     "date_modified": DATETIME_LOOKUPS,
     "redacted": BOOLEAN_LOOKUPS,
@@ -91,7 +92,7 @@ class FinancialDisclosureFilter(NoEmptyFilterSet):
     class Meta:
         model = FinancialDisclosure
         fields = {
-            "id": ["exact"],
+            "id": INTEGER_LOOKUPS,
             "person": ["exact"],
             "date_created": DATETIME_LOOKUPS,
             "date_modified": DATETIME_LOOKUPS,
@@ -109,7 +110,7 @@ class GiftFilter(NoEmptyFilterSet):
     class Meta:
         model = Gift
         fields = {
-            "id": ["exact"],
+            "id": INTEGER_LOOKUPS,
             "date_created": DATETIME_LOOKUPS,
             "date_modified": DATETIME_LOOKUPS,
             "redacted": BOOLEAN_LOOKUPS,
