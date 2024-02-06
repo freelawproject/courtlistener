@@ -81,7 +81,7 @@ class DocketFilter(NoEmptyFilterSet):
     class Meta:
         model = Docket
         fields = {
-            "id": ["exact"],
+            "id": INTEGER_LOOKUPS,
             "date_modified": DATETIME_LOOKUPS,
             "date_created": DATETIME_LOOKUPS,
             "date_filed": DATE_LOOKUPS,
@@ -154,7 +154,7 @@ class OpinionClusterFilter(NoEmptyFilterSet):
     class Meta:
         model = OpinionCluster
         fields = {
-            "id": ["exact"],
+            "id": INTEGER_LOOKUPS,
             "date_created": DATETIME_LOOKUPS,
             "date_modified": DATETIME_LOOKUPS,
             "date_filed": DATE_LOOKUPS,
@@ -180,7 +180,7 @@ class OpinionsCitedFilter(NoEmptyFilterSet):
     class Meta:
         model = OpinionsCited
         fields = {
-            "id": ["exact"],
+            "id": INTEGER_LOOKUPS,
         }
 
 
@@ -195,7 +195,7 @@ class DocketEntryFilter(NoEmptyFilterSet):
     class Meta:
         model = DocketEntry
         fields = {
-            "id": ["exact"],
+            "id": INTEGER_LOOKUPS,
             "entry_number": INTEGER_LOOKUPS + ["isnull"],
             "date_created": DATETIME_LOOKUPS,
             "date_modified": DATETIME_LOOKUPS,
@@ -213,7 +213,7 @@ class RECAPDocumentFilter(NoEmptyFilterSet):
     class Meta:
         model = RECAPDocument
         fields = {
-            "id": ["exact"],
+            "id": INTEGER_LOOKUPS,
             "date_created": DATETIME_LOOKUPS,
             "date_modified": DATETIME_LOOKUPS,
             "date_upload": DATETIME_LOOKUPS,
