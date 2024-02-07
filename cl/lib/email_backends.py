@@ -22,6 +22,13 @@ from cl.users.email_handlers import (
 )
 
 
+def get_email_prefix() -> str:
+    """Simple helper for getting the prefix for the email counter.
+    Useful for mocking the logger.
+    """
+    return "email"
+
+
 def incr_email_counters(pipe: Pipeline) -> None:
     """increments the temporary counter and adds a new
     element to the sorted set once it reaches the value of
@@ -30,14 +37,17 @@ def incr_email_counters(pipe: Pipeline) -> None:
     Args:
         pipe (Pipeline): A pipeline object.
     """
-    temp_counter = int(pipe.get("email:temp_counter") or 0)  # type: ignore
+    prefix = get_email_prefix()
+    temp_counter = int(pipe.get(f"{prefix}:temp_counter") or 0)  # type: ignore
     pipe.multi()
     if int(temp_counter) + 1 >= settings.EMAIL_MAX_TEMP_COUNTER:
         current_time = time.time_ns()
-        pipe.zadd("email:delivery_attempts", {str(current_time): current_time})
-        pipe.set("email:temp_counter", 0)
+        pipe.zadd(
+            f"{prefix}:delivery_attempts", {str(current_time): current_time}
+        )
+        pipe.set(f"{prefix}:temp_counter", 0)
     else:
-        pipe.incr("email:temp_counter")
+        pipe.incr(f"{prefix}:temp_counter")
 
 
 def get_attempts_in_window(r: Redis) -> int:
@@ -56,10 +66,11 @@ def get_attempts_in_window(r: Redis) -> int:
     current_time = time.time_ns()
     trim_time = current_time - (24 * 60 * 60 * 1_000_000_000)
     pipe = r.pipeline()
+    prefix = get_email_prefix()
     # Removes attempts outside the current window
-    pipe.zremrangebyscore("email:delivery_attempts", 0, trim_time)
+    pipe.zremrangebyscore(f"{prefix}:delivery_attempts", 0, trim_time)
     # Get number of elements in the set
-    pipe.zcard("email:delivery_attempts")
+    pipe.zcard(f"{prefix}:delivery_attempts")
     _removed, size = pipe.execute()
     return int(size)
 
@@ -78,7 +89,8 @@ def get_email_count(r: Redis) -> int:
     Returns:
         int: number of emails sent in the last 24 hours
     """
-    temp_counter = r.get("email:temp_counter")
+    prefix = get_email_prefix()
+    temp_counter = r.get(f"{prefix}:temp_counter")
     previous_attempts = get_attempts_in_window(r)
     if not temp_counter:
         return previous_attempts * settings.EMAIL_MAX_TEMP_COUNTER
@@ -213,7 +225,8 @@ class EmailBackend(BaseEmailBackend):
                 email.to = final_recipient_list
                 email.send()
                 # update the counters
-                r.transaction(incr_email_counters, "email:temp_counter")
+                prefix = get_email_prefix()
+                r.transaction(incr_email_counters, f"{prefix}:temp_counter")
                 msg_count += 1
 
         # Close base backend connection

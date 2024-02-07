@@ -77,6 +77,7 @@ ESDocumentClassType = Union[
     Type[DocketDocument],
     Type[OpinionDocument],
     Type[OpinionClusterDocument],
+    Type[ESRECAPDocument],
 ]
 
 
