@@ -18,12 +18,9 @@ SOLR_OPINION_HL_FIELDS = [
 SOLR_PEOPLE_HL_FIELDS = ["name", "dob_city", "dob_state", "name_reverse"]
 PEOPLE_ES_HL_FIELDS = [
     "name",
-    "name.exact",
     "dob_city",
     "political_affiliation",
-    "political_affiliation.exact",
     "school",
-    "school.exact",
 ]
 PEOPLE_ES_HL_KEYWORD_FIELDS = [
     "dob_state_id",
@@ -118,22 +115,15 @@ SEARCH_ORAL_ARGUMENT_HL_FIELDS = [
 ]
 SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS = [
     "caseName",
-    "caseName.exact",
     "judge",
-    "judge.exact",
     "docketNumber",
-    "docketNumber.exact",
     "court_citation_string",
     "text",
-    "text.exact",
 ]
 SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS = [
     "text",
-    "text.exact",
     "docketNumber",
-    "docketNumber.exact",
     "judge",
-    "judge.exact",
 ]
 SOLR_RECAP_HL_FIELDS = [
     "assignedTo",
@@ -181,7 +171,6 @@ SEARCH_OPINION_CHILD_HL_FIELDS = {
     "text": 100,
 }
 
-MULTI_VALUE_HL_FIELDS = ["citation"]
 # Search query for related items
 RELATED_PATTERN = re.compile(
     r"""
