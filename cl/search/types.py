@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Any, Type, Union
 
 from elasticsearch_dsl.response import Hit
@@ -19,6 +20,7 @@ from cl.search.documents import (
 from cl.search.models import (
     Citation,
     Docket,
+    DocketEntry,
     Opinion,
     OpinionCluster,
     Parenthetical,
@@ -43,6 +45,7 @@ ESModelType = Union[
 ESModelClassType = Union[
     Type[Citation],
     Type[Docket],
+    Type[DocketEntry],
     Type[Opinion],
     Type[OpinionCluster],
     Type[Parenthetical],
@@ -84,3 +87,16 @@ PercolatorResponseType = tuple[list[Hit], ESDictDocument]
 SaveDocumentResponseType = tuple[str, ESDictDocument]
 
 SearchAlertHitType = tuple[Alert, str, list[ESDictDocument], int]
+
+
+class EventTable(Enum):
+    DOCKET = "docket"
+    DOCKET_ENTRY = "de"
+    RECAP_DOC = "rd"
+
+    @classmethod
+    def get_member(cls, value):
+        for member in cls:
+            if member.value == value:
+                return member
+        return None
