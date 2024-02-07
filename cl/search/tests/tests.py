@@ -1948,7 +1948,7 @@ class ESIndexingTasksUtils(TestCase):
         date_start = now().replace(year=2024, month=1, day=16, hour=0)
         date_end = now().replace(year=2024, month=1, day=19, hour=1)
         unique_events = get_unique_oldest_history_rows(
-            date_start, date_end, EventTable.DOCKET
+            date_start, date_end, 0, EventTable.DOCKET
         )
         # Confirm the expected events are returned.
         unique_event_ids = set(unique_events.values_list("pgh_id", flat=True))

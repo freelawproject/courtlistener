@@ -37,7 +37,7 @@ from cl.search.types import EventTable
 
 
 def compose_redis_key(
-    search_type: str, event_doc_type: EventTable | None
+    search_type: str, event_doc_type: EventTable | None = None
 ) -> str:
     """Compose a Redis key based on the search type for indexing log.
 
@@ -76,7 +76,7 @@ def log_last_document_indexed(
 
 
 def get_last_parent_document_id_processed(
-    search_type: str, event_doc_type: EventTable
+    search_type: str, event_doc_type: EventTable | None = None
 ) -> int:
     """Get the last document ID indexed.
 

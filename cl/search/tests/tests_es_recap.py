@@ -49,6 +49,7 @@ from cl.search.tasks import (
     index_related_cites_fields,
     update_es_document,
 )
+from cl.search.types import EventTable
 from cl.tests.cases import (
     CountESTasksTestCase,
     ESIndexTestCase,
@@ -4193,6 +4194,10 @@ class RECAPHistoryTablesIndexingTest(
             pk_offset=0,
             testing_mode=True,
         )
+        self.r = make_redis_interface("CACHE")
+        keys = self.r.keys(compose_redis_key(SEARCH_TYPES.RECAP))
+        if keys:
+            self.r.delete(*keys)
 
     def test_docket_history_table_indexing(self) -> None:
         """Confirm that dockets and their child documents are properly updated
@@ -4301,6 +4306,13 @@ class RECAPHistoryTablesIndexingTest(
         self.assertFalse(rd_1_doc_exists)
         self.assertFalse(rd_2_doc_exists)
 
+        # Clean up last_pk indexed.
+        keys = self.r.keys(
+            compose_redis_key(SEARCH_TYPES.RECAP, EventTable.DOCKET)
+        )
+        if keys:
+            self.r.delete(*keys)
+
     def test_docket_entry_history_table_indexing(self) -> None:
         """Confirm that docket entries changes are properly updated into
         ESRECAPDocuments based on events from their history tables."""
@@ -4385,6 +4397,13 @@ class RECAPHistoryTablesIndexingTest(
         )
         self.assertFalse(rd_1_doc_exists)
         self.assertFalse(rd_2_doc_exists)
+
+        # Clean up last_pk indexed.
+        keys = self.r.keys(
+            compose_redis_key(SEARCH_TYPES.RECAP, EventTable.DOCKET_ENTRY)
+        )
+        if keys:
+            self.r.delete(*keys)
 
     def test_recap_history_table_indexing(self) -> None:
         """Confirm that RECAPDocument changes are properly updated into
@@ -4477,3 +4496,10 @@ class RECAPHistoryTablesIndexingTest(
         )
         self.assertFalse(rd_1_doc_exists)
         self.assertFalse(rd_2_doc_exists)
+
+        # Clean up last_pk indexed.
+        keys = self.r.keys(
+            compose_redis_key(SEARCH_TYPES.RECAP, EventTable.RECAP_DOC)
+        )
+        if keys:
+            self.r.delete(*keys)
