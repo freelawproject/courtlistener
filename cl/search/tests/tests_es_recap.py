@@ -4238,7 +4238,7 @@ class RECAPHistoryTablesIndexingTest(
             search_type=SEARCH_TYPES.RECAP,
             queue="celery",
             testing_mode=True,
-            update_from_event_tables="docket",
+            update_from_event_tables=EventTable.DOCKET.value,
             start_date=start_date.date().isoformat(),
             end_date=end_date.date().isoformat(),
         )
@@ -4288,7 +4288,7 @@ class RECAPHistoryTablesIndexingTest(
             search_type=SEARCH_TYPES.RECAP,
             queue="celery",
             testing_mode=True,
-            update_from_event_tables="docket",
+            update_from_event_tables=EventTable.DOCKET.value,
             start_date=start_date.date().isoformat(),
             end_date=end_date.date().isoformat(),
         )
@@ -4346,7 +4346,7 @@ class RECAPHistoryTablesIndexingTest(
             search_type=SEARCH_TYPES.RECAP,
             queue="celery",
             testing_mode=True,
-            update_from_event_tables="de",
+            update_from_event_tables=EventTable.DOCKET_ENTRY.value,
             start_date=start_date.date().isoformat(),
             end_date=end_date.date().isoformat(),
         )
@@ -4384,7 +4384,7 @@ class RECAPHistoryTablesIndexingTest(
             search_type=SEARCH_TYPES.RECAP,
             queue="celery",
             testing_mode=True,
-            update_from_event_tables="de",
+            update_from_event_tables=EventTable.DOCKET_ENTRY.value,
             start_date=start_date.date().isoformat(),
             end_date=end_date.date().isoformat(),
         )
@@ -4444,7 +4444,7 @@ class RECAPHistoryTablesIndexingTest(
             search_type=SEARCH_TYPES.RECAP,
             queue="celery",
             testing_mode=True,
-            update_from_event_tables="rd",
+            update_from_event_tables=EventTable.RECAP_DOC.value,
             start_date=start_date.date().isoformat(),
             end_date=end_date.date().isoformat(),
         )
@@ -4482,7 +4482,7 @@ class RECAPHistoryTablesIndexingTest(
             search_type=SEARCH_TYPES.RECAP,
             queue="celery",
             testing_mode=True,
-            update_from_event_tables="rd",
+            update_from_event_tables=EventTable.RECAP_DOC.value,
             start_date=start_date.date().isoformat(),
             end_date=end_date.date().isoformat(),
         )

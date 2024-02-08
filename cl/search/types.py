@@ -91,9 +91,9 @@ SearchAlertHitType = tuple[Alert, str, list[ESDictDocument], int]
 
 
 class EventTable(Enum):
-    DOCKET = "docket"
-    DOCKET_ENTRY = "de"
-    RECAP_DOC = "rd"
+    DOCKET = "search.Docket"
+    DOCKET_ENTRY = "search.DocketEntry"
+    RECAP_DOC = "search.RECAPDocument"
 
     @classmethod
     def get_member(cls, value):
