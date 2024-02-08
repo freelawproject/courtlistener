@@ -76,7 +76,6 @@ class MembershipWebhookViewSet(
         """
         if not addresses:
             address = defaultdict(lambda: "")
-            address["wants_newsletter"] = False
             return address
 
         return {
@@ -86,7 +85,6 @@ class MembershipWebhookViewSet(
             "city": addresses[0]["city"],
             "state": addresses[0]["stateProvince"]["code"],
             "zip_code": addresses[0]["zipCode"],
-            "wants_newsletter": False,
         }
 
     def _get_member_record(self, account_id: str) -> User:

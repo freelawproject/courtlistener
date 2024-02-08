@@ -76,7 +76,6 @@ def handle_external_payment_if_needed(charge: StripeChargeObject) -> None:
                 "city": billing_details["address"]["city"],
                 "state": billing_details["address"]["state"],
                 "zip_code": billing_details["address"]["postal_code"],
-                "wants_newsletter": False,
             },
         )
     if Donation.objects.filter(payment_id=charge["id"]).exists():

@@ -225,7 +225,6 @@ class DonationIntegrationTest(SimpleUserDataMixin, TestCase):
             "state": "NY",
             "zip_code": "12345",
             # Tailing checkboxes
-            "wants_newsletter": True,
             "send_annual_reminder": True,
         }
 
