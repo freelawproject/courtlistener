@@ -1454,41 +1454,43 @@ def remove_parent_and_child_docs_by_query(
     es_document = getattr(es_document_module, es_document_name)
     s = es_document.search()
     instance_id = main_instance_ids[0]
-    if es_document is ESRECAPDocument and event_table == EventTable.DOCKET:
-        parent_query = Q("term", _id=instance_id)
-        child_query = Q("parent_id", type="recap_document", id=instance_id)
-        should_query = Q(
-            "bool", should=[parent_query, child_query], minimum_should_match=1
-        )
-        s = s.query(should_query)
-        query = s.to_dict()["query"]
-        count_query = RECAPDocument.objects.filter(
-            docket_entry__docket_id=instance_id
-        )
-    elif (
-        es_document is ESRECAPDocument
-        and event_table == EventTable.DOCKET_ENTRY
-    ):
-        child_query = Q("term", docket_entry_id=instance_id)
-        s = s.query(child_query)
-        query = s.to_dict()["query"]
-        count_query = RECAPDocument.objects.filter(docket_entry_id=instance_id)
 
-    elif (
-        es_document is ESRECAPDocument
-        and event_table == EventTable.RECAP_DOCUMENT
-    ):
-        ids_to_remove = [
-            ES_CHILD_ID(doc_id).RECAP for doc_id in main_instance_ids
-        ]
-        child_query = Q("terms", _id=ids_to_remove)
-        s = s.query(child_query)
-        query = s.to_dict()["query"]
-        count_query = RECAPDocument.objects.filter(pk__in=main_instance_ids)
+    match event_table:
+        case EventTable.DOCKET if es_document is ESRECAPDocument:
+            parent_query = Q("term", _id=instance_id)
+            child_query = Q("parent_id", type="recap_document", id=instance_id)
+            should_query = Q(
+                "bool",
+                should=[parent_query, child_query],
+                minimum_should_match=1,
+            )
+            s = s.query(should_query)
+            query = s.to_dict()["query"]
+            count_query = RECAPDocument.objects.filter(
+                docket_entry__docket_id=instance_id
+            )
+        case EventTable.DOCKET_ENTRY if es_document is ESRECAPDocument:
+            child_query = Q("term", docket_entry_id=instance_id)
+            s = s.query(child_query)
+            query = s.to_dict()["query"]
+            count_query = RECAPDocument.objects.filter(
+                docket_entry_id=instance_id
+            )
 
-    else:
-        # Abort UBQ request for a not supported document-
-        return
+        case EventTable.RECAP_DOCUMENT if es_document is ESRECAPDocument:
+            ids_to_remove = [
+                ES_CHILD_ID(doc_id).RECAP for doc_id in main_instance_ids
+            ]
+            child_query = Q("terms", _id=ids_to_remove)
+            s = s.query(child_query)
+            query = s.to_dict()["query"]
+            count_query = RECAPDocument.objects.filter(
+                pk__in=main_instance_ids
+            )
+
+        case _:
+            # Abort DeleteByQuery request for a not supported document type.
+            return
 
     client = connections.get_connection(alias="no_retry_connection")
     try:
