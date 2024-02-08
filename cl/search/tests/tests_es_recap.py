@@ -4444,7 +4444,7 @@ class RECAPHistoryTablesIndexingTest(
             search_type=SEARCH_TYPES.RECAP,
             queue="celery",
             testing_mode=True,
-            update_from_event_tables=EventTable.RECAP_DOC.value,
+            update_from_event_tables=EventTable.RECAP_DOCUMENT.value,
             start_date=start_date.date().isoformat(),
             end_date=end_date.date().isoformat(),
         )
@@ -4482,7 +4482,7 @@ class RECAPHistoryTablesIndexingTest(
             search_type=SEARCH_TYPES.RECAP,
             queue="celery",
             testing_mode=True,
-            update_from_event_tables=EventTable.RECAP_DOC.value,
+            update_from_event_tables=EventTable.RECAP_DOCUMENT.value,
             start_date=start_date.date().isoformat(),
             end_date=end_date.date().isoformat(),
         )
@@ -4499,7 +4499,7 @@ class RECAPHistoryTablesIndexingTest(
 
         # Clean up last_pk indexed.
         keys = self.r.keys(
-            compose_redis_key(SEARCH_TYPES.RECAP, EventTable.RECAP_DOC)
+            compose_redis_key(SEARCH_TYPES.RECAP, EventTable.RECAP_DOCUMENT)
         )
         if keys:
             self.r.delete(*keys)

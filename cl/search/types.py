@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Type, Union
+from typing import Any, Literal, Type, Union
 
 from elasticsearch_dsl.response import Hit
 
@@ -80,6 +80,17 @@ ESDocumentClassType = Union[
     Type[ESRECAPDocument],
 ]
 
+ESDocumentNameType = Literal[
+    "AudioDocument",
+    "ParentheticalGroupDocument",
+    "AudioPercolator",
+    "PersonDocument",
+    "PositionDocument",
+    "DocketDocument",
+    "OpinionDocument",
+    "OpinionClusterDocument",
+    "ESRECAPDocument",
+]
 
 ESDictDocument = dict[str, Any]
 
@@ -93,7 +104,7 @@ SearchAlertHitType = tuple[Alert, str, list[ESDictDocument], int]
 class EventTable(Enum):
     DOCKET = "search.Docket"
     DOCKET_ENTRY = "search.DocketEntry"
-    RECAP_DOC = "search.RECAPDocument"
+    RECAP_DOCUMENT = "search.RECAPDocument"
 
     @classmethod
     def get_member(cls, value):

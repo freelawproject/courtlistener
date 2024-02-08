@@ -54,6 +54,7 @@ from cl.search.types import (
     ESDictDocument,
     ESDocumentClassType,
     ESDocumentInstanceType,
+    ESDocumentNameType,
     ESModelClassType,
     ESModelType,
     EventTable,
@@ -288,7 +289,7 @@ def es_save_document(
     self: Task,
     instance_id: int,
     app_label: str,
-    es_document_name: str,
+    es_document_name: ESDocumentNameType,
 ) -> SaveDocumentResponseType | None:
     """Save a document in Elasticsearch using a provided callable.
 
@@ -478,7 +479,7 @@ def document_fields_to_update(
 )
 def update_es_document(
     self: Task,
-    es_document_name: str,
+    es_document_name: ESDocumentNameType,
     fields_to_update: list[str],
     main_instance_data: tuple[str, int],
     related_instance_data: tuple[str, int] | None = None,
@@ -656,7 +657,7 @@ def handle_ubq_retries(
 )
 def update_children_docs_by_query(
     self: Task,
-    es_document_name: str,
+    es_document_name: ESDocumentNameType,
     parent_instance_id: int,
     fields_to_update: list[str],
     fields_map: dict[str, str] | None = None,
@@ -684,30 +685,35 @@ def update_children_docs_by_query(
         if not parent_instance:
             return
         count_query = Position.objects.filter(person_id=parent_instance_id)
-    elif (
-        es_document is ESRECAPDocument
-        and event_table == EventTable.DOCKET_ENTRY
-    ):
-        s = s.query("term", docket_entry_id=parent_instance_id)
-        parent_doc_class = DocketDocument
-        parent_instance = get_instance_from_db(parent_instance_id, DocketEntry)
-        if not parent_instance:
-            return
-        main_doc = parent_doc_class.exists(parent_instance.docket.pk)
-        count_query = RECAPDocument.objects.filter(
-            docket_entry_id=parent_instance_id
-        )
 
     elif es_document is ESRECAPDocument:
-        s = s.query("parent_id", type="recap_document", id=parent_instance_id)
-        parent_doc_class = DocketDocument
-        main_doc = parent_doc_class.exists(parent_instance_id)
-        parent_instance = get_instance_from_db(parent_instance_id, Docket)
-        if not parent_instance:
+        main_instance_id = None
+        if event_table == EventTable.DOCKET_ENTRY:
+            s = s.query("term", docket_entry_id=parent_instance_id)
+            parent_instance = get_instance_from_db(
+                parent_instance_id, DocketEntry
+            )
+            if not parent_instance:
+                return
+            main_instance_id = parent_instance.docket.pk
+            count_query = RECAPDocument.objects.filter(
+                docket_entry_id=parent_instance_id
+            )
+        elif event_table in [None, EventTable.DOCKET]:
+            s = s.query(
+                "parent_id", type="recap_document", id=parent_instance_id
+            )
+            parent_instance = get_instance_from_db(parent_instance_id, Docket)
+            if not parent_instance:
+                return
+            main_instance_id = parent_instance.pk
+            count_query = RECAPDocument.objects.filter(
+                docket_entry__docket_id=parent_instance_id
+            )
+        if not main_instance_id:
             return
-        count_query = RECAPDocument.objects.filter(
-            docket_entry__docket_id=parent_instance_id
-        )
+        parent_doc_class = DocketDocument
+        main_doc = parent_doc_class.exists(main_instance_id)
     elif (
         es_document is OpinionDocument or es_document is OpinionClusterDocument
     ):
@@ -722,7 +728,7 @@ def update_children_docs_by_query(
         count_query = Opinion.objects.filter(cluster_id=parent_instance_id)
 
     else:
-        # Abort bulk update for a not supported document
+        # Abort UBQ update for a not supported document
         return
 
     if not main_doc:
@@ -867,7 +873,9 @@ def index_documents_in_bulk_from_queryset(
     :param base_doc: The base ES document fields.
     :param parent_instance_id: Optional, the parent instance ID used for
     routing in ES.
-    :param testing_mode: Set to True to use streaming bulk for test cases.
+    :param testing_mode: Set to True to enable streaming bulk, which is used in
+     TestCase-based tests because parallel_bulk is incompatible with them.
+    https://github.com/freelawproject/courtlistener/pull/3324#issue-1970675619
     Default is False.
     :return: A list of IDs of documents that failed to index.
     """
@@ -929,8 +937,10 @@ def index_parent_and_child_docs(
     :param self: The Celery task instance
     :param instance_ids: The parent instance IDs to index.
     :param search_type: The Search Type to index parent and child docs.
-    :param testing_mode: If True uses streaming_bulk in TestCase based tests,
-    otherwise uses parallel_bulk in production.
+    :param testing_mode: Set to True to enable streaming bulk, which is used in
+     TestCase-based tests because parallel_bulk is incompatible with them.
+    https://github.com/freelawproject/courtlistener/pull/3324#issue-1970675619
+    Default is False.
     :return: None
     """
 
@@ -1033,8 +1043,10 @@ def index_parent_or_child_docs(
     :param instance_ids: The parent instance IDs to index.
     :param search_type: The Search Type to index parent and child docs.
     :param document_type: The document type to index, 'parent' or 'child' documents
-    :param testing_mode: If True uses streaming_bulk in TestCase based tests,
-    otherwise uses parallel_bulk in production.
+    :param testing_mode: Set to True to enable streaming bulk, which is used in
+     TestCase-based tests because parallel_bulk is incompatible with them.
+    https://github.com/freelawproject/courtlistener/pull/3324#issue-1970675619
+    Default is False.
     :return: None
     """
 
@@ -1150,7 +1162,10 @@ def index_parent_or_child_docs(
     queue=settings.CELERY_ETL_TASK_QUEUE,
 )
 def remove_document_from_es_index(
-    self: Task, es_document_name: str, instance_id: int, routing: int | None
+    self: Task,
+    es_document_name: ESDocumentNameType,
+    instance_id: int,
+    routing: int | None,
 ) -> None:
     """Remove a document from an Elasticsearch index.
 
@@ -1193,6 +1208,10 @@ def index_dockets_in_bulk(
 
     :param self: The Celery task instance
     :param instance_ids: The Docket IDs to index.
+    :param testing_mode: Set to True to enable streaming bulk, which is used in
+     TestCase-based tests because parallel_bulk is incompatible with them.
+    https://github.com/freelawproject/courtlistener/pull/3324#issue-1970675619
+    Default is False.
     :return: None
     """
 
@@ -1419,7 +1438,7 @@ def index_related_cites_fields(
 )
 def remove_parent_and_child_docs_by_query(
     self: Task,
-    es_document_name: str,
+    es_document_name: ESDocumentNameType,
     main_instance_ids: list[int],
     event_table: EventTable | None = None,
 ) -> None:
@@ -1456,7 +1475,8 @@ def remove_parent_and_child_docs_by_query(
         count_query = RECAPDocument.objects.filter(docket_entry_id=instance_id)
 
     elif (
-        es_document is ESRECAPDocument and event_table == EventTable.RECAP_DOC
+        es_document is ESRECAPDocument
+        and event_table == EventTable.RECAP_DOCUMENT
     ):
         ids_to_remove = [
             ES_CHILD_ID(doc_id).RECAP for doc_id in main_instance_ids

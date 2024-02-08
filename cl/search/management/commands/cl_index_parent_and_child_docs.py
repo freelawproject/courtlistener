@@ -2,7 +2,6 @@ from datetime import date, datetime
 from typing import Iterable, Mapping
 
 from django.conf import settings
-from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import QuerySet
 
 from cl.lib.argparse_types import valid_date_time
@@ -13,6 +12,7 @@ from cl.lib.es_signal_processor import (
     get_fields_to_update,
 )
 from cl.lib.redis_utils import make_redis_interface
+from cl.lib.utils import chunks
 from cl.people_db.models import Person
 from cl.search.documents import ESRECAPDocument
 from cl.search.models import (
@@ -134,7 +134,7 @@ def get_unique_oldest_history_rows(
                 .order_by("id", "pgh_created_at")
                 .distinct("id")
             )
-        case EventTable.RECAP_DOC:
+        case EventTable.RECAP_DOCUMENT:
             oldest_unique_events = (
                 RECAPDocumentEvent.objects.filter(
                     pgh_id__gte=pk_offset,
@@ -148,24 +148,25 @@ def get_unique_oldest_history_rows(
 
 
 def get_documents_to_update_or_remove(
-    iterable: Iterable, search_type: str, event_doc_type: EventTable | None
+    events: QuerySet,
+    search_type: str,
+    event_doc_type: EventTable | None,
+    chunk_size: int,
 ) -> tuple[list[int], list[tuple[int, list[str]]], list[int]]:
     """Determines the documents to update or remove based on changes in
     specified fields.
 
-    :param iterable: An iterable of the event table instances.
+    :param events: An iterable of the event table instances.
     :param search_type: The search type related to the update/remove action.
     :param event_doc_type: An optional EventTable enum member specifying the
     document type to be processed.
+    :param chunk_size: The number of items to retrieve from DB at a time.
     :return: A four tuple containing, a list of strings containing the fields
     to be updated, a list containing IDs of parent documents to update, a list
     containing IDs of child documents to update, a list containing IDs of
     documents to delete.
     """
 
-    main_documents_to_update = []
-    child_documents_to_update = []
-    documents_to_delete = []
     match search_type:
         case SEARCH_TYPES.RECAP if event_doc_type == EventTable.DOCKET:
             tracked_set = Docket.es_rd_field_tracker
@@ -183,7 +184,7 @@ def get_documents_to_update_or_remove(
             document_model = DocketEntry
             related_child_name = "recap_documents"
 
-        case SEARCH_TYPES.RECAP if event_doc_type == EventTable.RECAP_DOC:
+        case SEARCH_TYPES.RECAP if event_doc_type == EventTable.RECAP_DOCUMENT:
             tracked_set = RECAPDocument.es_rd_field_tracker
             fields_map = recap_document_field_mapping["save"][RECAPDocument][
                 "self"
@@ -194,28 +195,45 @@ def get_documents_to_update_or_remove(
         case _:
             return [], [], []
 
-    for event in iterable:
-        try:
-            current_instance = document_model.objects.get(pk=event.id)
-        except ObjectDoesNotExist:
-            # The document needs to be removed from the ES index.
-            documents_to_delete.append(event.id)
-            continue
-
-        # Check each tracked field to determine if it has changed.
-        changed_fields = check_fields_that_changed(
-            current_instance, tracked_set, event
-        )
-        fields_to_update = get_fields_to_update(changed_fields, fields_map)
-        if fields_to_update:
-            # Append main documents that need to be updated.
-            main_documents_to_update.append(event.id)
-            if (
-                related_child_name
-                and getattr(current_instance, related_child_name).exists()
-            ):
-                # Append child documents that need to be updated.
-                child_documents_to_update.append((event.id, fields_to_update))
+    main_documents_to_update = []
+    child_documents_to_update = []
+    documents_to_delete = []
+    event_ids = list(events.values_list("id", flat=True))
+    for event_ids_chunk in chunks(event_ids, chunk_size):
+        # Fetch event objects and current instances in bulk for the current
+        # chunk, thereby minimizing database queries and mitigating memory
+        # issues simultaneously.
+        event_ids = list(event_ids_chunk)
+        events_bulk = {
+            event.id: event for event in events.filter(id__in=event_ids)
+        }
+        current_instances_bulk = document_model.objects.filter(
+            pk__in=event_ids
+        ).in_bulk()
+        for event_id in event_ids:
+            event = events_bulk.get(event_id)
+            current_instance = current_instances_bulk.get(event_id)
+            if not current_instance:
+                # The instance no longer exists in the database and needs to be
+                # removed from the ES index.
+                documents_to_delete.append(event_id)
+                continue
+            # Check each tracked field to determine if it has changed.
+            changed_fields = check_fields_that_changed(
+                current_instance, tracked_set, event
+            )
+            fields_to_update = get_fields_to_update(changed_fields, fields_map)
+            if fields_to_update:
+                # Append main documents that need to be updated.
+                main_documents_to_update.append(event_id)
+                if (
+                    related_child_name
+                    and getattr(current_instance, related_child_name).exists()
+                ):
+                    # Append child documents that need to be updated.
+                    child_documents_to_update.append(
+                        (event_id, fields_to_update)
+                    )
 
     return (
         main_documents_to_update,
@@ -340,9 +358,8 @@ class Command(VerboseCommand):
                         pk_offset,
                         update_from_event_tables,
                     )
-                    q = queryset.iterator()
                     self.index_documents_from_event_table(
-                        q, SEARCH_TYPES.RECAP
+                        queryset, SEARCH_TYPES.RECAP
                     )
                     return
                 elif document_type == "child":
@@ -395,12 +412,25 @@ class Command(VerboseCommand):
 
     def process_queryset(
         self,
-        iterable,
-        count,
-        search_type,
-        chunk_size,
+        items: Iterable,
+        count: int,
+        search_type: str,
+        chunk_size: int,
         task_to_use: str,
-    ):
+    ) -> None:
+        """Process a queryset and execute tasks based on the specified celery
+        task_to_use.
+
+        :param items: Iterable of items to process. Items can be a simple
+        iterable of IDs or a tuple of (ID, changed_fields) for cases requiring
+        field changes.
+        :param count: Total number of items expected to process.
+        :param search_type: The search type related to the update/remove action.
+        :param chunk_size: The number of items to process in a single chunk.
+        :param task_to_use: The name of the celery task to execute.
+        :return: None
+        """
+
         event_doc_type = EventTable.get_member(
             self.options.get("update_from_event_tables", None)
         )
@@ -421,7 +451,7 @@ class Command(VerboseCommand):
                 "docket_entry"
             ]
 
-        if event_doc_type == EventTable.RECAP_DOC:
+        if event_doc_type == EventTable.RECAP_DOCUMENT:
             fields_map = recap_document_field_mapping["save"][RECAPDocument][
                 "self"
             ]
@@ -431,7 +461,7 @@ class Command(VerboseCommand):
         processed_count = 0
         throttle = CeleryThrottle(queue_name=queue)
         # Indexing Parent and their child documents.
-        for item in iterable:
+        for item in items:
             item_id = item
             changed_fields = []
             if isinstance(item, tuple):
@@ -490,12 +520,12 @@ class Command(VerboseCommand):
 
     def index_documents_from_event_table(
         self,
-        iterable: Iterable,
+        items_to_update: QuerySet,
         search_type: str,
     ) -> None:
         """Index documents that have changed based on the model history tables.
 
-        :param iterable: An iterable of the event table instances.
+        :param items_to_update: A queryset of the event table instances to update
         :param search_type: The search type related to the update/remove action.
         :return: None
         """
@@ -508,7 +538,7 @@ class Command(VerboseCommand):
             child_documents_to_update,
             documents_to_delete,
         ) = get_documents_to_update_or_remove(
-            iterable, search_type, event_doc_type
+            items_to_update, search_type, event_doc_type, chunk_size
         )
 
         if event_doc_type == EventTable.DOCKET:
@@ -522,7 +552,7 @@ class Command(VerboseCommand):
                 "index_parent_or_child_docs",
             )
 
-        if event_doc_type == EventTable.RECAP_DOC:
+        if event_doc_type == EventTable.RECAP_DOCUMENT:
             # Process RECAP documents to update.
             count = len(main_documents_to_update)
             self.process_queryset(
@@ -545,7 +575,7 @@ class Command(VerboseCommand):
         # Process parent and child documents to remove.
         # Remove multiple RECAPDocuments at once according to the chunk size.
         # Otherwise, remove one element at a time for main documents with children.
-        if not event_doc_type == EventTable.RECAP_DOC:
+        if not event_doc_type == EventTable.RECAP_DOCUMENT:
             chunk_size = 1
         count = len(documents_to_delete)
         self.process_queryset(
