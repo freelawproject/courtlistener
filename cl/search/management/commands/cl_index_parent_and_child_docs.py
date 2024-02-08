@@ -148,7 +148,7 @@ def get_unique_oldest_history_rows(
 
 
 def get_documents_to_update_or_remove(
-    events: QuerySet,
+    events_to_update: QuerySet,
     search_type: str,
     event_doc_type: EventTable | None,
     chunk_size: int,
@@ -156,7 +156,7 @@ def get_documents_to_update_or_remove(
     """Determines the documents to update or remove based on changes in
     specified fields.
 
-    :param events: An iterable of the event table instances.
+    :param events_to_update: A queryset of the event table instances to update.
     :param search_type: The search type related to the update/remove action.
     :param event_doc_type: An optional EventTable enum member specifying the
     document type to be processed.
@@ -198,14 +198,15 @@ def get_documents_to_update_or_remove(
     main_documents_to_update = []
     child_documents_to_update = []
     documents_to_delete = []
-    event_ids = list(events.values_list("id", flat=True))
+    event_ids = list(events_to_update.values_list("id", flat=True))
     for event_ids_chunk in chunks(event_ids, chunk_size):
         # Fetch event objects and current instances in bulk for the current
         # chunk, thereby minimizing database queries and mitigating memory
         # issues simultaneously.
         event_ids = list(event_ids_chunk)
         events_bulk = {
-            event.id: event for event in events.filter(id__in=event_ids)
+            event.id: event
+            for event in events_to_update.filter(id__in=event_ids)
         }
         current_instances_bulk = document_model.objects.filter(
             pk__in=event_ids
@@ -520,12 +521,12 @@ class Command(VerboseCommand):
 
     def index_documents_from_event_table(
         self,
-        items_to_update: QuerySet,
+        events_to_update: QuerySet,
         search_type: str,
     ) -> None:
         """Index documents that have changed based on the model history tables.
 
-        :param items_to_update: A queryset of the event table instances to update
+        :param events_to_update: A queryset of the event table instances to update
         :param search_type: The search type related to the update/remove action.
         :return: None
         """
@@ -538,7 +539,7 @@ class Command(VerboseCommand):
             child_documents_to_update,
             documents_to_delete,
         ) = get_documents_to_update_or_remove(
-            items_to_update, search_type, event_doc_type, chunk_size
+            events_to_update, search_type, event_doc_type, chunk_size
         )
 
         if event_doc_type == EventTable.DOCKET:
