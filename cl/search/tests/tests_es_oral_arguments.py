@@ -340,8 +340,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
-        self.assertIn("<mark>Hong</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>Hong</mark>"), 1)
+        self.assertIn("<mark>Hong Liu Yang</mark>", r.content.decode())
 
         # Docket number highlights
         r = self.client.get(
@@ -355,7 +354,10 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
-        self.assertIn("<mark>19", r.content.decode())
+        self.assertIn(
+            f"<mark>{self.audio_2.docket.docket_number}</mark>",
+            r.content.decode(),
+        )
 
         # Judge highlights
         r = self.client.get(
@@ -369,8 +371,10 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
-        self.assertIn("<mark>John</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>John</mark>"), 1)
+        self.assertIn("<mark>John Smith</mark>", r.content.decode())
+        self.assertEqual(
+            r.content.decode().count("<mark>John Smith</mark>"), 1
+        )
 
         # Court citation string highlights
         r = self.client.get(
@@ -384,8 +388,13 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
-        self.assertIn("<mark>Bankr.</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>Bankr.</mark>"), 1)
+        self.assertIn(
+            "<mark>Bankr.&nbsp;C.D.&nbsp;Cal</mark>", r.content.decode()
+        )
+        self.assertEqual(
+            r.content.decode().count("<mark>Bankr.&nbsp;C.D.&nbsp;Cal</mark>"),
+            1,
+        )
 
     def test_oa_case_name_filtering(self) -> None:
         """Filter by case_name"""
@@ -1232,7 +1241,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
-        self.assertIn("<mark>Freedom</mark>", r.content.decode())
+        self.assertIn("<mark>Freedom of Inform</mark>", r.content.decode())
         # API
         r = self.client.get(
             reverse("search-list", kwargs={"version": "v3"}), search_params
@@ -1252,7 +1261,9 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
-        self.assertIn("<mark>ptsd</mark>", r.content.decode())
+        # When using FVH, if the abbreviation term is indexed, then performing
+        # a search using the whole term does not highlight the abbreviation.
+        self.assertNotIn("<mark>ptsd</mark>", r.content.decode())
 
         # Split terms post traumatic
         search_params["q"] = "post traumatic stress disorder"
@@ -1263,7 +1274,9 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
-        self.assertIn("<mark>ptsd</mark>", r.content.decode())
+        # When using FVH, if the abbreviation term is indexed, then performing
+        # a search using the whole term does not highlight the abbreviation.
+        self.assertNotIn("<mark>ptsd</mark>", r.content.decode())
 
         # Search acronym "apa"
         search_params["q"] = "apa"
@@ -1274,10 +1287,12 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 2
         self.assertEqual(actual, expected)
+        # Note that if the whole term is indexed and a search is performed
+        # using the abbreviation term, the whole term is properly highlighted.
         self.assertIn("<mark>apa</mark>", r.content.decode())
-        self.assertIn("<mark>Administrative</mark>", r.content.decode())
-        self.assertIn("<mark>procedures</mark>", r.content.decode())
-        self.assertIn("<mark>act</mark>", r.content.decode())
+        self.assertIn(
+            "<mark>Administrative procedures act</mark>", r.content.decode()
+        )
 
         # Search by "Administrative procedures act"
         search_params["q"] = "Administrative procedures act"
@@ -1288,10 +1303,12 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 2
         self.assertEqual(actual, expected)
-        self.assertIn("<mark>apa</mark>", r.content.decode())
         self.assertIn("<mark>Administrative</mark>", r.content.decode())
         self.assertIn("<mark>procedures</mark>", r.content.decode())
         self.assertIn("<mark>act</mark>", r.content.decode())
+        # When using FVH, if the abbreviation term is indexed, then performing
+        # a search using the whole term does not highlight the abbreviation.
+        self.assertNotIn("<mark>apa</mark>", r.content.decode())
 
         # Search by "Administrative" shouldn't return results for "apa" but for
         # "Administrative" and "Administrative procedures act".
@@ -1387,7 +1404,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
-        self.assertIn("<mark>Freedom</mark>", r.content.decode())
+        self.assertIn("<mark>Freedom of Inform</mark>", r.content.decode())
         # API
         r = self.client.get(
             reverse("search-list", kwargs={"version": "v3"}), search_params
@@ -1734,8 +1751,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         expected = 2
         self.assertEqual(actual, expected)
         self.assertIn("<mark>Learn</mark>", r.content.decode())
-        self.assertIn("<mark>Learning</mark>", r.content.decode())
-        self.assertIn("<mark>rd</mark>", r.content.decode())
+        self.assertIn("<mark>Learning rd</mark>", r.content.decode())
 
         # Search for '"learning" road' should return only a result for
         # 'Learning rd'
@@ -1900,7 +1916,9 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         expected = 1
         self.assertEqual(actual, expected)
         # Transcript highlights
-        self.assertIn("<mark>transcript</mark>", r.content.decode())
+        self.assertIn(
+            "<mark>This is the best transcript</mark>", r.content.decode()
+        )
 
 
 class OralArgumentIndexingTest(
