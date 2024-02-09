@@ -51,7 +51,6 @@ def create_stub_account(
             city=profile_data["city"],
             state=profile_data["state"],
             zip_code=profile_data["zip_code"],
-            wants_newsletter=profile_data["wants_newsletter"],
         )
     return new_user, profile
 
@@ -77,7 +76,6 @@ def convert_to_stub_account(user: User) -> User:
     profile.state = None
     profile.stub_account = True
     profile.email_confirmed = False
-    profile.wants_newsletter = False
     profile.zip_code = None
     profile.save()
 

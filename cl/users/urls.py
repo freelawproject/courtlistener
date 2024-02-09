@@ -174,10 +174,6 @@ urlpatterns = [
     ),
     # Webhooks
     path(
-        "webhook/moosend/",
-        views.moosend_webhook,
-    ),
-    path(
         "webhook/ses/",
         SESEventWebhookView.as_view(),
         name="handle_ses_webhook",

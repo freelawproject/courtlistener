@@ -95,10 +95,6 @@ class UserProfile(models.Model):
         upload_to="avatars/%Y/%m/%d",
         blank=True,
     )
-    wants_newsletter = models.BooleanField(
-        help_text="This user wants newsletters",
-        default=False,
-    )
     unlimited_docket_alerts = models.BooleanField(
         help_text="Should the user get unlimited docket alerts?",
         default=False,
