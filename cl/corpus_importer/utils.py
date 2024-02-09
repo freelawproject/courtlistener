@@ -722,10 +722,14 @@ def winnow_case_name(case_name: str) -> Set:
         "st",
         "ex",
         "rel",
+        "people",
+        "debtor",
+        "debtors",
+        "commonwealth",
     }
 
     # strings where order matters
-    false_positive_strings = ["united states"]
+    false_positive_strings = ["united states", "in re"]
 
     false_positive_strings_regex = re.compile(
         "|".join(map(re.escape, false_positive_strings))
@@ -741,11 +745,16 @@ def winnow_case_name(case_name: str) -> Set:
     # "R. L. C. R. v. L. Z. S." -> "RLCR v. LZS"
     # "J. B. v. C. E." -> "JB v. CE"
     # "County v. A. D. B. County" -> "County v. ADB County"
-    case_name = re.sub(
-        r"\b[A-Z][A-Z\.\s]*[A-Z]\b\.?",
-        lambda m: m.group().replace(".", "").replace(" ", ""),
-        case_name,
-    )
+    tokens = re.findall(r"(?:[A-Z][.] ?){2,}|.", case_name)
+    new_tokens = []
+    for token in tokens:
+        if "." in token and len(token) > 1:
+            add_space = token[-1] == " "
+            token = token.replace(". ", ".").replace(".", "")
+            if add_space:
+                token = f"{token} "
+        new_tokens.append(token)
+    case_name = "".join(new_tokens)
 
     # Remove all non-alphanumeric characters
     case_title = re.sub(r"[^a-z0-9 ]", " ", case_name.lower())

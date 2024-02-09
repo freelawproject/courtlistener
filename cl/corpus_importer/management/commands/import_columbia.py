@@ -145,13 +145,12 @@ def find_duplicates(
     return None
 
 
-def add_new_case(item: dict, debug: bool = False) -> None:
+def add_new_case(item: dict) -> None:
     """Add a new case
 
     Create new docket, cluster, opinions and citations
 
     :param item: dict with data to add new case
-    :param debug: True if it should roll back the changes
     :return: None
     """
 
@@ -226,20 +225,13 @@ def add_new_case(item: dict, debug: bool = False) -> None:
 
         domain = "https://www.courtlistener.com"
 
-        if settings.DEBUG:
-            domain = "http://127.0.0.1:8000"
-
-        if debug:
-            transaction.set_rollback(True)
-
         logger.info(f"Created item at: {domain}{cluster.get_absolute_url()}")
 
 
-def import_opinion(filepath: str, debug: bool = False) -> None:
+def import_opinion(filepath: str) -> None:
     """Try to import xml opinion from columbia
 
     :param filepath: specified path to xml file
-    :param debug: True if it should roll back the changes
     :return: None
     """
     try:
@@ -345,34 +337,25 @@ def import_opinion(filepath: str, debug: bool = False) -> None:
         return
 
     try:
-        previously_imported_case = find_duplicates(
+        possible_match = find_duplicates(
             columbia_data, valid_citations
         )
     except ZeroDivisionError:
         logger.warning(
-            f"It is not possible to find duplicates, the opinion is probably empty in "
-            f"the columbia file: {columbia_data['file']}"
+            f"It is not possible to find duplicates, the opinion is probably "
+            f"empty in the columbia file: {filepath}"
         )
         return
 
-    domain = "https://www.courtlistener.com"
-
-    if settings.DEBUG:
-        domain = "http://127.0.0.1:8000"
-
-    if previously_imported_case:
-        with transaction.atomic():
-            # Case already exists, try to add citations
-            add_citations_to_cluster(
-                columbia_data["citations"], previously_imported_case.id
-            )
-            logger.info(
-                f"Adding citations for case at: {domain}/opinion/{previously_imported_case.id}/{previously_imported_case.slug}"
-            )
+    if possible_match:
+        # Log a message if we have a possible match, avoid adding
+        # incorrect data
+        logger.info(
+            f"Match found: {possible_match.pk} for columbia file: {filepath}")
         return
 
-    # No duplicates, create new case
-    add_new_case(columbia_data, debug)
+    # No match for the file, create new case
+    add_new_case(columbia_data)
 
 
 def parse_columbia_opinions(options: dict) -> None:
@@ -383,7 +366,6 @@ def parse_columbia_opinions(options: dict) -> None:
     """
     csv_filepath, xml_dir = options["csv_file"], options["xml_dir"]
     skip_until, limit = options["skip_until"], options["limit"]
-    debug = options["debug"]
     total_processed = 0
     start = False if skip_until else True
 
@@ -398,7 +380,7 @@ def parse_columbia_opinions(options: dict) -> None:
         if not start:
             continue
 
-        # filepath example: indiana\court_opinions\documents\2713f39c5a8e8684.xml
+        # filepath example: indiana/court_opinions/documents/2713f39c5a8e8684.xml
         xml_path = os.path.join(xml_dir, filepath)
         if not os.path.exists(xml_path):
             logger.warning(f"No file at: {xml_path}")
@@ -406,7 +388,6 @@ def parse_columbia_opinions(options: dict) -> None:
 
         import_opinion(
             filepath=xml_path,
-            debug=debug,
         )
 
         total_processed += 1
@@ -453,13 +434,6 @@ class Command(VerboseCommand):
             default="/opt/courtlistener/_columbia",
             required=False,
             help="The absolute path to the directory with columbia xml files",
-        )
-
-        parser.add_argument(
-            "--debug",
-            action="store_true",
-            default=False,
-            help="Don't save the data. Only pretend.",
         )
 
     def handle(self, *args, **options) -> None:
