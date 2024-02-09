@@ -51,7 +51,6 @@ class ProfileForm(ModelForm):
             "city",
             "state",
             "zip_code",
-            "wants_newsletter",
             "is_tester",
             "docket_default_order_desc",
             "barmembership",

@@ -307,30 +307,18 @@
   </div>
 
   {% block newsletter %}
-    {% if user.is_anonymous or user.is_authenticated and not user.profile.wants_newsletter %}
     <div class="row base-newsletter hidden-print">
       <div class="col-sm-6">
         <p class="bold bottom">Newsletter</p>
         <p>Sign up to receive the Free Law Project newsletter with tips and announcements.</p>
       </div>
       <div class="col-sm-6 right">
-        <form action="https://freelawproject.m-pages.com/free-law-project-newsletter"
-          method="get" target="_blank" class="form-inline">
-          <div class="form-group">
-            <input name="EMAIL" class="form-control" id="mce-EMAIL"
-                   type="email" placeholder="Email Address"
-                   value="{{ user.email|default:"" }}">
-          </div>
-          <!-- Honey pot -->
-          <div style="position: absolute; left: -5000px;" aria-hidden="true">
-            <input name="b_4ea266fe7d0d074abd3f6a2ae_ba547fa86b" tabindex="-1"
-                   value="" type="text">
-          </div>
-          <button type="submit" class="btn btn-default"><i class="fa fa-newspaper-o"></i>&nbsp;Subscribe</button>
-        </form>
+        <a href="https://donate.free.law/np/clients/freelawproject/subscribe.jsp?forwardedFromSecureDomain=1&subscription=9"
+          class="btn btn-default">
+          <i class="fa fa-newspaper-o"></i>&nbsp;Subscribe
+        </a>
       </div>
     </div>
-    {% endif %}
   {% endblock %}
 
   {% block footer %}

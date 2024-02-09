@@ -16,6 +16,7 @@ from django.utils.timezone import now
 from elasticsearch.exceptions import (
     ConflictError,
     ConnectionError,
+    ConnectionTimeout,
     NotFoundError,
     RequestError,
 )
@@ -273,7 +274,7 @@ def get_instance_from_db(
 
 @app.task(
     bind=True,
-    autoretry_for=(ConnectionError, ConflictError),
+    autoretry_for=(ConnectionError, ConflictError, ConnectionTimeout),
     max_retries=5,
     retry_backoff=1 * 60,
     retry_backoff_max=10 * 60,
@@ -465,7 +466,7 @@ def document_fields_to_update(
 
 @app.task(
     bind=True,
-    autoretry_for=(ConnectionError, ConflictError),
+    autoretry_for=(ConnectionError, ConflictError, ConnectionTimeout),
     max_retries=5,
     retry_backoff=1 * 60,
     retry_backoff_max=10 * 60,
@@ -753,7 +754,12 @@ def update_children_docs_by_query(
 
 @app.task(
     bind=True,
-    autoretry_for=(ConnectionError, NotFoundError, ConflictError),
+    autoretry_for=(
+        ConnectionError,
+        NotFoundError,
+        ConflictError,
+        ConnectionTimeout,
+    ),
     max_retries=5,
     retry_backoff=1 * 60,
     retry_backoff_max=10 * 60,
@@ -1123,7 +1129,7 @@ def index_parent_or_child_docs(
 
 @app.task(
     bind=True,
-    autoretry_for=(ConnectionError, ConflictError),
+    autoretry_for=(ConnectionError, ConflictError, ConnectionTimeout),
     max_retries=5,
     retry_backoff=1 * 60,
     retry_backoff_max=10 * 60,
@@ -1258,7 +1264,12 @@ def build_bulk_cites_doc(
 
 @app.task(
     bind=True,
-    autoretry_for=(ConnectionError, ConflictError, NotFoundError),
+    autoretry_for=(
+        ConnectionError,
+        ConflictError,
+        NotFoundError,
+        ConnectionTimeout,
+    ),
     max_retries=6,
     retry_backoff=2 * 60,
     retry_backoff_max=20 * 60,
