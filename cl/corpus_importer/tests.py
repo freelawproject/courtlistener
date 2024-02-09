@@ -27,9 +27,6 @@ from cl.corpus_importer.factories import (
     RssDocketEntryDataFactory,
 )
 from cl.corpus_importer.import_columbia.columbia_utils import fix_xml_tags
-from cl.corpus_importer.import_columbia.parse_opinions import (
-    get_state_court_object,
-)
 from cl.corpus_importer.management.commands.clean_up_mis_matched_dockets import (
     find_and_fix_mis_matched_dockets,
 )
