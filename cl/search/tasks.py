@@ -629,7 +629,7 @@ def handle_ubq_retries(
 
     if isinstance(exc, ConnectionError | ConnectionTimeout) and count_query:
         num_documents = count_query.count()
-        estimated_time_ms = num_documents * 15  # 15ms per document
+        estimated_time_ms = num_documents * 90  # 90ms per document
         # Convert ms to seconds
         estimated_delay_sec = round(estimated_time_ms / 1000)
         # Apply exponential backoff with jitter
