@@ -8,6 +8,7 @@ from django.http import (
     HttpResponseRedirect,
 )
 from django.shortcuts import get_object_or_404, render
+from django.template.response import TemplateResponse
 from django.urls import reverse
 from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
 
@@ -132,12 +133,12 @@ def toggle_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
         )
 
 
-def new_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
+async def new_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
     """Allow users to create docket alerts based on case and court ID"""
     pacer_case_id = request.GET.get("pacer_case_id")
     court_id = request.GET.get("court_id")
     if not pacer_case_id or not court_id:
-        return render(
+        return TemplateResponse(
             request,
             "docket_alert_new.html",
             {
@@ -148,11 +149,11 @@ def new_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
             status=HTTP_400_BAD_REQUEST,
         )
     try:
-        docket = Docket.objects.get(
+        docket = await Docket.objects.aget(
             pacer_case_id=pacer_case_id, court_id=court_id
         )
     except Docket.DoesNotExist:
-        return render(
+        return TemplateResponse(
             request,
             "docket_alert_new.html",
             {
@@ -162,14 +163,14 @@ def new_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
             },
             status=HTTP_404_NOT_FOUND,
         )
-    except Docket.MultipleObjectsReturned as exc:
-        docket = Docket.objects.filter(
+    except Docket.MultipleObjectsReturned:
+        docket = await Docket.objects.filter(
             pacer_case_id=pacer_case_id, court_id=court_id
-        ).earliest("date_created")
+        ).aearliest("date_created")
 
     title = f"New Docket Alert for {make_docket_title(docket)}"
-    has_alert = user_has_alert(request.user, docket)
-    return render(
+    has_alert = await user_has_alert(await request.auser(), docket)  # type: ignore[attr-defined]
+    return TemplateResponse(
         request,
         "docket_alert_new.html",
         {

@@ -6,9 +6,7 @@ def new_title_for_viz(referer):
         page_title=referer.page_title, map=referer.map
     ).exists()
 
-    if not matching_title_on_viz_exists:
-        return True
-    return False
+    return not matching_title_on_viz_exists
 
 
 def reverse_endpoints_if_needed(start, end):
@@ -39,12 +37,12 @@ def graphs_intersect(good_nodes, main_graph, sub_graph):
     First check if it's in the main graph, then check if it's in good_nodes,
     indicating a second path to the start node.
     """
-    return any([(node in main_graph) for node in sub_graph.nodes()]) or any(
-        [(node in good_nodes) for node in sub_graph.nodes()]
+    return any((node in main_graph) for node in sub_graph.nodes()) or any(
+        (node in good_nodes) for node in sub_graph.nodes()
     )
 
 
-def set_shortest_path_to_end(good_nodes, node_id, target_id):
+def set_shortest_path_to_end(good_nodes, node_id, target_id) -> bool:
     """Determine if a path is to the end is shorter, and if so, update the
     current value.
     """

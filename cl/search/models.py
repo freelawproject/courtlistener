@@ -59,6 +59,11 @@ class PRECEDENTIAL_STATUS:
         (UNKNOWN, "Unknown Status"),
     )
 
+    @classmethod
+    def get_status_value(cls, name):
+        reverse_names = {value: key for key, value in cls.NAMES}
+        return reverse_names.get(name)
+
 
 class SOURCES:
     COURT_WEBSITE = "C"
@@ -700,8 +705,8 @@ class Docket(AbstractDateTimeModel):
         blank=True,
     )
     filepath_local = models.FileField(
-        help_text=f"Path to RECAP's Docket XML page as provided by the "
-        f"original RECAP architecture. These fields are for backup purposes "
+        help_text="Path to RECAP's Docket XML page as provided by the "
+        "original RECAP architecture. These fields are for backup purposes "
         f"only. {s3_warning_note}",
         upload_to=make_recap_path,
         storage=IncrementingAWSMediaStorage(),
@@ -793,6 +798,15 @@ class Docket(AbstractDateTimeModel):
             "slug",
         ]
     )
+    es_o_field_tracker = FieldTracker(
+        fields=[
+            "court_id",
+            "docket_number",
+            "date_argued",
+            "date_reargued",
+            "date_reargument_denied",
+        ]
+    )
 
     class Meta:
         unique_together = ("docket_number", "pacer_case_id", "court")
@@ -854,6 +868,31 @@ class Docket(AbstractDateTimeModel):
             # Simply add the RECAP value to the other value.
             self.source = self.source + self.RECAP
 
+    @property
+    def authorities(self):
+        """Returns a queryset that can be used for querying and caching
+        authorities.
+        """
+        return OpinionsCitedByRECAPDocument.objects.filter(
+            citing_document__docket_entry__docket_id=self.pk
+        )
+
+    async def ahas_authorities(self):
+        return await self.authorities.aexists()
+
+    @property
+    def authority_count(self):
+        return self.authorities.count()
+
+    @property
+    def authorities_with_data(self):
+        """Returns a queryset of this document's authorities for
+        eventual injection into a view template.
+
+        The returned queryset is sorted by the depth field.
+        """
+        return build_authorities_query(self.authorities)
+
     def add_idb_source(self):
         if self.source == self.DEFAULT:
             self.source = self.IDB
@@ -903,20 +942,20 @@ class Docket(AbstractDateTimeModel):
         return (
             f"https://ecf.{self.pacer_court_id}.uscourts.gov"
             f"{path}"
-            f"servlet=CaseSummary.jsp&"
+            "servlet=CaseSummary.jsp&"
             f"caseId={self.pacer_case_id}&"
-            f"incOrigDkt=Y&"
-            f"incDktEntries=Y"
+            "incOrigDkt=Y&"
+            "incDktEntries=Y"
         )
 
     def pacer_appellate_url_with_caseNum(self, path):
         return (
             f"https://ecf.{self.pacer_court_id}.uscourts.gov"
             f"{path}"
-            f"servlet=CaseSummary.jsp&"
+            "servlet=CaseSummary.jsp&"
             f"caseNum={self.docket_number}&"
-            f"incOrigDkt=Y&"
-            f"incDktEntries=Y"
+            "incOrigDkt=Y&"
+            "incDktEntries=Y"
         )
 
     @property
@@ -1104,8 +1143,8 @@ class Docket(AbstractDateTimeModel):
                     rd_out["absolute_url"] = rd.get_absolute_url()
                 except NoReverseMatch:
                     raise InvalidDocumentError(
-                        "Unable to save to index due to missing absolute_url: "
-                        "%s" % self.pk
+                        "Unable to save to index due to missing "
+                        f"absolute_url: {self.pk}"
                     )
 
                 text_template = loader.get_template("indexes/dockets_text.txt")
@@ -1452,6 +1491,27 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
                 },
             )
 
+    def get_authorities_url(self) -> str:
+        if self.document_type == self.ATTACHMENT:
+            return reverse(
+                "view_attachment_authorities",
+                kwargs={
+                    "docket_id": self.docket_entry.docket.pk,
+                    "doc_num": self.document_number,
+                    "att_num": self.attachment_number,
+                    "slug": self.docket_entry.docket.slug,
+                },
+            )
+        else:
+            return reverse(
+                "view_document_authorities",
+                kwargs={
+                    "docket_id": self.docket_entry.docket.pk,
+                    "doc_num": self.document_number,
+                    "slug": self.docket_entry.docket.slug,
+                },
+            )
+
     @property
     def pacer_url(self) -> str | None:
         """Construct a doc1 URL for any item, if we can. Else, return None."""
@@ -1504,6 +1564,19 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
                 self.has_valid_pdf,
             ]
         )
+
+    @property
+    def authority_count(self):
+        return self.cited_opinions.count()
+
+    @property
+    def authorities_with_data(self):
+        """Returns a queryset of this document's authorities for
+        eventual injection into a view template.
+
+        The returned queryset is sorted by the depth field.
+        """
+        return build_authorities_query(self.cited_opinions)
 
     def save(
         self,
@@ -2636,6 +2709,75 @@ class OpinionCluster(AbstractDateTimeModel):
             "precedential_status",
         ]
     )
+    es_o_field_tracker = FieldTracker(
+        fields=[
+            "docket_id",
+            "case_name",
+            "case_name_short",
+            "case_name_full",
+            "date_filed",
+            "judges",
+            "attorneys",
+            "nature_of_suit",
+            "attorneys",
+            "precedential_status",
+            "procedural_history",
+            "posture",
+            "syllabus",
+            "scdb_id",
+            "citation_count",
+            "slug",
+            "source",
+        ]
+    )
+
+    async def acaption(self):
+        """Make a proper caption
+
+        This selects the best case name, then combines it with the best one or
+        two citations we have in our system. Finally, if it's not a SCOTUS
+        opinion, it adds the court abbreviation to the end. The result is
+        something like:
+
+            Plessy v. Ferguson, 410 U.S. 113
+
+        or
+
+            Lenore Foman v. Elvira A. Davis (1st Cir. 1961)
+
+        Note that nbsp; are used liberally to prevent the end from getting
+        broken up across lines.
+        """
+        caption = best_case_name(self)
+        citation_list = [citation async for citation in self.citations.all()]
+        citations = sorted(citation_list, key=sort_cites)
+        if not citations:
+            docket = await Docket.objects.aget(id=self.docket_id)
+            if docket.docket_number:
+                caption += f", {docket.docket_number}"
+        else:
+            if citations[0].type == Citation.NEUTRAL:
+                caption += f", {citations[0]}"
+                # neutral cites lack the parentheses, so we're done here.
+                return caption
+            elif (
+                len(citations) >= 2
+                and citations[0].type == Citation.WEST
+                and citations[1].type == Citation.LEXIS
+            ):
+                caption += f", {citations[0]}, {citations[1]}"
+            else:
+                caption += f", {citations[0]}"
+
+        cluster = await OpinionCluster.objects.aget(pk=self.pk)
+        docket = await Docket.objects.aget(id=cluster.docket_id)
+        court = await Court.objects.aget(pk=docket.court_id)
+        if docket.court_id != "scotus":
+            court = re.sub(" ", "&nbsp;", court.citation_string)
+            # Strftime fails before 1900. Do it this way instead.
+            year = self.date_filed.isoformat().split("-")[0]
+            caption += f"&nbsp;({court}&nbsp;{year})"
+        return caption
 
     @property
     def caption(self):
@@ -2687,6 +2829,12 @@ class OpinionCluster(AbstractDateTimeModel):
         citations = sorted(self.citations.all(), key=sort_cites)
         return ", ".join(str(c) for c in citations)
 
+    async def acitation_string(self):
+        """Make a citation string, joined by commas"""
+        result = [citation async for citation in self.citations.all()]
+        citations = sorted(result, key=sort_cites)
+        return ", ".join(str(c) for c in citations)
+
     @property
     def authorities(self):
         """Returns a queryset that can be used for querying and caching
@@ -2704,6 +2852,32 @@ class OpinionCluster(AbstractDateTimeModel):
                 [
                     list(sub_opinion.opinions_cited.all().only("pk"))
                     for sub_opinion in self.sub_opinions.all()
+                ],
+                [],
+            )
+        ).order_by("-citation_count", "-date_filed")
+
+    async def aauthorities(self):
+        """Returns a queryset that can be used for querying and caching
+        authorities.
+        """
+        # All clusters that have sub_opinions cited by the sub_opinions of
+        # the current cluster, ordered by citation count, descending.
+        # Note that:
+        #  - sum()'ing an empty list with a nested one, flattens the nested
+        #    list.
+        #  - QuerySets are lazy by default, so we need to call list() on the
+        #    queryset object to evaluate it here and now.
+        return OpinionCluster.objects.filter(
+            sub_opinions__in=sum(
+                [
+                    [
+                        i
+                        async for i in sub_opinion.opinions_cited.all().only(
+                            "pk"
+                        )
+                    ]
+                    async for sub_opinion in self.sub_opinions.all()
                 ],
                 [],
             )
@@ -2727,6 +2901,10 @@ class OpinionCluster(AbstractDateTimeModel):
     def authority_count(self):
         return self.authorities.count()
 
+    async def aauthority_count(self):
+        authorities = await self.aauthorities()
+        return await authorities.acount()
+
     @property
     def has_private_authority(self):
         if not hasattr(self, "_has_private_authority"):
@@ -2739,18 +2917,31 @@ class OpinionCluster(AbstractDateTimeModel):
             self._has_private_authority = private
         return self._has_private_authority
 
-    @property
-    def authorities_with_data(self):
+    async def ahas_private_authority(self):
+        if not hasattr(self, "_has_private_authority"):
+            # Calculate it, then cache it.
+            private = False
+            async for authority in await self.aauthorities():
+                if authority.blocked:
+                    private = True
+                    break
+            self._has_private_authority = private
+        return self._has_private_authority
+
+    async def aauthorities_with_data(self):
         """Returns a list of this cluster's authorities with an extra field
         appended related to citation counts, for eventual injection into a
         view template.
         The returned list is sorted by that citation count field.
         """
-        authorities_with_data = list(self.authorities)
-        for authority in authorities_with_data:
-            authority.citation_depth = get_citation_depth_between_clusters(
-                citing_cluster_pk=self.pk, cited_cluster_pk=authority.pk
+        authorities_with_data = []
+        async for authority in await self.aauthorities():
+            authority.citation_depth = (
+                await get_citation_depth_between_clusters(
+                    citing_cluster_pk=self.pk, cited_cluster_pk=authority.pk
+                )
             )
+            authorities_with_data.append(authority)
 
         authorities_with_data.sort(
             key=lambda x: x.citation_depth, reverse=True
@@ -2791,6 +2982,22 @@ class OpinionCluster(AbstractDateTimeModel):
             add_items_to_solr.delay(
                 [self.pk], "search.OpinionCluster", force_commit
             )
+
+    async def asave(
+        self,
+        update_fields=None,
+        index=True,
+        force_commit=False,
+        *args,
+        **kwargs,
+    ):
+        return await sync_to_async(self.save)(
+            update_fields=update_fields,
+            index=index,
+            force_commit=force_commit,
+            *args,
+            **kwargs,
+        )
 
     def delete(self, *args, **kwargs):
         """
@@ -3157,7 +3364,7 @@ class Opinion(AbstractDateTimeModel):
     )
     local_path = models.FileField(
         help_text=(
-            f"The location in AWS S3 where the original opinion file is "
+            "The location in AWS S3 where the original opinion file is "
             f"stored. {s3_warning_note}"
         ),
         upload_to=make_upload_path,
@@ -3203,6 +3410,23 @@ class Opinion(AbstractDateTimeModel):
     )
     es_pa_field_tracker = FieldTracker(
         fields=["extracted_by_ocr", "cluster_id", "author_id"]
+    )
+    es_o_field_tracker = FieldTracker(
+        fields=[
+            "cluster_id",
+            "author_id",
+            "type",
+            "per_curiam",
+            "download_url",
+            "local_path",
+            "html_columbia",
+            "html_lawbox",
+            "xml_harvard",
+            "html_anon_2020",
+            "html",
+            "plain_text",
+            "sha1",
+        ]
     )
 
     @property
@@ -3396,6 +3620,40 @@ class OpinionsCitedByRECAPDocument(models.Model):
         verbose_name_plural = "Opinions cited by RECAP document"
         unique_together = ("citing_document", "cited_opinion")
         indexes = [models.Index(fields=["depth"])]
+
+
+def build_authorities_query(
+    base_queryset: QuerySet[OpinionsCitedByRECAPDocument],
+) -> QuerySet[OpinionsCitedByRECAPDocument]:
+    """
+    Optimizes the authorities query by applying select_related, prefetch_related,
+    and selecting only the relevant fields to display the list of citations
+
+    Args:
+        base_queryset (QuerySet[OpinionsCitedByRECAPDocument]): The queryset to optimize
+    """
+    return (
+        base_queryset.select_related("cited_opinion__cluster__docket__court")
+        .prefetch_related(
+            "cited_opinion__cluster__citations",
+        )
+        .only(
+            "depth",
+            "citing_document_id",
+            "cited_opinion__cluster__slug",
+            "cited_opinion__cluster__case_name",
+            "cited_opinion__cluster__case_name_full",
+            "cited_opinion__cluster__case_name_short",
+            "cited_opinion__cluster__citation_count",
+            "cited_opinion__cluster__docket_id",
+            "cited_opinion__cluster__date_filed",
+            "cited_opinion__cluster__docket__docket_number",
+            "cited_opinion__cluster__docket__court_id",
+            "cited_opinion__cluster__docket__court__citation_string",
+            "cited_opinion__cluster__docket__court__full_name",
+        )
+        .order_by("-depth")
+    )
 
 
 class Parenthetical(models.Model):

@@ -22,6 +22,7 @@ def inject_settings(request):
     }
 
 
+DONATE_URL = "https://donate.free.law/forms/supportflp"
 info_tips = (
     # Other Projects
     'CourtListener is powered by <a href="https://github.com/freelawproject/juriscraper">more than 200 screen scrapers</a> that run every hour of every day.',
@@ -29,17 +30,17 @@ info_tips = (
     'We <a href="https://github.com/freelawproject/judge-pics">have a collection of more than 1,200 judicial portraits</a> and we need volunteers to help collect them all.',
     # History
     'CourtListener was started in 2009 to create alerts for the federal appeals courts. It has since grown into the <a href="%s?referrer=tip">user-supported</a> non-profit Free Law Project.'
-    % reverse("donate"),
+    % DONATE_URL,
     'We host and maintain <a href="https://free.law/2020/03/10/courts-db-a-new-open-database/">a massive database of court identifiers and information</a> we call the Court-DB',
     # Non-profit and fundraising
     'Free Law Project is a 501(c)(3) non-profit that relies on your support to operate. Please <a href="%s?referrer=tip">donate</a> to support this site</a>. <i class="fa fa-heart red"></i>'
-    % reverse("donate"),
-    'CourtListener gets more than two million visits per year, but has a lean staff of only a few developers. Please <a href="%s?referrer=tip">donate</a> to support this site. <i class="fa fa-heart red"></i>'
-    % reverse("donate"),
+    % DONATE_URL,
+    'CourtListener serves more than 200 million requests per year, but has a lean staff of only a handful of developers. Please <a href="%s?referrer=tip">donate</a> to support our work making the judiciary more equitable. <i class="fa fa-heart red"></i>'
+    % DONATE_URL,
     'CourtListener is supported by <a href="%s?referrer=tip">user donations</a> and small grants. More donations result in less time spent seeking grants and more time adding features. <i class="fa fa-heart red"></i>'
-    % reverse("donate"),
+    % DONATE_URL,
     'Free Law Project is a member of the <a href="http://www.falm.info/">Free Access to Law Movement</a> and relies heavily on <a href="%s?referrer=tip">your donations</a>. <i class="fa fa-heart red"></i>'
-    % reverse("donate"),
+    % DONATE_URL,
     'Free Law Project, the non-profit behind CourtListener, provides <a href="https://free.law/data-consulting/">data consulting and client services</a> for those that need help with our data.',
     'If you have a Github account, you <a href="https://github.com/sponsors/freelawproject/">can sponsor our work</a> so we can do more of it. <i class="fa fa-heart red"></i>',
     # Recognition

@@ -665,11 +665,9 @@ def find_dates_in_xml(soup: BeautifulSoup) -> dict:
     )
     parsed_dates = parse_dates(found_dates)
     current_year = date.today().year
-    date_filed = (
-        date_argued
-    ) = (
-        date_reargued
-    ) = date_reargument_denied = date_cert_granted = date_cert_denied = None
+    date_filed = date_argued = date_reargued = date_reargument_denied = (
+        date_cert_granted
+    ) = date_cert_denied = None
     unknown_date = None
 
     for date_cluster in parsed_dates:
@@ -739,7 +737,7 @@ def find_judges(opinions=None) -> str:
 
     judge_list = list(itertools.chain.from_iterable(judges))
     judge_list = list(map(titlecase, judge_list))
-    return ", ".join(sorted(list(set(judge_list))))
+    return ", ".join(sorted(set(judge_list)))
 
 
 def map_opinion_types(opinions=None) -> None:

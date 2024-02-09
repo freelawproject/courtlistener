@@ -9,7 +9,11 @@ from cl.audio.models import Audio
 from cl.lib.document_serializer import DocumentSerializer
 from cl.people_db.models import PartyType, Person
 from cl.recap.api_serializers import FjcIntegratedDatabaseSerializer
-from cl.search.documents import AudioDocument, PersonDocument
+from cl.search.documents import (
+    AudioDocument,
+    OpinionClusterDocument,
+    PersonDocument,
+)
 from cl.search.models import (
     Citation,
     Court,
@@ -351,3 +355,37 @@ class ExtendedPersonESSerializer(PersonESResultSerializer):
     selection_method = serializers.ListField(read_only=True)
     selection_method_id = serializers.ListField(read_only=True)
     termination_reason = serializers.ListField(read_only=True)
+
+
+class OpinionESResultSerializer(DocumentSerializer):
+    """The serializer for Opinion results."""
+
+    cluster_id = serializers.IntegerField(read_only=True)
+    status_exact = serializers.CharField(read_only=True)
+
+    # Fields from the opinion child
+    id = serializers.IntegerField(read_only=True)
+    snippet = serializers.CharField(read_only=True)
+    author_id = serializers.IntegerField(read_only=True)
+    type = serializers.CharField(read_only=True)
+    download_url = serializers.CharField(read_only=True)
+    local_path = serializers.CharField(read_only=True)
+    cites = serializers.ListField(read_only=True)
+    joined_by_ids = serializers.ListField(read_only=True)
+
+    per_curiam = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        document = OpinionClusterDocument
+        exclude = (
+            "text",
+            "caseNameFull",
+            "dateFiled_text",
+            "dateArgued_text",
+            "dateReargued_text",
+            "dateReargumentDenied_text",
+            "posture",
+            "syllabus",
+            "procedural_history",
+            "panel_names",
+        )

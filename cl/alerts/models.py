@@ -47,7 +47,7 @@ class Alert(AbstractDateTimeModel):
     )
     alert_type = models.CharField(
         help_text="The type of search alert this is, one of: %s"
-        % ", ".join(["%s (%s)" % (t[0], t[1]) for t in SEARCH_TYPES.NAMES]),
+        % ", ".join(f"{t[0]} ({t[1]})" for t in SEARCH_TYPES.NAMES),
         max_length=3,
         choices=SEARCH_TYPES.NAMES,
         default=SEARCH_TYPES.OPINION,
@@ -73,7 +73,7 @@ class Alert(AbstractDateTimeModel):
         # Set the search type based on the provided query.
         qd = QueryDict(self.query.encode(), mutable=True)
         self.alert_type = qd.get("type", SEARCH_TYPES.OPINION)
-        super(Alert, self).save(*args, **kwargs)
+        super().save(*args, **kwargs)
 
 
 class DocketAlertManager(models.Manager):
@@ -128,7 +128,7 @@ class DocketAlert(AbstractDateTimeModel):
         """Ensure we get a token when we save the first time."""
         if self.pk is None:
             self.secret_key = get_random_string(length=40)
-        super(DocketAlert, self).save(*args, **kwargs)
+        super().save(*args, **kwargs)
 
 
 class RealTimeQueue(models.Model):
@@ -150,7 +150,7 @@ class RealTimeQueue(models.Model):
     )
     item_type = models.CharField(
         help_text="the type of item this is, one of: %s"
-        % ", ".join(["%s (%s)" % (t[0], t[1]) for t in SEARCH_TYPES.NAMES]),
+        % ", ".join(f"{t[0]} ({t[1]})" for t in SEARCH_TYPES.NAMES),
         max_length=3,
         choices=SEARCH_TYPES.NAMES,
         db_index=True,
@@ -165,7 +165,7 @@ class DateJSONEncoder(DjangoJSONEncoder):
         return super().default(obj)
 
 
-class SCHEDULED_ALERT_HIT_STATUS(object):
+class SCHEDULED_ALERT_HIT_STATUS:
     """ScheduledAlertHit Status Types"""
 
     SCHEDULED = 0

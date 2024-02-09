@@ -5,10 +5,11 @@ from decimal import Decimal
 from typing import Dict
 
 import pghistory
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import Group, Permission, User
 from django.contrib.postgres.fields import ArrayField
-from django.core.exceptions import FieldError
+from django.core.exceptions import FieldError, ObjectDoesNotExist
 from django.core.mail import EmailMessage, EmailMultiAlternatives
 from django.db import models
 from django.db.models import Q, Sum, UniqueConstraint
@@ -141,35 +142,22 @@ class UserProfile(models.Model):
         help_text="Sort dockets in descending order by default",
         default=False,
     )
+    neon_account_id = models.CharField(
+        help_text="Unique identifier assigned by Neon CRM to a customer record",
+        blank=True,
+    )
 
     @property
-    def total_donated_last_year(self) -> Decimal:
-        one_year_ago = now() - timedelta(days=365)
-        total = (
-            self.user.donations.filter(date_created__gte=one_year_ago)
-            .exclude(status__in=donation_exclusion_codes)
-            .aggregate(Sum("amount"))["amount__sum"]
-        )
-        if total is None:
-            total = Decimal(0.0)
-        return total
-
-    @property
-    def total_donated(self) -> Decimal:
-        total = self.user.donations.exclude(
-            status__in=donation_exclusion_codes
-        ).aggregate(Sum("amount"))["amount__sum"]
-        if total is None:
-            total = Decimal(0.0)
-        return total
-
-    @property
-    def is_monthly_donor(self) -> bool:
-        """Does the profile have any monthly donations set up and running?
+    def is_member(self) -> bool:
+        """Does the user have an active membership?
 
         :return bool: True if so, False if not.
         """
-        return bool(self.user.monthly_donations.filter(enabled=True).count())
+        try:
+            membership = self.user.membership
+            return membership.is_active
+        except ObjectDoesNotExist:
+            return False
 
     @property
     def email_grants_unlimited_docket_alerts(self) -> bool:
@@ -189,7 +177,7 @@ class UserProfile(models.Model):
 
         The answer is yes, if any of the following is true:
          - They get unlimited ones
-         - They are a monthly donor
+         - They are a member
          - They are under the threshold
          - Their email domain is unlimited
 
@@ -200,7 +188,7 @@ class UserProfile(models.Model):
                 # Place performant checks first
                 self.unlimited_docket_alerts,
                 self.email_grants_unlimited_docket_alerts,
-                self.is_monthly_donor,
+                self.is_member,
                 self.user.docket_alerts.subscriptions().count()
                 < settings.MAX_FREE_DOCKET_ALERTS,
             ]
@@ -237,7 +225,7 @@ class UserProfileBarMembership(UserProfile.barmembership.through):
         proxy = True
 
 
-class EMAIL_NOTIFICATIONS(object):
+class EMAIL_NOTIFICATIONS:
     """SES Email Notifications Subtypes"""
 
     UNDETERMINED = 0
@@ -268,7 +256,7 @@ class EMAIL_NOTIFICATIONS(object):
     INVERTED = invert_choices_group_lookup(TYPES)
 
 
-class FLAG_TYPES(object):
+class FLAG_TYPES:
     """EmailFlag Flag Types"""
 
     BAN = 0
@@ -447,7 +435,7 @@ class EmailSent(AbstractDateTimeModel):
         return f"Email: {self.message_id}"
 
 
-class STATUS_TYPES(object):
+class STATUS_TYPES:
     """FailedEmail Status Types"""
 
     WAITING = 0

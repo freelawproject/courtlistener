@@ -68,10 +68,10 @@ def get_queue_length(queue_name: str = "celery") -> int:
         for pri in DEFAULT_PRIORITY_STEPS
     ]
     r = make_redis_interface("CELERY")
-    return sum([r.llen(x) for x in priority_names])
+    return sum(r.llen(x) for x in priority_names)
 
 
-class CeleryThrottle(object):
+class CeleryThrottle:
     """A class for throttling celery."""
 
     def __init__(
@@ -147,7 +147,7 @@ def throttle_task(rate: str, key: str | None = None) -> Callable:
                     raise KeyError(
                         f"Unknown parameter '{key}' in throttle_task "
                         f"decorator of function {task.name}. "
-                        f"`key` parameter must match a parameter "
+                        "`key` parameter must match a parameter "
                         f"name from function signature: '{sig}'"
                     )
             delay = get_task_wait(task, rate, key=key_value)
@@ -270,7 +270,8 @@ def get_task_wait(
     wait until the next open window for processing. If not throttled, returns
     zero (i.e., don't wait).
     """
-    task_sub_key = f"{task.name}{':' + str(key) if key else ''}"
+    task_sub_key_suffix = f":{str(key)}" if key else ""
+    task_sub_key = f"{task.name}{task_sub_key_suffix}"
     throttle_key = f"celery_throttle:{task_sub_key}"
 
     r = make_redis_interface("CACHE")

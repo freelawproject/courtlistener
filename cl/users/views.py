@@ -3,8 +3,8 @@ import logging
 from collections import OrderedDict
 from datetime import timedelta
 from email.utils import parseaddr
-from json import JSONDecodeError
 
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import logout, update_session_auth_hash
@@ -155,31 +155,29 @@ def view_notes(request: AuthenticatedHttpRequest) -> HttpResponse:
     docket_search_url = (
         "/?type=r&q=xxx AND docket_id:("
         + " OR ".join(
-            [str(a.instance.docket_id.pk) for a in note_forms["Dockets"]]
+            str(a.instance.docket_id.pk) for a in note_forms["Dockets"]
         )
         + ")"
     )
     oral_search_url = (
         "/?type=oa&q=xxx AND id:("
         + " OR ".join(
-            [str(a.instance.audio_id.pk) for a in note_forms["Oral Arguments"]]
+            str(a.instance.audio_id.pk) for a in note_forms["Oral Arguments"]
         )
         + ")"
     )
     recap_search_url = (
         "/?type=r&q=xxx AND docket_entry_id:("
         + " OR ".join(
-            [
-                str(a.instance.recap_doc_id.pk)
-                for a in note_forms["RECAP Documents"]
-            ]
+            str(a.instance.recap_doc_id.pk)
+            for a in note_forms["RECAP Documents"]
         )
         + ")"
     )
     opinion_search_url = (
         "/?q=xxx AND cluster_id:("
         + " OR ".join(
-            [str(a.instance.cluster_id.pk) for a in note_forms["Opinions"]]
+            str(a.instance.cluster_id.pk) for a in note_forms["Opinions"]
         )
         + ")&stat_Precedential=on&stat_Non-Precedential=on&stat_Errata=on&stat_Separate%20Opinion=on&stat_In-chambers=on&stat_Relating-to%20orders=on&stat_Unknown%20Status=on"
     )
@@ -204,7 +202,7 @@ def view_donations(request: AuthenticatedHttpRequest) -> HttpResponse:
     return TemplateResponse(
         request,
         "profile/donations.html",
-        {"page": "profile_donations", "private": True},
+        {"page": "profile_your_support", "private": True},
     )
 
 
@@ -535,7 +533,7 @@ def register(request: HttpRequest) -> HttpResponse:
                     email["from_email"],
                     email["to"],
                 )
-                tally_stat("user.created")
+                async_to_sync(tally_stat)("user.created")
                 get_str = "?next=%s&email=%s" % (
                     urlencode(redirect_to),
                     urlencode(user.email),

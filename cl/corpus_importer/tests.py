@@ -27,6 +27,9 @@ from cl.corpus_importer.factories import (
     RssDocketEntryDataFactory,
 )
 from cl.corpus_importer.import_columbia.columbia_utils import fix_xml_tags
+from cl.corpus_importer.import_columbia.parse_opinions import (
+    get_state_court_object,
+)
 from cl.corpus_importer.management.commands.clean_up_mis_matched_dockets import (
     find_and_fix_mis_matched_dockets,
 )
@@ -1079,9 +1082,15 @@ class TrollerBKTests(TestCase):
             pacer_case_id="12524",
         )
 
+    @classmethod
+    def restart_troller_log(cls):
+        r = make_redis_interface("STATS")
+        key = r.keys("troller_bk:log")
+        if key:
+            r.delete(*key)
+
     def setUp(self) -> None:
-        self.r = make_redis_interface("STATS")
-        self.r.flushdb()
+        self.restart_troller_log()
 
     def test_merge_district_rss_before_2018(self):
         """1 Test merge district RSS file before 2018-4-20 into an existing
@@ -1743,7 +1752,7 @@ class TrollerBKTests(TestCase):
         self.assertEqual(last_values["total_rds"], 180)
         self.assertEqual(last_values["last_line"], 100)
 
-        self.r.flushdb()
+        self.restart_troller_log()
 
     def test_merge_mapped_court_rss_before_2018(self):
         """Merge a court mapped RSS file before 2018-4-20

@@ -429,7 +429,7 @@
 
   {% if docket.clusters.count %}
     <div class="col-xs-6">
-      <h3>Opinions Outside of RECAP Collection</h3>
+      <h3>Opinions from our Case Law Database</h3>
       <hr class="top">
       <ul>
         {% for cluster in docket.clusters.all %}
@@ -496,6 +496,14 @@
         <li class="{% block nav-idb %}inactive{% endblock %}"
             role="presentation">
           <a href="{% url "docket_idb_data" docket_id=docket.pk slug=docket.slug %}"><i class="fa fa-info-circle"></i>&nbsp;FJC Integrated Database
+          </a>
+        </li>
+        {% endif %}
+
+        {% if authorities %}
+        <li class="{% block nav-authorities %}inactive{% endblock %}"
+            role="presentation">
+          <a href="{% url "docket_authorities" docket_id=docket.pk slug=docket.slug %}">Authorities
           </a>
         </li>
         {% endif %}

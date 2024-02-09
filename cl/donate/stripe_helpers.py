@@ -15,11 +15,7 @@ from stripe.stripe_object import StripeObject
 
 from cl.donate.models import PROVIDERS, Donation
 from cl.donate.types import StripeChargeObject, StripeEventObject
-from cl.donate.utils import (
-    PaymentFailureException,
-    send_big_donation_email,
-    send_thank_you_email,
-)
+from cl.donate.utils import PaymentFailureException, send_thank_you_email
 from cl.users.utils import create_stub_account
 
 logger = logging.getLogger(__name__)
@@ -154,7 +150,6 @@ def send_thank_you_if_needed(d: Donation, charge: StripeChargeObject) -> None:
     payment_type = charge["metadata"]["type"]
     recurring = charge["metadata"].get("recurring", False)
     send_thank_you_email(d, payment_type, recurring=recurring)
-    send_big_donation_email(d, payment_type, recurring=recurring)
 
 
 def update_donation_for_event(
@@ -198,7 +193,7 @@ def update_donation_for_event(
         logger.info(f"A dispute on charge {charge['id']} has been updated.")
     elif event["type"].endswith("dispute.funds_withdrawn"):
         logger.info(
-            f"Funds for the stripe dispute on charge "
+            "Funds for the stripe dispute on charge "
             f"{charge['charge']} have been withdrawn"
         )
     elif event["type"].endswith("dispute.closed"):
@@ -245,7 +240,6 @@ def process_stripe_payment(
     amount: int,
     email: str,
     kwargs: Dict[str, Union[str, bool, Dict[str, str]]],
-    stripe_redirect_url: str,
 ) -> Dict[str, Union[str, int]]:
     """Process a stripe payment.
 
@@ -279,7 +273,6 @@ def process_stripe_payment(
         response = {
             "status": Donation.AWAITING_PAYMENT,
             "payment_id": charge.id,
-            "redirect": stripe_redirect_url,
         }
     except (stripe.error.CardError, stripe.error.InvalidRequestError) as e:
         logger.info(f"Stripe was unable to process the payment: {e}")

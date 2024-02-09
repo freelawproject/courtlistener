@@ -5,6 +5,7 @@ from rest_framework.exceptions import ParseError
 from cl.lib import search_utils
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
+    do_count_query,
     merge_unavailable_fields_on_parent_document,
 )
 from cl.lib.scorched_utils import ExtraSolrInterface
@@ -29,8 +30,6 @@ def get_object_list(request, cd, paginator):
     if cd["type"] == SEARCH_TYPES.DOCKETS:
         group = True
 
-    total_query_results = 0
-
     is_oral_argument_active = cd[
         "type"
     ] == SEARCH_TYPES.ORAL_ARGUMENT and waffle.flag_is_active(
@@ -50,9 +49,8 @@ def get_object_list(request, cd, paginator):
     if search_query:
         (
             main_query,
-            total_query_results,
+            child_docs_count_query,
             top_hits_limit,
-            total_child_results,
         ) = build_es_main_query(search_query, cd)
     else:
         main_query = search_utils.build_main_query(
@@ -66,7 +64,6 @@ def get_object_list(request, cd, paginator):
     if is_oral_argument_active or is_people_active:
         sl = ESList(
             main_query=main_query,
-            count=total_query_results,
             offset=offset,
             page_size=page_size,
             type=cd["type"],
@@ -77,26 +74,23 @@ def get_object_list(request, cd, paginator):
     return sl
 
 
-class ESList(object):
+class ESList:
     """This class implements a yielding list object that fetches items from ES
     as they are queried.
     """
 
-    def __init__(
-        self, main_query, count, offset, page_size, type, length=None
-    ):
-        super(ESList, self).__init__()
+    def __init__(self, main_query, offset, page_size, type, length=None):
+        super().__init__()
         self.main_query = main_query
         self.offset = offset
         self.page_size = page_size
         self.type = type
-        self.count = count
         self._item_cache = []
         self._length = length
 
     def __len__(self):
         if self._length is None:
-            self._length = self.count
+            self._length = do_count_query(self.main_query)
         return self._length
 
     def __iter__(self):
@@ -115,7 +109,11 @@ class ESList(object):
 
         # Merge unavailable fields in ES by pulling data from the DB to make
         # the API backwards compatible
-        merge_unavailable_fields_on_parent_document(results, self.type, "api")
+        if self.type == SEARCH_TYPES.PEOPLE:
+            merge_unavailable_fields_on_parent_document(
+                results, self.type, "api"
+            )
+
         # Pull the text snippet up a level
         for result in results:
             if hasattr(result.meta, "highlight") and hasattr(
@@ -151,13 +149,13 @@ class ESList(object):
         self._item_cache.append(p_object)
 
 
-class SolrList(object):
+class SolrList:
     """This implements a yielding list object that fetches items as they are
     queried.
     """
 
     def __init__(self, main_query, offset, type, length=None):
-        super(SolrList, self).__init__()
+        super().__init__()
         self.main_query = main_query
         self.offset = offset
         self.type = type
@@ -230,7 +228,7 @@ class SolrList(object):
         self._item_cache.append(p_object)
 
 
-class ResultObject(object):
+class ResultObject:
     def __init__(self, initial=None):
         self.__dict__["_data"] = initial or {}
 
