@@ -2191,13 +2191,13 @@ setuptools = "*"
 
 [[package]]
 name = "juriscraper"
-version = "2.5.90"
+version = "2.5.92"
 description = "An API to scrape American court websites for metadata."
 optional = false
 python-versions = "*"
 files = [
-    {file = "juriscraper-2.5.90-py27-none-any.whl", hash = "sha256:ebbb5638b68ea24e89719ef2cf6852225c0b98cd0f33f4f67fade4670a6895f5"},
-    {file = "juriscraper-2.5.90.tar.gz", hash = "sha256:f07a898e7459879fc74c6225e6e88a12424d100998c44ff25f1d93fa533eea0b"},
+    {file = "juriscraper-2.5.92-py27-none-any.whl", hash = "sha256:a3193e12726eae0a3eb196e197b4c1607260389da3b434828714d92349d9f93f"},
+    {file = "juriscraper-2.5.92.tar.gz", hash = "sha256:b2d3d88e15d75649b8680fcc30e6c9d8454c8133d3e60deedd93787aa5f6b8e7"},
 ]
 
 [package.dependencies]
@@ -3879,13 +3879,13 @@ files = [
 
 [[package]]
 name = "reporters-db"
-version = "3.2.40"
+version = "3.2.41"
 description = "Database of Court Reporters"
 optional = false
 python-versions = "*"
 files = [
-    {file = "reporters-db-3.2.40.tar.gz", hash = "sha256:35aa31cee6a92e8bb09d958b0b522b4fedf6a8ab8dcfdd2c7fba22611663217f"},
-    {file = "reporters_db-3.2.40-py2.py3-none-any.whl", hash = "sha256:33fdf123332347986f7b6bb35843a5d0eadc5a8c4643907e4258a0a91ae46451"},
+    {file = "reporters-db-3.2.41.tar.gz", hash = "sha256:718ba185b32d323830243c54474174dca2f2ab0325af36d8f372c0df2601dfdd"},
+    {file = "reporters_db-3.2.41-py2.py3-none-any.whl", hash = "sha256:c25182e4d14fabde3df6ed61488b35e75924b4d3be17478add370eda8b44bd21"},
 ]
 
 [package.dependencies]
