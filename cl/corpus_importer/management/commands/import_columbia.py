@@ -9,6 +9,7 @@ filepath
 michigan/supreme_court_opinions/documents/d5a484f1bad20ba0.xml
 
 """
+
 import os
 from datetime import timedelta
 from typing import Optional
@@ -165,9 +166,11 @@ def add_new_case(item: dict) -> None:
         case_name_short=item["case_name_short"] or "",
         case_name=item["case_name"] or "",
         case_name_full=item["case_name_full"] or "",
-        docket_number=clean_docket_number(item["docket_number"])
-        if item["docket_number"]
-        else None,
+        docket_number=(
+            clean_docket_number(item["docket_number"])
+            if item["docket_number"]
+            else None
+        ),
     )
 
     cluster = OpinionCluster(
@@ -182,9 +185,11 @@ def add_new_case(item: dict) -> None:
         source=SOURCES.COLUMBIA_ARCHIVE,
         attorneys=item["attorneys"] or "",
         posture=item["posture"] or "",
-        syllabus=convert_columbia_html(item["syllabus"], opinion_index=99)
-        if item.get("syllabus")
-        else "",
+        syllabus=(
+            convert_columbia_html(item["syllabus"], opinion_index=99)
+            if item.get("syllabus")
+            else ""
+        ),
     )
 
     new_opinions = []
@@ -195,9 +200,11 @@ def add_new_case(item: dict) -> None:
 
         opinion = Opinion(
             author=author,
-            author_str=titlecase(opinion_info["byline"])
-            if opinion_info["byline"]
-            else "",
+            author_str=(
+                titlecase(opinion_info["byline"])
+                if opinion_info["byline"]
+                else ""
+            ),
             per_curiam=opinion_info["per_curiam"],
             type=opinion_info["type"],
             html_columbia=convert_columbia_html(
@@ -337,9 +344,7 @@ def import_opinion(filepath: str) -> None:
         return
 
     try:
-        possible_match = find_duplicates(
-            columbia_data, valid_citations
-        )
+        possible_match = find_duplicates(columbia_data, valid_citations)
     except ZeroDivisionError:
         logger.warning(
             f"It is not possible to find duplicates, the opinion is probably "
@@ -351,7 +356,8 @@ def import_opinion(filepath: str) -> None:
         # Log a message if we have a possible match, avoid adding
         # incorrect data
         logger.info(
-            f"Match found: {possible_match.pk} for columbia file: {filepath}")
+            f"Match found: {possible_match.pk} for columbia file: {filepath}"
+        )
         return
 
     # No match for the file, create new case
