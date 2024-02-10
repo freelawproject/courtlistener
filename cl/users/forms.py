@@ -104,10 +104,18 @@ class UserForm(ModelForm):
         )
         widgets = {
             "first_name": forms.TextInput(
-                attrs={"class": "form-control", "autocomplete": "given-name"}
+                attrs={
+                    "class": "form-control",
+                    "autocomplete": "given-name",
+                    "required": True,
+                }
             ),
             "last_name": forms.TextInput(
-                attrs={"class": "form-control", "autocomplete": "family-name"}
+                attrs={
+                    "class": "form-control",
+                    "autocomplete": "family-name",
+                    "required": True,
+                }
             ),
         }
 
