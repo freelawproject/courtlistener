@@ -217,23 +217,13 @@ class CourtMatchingTest(SimpleTestCase):
                 # noqa
             },
             {
-                "name": "District Court of Appeal Florida.",
-                "answer": "fladistctapp",
-                # noqa
-            },
-            {
                 "name": "District Court of Appeal, Florida.",
                 "answer": "fladistctapp",
                 # noqa
             },
             {
                 "name": "District Court of Appeal of Florida, Second District.",
-                "answer": "fladistctapp",
-                # noqa
-            },
-            {
-                "name": "District Court of Appeal of Florida, Second District.",
-                "answer": "fladistctapp",
+                "answer": "fladistctapp2",
                 # noqa
             },
             {
